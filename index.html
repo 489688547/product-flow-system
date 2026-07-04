@@ -1752,7 +1752,7 @@
       screen.classList.toggle("hidden", !!currentUser);
       const checkButton = document.getElementById("dingCheck");
       const loginButton = document.getElementById("dingLogin");
-      if (checkButton) checkButton.onclick = checkDingTalkEnvironment;
+      if (checkButton) checkButton.onclick = () => checkDingTalkEnvironment({ loginWhenReady: true });
       if (loginButton) loginButton.onclick = () => attemptDingTalkLogin({ force: true });
       if (!currentUser && !dingAutoLoginTried) {
         dingAutoLoginTried = true;
@@ -1795,20 +1795,43 @@
       const inDingTalk = /DingTalk|AliApp\(DingTalk/i.test(ua);
       return { corpId, hasDd, inDingTalk, ua };
     }
-    async function checkDingTalkEnvironment() {
+    function hasDingAuthApi(api = window.dd) {
+      return !!(api && (api.runtime?.permission?.requestAuthCode || api.getAuthCode));
+    }
+    function waitForDingApi(timeout = 6000) {
+      return new Promise((resolve, reject) => {
+        if (hasDingAuthApi()) {
+          resolve(window.dd);
+          return;
+        }
+        const started = Date.now();
+        const timer = setInterval(() => {
+          if (hasDingAuthApi()) {
+            clearInterval(timer);
+            resolve(window.dd);
+            return;
+          }
+          if (Date.now() - started >= timeout) {
+            clearInterval(timer);
+            reject(new Error("钉钉 JSAPI 未加载完成，请关闭后从钉钉工作台重新打开。"));
+          }
+        }, 150);
+      });
+    }
+    async function checkDingTalkEnvironment({ loginWhenReady = false } = {}) {
       const env = detectDingTalkEnvironment();
       let backend = null;
-      setDingStatus("正在检测钉钉环境和本地服务...");
+      setDingStatus("正在检测钉钉环境和服务端配置...");
       try {
         const res = await fetch(`${dingApiBase()}/api/dingtalk/config`);
         backend = await res.json();
       } catch (e) {
-        backend = { configured: false, message: "本地钉钉服务未启动" };
+        backend = { configured: false, message: "钉钉登录服务不可用" };
       }
       if (!env.inDingTalk) {
         const serviceText = backend.configured
-          ? "本地服务已配置。"
-          : `本地服务${backend.message ? `：${backend.message}` : "未完成配置"}${backend.missing?.length ? `，缺少 ${backend.missing.join("、")}` : ""}。`;
+          ? "服务端已配置。"
+          : `服务端${backend.message ? `：${backend.message}` : "未完成配置"}${backend.missing?.length ? `，缺少 ${backend.missing.join("、")}` : ""}。`;
         setDingStatus(`当前不是钉钉客户端环境。${serviceText}正式登录需要从钉钉工作台 H5 微应用入口打开。`, "warn");
         return { env, backend };
       }
@@ -1820,7 +1843,8 @@
         setDingStatus(`已检测到钉钉环境和 corpId，但服务端缺少配置：${(backend.missing || []).join("、") || backend.message || "AppKey/AppSecret"}`, "warn");
         return { env, backend };
       }
-      setDingStatus("钉钉环境、corpId 和本地服务端配置均已就绪。", "ok");
+      setDingStatus(loginWhenReady ? "钉钉环境、corpId 和服务端配置均已就绪，正在进入系统..." : "钉钉环境、corpId 和服务端配置均已就绪。", "ok");
+      if (loginWhenReady) await attemptDingTalkLogin({ force: true });
       return { env, backend };
     }
     function requestDingAuthCode(corpId) {
@@ -1867,15 +1891,21 @@
       toast(`已通过钉钉登录：${currentUser.dingUser.name || currentRole().name}`);
     }
     async function attemptDingTalkLogin({ force = false } = {}) {
-      const env = detectDingTalkEnvironment();
+      let env = detectDingTalkEnvironment();
       if (!env.inDingTalk) {
         if (force) await checkDingTalkEnvironment();
         else setDingStatus("等待钉钉免登：当前浏览器不是钉钉客户端。", "warn");
         return;
       }
-      if (!env.hasDd) {
-        setDingStatus("已在钉钉客户端，但钉钉 JSAPI 未加载完成，请稍后重试。", "warn");
-        return;
+      if (!env.hasDd || !hasDingAuthApi()) {
+        setDingStatus("已在钉钉客户端，正在等待钉钉 JSAPI...");
+        try {
+          await waitForDingApi();
+          env = detectDingTalkEnvironment();
+        } catch (error) {
+          setDingStatus(error.message, "warn");
+          return;
+        }
       }
       if (!env.corpId) {
         setDingStatus("缺少 corpId，无法请求钉钉免登码。请在应用首页地址中配置 corpId=$CORPID$。", "warn");
