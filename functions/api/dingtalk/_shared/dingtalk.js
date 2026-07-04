@@ -96,7 +96,7 @@ export function mapDingRole(user = {}) {
     roleNames,
     user.extension
   ].filter(Boolean).join(" ");
-  if (user.boss || user.admin || /老板|总经理|负责人|高层|管理层|创始人/i.test(text)) return "executive";
+  if (user.boss || user.admin || /老板|总经理|管理员|负责人|高层|管理层|创始人/i.test(text)) return "executive";
   if (/产品|产品经理|研发|项目/i.test(text)) return "product";
   if (/运营|店长|投放|直播|内容/i.test(text)) return "ops";
   if (/客服|售后|用户/i.test(text)) return "service";

@@ -1645,9 +1645,9 @@
       readonly: {
         name: "只读访客",
         dept: "访客",
-        desc: "只能查看核心页面，不能新增、删除或编辑数据。",
+        desc: "可以查看需求、产品进度和评审信息，不能新增、删除或编辑数据。",
         icon: "eye",
-        screens: ["dashboard", "products", "reviews", "lifecycle"],
+        screens: ["dashboard", "demands", "products", "workflow", "reviews", "lifecycle"],
         permissions: {}
       }
     };
@@ -1740,6 +1740,10 @@
       try {
         const parsed = JSON.parse(raw);
         if (parsed.expiresAt && Date.now() > Number(parsed.expiresAt)) {
+          localStorage.removeItem("productFlowUser");
+          return null;
+        }
+        if (parsed.source === "dingtalk" && parsed.role === "readonly") {
           localStorage.removeItem("productFlowUser");
           return null;
         }

@@ -33,6 +33,11 @@ test("mapDingRole maps product and finance job text to local permissions", () =>
   assert.equal(mapDingRole({ title: "行政专员" }), "readonly");
 });
 
+test("mapDingRole treats DingTalk administrators and general managers as executives", () => {
+  assert.equal(mapDingRole({ title: "总经理" }), "executive");
+  assert.equal(mapDingRole({ role_list: [{ group_name: "主管理员", name: "管理员" }] }), "executive");
+});
+
 test("publicUser masks mobile and preserves department and role metadata", () => {
   const result = publicUser(
     { userid: "u-1", unionid: "union-1" },
