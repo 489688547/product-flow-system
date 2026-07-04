@@ -1,0 +1,3402 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>产品全周期协同系统</title>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.40/dingtalk.open.js"></script>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --panel-solid: #ffffff;
+      --panel-2: #f4f4f5;
+      --ink: #09090b;
+      --muted: #71717a;
+      --line: #e4e4e7;
+      --line-strong: #d4d4d8;
+      --green: #16a34a;
+      --blue: #2563eb;
+      --gold: #d97706;
+      --red: #dc2626;
+      --violet: #7c3aed;
+      --teal: #0891b2;
+      --control: #ffffff;
+      --control-hover: #f4f4f5;
+      --primary: #18181b;
+      --primary-hover: #27272a;
+      --ring: rgba(37, 99, 235, .22);
+      --shadow: 0 1px 2px rgba(15, 23, 42, .05);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      letter-spacing: 0;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, transform .14s ease; }
+    button:active { transform: scale(.98); }
+    button:focus-visible,
+    .task-link:focus-visible,
+    .sort-button:focus-visible {
+      outline: 3px solid var(--ring);
+      outline-offset: 2px;
+    }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 252px minmax(0, 1fr);
+      gap: 20px;
+      padding: 16px 18px 18px 16px;
+    }
+    .sidebar {
+      position: sticky;
+      top: 16px;
+      height: calc(100vh - 34px);
+      padding: 18px 14px;
+      background: var(--panel);
+      color: var(--ink);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px 16px;
+      border-bottom: 1px solid var(--line);
+    }
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 800;
+      box-shadow: none;
+    }
+    .brand strong { display: block; font-size: 15px; }
+    .brand span { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+    .login-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background: rgba(248, 250, 252, .9);
+      backdrop-filter: blur(18px);
+    }
+    .login-card {
+      width: min(760px, 100%);
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--panel);
+      box-shadow: 0 24px 80px rgba(15, 23, 42, .14);
+      display: grid;
+      gap: 18px;
+    }
+    .login-head {
+      display: grid;
+      grid-template-columns: 44px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+    }
+    .login-head .brand-mark { width: 44px; height: 44px; }
+    .role-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .role-card {
+      min-height: 92px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--control);
+      text-align: left;
+      display: grid;
+      gap: 8px;
+      box-shadow: var(--shadow);
+    }
+    .role-card:hover {
+      border-color: #93c5fd;
+      background: #f8fbff;
+      box-shadow: 0 8px 24px rgba(37, 99, 235, .08);
+    }
+    .role-card strong {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 14px;
+    }
+    .role-card p { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .ding-connect {
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #f8fafc;
+      display: grid;
+      gap: 12px;
+    }
+    .ding-connect-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+    .ding-connect strong { font-size: 14px; }
+    .ding-connect-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .ding-status {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      margin-top: 5px;
+      border-radius: 50%;
+      background: var(--line-strong);
+      flex: 0 0 auto;
+    }
+    .ding-status.ok .status-dot { background: var(--green); }
+    .ding-status.warn .status-dot { background: var(--gold); }
+    .ding-status.error .status-dot { background: var(--red); }
+    .role-divider {
+      height: 1px;
+      background: var(--line);
+    }
+    .user-pill {
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 6px 4px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+    .user-pill span {
+      max-width: 150px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #3f3f46;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .permission-note {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .nav {
+      display: grid;
+      gap: 6px;
+    }
+    .nav button {
+      height: 42px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 11px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #606066;
+      background: transparent;
+      text-align: left;
+    }
+    .nav button:hover { background: var(--panel-2); color: var(--ink); }
+    .nav button.active {
+      background: #eff6ff;
+      color: #1d4ed8;
+      box-shadow: inset 3px 0 0 var(--blue);
+    }
+    .nav i, .btn i, .icon-btn i, .mini-action i { width: 17px; height: 17px; }
+    .main {
+      min-width: 0;
+      padding: 7px 0 22px;
+    }
+    .topbar {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .topbar > div:first-child { min-width: 0; }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 25px; line-height: 1.18; font-weight: 700; }
+    .sub { margin-top: 5px; color: var(--muted); font-size: 13px; }
+    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .toolbar select { width: auto; min-width: 128px; }
+    .date-filter {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .date-filter label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .date-filter input {
+      width: 136px;
+      min-height: 32px;
+      padding: 5px 8px;
+      font-size: 12px;
+    }
+    .date-filter span { color: var(--muted); font-size: 12px; }
+    .btn, .icon-btn, .mini-action {
+      border: 1px solid var(--line);
+      background: var(--control);
+      color: var(--ink);
+      border-radius: 8px;
+      min-height: 36px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 0 12px;
+      font-weight: 600;
+      box-shadow: none;
+    }
+    .btn:hover, .icon-btn:hover, .mini-action:hover { background: var(--control-hover); border-color: var(--line-strong); }
+    .btn.primary {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+      box-shadow: none;
+    }
+    .btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .btn.ghost { background: transparent; border-color: transparent; color: #3f3f46; }
+    .btn.ghost:hover { background: var(--panel-2); }
+    .icon-btn { width: 36px; padding: 0; }
+    .mini-action { min-height: 28px; padding: 0 9px; font-size: 12px; color: #3a3a3c; }
+    .mini-action.icon-only {
+      width: 30px;
+      min-width: 30px;
+      min-height: 30px;
+      padding: 0;
+      gap: 0;
+    }
+    .mini-action.danger {
+      color: #b91c1c;
+      border-color: #fecaca;
+      background: #fff;
+    }
+    .mini-action.danger:hover {
+      color: #991b1b;
+      border-color: #fca5a5;
+      background: #fef2f2;
+    }
+    .mini-action[data-demand-convert],
+    .mini-action[data-demand-finish] {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+    }
+    .mini-action[data-demand-convert]:hover,
+    .mini-action[data-demand-finish]:hover {
+      border-color: var(--primary-hover);
+      background: var(--primary-hover);
+      color: #fff;
+    }
+    .screen { display: none; }
+    .screen.active { display: block; }
+    .grid {
+      display: grid;
+      gap: 14px;
+    }
+    .grid > *, .panel, .card { min-width: 0; }
+    .cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .cols-2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    .layout-main { grid-template-columns: minmax(0, 1fr) 354px; align-items: start; }
+    .panel, .card {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+    .panel { padding: 18px; }
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .panel-head h2 { font-size: 16px; line-height: 1.28; font-weight: 700; }
+    .panel-head h3 { font-size: 15px; line-height: 1.28; font-weight: 700; }
+    .small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .metric {
+      padding: 13px;
+      min-height: 86px;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto 18px;
+      align-items: center;
+      gap: 10px;
+      border-left: 0;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      text-align: left;
+    }
+    .metric:hover { border-color: var(--line-strong); background: #fafafa; }
+    .metric:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
+    .metric-icon {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      color: #3f3f46;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+    }
+    .metric.blue .metric-icon { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+    .metric.gold .metric-icon { color: #a16207; background: #fefce8; border-color: #fde68a; }
+    .metric.red .metric-icon { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+    .metric-icon i,
+    .metric-arrow i { width: 16px; height: 16px; }
+    .metric-body { display: grid; gap: 4px; min-width: 0; }
+    .metric-body span:first-child { color: var(--ink); font-size: 13px; line-height: 1.3; font-weight: 700; }
+    .metric-body span:last-child { color: var(--muted); font-size: 12px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .metric strong { font-size: 22px; line-height: 1; font-weight: 700; letter-spacing: 0; }
+    .metric-arrow { color: #8e8e93; display: grid; place-items: center; }
+    .status-line {
+      display: grid;
+      grid-template-columns: 92px minmax(0, 1fr);
+      align-items: center;
+      gap: 12px;
+      padding: 9px 0;
+      border-top: 1px solid var(--line);
+    }
+    .status-line:first-child { border-top: 0; padding-top: 0; }
+    .status-line .small { font-size: 12px; line-height: 1.4; }
+    .status-line strong {
+      justify-self: end;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      text-align: right;
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 700;
+      color: var(--ink);
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      white-space: nowrap;
+    }
+    .badge.green { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+    .badge.blue { color: #1d4ed8; background: #eff6ff; border-color: #bfdbfe; }
+    .badge.gold { color: #92400e; background: #fffbeb; border-color: #fde68a; }
+    .badge.red { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
+    .badge.violet { color: #6d28d9; background: #f5f3ff; border-color: #ddd6fe; }
+    .progress-track {
+      height: 8px;
+      border-radius: 999px;
+      background: #e4e4e7;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      background: var(--blue);
+      border-radius: 999px;
+      transition: width .22s ease;
+    }
+    .product-list { display: grid; gap: 10px; }
+    .product-list-head {
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) 96px 58px 84px minmax(300px, 420px);
+      gap: 10px;
+      align-items: center;
+      padding: 0 12px 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .product-list-head span:last-child { text-align: right; }
+    .product-row {
+      display: grid;
+      grid-template-columns: minmax(190px, 1fr) 140px 108px 112px 84px;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+    .product-row.archive-row {
+      grid-template-columns: minmax(280px, 1fr) 96px 58px 84px minmax(300px, 420px);
+    }
+    .product-row .table-actions { justify-content: flex-end; }
+    .product-actions {
+      display: grid;
+      grid-template-columns: repeat(6, 30px);
+      justify-content: end;
+      gap: 6px;
+    }
+    .product-row:hover { border-color: var(--line-strong); background: #fafafa; }
+    .product-row.active { border-color: #93c5fd; box-shadow: 0 0 0 3px var(--ring); }
+    .product-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .product-name strong, .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .product-identity {
+      display: grid;
+      grid-template-columns: 58px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      min-width: 0;
+    }
+    .product-identity.compact {
+      grid-template-columns: 36px minmax(0, 1fr);
+      gap: 9px;
+    }
+    .product-thumb {
+      width: 58px;
+      height: 58px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      object-fit: cover;
+      background: var(--panel-2);
+      box-shadow: none;
+    }
+    .product-thumb.small {
+      width: 36px;
+      height: 36px;
+      border-radius: 7px;
+    }
+    .image-field {
+      display: none;
+      grid-template-columns: 96px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+    }
+    .image-field.show { display: grid; }
+    .image-preview {
+      width: 96px;
+      height: 96px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      object-fit: cover;
+      background: var(--panel-2);
+    }
+    .image-tools {
+      display: grid;
+      gap: 8px;
+    }
+    .workflow-product {
+      margin-top: 12px;
+      max-width: 360px;
+    }
+    .stage-map {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(104px, 1fr));
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .stage {
+      min-height: 118px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafafa;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+      position: relative;
+      cursor: pointer;
+    }
+    .stage:hover { border-color: var(--line-strong); background: #fff; }
+    .stage.current {
+      border-color: #93c5fd;
+      background: #eff6ff;
+      box-shadow: none;
+    }
+    .stage.selected {
+      border-color: #60a5fa;
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    .stage.done { background: #fff; color: #52525b; }
+    .stage.locked { opacity: .58; }
+    .stage-num {
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: #e4e4e7;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .stage.current .stage-num { background: var(--blue); color: #fff; }
+    .stage-title { font-weight: 700; font-size: 13px; line-height: 1.28; }
+    .stage-meta { color: var(--muted); font-size: 12px; line-height: 1.38; }
+    .task-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .task-table th, .task-table td {
+      padding: 11px 9px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+      line-height: 1.45;
+    }
+    .task-table th {
+      color: var(--muted);
+      font-weight: 600;
+      background: #fafafa;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+    .task-table tbody tr:hover td { background: #fafafa; }
+    .task-table tr:last-child td { border-bottom: 0; }
+    .task-link {
+      border: 0;
+      background: transparent;
+      color: var(--ink);
+      padding: 0;
+      min-height: 0;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font: inherit;
+      font-weight: 600;
+      line-height: 1.35;
+      text-align: left;
+      cursor: pointer;
+    }
+    .task-link:hover { color: var(--blue); }
+    .task-link i {
+      width: 14px;
+      height: 14px;
+      flex: 0 0 auto;
+    }
+    .stage-editor {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafafa;
+    }
+    .stage-editor-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .stage-editor-title {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .stage-editor-title strong { font-size: 14px; line-height: 1.3; }
+    .stage-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .task-edit-row {
+      display: grid;
+      grid-template-columns: 104px minmax(220px, 1.4fr) 128px 150px 76px 70px 72px;
+      gap: 8px;
+      align-items: center;
+      padding: 8px 0;
+      border-top: 1px solid var(--line);
+    }
+    .task-edit-row.focused {
+      margin: 0 -8px;
+      padding: 8px;
+      border-radius: 8px;
+      border-top-color: transparent;
+      background: #eff6ff;
+      box-shadow: 0 0 0 2px var(--ring);
+    }
+    .task-edit-row:first-child { border-top: 0; padding-top: 0; }
+    .task-edit-row input,
+    .task-edit-row select {
+      min-height: 32px;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+    .task-edit-head {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      padding-bottom: 6px;
+    }
+    .checklist { display: grid; gap: 8px; }
+    .check {
+      display: grid;
+      grid-template-columns: 16px minmax(0,1fr) auto;
+      gap: 9px;
+      align-items: start;
+      width: 100%;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fafafa;
+      color: var(--ink);
+      text-align: left;
+    }
+    button.check { cursor: pointer; }
+    .check > svg { width: 16px; height: 16px; margin-top: 2px; color: #52525b; }
+    .check strong { font-size: 13px; line-height: 1.35; font-weight: 700; }
+    .check .badge { min-height: 22px; min-width: 22px; padding: 0 7px; font-size: 11px; }
+    .check:hover { background: #fff; border-color: var(--line-strong); }
+    .check input { margin-top: 2px; }
+    .check.done { color: var(--muted); }
+    .section-gap { margin-top: 14px; }
+    .span-all { grid-column: 1 / -1; }
+    .task-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      min-width: 0;
+    }
+    .task-label span { min-width: 0; }
+    .package-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+      gap: 14px;
+      min-height: 260px;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .package-grid.dragging {
+      border-color: #93c5fd;
+      background: #eff6ff;
+    }
+    .file-card {
+      padding: 10px;
+      display: grid;
+      gap: 8px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      min-height: 214px;
+    }
+    .file-preview {
+      height: 104px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      display: grid;
+      place-items: center;
+      color: #52525b;
+      overflow: hidden;
+    }
+    .file-preview svg { width: 38px; height: 38px; }
+    .file-preview img {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: cover;
+    }
+    .file-preview.image { background: #f0fdf4; color: #166534; }
+    .file-preview.video { background: #fef2f2; color: #991b1b; }
+    .file-preview.link { background: #eff6ff; color: #1d4ed8; }
+    .file-name {
+      font-weight: 700;
+      font-size: 13px;
+      line-height: 1.3;
+      min-height: 34px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .demand-board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .demand-card {
+      padding: 14px;
+      min-height: 196px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: var(--panel);
+    }
+    .demand-card h3 { font-size: 15px; line-height: 1.25; }
+    .demand-card .small { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .demand-card-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+    }
+    .demand-status-control {
+      min-height: 30px;
+      width: auto;
+      max-width: 112px;
+      padding: 4px 24px 4px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+      background-color: var(--control);
+    }
+    .demand-next {
+      padding: 9px;
+      border-radius: 8px;
+      background: #fafafa;
+      border: 1px solid var(--line);
+    }
+    .linked-product {
+      padding: 9px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #fff;
+    }
+    .demand-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+    .demand-table { min-width: 920px; }
+    .demand-table td { vertical-align: middle; }
+    .sort-button {
+      width: 100%;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      color: inherit;
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 5px;
+      min-height: 24px;
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+      box-shadow: none;
+    }
+    .sort-button:hover { color: var(--ink); background: transparent; }
+    .sort-button i { width: 13px; height: 13px; color: #8e8e93; }
+    .table-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border-radius: 8px;
+    }
+    .deliverable {
+      padding: 13px;
+      min-height: 152px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      background: var(--panel);
+    }
+    .deliverable-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .deliverable h3 { font-size: 15px; line-height: 1.25; }
+    .review-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .review-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .minute-doc {
+      width: min(860px, 100%);
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 28px 34px;
+      display: grid;
+      gap: 16px;
+    }
+    .minute-doc-title {
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      padding: 0 0 12px;
+      font-size: 22px;
+      font-weight: 700;
+      min-height: 42px;
+      background: transparent;
+    }
+    .minute-doc-meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .minute-doc-body {
+      min-height: 420px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      padding: 4px 0;
+      font-size: 14px;
+      line-height: 1.72;
+    }
+    .review-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .decision-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .decision {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      display: grid;
+      gap: 8px;
+    }
+    .decision strong { font-size: 15px; }
+    .rules-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .rules-table th, .rules-table td {
+      border: 1px solid var(--line);
+      padding: 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .rules-table th { background: var(--panel-2); }
+    .lifecycle-list {
+      display: grid;
+      gap: 8px;
+    }
+    .lifecycle-paths {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin-bottom: 12px;
+    }
+    .lifecycle-head,
+    .lifecycle-row {
+      display: grid;
+      grid-template-columns: minmax(190px, 1.3fr) 92px 120px minmax(120px, .75fr) minmax(190px, 1fr) minmax(170px, .9fr);
+      gap: 10px;
+      align-items: center;
+    }
+    .lifecycle-head {
+      padding: 0 10px 6px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .lifecycle-row {
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      font-size: 13px;
+    }
+    .lifecycle-row > *,
+    .lifecycle-head > * { min-width: 0; }
+    .lifecycle-row:hover { border-color: var(--line-strong); }
+    .lifecycle-product-cell {
+      display: grid;
+      gap: 8px;
+    }
+    .product-status-control {
+      min-height: 30px;
+      width: 132px;
+      padding: 4px 24px 4px 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+      background-color: var(--control);
+    }
+    .lifecycle-reason {
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .metric-stack {
+      display: grid;
+      gap: 2px;
+    }
+    .metric-stack.compact {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 4px 10px;
+    }
+    .metric-edit-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px 8px;
+    }
+    .metric-edit-grid label {
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .metric-edit-grid input {
+      min-height: 30px;
+      padding: 5px 7px;
+      font-size: 12px;
+    }
+    .metric-stack strong {
+      font-size: 13px;
+      line-height: 1.2;
+    }
+    .metric-stack span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0,1fr));
+      gap: 10px;
+    }
+    label.field { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line-strong);
+      border-radius: 8px;
+      background: var(--control);
+      color: var(--ink);
+      padding: 9px 10px;
+      min-height: 38px;
+      outline: none;
+    }
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      padding-right: 30px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236e6e73' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 9px center;
+      background-size: 14px 14px;
+    }
+    textarea { resize: vertical; min-height: 86px; line-height: 1.45; }
+    input:focus, select:focus, textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 4px var(--ring); }
+    input[type="checkbox"] {
+      appearance: none;
+      -webkit-appearance: none;
+      width: 14px;
+      min-width: 14px;
+      height: 14px;
+      min-height: 14px;
+      margin: 1px 0 0;
+      padding: 0;
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      background: var(--control);
+      box-shadow: none;
+      display: inline-grid;
+      place-content: center;
+      flex: 0 0 auto;
+      vertical-align: text-top;
+    }
+    input[type="checkbox"]::after {
+      content: "";
+      width: 7px;
+      height: 4px;
+      border-left: 1.8px solid #fff;
+      border-bottom: 1.8px solid #fff;
+      transform: rotate(-45deg) translate(1px, -1px) scale(0);
+      transform-origin: center;
+      transition: transform .12s ease;
+    }
+    input[type="checkbox"]:checked {
+      border-color: var(--primary);
+      background: var(--primary);
+      box-shadow: 0 0 0 3px var(--ring);
+    }
+    input[type="checkbox"]:checked::after { transform: rotate(-45deg) translate(1px, -1px) scale(1); }
+    input[type="checkbox"]:focus { box-shadow: 0 0 0 3px var(--ring); }
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(15, 23, 42, .38);
+      z-index: 20;
+      padding: 20px;
+    }
+    .modal.open { display: flex; }
+    .dialog {
+      width: min(760px, 100%);
+      max-height: calc(100vh - 40px);
+      overflow: auto;
+      background: var(--panel);
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      box-shadow: 0 20px 60px rgba(15,23,42,.18);
+    }
+    .dialog-head, .dialog-foot {
+      padding: 14px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+    }
+    .dialog-foot { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
+    .dialog-body { padding: 16px; }
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      min-width: 240px;
+      max-width: 360px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: #18181b;
+      color: #fff;
+      box-shadow: 0 12px 30px rgba(15,23,42,.22);
+      display: none;
+      z-index: 30;
+      font-size: 13px;
+    }
+    .toast.show { display: block; }
+    .hidden { display: none !important; }
+    .empty {
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      padding: 18px;
+      color: var(--muted);
+      text-align: center;
+      background: var(--panel-2);
+    }
+    .split-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .swatches { display: flex; gap: 6px; }
+    .swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border: 1px solid rgba(0,0,0,.12);
+    }
+    .swatch.green { background: #21805d; }
+    .swatch.blue { background: #246f9e; }
+    .swatch.gold { background: #b87514; }
+    .mobile-tabs { display: none; }
+    @media (max-width: 1100px) {
+      .app { grid-template-columns: 1fr; padding: 12px; }
+      .sidebar {
+        position: static;
+        height: auto;
+        padding: 12px;
+      }
+      .nav { grid-template-columns: repeat(4, minmax(0,1fr)); }
+      .nav button { justify-content: center; }
+      .nav button span { display: none; }
+      .layout-main, .cols-4, .cols-3, .cols-2, .package-grid, .demand-board, .decision-grid, .lifecycle-paths { grid-template-columns: 1fr; }
+      .product-list-head { display: none; }
+      .product-row, .product-row.archive-row { grid-template-columns: 1fr; }
+      .lifecycle-head { display: none; }
+      .lifecycle-row { grid-template-columns: 1fr; align-items: start; }
+      .product-row .table-actions { justify-content: flex-start; }
+      .product-actions { justify-content: start; }
+      .role-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 720px) {
+      .main { padding: 4px 0 16px; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .toolbar { justify-content: flex-start; }
+      .stage-map { grid-template-columns: repeat(7, 150px); }
+      .form-grid { grid-template-columns: 1fr; }
+      .task-table { min-width: 680px; }
+      .stage-editor { overflow-x: auto; }
+      .task-edit-row { grid-template-columns: 104px 240px 128px 150px 76px 70px; min-width: 820px; }
+      .table-wrap { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-screen hidden" id="loginScreen" aria-modal="true" role="dialog">
+    <section class="login-card" aria-labelledby="loginTitle">
+      <div class="login-head">
+        <div class="brand-mark">P</div>
+        <div>
+          <h1 id="loginTitle">产品全周期协同系统</h1>
+          <p class="sub">使用当前钉钉账号进入系统，系统会按组织架构和岗位自动匹配权限。</p>
+        </div>
+      </div>
+      <div class="ding-connect">
+        <div class="ding-connect-head">
+          <div>
+            <strong>钉钉账号免登</strong>
+            <p class="sub">请从钉钉工作台打开本应用，系统会自动获取当前用户身份。</p>
+          </div>
+          <div class="ding-connect-actions">
+            <button class="mini-action" id="dingCheck" type="button"><i data-lucide="radar"></i>检测环境</button>
+            <button class="btn primary" id="dingLogin" type="button"><i data-lucide="log-in"></i>重新登录</button>
+          </div>
+        </div>
+        <div class="ding-status" id="dingStatus"><span class="status-dot"></span><span>正在等待钉钉免登。</span></div>
+      </div>
+      <p class="permission-note">本地会缓存少量账号信息用于保持登录；退出账号后会清除本地登录状态。</p>
+    </section>
+  </div>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">P</div>
+        <div>
+          <strong>产品全周期</strong>
+          <span>流程协同系统</span>
+        </div>
+      </div>
+      <nav class="nav" id="nav">
+        <button class="active" data-screen="dashboard"><i data-lucide="layout-dashboard"></i><span>总览</span></button>
+        <button data-screen="demands"><i data-lucide="inbox"></i><span>需求池</span></button>
+        <button data-screen="products"><i data-lucide="package"></i><span>产品档案</span></button>
+        <button data-screen="workflow"><i data-lucide="git-branch"></i><span>产品进度</span></button>
+        <button data-screen="reviews"><i data-lucide="clipboard-check"></i><span>评审决策</span></button>
+        <button data-screen="lifecycle"><i data-lucide="activity"></i><span>生命周期</span></button>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">产品协同总览</h1>
+          <p class="sub" id="pageSub">只看本周要处理的待办事项和跨产品风险提醒。</p>
+        </div>
+        <div class="toolbar">
+          <select class="hidden" id="statusFilter" title="筛选产品状态">
+            <option value="all">全部状态</option>
+            <option value="开发中">开发中</option>
+            <option value="上市筹备">上市筹备</option>
+            <option value="维持观察">维持观察</option>
+            <option value="清仓中">清仓中</option>
+            <option value="已淘汰">已淘汰</option>
+          </select>
+          <select class="hidden" id="productSelect" title="切换产品"></select>
+          <button class="btn primary hidden" id="newIdea"><i data-lucide="plus"></i>添加机会</button>
+          <div class="user-pill" id="userPill">
+            <span id="userRoleName">未登录</span>
+            <button class="mini-action" id="switchUser" type="button">退出账号</button>
+          </div>
+        </div>
+      </header>
+
+      <section class="screen active" id="dashboard">
+        <div class="grid cols-3" id="metrics"></div>
+        <div class="grid layout-main section-gap">
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>本周待办事项</h2>
+                <p class="small">显示当前阶段未完成事项，同时保留所有逾期待办提醒。</p>
+              </div>
+            </div>
+            <div class="table-wrap">
+              <table class="task-table">
+                <thead>
+                  <tr><th>产品</th><th>任务</th><th>责任部门</th><th>交付物</th><th>截止</th><th>状态</th></tr>
+                </thead>
+                <tbody id="todayTasks"></tbody>
+              </table>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head"><h2>风险提醒</h2><i data-lucide="triangle-alert"></i></div>
+            <div class="checklist" id="riskList"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="screen" id="demands">
+        <div class="grid">
+          <section class="panel">
+            <div class="panel-head"><h2>需求推进规则</h2></div>
+            <div class="decision-grid">
+              <div class="decision"><strong>1. 收集机会</strong><p class="small">任何部门都可以提交一句话、链接、截图或用户反馈。</p></div>
+              <div class="decision"><strong>2. 进入讨论</strong><p class="small">产品部组织运营、品牌、供应链或高层快速判断是否值得继续看。</p></div>
+              <div class="decision"><strong>3. 形成结论</strong><p class="small">明确用户痛点、市场空间、供应链可行性、资源投入和建议等级。</p></div>
+              <div class="decision"><strong>4. 转入开发</strong><p class="small">自动生成产品档案，进入产品立项阶段继续推进。</p></div>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="panel-head">
+              <div>
+                <h2>需求池</h2>
+                <p class="small">先把机会放进来，讨论清楚市场、用户、供应链和资源，再转入产品开发流程。</p>
+              </div>
+              <button class="btn primary" id="addDemand"><i data-lucide="plus"></i>添加机会</button>
+            </div>
+            <div class="demand-board" id="demandBoard"></div>
+            <div class="table-wrap section-gap">
+              <table class="task-table demand-table">
+                <thead>
+                  <tr>
+                    <th><button class="sort-button" type="button" data-demand-sort="name">机会名称<i data-lucide="chevrons-up-down"></i></button></th>
+                    <th><button class="sort-button" type="button" data-demand-sort="status">状态<i data-lucide="chevrons-up-down"></i></button></th>
+                    <th><button class="sort-button" type="button" data-demand-sort="level">等级<i data-lucide="chevrons-up-down"></i></button></th>
+                    <th><button class="sort-button" type="button" data-demand-sort="source">来源<i data-lucide="chevrons-up-down"></i></button></th>
+                    <th><button class="sort-button" type="button" data-demand-sort="owner">负责人<i data-lucide="chevrons-up-down"></i></button></th>
+                    <th><button class="sort-button" type="button" data-demand-sort="created">创建时间<i data-lucide="chevrons-up-down"></i></button></th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="demandTableRows"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="screen" id="products">
+        <div class="product-list">
+          <div class="product-list-head" aria-hidden="true">
+            <span>产品</span><span>状态</span><span>等级</span><span>阶段</span><span>操作</span>
+          </div>
+          <div class="product-list" id="productList"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="workflow">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>产品进度</h2>
+              <p class="small">每个阶段都拆成会前准备、会议/决策、会后交付、下一阶段准入。</p>
+              <div class="workflow-product" id="workflowProduct"></div>
+            </div>
+            <span class="badge blue" id="workflowStage">-</span>
+          </div>
+          <div class="stage-map" id="workflowStageMap"></div>
+          <div class="stage-editor" id="stageEditor"></div>
+        </section>
+      </section>
+
+      <section class="screen" id="deliverables">
+        <div class="panel">
+          <div class="panel-head">
+            <div class="toolbar">
+              <button class="btn ghost" id="backToProducts"><i data-lucide="arrow-left"></i>返回</button>
+            </div>
+            <div class="product-name">
+              <h2>资料包</h2>
+              <p class="small">拖入文件即可加入当前产品资料包。</p>
+            </div>
+          </div>
+          <div class="package-grid" id="deliverableRows"></div>
+        </div>
+      </section>
+
+      <section class="screen" id="reviews">
+        <section class="panel">
+          <div id="reviewList"></div>
+        </section>
+      </section>
+
+      <section class="screen" id="lifecycle">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>生命周期决策标准</h2>
+              <p class="small">第六阶段复盘形成明确决策，第七阶段按路径执行，不让产品进入无人管理状态。</p>
+            </div>
+            <span class="badge violet">复盘规则</span>
+          </div>
+          <div class="decision-grid lifecycle-paths" id="lifecyclePathCards"></div>
+          <div class="table-wrap">
+            <table class="rules-table">
+              <thead><tr><th>维度</th><th>升级</th><th>维持</th><th>清仓退出</th><th>淘汰下架</th></tr></thead>
+              <tbody id="ruleRows"></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="panel section-gap">
+          <div class="panel-head">
+            <div>
+              <h2>产品生命周期列表</h2>
+              <p class="small">先看产品是否已进入复盘，再看明确决策和下一步执行动作。</p>
+            </div>
+          </div>
+          <div class="lifecycle-list" id="lifecycleRows"></div>
+        </section>
+      </section>
+
+    </main>
+  </div>
+
+  <div class="modal" id="modal">
+    <div class="dialog">
+      <div class="dialog-head">
+        <h2 id="modalTitle">添加需求机会</h2>
+        <button class="icon-btn" id="closeModal" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <label class="field">产品/机会名称<input id="formName" placeholder="例如：鹦鹉谷物棒升级版"></label>
+          <label class="field">产品等级
+            <select id="formLevel">
+              <option>P0 重点品</option>
+              <option>P1 常规新品</option>
+              <option>P2 小改/补充品</option>
+              <option>应季品</option>
+            </select>
+          </label>
+          <label class="field">负责人<input id="formOwner" placeholder="产品部"></label>
+          <label class="field">来源部门
+            <select id="formSource">
+              <option>产品部</option><option>运营</option><option>高层</option><option>客服</option><option>品牌</option><option>供应链</option>
+            </select>
+          </label>
+          <label class="field span-all">机会描述<textarea id="formDesc" placeholder="看到什么市场机会、用户痛点、供应链可能性"></textarea></label>
+          <div class="field span-all image-field" id="imageField">
+            <img class="image-preview" id="formImagePreview" alt="产品图片预览">
+            <div class="image-tools">
+              <input id="formImage" type="hidden">
+              <div class="table-actions">
+                <label class="mini-action"><i data-lucide="upload"></i>上传图片<input class="hidden" type="file" id="formImageFile" accept="image/*"></label>
+                <button class="mini-action" type="button" id="regenerateImage"><i data-lucide="sparkles"></i>重新生成封面</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn ghost" id="cancelModal">取消</button>
+        <button class="btn primary" id="saveModal"><i data-lucide="save"></i>保存</button>
+      </div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+  <script>
+    const DATA_MODEL = Object.freeze({
+      Product: "核心对象。承载等级、阶段、状态、负责人、生命周期数据和统一产品图片。",
+      Demand: "需求池机会。讨论完成并转入开发后，通过 productId 关联 Product。",
+      Task: "阶段任务。通过 productId 归属产品，通过 stage 归属 7 个流程阶段。",
+      Deliverable: "资料包文件。通过 productId 归属产品，通过 stage 归属自然产生的流程节点。",
+      Review: "评审会议。通过 productId 归属产品，实际通过状态由会议任务完成 + 会议纪要内容共同决定。",
+      Decision: "会议或生命周期决策记录。通过 productId 回溯到产品。"
+    });
+
+    const stages = [
+      { name: "机会发现与立项准备", short: "机会准备", goal: "把模糊想法变成值得上会的正式提案" },
+      { name: "产品立项", short: "立项", goal: "决定是否做、怎么做、按什么等级做" },
+      { name: "研发与打样", short: "打样研发", goal: "把 PRD 转成可量产的标准样" },
+      { name: "测试验证", short: "测试", goal: "验证产品力、风险和内容素材" },
+      { name: "上市筹备", short: "上市筹备", goal: "统一资料包、实物、时间表和交付物" },
+      { name: "上市与复盘", short: "上市复盘", goal: "看首周、首月和季度表现" },
+      { name: "生命周期管理", short: "生命周期", goal: "升级、维持、清仓或淘汰" }
+    ];
+
+    const stageTemplates = [
+      [
+        ["会前准备", "高层提出战略目标，产品部倒推产品矩阵与排期", "产品部", "产品矩阵建议 / 产品排期表"],
+        ["会前准备", "任何部门提交机会，一句话、链接、截图都可进入机会池", "全员", "机会记录"],
+        ["会议/决策", "5-10 分钟初筛沟通，确认是否值得继续看", "产品 / 运营 / 高层", "初筛结论"],
+        ["会后交付", "供应链摸底成本、周期和可做性", "供应链/采购", "供应链反馈"],
+        ["准入条件", "形成《产品初步想法》，至少一方认为值得继续看", "产品部", "产品初步想法"]
+      ],
+      [
+        ["会前准备", "粗线条调研竞品、差评、供应链和内容卖点", "产品部", "调研笔记"],
+        ["会前准备", "撰写 PRD 草案并提前 2 天发出", "产品部", "PRD 草案"],
+        ["会议/决策", "立项评审会：产品讲 PRD，运营判断销售，高层拍板", "高层 / 产品 / 运营 / 品牌", "立项评审纪要"],
+        ["会后交付", "明确产品等级、首批定量、资源分配和关键 deadline", "产品部", "决策记录"],
+        ["准入条件", "PRD 终版冻结并通知相关方", "产品部", "PRD 终版"]
+      ],
+      [
+        ["会前准备", "整理打样需求，向工厂同步制造素材和测试素材需求", "产品 / 供应链", "打样需求单"],
+        ["会议/决策", "样品内部评审，老板看感觉、运营看卖相、品牌看调性", "高层 / 运营 / 品牌 / 产品", "样品修改意见清单"],
+        ["会前准备", "包装设计需求、初稿评审、终稿确认、包装实样确认", "产品 / 设计 / 品牌 / 运营", "包装设计修改意见"],
+        ["会议/决策", "标准样终审与封样，确认大货唯一标准", "高层 / 产品 / 运营 / 品牌", "标准样封样确认书"],
+        ["准入条件", "品质规格书绑定标准样，必要时启动专利申请", "产品部", "产品品质规格书"]
+      ],
+      [
+        ["会前准备", "制定测试类型、数量、通过标准、周期和反馈方式", "产品部", "产品测试方案"],
+        ["会前准备", "准备样品、内测反馈表，招募内部和外部体验用户", "产品 / 运营 / 客服", "样品分发记录"],
+        ["会后交付", "回收反馈，记录真实使用素材和对比测评素材", "产品部", "内测反馈表"],
+        ["会后交付", "汇总定量评分、好评点、问题点和结论", "产品部", "产品测试验证报告"],
+        ["准入条件", "测试结果评审明确通过、修改后重测或终止", "高层 / 产品 / 运营 / 品牌", "测试结果评审纪要"]
+      ],
+      [
+        ["会前准备", "归档上市版资料包：PRD、品质规格书、测试报告、标准样资料", "产品部", "产品资料包"],
+        ["会前准备", "大货到仓验收，对照标准样和品质规格书抽检", "供应链 / 产品", "大货验收记录"],
+        ["会后交付", "实物分发给运营、设计、品牌、直播、客服并签收", "采购", "样品分发签收表"],
+        ["会议/决策", "上市启动会统一上市日、各部门 deadline 和依赖关系", "产品部 / 全部门", "上市筹备任务清单"],
+        ["准入条件", "各部门交付物按节点产出，上市日期无异议", "产品部", "上市时间轴"]
+      ],
+      [
+        ["会前准备", "运营上架并启动内容和直播排期，客服启用 FAQ", "运营 / 客服", "上架链接 / FAQ"],
+        ["会后交付", "首周汇总销售、流量、转化和用户问题", "运营 / 客服", "首周数据速览"],
+        ["会议/决策", "首月深度复盘，判断推广问题、产品问题或市场变化", "产品 / 运营 / 客服 / 供应链", "首月复盘报告"],
+        ["会议/决策", "季度复盘，结合销量、评分、退货率、利润做去留判断", "高层 / 产品 / 运营", "季度产品决策记录"],
+        ["准入条件", "产品进入明确生命周期状态", "产品部", "生命周期状态"]
+      ],
+      [
+        ["会议/决策", "路径 A：确认升级方向，走简化或完整开发流程", "产品 / 运营 / 供应链", "产品升级方案"],
+        ["会后交付", "路径 B：维持运营，继续监控销量、评分、退货率、利润", "运营 / 产品", "季度数据追踪"],
+        ["会议/决策", "路径 C：制定清仓方案，确认价格、渠道、周期和底线", "产品 / 运营 / 供应链 / 财务", "产品清仓方案"],
+        ["会后交付", "路径 D：下架链接、处理库存、客服知识库更新", "运营 / 供应链 / 客服", "产品下架确认单"],
+        ["准入条件", "归档全生命周期文档和淘汰原因", "产品部", "产品生命周期档案"]
+      ]
+    ];
+
+    const deliverableTemplates = [
+      ["产品初步想法", 0, true], ["产品矩阵建议", 0, false], ["产品排期表", 0, false],
+      ["PRD 草案", 1, true], ["立项评审会议纪要", 1, true], ["PRD 终版", 1, true],
+      ["打样需求单", 2, true], ["样品修改意见清单", 2, true], ["包装设计需求单", 2, false], ["标准样封样确认书", 2, true], ["产品品质规格书", 2, true],
+      ["产品测试方案", 3, true], ["产品内测反馈表", 3, false], ["产品测试验证报告", 3, true], ["测试结果评审纪要", 3, true],
+      ["产品资料包", 4, true], ["产品样品分发签收表", 4, false], ["上市筹备任务清单", 4, true],
+      ["首周数据速览", 5, false], ["首月复盘报告", 5, true], ["季度产品决策记录", 5, true],
+      ["产品升级方案", 6, false], ["产品清仓方案", 6, false], ["产品下架确认单", 6, false], ["产品生命周期档案", 6, true]
+    ];
+
+    const meetingRules = [
+      { id: "planning", title: "规划终审会", stage: 0, minute: "规划终审会议纪要", owner: "高层 / 产品", keywords: ["初筛", "规划终审", "战略目标"], levels: ["P0 重点品"] },
+      { id: "project", title: "立项评审会", stage: 1, minute: "立项评审会议纪要", owner: "高层 / 产品 / 运营", keywords: ["立项评审"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"] },
+      { id: "sample", title: "样品评审会", stage: 2, minute: "样品评审会议纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["样品内部评审", "样品评审"], levels: ["P0 重点品", "P1 常规新品"] },
+      { id: "standard", title: "标准样终审会", stage: 2, minute: "标准样封样确认书", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["标准样终审", "封样"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品"] },
+      { id: "test", title: "测试结果评审会", stage: 3, minute: "测试结果评审纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["测试结果评审"], levels: ["P0 重点品", "P1 常规新品"] },
+      { id: "launch", title: "上市启动会", stage: 4, minute: "上市启动会议纪要", owner: "产品 / 运营 / 品牌 / 供应链", keywords: ["上市启动会"], levels: ["P0 重点品", "P1 常规新品", "应季品"] },
+      { id: "first-month", title: "首月深度复盘会", stage: 5, minute: "首月复盘报告", owner: "产品 / 运营 / 客服 / 供应链", keywords: ["首月深度复盘", "首月复盘"], levels: ["P0 重点品", "P1 常规新品"] },
+      { id: "quarter", title: "季度产品复盘会", stage: 5, minute: "季度产品决策记录", owner: "高层 / 产品 / 运营", keywords: ["季度复盘", "季度产品复盘"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"] },
+      { id: "lifecycle", title: "生命周期决策会", stage: 6, minute: "生命周期决策纪要", owner: "高层 / 产品 / 运营 / 供应链", keywords: ["确认升级方向", "制定清仓方案", "生命周期"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"] }
+    ];
+
+    const rules = [
+      ["销量趋势", "持续上升或稳定高位", "稳定在盈亏平衡线以上", "连续 2 个季度下滑", "连续 2 个季度低于最低阈值"],
+      ["用户评分", "≥4.5 分", "≥4.0 分", "3.5-4.0 分", "<3.5 分且持续下滑"],
+      ["退货率", "≤行业均值", "≤行业均值 1.2 倍", "高于均值 1.5 倍", "高于均值 2 倍以上"],
+      ["利润贡献", "毛利率达标且周转快", "毛利率达标", "毛利率低于标准但有清仓空间", "亏损且无改善可能"]
+    ];
+    const productStatuses = ["开发中", "上市筹备", "维持观察", "清仓中", "已淘汰"];
+    const allScreens = ["dashboard", "demands", "products", "workflow", "reviews", "lifecycle"];
+    const roleProfiles = {
+      executive: {
+        name: "高层 / 老板",
+        dept: "管理层",
+        desc: "查看全部流程，能处理关键评审、生命周期和最终调整。",
+        icon: "crown",
+        screens: allScreens,
+        permissions: {
+          addIdea: true, editDemand: true, convertDemand: true,
+          editProduct: true, deleteProduct: true,
+          editTasks: true, editDocs: true, editReviews: true,
+          editLifecycleStatus: true, editMetrics: true
+        }
+      },
+      product: {
+        name: "产品部",
+        dept: "产品负责人",
+        desc: "管理需求、产品档案、阶段任务、资料包、会议纪要和生命周期。",
+        icon: "badge-check",
+        screens: allScreens,
+        permissions: {
+          addIdea: true, editDemand: true, convertDemand: true,
+          editProduct: true, deleteProduct: true,
+          editTasks: true, editDocs: true, editReviews: true,
+          editLifecycleStatus: true, editMetrics: true
+        }
+      },
+      ops: {
+        name: "运营",
+        dept: "运营部门",
+        desc: "提交和讨论机会，查看产品推进，维护上市后销售、评分、退货等数据。",
+        icon: "trending-up",
+        screens: ["dashboard", "demands", "products", "workflow", "lifecycle"],
+        permissions: {
+          addIdea: true, editDemand: true, editTasks: true,
+          editDocs: true, editMetrics: true, editLifecycleStatus: true
+        }
+      },
+      service: {
+        name: "客服",
+        dept: "客服部门",
+        desc: "录入用户反馈型机会，查看任务和资料，不直接改产品状态。",
+        icon: "headphones",
+        screens: ["dashboard", "demands", "products", "workflow"],
+        permissions: { addIdea: true, editDemand: true }
+      },
+      brand: {
+        name: "品牌 / 设计",
+        dept: "品牌部门",
+        desc: "查看产品、资料和会议，维护包装、图片、内容相关资料。",
+        icon: "palette",
+        screens: ["dashboard", "demands", "products", "workflow", "reviews"],
+        permissions: { addIdea: true, editDemand: true, editDocs: true }
+      },
+      supply: {
+        name: "供应链",
+        dept: "供应链部门",
+        desc: "查看开发进度和生命周期，维护打样、验收、库存相关任务和资料。",
+        icon: "truck",
+        screens: ["dashboard", "products", "workflow", "lifecycle"],
+        permissions: { editTasks: true, editDocs: true, editMetrics: true }
+      },
+      finance: {
+        name: "财务",
+        dept: "财务部门",
+        desc: "查看产品和生命周期，维护利润、清仓相关经营数据。",
+        icon: "calculator",
+        screens: ["dashboard", "products", "lifecycle"],
+        permissions: { editMetrics: true }
+      },
+      readonly: {
+        name: "只读访客",
+        dept: "访客",
+        desc: "只能查看核心页面，不能新增、删除或编辑数据。",
+        icon: "eye",
+        screens: ["dashboard", "products", "reviews", "lifecycle"],
+        permissions: {}
+      }
+    };
+    const lifecyclePaths = {
+      "升级": {
+        title: "路径A：产品升级",
+        condition: "季度复盘决策为升级",
+        action: "确认升级方向，判断小改走简化流程、大改回到打样至上市筹备。",
+        deliverable: "产品升级方案 / 新旧切换方案 / 升级版首月复盘报告",
+        cls: "green"
+      },
+      "维持": {
+        title: "路径B：维持运营",
+        condition: "季度复盘决策为维持",
+        action: "正常运营，持续监控销量、评分、退货率、利润，下季度再次复盘。",
+        deliverable: "季度数据追踪记录 / 季度产品决策记录",
+        cls: "blue"
+      },
+      "清仓退出": {
+        title: "路径C：清仓退出",
+        condition: "季度复盘决策为清仓退出",
+        action: "制定清仓价、渠道、周期和底线，执行清仓并完成下架关闭。",
+        deliverable: "产品清仓方案 / 库存消耗进度表 / 产品下架确认单",
+        cls: "gold"
+      },
+      "淘汰下架": {
+        title: "路径D：淘汰下架",
+        condition: "直接下架或清仓价值极低",
+        action: "各平台下架链接，处理剩余库存，归档淘汰原因和复盘总结。",
+        deliverable: "产品下架确认单 / 产品生命周期档案",
+        cls: "red"
+      }
+    };
+
+    const defaultProducts = [
+      { id: "p1", name: "鹦鹉谷物棒", level: "P1 常规新品", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, launch: "2026-08-15", sales: 0, score: 0, returnRate: 0, profit: 0, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。" },
+      { id: "p2", name: "仓鼠冻干零食", level: "P0 重点品", owner: "叶津成", source: "运营", status: "维持观察", stage: 6, launch: "2026-06-01", sales: 5000, score: 4.6, returnRate: 0.08, profit: 0.32, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。" },
+      { id: "p3", name: "兔用草架旧款", level: "P2 小改/补充品", owner: "赵雨涵", source: "客服", status: "清仓中", stage: 6, launch: "2025-09-20", sales: 300, score: 3.8, returnRate: 0.19, profit: 0.06, desc: "评分下滑，库存进入清仓处理。" }
+    ];
+
+    const defaultDemands = [
+      { id: "d1", name: "鹦鹉站杆升级版", level: "P1 常规新品", owner: "叶津成", source: "客服", status: "待讨论", productId: "", created: "今天", desc: "用户反馈站杆稳定性和清洁便利性有优化空间，需要判断是否做结构升级。", discussion: "待讨论：补充用户痛点、现有差评、供应链可行性和预估成本。" },
+      { id: "d2", name: "仓鼠夏季降温窝", level: "应季品", owner: "赵雨涵", source: "运营", status: "讨论中", productId: "", created: "今天", desc: "夏季搜索和内容热度上升，运营希望提前评估应季品窗口。", discussion: "讨论中：需要确认开发周期、上市窗口、首批铺货和过季库存预案。" },
+      { id: "d3", name: "兔用草架旧款包装微调", level: "P2 小改/补充品", owner: "赵雨涵", source: "品牌", status: "暂缓", productId: "", created: "06-30", desc: "品牌提出包装视觉老旧，但当前清仓优先级更高。", discussion: "暂缓：等库存处理后再判断是否升级包装。" }
+    ];
+
+    const APP_VERSION = "2026-07-03-product-flow-v4";
+    const defaultTodoWeek = currentWeekRange();
+    let state = loadState();
+    let currentId = state.currentId || state.products[0].id;
+    let selectedStage = currentProduct()?.stage || 0;
+    let demandSort = { key: "created", direction: "desc" };
+    let todoDateRange = { start: formatDateInput(defaultTodoWeek.start), end: formatDateInput(defaultTodoWeek.end) };
+    let modalMode = "idea";
+    let focusedTaskId = "";
+    let editingId = "";
+    let activeMinuteDocId = "";
+    let currentUser = loadUser();
+    let dingAutoLoginTried = false;
+
+    function loadState() {
+      const raw = localStorage.getItem("productFlowState");
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.version === APP_VERSION) return normalizeState(parsed);
+        } catch (e) {}
+      }
+      return normalizeState({
+        version: APP_VERSION,
+        currentId: "p1",
+        demands: defaultDemands,
+        products: defaultProducts,
+        tasks: buildInitialTasks(defaultProducts),
+        deliverables: buildInitialDeliverables(defaultProducts),
+        reviews: buildInitialReviews(defaultProducts),
+        decisions: [
+          { id: cryptoId(), productId: "p1", title: "立项评审通过", body: "按 P1 常规新品推进，首批按 2 个月销量预估，进入打样研发阶段。", date: "2026-06-24" },
+          { id: cryptoId(), productId: "p2", title: "首月复盘结论", body: "销量达标、评分较高，建议维持观察并准备加大推广。", date: "2026-07-01" }
+        ]
+      });
+    }
+    function saveState() {
+      state.currentId = currentId;
+      localStorage.setItem("productFlowState", JSON.stringify(state));
+    }
+    function loadUser() {
+      const raw = localStorage.getItem("productFlowUser");
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed.expiresAt && Date.now() > Number(parsed.expiresAt)) {
+          localStorage.removeItem("productFlowUser");
+          return null;
+        }
+        return parsed && roleProfiles[parsed.role] ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    function currentRole() {
+      return currentUser && roleProfiles[currentUser.role] ? roleProfiles[currentUser.role] : roleProfiles.readonly;
+    }
+    function can(permission) {
+      return !!currentRole().permissions[permission];
+    }
+    function denyIfCannot(permission, message = "当前账号没有这个操作权限。") {
+      if (can(permission)) return false;
+      toast(message);
+      return true;
+    }
+    function screenAllowed(screen) {
+      if (screen === "deliverables") return currentRole().screens.includes("products");
+      return currentRole().screens.includes(screen);
+    }
+    function firstAllowedScreen() {
+      return currentRole().screens[0] || "dashboard";
+    }
+    function loginAs(roleKey) {
+      if (!roleProfiles[roleKey]) return;
+      currentUser = { role: roleKey, source: "manual", expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000 };
+      localStorage.setItem("productFlowUser", JSON.stringify(currentUser));
+      renderAll();
+      navigateToScreen(firstAllowedScreen());
+      toast(`已切换为：${roleProfiles[roleKey].name}`);
+    }
+    function logoutUser() {
+      currentUser = null;
+      localStorage.removeItem("productFlowUser");
+      renderLogin();
+    }
+    function renderLogin() {
+      const screen = document.getElementById("loginScreen");
+      if (!screen) return;
+      screen.classList.toggle("hidden", !!currentUser);
+      const checkButton = document.getElementById("dingCheck");
+      const loginButton = document.getElementById("dingLogin");
+      if (checkButton) checkButton.onclick = checkDingTalkEnvironment;
+      if (loginButton) loginButton.onclick = () => attemptDingTalkLogin({ force: true });
+      if (!currentUser && !dingAutoLoginTried) {
+        dingAutoLoginTried = true;
+        setTimeout(() => attemptDingTalkLogin({ force: false }), 200);
+      }
+      if (window.lucide) lucide.createIcons();
+    }
+    function applyPermissions() {
+      const role = currentRole();
+      document.querySelectorAll("#nav button[data-screen]").forEach(btn => {
+        btn.classList.toggle("hidden", !screenAllowed(btn.dataset.screen));
+      });
+      const name = document.getElementById("userRoleName");
+      if (name) {
+        const dingName = currentUser?.dingUser?.name || currentUser?.dingUser?.userid || "";
+        name.textContent = currentUser ? `${dingName ? `${dingName} · ` : ""}${role.name}` : "未登录";
+      }
+      const addDemandButton = document.getElementById("addDemand");
+      if (addDemandButton) addDemandButton.classList.toggle("hidden", !can("addIdea"));
+      const newIdeaButton = document.getElementById("newIdea");
+      if (newIdeaButton && !can("addIdea")) newIdeaButton.classList.add("hidden");
+      renderLogin();
+    }
+    function dingApiBase() {
+      const isLocal = ["127.0.0.1", "localhost", ""].includes(location.hostname);
+      if (location.protocol === "file:" || (isLocal && location.port !== "8127")) return "http://127.0.0.1:8127";
+      return "";
+    }
+    function setDingStatus(text, type = "") {
+      const el = document.getElementById("dingStatus");
+      if (!el) return;
+      el.className = `ding-status ${type}`.trim();
+      el.innerHTML = `<span class="status-dot"></span><span>${esc(text)}</span>`;
+    }
+    function detectDingTalkEnvironment() {
+      const params = new URLSearchParams(location.search);
+      const corpId = params.get("corpId") || params.get("corpid") || window.dd?.corpId || "";
+      const ua = navigator.userAgent || "";
+      const hasDd = !!window.dd;
+      const inDingTalk = /DingTalk|AliApp\(DingTalk/i.test(ua);
+      return { corpId, hasDd, inDingTalk, ua };
+    }
+    async function checkDingTalkEnvironment() {
+      const env = detectDingTalkEnvironment();
+      let backend = null;
+      setDingStatus("正在检测钉钉环境和本地服务...");
+      try {
+        const res = await fetch(`${dingApiBase()}/api/dingtalk/config`);
+        backend = await res.json();
+      } catch (e) {
+        backend = { configured: false, message: "本地钉钉服务未启动" };
+      }
+      if (!env.inDingTalk) {
+        const serviceText = backend.configured
+          ? "本地服务已配置。"
+          : `本地服务${backend.message ? `：${backend.message}` : "未完成配置"}${backend.missing?.length ? `，缺少 ${backend.missing.join("、")}` : ""}。`;
+        setDingStatus(`当前不是钉钉客户端环境。${serviceText}正式登录需要从钉钉工作台 H5 微应用入口打开。`, "warn");
+        return { env, backend };
+      }
+      if (!env.corpId) {
+        setDingStatus(`已检测到钉钉客户端，但没有拿到 corpId。H5 微应用首页地址需要带 corpId=$CORPID$ 参数。${backend.callbackUrl ? `本地回调示例：${backend.callbackUrl}` : ""}`, "warn");
+        return { env, backend };
+      }
+      if (!backend.configured) {
+        setDingStatus(`已检测到钉钉环境和 corpId，但服务端缺少配置：${(backend.missing || []).join("、") || backend.message || "AppKey/AppSecret"}`, "warn");
+        return { env, backend };
+      }
+      setDingStatus("钉钉环境、corpId 和本地服务端配置均已就绪。", "ok");
+      return { env, backend };
+    }
+    function requestDingAuthCode(corpId) {
+      return new Promise((resolve, reject) => {
+        const api = window.dd;
+        if (!api) {
+          reject(new Error("未检测到钉钉 JSAPI"));
+          return;
+        }
+        const done = result => {
+          const code = result?.code || result?.authCode;
+          if (code) resolve(code);
+          else reject(new Error("钉钉未返回免登授权码"));
+        };
+        const fail = error => reject(new Error(typeof error === "string" ? error : JSON.stringify(error || {})));
+        const run = () => {
+          if (api.runtime?.permission?.requestAuthCode) {
+            api.runtime.permission.requestAuthCode({ corpId, onSuccess: done, onFail: fail });
+            return;
+          }
+          if (api.getAuthCode) {
+            api.getAuthCode({ corpId, success: done, fail });
+            return;
+          }
+          fail("当前钉钉 JSAPI 不支持免登授权码");
+        };
+        if (api.ready) api.ready(run);
+        else run();
+        if (api.error) api.error(fail);
+      });
+    }
+    function persistDingUser(payload) {
+      const roleKey = roleProfiles[payload.role] ? payload.role : "readonly";
+      currentUser = {
+        role: roleKey,
+        source: "dingtalk",
+        dingUser: payload.user || {},
+        org: payload.org || {},
+        expiresAt: Date.now() + 7 * 24 * 60 * 60 * 1000
+      };
+      localStorage.setItem("productFlowUser", JSON.stringify(currentUser));
+      renderAll();
+      navigateToScreen(firstAllowedScreen());
+      toast(`已通过钉钉登录：${currentUser.dingUser.name || currentRole().name}`);
+    }
+    async function attemptDingTalkLogin({ force = false } = {}) {
+      const env = detectDingTalkEnvironment();
+      if (!env.inDingTalk) {
+        if (force) await checkDingTalkEnvironment();
+        else setDingStatus("等待钉钉免登：当前浏览器不是钉钉客户端。", "warn");
+        return;
+      }
+      if (!env.hasDd) {
+        setDingStatus("已在钉钉客户端，但钉钉 JSAPI 未加载完成，请稍后重试。", "warn");
+        return;
+      }
+      if (!env.corpId) {
+        setDingStatus("缺少 corpId，无法请求钉钉免登码。请在应用首页地址中配置 corpId=$CORPID$。", "warn");
+        return;
+      }
+      try {
+        setDingStatus("正在向钉钉请求免登授权码...");
+        const authCode = await requestDingAuthCode(env.corpId);
+        setDingStatus("已拿到免登码，正在向服务端换取用户身份...");
+        const res = await fetch(`${dingApiBase()}/api/dingtalk/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ authCode, corpId: env.corpId })
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload.message || "钉钉服务端登录失败");
+        persistDingUser(payload);
+      } catch (error) {
+        setDingStatus(error.message || "钉钉登录失败", "error");
+      }
+    }
+    function cryptoId() {
+      return "id" + Math.random().toString(16).slice(2) + Date.now().toString(16);
+    }
+    function normalizeState(data) {
+      data.products = (data.products || []).map(product => ({
+        ...product,
+        image: product.image && !isGeneratedPlaceholderImage(product.image) ? product.image : generateProductImage(product.name || "产品")
+      }));
+      data.deliverables = (data.deliverables || []).map(doc => ({
+        type: inferAssetType(doc.name),
+        source: "流程自动",
+        url: "",
+        content: defaultMinuteContent(doc),
+        ...doc
+      }));
+      return data;
+    }
+    function productImageSeed(name) {
+      const text = String(name || "产品").slice(0, 8);
+      let hash = 0;
+      for (let i = 0; i < text.length; i += 1) hash = (hash * 31 + text.charCodeAt(i)) >>> 0;
+      return hash || 1001;
+    }
+    function productImagePrompt(name) {
+      const text = String(name || "宠物用品").trim();
+      const rules = [
+        { words: ["鹦鹉", "站杆"], prompt: "parrot perch bird stand pet accessory product" },
+        { words: ["鹦鹉", "谷物棒"], prompt: "parrot seed treat stick pet snack product" },
+        { words: ["鹦鹉"], prompt: "parrot pet accessory product" },
+        { words: ["仓鼠", "冻干"], prompt: "hamster freeze dried treat pet snack product" },
+        { words: ["仓鼠", "降温窝"], prompt: "hamster cooling hideout ceramic house pet product" },
+        { words: ["仓鼠"], prompt: "hamster pet accessory product" },
+        { words: ["兔", "草架"], prompt: "rabbit hay feeder pet product" },
+        { words: ["兔"], prompt: "rabbit pet accessory product" },
+        { words: ["包装"], prompt: "pet product package mockup ecommerce" }
+      ];
+      const matched = rules.find(rule => rule.words.every(word => text.includes(word)));
+      const subject = matched ? matched.prompt : `${text} pet product ecommerce`;
+      return `marketplace product photo, ${subject}, realistic ecommerce listing image, clean white background, soft natural shadow, no text, no logo`;
+    }
+    function generateProductImage(name, salt = "") {
+      const seed = salt || productImageSeed(name);
+      return `https://image.pollinations.ai/prompt/${encodeURIComponent(productImagePrompt(name))}?width=512&height=512&nologo=true&private=true&seed=${encodeURIComponent(seed)}`;
+    }
+    function isGeneratedPlaceholderImage(image) {
+      return String(image || "").startsWith("data:image/svg+xml");
+    }
+    function fallbackProductImage(name) {
+      const text = String(name || "产品").slice(0, 8);
+      const hash = productImageSeed(text);
+      const hueA = hash % 360;
+      const hueB = (hueA + 48 + (hash % 72)) % 360;
+      const hueC = (hueA + 180) % 360;
+      const initials = text.slice(0, 2);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320" viewBox="0 0 320 320">
+        <defs>
+          <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="hsl(${hueA}, 78%, 68%)"/>
+            <stop offset="1" stop-color="hsl(${hueB}, 76%, 54%)"/>
+          </linearGradient>
+          <radialGradient id="r" cx=".72" cy=".22" r=".66">
+            <stop offset="0" stop-color="hsla(${hueC}, 90%, 82%, .92)"/>
+            <stop offset="1" stop-color="hsla(${hueC}, 80%, 64%, 0)"/>
+          </radialGradient>
+        </defs>
+        <rect width="320" height="320" rx="42" fill="url(#g)"/>
+        <circle cx="238" cy="66" r="106" fill="url(#r)"/>
+        <path d="M55 224c45-74 88-92 133-58 26 20 47 18 77-6v87H55z" fill="rgba(255,255,255,.24)"/>
+        <text x="50%" y="50%" dy="18" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="72" font-weight="700" fill="white">${escapeAttr(initials)}</text>
+      </svg>`;
+      return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+    }
+    function setImagePreview(src, name) {
+      const preview = document.getElementById("formImagePreview");
+      preview.onerror = () => {
+        preview.onerror = null;
+        preview.src = fallbackProductImage(name);
+      };
+      preview.src = src || generateProductImage(name);
+    }
+    function buildInitialTasks(products) {
+      return products.flatMap(product => stageTemplates.flatMap((rows, stageIndex) => rows.map((row, idx) => ({
+        id: cryptoId(),
+        productId: product.id,
+        stage: stageIndex,
+        category: row[0],
+        title: row[1],
+        owner: row[2],
+        deliverable: row[3],
+        due: dueByStage(stageIndex, idx),
+        done: product.stage > stageIndex
+      }))));
+    }
+    function buildInitialDeliverables(products) {
+      return products.flatMap(product => deliverableTemplates.map(([name, stage, required], idx) => ({
+        id: cryptoId(),
+        productId: product.id,
+        name, stage, required,
+        type: inferAssetType(name),
+        source: "流程自动",
+        url: "",
+        status: product.stage > stage ? "已归档" : product.stage === stage && idx % 3 === 0 ? "待审核" : "未开始",
+        owner: ownerByDeliverable(name),
+        updated: product.stage > stage ? "2026-07-01" : "-"
+      })));
+    }
+    function buildInitialReviews(products) {
+      const names = [
+        ["规划终审会", 0], ["立项评审会", 1], ["样品评审会", 2], ["标准样终审会", 2],
+        ["测试结果评审会", 3], ["上市启动会", 4], ["首月深度复盘会", 5], ["季度产品复盘会", 5]
+      ];
+      return products.flatMap(product => names.map(([title, stage]) => ({
+        id: cryptoId(), productId: product.id, title, stage,
+        status: product.stage > stage ? "已通过" : product.stage === stage ? "待评审" : "未开始",
+        owner: stage < 2 ? "产品部 / 高层" : stage < 5 ? "产品部 / 相关部门" : "产品部 / 运营 / 客服",
+        result: product.stage > stage ? "通过，进入下一节点" : "-"
+      })));
+    }
+    function dueByStage(stage, idx) {
+      const day = 5 + stage * 4 + idx;
+      return `07-${String(Math.min(day, 28)).padStart(2, "0")}`;
+    }
+    function currentWeekRange(base = new Date()) {
+      const date = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+      const day = date.getDay() || 7;
+      const start = new Date(date);
+      start.setDate(date.getDate() - day + 1);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return { start, end };
+    }
+    function formatDateInput(date) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    function parseDateInput(value) {
+      if (!value) return null;
+      const [year, month, day] = value.split("-").map(Number);
+      if (!year || !month || !day) return null;
+      return new Date(year, month - 1, day);
+    }
+    function parseTaskDue(due) {
+      const match = String(due || "").match(/^(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      const year = Number((todoDateRange.start || formatDateInput(new Date())).slice(0, 4)) || new Date().getFullYear();
+      return new Date(year, Number(match[1]) - 1, Number(match[2]));
+    }
+    function ownerByDeliverable(name) {
+      if (name.includes("包装")) return "设计 / 产品";
+      if (name.includes("测试") || name.includes("内测")) return "产品部";
+      if (name.includes("上市") || name.includes("首周")) return "产品 / 运营";
+      if (name.includes("清仓") || name.includes("下架")) return "运营 / 供应链";
+      if (name.includes("分发")) return "采购";
+      return "产品部";
+    }
+    function inferAssetType(name) {
+      if (name.includes("视频") || name.includes("素材") || name.includes("测评")) return "视频";
+      if (name.includes("图片") || name.includes("包装") || name.includes("标准样") || name.includes("样品")) return "图片";
+      if (name.includes("链接") || name.includes("页面")) return "链接";
+      return "文档";
+    }
+    function assetIcon(doc) {
+      const value = `${doc.type || ""} ${doc.name || ""} ${doc.url || ""}`;
+      if (/视频|video|mp4|mov/i.test(value)) return "file-video";
+      if (/图片|image|png|jpe?g|webp|gif/i.test(value)) return "file-image";
+      if (/链接|https?:|www\\./i.test(value)) return "link";
+      return "file-text";
+    }
+    function isImageAsset(doc) {
+      const value = `${doc.type || ""} ${doc.name || ""} ${doc.url || ""}`;
+      return /图片|image|png|jpe?g|webp|gif|data:image|blob:/i.test(value);
+    }
+    function filePreviewHtml(doc) {
+      if (isImageAsset(doc) && doc.url) {
+        return `<img src="${escapeAttr(doc.url)}" alt="${escapeAttr(doc.name)}" loading="lazy" decoding="async">`;
+      }
+      return `<i data-lucide="${assetIcon(doc)}"></i>`;
+    }
+    function assetPreviewClass(doc) {
+      const icon = assetIcon(doc);
+      if (icon === "file-image") return "image";
+      if (icon === "file-video") return "video";
+      if (icon === "link") return "link";
+      return "";
+    }
+    function defaultMinuteContent(doc = {}, force = false) {
+      if (!force && !String(doc.name || "").includes("纪要") && !String(doc.name || "").includes("决策")) return "";
+      return [
+        `# ${doc.name || "会议纪要"}`,
+        "",
+        "产品：",
+        `阶段：${Number.isInteger(doc.stage) ? stages[doc.stage]?.name || "" : ""}`,
+        `负责人：${doc.owner || ""}`,
+        `日期：${doc.updated && doc.updated !== "-" ? doc.updated : "今天"}`,
+        "",
+        "## 会议结论",
+        "本次会议结论已记录，后续按流程继续推进。",
+        "",
+        "## 行动项",
+        "- 产品部补齐相关资料和下一步任务。",
+        "- 相关部门按约定时间交付对应内容。",
+        "",
+        "## 风险与备注",
+        "暂无新增风险。"
+      ].join("\n");
+    }
+    function escapeAttr(value) {
+      return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+    function esc(value) {
+      return escapeAttr(value);
+    }
+    function byId(rows, id) {
+      return (rows || []).find(item => item.id === id) || null;
+    }
+    function productById(id) {
+      return byId(state.products, id);
+    }
+    function currentProduct() {
+      return productById(currentId) || state.products[0];
+    }
+    function productTasks(productId = currentId) {
+      return state.tasks.filter(t => t.productId === productId);
+    }
+    function productDeliverables(productId = currentId) {
+      return state.deliverables.filter(d => d.productId === productId);
+    }
+    function productReviews(productId = currentId) {
+      return state.reviews.filter(r => r.productId === productId);
+    }
+    function productImage(product) {
+      return product?.image || generateProductImage(product?.name || "产品");
+    }
+    function productIdentityHtml(product, meta = "", options = {}) {
+      if (!product) return `<span class="small">-</span>`;
+      const compact = options.compact ? " compact" : "";
+      const thumb = options.compact ? "product-thumb small" : "product-thumb";
+      const fallback = fallbackProductImage(product.name || "产品");
+      const secondary = meta || product.desc || "";
+      return `<div class="product-identity${compact}">
+        <img class="${thumb}" src="${esc(productImage(product))}" alt="${esc(product.name)}" data-fallback="${esc(fallback)}" loading="lazy" decoding="async">
+        <div class="product-name"><strong>${esc(product.name)}</strong>${secondary ? `<span class="small">${esc(secondary)}</span>` : ""}</div>
+      </div>`;
+    }
+    function bindProductImageFallback(root = document) {
+      root.querySelectorAll(".product-thumb").forEach(img => img.addEventListener("error", () => {
+        img.src = img.dataset.fallback || fallbackProductImage(img.alt);
+      }, { once: true }));
+    }
+    function selectProductAndNavigate(productId, target = "products", options = {}) {
+      const product = productById(productId);
+      if (!product) return;
+      currentId = product.id;
+      selectedStage = Number.isInteger(options.stage) ? options.stage : product.stage;
+      if (target === "reviews") activeMinuteDocId = "";
+      navigateToScreen(target);
+      renderAll();
+      if (options.toast !== false) toast(options.message || `已切换到：${product.name}`);
+    }
+    function requiredMeetings(product) {
+      return meetingRules.filter(rule => rule.levels.includes(product.level));
+    }
+    function meetingMinute(product, meeting) {
+      const docs = productDeliverables(product.id);
+      const candidates = docs.filter(doc => doc.stage === meeting.stage && (
+        doc.name.includes(meeting.minute) ||
+        doc.name.includes(meeting.title) ||
+        (doc.name.includes("会议纪要") && meeting.title.includes(doc.name.replace("会议纪要", "")))
+      ));
+      const doc = candidates.find(item => item.source === "会议产生") || candidates[0] || null;
+      const content = String(doc?.content || "").trim();
+      return { doc, hasMinutes: !!content };
+    }
+    function meetingTask(product, meeting) {
+      const tasks = productTasks(product.id).filter(task => task.stage === meeting.stage && task.category === "会议/决策");
+      return tasks.find(task => (meeting.keywords || []).some(keyword => task.title.includes(keyword))) || null;
+    }
+    function meetingStatus(product, meeting) {
+      const task = meetingTask(product, meeting);
+      const minutes = meetingMinute(product, meeting);
+      const taskDone = !!task && task.done;
+      const passed = taskDone && minutes.hasMinutes;
+      return { task, minutes, taskDone, passed };
+    }
+    function meetingReviewState(product, meeting) {
+      const status = meetingStatus(product, meeting);
+      if (product.stage < meeting.stage) return { ...status, text: "未到阶段", badge: "", actionable: false };
+      if (!status.taskDone) return { ...status, text: "待开会", badge: "gold", actionable: false };
+      if (!status.minutes.hasMinutes) return { ...status, text: "待补纪要", badge: "gold", actionable: true };
+      return { ...status, text: "已通过", badge: "green", actionable: true };
+    }
+    function completion(productId = currentId) {
+      const tasks = productTasks(productId);
+      if (!tasks.length) return 0;
+      return Math.round(tasks.filter(t => t.done).length / tasks.length * 100);
+    }
+    function stageReady(product) {
+      const tasks = productTasks(product.id).filter(t => t.stage === product.stage);
+      const requiredDocs = productDeliverables(product.id).filter(d => d.stage === product.stage && d.required);
+      const currentReview = requiredMeetings(product).filter(r => r.stage === product.stage);
+      const tasksOk = tasks.every(t => t.done);
+      const docsOk = requiredDocs.every(d => d.status === "已归档" || d.status === "已审核");
+      const reviewOk = currentReview.every(r => meetingStatus(product, r).passed);
+      return { tasksOk, docsOk, reviewOk, ready: tasksOk && docsOk && reviewOk };
+    }
+    function lifecycleDecision(p) {
+      if (p.score >= 4.5 && p.sales >= 4000 && p.returnRate <= .1 && p.profit >= .25) return ["升级", "销量达标、评分高、退货率低，建议加大推广或做升级版。", "green"];
+      if (p.sales >= 1200 && p.score >= 4.0 && p.returnRate <= .14) return ["维持", "指标稳定在安全线以上，继续运营并季度复盘。", "blue"];
+      if (p.score >= 3.5 && (p.sales < 800 || p.profit < .1)) return ["清仓退出", "销量或利润偏弱，但仍有清仓空间，建议制定清仓计划。", "gold"];
+      return ["淘汰下架", "评分或退货率风险较高，继续投入意义不大。", "red"];
+    }
+    function lifecycleWorkflow(p) {
+      if (p.stage < 5) {
+        return {
+          reviewNode: "未到复盘",
+          decision: "待上市",
+          cls: "",
+          path: "先完成上市筹备",
+          action: "完成当前阶段任务，上市后进入首周跟进和首月复盘。",
+          deliverable: "上市资料包 / 首周数据速览",
+          reason: "产品尚未上市，生命周期判断不能提前替代开发流程。"
+        };
+      }
+      if (p.stage === 5) {
+        const [decision, reason, cls] = lifecycleDecision(p);
+        return {
+          reviewNode: "首月复盘",
+          decision: "初步判断",
+          cls,
+          path: decision,
+          action: "补齐首月销售数据、用户反馈、上市过程回顾，由老板给出继续推/观察/调整/清仓初判。",
+          deliverable: "首月复盘报告 / 行动项清单",
+          reason
+        };
+      }
+      const [decision, reason, cls] = lifecycleDecision(p);
+      const path = lifecyclePaths[decision];
+      return {
+        reviewNode: "季度决策",
+        decision,
+        cls,
+        path: path.title,
+        action: path.action,
+        deliverable: path.deliverable,
+        reason
+      };
+    }
+    function formatPercentInput(value) {
+      const num = Number(value || 0) * 100;
+      return Number.isInteger(num) ? String(num) : String(Math.round(num * 10) / 10);
+    }
+    function clampNumber(value, min, max) {
+      if (!Number.isFinite(value)) return min;
+      return Math.min(max, Math.max(min, value));
+    }
+    function badgeClass(text) {
+      if (text.includes("通过") || text.includes("已归档") || text.includes("升级") || text.includes("维持")) return "green";
+      if (text.includes("待") || text.includes("清仓") || text.includes("讨论中")) return "gold";
+      if (text.includes("驳回") || text.includes("淘汰") || text.includes("风险") || text.includes("暂缓")) return "red";
+      if (text.includes("上市") || text.includes("开发") || text.includes("已讨论")) return "blue";
+      return "";
+    }
+    function renderAll() {
+      const p = currentProduct();
+      if (!Number.isInteger(selectedStage) || selectedStage < 0 || selectedStage >= stages.length) selectedStage = p.stage;
+      renderProductSelect();
+      renderSidebar();
+      renderMetrics();
+      renderStageMaps();
+      renderStageEditor();
+      renderTasks();
+      renderStatus();
+      renderDemandPool();
+      renderProducts();
+      renderDeliverables();
+      renderReviews();
+      renderLifecycle();
+      applyPermissions();
+      if (window.lucide) lucide.createIcons();
+      bindProductImageFallback();
+      saveState();
+    }
+    function renderProductSelect() {
+      const select = document.getElementById("productSelect");
+      select.innerHTML = state.products.map(p => `<option value="${esc(p.id)}" ${p.id === currentId ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+    }
+    function renderSidebar() {
+      const p = currentProduct();
+      const todos = productTasks(p.id).filter(t => !t.done && t.stage <= p.stage).length;
+      const nameEl = document.getElementById("sideProductName");
+      const progressEl = document.getElementById("sideProgress");
+      const todoEl = document.getElementById("sideTodo");
+      if (nameEl) nameEl.textContent = p.name;
+      if (progressEl) progressEl.textContent = `${completion(p.id)}%`;
+      if (todoEl) todoEl.textContent = todos;
+    }
+    function renderMetrics() {
+      const metricsEl = document.getElementById("metrics");
+      if (!metricsEl) return;
+      const activeDemands = (state.demands || []).filter(d => d.status !== "已转开发" && d.status !== "暂缓").length;
+      const inProcess = state.products.filter(p => p.stage >= 0 && p.stage < stages.length && p.status !== "已淘汰").length;
+      const pendingReviews = state.products.reduce((sum, product) => sum + requiredMeetings(product).filter(meeting => product.stage >= meeting.stage && !meetingStatus(product, meeting).passed).length, 0);
+      metricsEl.innerHTML = [
+        ["需求池", activeDemands, "待讨论和讨论中机会", "blue", "inbox", "demands"],
+        ["在流程中产品", inProcess, "覆盖 7 个产品阶段", "", "git-branch", "products"],
+        ["待评审会议", pendingReviews, "需要写入决策", "gold", "clipboard-check", "reviews"]
+      ].filter(([, , , , , target]) => screenAllowed(target)).map(([label, val, desc, cls, icon, target]) => `<button class="card metric ${cls}" data-metric-target="${target}" type="button" aria-label="进入${label}">
+        <span class="metric-icon"><i data-lucide="${icon}"></i></span>
+        <span class="metric-body"><span>${esc(label)}</span><span>${esc(desc)}</span></span>
+        <strong>${esc(val)}</strong>
+        <span class="metric-arrow"><i data-lucide="chevron-right"></i></span>
+      </button>`).join("");
+      document.querySelectorAll("[data-metric-target]").forEach(card => card.addEventListener("click", () => navigateToScreen(card.dataset.metricTarget)));
+    }
+    function renderStageMaps() {
+      const p = currentProduct();
+      const html = stages.map((s, i) => {
+        const cls = `${i < p.stage ? "done" : i === p.stage ? "current" : "locked"} ${i === selectedStage ? "selected" : ""}`;
+        const stageTasks = productTasks(p.id).filter(t => t.stage === i);
+        const done = stageTasks.filter(t => t.done).length;
+        return `<div class="stage ${cls}" data-stage="${i}">
+          <div class="stage-num">${i + 1}</div>
+          <div class="stage-title">${esc(s.short)}</div>
+          <div class="stage-meta">${esc(s.goal)}</div>
+          <div class="progress-track"><div class="progress-fill" style="width:${stageTasks.length ? done / stageTasks.length * 100 : 0}%"></div></div>
+          <div class="small">${done}/${stageTasks.length} 任务完成</div>
+        </div>`;
+      }).join("");
+      const stageMap = document.getElementById("stageMap");
+      const workflowStageMap = document.getElementById("workflowStageMap");
+      if (stageMap) stageMap.innerHTML = html;
+      if (workflowStageMap) workflowStageMap.innerHTML = html;
+      const workflowStage = document.getElementById("workflowStage");
+      if (workflowStage) workflowStage.textContent = stages[p.stage].name;
+      const workflowProduct = document.getElementById("workflowProduct");
+      if (workflowProduct) workflowProduct.innerHTML = productIdentityHtml(p, `${p.level} · ${p.owner} · ${p.status}`, { compact: true });
+      document.querySelectorAll("[data-stage]").forEach(el => el.addEventListener("click", () => {
+        selectedStage = Number(el.dataset.stage);
+        renderAll();
+      }));
+    }
+    function renderStageEditor() {
+      const editor = document.getElementById("stageEditor");
+      if (!editor) return;
+      const p = currentProduct();
+      const stage = stages[selectedStage];
+      const tasks = productTasks(p.id).filter(t => t.stage === selectedStage);
+      const taskEditable = can("editTasks");
+      const disabled = taskEditable ? "" : "disabled";
+      editor.innerHTML = `<div class="stage-editor-head">
+        <div class="stage-editor-title">
+          <strong>${selectedStage + 1}. ${esc(stage.name)}</strong>
+          <span class="small">${esc(stage.goal)}</span>
+        </div>
+        <div class="stage-editor-actions ${taskEditable ? "" : "hidden"}">
+          <button class="mini-action" id="setSelectedStage"><i data-lucide="flag"></i>${selectedStage === p.stage ? "当前阶段" : "设为当前阶段"}</button>
+          <button class="mini-action" id="addSelectedStageTask"><i data-lucide="list-plus"></i>加任务</button>
+        </div>
+      </div>
+      <div class="task-edit-row task-edit-head">
+        <span>类别</span><span>任务内容</span><span>责任部门</span><span>交付物</span><span>截止</span><span>完成</span><span>操作</span>
+      </div>
+      ${tasks.map(t => `<div class="task-edit-row ${focusedTaskId === t.id ? "focused" : ""}" data-edit-task="${esc(t.id)}">
+        <select data-task-field="category" ${disabled}>
+          ${["会前准备", "会议/决策", "会后交付", "准入条件", "补充任务"].map(v => `<option value="${v}" ${t.category === v ? "selected" : ""}>${v}</option>`).join("")}
+        </select>
+        <input data-task-field="title" value="${esc(t.title)}" ${disabled}>
+        <input data-task-field="owner" value="${esc(t.owner)}" ${disabled}>
+        <input data-task-field="deliverable" value="${esc(t.deliverable)}" ${disabled}>
+        <input data-task-field="due" value="${esc(t.due)}" ${disabled}>
+        <label class="task-label"><input type="checkbox" data-task-field="done" ${t.done ? "checked" : ""} ${disabled}><span>${t.done ? "是" : "否"}</span></label>
+        ${taskEditable ? `<button class="mini-action danger" data-delete-task="${esc(t.id)}"><i data-lucide="trash-2"></i>删除</button>` : `<span class="small">只读</span>`}
+      </div>`).join("") || `<div class="empty">${taskEditable ? "这个阶段还没有任务，可以点击“加任务”。" : "这个阶段还没有任务。"}</div>`}`;
+      document.querySelectorAll("[data-edit-task] [data-task-field]").forEach(input => {
+        const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
+        input.addEventListener(eventName, () => updateStageTask(input.closest("[data-edit-task]").dataset.editTask, input.dataset.taskField, input.type === "checkbox" ? input.checked : input.value));
+      });
+      const setStageButton = document.getElementById("setSelectedStage");
+      if (setStageButton) setStageButton.addEventListener("click", setSelectedStageAsCurrent);
+      const addTaskButton = document.getElementById("addSelectedStageTask");
+      if (addTaskButton) addTaskButton.addEventListener("click", addTaskForSelectedStage);
+      if (focusedTaskId) {
+        requestAnimationFrame(() => {
+          const row = [...document.querySelectorAll("[data-edit-task]")].find(el => el.dataset.editTask === focusedTaskId);
+          if (row) row.scrollIntoView({ block: "center", behavior: "smooth" });
+          focusedTaskId = "";
+        });
+      }
+    }
+    function renderTasks() {
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const weeklyTasks = state.products.flatMap(product => productTasks(product.id)
+        .filter(t => !t.done && t.stage <= product.stage)
+        .map(t => ({ ...t, product, currentStage: t.stage === product.stage, dueDate: parseTaskDue(t.due) })))
+        .filter(t => {
+          if (t.currentStage) return true;
+          return t.dueDate && t.dueDate < todayStart;
+        })
+        .sort((a, b) => {
+          const overdueA = a.dueDate && a.dueDate < todayStart ? 0 : 1;
+          const overdueB = b.dueDate && b.dueDate < todayStart ? 0 : 1;
+          if (overdueA !== overdueB) return overdueA - overdueB;
+          const currentA = a.currentStage ? 0 : 1;
+          const currentB = b.currentStage ? 0 : 1;
+          if (currentA !== currentB) return currentA - currentB;
+          return String(a.due).localeCompare(String(b.due), "zh-Hans-CN");
+        })
+        .slice(0, 10);
+      const todayTasks = document.getElementById("todayTasks");
+      if (todayTasks) {
+        todayTasks.innerHTML = weeklyTasks.map(t => {
+          const overdue = t.dueDate && t.dueDate < todayStart;
+          const statusText = overdue ? "逾期" : t.currentStage ? "当前阶段" : "待办";
+          const statusClass = overdue ? "red" : t.currentStage ? "blue" : "gold";
+          return `<tr>
+          <td>${productIdentityHtml(t.product, stages[t.stage]?.short || "", { compact: true })}</td>
+          <td><button type="button" class="task-link" data-open-task="${esc(t.id)}"><i data-lucide="external-link"></i>${esc(t.title)}</button></td>
+          <td>${esc(t.owner)}</td>
+          <td>${esc(t.deliverable)}</td>
+          <td>${esc(t.due)}</td>
+          <td><span class="badge ${statusClass}">${statusText}</span></td>
+        </tr>`;
+        }).join("") || `<tr><td colspan="6">没有当前阶段或逾期待办事项</td></tr>`;
+      }
+      document.querySelectorAll("[data-open-task]").forEach(el => el.addEventListener("click", () => openTaskInWorkflow(el.dataset.openTask)));
+      document.querySelectorAll("[data-delete-task]").forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.deleteTask)));
+    }
+    function openTaskInWorkflow(taskId) {
+      const task = state.tasks.find(t => t.id === taskId);
+      if (!task) return;
+      const product = productById(task.productId);
+      if (!product) return;
+      focusedTaskId = task.id;
+      selectProductAndNavigate(product.id, "workflow", { stage: task.stage, message: `已定位到：${product.name} · ${stages[task.stage].short}` });
+    }
+    function renderStatus() {
+      const p = currentProduct();
+      const ready = stageReady(p);
+      const decision = lifecycleDecision(p);
+      const statusBadge = document.getElementById("statusBadge");
+      const statusLines = document.getElementById("statusLines");
+      if (statusBadge) {
+        statusBadge.textContent = p.status;
+        statusBadge.className = `badge ${badgeClass(p.status)}`;
+      }
+      if (statusLines) {
+        statusLines.innerHTML = [
+          ["当前阶段", stages[p.stage].name],
+          ["产品等级", p.level],
+          ["负责人", p.owner],
+          ["计划上市", p.launch || "-"],
+          ["生命周期判断", decision[0]]
+        ].map(([k, v]) => `<div class="status-line"><span class="small">${esc(k)}</span><strong>${esc(v)}</strong></div>`).join("");
+      }
+      const risks = [];
+      const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      state.products.forEach(product => {
+        const tasks = productTasks(product.id);
+        const overdueTasks = tasks.filter(task => !task.done && parseTaskDue(task.due) && parseTaskDue(task.due) < todayStart);
+        const skippedTasks = tasks.filter(task => !task.done && task.stage < product.stage && !overdueTasks.some(overdue => overdue.id === task.id));
+        const skippedDocs = productDeliverables(product.id).filter(doc => doc.required && doc.stage < product.stage && doc.status !== "已归档" && doc.status !== "已审核");
+        const skippedReviews = requiredMeetings(product).filter(review => review.stage < product.stage && !meetingStatus(product, review).passed);
+        if (overdueTasks.length) {
+          const firstDue = overdueTasks.map(task => task.due).sort()[0];
+          risks.push({ product, productId: product.id, title: `${overdueTasks.length} 项待办已超时`, body: `最早截止 ${firstDue}，需要优先补齐或重新排期。` });
+        }
+        if (skippedTasks.length) {
+          const stageNames = [...new Set(skippedTasks.map(task => stages[task.stage].short))].join("、");
+          risks.push({ product, productId: product.id, title: "历史阶段任务被跳过", body: `${stageNames} 仍有未完成事项，产品已推进到 ${stages[product.stage].short}。` });
+        }
+        if (skippedDocs.length) {
+          risks.push({ product, productId: product.id, title: "历史关键交付物未归档", body: `${skippedDocs.length} 个前置必需文件未归档，会影响后续评审和追溯。` });
+        }
+        if (skippedReviews.length) {
+          risks.push({ product, productId: product.id, title: "历史评审未决策", body: `${skippedReviews.length} 个前置评审没有通过结论，属于流程断点。` });
+        }
+      });
+      const riskList = document.getElementById("riskList");
+      if (riskList) {
+        riskList.innerHTML = risks.length
+          ? risks.slice(0, 8).map((risk, idx) => `<button type="button" class="check" data-risk-product="${esc(risk.productId)}">
+              <i data-lucide="alert-circle"></i><div>${productIdentityHtml(risk.product, risk.title, { compact: true })}<p class="small">${esc(risk.body)}</p></div><span class="badge gold">${idx + 1}</span>
+            </button>`).join("")
+          : `<div class="check done"><i data-lucide="check-circle"></i><div><strong>当前无阻塞</strong><p class="small">没有超时待办，也没有历史阶段漏项。</p></div><span class="badge green">1</span></div>`;
+      }
+    }
+    function sortDemands(demands) {
+      const statusOrder = { "待讨论": 1, "讨论中": 2, "已讨论": 3, "暂缓": 4, "已转开发": 5 };
+      const levelOrder = { "P0 重点品": 1, "P1 常规新品": 2, "P2 小改/补充品": 3, "应季品": 4 };
+      const valueOf = demand => {
+        if (demandSort.key === "status") return statusOrder[demand.status] || 99;
+        if (demandSort.key === "level") return levelOrder[demand.level] || 99;
+        return String(demand[demandSort.key] || "");
+      };
+      return [...demands].sort((a, b) => {
+        const av = valueOf(a);
+        const bv = valueOf(b);
+        const result = typeof av === "number" && typeof bv === "number"
+          ? av - bv
+          : String(av).localeCompare(String(bv), "zh-Hans-CN");
+        return demandSort.direction === "asc" ? result : -result;
+      });
+    }
+    function setDemandSort(key) {
+      demandSort = {
+        key,
+        direction: demandSort.key === key && demandSort.direction === "asc" ? "desc" : "asc"
+      };
+      renderDemandPool();
+      if (window.lucide) lucide.createIcons();
+    }
+    function renderDemandPool() {
+      const board = document.getElementById("demandBoard");
+      if (!board) return;
+      const demands = state.demands || [];
+      const demandEditable = can("editDemand");
+      const demandConvertible = can("convertDemand");
+      board.innerHTML = demands.map(d => {
+        const product = d.productId ? productById(d.productId) : null;
+        const actions = [];
+        const nextStep = {
+          "待讨论": "下一步：组织产品、运营、供应链快速讨论。",
+          "讨论中": "下一步：形成是否转入开发的明确结论。",
+          "已讨论": "下一步：转入产品档案并进入立项流程。",
+          "已转开发": "下一步：在产品档案里继续推进。",
+          "暂缓": "下一步：等资源、信息或时机成熟后重新评估。"
+        }[d.status] || "下一步：补充判断信息。";
+        if (demandEditable && d.status === "待讨论") actions.push(`<button class="mini-action" data-demand-start="${esc(d.id)}"><i data-lucide="messages-square"></i>进入讨论</button>`);
+        if (demandEditable && d.status === "讨论中") actions.push(`<button class="mini-action" data-demand-finish="${esc(d.id)}"><i data-lucide="clipboard-check"></i>形成结论</button>`);
+        if (demandConvertible && d.status === "已讨论") actions.push(`<button class="mini-action" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i>转入开发</button>`);
+        if (demandEditable && d.status !== "已转开发" && d.status !== "暂缓") actions.push(`<button class="mini-action" data-demand-pause="${esc(d.id)}"><i data-lucide="pause"></i>暂缓</button>`);
+        if (demandEditable && d.status === "暂缓") actions.push(`<button class="mini-action" data-demand-resume="${esc(d.id)}"><i data-lucide="rotate-ccw"></i>恢复待讨论</button>`);
+        if (product) actions.push(`<button class="mini-action" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i>查看产品</button>`);
+        if (demandEditable) actions.push(`<button class="mini-action" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i>编辑</button>`);
+        if (demandEditable) actions.push(`<button class="mini-action danger" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>`);
+        const statusControl = d.status === "已转开发" || !demandEditable
+          ? `<span class="badge ${badgeClass(d.status)}">${d.status}</span>`
+          : `<select class="demand-status-control" data-demand-status="${esc(d.id)}" aria-label="调整需求状态">
+              ${["待讨论", "讨论中", "已讨论", "暂缓"].map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>`;
+        return `<div class="card demand-card">
+          <div class="demand-card-head"><h3>${esc(d.name)}</h3>${statusControl}</div>
+          <p class="small">${esc(d.desc)}</p>
+          <div class="review-meta">
+            <span class="badge">${esc(d.level.split(" ")[0])}</span>
+            <span class="badge">${esc(d.source)}</span>
+            <span class="badge">${esc(d.owner)}</span>
+          </div>
+          ${product ? `<div class="linked-product">${productIdentityHtml(product, "已生成产品档案", { compact: true })}</div>` : ""}
+          <div class="demand-next"><p class="small">${esc(nextStep)}</p></div>
+          <div class="demand-actions">${actions.join("")}</div>
+        </div>`;
+      }).join("") || `<div class="empty">暂无需求机会</div>`;
+      const table = document.getElementById("demandTableRows");
+      if (table) {
+        table.innerHTML = sortDemands(demands).map(d => {
+          const product = d.productId ? productById(d.productId) : null;
+          const statusCell = d.status === "已转开发" || !demandEditable
+            ? `<span class="badge ${badgeClass(d.status)}">${d.status}</span>`
+            : `<select class="demand-status-control" data-demand-status="${esc(d.id)}" aria-label="调整需求状态">
+                ${["待讨论", "讨论中", "已讨论", "暂缓"].map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
+              </select>`;
+          const rowActions = [];
+          if (demandConvertible && d.status === "已讨论") rowActions.push(`<button class="mini-action" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i>转开发</button>`);
+          if (product) rowActions.push(`<button class="mini-action" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i>查看产品</button>`);
+          if (demandEditable) rowActions.push(`<button class="mini-action" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i>编辑</button>`);
+          if (demandEditable) rowActions.push(`<button class="mini-action danger" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>`);
+          return `<tr>
+            <td><strong>${esc(d.name)}</strong><p class="small">${esc(d.desc)}</p>${product ? productIdentityHtml(product, "已生成产品档案", { compact: true }) : ""}</td>
+            <td>${statusCell}</td>
+            <td>${esc(d.level)}</td>
+            <td>${esc(d.source)}</td>
+            <td>${esc(d.owner)}</td>
+            <td>${esc(d.created || "-")}</td>
+            <td><div class="table-actions">${rowActions.join("") || `<span class="small">-</span>`}</div></td>
+          </tr>`;
+        }).join("") || `<tr><td colspan="7">暂无需求机会</td></tr>`;
+      }
+      document.querySelectorAll("[data-demand-start]").forEach(btn => btn.addEventListener("click", () => startDemandDiscussion(btn.dataset.demandStart)));
+      document.querySelectorAll("[data-demand-finish]").forEach(btn => btn.addEventListener("click", () => finishDemandDiscussion(btn.dataset.demandFinish)));
+      document.querySelectorAll("[data-demand-convert]").forEach(btn => btn.addEventListener("click", () => convertDemandToProduct(btn.dataset.demandConvert)));
+      document.querySelectorAll("[data-demand-pause]").forEach(btn => btn.addEventListener("click", () => pauseDemand(btn.dataset.demandPause)));
+      document.querySelectorAll("[data-demand-resume]").forEach(btn => btn.addEventListener("click", () => setDemandStatus(btn.dataset.demandResume, "待讨论")));
+      document.querySelectorAll("[data-edit-demand]").forEach(btn => btn.addEventListener("click", () => openModal("demandEdit", btn.dataset.editDemand)));
+      document.querySelectorAll("[data-delete-demand]").forEach(btn => btn.addEventListener("click", () => deleteDemand(btn.dataset.deleteDemand)));
+      document.querySelectorAll("[data-demand-status]").forEach(select => select.addEventListener("change", () => setDemandStatus(select.dataset.demandStatus, select.value)));
+      document.querySelectorAll("[data-select-product]").forEach(btn => btn.addEventListener("click", () => selectProductAndNavigate(btn.dataset.selectProduct, "products")));
+    }
+    function renderProducts() {
+      const filter = document.getElementById("statusFilter").value;
+      const list = state.products.filter(p => filter === "all" || p.status === filter);
+      const productEditable = can("editProduct");
+      const productDeletable = can("deleteProduct");
+      document.getElementById("productList").innerHTML = list.map(p => `<div class="product-row archive-row ${p.id === currentId ? "active" : ""}">
+        ${productIdentityHtml(p, p.desc)}
+        <span class="badge ${badgeClass(p.status)}">${esc(p.status)}</span>
+        <span>${esc(p.level.split(" ")[0])}</span>
+        <span>${esc(stages[p.stage].short)}</span>
+        <div class="table-actions product-actions">
+          ${screenAllowed("workflow") ? `<button class="mini-action icon-only" title="产品进度" aria-label="产品进度" data-open-product="${esc(p.id)}" data-product-target="workflow"><i data-lucide="git-branch"></i></button>` : ""}
+          <button class="mini-action icon-only" title="资料包" aria-label="资料包" data-open-product="${esc(p.id)}" data-product-target="deliverables"><i data-lucide="folder-check"></i></button>
+          ${screenAllowed("reviews") ? `<button class="mini-action icon-only" title="会议决策" aria-label="会议决策" data-open-product="${esc(p.id)}" data-product-target="reviews"><i data-lucide="clipboard-check"></i></button>` : ""}
+          ${screenAllowed("lifecycle") ? `<button class="mini-action icon-only" title="生命周期" aria-label="生命周期" data-open-product="${esc(p.id)}" data-product-target="lifecycle"><i data-lucide="activity"></i></button>` : ""}
+          ${productEditable ? `<button class="mini-action icon-only" title="编辑产品" aria-label="编辑产品" data-edit-product="${esc(p.id)}"><i data-lucide="pencil"></i></button>` : ""}
+          ${productDeletable ? `<button class="mini-action icon-only danger" title="删除产品" aria-label="删除产品" data-delete-product="${esc(p.id)}"><i data-lucide="trash-2"></i></button>` : ""}
+        </div>
+      </div>`).join("") || `<div class="empty">没有符合筛选条件的产品</div>`;
+      document.querySelectorAll("#productList [data-open-product]").forEach(btn => btn.addEventListener("click", () => selectProductAndNavigate(btn.dataset.openProduct, btn.dataset.productTarget || "workflow")));
+      document.querySelectorAll("#productList [data-edit-product]").forEach(btn => btn.addEventListener("click", () => openModal("productEdit", btn.dataset.editProduct)));
+      document.querySelectorAll("#productList [data-delete-product]").forEach(btn => btn.addEventListener("click", () => deleteProduct(btn.dataset.deleteProduct)));
+    }
+    function renderDeliverables() {
+      const docs = productDeliverables();
+      const rows = document.getElementById("deliverableRows");
+      const docsEditable = can("editDocs");
+      rows.innerHTML = docs.map(d => `<div class="file-card">
+        <div class="file-preview ${assetPreviewClass(d)}">${filePreviewHtml(d)}</div>
+        <div class="file-name">${esc(d.name)}</div>
+        <div class="table-actions">
+          <button class="mini-action" data-open-doc="${esc(d.id)}"><i data-lucide="external-link"></i>打开</button>
+          ${docsEditable ? `<button class="mini-action danger" data-delete-doc="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>` : ""}
+        </div>
+      </div>`).join("") || `<div class="empty">暂无资料文件</div>`;
+      document.querySelectorAll("[data-open-doc]").forEach(btn => btn.addEventListener("click", () => openDocLink(btn.dataset.openDoc)));
+      document.querySelectorAll("[data-delete-doc]").forEach(btn => btn.addEventListener("click", () => deleteDoc(btn.dataset.deleteDoc)));
+      bindPackageDropzone();
+      const backButton = document.getElementById("backToProducts");
+      if (backButton) backButton.addEventListener("click", () => navigateToScreen("products"));
+    }
+    function renderReviews() {
+      const product = currentProduct();
+      const activeDoc = activeMinuteDocId ? state.deliverables.find(doc => doc.id === activeMinuteDocId && doc.productId === product.id) : null;
+      const reviewEditable = can("editReviews");
+      const reviewDisabled = reviewEditable ? "" : "disabled";
+      if (activeDoc) {
+        document.getElementById("reviewList").innerHTML = `<div class="minute-doc">
+          <div class="split-row">
+            <button class="btn ghost" id="backToMeetings"><i data-lucide="arrow-left"></i>返回会议列表</button>
+            <span class="badge green">会议纪要</span>
+          </div>
+          <input class="minute-doc-title" value="${esc(activeDoc.name)}" data-minute-field="name" data-minute-id="${esc(activeDoc.id)}" aria-label="会议纪要标题" ${reviewDisabled}>
+          <div class="minute-doc-meta">
+            <label class="field">产品<input value="${esc(product.name)}" disabled></label>
+            <label class="field">阶段<input value="${esc(stages[activeDoc.stage]?.name || "-")}" disabled></label>
+            <label class="field">负责人<input value="${esc(activeDoc.owner || "")}" data-minute-field="owner" data-minute-id="${esc(activeDoc.id)}" ${reviewDisabled}></label>
+          </div>
+          <textarea class="minute-doc-body" data-minute-field="content" data-minute-id="${esc(activeDoc.id)}" ${reviewDisabled}>${esc(activeDoc.content || defaultMinuteContent(activeDoc))}</textarea>
+        </div>`;
+        document.getElementById("backToMeetings").addEventListener("click", () => {
+          activeMinuteDocId = "";
+          renderReviews();
+          if (window.lucide) lucide.createIcons();
+        });
+        document.querySelectorAll("[data-minute-field]").forEach(input => {
+          input.addEventListener("input", () => updateMinuteDoc(input.dataset.minuteId, input.dataset.minuteField, input.value));
+        });
+        return;
+      }
+      const meetings = requiredMeetings(product);
+      const states = meetings.map(meeting => ({ meeting, state: meetingReviewState(product, meeting) }));
+      const passedCount = states.filter(row => row.state.passed).length;
+      document.getElementById("reviewList").innerHTML = `<div>
+        <div class="review-summary">
+          ${productIdentityHtml(product, `${product.level} · 当前 ${stages[product.stage].short}`, { compact: true })}
+          <div class="review-progress"><span>会议通过</span><span class="badge ${passedCount === meetings.length ? "green" : "gold"}">${passedCount}/${meetings.length}</span></div>
+        </div>
+        <div class="table-wrap">
+          <table class="task-table">
+            <thead><tr><th>会议</th><th>阶段</th><th>纪要 / 决策文件</th><th>责任人</th><th>会议状态</th><th>操作</th></tr></thead>
+            <tbody>
+              ${states.map(({ meeting, state }) => {
+                return `<tr>
+                  <td><strong>${esc(meeting.title)}</strong></td>
+                  <td>${esc(stages[meeting.stage].short)}</td>
+                  <td>${state.passed && state.minutes.doc ? `<span>${esc(state.minutes.doc.name)}</span>` : `<span class="small">${esc(meeting.minute)}</span>`}</td>
+                  <td>${esc(meeting.owner)}</td>
+                  <td><span class="badge ${state.badge}">${state.text}</span></td>
+                  <td><div class="table-actions">
+                    ${state.passed && state.minutes.doc ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>` : state.actionable && reviewEditable ? `<button class="mini-action" data-add-minutes="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="file-plus"></i>补充纪要</button>` : `<span class="small">-</span>`}
+                  </div></td>
+                </tr>`;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+      document.querySelectorAll("[data-add-minutes]").forEach(btn => btn.addEventListener("click", () => addMeetingMinutes(btn.dataset.addMinutes)));
+      document.querySelectorAll("[data-open-meeting-doc]").forEach(btn => btn.addEventListener("click", () => openMeetingDoc(btn.dataset.openMeetingDoc)));
+    }
+    function renderLifecycle() {
+      document.getElementById("lifecyclePathCards").innerHTML = Object.entries(lifecyclePaths).map(([decision, path]) => `
+        <div class="decision">
+          <strong><span class="badge ${path.cls}">${esc(decision)}</span> ${esc(path.title)}</strong>
+          <p class="small">${esc(path.condition)}</p>
+          <p class="small">${esc(path.action)}</p>
+        </div>`).join("");
+      document.getElementById("lifecycleRows").innerHTML = `
+        <div class="lifecycle-head" aria-hidden="true">
+          <span>产品</span><span>复盘节点</span><span>决策路径</span><span>核心数据</span><span>下一步动作</span><span>交付物</span>
+        </div>
+        ${state.products.map(p => {
+        const flow = lifecycleWorkflow(p);
+        const statusControl = can("editLifecycleStatus")
+          ? `<select class="product-status-control" data-product-status="${esc(p.id)}" aria-label="调整${esc(p.name)}状态">
+              ${productStatuses.map(status => `<option value="${status}" ${p.status === status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>`
+          : `<span class="badge ${badgeClass(p.status)}">${esc(p.status)}</span>`;
+        const metricDisabled = can("editMetrics") ? "" : "disabled";
+        return `<div class="lifecycle-row">
+          <div class="lifecycle-product-cell">
+            ${productIdentityHtml(p, `${p.level} · ${p.owner || "-"} · ${stages[p.stage]?.short || "-"}`, { compact: true })}
+            ${statusControl}
+          </div>
+          <div class="metric-stack"><strong>${esc(flow.reviewNode)}</strong><span>${esc(p.launch || "未定上市日")}</span></div>
+          <div class="metric-stack"><strong><span class="badge ${flow.cls}">${esc(flow.decision)}</span></strong><span>${esc(flow.path)}</span></div>
+          <div class="metric-edit-grid">
+            <label>销量<input type="number" min="0" step="1" value="${esc(p.sales || 0)}" data-product-metric="${esc(p.id)}|sales" ${metricDisabled}></label>
+            <label>评分<input type="number" min="0" max="5" step="0.1" value="${esc(p.score || 0)}" data-product-metric="${esc(p.id)}|score" ${metricDisabled}></label>
+            <label>退货率%<input type="number" min="0" max="100" step="0.1" value="${esc(formatPercentInput(p.returnRate))}" data-product-metric="${esc(p.id)}|returnRate" ${metricDisabled}></label>
+            <label>利润率%<input type="number" min="-100" max="100" step="0.1" value="${esc(formatPercentInput(p.profit))}" data-product-metric="${esc(p.id)}|profit" ${metricDisabled}></label>
+          </div>
+          <div class="lifecycle-reason">${esc(flow.action)}<br><span class="small">${esc(flow.reason)}</span></div>
+          <div class="lifecycle-reason">${esc(flow.deliverable)}</div>
+        </div>`;
+      }).join("")}`;
+      document.getElementById("ruleRows").innerHTML = rules.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("");
+      document.querySelectorAll("[data-product-status]").forEach(select => select.addEventListener("change", () => updateProductStatus(select.dataset.productStatus, select.value)));
+      document.querySelectorAll("[data-product-metric]").forEach(input => input.addEventListener("change", () => updateProductMetric(input.dataset.productMetric, input.value)));
+    }
+    function toggleTask(id, done) {
+      if (denyIfCannot("editTasks")) return;
+      const task = state.tasks.find(t => t.id === id);
+      if (task) task.done = done;
+      toast(done ? "任务已完成" : "任务已重新打开");
+      renderAll();
+    }
+    function deleteTask(id) {
+      if (denyIfCannot("editTasks")) return;
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      if (!confirm(`确认删除任务「${task.title}」？`)) return;
+      state.tasks = state.tasks.filter(t => t.id !== id);
+      if (focusedTaskId === id) focusedTaskId = "";
+      toast("任务已删除。");
+      renderAll();
+    }
+    function archiveDoc(id) {
+      if (denyIfCannot("editDocs")) return;
+      const doc = state.deliverables.find(d => d.id === id);
+      if (doc) {
+        doc.status = "已归档";
+        doc.updated = "今天";
+        toast(`已归档：${doc.name}`);
+      }
+      renderAll();
+    }
+    function openDocLink(id) {
+      const doc = state.deliverables.find(d => d.id === id);
+      if (!doc) return;
+      if (!doc.url) {
+        const html = `<html><head><title>${escapeAttr(doc.name)}</title><style>body{font:16px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;line-height:1.7;max-width:780px;margin:48px auto;color:#1d1d1f;white-space:pre-wrap}h1{font-size:28px}</style></head><body><h1>${escapeAttr(doc.name)}</h1>${escapeAttr(doc.content || "暂无文件内容。")}</body></html>`;
+        const blob = new Blob([html], { type: "text/html" });
+        window.open(URL.createObjectURL(blob), "_blank", "noopener");
+        return;
+      }
+      const raw = doc.url.trim();
+      const href = /^(https?:|file:|mailto:|blob:|data:)/.test(raw) ? raw : `https://${raw}`;
+      window.open(href, "_blank", "noopener");
+    }
+    function addDroppedFiles(files) {
+      if (!can("editDocs")) {
+        toast("当前账号没有新增资料权限。");
+        return;
+      }
+      const p = currentProduct();
+      const incoming = [...files].filter(file => file && file.name);
+      if (!incoming.length) return;
+      let pending = incoming.length;
+      const commitDoc = doc => {
+        state.deliverables.unshift(doc);
+        pending -= 1;
+        if (pending === 0) {
+          toast(`已加入 ${incoming.length} 个文件。`);
+          renderAll();
+        }
+      };
+      incoming.forEach(file => {
+        const fileType = String(file.type || "");
+        const doc = {
+          id: cryptoId(),
+          productId: p.id,
+          name: file.name,
+          stage: selectedStage,
+          required: false,
+          type: fileType.startsWith("image/") ? "图片" : fileType.startsWith("video/") ? "视频" : "文档",
+          source: "拖入文件",
+          url: "",
+          status: "未开始",
+          owner: "产品部",
+          updated: "今天"
+        };
+        if (file instanceof Blob && fileType.startsWith("image/") && typeof FileReader !== "undefined") {
+          const reader = new FileReader();
+          reader.onload = () => {
+            doc.url = String(reader.result || "");
+            commitDoc(doc);
+          };
+          reader.onerror = () => {
+            doc.url = URL.createObjectURL(file);
+            commitDoc(doc);
+          };
+          reader.readAsDataURL(file);
+          return;
+        }
+        doc.url = file instanceof Blob ? URL.createObjectURL(file) : "";
+        commitDoc(doc);
+      });
+    }
+    function bindPackageDropzone() {
+      const zone = document.getElementById("deliverableRows");
+      if (!zone) return;
+      if (zone.dataset.dropBound === "1") return;
+      zone.dataset.dropBound = "1";
+      ["dragenter", "dragover"].forEach(eventName => zone.addEventListener(eventName, event => {
+        event.preventDefault();
+        zone.classList.add("dragging");
+      }));
+      ["dragleave", "drop"].forEach(eventName => zone.addEventListener(eventName, event => {
+        event.preventDefault();
+        if (eventName === "drop") addDroppedFiles(event.dataTransfer.files);
+        zone.classList.remove("dragging");
+      }));
+    }
+    function updateDocField(id, field, value) {
+      if (denyIfCannot("editDocs")) return;
+      const doc = state.deliverables.find(d => d.id === id);
+      if (!doc) return;
+      doc[field] = field === "stage" ? Number(value) : value;
+      doc.updated = "今天";
+      saveState();
+      renderStatus();
+    }
+    function deleteDoc(id) {
+      if (denyIfCannot("editDocs")) return;
+      const doc = state.deliverables.find(d => d.id === id);
+      if (!doc) return;
+      if (!confirm(`确认删除文件「${doc.name}」？`)) return;
+      state.deliverables = state.deliverables.filter(d => d.id !== id);
+      toast("文件已删除。");
+      renderAll();
+    }
+    function advanceStage() {
+      const p = currentProduct();
+      const ready = stageReady(p);
+      if (!ready.ready) {
+        toast("当前阶段还有任务、交付物或评审未完成，系统不建议推进。");
+        return;
+      }
+      if (p.stage < stages.length - 1) {
+        p.stage += 1;
+        if (p.stage === 4) p.status = "上市筹备";
+        if (p.stage === 6) p.status = "维持观察";
+        toast(`已进入：${stages[p.stage].name}`);
+      } else {
+        toast("已经在生命周期管理阶段。");
+      }
+      renderAll();
+    }
+    function completeCurrentStage() {
+      const p = currentProduct();
+      productTasks(p.id).filter(t => t.stage === p.stage).forEach(t => t.done = true);
+      productDeliverables(p.id).filter(d => d.stage === p.stage && d.required).forEach(d => { d.status = "已归档"; d.updated = "今天"; });
+      productReviews(p.id).filter(r => r.stage === p.stage && r.status === "待评审").forEach(r => { r.status = "已通过"; r.result = "通过，进入下一节点"; });
+      toast("当前阶段任务、关键交付物和评审已完成。");
+      renderAll();
+    }
+    function approveCurrentReview() {
+      if (denyIfCannot("editReviews")) return;
+      const p = currentProduct();
+      const review = productReviews(p.id).find(r => r.stage === p.stage && r.status === "待评审");
+      if (!review) {
+        toast("当前阶段没有待评审会议。");
+        return;
+      }
+      review.status = "已通过";
+      review.result = "通过，进入下一节点";
+      state.decisions.unshift({ id: cryptoId(), productId: p.id, title: `${review.title}通过`, body: `会议结论：${p.name} 当前阶段通过，后续按 ${p.level} 流程继续推进。`, date: "今天" });
+      toast("评审已通过，并写入决策记录。");
+      renderAll();
+    }
+    function addMeetingMinutes(payload) {
+      if (denyIfCannot("editReviews")) return;
+      const [productId, meetingId] = payload.split("|");
+      const product = productById(productId);
+      const meeting = meetingRules.find(rule => rule.id === meetingId);
+      if (!product || !meeting) return;
+      const existing = productDeliverables(product.id).find(doc => doc.stage === meeting.stage && (doc.name.includes(meeting.minute) || doc.name.includes(meeting.title)));
+      if (existing) {
+        existing.name = meeting.minute;
+        existing.source = "会议产生";
+        existing.status = "已归档";
+        existing.owner = meeting.owner;
+        existing.updated = "今天";
+        existing.content = existing.content || defaultMinuteContent(existing, true);
+        activeMinuteDocId = existing.id;
+      } else {
+        const doc = {
+          id: cryptoId(),
+          productId: product.id,
+          name: meeting.minute,
+          stage: meeting.stage,
+          required: true,
+          type: "文档",
+          source: "会议产生",
+          url: "",
+          status: "已归档",
+          owner: meeting.owner,
+          updated: "今天"
+        };
+        doc.content = defaultMinuteContent(doc, true);
+        state.deliverables.unshift(doc);
+        activeMinuteDocId = doc.id;
+      }
+      state.decisions.unshift({
+        id: cryptoId(),
+        productId: product.id,
+        title: `${meeting.title}通过`,
+        body: `已补齐「${meeting.minute}」，系统按会议纪要判断该会议通过。`,
+        date: "今天"
+      });
+      currentId = product.id;
+      toast("会议纪要已补齐。");
+      renderAll();
+    }
+    function openMeetingDoc(payload) {
+      const [productId, docId] = payload.split("|");
+      const product = productById(productId);
+      const doc = state.deliverables.find(d => d.id === docId);
+      if (!product || !doc) return;
+      currentId = product.id;
+      selectedStage = product.stage;
+      activeMinuteDocId = doc.id;
+      navigateToScreen("reviews");
+      renderAll();
+    }
+    function updateMinuteDoc(id, field, value) {
+      if (denyIfCannot("editReviews")) return;
+      const doc = state.deliverables.find(d => d.id === id);
+      if (!doc) return;
+      doc[field] = value;
+      doc.updated = "今天";
+      saveState();
+    }
+    function addReview() {
+      if (denyIfCannot("editReviews")) return;
+      const p = currentProduct();
+      state.reviews.unshift({
+        id: cryptoId(),
+        productId: p.id,
+        title: `${stages[selectedStage].short}补充评审`,
+        stage: selectedStage,
+        status: "待评审",
+        owner: "产品部",
+        result: "待定"
+      });
+      toast("已新增评审会议。");
+      renderAll();
+    }
+    function updateReviewField(id, field, value) {
+      if (denyIfCannot("editReviews")) return;
+      const review = state.reviews.find(r => r.id === id);
+      if (!review) return;
+      review[field] = field === "stage" ? Number(value) : value;
+      saveState();
+      renderStatus();
+    }
+    function deleteReview(id) {
+      if (denyIfCannot("editReviews")) return;
+      const review = state.reviews.find(r => r.id === id);
+      if (!review) return;
+      if (!confirm(`确认删除评审「${review.title}」？`)) return;
+      state.reviews = state.reviews.filter(r => r.id !== id);
+      toast("评审会议已删除。");
+      renderAll();
+    }
+    function markKeyDocs() {
+      if (denyIfCannot("editDocs")) return;
+      const p = currentProduct();
+      productDeliverables(p.id).filter(d => d.stage <= p.stage && d.required).forEach(d => { d.status = "已归档"; d.updated = "今天"; });
+      toast("当前阶段前的关键文档已归档。");
+      renderAll();
+    }
+    function addDecision() {
+      if (denyIfCannot("editReviews")) return;
+      const p = currentProduct();
+      state.decisions.unshift({
+        id: cryptoId(),
+        productId: p.id,
+        title: `${stages[p.stage].short}阶段人工决策`,
+        body: `确认 ${p.name} 当前阶段继续推进，关键责任人和交付物已同步。`,
+        date: "今天"
+      });
+      toast("已新增一条决策记录。");
+      renderAll();
+    }
+    function updateDecisionField(id, field, value) {
+      if (denyIfCannot("editReviews")) return;
+      const decision = state.decisions.find(d => d.id === id);
+      if (!decision) return;
+      decision[field] = value;
+      saveState();
+    }
+    function deleteDecision(id) {
+      if (denyIfCannot("editReviews")) return;
+      const decision = state.decisions.find(d => d.id === id);
+      if (!decision) return;
+      if (!confirm(`确认删除决策「${decision.title}」？`)) return;
+      state.decisions = state.decisions.filter(d => d.id !== id);
+      toast("决策记录已删除。");
+      renderAll();
+    }
+    function setDemandStatus(id, status) {
+      if (denyIfCannot("editDemand")) return;
+      const demand = state.demands.find(d => d.id === id);
+      if (!demand || demand.status === "已转开发") return;
+      const discussionByStatus = {
+        "待讨论": "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品等级。",
+        "讨论中": "讨论中：请补充市场空间、用户痛点、竞品情况、供应链可行性和资源投入。",
+        "已讨论": "讨论结论：方向成立，建议转入产品立项，继续补齐 PRD、首批定量和资源投入判断。",
+        "暂缓": "暂缓：当前信息、资源或时机不足，后续重新评估。"
+      };
+      if (!discussionByStatus[status]) return;
+      demand.status = status;
+      demand.discussion = discussionByStatus[status];
+      toast(`需求状态已调整为：${status}`);
+      renderAll();
+    }
+    function updateProductStatus(id, status) {
+      if (denyIfCannot("editLifecycleStatus")) return;
+      if (!productStatuses.includes(status)) return;
+      const product = productById(id);
+      if (!product || product.status === status) return;
+      product.status = status;
+      toast(`${product.name} 状态已调整为：${status}`);
+      renderAll();
+    }
+    function updateProductMetric(payload, value) {
+      if (denyIfCannot("editMetrics")) return;
+      const [productId, field] = payload.split("|");
+      const product = productById(productId);
+      if (!product || !["sales", "score", "returnRate", "profit"].includes(field)) return;
+      const raw = Number(value);
+      if (field === "sales") product.sales = Math.round(clampNumber(raw, 0, 999999));
+      if (field === "score") product.score = Math.round(clampNumber(raw, 0, 5) * 10) / 10;
+      if (field === "returnRate") product.returnRate = Math.round(clampNumber(raw, 0, 100) * 10) / 1000;
+      if (field === "profit") product.profit = Math.round(clampNumber(raw, -100, 100) * 10) / 1000;
+      toast(`${product.name} 经营数据已更新。`);
+      renderAll();
+    }
+    function startDemandDiscussion(id) {
+      setDemandStatus(id, "讨论中");
+    }
+    function finishDemandDiscussion(id) {
+      setDemandStatus(id, "已讨论");
+    }
+    function pauseDemand(id) {
+      setDemandStatus(id, "暂缓");
+    }
+    function deleteDemand(id) {
+      if (denyIfCannot("editDemand")) return;
+      const demand = state.demands.find(d => d.id === id);
+      if (!demand) return;
+      const extra = demand.productId ? "已生成的产品档案会保留。" : "";
+      if (!confirm(`确认删除机会「${demand.name}」？${extra}`)) return;
+      state.demands = state.demands.filter(d => d.id !== id);
+      toast("需求机会已删除。");
+      renderAll();
+    }
+    function deleteProduct(id) {
+      if (denyIfCannot("deleteProduct")) return;
+      const product = productById(id);
+      if (!product) return;
+      if (state.products.length <= 1) {
+        toast("至少需要保留一个产品档案。");
+        return;
+      }
+      if (!confirm(`确认删除产品档案「${product.name}」？相关任务、交付物、评审和决策都会删除。`)) return;
+      state.products = state.products.filter(p => p.id !== id);
+      state.tasks = state.tasks.filter(t => t.productId !== id);
+      state.deliverables = state.deliverables.filter(d => d.productId !== id);
+      state.reviews = state.reviews.filter(r => r.productId !== id);
+      state.decisions = state.decisions.filter(d => d.productId !== id);
+      state.demands.forEach(demand => {
+        if (demand.productId === id) {
+          demand.productId = "";
+          demand.status = "已讨论";
+          demand.discussion = "原产品档案已删除，可重新评估后再次转入开发。";
+        }
+      });
+      currentId = state.products[0].id;
+      selectedStage = currentProduct().stage;
+      toast("产品档案及关联数据已删除。");
+      renderAll();
+    }
+    function convertDemandToProduct(id) {
+      if (denyIfCannot("convertDemand")) return;
+      const demand = state.demands.find(d => d.id === id);
+      if (!demand) return;
+      if (demand.productId) {
+        currentId = demand.productId;
+        selectedStage = currentProduct().stage;
+        toast("该机会已经转入产品开发。");
+        renderAll();
+        return;
+      }
+      const product = {
+        id: cryptoId(),
+        name: demand.name,
+        level: demand.level,
+        owner: demand.owner,
+        source: demand.source,
+        status: "开发中",
+        stage: 1,
+        launch: "-",
+        sales: 0, score: 0, returnRate: 0, profit: 0,
+        image: generateProductImage(demand.name),
+        desc: `${demand.desc} ${demand.discussion}`
+      };
+      state.products.unshift(product);
+      state.tasks.push(...buildInitialTasks([product]));
+      state.deliverables.push(...buildInitialDeliverables([product]));
+      state.reviews.push(...buildInitialReviews([product]));
+      state.decisions.unshift({
+        id: cryptoId(),
+        productId: product.id,
+        title: "需求池转入开发",
+        body: `机会「${demand.name}」已讨论通过，进入产品立项阶段。`,
+        date: "今天"
+      });
+      demand.status = "已转开发";
+      demand.productId = product.id;
+      demand.discussion = "已转开发：自动生成产品档案，当前进入产品立项阶段。";
+      currentId = product.id;
+      selectedStage = product.stage;
+      toast("已生成产品档案，并进入产品立项阶段。");
+      renderAll();
+    }
+    function openModal(mode, id = "") {
+      if (mode === "idea" && denyIfCannot("addIdea")) return;
+      if (mode === "demandEdit" && denyIfCannot("editDemand")) return;
+      if (mode === "productEdit" && denyIfCannot("editProduct")) return;
+      modalMode = mode;
+      editingId = id;
+      const titleMap = {
+        idea: "添加需求机会",
+        demandEdit: "编辑需求机会",
+        productEdit: "编辑产品档案"
+      };
+      document.getElementById("modalTitle").textContent = titleMap[mode] || "添加需求机会";
+      const target = mode === "demandEdit"
+        ? state.demands.find(d => d.id === id)
+        : mode === "productEdit"
+          ? productById(id)
+          : null;
+      document.getElementById("formName").value = target?.name || "";
+      document.getElementById("formLevel").value = target?.level || "P1 常规新品";
+      document.getElementById("formOwner").value = target?.owner || "赵雨涵";
+      document.getElementById("formSource").value = target?.source || "产品部";
+      document.getElementById("formDesc").value = target?.desc || "";
+      const imageField = document.getElementById("imageField");
+      const imageInput = document.getElementById("formImage");
+      const imagePreview = document.getElementById("formImagePreview");
+      imageField.classList.toggle("show", mode === "productEdit");
+      if (mode === "productEdit") {
+        const image = target?.image || generateProductImage(target?.name || "产品");
+        imageInput.value = image;
+        setImagePreview(image, target?.name || "产品");
+      } else {
+        imageInput.value = "";
+        imagePreview.onerror = null;
+        imagePreview.removeAttribute("src");
+      }
+      document.getElementById("modal").classList.add("open");
+    }
+    function closeModal() {
+      document.getElementById("modal").classList.remove("open");
+    }
+    function saveModal() {
+      const name = document.getElementById("formName").value.trim();
+      if (!name) {
+        toast("请先填写产品/机会名称。");
+        return;
+      }
+      if (modalMode === "demandEdit") {
+        if (denyIfCannot("editDemand")) return;
+        const demand = state.demands.find(d => d.id === editingId);
+        if (!demand) return;
+        demand.name = name;
+        demand.level = document.getElementById("formLevel").value;
+        demand.owner = document.getElementById("formOwner").value.trim() || "产品部";
+        demand.source = document.getElementById("formSource").value;
+        demand.desc = document.getElementById("formDesc").value.trim() || demand.desc;
+        closeModal();
+        toast("需求机会已更新。");
+        renderAll();
+        return;
+      }
+      if (modalMode === "productEdit") {
+        if (denyIfCannot("editProduct")) return;
+        const product = productById(editingId);
+        if (!product) return;
+        product.name = name;
+        product.level = document.getElementById("formLevel").value;
+        product.owner = document.getElementById("formOwner").value.trim() || "产品部";
+        product.source = document.getElementById("formSource").value;
+        product.desc = document.getElementById("formDesc").value.trim() || product.desc;
+        product.image = document.getElementById("formImage").value.trim() || generateProductImage(product.name);
+        closeModal();
+        toast("产品档案已更新。");
+        renderAll();
+        return;
+      }
+      if (denyIfCannot("addIdea")) return;
+      const item = {
+        id: cryptoId(),
+        name,
+        level: document.getElementById("formLevel").value,
+        owner: document.getElementById("formOwner").value.trim() || "产品部",
+        source: document.getElementById("formSource").value,
+        status: modalMode === "product" ? "开发中" : "待讨论",
+        stage: 0,
+        launch: "-",
+        sales: 0, score: 0, returnRate: 0, profit: 0,
+        desc: document.getElementById("formDesc").value.trim() || "新机会已进入机会池，等待初筛。"
+      };
+      state.demands.unshift({
+        id: item.id,
+        name: item.name,
+        level: item.level,
+        owner: item.owner,
+        source: item.source,
+        status: "待讨论",
+        productId: "",
+        created: "今天",
+        desc: item.desc,
+        discussion: "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品等级。"
+      });
+      closeModal();
+      toast("机会已进入需求池。");
+      renderAll();
+    }
+    function updateStageTask(id, field, value) {
+      if (denyIfCannot("editTasks")) return;
+      const task = state.tasks.find(t => t.id === id);
+      if (!task) return;
+      task[field] = value;
+      saveState();
+      if (field === "done") renderAll();
+    }
+    function addTaskForSelectedStage() {
+      if (denyIfCannot("editTasks")) return;
+      const p = currentProduct();
+      const task = {
+        id: cryptoId(),
+        productId: p.id,
+        stage: selectedStage,
+        category: "补充任务",
+        title: "新的阶段任务",
+        owner: "产品部",
+        deliverable: "新的阶段交付物",
+        due: "07-30",
+        done: false
+      };
+      state.tasks.push(task);
+      state.deliverables.unshift({
+        id: cryptoId(),
+        productId: p.id,
+        name: task.deliverable,
+        stage: selectedStage,
+        required: false,
+        type: "文档",
+        source: "任务补充",
+        url: "",
+        status: "未开始",
+        owner: task.owner,
+        updated: "今天"
+      });
+      toast(`已添加到：${stages[selectedStage].short}`);
+      renderAll();
+    }
+    function setSelectedStageAsCurrent() {
+      if (denyIfCannot("editTasks")) return;
+      const p = currentProduct();
+      p.stage = selectedStage;
+      if (p.stage < 4) p.status = "开发中";
+      if (p.stage === 4 || p.stage === 5) p.status = "上市筹备";
+      if (p.stage === 6) p.status = "维持观察";
+      toast(`当前进度已调整为：${stages[p.stage].name}`);
+      renderAll();
+    }
+    function toast(text) {
+      const el = document.getElementById("toast");
+      el.textContent = text;
+      el.classList.add("show");
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+    }
+    const pageTitles = {
+      dashboard: ["产品协同总览", "只看本周要处理的待办事项和跨产品风险提醒。"],
+      demands: ["需求池", "先收集机会，讨论清楚，再转入产品开发流程。"],
+      products: ["产品档案", "每个产品的状态、等级、阶段和负责人。"],
+      workflow: ["产品进度", "按阶段、任务、会议、交付物和准入条件推进。"],
+      deliverables: ["资料包", "像文件夹一样管理这个产品的文档、图片、视频、链接和会议纪要。"],
+      reviews: ["评审决策", "会议任务完成且纪要内容非空，才算评审通过。"],
+      lifecycle: ["生命周期看板", "从首月/季度复盘形成决策，再按升级、维持、清仓或淘汰路径推进。"]
+    };
+    function navigateToScreen(screen) {
+      if (!pageTitles[screen]) return;
+      if (!screenAllowed(screen)) screen = firstAllowedScreen();
+      const activeNav = screen === "deliverables" ? "products" : screen;
+      document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.screen === activeNav));
+      document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === screen));
+      document.getElementById("pageTitle").textContent = pageTitles[screen][0];
+      document.getElementById("pageSub").textContent = pageTitles[screen][1];
+      document.getElementById("statusFilter").classList.toggle("hidden", screen !== "products");
+      document.getElementById("productSelect").classList.toggle("hidden", screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "lifecycle");
+      document.getElementById("newIdea").classList.toggle("hidden", !can("addIdea") || screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "reviews" || screen === "lifecycle");
+    }
+    function syncTodoDateInputs() {
+      const start = document.getElementById("todoStartDate");
+      const end = document.getElementById("todoEndDate");
+      if (start) start.value = todoDateRange.start;
+      if (end) end.value = todoDateRange.end;
+    }
+    document.getElementById("nav").addEventListener("click", e => {
+      const btn = e.target.closest("button[data-screen]");
+      if (!btn) return;
+      navigateToScreen(btn.dataset.screen);
+    });
+    document.getElementById("productSelect").addEventListener("change", e => { currentId = e.target.value; selectedStage = currentProduct().stage; activeMinuteDocId = ""; renderAll(); });
+    const todoStartInput = document.getElementById("todoStartDate");
+    if (todoStartInput) todoStartInput.addEventListener("change", e => { todoDateRange.start = e.target.value; renderTasks(); if (window.lucide) lucide.createIcons(); });
+    const todoEndInput = document.getElementById("todoEndDate");
+    if (todoEndInput) todoEndInput.addEventListener("change", e => { todoDateRange.end = e.target.value; renderTasks(); if (window.lucide) lucide.createIcons(); });
+    document.getElementById("statusFilter").addEventListener("change", renderProducts);
+    const approveReviewButton = document.getElementById("approveReview");
+    if (approveReviewButton) approveReviewButton.addEventListener("click", approveCurrentReview);
+    const addReviewButton = document.getElementById("addReview");
+    if (addReviewButton) addReviewButton.addEventListener("click", addReview);
+    const addDecisionButton = document.getElementById("addDecision");
+    if (addDecisionButton) addDecisionButton.addEventListener("click", addDecision);
+    document.getElementById("switchUser").addEventListener("click", logoutUser);
+    document.getElementById("newIdea").addEventListener("click", () => openModal("idea"));
+    document.getElementById("addDemand").addEventListener("click", () => openModal("idea"));
+    document.getElementById("closeModal").addEventListener("click", closeModal);
+    document.getElementById("cancelModal").addEventListener("click", closeModal);
+    document.getElementById("saveModal").addEventListener("click", saveModal);
+    document.getElementById("formImage").addEventListener("input", e => {
+      const value = e.target.value.trim();
+      if (value) document.getElementById("formImagePreview").src = value;
+    });
+    document.getElementById("formImageFile").addEventListener("change", e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        document.getElementById("formImage").value = reader.result;
+        setImagePreview(reader.result, document.getElementById("formName").value.trim() || "产品");
+      };
+      reader.readAsDataURL(file);
+    });
+    document.getElementById("regenerateImage").addEventListener("click", () => {
+      const name = document.getElementById("formName").value.trim() || "产品";
+      const image = generateProductImage(name, Date.now().toString());
+      document.getElementById("formImage").value = image;
+      setImagePreview(image, name);
+      toast("已按产品名称重新生成封面。");
+    });
+    document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+    document.addEventListener("click", e => {
+      const target = e.target.closest("button");
+      if (!target) return;
+      if (target.dataset.riskProduct) {
+        const product = productById(target.dataset.riskProduct);
+        if (product) selectProductAndNavigate(product.id, "workflow", { message: `已定位到：${product.name} · ${stages[product.stage].short}` });
+        return;
+      }
+      if (target.dataset.demandSort) {
+        e.preventDefault();
+        setDemandSort(target.dataset.demandSort);
+        return;
+      }
+      if (target.id === "completeAllVisible") completeCurrentStage();
+    });
+    syncTodoDateInputs();
+    renderAll();
+  </script>
+</body>
+</html>
