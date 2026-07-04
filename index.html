@@ -1233,6 +1233,7 @@
           </div>
           <div class="ding-connect-actions">
             <button class="mini-action" id="dingCheck" type="button"><i data-lucide="radar"></i>检测环境</button>
+            <button class="mini-action hidden" id="localDevLogin" type="button"><i data-lucide="monitor-check"></i>本地测试登录</button>
             <button class="btn primary" id="dingLogin" type="button"><i data-lucide="log-in"></i>重新登录</button>
           </div>
         </div>
@@ -1783,14 +1784,36 @@
       localStorage.removeItem("productFlowUser");
       renderLogin();
     }
+    function isLocalPreview() {
+      return location.protocol === "file:" || ["127.0.0.1", "localhost", ""].includes(location.hostname);
+    }
+    function loginLocalDev() {
+      if (!isLocalPreview()) return;
+      currentUser = {
+        role: "executive",
+        source: "local-dev",
+        dingUser: { name: "本地测试账号", title: "总经理" },
+        org: { corpId: "local-dev", deptIds: [], roles: [{ name: "总经理" }] },
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000
+      };
+      localStorage.setItem("productFlowUser", JSON.stringify(currentUser));
+      renderAll();
+      navigateToScreen(firstAllowedScreen());
+      toast("已进入本地测试模式。");
+    }
     function renderLogin() {
       const screen = document.getElementById("loginScreen");
       if (!screen) return;
       screen.classList.toggle("hidden", !!currentUser);
       const checkButton = document.getElementById("dingCheck");
       const loginButton = document.getElementById("dingLogin");
+      const localDevButton = document.getElementById("localDevLogin");
       if (checkButton) checkButton.onclick = () => checkDingTalkEnvironment({ loginWhenReady: true });
       if (loginButton) loginButton.onclick = () => attemptDingTalkLogin({ force: true });
+      if (localDevButton) {
+        localDevButton.classList.toggle("hidden", !isLocalPreview());
+        localDevButton.onclick = loginLocalDev;
+      }
       if (!currentUser && !dingAutoLoginTried) {
         dingAutoLoginTried = true;
         setTimeout(() => attemptDingTalkLogin({ force: false }), 200);
