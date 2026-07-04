@@ -55,15 +55,15 @@
     .app {
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 252px minmax(0, 1fr);
-      gap: 20px;
-      padding: 16px 18px 18px 16px;
+      grid-template-columns: 220px minmax(0, 1fr);
+      gap: 18px;
+      padding: 14px 16px 16px 14px;
     }
     .sidebar {
       position: sticky;
       top: 16px;
       height: calc(100vh - 34px);
-      padding: 18px 14px;
+      padding: 14px 10px;
       background: var(--panel);
       color: var(--ink);
       border: 1px solid var(--line);
@@ -71,13 +71,13 @@
       box-shadow: var(--shadow);
       display: flex;
       flex-direction: column;
-      gap: 18px;
+      gap: 14px;
     }
     .brand {
       display: flex;
       align-items: center;
       gap: 10px;
-      padding: 8px 10px 16px;
+      padding: 6px 8px 14px;
       border-bottom: 1px solid var(--line);
     }
     .brand-mark {
@@ -226,7 +226,7 @@
       height: 42px;
       border: 0;
       border-radius: 8px;
-      padding: 0 11px;
+      padding: 0 10px;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -584,6 +584,19 @@
       border-collapse: collapse;
       font-size: 13px;
     }
+    #dashboard .task-table { min-width: 900px; }
+    #dashboard .task-table th:nth-child(1),
+    #dashboard .task-table td:nth-child(1) { width: 16%; }
+    #dashboard .task-table th:nth-child(2),
+    #dashboard .task-table td:nth-child(2) { width: 34%; }
+    #dashboard .task-table th:nth-child(3),
+    #dashboard .task-table td:nth-child(3) { width: 17%; }
+    #dashboard .task-table th:nth-child(4),
+    #dashboard .task-table td:nth-child(4) { width: 18%; }
+    #dashboard .task-table th:nth-child(5),
+    #dashboard .task-table td:nth-child(5) { width: 7%; }
+    #dashboard .task-table th:nth-child(6),
+    #dashboard .task-table td:nth-child(6) { width: 8%; }
     .task-table th, .task-table td {
       padding: 11px 9px;
       border-bottom: 1px solid var(--line);
@@ -1150,6 +1163,26 @@
     .swatch.blue { background: #246f9e; }
     .swatch.gold { background: #b87514; }
     .mobile-tabs { display: none; }
+    @media (max-width: 1680px) {
+      .app { grid-template-columns: 188px minmax(0, 1fr); gap: 12px; padding: 12px; }
+      .sidebar { top: 12px; height: calc(100vh - 24px); padding: 12px 8px; }
+      .brand { gap: 8px; padding: 4px 7px 12px; }
+      .brand-mark { width: 34px; height: 34px; }
+      .brand strong { font-size: 14px; }
+      .brand span { font-size: 11px; }
+      .nav { gap: 4px; }
+      .nav button { height: 38px; padding: 0 8px; gap: 8px; font-size: 13px; }
+      .topbar { min-height: 56px; margin-bottom: 14px; }
+      h1 { font-size: 23px; }
+      .sub { font-size: 12px; }
+      .panel { padding: 16px; }
+      #dashboard .layout-main { grid-template-columns: 1fr; }
+      #dashboard #riskList {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+    }
     @media (max-width: 1100px) {
       .app { grid-template-columns: 1fr; padding: 12px; }
       .sidebar {
