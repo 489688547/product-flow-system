@@ -14,3 +14,8 @@ test("app shell uses a narrower navigation rail before mobile collapse", () => {
   assert.match(html, /\.app \{\s+min-height: 100vh;\s+display: grid;\s+grid-template-columns: 224px minmax\(0, 1fr\);/);
   assert.match(html, /@media \(max-width: 1680px\)[\s\S]*\.app \{ grid-template-columns: 188px minmax\(0, 1fr\);/);
 });
+
+test("product archive rows do not highlight the current product", () => {
+  assert.doesNotMatch(html, /archive-row \$\{p\.id === currentId/);
+  assert.doesNotMatch(html, /\.product-row\.active/);
+});

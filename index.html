@@ -514,7 +514,6 @@
       gap: 6px;
     }
     .product-row:hover { border-color: var(--line-strong); background: var(--panel-2); }
-    .product-row.active { border-color: #93c5fd; box-shadow: 0 0 0 3px var(--ring); }
     .product-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .product-name strong, .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .product-identity {
@@ -2738,7 +2737,7 @@
       const list = state.products.filter(p => filter === "all" || p.status === filter);
       const productEditable = can("editProduct");
       const productDeletable = can("deleteProduct");
-      document.getElementById("productList").innerHTML = list.map(p => `<div class="product-row archive-row ${p.id === currentId ? "active" : ""}">
+      document.getElementById("productList").innerHTML = list.map(p => `<div class="product-row archive-row">
         ${productIdentityHtml(p, p.desc)}
         <span class="badge ${badgeClass(p.status)}">${esc(p.status)}</span>
         <span>${esc(p.level.split(" ")[0])}</span>
