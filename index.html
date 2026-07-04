@@ -1233,7 +1233,6 @@
           </div>
           <div class="ding-connect-actions">
             <button class="mini-action" id="dingCheck" type="button"><i data-lucide="radar"></i>检测环境</button>
-            <button class="mini-action hidden" id="localDevLogin" type="button"><i data-lucide="monitor-check"></i>本地测试登录</button>
             <button class="btn primary" id="dingLogin" type="button"><i data-lucide="log-in"></i>重新登录</button>
           </div>
         </div>
@@ -1801,17 +1800,31 @@
       navigateToScreen(firstAllowedScreen());
       toast("已进入本地测试模式。");
     }
+    function createLocalDevLoginButton() {
+      if (!isLocalPreview()) return null;
+      let button = document.getElementById("localDevLogin");
+      if (button) return button;
+      const loginButton = document.getElementById("dingLogin");
+      const actions = loginButton?.parentElement;
+      if (!actions) return null;
+      button = document.createElement("button");
+      button.className = "mini-action";
+      button.id = "localDevLogin";
+      button.type = "button";
+      button.innerHTML = '<i data-lucide="monitor-check"></i>本地测试登录';
+      actions.insertBefore(button, loginButton);
+      return button;
+    }
     function renderLogin() {
       const screen = document.getElementById("loginScreen");
       if (!screen) return;
       screen.classList.toggle("hidden", !!currentUser);
       const checkButton = document.getElementById("dingCheck");
       const loginButton = document.getElementById("dingLogin");
-      const localDevButton = document.getElementById("localDevLogin");
+      const localDevButton = createLocalDevLoginButton();
       if (checkButton) checkButton.onclick = () => checkDingTalkEnvironment({ loginWhenReady: true });
       if (loginButton) loginButton.onclick = () => attemptDingTalkLogin({ force: true });
       if (localDevButton) {
-        localDevButton.classList.toggle("hidden", !isLocalPreview());
         localDevButton.onclick = loginLocalDev;
       }
       if (!currentUser && !dingAutoLoginTried) {
