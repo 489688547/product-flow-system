@@ -8,8 +8,8 @@
   <script src="https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.40/dingtalk.open.js"></script>
   <style>
     :root {
-      --bg: #f5f7fb;
-      --bg-elevated: #eef2f7;
+      --bg: #f6f8fb;
+      --bg-elevated: #eef3fa;
       --panel: #ffffff;
       --panel-solid: #ffffff;
       --panel-2: #f8fafc;
@@ -17,8 +17,8 @@
       --ink: #111827;
       --ink-soft: #334155;
       --muted: #64748b;
-      --line: #e2e8f0;
-      --line-strong: #cbd5e1;
+      --line: #e6ebf2;
+      --line-strong: #cdd7e5;
       --green: #16a34a;
       --green-soft: #ecfdf5;
       --blue: #2563eb;
@@ -40,8 +40,8 @@
       --sidebar-ink: #111827;
       --sidebar-muted: #64748b;
       --ring: rgba(37, 99, 235, .22);
-      --shadow: 0 1px 2px rgba(15, 23, 42, .06);
-      --shadow-lift: 0 4px 8px rgba(15, 23, 42, .08);
+      --shadow: none;
+      --shadow-lift: 0 2px 6px rgba(15, 23, 42, .06);
       --radius: 8px;
     }
 
@@ -324,7 +324,7 @@
       font-weight: 650;
       box-shadow: var(--shadow);
     }
-    .btn:hover, .icon-btn:hover, .mini-action:hover { background: var(--control-hover); border-color: var(--line-strong); }
+    .btn:hover, .icon-btn:hover, .mini-action:hover { background: #f7fbff; border-color: #bcd3ff; color: var(--primary); }
     .btn.primary {
       border-color: var(--primary);
       background: var(--primary);
@@ -367,6 +367,33 @@
     }
     .screen { display: none; }
     .screen.active { display: block; }
+    .page-section {
+      display: grid;
+      gap: 14px;
+    }
+    .section-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .section-title h2 {
+      font-size: 16px;
+      line-height: 1.28;
+      font-weight: 750;
+    }
+    .section-title p {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
     .grid {
       display: grid;
       gap: 14px;
@@ -410,7 +437,7 @@
       border-color: var(--metric-accent-border);
       background: linear-gradient(90deg, var(--metric-accent-soft) 0, #fff 62%);
     }
-    .metric:hover { border-color: var(--metric-accent); background: linear-gradient(90deg, var(--metric-accent-soft) 0, var(--panel-2) 68%); box-shadow: var(--shadow-lift); }
+    .metric:hover { border-color: var(--metric-accent); background: linear-gradient(90deg, var(--metric-accent-soft) 0, var(--panel-2) 68%); box-shadow: none; }
     .metric:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
     .metric-icon {
       width: 36px;
@@ -513,12 +540,24 @@
     }
     .product-row .table-actions { justify-content: flex-end; }
     .product-actions {
-      display: grid;
-      grid-template-columns: repeat(6, 30px);
+      display: flex;
       justify-content: end;
       gap: 6px;
     }
-    .product-row:hover { border-color: var(--line-strong); background: var(--panel-2); }
+    .product-action-menu {
+      display: flex;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .product-action-menu .mini-action {
+      min-width: 62px;
+      padding: 0 9px;
+    }
+    .product-action-menu .mini-action span {
+      line-height: 1;
+    }
+    .product-row:hover { border-color: #bcd3ff; background: #f9fbff; }
     .product-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .product-name strong, .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .product-identity {
@@ -588,7 +627,7 @@
       position: relative;
       cursor: pointer;
     }
-    .stage:hover { border-color: var(--line-strong); background: #fff; }
+    .stage:hover { border-color: #bcd3ff; background: #fff; }
     .stage.current {
       border-color: #93c5fd;
       background: var(--blue-soft);
@@ -737,7 +776,7 @@
     .check > svg { width: 16px; height: 16px; margin-top: 2px; color: var(--ink-soft); }
     .check strong { font-size: 13px; line-height: 1.35; font-weight: 750; }
     .check .badge { min-height: 22px; min-width: 22px; padding: 0 7px; font-size: 11px; }
-    .check:hover { background: #fff; border-color: var(--line-strong); }
+    .check:hover { background: #fff; border-color: #bcd3ff; }
     .check input { margin-top: 2px; }
     .check.done { color: var(--muted); }
     .section-gap { margin-top: 14px; }
@@ -758,6 +797,38 @@
       border-radius: 8px;
       padding: 2px;
     }
+    .package-drop-hint {
+      min-height: 58px;
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: var(--panel-2);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--ink-soft);
+    }
+    .package-drop-hint strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.25;
+      color: var(--ink);
+    }
+    .package-drop-hint span {
+      display: block;
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+    .package-drop-hint i {
+      width: 22px;
+      height: 22px;
+      color: var(--primary);
+      flex: 0 0 auto;
+    }
     .package-grid.dragging {
       border-color: #93c5fd;
       background: var(--blue-soft);
@@ -772,10 +843,7 @@
       box-shadow: var(--shadow);
       min-height: 214px;
     }
-    .file-card:hover {
-      border-color: var(--line-strong);
-      box-shadow: var(--shadow-lift);
-    }
+    .file-card:hover { border-color: #bcd3ff; box-shadow: none; }
     .file-preview {
       height: 104px;
       border-radius: 7px;
@@ -869,6 +937,32 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
     }
+    .demand-status-strip {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .demand-status-item {
+      min-height: 58px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      display: grid;
+      gap: 3px;
+    }
+    .demand-status-item strong {
+      font-size: 18px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .demand-status-item span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+      white-space: nowrap;
+    }
     .demand-card {
       padding: 14px;
       min-height: 196px;
@@ -877,7 +971,7 @@
       gap: 10px;
       background: var(--panel);
     }
-    .demand-card:hover { border-color: var(--line-strong); box-shadow: var(--shadow-lift); }
+    .demand-card:hover { border-color: #bcd3ff; box-shadow: none; }
     .demand-card h3 { font-size: 15px; line-height: 1.25; font-weight: 750; }
     .demand-card .small { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
     .demand-card-head {
@@ -956,7 +1050,13 @@
       width: 100%;
       overflow-x: auto;
       border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel);
     }
+    .table-wrap .task-table th:first-child,
+    .table-wrap .task-table td:first-child { padding-left: 12px; }
+    .table-wrap .task-table th:last-child,
+    .table-wrap .task-table td:last-child { padding-right: 12px; }
     .deliverable {
       padding: 13px;
       min-height: 152px;
@@ -1029,6 +1129,17 @@
       flex-wrap: wrap;
       gap: 6px;
     }
+    .review-action-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+    .review-action-group:empty { display: none; }
     .decision-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1118,6 +1229,12 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px 8px;
     }
+    .lifecycle-data-panel {
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
     .metric-edit-grid label {
       display: grid;
       gap: 3px;
@@ -1130,6 +1247,10 @@
       min-height: 30px;
       padding: 5px 7px;
       font-size: 12px;
+    }
+    .metric-input {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
     }
     .metric-stack strong {
       font-size: 13px;
@@ -1337,6 +1458,39 @@
       text-align: center;
       background: var(--panel-2);
     }
+    .empty-state {
+      grid-column: 1 / -1;
+      min-height: 168px;
+      padding: 28px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: var(--panel-2);
+      display: grid;
+      place-items: center;
+      text-align: center;
+      color: var(--muted);
+    }
+    .empty-state-inner {
+      max-width: 340px;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
+    }
+    .empty-state i {
+      width: 28px;
+      height: 28px;
+      color: var(--primary);
+    }
+    .empty-state strong {
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.3;
+    }
+    .empty-state p {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
     .split-row {
       display: flex;
       align-items: center;
@@ -1373,6 +1527,9 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
       }
+      .demand-status-strip { grid-template-columns: repeat(5, minmax(84px, 1fr)); overflow-x: auto; }
+      .product-row.archive-row { grid-template-columns: minmax(240px, 1fr) 90px 54px 76px minmax(270px, 390px); }
+      .product-action-menu .mini-action { min-width: 56px; }
     }
     @media (max-width: 1100px) {
       .app { grid-template-columns: 1fr; padding: 12px; }
@@ -1385,11 +1542,13 @@
       .nav button { justify-content: center; }
       .nav button span { display: none; }
       .layout-main, .cols-4, .cols-3, .cols-2, .package-grid, .demand-board, .decision-grid, .lifecycle-paths { grid-template-columns: 1fr; }
+      .demand-status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
       .product-list-head { display: none; }
       .product-row, .product-row.archive-row { grid-template-columns: 1fr; }
       .lifecycle-head { display: none; }
       .lifecycle-row { grid-template-columns: 1fr; align-items: start; }
       .product-row .table-actions { justify-content: flex-start; }
+      .product-action-menu,
       .product-actions { justify-content: start; }
       .role-grid { grid-template-columns: 1fr; }
     }
@@ -1400,6 +1559,8 @@
       .stage-map { grid-template-columns: repeat(7, 150px); }
       .form-grid { grid-template-columns: 1fr; }
       .task-table { min-width: 680px; }
+      .demand-status-strip { grid-template-columns: 1fr; }
+      .package-drop-hint { align-items: flex-start; }
       .stage-editor { overflow-x: auto; }
       .task-edit-row { grid-template-columns: 104px 240px 128px 150px 76px 70px 150px; min-width: 970px; }
       .sync-meeting-fields { grid-template-columns: 1fr; }
@@ -1503,8 +1664,8 @@
       </section>
 
       <section class="screen" id="demands">
-        <div class="grid">
-          <section class="panel">
+        <div class="page-section">
+          <section class="panel page-section">
             <div class="panel-head"><h2>需求推进规则</h2></div>
             <div class="decision-grid">
               <div class="decision"><strong>1. 收集机会</strong><p class="small">任何部门都可以提交一句话、链接、截图或用户反馈。</p></div>
@@ -1514,14 +1675,23 @@
             </div>
           </section>
           <section class="panel">
-            <div class="panel-head">
-              <div>
-                <h2>需求池</h2>
-                <p class="small">先把机会放进来，讨论清楚市场、用户、供应链和资源，再转入产品开发流程。</p>
+            <div class="section-toolbar">
+              <div class="section-title">
+                <h2>需求看板</h2>
+                <p>先把机会放进来，讨论清楚市场、用户、供应链和资源，再转入产品开发流程。</p>
               </div>
               <button class="btn primary" id="addDemand"><i data-lucide="plus"></i>添加机会</button>
             </div>
+            <div class="demand-status-strip" id="demandStatusStrip"></div>
             <div class="demand-board" id="demandBoard"></div>
+          </section>
+          <section class="panel">
+            <div class="section-toolbar">
+              <div class="section-title">
+                <h2>需求记录</h2>
+                <p>按一条条机会记录管理，可排序、编辑、暂停、恢复或转入产品开发。</p>
+              </div>
+            </div>
             <div class="table-wrap section-gap">
               <table class="task-table demand-table">
                 <thead>
@@ -1543,12 +1713,20 @@
       </section>
 
       <section class="screen" id="products">
-        <div class="product-list">
-          <div class="product-list-head" aria-hidden="true">
-            <span>产品</span><span>状态</span><span>等级</span><span>阶段</span><span>操作</span>
+        <section class="panel">
+          <div class="section-toolbar">
+            <div class="section-title">
+              <h2>产品列表</h2>
+              <p>产品只能从需求池转入开发后生成；这里负责查看状态、阶段、资料和会议记录。</p>
+            </div>
           </div>
-          <div class="product-list" id="productList"></div>
-        </div>
+          <div class="product-list">
+            <div class="product-list-head" aria-hidden="true">
+              <span>产品</span><span>状态</span><span>等级</span><span>阶段</span><span>操作</span>
+            </div>
+            <div class="product-list" id="productList"></div>
+          </div>
+        </section>
       </section>
 
       <section class="screen" id="workflow">
@@ -1576,6 +1754,10 @@
               <h2>资料包</h2>
               <p class="small">拖入文件即可加入当前产品资料包。</p>
             </div>
+          </div>
+          <div class="package-drop-hint">
+            <div><strong>拖拽文件到这里</strong><span>支持图片、视频、PDF、PPT、表格、文档、压缩包和普通链接资料。</span></div>
+            <i data-lucide="upload-cloud"></i>
           </div>
           <div class="package-grid" id="deliverableRows"></div>
         </div>
@@ -2600,6 +2782,15 @@
     function esc(value) {
       return escapeAttr(value);
     }
+    function emptyStateHtml(title, body, icon = "inbox") {
+      return `<div class="empty-state">
+        <div class="empty-state-inner">
+          <i data-lucide="${icon}"></i>
+          <strong>${esc(title)}</strong>
+          <p>${esc(body)}</p>
+        </div>
+      </div>`;
+    }
     function byId(rows, id) {
       return (rows || []).find(item => item.id === id) || null;
     }
@@ -3009,7 +3200,7 @@
         <label class="task-label"><input type="checkbox" data-task-field="done" ${t.done ? "checked" : ""} ${disabled}><span>${t.done ? "是" : "否"}</span></label>
         ${taskActions}
       </div>`;
-      }).join("") || `<div class="empty">${taskEditable ? "这个阶段还没有任务，可以点击“加任务”。" : "这个阶段还没有任务。"}</div>`}`;
+      }).join("") || emptyStateHtml("这个阶段还没有任务", taskEditable ? "点击右上角“加任务”，补充这个阶段需要推进的事项。" : "当前账号只读，暂无这个阶段的任务记录。", "list-plus")}`;
       document.querySelectorAll("[data-edit-task] [data-task-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateStageTask(input.closest("[data-edit-task]").dataset.editTask, input.dataset.taskField, input.type === "checkbox" ? input.checked : input.value));
@@ -3156,6 +3347,14 @@
       const demands = state.demands || [];
       const demandEditable = can("editDemand");
       const demandConvertible = can("convertDemand");
+      const strip = document.getElementById("demandStatusStrip");
+      if (strip) {
+        const statusLabels = ["待讨论", "讨论中", "已讨论", "暂缓", "已转开发"];
+        strip.innerHTML = statusLabels.map(status => {
+          const count = demands.filter(demand => demand.status === status).length;
+          return `<div class="demand-status-item"><strong>${count}</strong><span>${status}</span></div>`;
+        }).join("");
+      }
       board.innerHTML = demands.map(d => {
         const product = d.productId ? productById(d.productId) : null;
         const actions = [];
@@ -3191,7 +3390,7 @@
           <div class="demand-next"><p class="small">${esc(nextStep)}</p></div>
           <div class="demand-actions">${actions.join("")}</div>
         </div>`;
-      }).join("") || `<div class="empty">暂无需求机会</div>`;
+      }).join("") || emptyStateHtml("暂无需求机会", "点击添加机会，把市场反馈、竞品线索或内部想法先放进需求池。", "inbox");
       const table = document.getElementById("demandTableRows");
       if (table) {
         table.innerHTML = sortDemands(demands).map(d => {
@@ -3215,7 +3414,7 @@
             <td>${esc(d.created || "-")}</td>
             <td><div class="table-actions">${rowActions.join("") || `<span class="small">-</span>`}</div></td>
           </tr>`;
-        }).join("") || `<tr><td colspan="7">暂无需求机会</td></tr>`;
+        }).join("") || `<tr><td colspan="7">${emptyStateHtml("暂无需求记录", "还没有可排序的机会记录。添加机会后会自动出现在这里。", "list-filter")}</td></tr>`;
       }
       document.querySelectorAll("[data-demand-start]").forEach(btn => btn.addEventListener("click", () => startDemandDiscussion(btn.dataset.demandStart)));
       document.querySelectorAll("[data-demand-finish]").forEach(btn => btn.addEventListener("click", () => finishDemandDiscussion(btn.dataset.demandFinish)));
@@ -3237,15 +3436,15 @@
         <span class="badge ${badgeClass(p.status)}">${esc(p.status)}</span>
         <span>${esc(p.level.split(" ")[0])}</span>
         <span>${esc(stages[p.stage].short)}</span>
-        <div class="table-actions product-actions">
-          ${screenAllowed("workflow") ? `<button class="mini-action icon-only" title="产品进度" aria-label="产品进度" data-open-product="${esc(p.id)}" data-product-target="workflow"><i data-lucide="git-branch"></i></button>` : ""}
-          <button class="mini-action icon-only" title="资料包" aria-label="资料包" data-open-product="${esc(p.id)}" data-product-target="deliverables"><i data-lucide="folder-check"></i></button>
-          ${screenAllowed("reviews") ? `<button class="mini-action icon-only" title="会议决策" aria-label="会议决策" data-open-product="${esc(p.id)}" data-product-target="reviews"><i data-lucide="clipboard-check"></i></button>` : ""}
-          ${screenAllowed("lifecycle") ? `<button class="mini-action icon-only" title="生命周期" aria-label="生命周期" data-open-product="${esc(p.id)}" data-product-target="lifecycle"><i data-lucide="activity"></i></button>` : ""}
+        <div class="product-action-menu"><div class="table-actions product-actions">
+          ${screenAllowed("workflow") ? `<button class="mini-action" title="产品进度" aria-label="产品进度" data-open-product="${esc(p.id)}" data-product-target="workflow"><i data-lucide="git-branch"></i><span>进度</span></button>` : ""}
+          <button class="mini-action" title="资料包" aria-label="资料包" data-open-product="${esc(p.id)}" data-product-target="deliverables"><i data-lucide="folder-check"></i><span>资料</span></button>
+          ${screenAllowed("reviews") ? `<button class="mini-action" title="会议决策" aria-label="会议决策" data-open-product="${esc(p.id)}" data-product-target="reviews"><i data-lucide="clipboard-check"></i><span>评审</span></button>` : ""}
+          ${screenAllowed("lifecycle") ? `<button class="mini-action" title="生命周期" aria-label="生命周期" data-open-product="${esc(p.id)}" data-product-target="lifecycle"><i data-lucide="activity"></i><span>生命周期</span></button>` : ""}
           ${productEditable ? `<button class="mini-action icon-only" title="编辑产品" aria-label="编辑产品" data-edit-product="${esc(p.id)}"><i data-lucide="pencil"></i></button>` : ""}
           ${productDeletable ? `<button class="mini-action icon-only danger" title="删除产品" aria-label="删除产品" data-delete-product="${esc(p.id)}"><i data-lucide="trash-2"></i></button>` : ""}
-        </div>
-      </div>`).join("") || `<div class="empty">没有符合筛选条件的产品</div>`;
+        </div></div>
+      </div>`).join("") || emptyStateHtml("没有符合筛选条件的产品", "可以切换右上角状态筛选；产品档案只能从需求池转入开发后生成。", "package");
       document.querySelectorAll("#productList [data-open-product]").forEach(btn => btn.addEventListener("click", () => selectProductAndNavigate(btn.dataset.openProduct, btn.dataset.productTarget || "workflow")));
       document.querySelectorAll("#productList [data-edit-product]").forEach(btn => btn.addEventListener("click", () => openModal("productEdit", btn.dataset.editProduct)));
       document.querySelectorAll("#productList [data-delete-product]").forEach(btn => btn.addEventListener("click", () => deleteProduct(btn.dataset.deleteProduct)));
@@ -3262,7 +3461,7 @@
           <button class="mini-action" data-open-doc="${esc(d.id)}"><i data-lucide="external-link"></i>打开</button>
           ${docsEditable ? `<button class="mini-action danger" data-delete-doc="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>` : ""}
         </div>
-      </div>`).join("") || `<div class="empty">暂无资料文件</div>`;
+      </div>`).join("") || emptyStateHtml("暂无资料文件", "拖拽文件到这里，或在流程任务和会议纪要中自然沉淀资料。", "folder-open");
       document.querySelectorAll("[data-open-doc]").forEach(btn => btn.addEventListener("click", () => openDocLink(btn.dataset.openDoc)));
       document.querySelectorAll("[data-delete-doc]").forEach(btn => btn.addEventListener("click", () => deleteDoc(btn.dataset.deleteDoc)));
       bindPackageDropzone();
@@ -3334,8 +3533,8 @@
                   <td>${esc(meeting.owner)}</td>
                   <td><span class="badge ${state.badge}">${state.text}</span></td>
                   <td><div class="table-actions">
-                    ${calendarAction || ""}
-                    ${minutesAction || ""}
+                    ${calendarAction ? `<div class="review-action-group">${calendarAction}</div>` : ""}
+                    ${minutesAction ? `<div class="review-action-group">${minutesAction}</div>` : ""}
                     ${!calendarAction && !minutesAction ? `<span class="small">-</span>` : ""}
                   </div></td>
                 </tr>`;
@@ -3373,11 +3572,13 @@
           </div>
           <div class="metric-stack"><strong>${esc(flow.reviewNode)}</strong><span>${esc(p.launch || "未定上市日")}</span></div>
           <div class="metric-stack"><strong><span class="badge ${flow.cls}">${esc(flow.decision)}</span></strong><span>${esc(flow.path)}</span></div>
-          <div class="metric-edit-grid">
-            <label>销量<input type="number" min="0" step="1" value="${esc(p.sales || 0)}" data-product-metric="${esc(p.id)}|sales" ${metricDisabled}></label>
-            <label>评分<input type="number" min="0" max="5" step="0.1" value="${esc(p.score || 0)}" data-product-metric="${esc(p.id)}|score" ${metricDisabled}></label>
-            <label>退货率%<input type="number" min="0" max="100" step="0.1" value="${esc(formatPercentInput(p.returnRate))}" data-product-metric="${esc(p.id)}|returnRate" ${metricDisabled}></label>
-            <label>利润率%<input type="number" min="-100" max="100" step="0.1" value="${esc(formatPercentInput(p.profit))}" data-product-metric="${esc(p.id)}|profit" ${metricDisabled}></label>
+          <div class="lifecycle-data-panel">
+            <div class="metric-edit-grid">
+              <label>销量<input class="metric-input" type="number" min="0" step="1" value="${esc(p.sales || 0)}" data-product-metric="${esc(p.id)}|sales" ${metricDisabled}></label>
+              <label>评分<input class="metric-input" type="number" min="0" max="5" step="0.1" value="${esc(p.score || 0)}" data-product-metric="${esc(p.id)}|score" ${metricDisabled}></label>
+              <label>退货率%<input class="metric-input" type="number" min="0" max="100" step="0.1" value="${esc(formatPercentInput(p.returnRate))}" data-product-metric="${esc(p.id)}|returnRate" ${metricDisabled}></label>
+              <label>利润率%<input class="metric-input" type="number" min="-100" max="100" step="0.1" value="${esc(formatPercentInput(p.profit))}" data-product-metric="${esc(p.id)}|profit" ${metricDisabled}></label>
+            </div>
           </div>
           <div class="lifecycle-reason">${esc(flow.action)}<br><span class="small">${esc(flow.reason)}</span></div>
           <div class="lifecycle-reason">${esc(flow.deliverable)}</div>
