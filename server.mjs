@@ -8,12 +8,15 @@ import {
   getDingAccessToken,
   getDingUserByCode,
   getDingUserDetail,
+  filterOrgUsers,
   mapDingRole,
-  publicUser
+  publicUser,
+  syncDingOrg
 } from "./functions/api/dingtalk/_shared/dingtalk.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.DINGTALK_PORT || 8127);
+let orgCache = null;
 
 loadDotEnv();
 
@@ -82,6 +85,51 @@ async function handleDingLogin(req, res) {
   }
 }
 
+async function syncOrgCache() {
+  const accessToken = await getDingAccessToken(process.env);
+  orgCache = await syncDingOrg(accessToken, fetch, new Date(), {
+    rootDeptId: process.env.DINGTALK_ROOT_DEPT_ID || 1
+  });
+  return orgCache;
+}
+
+async function handleDingOrgSync(req, res) {
+  try {
+    const org = await syncOrgCache();
+    json(res, 200, { synced: true, org });
+  } catch (error) {
+    json(res, error.status || 500, {
+      synced: false,
+      message: error.message || "钉钉组织架构同步失败",
+      detail: error.detail || undefined
+    });
+  }
+}
+
+async function handleDingOrgUsers(req, res, url) {
+  try {
+    if (!orgCache || Date.now() > Date.parse(orgCache.expiresAt || 0)) await syncOrgCache();
+    const query = url.searchParams.get("q") || "";
+    const limit = Number(url.searchParams.get("limit") || 20);
+    json(res, 200, { users: filterOrgUsers(orgCache, query, limit), syncedAt: orgCache.syncedAt });
+  } catch (error) {
+    json(res, error.status || 500, {
+      users: [],
+      message: error.message || "钉钉同事搜索失败",
+      detail: error.detail || undefined
+    });
+  }
+}
+
+function handleDingOrgStatus(res) {
+  json(res, 200, {
+    configured: buildConfigResponse(process.env, "").configured,
+    cached: !!orgCache,
+    syncedAt: orgCache?.syncedAt || "",
+    expiresAt: orgCache?.expiresAt || ""
+  });
+}
+
 async function serveStatic(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
@@ -124,6 +172,18 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/dingtalk/login" && req.method === "POST") {
     await handleDingLogin(req, res);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/org/status" && req.method === "GET") {
+    handleDingOrgStatus(res);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/org/sync" && ["GET", "POST"].includes(req.method)) {
+    await handleDingOrgSync(req, res);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/org/users" && req.method === "GET") {
+    await handleDingOrgUsers(req, res, url);
     return;
   }
   await serveStatic(req, res);

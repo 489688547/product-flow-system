@@ -1746,6 +1746,7 @@
     let editingId = "";
     let activeMinuteDocId = "";
     let currentUser = loadUser();
+    let orgCache = loadOrgCache();
     let dingAutoLoginTried = false;
 
     function loadState() {
@@ -1792,6 +1793,40 @@
         return null;
       }
     }
+    function loadOrgCache() {
+      const raw = localStorage.getItem("productFlowOrgCache");
+      if (!raw) return null;
+      try {
+        const parsed = JSON.parse(raw);
+        return parsed && parsed.version === "org-v1" ? parsed : null;
+      } catch (e) {
+        return null;
+      }
+    }
+    function saveOrgCache(org) {
+      if (!org || org.version !== "org-v1") return;
+      orgCache = org;
+      localStorage.setItem("productFlowOrgCache", JSON.stringify(org));
+    }
+    function orgCacheExpired() {
+      return !orgCache || Date.now() > Date.parse(orgCache.expiresAt || 0);
+    }
+    async function syncDingOrgCache({ force = false } = {}) {
+      if (currentUser?.source !== "dingtalk") return orgCache;
+      if (!force && !orgCacheExpired()) return orgCache;
+      try {
+        const res = await fetch(`${dingApiBase()}/api/dingtalk/org/sync`, { method: "POST" });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !payload.org) throw new Error(payload.message || "钉钉组织架构同步失败");
+        saveOrgCache(payload.org);
+        toast(`组织架构已同步：${payload.org.users?.length || 0} 人`);
+        return orgCache;
+      } catch (error) {
+        console.warn(error);
+        if (!orgCache) toast(error.message || "钉钉组织架构同步失败，请检查通讯录权限。");
+        return orgCache;
+      }
+    }
     function currentRole() {
       return currentUser && roleProfiles[currentUser.role] ? roleProfiles[currentUser.role] : roleProfiles.readonly;
     }
@@ -1820,7 +1855,9 @@
     }
     function logoutUser() {
       currentUser = null;
+      orgCache = null;
       localStorage.removeItem("productFlowUser");
+      localStorage.removeItem("productFlowOrgCache");
       renderLogin();
     }
     function isLocalPreview() {
@@ -2002,6 +2039,7 @@
       renderAll();
       navigateToScreen(firstAllowedScreen());
       toast(`已通过钉钉登录：${currentUser.dingUser.name || currentRole().name}`);
+      syncDingOrgCache({ force: true });
     }
     async function attemptDingTalkLogin({ force = false } = {}) {
       let env = detectDingTalkEnvironment();
@@ -3540,6 +3578,7 @@
     });
     syncTodoDateInputs();
     renderAll();
+    if (currentUser?.source === "dingtalk") syncDingOrgCache();
   </script>
 </body>
 </html>

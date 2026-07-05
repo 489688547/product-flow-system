@@ -85,6 +85,50 @@ export async function getDingUserDetail(accessToken, userid, fetchImpl = fetch) 
   return data.result || {};
 }
 
+async function postDingTopApi(accessToken, path, body, fetchImpl = fetch) {
+  const res = await fetchImpl(`https://oapi.dingtalk.com${path}?access_token=${encodeURIComponent(accessToken)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  if (!res.ok || data.errcode !== 0) {
+    const err = new Error(data.errmsg || "钉钉组织架构同步失败");
+    err.status = 502;
+    err.detail = data;
+    throw err;
+  }
+  return data.result || {};
+}
+
+export async function getDingDepartments(accessToken, fetchImpl = fetch, rootDeptId = 1) {
+  const result = await postDingTopApi(accessToken, "/topapi/v2/department/listsub", {
+    dept_id: Number(rootDeptId) || 1,
+    language: "zh_CN"
+  }, fetchImpl);
+  return Array.isArray(result) ? result : result.list || [];
+}
+
+export async function getDingDepartmentUsers(accessToken, deptId, fetchImpl = fetch) {
+  const users = [];
+  let cursor = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const result = await postDingTopApi(accessToken, "/topapi/v2/user/list", {
+      dept_id: Number(deptId),
+      cursor,
+      size: 100,
+      language: "zh_CN"
+    }, fetchImpl);
+    const list = Array.isArray(result.list) ? result.list : [];
+    users.push(...list);
+    hasMore = !!result.has_more;
+    cursor = Number(result.next_cursor || cursor + list.length);
+    if (!list.length) hasMore = false;
+  }
+  return users;
+}
+
 export function mapDingRole(user = {}) {
   const roleNames = (user.role_list || []).map(role => `${role.group_name || ""} ${role.name || ""}`).join(" ");
   const text = [
@@ -117,6 +161,63 @@ export function publicUser(basic = {}, detail = {}) {
     deptIds: detail.dept_id_list || [],
     roles: detail.role_list || []
   };
+}
+
+function publicOrgUser(user = {}, departmentsById = new Map()) {
+  const deptIds = Array.isArray(user.dept_id_list) ? user.dept_id_list : [];
+  return {
+    userId: user.userid || "",
+    unionId: user.unionid || "",
+    name: user.name || user.userid || "",
+    avatar: user.avatar || "",
+    title: user.title || "",
+    deptIds,
+    departmentNames: deptIds.map(id => departmentsById.get(String(id))?.name).filter(Boolean),
+    roles: user.role_list || [],
+    role: mapDingRole(user),
+    active: user.active !== false
+  };
+}
+
+export async function syncDingOrg(accessToken, fetchImpl = fetch, now = new Date(), options = {}) {
+  const departments = (await getDingDepartments(accessToken, fetchImpl, options.rootDeptId || 1)).map(dept => ({
+    deptId: String(dept.dept_id || dept.deptId || ""),
+    parentId: String(dept.parent_id || dept.parentId || "0"),
+    name: dept.name || ""
+  })).filter(dept => dept.deptId && dept.name);
+  const departmentsById = new Map(departments.map(dept => [dept.deptId, dept]));
+  const byUserId = new Map();
+  for (const dept of departments) {
+    const users = await getDingDepartmentUsers(accessToken, dept.deptId, fetchImpl);
+    users.forEach(user => {
+      const safeUser = publicOrgUser(user, departmentsById);
+      if (safeUser.userId) byUserId.set(safeUser.userId, safeUser);
+    });
+  }
+  const syncedAt = now.toISOString();
+  const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  return {
+    version: "org-v1",
+    syncedAt,
+    expiresAt,
+    departments,
+    users: [...byUserId.values()].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"))
+  };
+}
+
+export function filterOrgUsers(org = {}, query = "", limit = 20) {
+  const text = String(query || "").trim().toLowerCase();
+  const users = Array.isArray(org.users) ? org.users : [];
+  const result = text
+    ? users.filter(user => [
+      user.name,
+      user.title,
+      user.role,
+      ...(user.departmentNames || []),
+      ...(user.roles || []).map(role => `${role.group_name || ""} ${role.name || ""}`)
+    ].filter(Boolean).join(" ").toLowerCase().includes(text))
+    : users;
+  return result.slice(0, limit);
 }
 
 export async function loginWithDingTalk({ authCode, corpId }, env = {}, fetchImpl = fetch) {

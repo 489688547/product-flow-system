@@ -12,3 +12,11 @@ test("DingTalk login waits for JSAPI before auto login", () => {
 test("environment check continues into login when DingTalk is ready", () => {
   assert.match(html, /checkDingTalkEnvironment\(\{ loginWhenReady: true \}\)/);
 });
+
+test("DingTalk login refreshes organization cache for people picking", () => {
+  assert.match(html, /productFlowOrgCache/);
+  assert.match(html, /function syncDingOrgCache\(/);
+  assert.match(html, /\/api\/dingtalk\/org\/sync/);
+  assert.match(html, /syncDingOrgCache\(\{ force: true \}\)/);
+  assert.match(html, /currentUser\?\.source === "dingtalk"[\s\S]*?syncDingOrgCache\(\)/);
+});
