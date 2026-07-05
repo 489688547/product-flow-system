@@ -1248,6 +1248,42 @@
     }
     .sync-target strong { font-size: 13px; line-height: 1.3; }
     .sync-target span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .sync-action-switch {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+    .sync-action-switch button {
+      min-height: 34px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      box-shadow: none;
+    }
+    .sync-action-switch button.active {
+      background: var(--panel);
+      color: var(--primary);
+      box-shadow: var(--shadow);
+    }
+    .sync-action-switch i { width: 15px; height: 15px; }
+    .sync-hint {
+      margin: -2px 0 12px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
     .people-list {
       max-height: 260px;
       overflow: auto;
@@ -1635,6 +1671,11 @@
           <strong id="syncTargetTitle">-</strong>
           <span id="syncTargetMeta">-</span>
         </div>
+        <div class="sync-action-switch hidden" id="syncActionSwitch" role="group" aria-label="钉钉会议动作">
+          <button type="button" data-sync-action="schedule"><i data-lucide="calendar-plus"></i>预约到日历</button>
+          <button type="button" data-sync-action="instant"><i data-lucide="video"></i>立即开会</button>
+        </div>
+        <p class="sync-hint hidden" id="syncActionHint"></p>
         <div class="sync-meeting-fields hidden" id="syncMeetingFields">
           <label class="field">开始时间<input id="syncStartTime" type="datetime-local"></label>
           <label class="field">结束时间<input id="syncEndTime" type="datetime-local"></label>
@@ -1891,6 +1932,7 @@
     let syncModalMode = "";
     let syncTargetId = "";
     let syncMeetingId = "";
+    let syncMeetingAction = "schedule";
     let syncSelectedUsers = new Set();
 
     function loadState() {
@@ -2673,12 +2715,15 @@
       syncModalMode = mode;
       syncTargetId = payload.taskId || payload.productId || "";
       syncMeetingId = payload.meetingId || "";
+      syncMeetingAction = payload.action || "schedule";
       syncSelectedUsers = new Set();
       const modal = document.getElementById("syncModal");
       const title = document.getElementById("syncTitle");
       const targetTitle = document.getElementById("syncTargetTitle");
       const targetMeta = document.getElementById("syncTargetMeta");
       const meetingFields = document.getElementById("syncMeetingFields");
+      const actionSwitch = document.getElementById("syncActionSwitch");
+      const actionHint = document.getElementById("syncActionHint");
       document.getElementById("syncPeopleSearch").value = "";
       if (mode === "todo") {
         const task = state.tasks.find(item => item.id === syncTargetId);
@@ -2688,6 +2733,9 @@
         targetTitle.textContent = task.title;
         targetMeta.textContent = `${product.name} · ${stages[task.stage]?.short || "-"} · ${task.owner || "未指定责任部门"}`;
         meetingFields.classList.add("hidden");
+        actionSwitch.classList.add("hidden");
+        actionHint.classList.add("hidden");
+        setSyncConfirmButton("同步待办", "send");
       }
       if (mode === "meeting") {
         const product = productById(syncTargetId);
@@ -2696,10 +2744,12 @@
         const defaults = defaultMeetingTimes();
         document.getElementById("syncStartTime").value = defaults.start;
         document.getElementById("syncEndTime").value = defaults.end;
-        title.textContent = "同步钉钉日程";
+        title.textContent = "钉钉会议协同";
         targetTitle.textContent = meeting.title;
         targetMeta.textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
-        meetingFields.classList.remove("hidden");
+        actionSwitch.classList.remove("hidden");
+        actionHint.classList.remove("hidden");
+        setSyncMeetingAction(syncMeetingAction);
       }
       renderPeoplePicker();
       modal.classList.add("open");
@@ -2710,7 +2760,26 @@
       syncModalMode = "";
       syncTargetId = "";
       syncMeetingId = "";
+      syncMeetingAction = "schedule";
       syncSelectedUsers = new Set();
+    }
+    function setSyncConfirmButton(label, icon = "send") {
+      const button = document.getElementById("confirmSyncModal");
+      button.disabled = false;
+      button.innerHTML = `<i data-lucide="${icon}"></i>${esc(label)}`;
+      if (window.lucide) lucide.createIcons();
+    }
+    function setSyncMeetingAction(action = "schedule") {
+      syncMeetingAction = action === "instant" ? "instant" : "schedule";
+      document.querySelectorAll("[data-sync-action]").forEach(button => {
+        button.classList.toggle("active", button.dataset.syncAction === syncMeetingAction);
+      });
+      const scheduling = syncMeetingAction === "schedule";
+      document.getElementById("syncMeetingFields").classList.toggle("hidden", !scheduling);
+      document.getElementById("syncActionHint").textContent = scheduling
+        ? "创建钉钉日程并写入日历，适合预约评审会和提前通知参会人。"
+        : "直接拉起钉钉视频会议，不写入日历；只在钉钉客户端内可用。";
+      setSyncConfirmButton(scheduling ? "预约日程" : "立即开会", scheduling ? "calendar-plus" : "video");
     }
     function renderPeoplePicker() {
       const list = document.getElementById("syncPeopleList");
@@ -2735,8 +2804,19 @@
         toast("请至少选择一位同事。");
         return;
       }
-      if (syncModalMode === "todo") await syncTaskToDingTodo(selected);
-      if (syncModalMode === "meeting") await syncMeetingToDingCalendar(selected);
+      const button = document.getElementById("confirmSyncModal");
+      button.disabled = true;
+      try {
+        if (syncModalMode === "todo") await syncTaskToDingTodo(selected);
+        if (syncModalMode === "meeting" && syncMeetingAction === "schedule") await syncMeetingToDingCalendar(selected);
+        if (syncModalMode === "meeting" && syncMeetingAction === "instant") await startDingVideoMeeting(selected);
+      } finally {
+        if (document.getElementById("syncModal").classList.contains("open")) {
+          button.disabled = false;
+          if (syncModalMode === "meeting") setSyncMeetingAction(syncMeetingAction);
+          if (syncModalMode === "todo") setSyncConfirmButton("同步待办", "send");
+        }
+      }
     }
     function completion(productId = currentId) {
       const tasks = productTasks(productId);
@@ -3232,8 +3312,16 @@
             <tbody>
               ${states.map(({ meeting, state }) => {
                 const eventRecord = dingMeetingRecord(product.id, meeting.id);
-                const canCreateMeeting = reviewEditable && state.text === "待开会" && eventRecord?.status !== "已同步";
-                const calendarAction = canCreateMeeting ? `<button class="mini-action" data-create-meeting="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="calendar-plus"></i>同步钉钉日程</button>` : syncStatusHtml(eventRecord, "日程已建");
+                const canCreateMeeting = reviewEditable && state.text === "待开会";
+                const canStartInstantMeeting = canCreateMeeting && currentUser?.source === "dingtalk" && detectDingTalkEnvironment().inDingTalk;
+                const meetingKey = `${esc(product.id)}|${esc(meeting.id)}`;
+                const calendarAction = canCreateMeeting
+                  ? [
+                    eventRecord?.status === "已同步" ? syncStatusHtml(eventRecord, "日程已建") : "",
+                    `<button class="mini-action" data-create-meeting="${meetingKey}" data-schedule-meeting="${meetingKey}"><i data-lucide="calendar-plus"></i>${eventRecord?.status === "已同步" ? "重新预约" : "预约日程"}</button>`,
+                    canStartInstantMeeting ? `<button class="mini-action" data-start-meeting="${meetingKey}"><i data-lucide="video"></i>立即开会</button>` : ""
+                  ].filter(Boolean).join("")
+                  : syncStatusHtml(eventRecord, "日程已建");
                 const minutesAction = state.passed && state.minutes.doc
                   ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>`
                   : state.actionable && reviewEditable
@@ -3624,6 +3712,74 @@
         toast(error.message || "钉钉日程创建失败");
       }
       renderAll();
+    }
+    function formatDingJsError(error, fallback = "钉钉客户端调用失败") {
+      if (!error) return fallback;
+      if (typeof error === "string") return error;
+      const code = error.errorCode || error.errcode || error.code || "";
+      const message = error.errorMessage || error.errmsg || error.message || "";
+      return [fallback, code && `错误码：${code}`, message && `详情：${message}`].filter(Boolean).join("；");
+    }
+    function callDingVideoConference({ title, calleeCorpId, calleeStaffIds }) {
+      return new Promise((resolve, reject) => {
+        const conference = window.dd?.biz?.conference || {};
+        const videoCall = conference.makeVideoConfCall || conference.videoConfCall;
+        if (!videoCall) {
+          reject(new Error("当前钉钉客户端不支持发起视频会议，请升级钉钉或改用预约日程。"));
+          return;
+        }
+        let settled = false;
+        const finish = value => {
+          if (settled) return;
+          settled = true;
+          resolve(value || {});
+        };
+        const fail = error => {
+          if (settled) return;
+          settled = true;
+          reject(new Error(formatDingJsError(error, "钉钉视频会议发起失败")));
+        };
+        try {
+          videoCall.call(conference, {
+            title,
+            calleeCorpId,
+            calleeStaffIds,
+            success: finish,
+            onSuccess: finish,
+            fail,
+            onFail: fail
+          });
+        } catch (error) {
+          fail(error);
+        }
+      });
+    }
+    async function startDingVideoMeeting(users) {
+      if (denyIfCannot("editReviews")) return;
+      const env = detectDingTalkEnvironment();
+      if (!env.inDingTalk) {
+        toast("立即开会需要在钉钉客户端内使用。");
+        return;
+      }
+      const product = productById(syncTargetId);
+      const meeting = meetingRules.find(rule => rule.id === syncMeetingId);
+      if (!product || !meeting) return;
+      const attendeeUserIds = users.map(dingUserId).filter(Boolean);
+      if (!attendeeUserIds.length) {
+        toast("选中的同事缺少 userId，无法发起钉钉会议。");
+        return;
+      }
+      try {
+        await callDingVideoConference({
+          title: `${product.name} · ${meeting.title}`,
+          calleeCorpId: env.corpId,
+          calleeStaffIds: attendeeUserIds
+        });
+        closeSyncModal();
+        toast("已发起钉钉视频会议。");
+      } catch (error) {
+        toast(error.message || "钉钉视频会议发起失败");
+      }
     }
     function updateMinuteDoc(id, field, value) {
       if (denyIfCannot("editReviews")) return;
@@ -4075,9 +4231,14 @@
         openSyncModal("todo", { taskId: target.dataset.syncTask });
         return;
       }
-      if (target.dataset.createMeeting) {
-        const [productId, meetingId] = target.dataset.createMeeting.split("|");
-        openSyncModal("meeting", { productId, meetingId });
+      if (target.dataset.scheduleMeeting || target.dataset.createMeeting) {
+        const [productId, meetingId] = (target.dataset.scheduleMeeting || target.dataset.createMeeting).split("|");
+        openSyncModal("meeting", { productId, meetingId, action: "schedule" });
+        return;
+      }
+      if (target.dataset.startMeeting) {
+        const [productId, meetingId] = target.dataset.startMeeting.split("|");
+        openSyncModal("meeting", { productId, meetingId, action: "instant" });
         return;
       }
       if (target.dataset.demandSort) {
@@ -4087,7 +4248,11 @@
       }
       if (target.id === "completeAllVisible") completeCurrentStage();
     });
-    document.getElementById("syncModal").addEventListener("click", e => { if (e.target.id === "syncModal") closeSyncModal(); });
+    document.getElementById("syncModal").addEventListener("click", e => {
+      if (e.target.id === "syncModal") closeSyncModal();
+      const actionButton = e.target.closest("[data-sync-action]");
+      if (actionButton) setSyncMeetingAction(actionButton.dataset.syncAction);
+    });
     syncTodoDateInputs();
     renderAll();
     if (currentUser?.source === "dingtalk") syncDingOrgCache();

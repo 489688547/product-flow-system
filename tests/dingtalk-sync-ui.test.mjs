@@ -15,11 +15,20 @@ test("workflow tasks can be synced to DingTalk todos through the org people pick
 
 test("review meetings can be created as DingTalk calendar events", () => {
   assert.match(html, /data-create-meeting/);
-  assert.match(html, /同步钉钉日程/);
+  assert.match(html, /预约日程/);
   assert.match(html, /const canCreateMeeting = reviewEditable && state\.text === "待开会"/);
   assert.match(html, /id="syncMeetingFields"/);
   assert.match(html, /\/api\/dingtalk\/calendar\/create/);
   assert.match(html, /dingMeetings/);
+});
+
+test("review meetings expose separate schedule and instant meeting actions", () => {
+  assert.match(html, /data-schedule-meeting/);
+  assert.match(html, /data-start-meeting/);
+  assert.match(html, /立即开会/);
+  assert.match(html, /syncMeetingAction/);
+  assert.match(html, /data-sync-action="schedule"/);
+  assert.match(html, /data-sync-action="instant"/);
 });
 
 test("DingTalk sync errors expose actionable API details in the UI", () => {
@@ -30,8 +39,16 @@ test("DingTalk sync errors expose actionable API details in the UI", () => {
 });
 
 test("review meeting sync sends DingTalk unionIds instead of userIds", () => {
-  assert.match(html, /const attendeeUnionIds = users\.map\(dingUnionId\)\.filter\(Boolean\);/);
-  assert.match(html, /organizerUnionId: currentUser\?\.dingUser\?\.unionid/);
-  assert.match(html, /attendeeUnionIds/);
-  assert.doesNotMatch(html, /const attendeeUserIds = users\.map\(dingUserId\)\.filter\(Boolean\);/);
+  const calendarSync = html.match(/async function syncMeetingToDingCalendar[\s\S]*?function formatDingJsError/)[0];
+  assert.match(calendarSync, /const attendeeUnionIds = users\.map\(dingUnionId\)\.filter\(Boolean\);/);
+  assert.match(calendarSync, /organizerUnionId: currentUser\?\.dingUser\?\.unionid/);
+  assert.match(calendarSync, /attendeeUnionIds/);
+  assert.doesNotMatch(calendarSync, /const attendeeUserIds = users\.map\(dingUserId\)\.filter\(Boolean\);/);
+});
+
+test("instant DingTalk meetings use staff userIds for the video conference JSAPI", () => {
+  assert.match(html, /function startDingVideoMeeting\(/);
+  assert.match(html, /const attendeeUserIds = users\.map\(dingUserId\)\.filter\(Boolean\);/);
+  assert.match(html, /calleeStaffIds/);
+  assert.match(html, /videoConfCall|makeVideoConfCall/);
 });
