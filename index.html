@@ -2540,13 +2540,13 @@
         ...product,
         image: product.image && !isGeneratedPlaceholderImage(product.image) ? product.image : generateProductImage(product.name || "产品")
       }));
-      data.deliverables = (data.deliverables || []).map(doc => ({
+      data.deliverables = pruneUnopenableDeliverables((data.deliverables || []).map(doc => ({
         source: "流程自动",
         url: "",
         content: defaultMinuteContent(doc),
         ...doc,
         type: inferAssetType(`${doc.name || ""} ${doc.url || ""}`, doc.mimeType || doc.mime || "")
-      }));
+      })));
       data.dingMeetings = Array.isArray(data.dingMeetings) ? data.dingMeetings : [];
       return data;
     }
@@ -2627,17 +2627,7 @@
       }))));
     }
     function buildInitialDeliverables(products) {
-      return products.flatMap(product => deliverableTemplates.map(([name, stage, required], idx) => ({
-        id: cryptoId(),
-        productId: product.id,
-        name, stage, required,
-        type: inferAssetType(name),
-        source: "流程自动",
-        url: "",
-        status: product.stage > stage ? "已归档" : product.stage === stage && idx % 3 === 0 ? "待审核" : "未开始",
-        owner: ownerByDeliverable(name),
-        updated: product.stage > stage ? "2026-07-01" : "-"
-      })));
+      return [];
     }
     function buildInitialReviews(products) {
       const names = [
@@ -2815,6 +2805,16 @@
       if (doc.error) return doc.error;
       if (String(doc.url || "").trim().startsWith("blob:")) return "本地文件内容已失效，请删除后重新拖入。";
       return "文件异常，请删除后重新拖入。";
+    }
+    function hasOpenablePackageContent(doc = {}) {
+      if (doc.status === "异常" || doc.error) return false;
+      if (String(doc.content || "").trim()) return true;
+      const raw = String(doc.url || "").trim();
+      if (!raw || raw.startsWith("blob:")) return false;
+      return true;
+    }
+    function pruneUnopenableDeliverables(deliverables = []) {
+      return deliverables.filter(doc => hasOpenablePackageContent(doc));
     }
     function defaultMinuteContent(doc = {}, force = false) {
       if (!force && !String(doc.name || "").includes("纪要") && !String(doc.name || "").includes("决策")) return "";
@@ -4492,19 +4492,6 @@
         done: false
       };
       state.tasks.push(task);
-      state.deliverables.unshift({
-        id: cryptoId(),
-        productId: p.id,
-        name: task.deliverable,
-        stage: selectedStage,
-        required: false,
-        type: "文档",
-        source: "任务补充",
-        url: "",
-        status: "未开始",
-        owner: task.owner,
-        updated: "今天"
-      });
       toast(`已添加到：${stages[selectedStage].short}`);
       renderAll();
     }

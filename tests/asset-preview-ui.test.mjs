@@ -62,3 +62,11 @@ test("file reader failures are reported instead of saving stale object urls", ()
   assert.match(html, /toast\(`文件「\$\{file\.name\}」读取失败，未加入资料包。`\);/);
   assert.doesNotMatch(html, /reader\.onerror = \(\) => \{[\s\S]*URL\.createObjectURL\(file\)[\s\S]*commitDoc\(doc\)/);
 });
+
+test("empty placeholder package files are pruned from defaults and restored state", () => {
+  assert.match(html, /function hasOpenablePackageContent\(doc = \{\}\)/);
+  assert.match(html, /function pruneUnopenableDeliverables\(deliverables = \[\]\)/);
+  assert.match(html, /data\.deliverables = pruneUnopenableDeliverables\(\(data\.deliverables \|\| \[\]\)\.map\(doc =>/);
+  assert.match(html, /function buildInitialDeliverables\(products\) \{\s*return \[\];\s*\}/);
+  assert.match(html, /if \(!raw \|\| raw\.startsWith\("blob:"\)\) return false/);
+});
