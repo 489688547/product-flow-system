@@ -2238,7 +2238,7 @@
       } catch (error) {
         console.warn(error);
         if (!orgCache) toast(error.message || "钉钉组织架构同步失败，请检查通讯录权限。");
-        return orgCache;
+        return force ? null : orgCache;
       }
     }
     function dingUserId(user = {}) {
@@ -2262,6 +2262,9 @@
     }
     function findOrgUser(key) {
       return orgUsers().find(user => dingUserId(user) === key || dingUnionId(user) === key) || null;
+    }
+    function resolveSelectedSyncUsers() {
+      return [...syncSelectedUsers].map(findOrgUser).filter(Boolean);
     }
     function filterPeople(keyword = "") {
       const query = keyword.trim().toLowerCase();
@@ -2963,8 +2966,16 @@
       return { ...status, text: "已通过", badge: "green", actionable: true };
     }
     async function openSyncModal(mode, payload = {}) {
+      if (currentUser?.source !== "dingtalk") {
+        toast("需要从钉钉登录后才能同步待办或日历。");
+        return;
+      }
+      const refreshedOrg = await syncDingOrgCache({ force: true });
+      if (!refreshedOrg || orgCacheExpired()) {
+        toast("组织架构未刷新成功，为避免发给离职人员，暂不允许同步。");
+        return;
+      }
       if (!ensureDingSyncReady()) return;
-      if (orgCacheExpired()) await syncDingOrgCache({ force: true });
       syncModalMode = mode;
       syncTargetId = payload.taskId || payload.productId || "";
       syncMeetingId = payload.meetingId || "";
@@ -3052,14 +3063,24 @@
       }));
     }
     async function confirmSyncModal() {
-      const selected = [...syncSelectedUsers].map(findOrgUser).filter(Boolean);
-      if (!selected.length) {
+      if (!syncSelectedUsers.size) {
         toast("请至少选择一位同事。");
         return;
       }
       const button = document.getElementById("confirmSyncModal");
       button.disabled = true;
       try {
+        const refreshedOrg = await syncDingOrgCache({ force: true });
+        if (!refreshedOrg || orgCacheExpired()) {
+          toast("组织架构刷新失败，暂不发送钉钉同步。");
+          return;
+        }
+        const selected = resolveSelectedSyncUsers();
+        if (!selected.length) {
+          renderPeoplePicker();
+          toast("请选择仍在职且可同步的同事。");
+          return;
+        }
         if (syncModalMode === "todo") await syncTaskToDingTodo(selected);
         if (syncModalMode === "meeting" && syncMeetingAction === "schedule") await syncMeetingToDingCalendar(selected);
         if (syncModalMode === "meeting" && syncMeetingAction === "instant") await startDingVideoMeeting(selected);

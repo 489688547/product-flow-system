@@ -13,6 +13,20 @@ test("workflow tasks can be synced to DingTalk todos through the org people pick
   assert.match(html, /dingTodo/);
 });
 
+test("DingTalk people picker force-refreshes org before showing colleagues", () => {
+  const openSyncModal = html.match(/async function openSyncModal[\s\S]*?function closeSyncModal/)[0];
+  assert.match(openSyncModal, /const refreshedOrg = await syncDingOrgCache\(\{ force: true \}\);/);
+  assert.match(openSyncModal, /if \(!refreshedOrg \|\| orgCacheExpired\(\)\)/);
+  assert.match(openSyncModal, /if \(!ensureDingSyncReady\(\)\) return;/);
+});
+
+test("DingTalk sync revalidates selected users after org refresh", () => {
+  const confirmSyncModal = html.match(/async function confirmSyncModal[\s\S]*?function completion/)[0];
+  assert.match(confirmSyncModal, /const refreshedOrg = await syncDingOrgCache\(\{ force: true \}\);/);
+  assert.match(confirmSyncModal, /const selected = resolveSelectedSyncUsers\(\);/);
+  assert.match(confirmSyncModal, /请选择仍在职且可同步的同事/);
+});
+
 test("review meetings can be created as DingTalk calendar events", () => {
   assert.match(html, /data-create-meeting/);
   assert.match(html, /预约日程/);
