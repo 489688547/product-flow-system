@@ -3599,6 +3599,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             organizerUnionId: currentUser?.dingUser?.unionid,
+            sourceId: `meeting:${product.id}:${meeting.id}`,
             summary: `${product.name} · ${meeting.title}`,
             description: `${stages[meeting.stage]?.name || ""}\n${meeting.minute}`,
             startTime: start.toISOString(),

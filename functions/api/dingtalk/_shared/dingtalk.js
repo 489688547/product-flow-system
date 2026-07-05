@@ -101,12 +101,21 @@ async function postDingTopApi(accessToken, path, body, fetchImpl = fetch) {
   return data.result || {};
 }
 
-async function requestDingOpenApi(accessToken, method, path, body, fetchImpl = fetch) {
+function dingClientToken(value = "") {
+  return String(value || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 64) || `product-flow-${Date.now()}`;
+}
+
+async function requestDingOpenApi(accessToken, method, path, body, fetchImpl = fetch, extraHeaders = {}) {
   const res = await fetchImpl(`https://api.dingtalk.com${path}`, {
     method,
     headers: {
       "content-type": "application/json",
-      "x-acs-dingtalk-access-token": accessToken
+      "x-acs-dingtalk-access-token": accessToken,
+      ...extraHeaders
     },
     body: body ? JSON.stringify(body) : undefined
   });
@@ -334,7 +343,8 @@ export async function createDingCalendarEvent(accessToken, input = {}, fetchImpl
     "POST",
     `/v1.0/calendar/users/${encodeURIComponent(organizerUnionId)}/calendars/primary/events`,
     body,
-    fetchImpl
+    fetchImpl,
+    { "x-client-token": dingClientToken(input.sourceId || `${organizerUnionId}-${input.summary || ""}-${input.startTime || ""}`) }
   );
 }
 

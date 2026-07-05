@@ -103,3 +103,20 @@ test("createDingCalendarEvent uses DingTalk unionIds for the OpenAPI calendar pa
   assert.match(calls[0].url, /\/v1\.0\/calendar\/users\/organizer-union\/calendars\/primary\/events$/);
   assert.deepEqual(calls[0].body.attendees, [{ id: "attendee-union" }]);
 });
+
+test("createDingCalendarEvent sends DingTalk idempotency client token", async () => {
+  const calls = [];
+  await createDingCalendarEvent("token-1", {
+    organizerUnionId: "organizer-union",
+    sourceId: "meeting:p1:standard",
+    summary: "标准样终审会",
+    startTime: "2026-07-05T14:00:00+08:00",
+    endTime: "2026-07-05T15:00:00+08:00",
+    attendeeUnionIds: ["attendee-union"]
+  }, async (url, options) => {
+    calls.push({ url, options });
+    return okJson({ id: "event-1" });
+  });
+
+  assert.equal(calls[0].options.headers["x-client-token"], "meeting-p1-standard");
+});
