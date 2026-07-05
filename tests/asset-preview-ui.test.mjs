@@ -34,3 +34,17 @@ test("normalized deliverables refresh stale file types from name and url", () =>
   assert.match(html, /spreadsheet: "XLS"/);
   assert.match(html, /document: "DOC"/);
 });
+
+test("opening local package files uses an HTML viewer instead of raw data urls", () => {
+  assert.match(html, /function openPackageViewer\(/);
+  assert.match(html, /function packageViewerHtml\(/);
+  assert.match(html, /URL\.createObjectURL\(new Blob\(\[html\]/);
+  assert.match(html, /if \(assetKind\(doc\) === "link" && \/\^\(https\?:\|mailto:\)\/\.test\(href\)\)/);
+  assert.match(html, /openPackageViewer\(doc, href\);/);
+});
+
+test("dropped package files persist non-image files as data urls too", () => {
+  assert.match(html, /reader\.readAsDataURL\(file\)/);
+  assert.doesNotMatch(html, /fileType\.startsWith\("image\/"\)[\s\S]*reader\.readAsDataURL\(file\)/);
+  assert.match(html, /doc\.url = String\(reader\.result \|\| ""\);/);
+});
