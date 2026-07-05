@@ -48,3 +48,17 @@ test("dropped package files persist non-image files as data urls too", () => {
   assert.doesNotMatch(html, /fileType\.startsWith\("image\/"\)[\s\S]*reader\.readAsDataURL\(file\)/);
   assert.match(html, /doc\.url = String\(reader\.result \|\| ""\);/);
 });
+
+test("bad dropped package files are rejected before they enter the package", () => {
+  assert.match(html, /const MAX_LOCAL_PACKAGE_FILE_SIZE = 12 \* 1024 \* 1024;/);
+  assert.match(html, /function validatePackageFile\(file\)/);
+  assert.match(html, /Number\(file\.size \|\| 0\) <= 0/);
+  assert.match(html, /Number\(file\.size \|\| 0\) > MAX_LOCAL_PACKAGE_FILE_SIZE/);
+  assert.match(html, /toast\(`已跳过 \$\{rejected\.length\} 个异常文件/);
+});
+
+test("file reader failures are reported instead of saving stale object urls", () => {
+  assert.match(html, /reader\.onerror = \(\) => \{/);
+  assert.match(html, /toast\(`文件「\$\{file\.name\}」读取失败，未加入资料包。`\);/);
+  assert.doesNotMatch(html, /reader\.onerror = \(\) => \{[\s\S]*URL\.createObjectURL\(file\)[\s\S]*commitDoc\(doc\)/);
+});

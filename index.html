@@ -844,6 +844,10 @@
       min-height: 214px;
     }
     .file-card:hover { border-color: #bcd3ff; box-shadow: none; }
+    .file-card.broken {
+      border-color: #fecaca;
+      background: #fffafa;
+    }
     .file-preview {
       height: 104px;
       border-radius: 7px;
@@ -913,6 +917,7 @@
     .file-preview.spreadsheet { background: var(--green-soft); color: #166534; }
     .file-preview.document { background: var(--blue-soft); color: #1d4ed8; }
     .file-preview.archive { background: var(--gold-soft); color: #92400e; }
+    .file-preview.broken { background: var(--red-soft); color: var(--red); }
     .file-name {
       font-weight: 750;
       font-size: 13px;
@@ -931,6 +936,12 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .file-error {
+      min-height: 16px;
+      color: #b91c1c;
+      font-size: 11px;
+      line-height: 1.25;
     }
     .demand-board {
       display: grid;
@@ -2741,6 +2752,9 @@
       return parts.filter(Boolean).join(" · ");
     }
     function filePreviewHtml(doc) {
+      if (isBrokenPackageDoc(doc)) {
+        return `<div class="file-preview-body"><i data-lucide="triangle-alert"></i><span class="file-extension">异常</span><span class="file-preview-label">需要重新拖入</span></div>`;
+      }
       if (isImageAsset(doc) && doc.url) {
         return `<img src="${escapeAttr(doc.url)}" alt="${escapeAttr(doc.name)}" loading="lazy" decoding="async">`;
       }
@@ -2753,7 +2767,19 @@
       return `<div class="file-preview-body"><i data-lucide="${assetIcon(doc)}"></i><span class="file-extension">${esc(filePreviewBadge(doc))}</span><span class="file-preview-label">${esc(filePreviewLabel(doc))}</span></div>`;
     }
     function filePreviewClass(doc) {
+      if (isBrokenPackageDoc(doc)) return "broken";
       return assetKind(doc);
+    }
+    function isBrokenPackageDoc(doc = {}) {
+      const raw = String(doc.url || "").trim();
+      if (doc.status === "异常" || doc.error) return true;
+      if (doc.source === "拖入文件" && raw.startsWith("blob:")) return true;
+      return false;
+    }
+    function brokenPackageMessage(doc = {}) {
+      if (doc.error) return doc.error;
+      if (String(doc.url || "").trim().startsWith("blob:")) return "本地文件内容已失效，请删除后重新拖入。";
+      return "文件异常，请删除后重新拖入。";
     }
     function defaultMinuteContent(doc = {}, force = false) {
       if (!force && !String(doc.name || "").includes("纪要") && !String(doc.name || "").includes("决策")) return "";
@@ -3453,15 +3479,19 @@
       const docs = productDeliverables();
       const rows = document.getElementById("deliverableRows");
       const docsEditable = can("editDocs");
-      rows.innerHTML = docs.map(d => `<div class="file-card">
+      rows.innerHTML = docs.map(d => {
+        const broken = isBrokenPackageDoc(d);
+        return `<div class="file-card ${broken ? "broken" : ""}">
         <div class="file-preview ${filePreviewClass(d)}">${filePreviewHtml(d)}</div>
         <div class="file-name">${esc(d.name)}</div>
         <div class="file-meta">${esc(fileMetaText(d))}</div>
+        ${broken ? `<div class="file-error">${esc(brokenPackageMessage(d))}</div>` : ""}
         <div class="table-actions">
-          <button class="mini-action" data-open-doc="${esc(d.id)}"><i data-lucide="external-link"></i>打开</button>
+          <button class="mini-action" data-open-doc="${esc(d.id)}"><i data-lucide="${broken ? "triangle-alert" : "external-link"}"></i>${broken ? "查看异常" : "打开"}</button>
           ${docsEditable ? `<button class="mini-action danger" data-delete-doc="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>` : ""}
         </div>
-      </div>`).join("") || emptyStateHtml("暂无资料文件", "拖拽文件到这里，或在流程任务和会议纪要中自然沉淀资料。", "folder-open");
+      </div>`;
+      }).join("") || emptyStateHtml("暂无资料文件", "拖拽文件到这里，或在流程任务和会议纪要中自然沉淀资料。", "folder-open");
       document.querySelectorAll("[data-open-doc]").forEach(btn => btn.addEventListener("click", () => openDocLink(btn.dataset.openDoc)));
       document.querySelectorAll("[data-delete-doc]").forEach(btn => btn.addEventListener("click", () => deleteDoc(btn.dataset.deleteDoc)));
       bindPackageDropzone();
@@ -3713,9 +3743,22 @@
       window.open(viewerUrl, "_blank", "noopener");
       setTimeout(() => URL.revokeObjectURL(viewerUrl), 30000);
     }
+    const MAX_LOCAL_PACKAGE_FILE_SIZE = 12 * 1024 * 1024;
+    function validatePackageFile(file) {
+      if (!file || !file.name) return "文件名称无效";
+      if (!(file instanceof Blob)) return "当前浏览器无法读取这个文件";
+      if (Number(file.size || 0) <= 0) return "文件为空";
+      if (Number(file.size || 0) > MAX_LOCAL_PACKAGE_FILE_SIZE) return "文件超过 12MB，本地资料包暂不保存";
+      if (typeof FileReader === "undefined") return "当前浏览器不支持本地文件读取";
+      return "";
+    }
     function openDocLink(id) {
       const doc = state.deliverables.find(d => d.id === id);
       if (!doc) return;
+      if (isBrokenPackageDoc(doc)) {
+        toast(brokenPackageMessage(doc));
+        return;
+      }
       if (!doc.url) {
         openPackageViewer({ ...doc, content: doc.content || "暂无文件内容。" }, "");
         return;
@@ -3734,15 +3777,36 @@
         return;
       }
       const p = currentProduct();
-      const incoming = [...files].filter(file => file && file.name);
+      const rejected = [];
+      const incoming = [...files].filter(file => {
+        const error = validatePackageFile(file);
+        if (!error) return true;
+        rejected.push({ file, error });
+        return false;
+      });
+      if (rejected.length) {
+        const first = rejected[0];
+        toast(`已跳过 ${rejected.length} 个异常文件：${first.file?.name || "未命名文件"}，${first.error}。`);
+      }
       if (!incoming.length) return;
       let pending = incoming.length;
+      let saved = 0;
+      let failed = 0;
+      const finishDrop = () => {
+        if (pending > 0) return;
+        const skipped = rejected.length + failed;
+        if (saved && skipped) toast(`已加入 ${saved} 个文件，跳过 ${skipped} 个异常文件。`);
+        else if (saved) toast(`已加入 ${saved} 个文件。`);
+        else if (failed === 1 && !rejected.length) return;
+        else if (skipped) toast(`已跳过 ${skipped} 个异常文件。`);
+      };
       const commitDoc = doc => {
         state.deliverables.unshift(doc);
+        saved += 1;
         pending -= 1;
         if (pending === 0) {
-          toast(`已加入 ${incoming.length} 个文件。`);
           renderAll();
+          finishDrop();
         }
       };
       incoming.forEach(file => {
@@ -3769,14 +3833,14 @@
             commitDoc(doc);
           };
           reader.onerror = () => {
-            doc.url = URL.createObjectURL(file);
-            commitDoc(doc);
+            failed += 1;
+            pending -= 1;
+            toast(`文件「${file.name}」读取失败，未加入资料包。`);
+            if (pending === 0) finishDrop();
           };
           reader.readAsDataURL(file);
           return;
         }
-        doc.url = file instanceof Blob ? URL.createObjectURL(file) : "";
-        commitDoc(doc);
       });
     }
     function bindPackageDropzone() {
