@@ -2545,7 +2545,7 @@
         const defaults = defaultMeetingTimes();
         document.getElementById("syncStartTime").value = defaults.start;
         document.getElementById("syncEndTime").value = defaults.end;
-        title.textContent = "创建钉钉会议日程";
+        title.textContent = "启动钉钉会议";
         targetTitle.textContent = meeting.title;
         targetMeta.textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
         meetingFields.classList.remove("hidden");
@@ -3080,8 +3080,8 @@
             <tbody>
               ${states.map(({ meeting, state }) => {
                 const eventRecord = dingMeetingRecord(product.id, meeting.id);
-                const canCreateMeeting = currentUser?.source === "dingtalk" && reviewEditable && product.stage >= meeting.stage && eventRecord?.status !== "已同步";
-                const calendarAction = canCreateMeeting ? `<button class="mini-action" data-create-meeting="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="calendar-plus"></i>创建会议</button>` : syncStatusHtml(eventRecord, "日程已建");
+                const canCreateMeeting = reviewEditable && state.text === "待开会" && eventRecord?.status !== "已同步";
+                const calendarAction = canCreateMeeting ? `<button class="mini-action" data-create-meeting="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="video"></i>启动钉钉会议</button>` : syncStatusHtml(eventRecord, "会议已建");
                 const minutesAction = state.passed && state.minutes.doc
                   ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>`
                   : state.actionable && reviewEditable
