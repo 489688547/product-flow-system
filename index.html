@@ -1358,6 +1358,24 @@
       border: 1px solid var(--line);
       box-shadow: 0 8px 12px rgba(15,23,42,.18);
     }
+    .confirm-dialog { width: min(420px, 100%); }
+    .confirm-message {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+    .confirm-name {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+      word-break: break-word;
+    }
     .dialog-head, .dialog-foot {
       padding: 14px 16px;
       display: flex;
@@ -1882,6 +1900,22 @@
       </div>
     </div>
   </div>
+  <div class="modal" id="confirmDialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="dialog confirm-dialog">
+      <div class="dialog-head">
+        <h2 id="confirmTitle">确认操作</h2>
+        <button class="icon-btn" id="closeConfirmDialog" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <p class="confirm-message" id="confirmMessage">这个操作无法撤销。</p>
+        <div class="confirm-name hidden" id="confirmName"></div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn ghost" id="cancelConfirmDialog">取消</button>
+        <button class="btn primary" id="confirmDialogAction"><i data-lucide="trash-2"></i>确认</button>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -2127,6 +2161,7 @@
     let syncMeetingId = "";
     let syncMeetingAction = "schedule";
     let syncSelectedUsers = new Set();
+    let confirmResolve = null;
 
     function loadState() {
       const raw = localStorage.getItem("productFlowState");
@@ -3625,11 +3660,16 @@
       toast(done ? "任务已完成" : "任务已重新打开");
       renderAll();
     }
-    function deleteTask(id) {
+    async function deleteTask(id) {
       if (denyIfCannot("editTasks")) return;
       const task = state.tasks.find(t => t.id === id);
       if (!task) return;
-      if (!confirm(`确认删除任务「${task.title}」？`)) return;
+      if (!await requestConfirm({
+        title: "删除任务",
+        message: "删除后不会再出现在本周待办和产品进度里。",
+        name: task.title,
+        confirmText: "删除"
+      })) return;
       state.tasks = state.tasks.filter(t => t.id !== id);
       if (focusedTaskId === id) focusedTaskId = "";
       toast("任务已删除。");
@@ -3867,11 +3907,16 @@
       saveState();
       renderStatus();
     }
-    function deleteDoc(id) {
+    async function deleteDoc(id) {
       if (denyIfCannot("editDocs")) return;
       const doc = state.deliverables.find(d => d.id === id);
       if (!doc) return;
-      if (!confirm(`确认删除文件「${doc.name}」？`)) return;
+      if (!await requestConfirm({
+        title: "删除文件",
+        message: "删除后会从当前产品资料包移除。",
+        name: doc.name,
+        confirmText: "删除"
+      })) return;
       state.deliverables = state.deliverables.filter(d => d.id !== id);
       toast("文件已删除。");
       renderAll();
@@ -4129,11 +4174,16 @@
       saveState();
       renderStatus();
     }
-    function deleteReview(id) {
+    async function deleteReview(id) {
       if (denyIfCannot("editReviews")) return;
       const review = state.reviews.find(r => r.id === id);
       if (!review) return;
-      if (!confirm(`确认删除评审「${review.title}」？`)) return;
+      if (!await requestConfirm({
+        title: "删除评审",
+        message: "删除后这个会议不会再出现在当前产品的评审列表里。",
+        name: review.title,
+        confirmText: "删除"
+      })) return;
       state.reviews = state.reviews.filter(r => r.id !== id);
       toast("评审会议已删除。");
       renderAll();
@@ -4165,11 +4215,16 @@
       decision[field] = value;
       saveState();
     }
-    function deleteDecision(id) {
+    async function deleteDecision(id) {
       if (denyIfCannot("editReviews")) return;
       const decision = state.decisions.find(d => d.id === id);
       if (!decision) return;
-      if (!confirm(`确认删除决策「${decision.title}」？`)) return;
+      if (!await requestConfirm({
+        title: "删除决策",
+        message: "删除后这条会议决策记录会从当前产品中移除。",
+        name: decision.title,
+        confirmText: "删除"
+      })) return;
       state.decisions = state.decisions.filter(d => d.id !== id);
       toast("决策记录已删除。");
       renderAll();
@@ -4221,17 +4276,22 @@
     function pauseDemand(id) {
       setDemandStatus(id, "暂缓");
     }
-    function deleteDemand(id) {
+    async function deleteDemand(id) {
       if (denyIfCannot("editDemand")) return;
       const demand = state.demands.find(d => d.id === id);
       if (!demand) return;
       const extra = demand.productId ? "已生成的产品档案会保留。" : "";
-      if (!confirm(`确认删除机会「${demand.name}」？${extra}`)) return;
+      if (!await requestConfirm({
+        title: "删除机会",
+        message: `删除后这条需求池记录会移除。${extra}`,
+        name: demand.name,
+        confirmText: "删除"
+      })) return;
       state.demands = state.demands.filter(d => d.id !== id);
       toast("需求机会已删除。");
       renderAll();
     }
-    function deleteProduct(id) {
+    async function deleteProduct(id) {
       if (denyIfCannot("deleteProduct")) return;
       const product = productById(id);
       if (!product) return;
@@ -4239,7 +4299,12 @@
         toast("至少需要保留一个产品档案。");
         return;
       }
-      if (!confirm(`确认删除产品档案「${product.name}」？相关任务、交付物、评审和决策都会删除。`)) return;
+      if (!await requestConfirm({
+        title: "删除产品档案",
+        message: "相关任务、资料包文件、评审和决策都会一起删除。",
+        name: product.name,
+        confirmText: "删除"
+      })) return;
       state.products = state.products.filter(p => p.id !== id);
       state.tasks = state.tasks.filter(t => t.productId !== id);
       state.deliverables = state.deliverables.filter(d => d.productId !== id);
@@ -4460,6 +4525,28 @@
       clearTimeout(window.__toastTimer);
       window.__toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
     }
+    function requestConfirm({ title = "确认操作", message = "这个操作无法撤销。", name = "", confirmText = "确认" } = {}) {
+      const modal = document.getElementById("confirmDialog");
+      document.getElementById("confirmTitle").textContent = title;
+      document.getElementById("confirmMessage").textContent = message;
+      const nameEl = document.getElementById("confirmName");
+      nameEl.textContent = name;
+      nameEl.classList.toggle("hidden", !name);
+      document.getElementById("confirmDialogAction").innerHTML = `<i data-lucide="trash-2"></i>${esc(confirmText)}`;
+      if (window.lucide) lucide.createIcons();
+      modal.classList.add("open");
+      return new Promise(resolve => {
+        confirmResolve = resolve;
+      });
+    }
+    function closeConfirmDialog(confirmed = false) {
+      document.getElementById("confirmDialog").classList.remove("open");
+      if (confirmResolve) {
+        const resolve = confirmResolve;
+        confirmResolve = null;
+        resolve(confirmed);
+      }
+    }
     const pageTitles = {
       dashboard: ["产品协同总览", "只看本周要处理的待办事项和跨产品风险提醒。"],
       demands: ["需求池", "先收集机会，讨论清楚，再转入产品开发流程。"],
@@ -4514,6 +4601,9 @@
     document.getElementById("cancelSyncModal").addEventListener("click", closeSyncModal);
     document.getElementById("confirmSyncModal").addEventListener("click", confirmSyncModal);
     document.getElementById("syncPeopleSearch").addEventListener("input", renderPeoplePicker);
+    document.getElementById("closeConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
+    document.getElementById("cancelConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
+    document.getElementById("confirmDialogAction").addEventListener("click", () => closeConfirmDialog(true));
     document.getElementById("formImage").addEventListener("input", e => {
       const value = e.target.value.trim();
       if (value) document.getElementById("formImagePreview").src = value;
@@ -4536,6 +4626,7 @@
       toast("已按产品名称重新生成封面。");
     });
     document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+    document.getElementById("confirmDialog").addEventListener("click", e => { if (e.target.id === "confirmDialog") closeConfirmDialog(false); });
     document.addEventListener("click", e => {
       const target = e.target.closest("button");
       if (!target) return;
