@@ -68,5 +68,6 @@ test("empty placeholder package files are pruned from defaults and restored stat
   assert.match(html, /function pruneUnopenableDeliverables\(deliverables = \[\]\)/);
   assert.match(html, /data\.deliverables = pruneUnopenableDeliverables\(\(data\.deliverables \|\| \[\]\)\.map\(doc =>/);
   assert.match(html, /function buildInitialDeliverables\(products\) \{\s*return \[\];\s*\}/);
+  assert.match(html, /if \(doc\.source === "流程自动" && !String\(doc\.url \|\| ""\)\.trim\(\)\) return false/);
   assert.match(html, /if \(!raw \|\| raw\.startsWith\("blob:"\)\) return false/);
 });

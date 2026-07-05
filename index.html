@@ -2808,6 +2808,7 @@
     }
     function hasOpenablePackageContent(doc = {}) {
       if (doc.status === "异常" || doc.error) return false;
+      if (doc.source === "流程自动" && !String(doc.url || "").trim()) return false;
       if (String(doc.content || "").trim()) return true;
       const raw = String(doc.url || "").trim();
       if (!raw || raw.startsWith("blob:")) return false;
