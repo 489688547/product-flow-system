@@ -15,7 +15,7 @@ test("workflow tasks can be synced to DingTalk todos through the org people pick
 
 test("review meetings can be created as DingTalk calendar events", () => {
   assert.match(html, /data-create-meeting/);
-  assert.match(html, /启动钉钉会议/);
+  assert.match(html, /同步钉钉日程/);
   assert.match(html, /const canCreateMeeting = reviewEditable && state\.text === "待开会"/);
   assert.match(html, /id="syncMeetingFields"/);
   assert.match(html, /\/api\/dingtalk\/calendar\/create/);
