@@ -22,6 +22,14 @@ test("sidebar uses a light collaboration-tool tone instead of a dark blue rail",
   assert.doesNotMatch(html, /--sidebar: #0f172a;/);
 });
 
+test("dashboard metric cards expose color as a card-level surface", () => {
+  assert.match(html, /\.metric \{[\s\S]*--metric-accent: var\(--blue\);[\s\S]*background: linear-gradient\(90deg, var\(--metric-accent-soft\) 0, #fff 62%\);/);
+  assert.match(html, /\.metric\.blue \{ --metric-accent: #1d4ed8; --metric-accent-soft: var\(--blue-soft\);/);
+  assert.match(html, /\.metric\.green \{ --metric-accent: #15803d; --metric-accent-soft: var\(--green-soft\);/);
+  assert.match(html, /\["在流程中产品", inProcess, "覆盖 7 个产品阶段", "green", "git-branch", "products"\]/);
+  assert.doesNotMatch(html, /border-left: 0;/);
+});
+
 test("product archive rows do not highlight the current product", () => {
   assert.doesNotMatch(html, /archive-row \$\{p\.id === currentId/);
   assert.doesNotMatch(html, /\.product-row\.active/);
