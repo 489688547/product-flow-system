@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   buildConfigResponse,
+  createDingCalendarEvent,
+  createDingTodoTask,
   getDingAccessToken,
   getDingUserByCode,
   getDingUserDetail,
@@ -121,6 +123,36 @@ async function handleDingOrgUsers(req, res, url) {
   }
 }
 
+async function handleDingTodoCreate(req, res) {
+  try {
+    const body = await readBody(req);
+    const accessToken = await getDingAccessToken(process.env);
+    const todo = await createDingTodoTask(accessToken, body);
+    json(res, 200, { synced: true, todo });
+  } catch (error) {
+    json(res, error.status || 500, {
+      synced: false,
+      message: error.message || "钉钉待办同步失败",
+      detail: error.detail || undefined
+    });
+  }
+}
+
+async function handleDingCalendarCreate(req, res) {
+  try {
+    const body = await readBody(req);
+    const accessToken = await getDingAccessToken(process.env);
+    const event = await createDingCalendarEvent(accessToken, body);
+    json(res, 200, { synced: true, event });
+  } catch (error) {
+    json(res, error.status || 500, {
+      synced: false,
+      message: error.message || "钉钉会议同步失败",
+      detail: error.detail || undefined
+    });
+  }
+}
+
 function handleDingOrgStatus(res) {
   json(res, 200, {
     configured: buildConfigResponse(process.env, "").configured,
@@ -184,6 +216,14 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/dingtalk/org/users" && req.method === "GET") {
     await handleDingOrgUsers(req, res, url);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/todo/create" && req.method === "POST") {
+    await handleDingTodoCreate(req, res);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/calendar/create" && req.method === "POST") {
+    await handleDingCalendarCreate(req, res);
     return;
   }
   await serveStatic(req, res);

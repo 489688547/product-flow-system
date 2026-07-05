@@ -687,7 +687,7 @@
     .stage-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .task-edit-row {
       display: grid;
-      grid-template-columns: 104px minmax(220px, 1.4fr) 128px 150px 76px 70px 72px;
+      grid-template-columns: 104px minmax(220px, 1.4fr) 128px 150px 76px 70px minmax(150px, .7fr);
       gap: 8px;
       align-items: center;
       padding: 8px 0;
@@ -877,6 +877,18 @@
       gap: 6px;
       flex-wrap: wrap;
     }
+    .sync-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 24px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .sync-status i { width: 13px; height: 13px; }
+    .sync-status.ok { color: var(--green); }
+    .sync-status.error { color: var(--red); }
     .table-wrap {
       width: 100%;
       overflow-x: auto;
@@ -1161,6 +1173,46 @@
     }
     .dialog-foot { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
     .dialog-body { padding: 16px; }
+    .sync-dialog { width: min(620px, 100%); }
+    .sync-target {
+      display: grid;
+      gap: 4px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      margin-bottom: 12px;
+    }
+    .sync-target strong { font-size: 13px; line-height: 1.3; }
+    .sync-target span { color: var(--muted); font-size: 12px; line-height: 1.35; }
+    .people-list {
+      max-height: 260px;
+      overflow: auto;
+      margin-top: 10px;
+      display: grid;
+      gap: 6px;
+    }
+    .people-row {
+      min-height: 48px;
+      display: grid;
+      grid-template-columns: 16px 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--control);
+    }
+    .people-row:hover { border-color: var(--line-strong); background: var(--control-hover); }
+    .people-row strong { display: block; font-size: 13px; line-height: 1.2; }
+    .people-row span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.2; }
+    .people-row input { margin-top: 0; }
+    .sync-meeting-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
     .toast {
       position: fixed;
       right: 22px;
@@ -1250,7 +1302,8 @@
       .form-grid { grid-template-columns: 1fr; }
       .task-table { min-width: 680px; }
       .stage-editor { overflow-x: auto; }
-      .task-edit-row { grid-template-columns: 104px 240px 128px 150px 76px 70px; min-width: 820px; }
+      .task-edit-row { grid-template-columns: 104px 240px 128px 150px 76px 70px 150px; min-width: 970px; }
+      .sync-meeting-fields { grid-template-columns: 1fr; }
       .table-wrap { overflow-x: auto; }
     }
   </style>
@@ -1508,6 +1561,30 @@
       </div>
     </div>
   </div>
+  <div class="modal" id="syncModal">
+    <div class="dialog sync-dialog">
+      <div class="dialog-head">
+        <h2 id="syncTitle">同步到钉钉</h2>
+        <button class="icon-btn" id="closeSyncModal" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <div class="sync-target">
+          <strong id="syncTargetTitle">-</strong>
+          <span id="syncTargetMeta">-</span>
+        </div>
+        <div class="sync-meeting-fields hidden" id="syncMeetingFields">
+          <label class="field">开始时间<input id="syncStartTime" type="datetime-local"></label>
+          <label class="field">结束时间<input id="syncEndTime" type="datetime-local"></label>
+        </div>
+        <label class="field">选择同事<input id="syncPeopleSearch" placeholder="搜索姓名、岗位、部门"></label>
+        <div class="people-list" id="syncPeopleList"></div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn ghost" id="cancelSyncModal">取消</button>
+        <button class="btn primary" id="confirmSyncModal"><i data-lucide="send"></i>同步</button>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -1748,6 +1825,10 @@
     let currentUser = loadUser();
     let orgCache = loadOrgCache();
     let dingAutoLoginTried = false;
+    let syncModalMode = "";
+    let syncTargetId = "";
+    let syncMeetingId = "";
+    let syncSelectedUsers = new Set();
 
     function loadState() {
       const raw = localStorage.getItem("productFlowState");
@@ -1826,6 +1907,39 @@
         if (!orgCache) toast(error.message || "钉钉组织架构同步失败，请检查通讯录权限。");
         return orgCache;
       }
+    }
+    function dingUserId(user = {}) {
+      return user.userId || user.userid || "";
+    }
+    function dingUnionId(user = {}) {
+      return user.unionId || user.unionid || "";
+    }
+    function dingUserLabel(user = {}) {
+      return [user.title, ...(user.departmentNames || []), ...(user.roles || []).map(role => role.name || role.groupName || "")].filter(Boolean).join(" · ");
+    }
+    function orgUsers() {
+      return (orgCache?.users || []).filter(user => user && user.active !== false);
+    }
+    function findOrgUser(key) {
+      return orgUsers().find(user => dingUserId(user) === key || dingUnionId(user) === key) || null;
+    }
+    function filterPeople(keyword = "") {
+      const query = keyword.trim().toLowerCase();
+      const users = orgUsers();
+      if (!query) return users;
+      return users.filter(user => [user.name, user.title, ...(user.departmentNames || []), ...(user.roles || []).map(role => role.name || "")].join(" ").toLowerCase().includes(query));
+    }
+    function ensureDingSyncReady() {
+      if (currentUser?.source !== "dingtalk") {
+        toast("需要从钉钉登录后才能同步待办或日历。");
+        return false;
+      }
+      if (!orgUsers().length) {
+        syncDingOrgCache({ force: true });
+        toast("正在同步钉钉组织架构，请稍后再选择同事。");
+        return false;
+      }
+      return true;
     }
     function currentRole() {
       return currentUser && roleProfiles[currentUser.role] ? roleProfiles[currentUser.role] : roleProfiles.readonly;
@@ -2093,6 +2207,7 @@
         content: defaultMinuteContent(doc),
         ...doc
       }));
+      data.dingMeetings = Array.isArray(data.dingMeetings) ? data.dingMeetings : [];
       return data;
     }
     function productImageSeed(name) {
@@ -2339,6 +2454,36 @@
       renderAll();
       if (options.toast !== false) toast(options.message || `已切换到：${product.name}`);
     }
+    function detailUrlFor(params = {}) {
+      const base = location.origin && location.origin !== "null" ? `${location.origin}${location.pathname}` : location.href.split("?")[0].split("#")[0];
+      const query = new URLSearchParams(params);
+      return `${base}?${query.toString()}`;
+    }
+    function formatDateTimeLocal(date) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const hh = String(date.getHours()).padStart(2, "0");
+      const min = String(date.getMinutes()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
+    }
+    function defaultMeetingTimes() {
+      const start = new Date();
+      start.setHours(start.getHours() + 1, 0, 0, 0);
+      const end = new Date(start);
+      end.setHours(start.getHours() + 1);
+      return { start: formatDateTimeLocal(start), end: formatDateTimeLocal(end) };
+    }
+    function dingMeetingRecord(productId, meetingId) {
+      return (state.dingMeetings || []).find(item => item.productId === productId && item.meetingId === meetingId) || null;
+    }
+    function syncStatusHtml(record, okText = "已同步") {
+      if (!record) return "";
+      const ok = record.status === "已同步";
+      const icon = ok ? "check-circle-2" : "circle-alert";
+      const text = ok ? okText : "同步失败";
+      return `<span class="sync-status ${ok ? "ok" : "error"}" title="${esc(record.error || record.assignees?.join("、") || "")}"><i data-lucide="${icon}"></i>${esc(text)}</span>`;
+    }
     function requiredMeetings(product) {
       return meetingRules.filter(rule => rule.levels.includes(product.level));
     }
@@ -2370,6 +2515,77 @@
       if (!status.taskDone) return { ...status, text: "待开会", badge: "gold", actionable: false };
       if (!status.minutes.hasMinutes) return { ...status, text: "待补纪要", badge: "gold", actionable: true };
       return { ...status, text: "已通过", badge: "green", actionable: true };
+    }
+    async function openSyncModal(mode, payload = {}) {
+      if (!ensureDingSyncReady()) return;
+      if (orgCacheExpired()) await syncDingOrgCache({ force: true });
+      syncModalMode = mode;
+      syncTargetId = payload.taskId || payload.productId || "";
+      syncMeetingId = payload.meetingId || "";
+      syncSelectedUsers = new Set();
+      const modal = document.getElementById("syncModal");
+      const title = document.getElementById("syncTitle");
+      const targetTitle = document.getElementById("syncTargetTitle");
+      const targetMeta = document.getElementById("syncTargetMeta");
+      const meetingFields = document.getElementById("syncMeetingFields");
+      document.getElementById("syncPeopleSearch").value = "";
+      if (mode === "todo") {
+        const task = state.tasks.find(item => item.id === syncTargetId);
+        const product = task ? productById(task.productId) : null;
+        if (!task || !product) return;
+        title.textContent = "同步待办到钉钉";
+        targetTitle.textContent = task.title;
+        targetMeta.textContent = `${product.name} · ${stages[task.stage]?.short || "-"} · ${task.owner || "未指定责任部门"}`;
+        meetingFields.classList.add("hidden");
+      }
+      if (mode === "meeting") {
+        const product = productById(syncTargetId);
+        const meeting = meetingRules.find(rule => rule.id === syncMeetingId);
+        if (!product || !meeting) return;
+        const defaults = defaultMeetingTimes();
+        document.getElementById("syncStartTime").value = defaults.start;
+        document.getElementById("syncEndTime").value = defaults.end;
+        title.textContent = "创建钉钉会议日程";
+        targetTitle.textContent = meeting.title;
+        targetMeta.textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
+        meetingFields.classList.remove("hidden");
+      }
+      renderPeoplePicker();
+      modal.classList.add("open");
+      if (window.lucide) lucide.createIcons();
+    }
+    function closeSyncModal() {
+      document.getElementById("syncModal").classList.remove("open");
+      syncModalMode = "";
+      syncTargetId = "";
+      syncMeetingId = "";
+      syncSelectedUsers = new Set();
+    }
+    function renderPeoplePicker() {
+      const list = document.getElementById("syncPeopleList");
+      const keyword = document.getElementById("syncPeopleSearch").value || "";
+      const users = filterPeople(keyword);
+      list.innerHTML = users.map(user => {
+        const key = dingUserId(user) || dingUnionId(user);
+        const checked = syncSelectedUsers.has(key) ? "checked" : "";
+        return `<label class="people-row">
+          <input type="checkbox" data-sync-user="${esc(key)}" ${checked}>
+          <span><strong>${esc(user.name || key)}</strong><span>${esc(dingUserLabel(user) || "未设置岗位")}</span></span>
+        </label>`;
+      }).join("") || `<div class="empty">没有匹配的同事。可以先点“检测环境/重新登录”刷新组织架构。</div>`;
+      list.querySelectorAll("[data-sync-user]").forEach(input => input.addEventListener("change", () => {
+        if (input.checked) syncSelectedUsers.add(input.dataset.syncUser);
+        else syncSelectedUsers.delete(input.dataset.syncUser);
+      }));
+    }
+    async function confirmSyncModal() {
+      const selected = [...syncSelectedUsers].map(findOrgUser).filter(Boolean);
+      if (!selected.length) {
+        toast("请至少选择一位同事。");
+        return;
+      }
+      if (syncModalMode === "todo") await syncTaskToDingTodo(selected);
+      if (syncModalMode === "meeting") await syncMeetingToDingCalendar(selected);
     }
     function completion(productId = currentId) {
       const tasks = productTasks(productId);
@@ -2542,7 +2758,16 @@
       <div class="task-edit-row task-edit-head">
         <span>类别</span><span>任务内容</span><span>责任部门</span><span>交付物</span><span>截止</span><span>完成</span><span>操作</span>
       </div>
-      ${tasks.map(t => `<div class="task-edit-row ${focusedTaskId === t.id ? "focused" : ""}" data-edit-task="${esc(t.id)}">
+      ${tasks.map(t => {
+        const todoSync = syncStatusHtml(t.dingTodo, "待办已同步");
+        const taskActions = taskEditable
+          ? `<div class="table-actions">
+              ${currentUser?.source === "dingtalk" ? `<button class="mini-action" data-sync-task="${esc(t.id)}"><i data-lucide="send"></i>同步待办</button>` : ""}
+              ${todoSync}
+              <button class="mini-action danger" data-delete-task="${esc(t.id)}"><i data-lucide="trash-2"></i>删除</button>
+            </div>`
+          : `<span class="small">只读</span>`;
+        return `<div class="task-edit-row ${focusedTaskId === t.id ? "focused" : ""}" data-edit-task="${esc(t.id)}">
         <select data-task-field="category" ${disabled}>
           ${["会前准备", "会议/决策", "会后交付", "准入条件", "补充任务"].map(v => `<option value="${v}" ${t.category === v ? "selected" : ""}>${v}</option>`).join("")}
         </select>
@@ -2551,8 +2776,9 @@
         <input data-task-field="deliverable" value="${esc(t.deliverable)}" ${disabled}>
         <input data-task-field="due" value="${esc(t.due)}" ${disabled}>
         <label class="task-label"><input type="checkbox" data-task-field="done" ${t.done ? "checked" : ""} ${disabled}><span>${t.done ? "是" : "否"}</span></label>
-        ${taskEditable ? `<button class="mini-action danger" data-delete-task="${esc(t.id)}"><i data-lucide="trash-2"></i>删除</button>` : `<span class="small">只读</span>`}
-      </div>`).join("") || `<div class="empty">${taskEditable ? "这个阶段还没有任务，可以点击“加任务”。" : "这个阶段还没有任务。"}</div>`}`;
+        ${taskActions}
+      </div>`;
+      }).join("") || `<div class="empty">${taskEditable ? "这个阶段还没有任务，可以点击“加任务”。" : "这个阶段还没有任务。"}</div>`}`;
       document.querySelectorAll("[data-edit-task] [data-task-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateStageTask(input.closest("[data-edit-task]").dataset.editTask, input.dataset.taskField, input.type === "checkbox" ? input.checked : input.value));
@@ -2853,6 +3079,14 @@
             <thead><tr><th>会议</th><th>阶段</th><th>纪要 / 决策文件</th><th>责任人</th><th>会议状态</th><th>操作</th></tr></thead>
             <tbody>
               ${states.map(({ meeting, state }) => {
+                const eventRecord = dingMeetingRecord(product.id, meeting.id);
+                const canCreateMeeting = currentUser?.source === "dingtalk" && reviewEditable && product.stage >= meeting.stage && eventRecord?.status !== "已同步";
+                const calendarAction = canCreateMeeting ? `<button class="mini-action" data-create-meeting="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="calendar-plus"></i>创建会议</button>` : syncStatusHtml(eventRecord, "日程已建");
+                const minutesAction = state.passed && state.minutes.doc
+                  ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>`
+                  : state.actionable && reviewEditable
+                    ? `<button class="mini-action" data-add-minutes="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="file-plus"></i>补充纪要</button>`
+                    : "";
                 return `<tr>
                   <td><strong>${esc(meeting.title)}</strong></td>
                   <td>${esc(stages[meeting.stage].short)}</td>
@@ -2860,7 +3094,9 @@
                   <td>${esc(meeting.owner)}</td>
                   <td><span class="badge ${state.badge}">${state.text}</span></td>
                   <td><div class="table-actions">
-                    ${state.passed && state.minutes.doc ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>` : state.actionable && reviewEditable ? `<button class="mini-action" data-add-minutes="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="file-plus"></i>补充纪要</button>` : `<span class="small">-</span>`}
+                    ${calendarAction || ""}
+                    ${minutesAction || ""}
+                    ${!calendarAction && !minutesAction ? `<span class="small">-</span>` : ""}
                   </div></td>
                 </tr>`;
               }).join("")}
@@ -2926,6 +3162,54 @@
       state.tasks = state.tasks.filter(t => t.id !== id);
       if (focusedTaskId === id) focusedTaskId = "";
       toast("任务已删除。");
+      renderAll();
+    }
+    async function syncTaskToDingTodo(users) {
+      if (denyIfCannot("editTasks")) return;
+      const task = state.tasks.find(t => t.id === syncTargetId);
+      const product = task ? productById(task.productId) : null;
+      if (!task || !product) return;
+      const executorUnionIds = users.map(dingUnionId).filter(Boolean);
+      if (!executorUnionIds.length) {
+        toast("选中的同事缺少 unionId，无法创建钉钉待办。");
+        return;
+      }
+      try {
+        const due = parseTaskDue(task.due);
+        const res = await fetch(`${dingApiBase()}/api/dingtalk/todo/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            creatorUnionId: currentUser?.dingUser?.unionid,
+            executorUnionIds,
+            sourceId: `task:${task.id}`,
+            subject: task.title,
+            description: `${product.name} · ${stages[task.stage]?.name || ""}\n责任部门：${task.owner || "-"}\n交付物：${task.deliverable || "-"}`,
+            dueTime: due ? due.getTime() : 0,
+            detailUrl: detailUrlFor({ product: product.id, task: task.id, screen: "workflow" })
+          })
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !payload.synced) throw new Error(payload.message || "钉钉待办同步失败");
+        task.dingTodo = {
+          todoId: payload.todo?.id || payload.todo?.taskId || "",
+          status: "已同步",
+          syncedAt: new Date().toISOString(),
+          assignees: users.map(user => user.name).filter(Boolean),
+          error: ""
+        };
+        closeSyncModal();
+        toast("已同步到钉钉待办。");
+      } catch (error) {
+        task.dingTodo = {
+          ...(task.dingTodo || {}),
+          status: "失败",
+          syncedAt: new Date().toISOString(),
+          assignees: users.map(user => user.name).filter(Boolean),
+          error: error.message || "钉钉待办同步失败"
+        };
+        toast(task.dingTodo.error);
+      }
       renderAll();
     }
     function archiveDoc(id) {
@@ -3125,6 +3409,64 @@
       selectedStage = product.stage;
       activeMinuteDocId = doc.id;
       navigateToScreen("reviews");
+      renderAll();
+    }
+    async function syncMeetingToDingCalendar(users) {
+      if (denyIfCannot("editReviews")) return;
+      const product = productById(syncTargetId);
+      const meeting = meetingRules.find(rule => rule.id === syncMeetingId);
+      if (!product || !meeting) return;
+      const attendeeUserIds = users.map(dingUserId).filter(Boolean);
+      if (!attendeeUserIds.length) {
+        toast("选中的同事缺少 userId，无法创建钉钉日程。");
+        return;
+      }
+      const startValue = document.getElementById("syncStartTime").value;
+      const endValue = document.getElementById("syncEndTime").value;
+      const start = startValue ? new Date(startValue) : null;
+      const end = endValue ? new Date(endValue) : null;
+      if (!start || !end || end <= start) {
+        toast("请填写有效的会议开始和结束时间。");
+        return;
+      }
+      const recordBase = {
+        id: `${product.id}|${meeting.id}`,
+        productId: product.id,
+        meetingId: meeting.id,
+        title: meeting.title,
+        startTime: start.toISOString(),
+        endTime: end.toISOString(),
+        attendees: users.map(user => user.name).filter(Boolean),
+        syncedAt: new Date().toISOString()
+      };
+      try {
+        const res = await fetch(`${dingApiBase()}/api/dingtalk/calendar/create`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            organizerUserId: currentUser?.dingUser?.userid,
+            summary: `${product.name} · ${meeting.title}`,
+            description: `${stages[meeting.stage]?.name || ""}\n${meeting.minute}`,
+            startTime: start.toISOString(),
+            endTime: end.toISOString(),
+            attendeeUserIds
+          })
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !payload.synced) throw new Error(payload.message || "钉钉日程创建失败");
+        state.dingMeetings = [
+          { ...recordBase, eventId: payload.event?.id || payload.event?.eventId || "", status: "已同步", error: "" },
+          ...(state.dingMeetings || []).filter(item => item.id !== recordBase.id)
+        ];
+        closeSyncModal();
+        toast("已创建钉钉会议日程。");
+      } catch (error) {
+        state.dingMeetings = [
+          { ...recordBase, eventId: "", status: "失败", error: error.message || "钉钉日程创建失败" },
+          ...(state.dingMeetings || []).filter(item => item.id !== recordBase.id)
+        ];
+        toast(error.message || "钉钉日程创建失败");
+      }
       renderAll();
     }
     function updateMinuteDoc(id, field, value) {
@@ -3539,6 +3881,10 @@
     document.getElementById("closeModal").addEventListener("click", closeModal);
     document.getElementById("cancelModal").addEventListener("click", closeModal);
     document.getElementById("saveModal").addEventListener("click", saveModal);
+    document.getElementById("closeSyncModal").addEventListener("click", closeSyncModal);
+    document.getElementById("cancelSyncModal").addEventListener("click", closeSyncModal);
+    document.getElementById("confirmSyncModal").addEventListener("click", confirmSyncModal);
+    document.getElementById("syncPeopleSearch").addEventListener("input", renderPeoplePicker);
     document.getElementById("formImage").addEventListener("input", e => {
       const value = e.target.value.trim();
       if (value) document.getElementById("formImagePreview").src = value;
@@ -3569,6 +3915,15 @@
         if (product) selectProductAndNavigate(product.id, "workflow", { message: `已定位到：${product.name} · ${stages[product.stage].short}` });
         return;
       }
+      if (target.dataset.syncTask) {
+        openSyncModal("todo", { taskId: target.dataset.syncTask });
+        return;
+      }
+      if (target.dataset.createMeeting) {
+        const [productId, meetingId] = target.dataset.createMeeting.split("|");
+        openSyncModal("meeting", { productId, meetingId });
+        return;
+      }
       if (target.dataset.demandSort) {
         e.preventDefault();
         setDemandSort(target.dataset.demandSort);
@@ -3576,6 +3931,7 @@
       }
       if (target.id === "completeAllVisible") completeCurrentStage();
     });
+    document.getElementById("syncModal").addEventListener("click", e => { if (e.target.id === "syncModal") closeSyncModal(); });
     syncTodoDateInputs();
     renderAll();
     if (currentUser?.source === "dingtalk") syncDingOrgCache();

@@ -101,6 +101,25 @@ async function postDingTopApi(accessToken, path, body, fetchImpl = fetch) {
   return data.result || {};
 }
 
+async function requestDingOpenApi(accessToken, method, path, body, fetchImpl = fetch) {
+  const res = await fetchImpl(`https://api.dingtalk.com${path}`, {
+    method,
+    headers: {
+      "content-type": "application/json",
+      "x-acs-dingtalk-access-token": accessToken
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.code || data.errcode) {
+    const err = new Error(data.message || data.errmsg || "钉钉接口调用失败");
+    err.status = res.ok ? 502 : res.status;
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+
 export async function getDingDepartments(accessToken, fetchImpl = fetch, rootDeptId = 1) {
   const result = await postDingTopApi(accessToken, "/topapi/v2/department/listsub", {
     dept_id: Number(rootDeptId) || 1,
@@ -218,6 +237,100 @@ export function filterOrgUsers(org = {}, query = "", limit = 20) {
     ].filter(Boolean).join(" ").toLowerCase().includes(text))
     : users;
   return result.slice(0, limit);
+}
+
+export function buildDingTodoPayload({
+  sourceId,
+  subject,
+  description = "",
+  creatorUnionId,
+  executorUnionIds = [],
+  participantUnionIds = [],
+  detailUrl,
+  dueTime = 0,
+  priority = 20
+} = {}) {
+  return {
+    sourceId: String(sourceId || ""),
+    subject: String(subject || "").slice(0, 1024),
+    description: String(description || ""),
+    creatorId: String(creatorUnionId || ""),
+    executorIds: executorUnionIds.filter(Boolean),
+    participantIds: participantUnionIds.filter(Boolean),
+    detailUrl: {
+      appUrl: String(detailUrl || ""),
+      pcUrl: String(detailUrl || "")
+    },
+    dueTime: Number(dueTime) || 0,
+    isOnlyShowExecutor: true,
+    priority
+  };
+}
+
+export async function createDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
+  const creatorUnionId = String(input.creatorUnionId || "");
+  if (!creatorUnionId) {
+    const err = new Error("缺少钉钉创建人 unionId，无法创建待办。");
+    err.status = 400;
+    throw err;
+  }
+  if (!input.executorUnionIds?.length) {
+    const err = new Error("请至少选择一个待办执行人。");
+    err.status = 400;
+    throw err;
+  }
+  if (!input.detailUrl) {
+    const err = new Error("缺少待办详情链接 detailUrl。");
+    err.status = 400;
+    throw err;
+  }
+  const body = buildDingTodoPayload(input);
+  return requestDingOpenApi(
+    accessToken,
+    "POST",
+    `/v1.0/todo/users/${encodeURIComponent(creatorUnionId)}/tasks?operatorId=${encodeURIComponent(creatorUnionId)}`,
+    body,
+    fetchImpl
+  );
+}
+
+export function buildDingCalendarEventPayload({
+  summary,
+  description = "",
+  startTime,
+  endTime,
+  attendeeUserIds = [],
+  timeZone = "Asia/Shanghai"
+} = {}) {
+  return {
+    summary: String(summary || "").slice(0, 1024),
+    description: String(description || ""),
+    start: { dateTime: String(startTime || ""), timeZone },
+    end: { dateTime: String(endTime || ""), timeZone },
+    attendees: attendeeUserIds.filter(Boolean).map(id => ({ id }))
+  };
+}
+
+export async function createDingCalendarEvent(accessToken, input = {}, fetchImpl = fetch) {
+  const organizerUserId = String(input.organizerUserId || "");
+  if (!organizerUserId) {
+    const err = new Error("缺少钉钉会议发起人 userId，无法创建日程。");
+    err.status = 400;
+    throw err;
+  }
+  if (!input.startTime || !input.endTime) {
+    const err = new Error("请填写会议开始和结束时间。");
+    err.status = 400;
+    throw err;
+  }
+  const body = buildDingCalendarEventPayload(input);
+  return requestDingOpenApi(
+    accessToken,
+    "POST",
+    `/v1.0/calendar/users/${encodeURIComponent(organizerUserId)}/calendars/primary/events`,
+    body,
+    fetchImpl
+  );
 }
 
 export async function loginWithDingTalk({ authCode, corpId }, env = {}, fetchImpl = fetch) {
