@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildDingCalendarEventPayload,
+  buildDingMeetingMinutesQuery,
   buildDingTodoPayload,
   createDingCalendarEvent,
+  queryDingMeetingMinutesText,
   createDingTodoTask
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
 
@@ -119,4 +121,51 @@ test("createDingCalendarEvent sends DingTalk idempotency client token", async ()
   });
 
   assert.equal(calls[0].options.headers["x-client-token"], "meeting-p1-standard");
+});
+
+test("buildDingMeetingMinutesQuery requires a DingTalk cloud recording conference id", () => {
+  assert.throws(
+    () => buildDingMeetingMinutesQuery({}),
+    /需要钉钉会议录制/
+  );
+  assert.deepEqual(buildDingMeetingMinutesQuery({ recordingId: "conf-1" }), { conferenceId: "conf-1", params: "" });
+});
+
+test("queryDingMeetingMinutesText returns text from DingTalk recording transcript response", async () => {
+  const calls = [];
+  const result = await queryDingMeetingMinutesText("token-1", {
+    recordingId: "conf-1"
+  }, async (url, options) => {
+    calls.push({ url, options });
+    return okJson({
+      paragraphList: [
+        {
+          sentenceList: [
+            { sentence: "确认进入立项。" },
+            { sentence: "产品部周三前补齐 PRD。" }
+          ]
+        }
+      ]
+    });
+  });
+
+  assert.match(calls[0].url, /\/v1\.0\/conference\/videoConferences\/conf-1\/cloudRecords\/getTexts/);
+  assert.equal(result.text, "确认进入立项。\n产品部周三前补齐 PRD。");
+});
+
+test("queryDingMeetingMinutesText also accepts wrapped transcript payloads", async () => {
+  const result = await queryDingMeetingMinutesText("token-1", {
+    conferenceId: "conf-2"
+  }, async () => {
+    return okJson({
+      result: {
+        paragraphList: [
+          { paragraph: "包装方向通过。" },
+          { sentenceList: [{ sentence: "供应链下周确认报价。" }] }
+        ]
+      }
+    });
+  });
+
+  assert.equal(result.text, "包装方向通过。\n供应链下周确认报价。");
 });

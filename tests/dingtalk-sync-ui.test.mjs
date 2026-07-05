@@ -45,6 +45,20 @@ test("review meetings expose separate schedule and instant meeting actions", () 
   assert.match(html, /data-sync-action="instant"/);
 });
 
+test("review meetings can import DingTalk minutes into the product package", () => {
+  assert.match(html, /id="minutesModal"/);
+  assert.match(html, /data-import-minutes/);
+  assert.match(html, /function createMeetingMinutesFromText\(/);
+  assert.match(html, /generateMeetingMinutesPoster\(/);
+  assert.match(html, /重点纪要图/);
+});
+
+test("DingTalk minutes sync fails with a recording id guidance instead of fake success", () => {
+  assert.match(html, /\/api\/dingtalk\/meeting\/minutes/);
+  assert.match(html, /minutesRecordingId/);
+  assert.match(html, /需要钉钉会议录制/);
+});
+
 test("DingTalk sync errors expose actionable API details in the UI", () => {
   assert.match(html, /function formatDingSyncError\(/);
   assert.match(html, /payload\.detail/);

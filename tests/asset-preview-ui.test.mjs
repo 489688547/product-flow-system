@@ -71,3 +71,10 @@ test("empty placeholder package files are pruned from defaults and restored stat
   assert.match(html, /if \(doc\.source === "流程自动" && !String\(doc\.url \|\| ""\)\.trim\(\)\) return false/);
   assert.match(html, /if \(!raw \|\| raw\.startsWith\("blob:"\)\) return false/);
 });
+
+test("meeting minutes poster is saved as an openable image asset", () => {
+  assert.match(html, /function generateMeetingMinutesPoster\(/);
+  assert.match(html, /data:image\/svg\+xml;charset=utf-8/);
+  assert.match(html, /type: "image"/);
+  assert.match(html, /source: "会议纪要生成"/);
+});

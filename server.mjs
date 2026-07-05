@@ -13,6 +13,7 @@ import {
   filterOrgUsers,
   mapDingRole,
   publicUser,
+  queryDingMeetingMinutesText,
   syncDingOrg
 } from "./functions/api/dingtalk/_shared/dingtalk.js";
 
@@ -153,6 +154,21 @@ async function handleDingCalendarCreate(req, res) {
   }
 }
 
+async function handleDingMeetingMinutes(req, res) {
+  try {
+    const body = await readBody(req);
+    const accessToken = await getDingAccessToken(process.env);
+    const result = await queryDingMeetingMinutesText(accessToken, body);
+    json(res, 200, { synced: true, text: result.text, raw: result.raw });
+  } catch (error) {
+    json(res, error.status || 500, {
+      synced: false,
+      message: error.message || "钉钉会议纪要同步失败",
+      detail: error.detail || undefined
+    });
+  }
+}
+
 function handleDingOrgStatus(res) {
   json(res, 200, {
     configured: buildConfigResponse(process.env, "").configured,
@@ -224,6 +240,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/dingtalk/calendar/create" && req.method === "POST") {
     await handleDingCalendarCreate(req, res);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/meeting/minutes" && req.method === "POST") {
+    await handleDingMeetingMinutes(req, res);
     return;
   }
   await serveStatic(req, res);

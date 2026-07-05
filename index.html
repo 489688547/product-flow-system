@@ -61,7 +61,7 @@
     button { cursor: pointer; transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .12s ease; }
     button:active { transform: translateY(1px); }
     button:focus-visible,
-    .task-link:focus-visible,
+    #todayTasks tr.task-row:focus-visible,
     .sort-button:focus-visible {
       outline: 3px solid var(--ring);
       outline-offset: 2px;
@@ -69,7 +69,7 @@
     .app {
       min-height: 100vh;
       display: grid;
-      grid-template-columns: 224px minmax(0, 1fr);
+      grid-template-columns: 172px minmax(0, 1fr);
       gap: 18px;
       padding: 16px;
     }
@@ -90,13 +90,13 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 6px 6px 14px;
+      gap: 8px;
+      padding: 6px 4px 14px;
       border-bottom: 1px solid var(--line);
     }
     .brand-mark {
-      width: 38px;
-      height: 38px;
+      width: 34px;
+      height: 34px;
       display: grid;
       place-items: center;
       border-radius: 8px;
@@ -117,7 +117,7 @@
       font-weight: 800;
       box-shadow: none;
     }
-    .brand strong { display: block; font-size: 15px; line-height: 1.2; }
+    .brand strong { display: block; font-size: 14px; line-height: 1.2; }
     .brand span { display: block; margin-top: 2px; color: var(--sidebar-muted); font-size: 12px; }
     .login-screen {
       position: fixed;
@@ -231,7 +231,7 @@
       box-shadow: var(--shadow);
     }
     .user-pill span {
-      max-width: 150px;
+      max-width: min(360px, 42vw);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -252,14 +252,15 @@
       height: 40px;
       border: 0;
       border-radius: 8px;
-      padding: 0 10px;
+      padding: 0 9px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 9px;
       color: var(--sidebar-muted);
       background: transparent;
       text-align: left;
       font-weight: 650;
+      white-space: nowrap;
     }
     .nav button:hover { background: var(--panel-2); color: var(--sidebar-ink); }
     .nav button.active {
@@ -353,14 +354,12 @@
       border-color: #fca5a5;
       background: #fef2f2;
     }
-    .mini-action[data-demand-convert],
-    .mini-action[data-demand-finish] {
+    .mini-action[data-demand-convert] {
       border-color: var(--primary);
       background: var(--primary);
       color: var(--primary-ink);
     }
-    .mini-action[data-demand-convert]:hover,
-    .mini-action[data-demand-finish]:hover {
+    .mini-action[data-demand-convert]:hover {
       border-color: var(--primary-hover);
       background: var(--primary-hover);
       color: #fff;
@@ -514,15 +513,19 @@
       transition: width .22s ease;
     }
     .product-list { display: grid; gap: 10px; }
-    .product-list-head {
+    .product-list-head,
+    .product-row.archive-row {
       display: grid;
-      grid-template-columns: minmax(280px, 1fr) 96px 58px 84px minmax(300px, 420px);
+      grid-template-columns: minmax(360px, 1fr) 108px 68px 104px 506px;
       gap: 10px;
       align-items: center;
+    }
+    .product-list-head {
       padding: 0 12px 4px;
       color: var(--muted);
       font-size: 12px;
       font-weight: 600;
+      padding: 0 12px 8px;
     }
     .product-list-head span:last-child { text-align: right; }
     .product-row {
@@ -536,19 +539,33 @@
       background: var(--panel);
     }
     .product-row.archive-row {
-      grid-template-columns: minmax(280px, 1fr) 96px 58px 84px minmax(300px, 420px);
+      min-height: 104px;
+    }
+    .product-row.archive-row > .badge,
+    .product-row.archive-row > .product-level,
+    .product-row.archive-row > .product-stage {
+      justify-self: start;
+    }
+    .product-level,
+    .product-stage {
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 650;
+      line-height: 1.35;
+      white-space: nowrap;
     }
     .product-row .table-actions { justify-content: flex-end; }
     .product-actions {
       display: flex;
       justify-content: end;
       gap: 6px;
+      flex-wrap: nowrap;
     }
     .product-action-menu {
       display: flex;
       justify-content: flex-end;
       gap: 6px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
     }
     .product-action-menu .mini-action {
       min-width: 62px;
@@ -603,6 +620,91 @@
     .image-tools {
       display: grid;
       gap: 8px;
+    }
+    .product-profile-panel {
+      display: none;
+      gap: 14px;
+      margin-bottom: 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+    .product-profile-panel.show { display: grid; }
+    .product-profile-hero {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+    .product-edit-media {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      align-items: start;
+    }
+    .product-edit-media.show { display: grid; }
+    .product-edit-media .image-preview {
+      width: 132px;
+      height: 132px;
+    }
+    .product-profile-title {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    .product-profile-title strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.3;
+    }
+    .product-meta-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .product-meta-item {
+      min-height: 58px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      display: grid;
+      gap: 4px;
+    }
+    .product-meta-item span {
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+    .product-meta-item strong {
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.35;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .product-discussion-record {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      display: grid;
+      gap: 6px;
+    }
+    .product-discussion-record strong {
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .product-discussion-record p {
+      color: var(--ink-soft);
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
     }
     .workflow-product {
       margin-top: 12px;
@@ -684,36 +786,34 @@
       position: sticky;
       top: 0;
       z-index: 1;
+      white-space: nowrap;
+      word-break: keep-all;
     }
     .task-table tbody tr:hover td { background: var(--panel-2); }
     .task-table tr:last-child td { border-bottom: 0; }
-    .task-link {
-      border: 0;
-      background: transparent;
-      color: var(--ink);
-      padding: 0;
-      min-height: 0;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font: inherit;
-      font-weight: 700;
-      line-height: 1.35;
-      text-align: left;
+    #todayTasks tr.task-row {
       cursor: pointer;
     }
-    .task-link:hover { color: var(--blue); }
-    .task-link i {
-      width: 14px;
-      height: 14px;
-      flex: 0 0 auto;
+    #todayTasks tr.task-row:hover td,
+    #todayTasks tr.task-row:focus-visible td {
+      background: #f8fbff;
     }
+    #todayTasks tr.task-row:focus-visible {
+      outline-offset: -3px;
+    }
+    .task-link {
+      color: var(--ink);
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    #todayTasks tr.task-row:hover .task-link { color: var(--blue); }
     .stage-editor {
       margin-top: 14px;
       padding: 14px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--panel-2);
+      overflow-x: auto;
     }
     .stage-editor-head {
       display: flex;
@@ -731,7 +831,7 @@
     .stage-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .task-edit-row {
       display: grid;
-      grid-template-columns: 104px minmax(220px, 1.4fr) 128px 150px 76px 70px minmax(150px, .7fr);
+      grid-template-columns: 104px minmax(340px, 1.7fr) minmax(168px, .8fr) minmax(180px, .85fr) 142px 72px 120px;
       gap: 8px;
       align-items: center;
       padding: 8px 0;
@@ -748,9 +848,15 @@
     .task-edit-row:first-child { border-top: 0; padding-top: 0; }
     .task-edit-row input,
     .task-edit-row select {
+      width: 100%;
+      min-width: 0;
       min-height: 32px;
       padding: 6px 8px;
       font-size: 12px;
+    }
+    .task-edit-row input[type="date"] {
+      min-width: 132px;
+      font-variant-numeric: tabular-nums;
     }
     .task-edit-head {
       color: var(--muted);
@@ -943,14 +1049,9 @@
       font-size: 11px;
       line-height: 1.25;
     }
-    .demand-board {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
     .demand-status-strip {
       display: grid;
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: repeat(6, minmax(0, 1fr));
       gap: 8px;
       margin-bottom: 12px;
     }
@@ -962,6 +1063,13 @@
       background: var(--panel-2);
       display: grid;
       gap: 3px;
+      text-align: left;
+    }
+    .demand-status-item:hover { border-color: #bcd3ff; background: #f8fbff; }
+    .demand-status-item.active {
+      border-color: #93c5fd;
+      background: var(--blue-soft);
+      color: var(--primary);
     }
     .demand-status-item strong {
       font-size: 18px;
@@ -974,22 +1082,28 @@
       line-height: 1.25;
       white-space: nowrap;
     }
-    .demand-card {
-      padding: 14px;
-      min-height: 196px;
+    .demand-filter-bar {
       display: flex;
-      flex-direction: column;
-      gap: 10px;
-      background: var(--panel);
+      justify-content: flex-end;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
     }
-    .demand-card:hover { border-color: #bcd3ff; box-shadow: none; }
-    .demand-card h3 { font-size: 15px; line-height: 1.25; font-weight: 750; }
-    .demand-card .small { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-    .demand-card-head {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
-      align-items: start;
+    .demand-filter-bar label {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .demand-filter-bar select {
+      width: 150px;
+      min-height: 32px;
+      padding: 5px 8px;
+      font-size: 12px;
+      color: var(--ink);
+      background: var(--control);
     }
     .demand-status-control {
       min-height: 30px;
@@ -1001,17 +1115,42 @@
       color: var(--ink);
       background-color: var(--control);
     }
-    .demand-next {
-      padding: 9px;
-      border-radius: 8px;
-      background: var(--panel-2);
-      border: 1px solid var(--line);
-    }
     .linked-product {
       padding: 9px;
       border-radius: 8px;
       border: 1px solid var(--line);
       background: #fff;
+    }
+    .settings-list {
+      display: grid;
+      gap: 8px;
+    }
+    .setting-row {
+      min-height: 58px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+    .setting-row strong {
+      display: block;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .setting-row .small {
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+    .permission-chips {
+      display: flex;
+      gap: 5px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      max-width: 360px;
     }
     .demand-actions {
       display: flex;
@@ -1019,8 +1158,51 @@
       flex-wrap: wrap;
       margin-top: auto;
     }
-    .demand-table { min-width: 920px; }
+    .demand-table {
+      min-width: 1248px;
+      table-layout: fixed;
+    }
+    .demand-col-name { width: 260px; }
+    .demand-col-status { width: 116px; }
+    .demand-col-level { width: 138px; }
+    .demand-col-discussion { width: auto; }
+    .demand-col-source { width: 72px; }
+    .demand-col-owner { width: 84px; }
+    .demand-col-created { width: 96px; }
+    .demand-col-actions { width: 172px; }
     .demand-table td { vertical-align: middle; }
+    .demand-table th:last-child,
+    .demand-table td:last-child {
+      width: 172px;
+    }
+    .demand-table td:first-child strong {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .demand-table td:first-child .small,
+    .demand-table td:nth-child(4) .small {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+    .demand-table td:nth-child(2),
+    .demand-table td:nth-child(3),
+    .demand-table td:nth-child(5),
+    .demand-table td:nth-child(6),
+    .demand-table td:nth-child(7) {
+      white-space: nowrap;
+    }
+    .demand-table .table-actions {
+      flex-wrap: nowrap;
+      justify-content: flex-end;
+    }
+    .demand-table .mini-action {
+      white-space: nowrap;
+      flex: 0 0 auto;
+    }
     .sort-button {
       width: 100%;
       border: 0;
@@ -1358,6 +1540,7 @@
       border: 1px solid var(--line);
       box-shadow: 0 8px 12px rgba(15,23,42,.18);
     }
+    .modal.product-modal .dialog { width: min(980px, 100%); }
     .confirm-dialog { width: min(420px, 100%); }
     .confirm-message {
       color: var(--muted);
@@ -1462,6 +1645,40 @@
       gap: 10px;
       margin-bottom: 12px;
     }
+    .minutes-dialog { width: min(760px, 100%); }
+    .minutes-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 210px;
+      gap: 12px;
+      align-items: start;
+    }
+    .minutes-preview-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+    .minutes-preview-card strong { font-size: 13px; line-height: 1.3; }
+    .minutes-preview-card p { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .minutes-preview-card img {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      object-fit: cover;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fff;
+    }
+    .minutes-status {
+      min-height: 18px;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .minutes-status.error { color: var(--red); }
+    .minutes-status.ok { color: var(--green); }
     .toast {
       position: fixed;
       right: 22px;
@@ -1538,7 +1755,7 @@
     .swatch.gold { background: #b87514; }
     .mobile-tabs { display: none; }
     @media (max-width: 1680px) {
-      .app { grid-template-columns: 188px minmax(0, 1fr); gap: 12px; padding: 12px; }
+      .app { grid-template-columns: 164px minmax(0, 1fr); gap: 12px; padding: 12px; }
       .sidebar { top: 12px; height: calc(100vh - 24px); padding: 12px 8px; }
       .brand { gap: 8px; padding: 4px 7px 12px; }
       .brand-mark { width: 34px; height: 34px; }
@@ -1556,8 +1773,9 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
       }
-      .demand-status-strip { grid-template-columns: repeat(5, minmax(84px, 1fr)); overflow-x: auto; }
-      .product-row.archive-row { grid-template-columns: minmax(240px, 1fr) 90px 54px 76px minmax(270px, 390px); }
+      .demand-status-strip { grid-template-columns: repeat(6, minmax(84px, 1fr)); overflow-x: auto; }
+      .product-list-head,
+      .product-row.archive-row { grid-template-columns: minmax(320px, 1fr) 104px 64px 92px 486px; }
       .product-action-menu .mini-action { min-width: 56px; }
     }
     @media (max-width: 1100px) {
@@ -1570,7 +1788,7 @@
       .nav { grid-template-columns: repeat(4, minmax(0,1fr)); }
       .nav button { justify-content: center; }
       .nav button span { display: none; }
-      .layout-main, .cols-4, .cols-3, .cols-2, .package-grid, .demand-board, .decision-grid, .lifecycle-paths { grid-template-columns: 1fr; }
+      .layout-main, .cols-4, .cols-3, .cols-2, .package-grid, .decision-grid, .lifecycle-paths { grid-template-columns: 1fr; }
       .demand-status-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; }
       .product-list-head { display: none; }
       .product-row, .product-row.archive-row { grid-template-columns: 1fr; }
@@ -1579,7 +1797,11 @@
       .product-row .table-actions { justify-content: flex-start; }
       .product-action-menu,
       .product-actions { justify-content: start; }
+      .setting-row { grid-template-columns: 1fr; align-items: start; }
+      .permission-chips { justify-content: flex-start; max-width: none; }
       .role-grid { grid-template-columns: 1fr; }
+      .minutes-grid { grid-template-columns: 1fr; }
+      .minutes-preview-card img { max-height: 320px; object-fit: contain; }
     }
     @media (max-width: 720px) {
       .main { padding: 4px 0 16px; }
@@ -1590,9 +1812,11 @@
       .task-table { min-width: 680px; }
       .demand-status-strip { grid-template-columns: 1fr; }
       .package-drop-hint { align-items: flex-start; }
-      .stage-editor { overflow-x: auto; }
-      .task-edit-row { grid-template-columns: 104px 240px 128px 150px 76px 70px 150px; min-width: 970px; }
+      .task-edit-row { grid-template-columns: 104px 340px 168px 180px 142px 72px 120px; min-width: 1174px; }
       .sync-meeting-fields { grid-template-columns: 1fr; }
+      .dialog-foot { flex-wrap: wrap; }
+      .product-profile-hero { grid-template-columns: 1fr; }
+      .product-meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .table-wrap { overflow-x: auto; }
     }
   </style>
@@ -1639,6 +1863,7 @@
         <button data-screen="workflow"><i data-lucide="git-branch"></i><span>产品进度</span></button>
         <button data-screen="reviews"><i data-lucide="clipboard-check"></i><span>评审决策</span></button>
         <button data-screen="lifecycle"><i data-lucide="activity"></i><span>生命周期</span></button>
+        <button data-screen="settings"><i data-lucide="settings"></i><span>设置</span></button>
       </nav>
     </aside>
 
@@ -1697,40 +1922,53 @@
           <section class="panel page-section">
             <div class="panel-head"><h2>需求推进规则</h2></div>
             <div class="decision-grid">
-              <div class="decision"><strong>1. 收集机会</strong><p class="small">任何部门都可以提交一句话、链接、截图或用户反馈。</p></div>
-              <div class="decision"><strong>2. 进入讨论</strong><p class="small">产品部组织运营、品牌、供应链或高层快速判断是否值得继续看。</p></div>
-              <div class="decision"><strong>3. 形成结论</strong><p class="small">明确用户痛点、市场空间、供应链可行性、资源投入和建议等级。</p></div>
-              <div class="decision"><strong>4. 转入开发</strong><p class="small">自动生成产品档案，进入产品立项阶段继续推进。</p></div>
+              <div class="decision"><strong>1. 收集机会</strong><p class="small">一句话、链接、截图或用户反馈先进入池子。</p></div>
+              <div class="decision"><strong>2. 讨论判断</strong><p class="small">补齐市场、用户、供应链和资源判断。</p></div>
+              <div class="decision"><strong>3. 形成结论</strong><p class="small">明确是否继续推进和建议产品等级。</p></div>
+              <div class="decision"><strong>4. 转入开发</strong><p class="small">生成产品档案，进入立项阶段。</p></div>
             </div>
           </section>
           <section class="panel">
             <div class="section-toolbar">
               <div class="section-title">
-                <h2>需求看板</h2>
-                <p>先把机会放进来，讨论清楚市场、用户、供应链和资源，再转入产品开发流程。</p>
+                <h2>需求池列表</h2>
+                <p>用一张列表管理所有机会，可筛选、编辑、暂停、恢复或转入产品开发。</p>
               </div>
               <button class="btn primary" id="addDemand"><i data-lucide="plus"></i>添加机会</button>
             </div>
             <div class="demand-status-strip" id="demandStatusStrip"></div>
-            <div class="demand-board" id="demandBoard"></div>
-          </section>
-          <section class="panel">
-            <div class="section-toolbar">
-              <div class="section-title">
-                <h2>需求记录</h2>
-                <p>按一条条机会记录管理，可排序、编辑、暂停、恢复或转入产品开发。</p>
-              </div>
+            <div class="demand-filter-bar">
+              <label>等级
+                <select id="demandLevelFilter" aria-label="筛选需求等级">
+                  <option value="all">全部等级</option>
+                  <option value="P0 重点品">P0 重点品</option>
+                  <option value="P1 常规新品">P1 常规新品</option>
+                  <option value="P2 小改/补充品">P2 小改/补充品</option>
+                  <option value="应季品">应季品</option>
+                </select>
+              </label>
             </div>
             <div class="table-wrap section-gap">
               <table class="task-table demand-table">
+                <colgroup>
+                  <col class="demand-col-name">
+                  <col class="demand-col-status">
+                  <col class="demand-col-level">
+                  <col class="demand-col-discussion">
+                  <col class="demand-col-source">
+                  <col class="demand-col-owner">
+                  <col class="demand-col-created">
+                  <col class="demand-col-actions">
+                </colgroup>
                 <thead>
                   <tr>
-                    <th><button class="sort-button" type="button" data-demand-sort="name">机会名称<i data-lucide="chevrons-up-down"></i></button></th>
-                    <th><button class="sort-button" type="button" data-demand-sort="status">状态<i data-lucide="chevrons-up-down"></i></button></th>
-                    <th><button class="sort-button" type="button" data-demand-sort="level">等级<i data-lucide="chevrons-up-down"></i></button></th>
-                    <th><button class="sort-button" type="button" data-demand-sort="source">来源<i data-lucide="chevrons-up-down"></i></button></th>
-                    <th><button class="sort-button" type="button" data-demand-sort="owner">负责人<i data-lucide="chevrons-up-down"></i></button></th>
-                    <th><button class="sort-button" type="button" data-demand-sort="created">创建时间<i data-lucide="chevrons-up-down"></i></button></th>
+                    <th>机会名称</th>
+                    <th>状态</th>
+                    <th>等级</th>
+                    <th>讨论摘要</th>
+                    <th>来源</th>
+                    <th>负责人</th>
+                    <th>创建时间</th>
                     <th>操作</th>
                   </tr>
                 </thead>
@@ -1826,6 +2064,30 @@
         </section>
       </section>
 
+      <section class="screen" id="settings">
+        <div class="layout-main">
+          <section class="panel page-section">
+            <div class="panel-head">
+              <div>
+                <h2>系统设置</h2>
+                <p class="small">公司级规则、钉钉组织架构和流程默认配置，只对总经办开放。</p>
+              </div>
+              <span class="badge blue">总经办</span>
+            </div>
+            <div class="settings-list" id="systemSettingsRows"></div>
+          </section>
+          <section class="panel page-section">
+            <div class="panel-head">
+              <div>
+                <h2>人员权限</h2>
+                <p class="small">按岗位查看能进入的页面和可编辑的数据范围。</p>
+              </div>
+            </div>
+            <div class="settings-list" id="permissionRows"></div>
+          </section>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -1836,6 +2098,31 @@
         <button class="icon-btn" id="closeModal" aria-label="关闭"><i data-lucide="x"></i></button>
       </div>
       <div class="dialog-body">
+        <div class="product-profile-panel" id="productProfilePanel">
+          <div class="product-profile-hero">
+            <div class="field image-field product-edit-media" id="imageField">
+              <img class="image-preview" id="formImagePreview" alt="产品图片预览">
+              <div class="image-tools">
+                <input id="formImage" type="hidden">
+                <div class="table-actions">
+                  <label class="mini-action"><i data-lucide="upload"></i>上传图片<input class="hidden" type="file" id="formImageFile" accept="image/*"></label>
+                  <button class="mini-action" type="button" id="regenerateImage"><i data-lucide="sparkles"></i>重新生成封面</button>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div class="product-profile-title">
+                <div>
+                  <strong id="productProfileTitle">产品资料</strong>
+                  <p class="small" id="productProfileSub">从需求池、产品进度、资料包和生命周期记录汇总。</p>
+                </div>
+                <span class="badge blue" id="productProfileBadge">产品档案</span>
+              </div>
+              <div class="product-meta-grid" id="productMetaRows"></div>
+            </div>
+          </div>
+          <div class="product-discussion-record" id="productDiscussionRecord"></div>
+        </div>
         <div class="form-grid">
           <label class="field">产品/机会名称<input id="formName" placeholder="例如：鹦鹉谷物棒升级版"></label>
           <label class="field">产品等级
@@ -1852,17 +2139,8 @@
               <option>产品部</option><option>运营</option><option>高层</option><option>客服</option><option>品牌</option><option>供应链</option>
             </select>
           </label>
-          <label class="field span-all">机会描述<textarea id="formDesc" placeholder="看到什么市场机会、用户痛点、供应链可能性"></textarea></label>
-          <div class="field span-all image-field" id="imageField">
-            <img class="image-preview" id="formImagePreview" alt="产品图片预览">
-            <div class="image-tools">
-              <input id="formImage" type="hidden">
-              <div class="table-actions">
-                <label class="mini-action"><i data-lucide="upload"></i>上传图片<input class="hidden" type="file" id="formImageFile" accept="image/*"></label>
-                <button class="mini-action" type="button" id="regenerateImage"><i data-lucide="sparkles"></i>重新生成封面</button>
-              </div>
-            </div>
-          </div>
+          <label class="field span-all"><span id="formDescLabel">机会描述</span><textarea id="formDesc" placeholder="看到什么市场机会、用户痛点、供应链可能性"></textarea></label>
+          <label class="field span-all" id="discussionField">讨论摘要<textarea id="formDiscussion" placeholder="讨论后的判断、争议点、下一步结论"></textarea></label>
         </div>
       </div>
       <div class="dialog-foot">
@@ -1897,6 +2175,41 @@
       <div class="dialog-foot">
         <button class="btn ghost" id="cancelSyncModal">取消</button>
         <button class="btn primary" id="confirmSyncModal"><i data-lucide="send"></i>同步</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal" id="minutesModal">
+    <div class="dialog minutes-dialog">
+      <div class="dialog-head">
+        <h2>同步 / 导入会议纪要</h2>
+        <button class="icon-btn" id="closeMinutesModal" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <div class="sync-target">
+          <strong id="minutesTargetTitle">-</strong>
+          <span id="minutesTargetMeta">-</span>
+        </div>
+        <div class="minutes-grid">
+          <div>
+            <label class="field">钉钉会议 ID / 录制资源 ID
+              <input id="minutesRecordingId" placeholder="开启云录制（闪记）后的 conferenceId">
+            </label>
+            <label class="field section-gap">会议纪要文本
+              <textarea id="minutesText" placeholder="可从钉钉闪记复制纪要，也可以填写讨论结论、关键争议和行动项。"></textarea>
+            </label>
+            <p class="minutes-status" id="minutesStatus">需要钉钉会议录制（闪记）的会议 ID；应用还要具备视频会议读权限。</p>
+          </div>
+          <aside class="minutes-preview-card">
+            <strong>生成资料</strong>
+            <p>保存后会写入一份可编辑会议纪要，并生成一张重点纪要图，自动放进当前产品资料包。</p>
+            <img id="minutesPosterPreview" alt="重点纪要图预览">
+          </aside>
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn ghost" id="cancelMinutesModal">取消</button>
+        <button class="btn" id="syncMinutesFromDing"><i data-lucide="cloud-download"></i>从钉钉同步</button>
+        <button class="btn primary" id="saveMinutesModal"><i data-lucide="image-plus"></i>生成资料</button>
       </div>
     </div>
   </div>
@@ -2019,7 +2332,29 @@
       ["利润贡献", "毛利率达标且周转快", "毛利率达标", "毛利率低于标准但有清仓空间", "亏损且无改善可能"]
     ];
     const productStatuses = ["开发中", "上市筹备", "维持观察", "清仓中", "已淘汰"];
+    const demandPoolStatuses = ["待讨论", "讨论中", "已讨论", "暂缓"];
     const allScreens = ["dashboard", "demands", "products", "workflow", "reviews", "lifecycle"];
+    const screenLabels = {
+      dashboard: "总览",
+      demands: "需求池",
+      products: "产品档案",
+      workflow: "产品进度",
+      reviews: "评审决策",
+      lifecycle: "生命周期",
+      settings: "设置"
+    };
+    const permissionLabels = {
+      addIdea: "新增机会",
+      editDemand: "编辑需求",
+      convertDemand: "转开发",
+      editProduct: "编辑产品",
+      deleteProduct: "删除产品",
+      editTasks: "编辑任务",
+      editDocs: "维护资料",
+      editReviews: "维护评审",
+      editLifecycleStatus: "生命周期",
+      editMetrics: "经营数据"
+    };
     const roleProfiles = {
       executive: {
         name: "高层 / 老板",
@@ -2099,6 +2434,11 @@
         permissions: {}
       }
     };
+    const departmentPriority = ["总经办", "产品部", "运营部", "品牌部", "财务部", "行政人事部", "其他"];
+    const titlePriority = [
+      "总经理", "副总经理", "总经理助理", "总监", "负责人", "经理", "主管",
+      "店长", "会计", "专员", "助理", "内容编导", "剪辑师", "媒介公关", "无"
+    ];
     const lifecyclePaths = {
       "升级": {
         title: "路径A：产品升级",
@@ -2147,7 +2487,8 @@
     let state = loadState();
     let currentId = state.currentId || state.products[0].id;
     let selectedStage = currentProduct()?.stage || 0;
-    let demandSort = { key: "created", direction: "desc" };
+    let demandStatusFilter = "all";
+    let demandLevelFilter = "all";
     let todoDateRange = { start: formatDateInput(defaultTodoWeek.start), end: formatDateInput(defaultTodoWeek.end) };
     let modalMode = "idea";
     let focusedTaskId = "";
@@ -2161,6 +2502,8 @@
     let syncMeetingId = "";
     let syncMeetingAction = "schedule";
     let syncSelectedUsers = new Set();
+    let minutesProductId = "";
+    let minutesMeetingId = "";
     let confirmResolve = null;
 
     function loadState() {
@@ -2198,6 +2541,10 @@
           localStorage.removeItem("productFlowUser");
           return null;
         }
+        if (parsed.source === "local-dev" && parsed.role === "executive") {
+          parsed.dingUser = parsed.dingUser || {};
+          parsed.dingUser.departmentNames = parsed.dingUser.departmentNames?.length ? parsed.dingUser.departmentNames : ["总经办"];
+        }
         if (parsed.source === "dingtalk" && parsed.role === "readonly") {
           localStorage.removeItem("productFlowUser");
           return null;
@@ -2233,6 +2580,7 @@
         const payload = await res.json().catch(() => ({}));
         if (!res.ok || !payload.org) throw new Error(payload.message || "钉钉组织架构同步失败");
         saveOrgCache(payload.org);
+        applyPermissions();
         toast(`组织架构已同步：${payload.org.users?.length || 0} 人`);
         return orgCache;
       } catch (error) {
@@ -2246,6 +2594,55 @@
     }
     function dingUnionId(user = {}) {
       return user.unionId || user.unionid || "";
+    }
+    function priorityIndex(value = "", priority = []) {
+      const text = String(value || "").trim();
+      if (!text) return priority.length + 1;
+      const exact = priority.findIndex(item => text === item);
+      if (exact >= 0) return exact;
+      const fuzzy = priority.findIndex(item => item !== "无" && text.includes(item));
+      return fuzzy >= 0 ? fuzzy : priority.length;
+    }
+    function highestByPriority(values = [], priority = []) {
+      return [...new Set(values.map(value => String(value || "").trim()).filter(Boolean))]
+        .sort((a, b) => priorityIndex(a, priority) - priorityIndex(b, priority))[0] || "";
+    }
+    function currentDingOrgUser() {
+      const ding = currentUser?.dingUser || {};
+      return findOrgUser(dingUserId(ding)) || findOrgUser(dingUnionId(ding));
+    }
+    function currentUserDepartments() {
+      const role = currentRole();
+      const ding = currentUser?.dingUser || {};
+      const orgUser = currentDingOrgUser();
+      return [...new Set([
+        ...(orgUser?.departmentNames || []),
+        ...(ding.departmentNames || []),
+        role.dept
+      ].map(item => String(item || "").trim()).filter(Boolean))];
+    }
+    function canViewSettings() {
+      return currentUserDepartments().some(department => department.includes("总经办"));
+    }
+    function currentUserDisplayName() {
+      if (!currentUser) return "未登录";
+      const role = currentRole();
+      const ding = currentUser.dingUser || {};
+      const orgUser = currentDingOrgUser();
+      const userName = orgUser?.name || ding.name || ding.userid || role.name;
+      const department = highestByPriority([
+        ...(orgUser?.departmentNames || []),
+        ...(ding.departmentNames || []),
+        role.dept
+      ], departmentPriority);
+      const title = highestByPriority([
+        orgUser?.title,
+        ding.title,
+        ...(orgUser?.roles || []).map(roleItem => roleItem.name || roleItem.groupName || ""),
+        ...(ding.roles || []).map(roleItem => roleItem.name || roleItem.groupName || ""),
+        role.name
+      ], titlePriority);
+      return [userName, [department, title].filter(Boolean).join(" / ")].filter(Boolean).join(" · ");
     }
     function dingUserLabel(user = {}) {
       return [user.title, ...(user.departmentNames || []), ...(user.roles || []).map(role => role.name || role.groupName || "")].filter(Boolean).join(" · ");
@@ -2296,6 +2693,7 @@
       return true;
     }
     function screenAllowed(screen) {
+      if (screen === "settings") return canViewSettings();
       if (screen === "deliverables") return currentRole().screens.includes("products");
       return currentRole().screens.includes(screen);
     }
@@ -2325,7 +2723,7 @@
       currentUser = {
         role: "executive",
         source: "local-dev",
-        dingUser: { name: "本地测试账号", title: "总经理" },
+        dingUser: { name: "本地测试账号", title: "总经理", departmentNames: ["总经办"] },
         org: { corpId: "local-dev", deptIds: [], roles: [{ name: "总经理" }] },
         expiresAt: Date.now() + 24 * 60 * 60 * 1000
       };
@@ -2374,8 +2772,7 @@
       });
       const name = document.getElementById("userRoleName");
       if (name) {
-        const dingName = currentUser?.dingUser?.name || currentUser?.dingUser?.userid || "";
-        name.textContent = currentUser ? `${dingName ? `${dingName} · ` : ""}${role.name}` : "未登录";
+        name.textContent = currentUserDisplayName();
       }
       const addDemandButton = document.getElementById("addDemand");
       if (addDemandButton) addDemandButton.classList.toggle("hidden", !can("addIdea"));
@@ -2670,10 +3067,22 @@
       return new Date(year, month - 1, day);
     }
     function parseTaskDue(due) {
-      const match = String(due || "").match(/^(\d{2})-(\d{2})$/);
-      if (!match) return null;
+      const text = String(due || "").trim();
+      const isoMatch = text.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (isoMatch) return new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+      const shortMatch = text.match(/^(\d{2})-(\d{2})$/);
+      if (!shortMatch) return null;
       const year = Number((todoDateRange.start || formatDateInput(new Date())).slice(0, 4)) || new Date().getFullYear();
-      return new Date(year, Number(match[1]) - 1, Number(match[2]));
+      return new Date(year, Number(shortMatch[1]) - 1, Number(shortMatch[2]));
+    }
+    function taskDueInputValue(due) {
+      const parsed = parseTaskDue(due);
+      return parsed ? formatDateInput(parsed) : "";
+    }
+    function formatTaskDueDisplay(due) {
+      const text = String(due || "").trim();
+      const isoMatch = text.match(/^\d{4}-(\d{2})-(\d{2})$/);
+      return isoMatch ? `${isoMatch[1]}-${isoMatch[2]}` : text;
     }
     function ownerByDeliverable(name) {
       if (name.includes("包装")) return "设计 / 产品";
@@ -2841,6 +3250,79 @@
         "暂无新增风险。"
       ].join("\n");
     }
+    function cleanMinuteLines(text = "") {
+      return String(text || "")
+        .split(/\r?\n|[。；;]/)
+        .map(line => line.replace(/^[-*•\d.\s、]+/, "").trim())
+        .filter(Boolean)
+        .slice(0, 80);
+    }
+    function pickMinuteLines(lines, keywords, fallbackStart = 0, count = 3) {
+      const picked = lines.filter(line => keywords.some(keyword => line.includes(keyword))).slice(0, count);
+      const fallback = lines.slice(fallbackStart, fallbackStart + count);
+      return (picked.length ? picked : fallback).slice(0, count);
+    }
+    function splitPosterLine(text = "", max = 24) {
+      const value = String(text || "").trim();
+      const chunks = [];
+      for (let index = 0; index < value.length; index += max) chunks.push(value.slice(index, index + max));
+      return chunks.length ? chunks.slice(0, 2) : ["-"];
+    }
+    function posterTextLines(text = "", x = 0, y = 0, options = {}) {
+      const lines = splitPosterLine(text, options.max || 24);
+      return lines.map((line, index) => `<text x="${x}" y="${y + index * (options.lineHeight || 24)}" fill="${options.fill || "#111827"}" font-size="${options.size || 18}" font-weight="${options.weight || 500}">${esc(line)}</text>`).join("");
+    }
+    function summarizeMeetingMinutes(text = "") {
+      const lines = cleanMinuteLines(text);
+      const fallback = lines.length ? lines : ["会议纪要已导入，后续按决策推进。"];
+      return {
+        conclusions: pickMinuteLines(fallback, ["结论", "决定", "通过", "确认", "建议"], 0, 4),
+        demands: pickMinuteLines(fallback, ["需求", "支持", "资源", "供应", "资料", "标准"], 1, 4),
+        risks: pickMinuteLines(fallback, ["风险", "问题", "缺少", "瓶颈", "待定", "不确定"], 2, 4),
+        actions: pickMinuteLines(fallback, ["行动", "待办", "负责", "提交", "补齐", "确认", "下周", "尽快"], 3, 5)
+      };
+    }
+    function generateMeetingMinutesPoster({ product, meeting, text }) {
+      const summary = summarizeMeetingMinutes(text);
+      const title = `${product?.name || "产品"} · ${meeting?.title || "会议纪要"}`;
+      const subtitle = `${product?.level || ""} / ${stages[meeting?.stage]?.name || ""} / ${meeting?.owner || ""}`.replace(/^ \/ /, "");
+      const card = (x, y, w, h, color, heading, lines) => `
+        <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18" fill="#fff" stroke="${color}" opacity=".98"/>
+        <text x="${x + 24}" y="${y + 38}" fill="${color}" font-size="20" font-weight="800">${esc(heading)}</text>
+        ${lines.slice(0, 4).map((line, index) => posterTextLines(`• ${line}`, x + 24, y + 76 + index * 42, { max: 28, size: 16, fill: "#111827", lineHeight: 20 })).join("")}
+      `;
+      const actions = summary.actions.slice(0, 4);
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
+        <rect width="1200" height="1600" fill="#ffffff"/>
+        <text x="70" y="88" fill="#111827" font-size="36" font-weight="850">${esc(title)}</text>
+        <text x="70" y="124" fill="#64748b" font-size="20">${esc(subtitle || "会议纪要重点图")}</text>
+        <line x1="70" y1="164" x2="1130" y2="164" stroke="#dbe3ee" stroke-width="3"/>
+        <text x="70" y="226" fill="#0284c7" font-size="28" font-weight="850">01 · 核心结论</text>
+        <rect x="70" y="252" width="1060" height="310" rx="22" fill="#eef9fd"/>
+        ${card(92, 284, 500, 236, "#0284c7", "会议决策", summary.conclusions)}
+        ${card(608, 284, 500, 236, "#0f766e", "关键判断", summary.demands)}
+        <text x="70" y="636" fill="#d97706" font-size="28" font-weight="850">02 · 风险与卡点</text>
+        <rect x="70" y="662" width="1060" height="266" rx="22" fill="#fff7ed"/>
+        ${summary.risks.slice(0, 4).map((line, index) => `
+          <rect x="${100 + index * 250}" y="716" width="220" height="128" rx="12" fill="#fff" stroke="#fed7aa"/>
+          ${posterTextLines(line, 122 + index * 250, 766, { max: 13, size: 17, fill: "#111827", weight: 700, lineHeight: 26 })}
+        `).join("")}
+        <text x="70" y="1002" fill="#16a34a" font-size="28" font-weight="850">03 · 后续行动项</text>
+        <rect x="70" y="1028" width="1060" height="360" rx="22" fill="#f0fdf4"/>
+        <rect x="100" y="1084" width="1000" height="52" rx="10" fill="#dcfce7"/>
+        <text x="132" y="1118" fill="#166534" font-size="18" font-weight="800">行动项</text>
+        <text x="720" y="1118" fill="#166534" font-size="18" font-weight="800">状态</text>
+        ${actions.map((line, index) => `
+          <line x1="100" y1="${1168 + index * 54}" x2="1100" y2="${1168 + index * 54}" stroke="#dbeafe"/>
+          ${posterTextLines(line, 132, 1204 + index * 54, { max: 40, size: 17, fill: "#111827", lineHeight: 21 })}
+          <rect x="720" y="${1180 + index * 54}" width="76" height="26" rx="7" fill="#eef2ff"/>
+          <text x="740" y="${1199 + index * 54}" fill="#475569" font-size="14" font-weight="700">待启动</text>
+        `).join("")}
+        <rect x="70" y="1440" width="1060" height="72" rx="18" fill="#f8fafc" stroke="#e2e8f0"/>
+        <text x="104" y="1485" fill="#334155" font-size="18" font-weight="750">资料由产品全周期协同系统根据会议纪要自动生成，可在资料包继续打开、删除或重新生成。</text>
+      </svg>`;
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
     function escapeAttr(value) {
       return String(value ?? "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
@@ -2874,8 +3356,43 @@
     function productReviews(productId = currentId) {
       return state.reviews.filter(r => r.productId === productId);
     }
+    function sourceDemandForProduct(product) {
+      if (!product) return null;
+      return state.demands.find(demand => demand.productId === product.id)
+        || state.demands.find(demand => demand.name === product.name && demand.status === "已转开发")
+        || null;
+    }
     function productImage(product) {
       return product?.image || generateProductImage(product?.name || "产品");
+    }
+    function productArchiveRecord(product) {
+      const demand = sourceDemandForProduct(product);
+      const tasks = productTasks(product.id);
+      const docs = productDeliverables(product.id);
+      const meetings = requiredMeetings(product);
+      const passedMeetings = meetings.filter(meeting => meetingStatus(product, meeting).passed).length;
+      const doneTasks = tasks.filter(task => task.done).length;
+      const stage = stages[product.stage] || { short: "-", name: "-" };
+      const discussion = demand?.discussion || "暂无需求讨论记录。这个产品可能来自旧数据，建议在需求池补齐机会讨论摘要。";
+      return {
+        product,
+        demand,
+        discussion,
+        meta: [
+          ["产品状态", product.status || "-"],
+          ["当前阶段", stage.short],
+          ["产品等级", product.level || "-"],
+          ["负责人", product.owner || "-"],
+          ["来源部门", product.source || demand?.source || "-"],
+          ["计划上市", product.launch || "-"],
+          ["任务完成", `${doneTasks}/${tasks.length || 0} · ${completion(product.id)}%`],
+          ["资料文件", `${docs.length} 个`],
+          ["评审会议", `${passedMeetings}/${meetings.length || 0} 通过`],
+          ["经营数据", `销量 ${product.sales || 0} · 评分 ${product.score || 0}`],
+          ["退货率", `${formatPercentInput(product.returnRate)}%`],
+          ["利润率", `${formatPercentInput(product.profit)}%`]
+        ]
+      };
     }
     function productIdentityHtml(product, meta = "", options = {}) {
       if (!product) return `<span class="small">-</span>`;
@@ -2892,6 +3409,31 @@
       root.querySelectorAll(".product-thumb").forEach(img => img.addEventListener("error", () => {
         img.src = img.dataset.fallback || fallbackProductImage(img.alt);
       }, { once: true }));
+    }
+    function renderProductProfilePanel(product) {
+      const panel = document.getElementById("productProfilePanel");
+      if (!panel || !product) return;
+      const record = productArchiveRecord(product);
+      const stage = stages[product.stage] || { short: "-", name: "-" };
+      document.getElementById("productProfileTitle").textContent = product.name || "产品资料";
+      document.getElementById("productProfileSub").textContent = `${product.level || "-"} · ${stage.name || stage.short} · ${product.owner || "-"}`;
+      const badge = document.getElementById("productProfileBadge");
+      badge.textContent = product.status || "产品档案";
+      badge.className = `badge ${badgeClass(product.status || "")}`;
+      document.getElementById("productMetaRows").innerHTML = record.meta.map(([label, value]) => `
+        <div class="product-meta-item">
+          <span>${esc(label)}</span>
+          <strong title="${esc(value)}">${esc(value)}</strong>
+        </div>
+      `).join("");
+      const demandMeta = record.demand
+        ? `来源机会：${record.demand.name || product.name} · ${record.demand.status || "-"} · ${record.demand.created || "-"}`
+        : "来源机会：未关联需求池记录";
+      document.getElementById("productDiscussionRecord").innerHTML = `
+        <strong>需求讨论记录</strong>
+        <p>${esc(record.discussion)}</p>
+        <p class="small">${esc(demandMeta)}</p>
+      `;
     }
     function selectProductAndNavigate(productId, target = "products", options = {}) {
       const product = productById(productId);
@@ -3178,6 +3720,7 @@
       renderDeliverables();
       renderReviews();
       renderLifecycle();
+      renderSettings();
       applyPermissions();
       if (window.lucide) lucide.createIcons();
       bindProductImageFallback();
@@ -3200,7 +3743,7 @@
     function renderMetrics() {
       const metricsEl = document.getElementById("metrics");
       if (!metricsEl) return;
-      const activeDemands = (state.demands || []).filter(d => d.status !== "已转开发" && d.status !== "暂缓").length;
+      const activeDemands = (state.demands || []).filter(d => isDemandInPool(d) && d.status !== "暂缓").length;
       const inProcess = state.products.filter(p => p.stage >= 0 && p.stage < stages.length && p.status !== "已淘汰").length;
       const pendingReviews = state.products.reduce((sum, product) => sum + requiredMeetings(product).filter(meeting => product.stage >= meeting.stage && !meetingStatus(product, meeting).passed).length, 0);
       metricsEl.innerHTML = [
@@ -3249,15 +3792,17 @@
       const stage = stages[selectedStage];
       const tasks = productTasks(p.id).filter(t => t.stage === selectedStage);
       const taskEditable = can("editTasks");
+      const productReturnable = can("convertDemand") && can("deleteProduct");
       const disabled = taskEditable ? "" : "disabled";
       editor.innerHTML = `<div class="stage-editor-head">
         <div class="stage-editor-title">
           <strong>${selectedStage + 1}. ${esc(stage.name)}</strong>
           <span class="small">${esc(stage.goal)}</span>
         </div>
-        <div class="stage-editor-actions ${taskEditable ? "" : "hidden"}">
-          <button class="mini-action" id="setSelectedStage"><i data-lucide="flag"></i>${selectedStage === p.stage ? "当前阶段" : "设为当前阶段"}</button>
-          <button class="mini-action" id="addSelectedStageTask"><i data-lucide="list-plus"></i>加任务</button>
+        <div class="stage-editor-actions ${taskEditable || productReturnable ? "" : "hidden"}">
+          ${taskEditable ? `<button class="mini-action" id="setSelectedStage"><i data-lucide="flag"></i>${selectedStage === p.stage ? "当前阶段" : "设为当前阶段"}</button>
+          <button class="mini-action" id="addSelectedStageTask"><i data-lucide="list-plus"></i>加任务</button>` : ""}
+          ${productReturnable ? `<button class="mini-action danger" data-return-product-demand="${esc(p.id)}"><i data-lucide="undo-2"></i>退回需求池</button>` : ""}
         </div>
       </div>
       <div class="task-edit-row task-edit-head">
@@ -3279,19 +3824,20 @@
         <input data-task-field="title" value="${esc(t.title)}" ${disabled}>
         <input data-task-field="owner" value="${esc(t.owner)}" ${disabled}>
         <input data-task-field="deliverable" value="${esc(t.deliverable)}" ${disabled}>
-        <input data-task-field="due" value="${esc(t.due)}" ${disabled}>
+        <input type="date" data-task-field="due" value="${esc(taskDueInputValue(t.due))}" ${disabled}>
         <label class="task-label"><input type="checkbox" data-task-field="done" ${t.done ? "checked" : ""} ${disabled}><span>${t.done ? "是" : "否"}</span></label>
         ${taskActions}
       </div>`;
       }).join("") || emptyStateHtml("这个阶段还没有任务", taskEditable ? "点击右上角“加任务”，补充这个阶段需要推进的事项。" : "当前账号只读，暂无这个阶段的任务记录。", "list-plus")}`;
       document.querySelectorAll("[data-edit-task] [data-task-field]").forEach(input => {
-        const eventName = input.type === "checkbox" || input.tagName === "SELECT" ? "change" : "input";
+        const eventName = input.type === "checkbox" || input.type === "date" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateStageTask(input.closest("[data-edit-task]").dataset.editTask, input.dataset.taskField, input.type === "checkbox" ? input.checked : input.value));
       });
       const setStageButton = document.getElementById("setSelectedStage");
       if (setStageButton) setStageButton.addEventListener("click", setSelectedStageAsCurrent);
       const addTaskButton = document.getElementById("addSelectedStageTask");
       if (addTaskButton) addTaskButton.addEventListener("click", addTaskForSelectedStage);
+      document.querySelectorAll("[data-return-product-demand]").forEach(btn => btn.addEventListener("click", () => returnProductToDemand(btn.dataset.returnProductDemand)));
       if (focusedTaskId) {
         requestAnimationFrame(() => {
           const row = [...document.querySelectorAll("[data-edit-task]")].find(el => el.dataset.editTask === focusedTaskId);
@@ -3317,7 +3863,7 @@
           const currentA = a.currentStage ? 0 : 1;
           const currentB = b.currentStage ? 0 : 1;
           if (currentA !== currentB) return currentA - currentB;
-          return String(a.due).localeCompare(String(b.due), "zh-Hans-CN");
+          return (a.dueDate?.getTime() || Number.MAX_SAFE_INTEGER) - (b.dueDate?.getTime() || Number.MAX_SAFE_INTEGER);
         })
         .slice(0, 10);
       const todayTasks = document.getElementById("todayTasks");
@@ -3326,17 +3872,25 @@
           const overdue = t.dueDate && t.dueDate < todayStart;
           const statusText = overdue ? "逾期" : t.currentStage ? "当前阶段" : "待办";
           const statusClass = overdue ? "red" : t.currentStage ? "blue" : "gold";
-          return `<tr>
+          return `<tr class="task-row" data-open-task="${esc(t.id)}" tabindex="0">
           <td>${productIdentityHtml(t.product, stages[t.stage]?.short || "", { compact: true })}</td>
-          <td><button type="button" class="task-link" data-open-task="${esc(t.id)}"><i data-lucide="external-link"></i>${esc(t.title)}</button></td>
+          <td><span class="task-link">${esc(t.title)}</span></td>
           <td>${esc(t.owner)}</td>
           <td>${esc(t.deliverable)}</td>
-          <td>${esc(t.due)}</td>
+          <td>${esc(formatTaskDueDisplay(t.due))}</td>
           <td><span class="badge ${statusClass}">${statusText}</span></td>
         </tr>`;
         }).join("") || `<tr><td colspan="6">没有当前阶段或逾期待办事项</td></tr>`;
       }
-      document.querySelectorAll("[data-open-task]").forEach(el => el.addEventListener("click", () => openTaskInWorkflow(el.dataset.openTask)));
+      document.querySelectorAll("#todayTasks [data-open-task]").forEach(el => {
+        el.addEventListener("click", () => openTaskInWorkflow(el.dataset.openTask));
+        el.addEventListener("keydown", e => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openTaskInWorkflow(el.dataset.openTask);
+          }
+        });
+      });
       document.querySelectorAll("[data-delete-task]").forEach(el => el.addEventListener("click", () => deleteTask(el.dataset.deleteTask)));
     }
     function openTaskInWorkflow(taskId) {
@@ -3399,126 +3953,77 @@
           : `<div class="check done"><i data-lucide="check-circle"></i><div><strong>当前无阻塞</strong><p class="small">没有超时待办，也没有历史阶段漏项。</p></div><span class="badge green">1</span></div>`;
       }
     }
-    function sortDemands(demands) {
-      const statusOrder = { "待讨论": 1, "讨论中": 2, "已讨论": 3, "暂缓": 4, "已转开发": 5 };
-      const levelOrder = { "P0 重点品": 1, "P1 常规新品": 2, "P2 小改/补充品": 3, "应季品": 4 };
-      const valueOf = demand => {
-        if (demandSort.key === "status") return statusOrder[demand.status] || 99;
-        if (demandSort.key === "level") return levelOrder[demand.level] || 99;
-        return String(demand[demandSort.key] || "");
-      };
-      return [...demands].sort((a, b) => {
-        const av = valueOf(a);
-        const bv = valueOf(b);
-        const result = typeof av === "number" && typeof bv === "number"
-          ? av - bv
-          : String(av).localeCompare(String(bv), "zh-Hans-CN");
-        return demandSort.direction === "asc" ? result : -result;
-      });
-    }
-    function setDemandSort(key) {
-      demandSort = {
-        key,
-        direction: demandSort.key === key && demandSort.direction === "asc" ? "desc" : "asc"
-      };
-      renderDemandPool();
-      if (window.lucide) lucide.createIcons();
+    function isDemandInPool(demand) {
+      return demandPoolStatuses.includes(demand.status) && !demand.productId;
     }
     function renderDemandPool() {
-      const board = document.getElementById("demandBoard");
-      if (!board) return;
       const demands = state.demands || [];
+      const visibleDemandRecords = demands.filter(isDemandInPool);
       const demandEditable = can("editDemand");
       const demandConvertible = can("convertDemand");
       const strip = document.getElementById("demandStatusStrip");
       if (strip) {
-        const statusLabels = ["待讨论", "讨论中", "已讨论", "暂缓", "已转开发"];
+        const statusLabels = ["all", ...demandPoolStatuses];
         strip.innerHTML = statusLabels.map(status => {
-          const count = demands.filter(demand => demand.status === status).length;
-          return `<div class="demand-status-item"><strong>${count}</strong><span>${status}</span></div>`;
+          const count = status === "all" ? visibleDemandRecords.length : visibleDemandRecords.filter(demand => demand.status === status).length;
+          const label = status === "all" ? "全部" : status;
+          const active = demandStatusFilter === status ? "active" : "";
+          return `<button class="demand-status-item ${active}" type="button" data-demand-filter="${esc(status)}"><strong>${count}</strong><span>${label}</span></button>`;
         }).join("");
       }
-      board.innerHTML = demands.map(d => {
-        const product = d.productId ? productById(d.productId) : null;
-        const actions = [];
-        const nextStep = {
-          "待讨论": "下一步：组织产品、运营、供应链快速讨论。",
-          "讨论中": "下一步：形成是否转入开发的明确结论。",
-          "已讨论": "下一步：转入产品档案并进入立项流程。",
-          "已转开发": "下一步：在产品档案里继续推进。",
-          "暂缓": "下一步：等资源、信息或时机成熟后重新评估。"
-        }[d.status] || "下一步：补充判断信息。";
-        if (demandEditable && d.status === "待讨论") actions.push(`<button class="mini-action" data-demand-start="${esc(d.id)}"><i data-lucide="messages-square"></i>进入讨论</button>`);
-        if (demandEditable && d.status === "讨论中") actions.push(`<button class="mini-action" data-demand-finish="${esc(d.id)}"><i data-lucide="clipboard-check"></i>形成结论</button>`);
-        if (demandConvertible && d.status === "已讨论") actions.push(`<button class="mini-action" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i>转入开发</button>`);
-        if (demandEditable && d.status !== "已转开发" && d.status !== "暂缓") actions.push(`<button class="mini-action" data-demand-pause="${esc(d.id)}"><i data-lucide="pause"></i>暂缓</button>`);
-        if (demandEditable && d.status === "暂缓") actions.push(`<button class="mini-action" data-demand-resume="${esc(d.id)}"><i data-lucide="rotate-ccw"></i>恢复待讨论</button>`);
-        if (product) actions.push(`<button class="mini-action" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i>查看产品</button>`);
-        if (demandEditable) actions.push(`<button class="mini-action" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i>编辑</button>`);
-        if (demandEditable) actions.push(`<button class="mini-action danger" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>`);
-        const statusControl = d.status === "已转开发" || !demandEditable
-          ? `<span class="badge ${badgeClass(d.status)}">${d.status}</span>`
-          : `<select class="demand-status-control" data-demand-status="${esc(d.id)}" aria-label="调整需求状态">
-              ${["待讨论", "讨论中", "已讨论", "暂缓"].map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
-            </select>`;
-        return `<div class="card demand-card">
-          <div class="demand-card-head"><h3>${esc(d.name)}</h3>${statusControl}</div>
-          <p class="small">${esc(d.desc)}</p>
-          <div class="review-meta">
-            <span class="badge">${esc(d.level.split(" ")[0])}</span>
-            <span class="badge">${esc(d.source)}</span>
-            <span class="badge">${esc(d.owner)}</span>
-          </div>
-          ${product ? `<div class="linked-product">${productIdentityHtml(product, "已生成产品档案", { compact: true })}</div>` : ""}
-          <div class="demand-next"><p class="small">${esc(nextStep)}</p></div>
-          <div class="demand-actions">${actions.join("")}</div>
-        </div>`;
-      }).join("") || emptyStateHtml("暂无需求机会", "点击添加机会，把市场反馈、竞品线索或内部想法先放进需求池。", "inbox");
       const table = document.getElementById("demandTableRows");
       if (table) {
-        table.innerHTML = sortDemands(demands).map(d => {
+        let visibleDemands = demandStatusFilter === "all" ? visibleDemandRecords : visibleDemandRecords.filter(demand => demand.status === demandStatusFilter);
+        if (demandLevelFilter !== "all") visibleDemands = visibleDemands.filter(demand => demand.level === demandLevelFilter);
+        table.innerHTML = visibleDemands.map(d => {
           const product = d.productId ? productById(d.productId) : null;
-          const statusCell = d.status === "已转开发" || !demandEditable
+          const statusCell = !demandEditable
             ? `<span class="badge ${badgeClass(d.status)}">${d.status}</span>`
             : `<select class="demand-status-control" data-demand-status="${esc(d.id)}" aria-label="调整需求状态">
-                ${["待讨论", "讨论中", "已讨论", "暂缓"].map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
+                ${demandPoolStatuses.map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
               </select>`;
           const rowActions = [];
           if (demandConvertible && d.status === "已讨论") rowActions.push(`<button class="mini-action" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i>转开发</button>`);
           if (product) rowActions.push(`<button class="mini-action" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i>查看产品</button>`);
-          if (demandEditable) rowActions.push(`<button class="mini-action" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i>编辑</button>`);
-          if (demandEditable) rowActions.push(`<button class="mini-action danger" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>`);
+          if (demandEditable) rowActions.push(`<button class="mini-action icon-only" title="编辑需求" aria-label="编辑需求" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i></button>`);
+          if (demandEditable) rowActions.push(`<button class="mini-action icon-only danger" title="删除需求" aria-label="删除需求" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i></button>`);
           return `<tr>
             <td><strong>${esc(d.name)}</strong><p class="small">${esc(d.desc)}</p>${product ? productIdentityHtml(product, "已生成产品档案", { compact: true }) : ""}</td>
             <td>${statusCell}</td>
             <td>${esc(d.level)}</td>
+            <td><p class="small">${esc(d.discussion || "-")}</p></td>
             <td>${esc(d.source)}</td>
             <td>${esc(d.owner)}</td>
             <td>${esc(d.created || "-")}</td>
             <td><div class="table-actions">${rowActions.join("") || `<span class="small">-</span>`}</div></td>
           </tr>`;
-        }).join("") || `<tr><td colspan="7">${emptyStateHtml("暂无需求记录", "还没有可排序的机会记录。添加机会后会自动出现在这里。", "list-filter")}</td></tr>`;
+        }).join("") || `<tr><td colspan="8">${emptyStateHtml("暂无需求机会", "当前筛选下没有机会记录。可以切换状态筛选，或添加新的市场反馈、竞品线索和内部想法。", "list-filter")}</td></tr>`;
       }
-      document.querySelectorAll("[data-demand-start]").forEach(btn => btn.addEventListener("click", () => startDemandDiscussion(btn.dataset.demandStart)));
-      document.querySelectorAll("[data-demand-finish]").forEach(btn => btn.addEventListener("click", () => finishDemandDiscussion(btn.dataset.demandFinish)));
+      document.querySelectorAll("[data-demand-filter]").forEach(btn => btn.addEventListener("click", () => { demandStatusFilter = btn.dataset.demandFilter || "all"; renderDemandPool(); if (window.lucide) lucide.createIcons(); }));
+      const levelFilter = document.getElementById("demandLevelFilter");
+      if (levelFilter) {
+        levelFilter.value = demandLevelFilter;
+        levelFilter.onchange = () => {
+          demandLevelFilter = levelFilter.value || "all";
+          renderDemandPool();
+          if (window.lucide) lucide.createIcons();
+        };
+      }
       document.querySelectorAll("[data-demand-convert]").forEach(btn => btn.addEventListener("click", () => convertDemandToProduct(btn.dataset.demandConvert)));
-      document.querySelectorAll("[data-demand-pause]").forEach(btn => btn.addEventListener("click", () => pauseDemand(btn.dataset.demandPause)));
-      document.querySelectorAll("[data-demand-resume]").forEach(btn => btn.addEventListener("click", () => setDemandStatus(btn.dataset.demandResume, "待讨论")));
       document.querySelectorAll("[data-edit-demand]").forEach(btn => btn.addEventListener("click", () => openModal("demandEdit", btn.dataset.editDemand)));
       document.querySelectorAll("[data-delete-demand]").forEach(btn => btn.addEventListener("click", () => deleteDemand(btn.dataset.deleteDemand)));
       document.querySelectorAll("[data-demand-status]").forEach(select => select.addEventListener("change", () => setDemandStatus(select.dataset.demandStatus, select.value)));
       document.querySelectorAll("[data-select-product]").forEach(btn => btn.addEventListener("click", () => selectProductAndNavigate(btn.dataset.selectProduct, "products")));
     }
     function renderProducts() {
-      const filter = document.getElementById("statusFilter").value;
-      const list = state.products.filter(p => filter === "all" || p.status === filter);
+      const list = state.products;
       const productEditable = can("editProduct");
       const productDeletable = can("deleteProduct");
       document.getElementById("productList").innerHTML = list.map(p => `<div class="product-row archive-row">
         ${productIdentityHtml(p, p.desc)}
         <span class="badge ${badgeClass(p.status)}">${esc(p.status)}</span>
-        <span>${esc(p.level.split(" ")[0])}</span>
-        <span>${esc(stages[p.stage].short)}</span>
+        <span class="product-level">${esc(p.level.split(" ")[0])}</span>
+        <span class="product-stage">${esc(stages[p.stage].short)}</span>
         <div class="product-action-menu"><div class="table-actions product-actions">
           ${screenAllowed("workflow") ? `<button class="mini-action" title="产品进度" aria-label="产品进度" data-open-product="${esc(p.id)}" data-product-target="workflow"><i data-lucide="git-branch"></i><span>进度</span></button>` : ""}
           <button class="mini-action" title="资料包" aria-label="资料包" data-open-product="${esc(p.id)}" data-product-target="deliverables"><i data-lucide="folder-check"></i><span>资料</span></button>
@@ -3608,11 +4113,13 @@
                     canStartInstantMeeting ? `<button class="mini-action" data-start-meeting="${meetingKey}"><i data-lucide="video"></i>立即开会</button>` : ""
                   ].filter(Boolean).join("")
                   : syncStatusHtml(eventRecord, "日程已建");
-                const minutesAction = state.passed && state.minutes.doc
-                  ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>`
-                  : state.actionable && reviewEditable
-                    ? `<button class="mini-action" data-add-minutes="${esc(product.id)}|${esc(meeting.id)}"><i data-lucide="file-plus"></i>补充纪要</button>`
-                    : "";
+                const importMinutesAction = reviewEditable && product.stage >= meeting.stage
+                  ? `<button class="mini-action" data-import-minutes="${meetingKey}"><i data-lucide="file-input"></i>${state.minutes.hasMinutes ? "重新生成" : "同步纪要"}</button>`
+                  : "";
+                const minutesAction = [
+                  state.minutes.doc && state.minutes.hasMinutes ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>` : "",
+                  importMinutesAction
+                ].filter(Boolean).join("");
                 return `<tr>
                   <td><strong>${esc(meeting.title)}</strong></td>
                   <td>${esc(stages[meeting.stage].short)}</td>
@@ -3630,6 +4137,7 @@
           </table>
         </div>
       </div>`;
+      document.querySelectorAll("[data-import-minutes]").forEach(btn => btn.addEventListener("click", () => openMinutesModal(btn.dataset.importMinutes)));
       document.querySelectorAll("[data-add-minutes]").forEach(btn => btn.addEventListener("click", () => addMeetingMinutes(btn.dataset.addMinutes)));
       document.querySelectorAll("[data-open-meeting-doc]").forEach(btn => btn.addEventListener("click", () => openMeetingDoc(btn.dataset.openMeetingDoc)));
     }
@@ -3674,6 +4182,43 @@
       document.getElementById("ruleRows").innerHTML = rules.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("");
       document.querySelectorAll("[data-product-status]").forEach(select => select.addEventListener("change", () => updateProductStatus(select.dataset.productStatus, select.value)));
       document.querySelectorAll("[data-product-metric]").forEach(input => input.addEventListener("change", () => updateProductMetric(input.dataset.productMetric, input.value)));
+    }
+    function renderSettings() {
+      const systemRows = document.getElementById("systemSettingsRows");
+      const permissionRows = document.getElementById("permissionRows");
+      if (!systemRows || !permissionRows) return;
+      const orgUserCount = orgCache?.users?.length || 0;
+      const deptCount = orgCache?.departments?.length || 0;
+      const currentDepartments = currentUserDepartments().join(" / ") || "-";
+      const systemSettings = [
+        ["登录方式", "钉钉免登，按组织架构和岗位自动匹配权限。", currentUser?.source === "dingtalk" ? "钉钉账号" : "本地测试"],
+        ["组织架构", orgUserCount ? `已缓存 ${deptCount} 个部门、${orgUserCount} 位人员。` : "尚未拿到钉钉组织架构缓存。", orgUserCount ? "已同步" : "待同步"],
+        ["设置可见范围", "只有当前用户部门包含“总经办”时才显示设置入口。", currentDepartments],
+        ["流程阶段", `产品进度使用 ${stages.length} 个阶段，需求池转开发后自动生成任务、资料和评审。`, `${stages.length} 阶段`],
+        ["资料与会议", "资料包、评审纪要、会议决策和钉钉同步记录按产品复用。", "按产品关联"]
+      ];
+      systemRows.innerHTML = systemSettings.map(([title, desc, status]) => `
+        <div class="setting-row">
+          <div><strong>${esc(title)}</strong><p class="small">${esc(desc)}</p></div>
+          <span class="badge blue">${esc(status)}</span>
+        </div>
+      `).join("");
+      const visibleRoles = Object.entries(roleProfiles).filter(([key]) => key !== "readonly");
+      permissionRows.innerHTML = visibleRoles.map(([key, role]) => {
+        const screens = [...role.screens, ...(key === currentUser?.role && canViewSettings() ? ["settings"] : [])]
+          .map(screen => screenLabels[screen] || screen)
+          .join(" / ");
+        const permissions = Object.keys(role.permissions || {}).filter(permission => role.permissions[permission]);
+        return `<div class="setting-row">
+          <div>
+            <strong>${esc(role.name)}</strong>
+            <p class="small">${esc(role.dept)} · 可见页面：${esc(screens || "-")}</p>
+          </div>
+          <div class="permission-chips">
+            ${permissions.map(permission => `<span class="badge">${esc(permissionLabels[permission] || permission)}</span>`).join("") || `<span class="badge">只读</span>`}
+          </div>
+        </div>`;
+      }).join("");
     }
     function toggleTask(id, done) {
       if (denyIfCannot("editTasks")) return;
@@ -3982,49 +4527,152 @@
       toast("评审已通过，并写入决策记录。");
       renderAll();
     }
-    function addMeetingMinutes(payload) {
+    function setMinutesMessage(message, type = "") {
+      const el = document.getElementById("minutesStatus");
+      if (!el) return;
+      el.textContent = message;
+      el.className = `minutes-status ${type}`.trim();
+    }
+    function updateMinutesPosterPreview() {
+      const product = productById(minutesProductId);
+      const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
+      const text = document.getElementById("minutesText")?.value || defaultMinuteContent({ name: meeting?.minute, stage: meeting?.stage, owner: meeting?.owner }, true);
+      const preview = document.getElementById("minutesPosterPreview");
+      if (preview && product && meeting) preview.src = generateMeetingMinutesPoster({ product, meeting, text });
+    }
+    function openMinutesModal(payload) {
       if (denyIfCannot("editReviews")) return;
       const [productId, meetingId] = payload.split("|");
       const product = productById(productId);
       const meeting = meetingRules.find(rule => rule.id === meetingId);
       if (!product || !meeting) return;
-      const existing = productDeliverables(product.id).find(doc => doc.stage === meeting.stage && (doc.name.includes(meeting.minute) || doc.name.includes(meeting.title)));
+      minutesProductId = product.id;
+      minutesMeetingId = meeting.id;
+      const existing = meetingMinute(product, meeting).doc;
+      document.getElementById("minutesTargetTitle").textContent = meeting.title;
+      document.getElementById("minutesTargetMeta").textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
+      document.getElementById("minutesRecordingId").value = "";
+      document.getElementById("minutesText").value = existing?.content || "";
+      setMinutesMessage("需要钉钉会议录制（闪记）的会议 ID；应用还要具备视频会议读权限。");
+      updateMinutesPosterPreview();
+      document.getElementById("minutesModal").classList.add("open");
+      if (window.lucide) lucide.createIcons();
+    }
+    function closeMinutesModal() {
+      document.getElementById("minutesModal").classList.remove("open");
+      minutesProductId = "";
+      minutesMeetingId = "";
+    }
+    function upsertProductDeliverable(match, nextDoc) {
+      const existing = state.deliverables.find(match);
       if (existing) {
-        existing.name = meeting.minute;
-        existing.source = "会议产生";
-        existing.status = "已归档";
-        existing.owner = meeting.owner;
-        existing.updated = "今天";
-        existing.content = existing.content || defaultMinuteContent(existing, true);
-        activeMinuteDocId = existing.id;
-      } else {
-        const doc = {
-          id: cryptoId(),
-          productId: product.id,
-          name: meeting.minute,
-          stage: meeting.stage,
-          required: true,
-          type: "文档",
-          source: "会议产生",
-          url: "",
-          status: "已归档",
-          owner: meeting.owner,
-          updated: "今天"
-        };
-        doc.content = defaultMinuteContent(doc, true);
-        state.deliverables.unshift(doc);
-        activeMinuteDocId = doc.id;
+        Object.assign(existing, nextDoc, { id: existing.id });
+        return existing;
       }
+      state.deliverables.unshift(nextDoc);
+      return nextDoc;
+    }
+    function createMeetingMinutesFromText({ productId, meetingId, text, source = "手动导入" } = {}) {
+      if (denyIfCannot("editReviews")) return null;
+      const product = productById(productId);
+      const meeting = meetingRules.find(rule => rule.id === meetingId);
+      const content = String(text || "").trim();
+      if (!product || !meeting || !content) {
+        setMinutesMessage("请先填写或同步会议纪要文本。", "error");
+        return null;
+      }
+      const minuteDoc = upsertProductDeliverable(doc => doc.productId === product.id && doc.stage === meeting.stage && (doc.name.includes(meeting.minute) || doc.name.includes(meeting.title)) && assetKind(doc) === "document", {
+        id: cryptoId(),
+        productId: product.id,
+        name: meeting.minute,
+        stage: meeting.stage,
+        required: true,
+        type: "文档",
+        source: "会议产生",
+        url: "",
+        status: "已归档",
+        owner: meeting.owner,
+        updated: "今天",
+        content
+      });
+      const posterUrl = generateMeetingMinutesPoster({ product, meeting, text: content });
+      upsertProductDeliverable(doc => doc.productId === product.id && doc.stage === meeting.stage && doc.name === `${meeting.title}重点纪要图`, {
+        id: cryptoId(),
+        productId: product.id,
+        name: `${meeting.title}重点纪要图`,
+        stage: meeting.stage,
+        required: false,
+        type: "image",
+        mimeType: "image/svg+xml",
+        size: posterUrl.length,
+        source: "会议纪要生成",
+        url: posterUrl,
+        status: "已归档",
+        owner: meeting.owner,
+        updated: "今天",
+        content
+      });
+      const task = meetingTask(product, meeting);
+      if (task) task.done = true;
       state.decisions.unshift({
         id: cryptoId(),
         productId: product.id,
-        title: `${meeting.title}通过`,
-        body: `已补齐「${meeting.minute}」，系统按会议纪要判断该会议通过。`,
+        title: `${meeting.title}纪要已归档`,
+        body: `已从${source}生成「${meeting.minute}」和重点纪要图，并写入产品资料包。`,
         date: "今天"
       });
       currentId = product.id;
-      toast("会议纪要已补齐。");
+      activeMinuteDocId = minuteDoc.id;
+      saveState();
+      closeMinutesModal();
+      toast("会议纪要和重点图已加入资料包。");
       renderAll();
+      return minuteDoc;
+    }
+    async function syncMinutesFromDing() {
+      const product = productById(minutesProductId);
+      const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
+      if (!product || !meeting) return;
+      const recordingId = document.getElementById("minutesRecordingId").value.trim();
+      if (!recordingId) {
+        setMinutesMessage("需要钉钉会议录制（闪记）的会议 ID，才能从钉钉自动同步。", "error");
+        return;
+      }
+      const button = document.getElementById("syncMinutesFromDing");
+      button.disabled = true;
+      setMinutesMessage("正在读取钉钉云录制文本...");
+      try {
+        const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            recordingId,
+            unionId: currentUser?.dingUser?.unionid || ""
+          })
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || !payload.synced || !payload.text) throw new Error(formatDingSyncError(payload, "钉钉会议纪要同步失败"));
+        document.getElementById("minutesText").value = payload.text;
+        updateMinutesPosterPreview();
+        setMinutesMessage("已读取钉钉会议文本，正在写入资料包。", "ok");
+        createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: "钉钉云录制" });
+      } catch (error) {
+        setMinutesMessage(error.message || "钉钉会议纪要同步失败", "error");
+        toast(error.message || "钉钉会议纪要同步失败");
+      } finally {
+        button.disabled = false;
+      }
+    }
+    function saveMinutesModal() {
+      createMeetingMinutesFromText({
+        productId: minutesProductId,
+        meetingId: minutesMeetingId,
+        text: document.getElementById("minutesText").value,
+        source: "手动导入"
+      });
+    }
+    function addMeetingMinutes(payload) {
+      openMinutesModal(payload);
     }
     function openMeetingDoc(payload) {
       const [productId, docId] = payload.split("|");
@@ -4344,6 +4992,58 @@
       toast("产品档案及关联数据已删除。");
       renderAll();
     }
+    function linkedDemandForProduct(id, product) {
+      let demand = state.demands.find(item => item.productId === id);
+      if (demand) return demand;
+      demand = {
+        id: cryptoId(),
+        name: product.name,
+        level: product.level,
+        owner: product.owner,
+        source: product.source || "产品进度",
+        status: "已讨论",
+        productId: id,
+        created: "今天",
+        desc: product.desc || "由产品进度退回需求池，需要重新判断是否继续推进。",
+        discussion: ""
+      };
+      state.demands.unshift(demand);
+      return demand;
+    }
+    function clearProductProgressData(id) {
+      state.tasks = state.tasks.filter(t => t.productId !== id);
+      state.deliverables = state.deliverables.filter(d => d.productId !== id);
+      state.reviews = state.reviews.filter(r => r.productId !== id);
+      state.decisions = state.decisions.filter(d => d.productId !== id);
+      state.dingMeetings = (state.dingMeetings || []).filter(meeting => meeting.productId !== id);
+      if (activeMinuteDocId && !state.deliverables.some(doc => doc.id === activeMinuteDocId)) activeMinuteDocId = "";
+    }
+    async function returnProductToDemand(id = currentId) {
+      if (denyIfCannot("convertDemand") || denyIfCannot("deleteProduct")) return;
+      const product = productById(id);
+      if (!product) return;
+      if (state.products.length <= 1) {
+        toast("至少需要保留一个产品档案。");
+        return;
+      }
+      if (!await requestConfirm({
+        title: "退回需求池",
+        message: "退回后会删除这个产品的任务、资料包、评审、决策和钉钉会议记录，需求会回到已讨论状态。",
+        name: product.name,
+        confirmText: "退回"
+      })) return;
+      const demand = linkedDemandForProduct(id, product);
+      clearProductProgressData(id);
+      state.products = state.products.filter(p => p.id !== id);
+      demand.productId = "";
+      demand.status = "已讨论";
+      demand.discussion = "从开发退回：产品进度已清除，需要重新评估是否继续推进。";
+      currentId = state.products[0].id;
+      selectedStage = currentProduct().stage;
+      toast("已退回需求池，并清除产品进度数据。");
+      renderAll();
+      navigateToScreen("demands");
+    }
     function convertDemandToProduct(id) {
       if (denyIfCannot("convertDemand")) return;
       const demand = state.demands.find(d => d.id === id);
@@ -4366,7 +5066,7 @@
         launch: "-",
         sales: 0, score: 0, returnRate: 0, profit: 0,
         image: generateProductImage(demand.name),
-        desc: `${demand.desc} ${demand.discussion}`
+        desc: demand.desc,
       };
       state.products.unshift(product);
       state.tasks.push(...buildInitialTasks([product]));
@@ -4398,6 +5098,7 @@
         demandEdit: "编辑需求机会",
         productEdit: "编辑产品档案"
       };
+      document.getElementById("modal").classList.toggle("product-modal", mode === "productEdit");
       document.getElementById("modalTitle").textContent = titleMap[mode] || "添加需求机会";
       const target = mode === "demandEdit"
         ? state.demands.find(d => d.id === id)
@@ -4409,18 +5110,27 @@
       document.getElementById("formOwner").value = target?.owner || "赵雨涵";
       document.getElementById("formSource").value = target?.source || "产品部";
       document.getElementById("formDesc").value = target?.desc || "";
+      document.getElementById("formDiscussion").value = target?.discussion || "";
+      const discussionField = document.getElementById("discussionField");
+      const productProfilePanel = document.getElementById("productProfilePanel");
       const imageField = document.getElementById("imageField");
       const imageInput = document.getElementById("formImage");
       const imagePreview = document.getElementById("formImagePreview");
+      document.getElementById("formDescLabel").textContent = mode === "productEdit" ? "产品描述" : "机会描述";
+      discussionField.classList.toggle("hidden", mode === "productEdit");
+      productProfilePanel.classList.toggle("show", mode === "productEdit");
       imageField.classList.toggle("show", mode === "productEdit");
       if (mode === "productEdit") {
         const image = target?.image || generateProductImage(target?.name || "产品");
         imageInput.value = image;
         setImagePreview(image, target?.name || "产品");
+        renderProductProfilePanel(target);
       } else {
         imageInput.value = "";
         imagePreview.onerror = null;
         imagePreview.removeAttribute("src");
+        document.getElementById("productMetaRows").innerHTML = "";
+        document.getElementById("productDiscussionRecord").innerHTML = "";
       }
       document.getElementById("modal").classList.add("open");
     }
@@ -4442,6 +5152,7 @@
         demand.owner = document.getElementById("formOwner").value.trim() || "产品部";
         demand.source = document.getElementById("formSource").value;
         demand.desc = document.getElementById("formDesc").value.trim() || demand.desc;
+        demand.discussion = document.getElementById("formDiscussion").value.trim();
         closeModal();
         toast("需求机会已更新。");
         renderAll();
@@ -4457,6 +5168,13 @@
         product.source = document.getElementById("formSource").value;
         product.desc = document.getElementById("formDesc").value.trim() || product.desc;
         product.image = document.getElementById("formImage").value.trim() || generateProductImage(product.name);
+        const demand = sourceDemandForProduct(product);
+        if (demand) {
+          demand.name = product.name;
+          demand.level = product.level;
+          demand.owner = product.owner;
+          demand.source = product.source;
+        }
         closeModal();
         toast("产品档案已更新。");
         renderAll();
@@ -4482,11 +5200,11 @@
         owner: item.owner,
         source: item.source,
         status: "待讨论",
-        productId: "",
-        created: "今天",
-        desc: item.desc,
-        discussion: "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品等级。"
-      });
+            productId: "",
+            created: "今天",
+            desc: item.desc,
+            discussion: document.getElementById("formDiscussion").value.trim() || "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品等级。"
+          });
       closeModal();
       toast("机会已进入需求池。");
       renderAll();
@@ -4497,7 +5215,7 @@
       if (!task) return;
       task[field] = value;
       saveState();
-      if (field === "done") renderAll();
+      if (field === "done" || field === "due") renderAll();
     }
     function addTaskForSelectedStage() {
       if (denyIfCannot("editTasks")) return;
@@ -4563,7 +5281,8 @@
       workflow: ["产品进度", "按阶段、任务、会议、交付物和准入条件推进。"],
       deliverables: ["资料包", "像文件夹一样管理这个产品的文档、图片、视频、链接和会议纪要。"],
       reviews: ["评审决策", "会议任务完成且纪要内容非空，才算评审通过。"],
-      lifecycle: ["生命周期看板", "从首月/季度复盘形成决策，再按升级、维持、清仓或淘汰路径推进。"]
+      lifecycle: ["生命周期看板", "从首月/季度复盘形成决策，再按升级、维持、清仓或淘汰路径推进。"],
+      settings: ["系统设置", "总经办维护公司级规则、组织架构状态和岗位权限范围。"]
     };
     function navigateToScreen(screen) {
       if (!pageTitles[screen]) return;
@@ -4573,9 +5292,9 @@
       document.querySelectorAll(".screen").forEach(s => s.classList.toggle("active", s.id === screen));
       document.getElementById("pageTitle").textContent = pageTitles[screen][0];
       document.getElementById("pageSub").textContent = pageTitles[screen][1];
-      document.getElementById("statusFilter").classList.toggle("hidden", screen !== "products");
-      document.getElementById("productSelect").classList.toggle("hidden", screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "lifecycle");
-      document.getElementById("newIdea").classList.toggle("hidden", !can("addIdea") || screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "reviews" || screen === "lifecycle");
+      document.getElementById("statusFilter").classList.add("hidden");
+      document.getElementById("productSelect").classList.toggle("hidden", screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "lifecycle" || screen === "settings");
+      document.getElementById("newIdea").classList.toggle("hidden", !can("addIdea") || screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "reviews" || screen === "lifecycle" || screen === "settings");
     }
     function syncTodoDateInputs() {
       const start = document.getElementById("todoStartDate");
@@ -4610,6 +5329,11 @@
     document.getElementById("cancelSyncModal").addEventListener("click", closeSyncModal);
     document.getElementById("confirmSyncModal").addEventListener("click", confirmSyncModal);
     document.getElementById("syncPeopleSearch").addEventListener("input", renderPeoplePicker);
+    document.getElementById("closeMinutesModal").addEventListener("click", closeMinutesModal);
+    document.getElementById("cancelMinutesModal").addEventListener("click", closeMinutesModal);
+    document.getElementById("saveMinutesModal").addEventListener("click", saveMinutesModal);
+    document.getElementById("syncMinutesFromDing").addEventListener("click", syncMinutesFromDing);
+    document.getElementById("minutesText").addEventListener("input", updateMinutesPosterPreview);
     document.getElementById("closeConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
     document.getElementById("cancelConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
     document.getElementById("confirmDialogAction").addEventListener("click", () => closeConfirmDialog(true));
@@ -4635,6 +5359,7 @@
       toast("已按产品名称重新生成封面。");
     });
     document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+    document.getElementById("minutesModal").addEventListener("click", e => { if (e.target.id === "minutesModal") closeMinutesModal(); });
     document.getElementById("confirmDialog").addEventListener("click", e => { if (e.target.id === "confirmDialog") closeConfirmDialog(false); });
     document.addEventListener("click", e => {
       const target = e.target.closest("button");
@@ -4656,11 +5381,6 @@
       if (target.dataset.startMeeting) {
         const [productId, meetingId] = target.dataset.startMeeting.split("|");
         openSyncModal("meeting", { productId, meetingId, action: "instant" });
-        return;
-      }
-      if (target.dataset.demandSort) {
-        e.preventDefault();
-        setDemandSort(target.dataset.demandSort);
         return;
       }
       if (target.id === "completeAllVisible") completeCurrentStage();

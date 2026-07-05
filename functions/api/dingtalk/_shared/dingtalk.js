@@ -348,6 +348,63 @@ export async function createDingCalendarEvent(accessToken, input = {}, fetchImpl
   );
 }
 
+export function buildDingMeetingMinutesQuery(input = {}) {
+  const conferenceId = String(input.conferenceId || input.recordingId || input.meetingId || "").trim();
+  if (!conferenceId) {
+    const err = new Error("需要钉钉会议录制（闪记）的会议 ID，才能同步会议纪要。");
+    err.status = 400;
+    throw err;
+  }
+  const query = new URLSearchParams();
+  if (input.unionId) query.set("unionId", String(input.unionId));
+  if (input.startTime) query.set("startTime", String(input.startTime));
+  if (input.direction) query.set("direction", String(input.direction));
+  if (input.maxResults) query.set("maxResults", String(input.maxResults));
+  if (input.nextToken) query.set("nextToken", String(input.nextToken));
+  return { conferenceId, params: query.toString() };
+}
+
+function collectDingTranscriptText(payload = {}) {
+  const root = payload.result || payload;
+  const paragraphs = Array.isArray(root.paragraphList) ? root.paragraphList : [];
+  const lines = [];
+  paragraphs.forEach(paragraph => {
+    const paragraphText = String(paragraph.paragraph || paragraph.text || "").trim();
+    if (paragraphText) lines.push(paragraphText);
+    const sentences = Array.isArray(paragraph.sentenceList) ? paragraph.sentenceList : [];
+    sentences.forEach(sentence => {
+      const text = String(sentence.sentence || sentence.text || "").trim();
+      if (text) lines.push(text);
+    });
+  });
+  const sentences = Array.isArray(root.sentences) ? root.sentences : [];
+  sentences.forEach(sentence => {
+    const text = String(sentence.sentence || sentence.text || "").trim();
+    if (text) lines.push(text);
+  });
+  return [...new Set(lines)].join("\n");
+}
+
+export async function queryDingMeetingMinutesText(accessToken, input = {}, fetchImpl = fetch) {
+  const { conferenceId, params } = buildDingMeetingMinutesQuery(input);
+  const suffix = params ? `?${params}` : "";
+  const data = await requestDingOpenApi(
+    accessToken,
+    "GET",
+    `/v1.0/conference/videoConferences/${encodeURIComponent(conferenceId)}/cloudRecords/getTexts${suffix}`,
+    null,
+    fetchImpl
+  );
+  const text = collectDingTranscriptText(data);
+  if (!text) {
+    const err = new Error("钉钉会议录制没有返回文本内容，请确认会议已开启云录制（闪记）且录制期间有人发言。");
+    err.status = 404;
+    err.detail = data;
+    throw err;
+  }
+  return { text, raw: data };
+}
+
 export async function loginWithDingTalk({ authCode, corpId }, env = {}, fetchImpl = fetch) {
   if (!authCode) {
     const err = new Error("缺少钉钉免登授权码 authCode");
