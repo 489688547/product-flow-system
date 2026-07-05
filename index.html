@@ -35,10 +35,10 @@
       --primary: #2563eb;
       --primary-hover: #1d4ed8;
       --primary-ink: #ffffff;
-      --sidebar: #0f172a;
-      --sidebar-soft: #1e293b;
-      --sidebar-ink: #f8fafc;
-      --sidebar-muted: #94a3b8;
+      --sidebar: #ffffff;
+      --sidebar-soft: #f8fafc;
+      --sidebar-ink: #111827;
+      --sidebar-muted: #64748b;
       --ring: rgba(37, 99, 235, .22);
       --shadow: 0 1px 2px rgba(15, 23, 42, .06);
       --shadow-lift: 0 4px 8px rgba(15, 23, 42, .08);
@@ -80,9 +80,9 @@
       padding: 12px;
       background: var(--sidebar);
       color: var(--sidebar-ink);
-      border: 1px solid rgba(255,255,255,.08);
+      border: 1px solid var(--line);
       border-radius: var(--radius);
-      box-shadow: 0 6px 12px rgba(15, 23, 42, .14);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 10px 24px rgba(15, 23, 42, .04);
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -92,7 +92,7 @@
       align-items: center;
       gap: 10px;
       padding: 6px 6px 14px;
-      border-bottom: 1px solid rgba(255,255,255,.1);
+      border-bottom: 1px solid var(--line);
     }
     .brand-mark {
       width: 38px;
@@ -107,8 +107,8 @@
       font-weight: 800;
     }
     .sidebar .brand-mark {
-      background: #f8fafc;
-      color: #0f172a;
+      background: var(--blue-soft);
+      color: var(--primary);
     }
     .login-card .brand-mark,
     .modal .brand-mark {
@@ -261,11 +261,11 @@
       text-align: left;
       font-weight: 650;
     }
-    .nav button:hover { background: rgba(255,255,255,.07); color: var(--sidebar-ink); }
+    .nav button:hover { background: var(--panel-2); color: var(--sidebar-ink); }
     .nav button.active {
-      background: #ffffff;
-      color: #0f172a;
-      box-shadow: none;
+      background: var(--blue-soft);
+      color: var(--primary);
+      box-shadow: inset 0 0 0 1px #bfdbfe;
     }
     .nav i, .btn i, .icon-btn i, .mini-action i { width: 17px; height: 17px; }
     .main {
@@ -788,9 +788,58 @@
       display: block;
       object-fit: cover;
     }
+    .file-preview video,
+    .file-preview object {
+      width: 100%;
+      height: 100%;
+      display: block;
+      border: 0;
+      object-fit: cover;
+      background: #fff;
+    }
+    .file-preview-body {
+      width: 100%;
+      height: 100%;
+      padding: 12px;
+      display: grid;
+      grid-template-rows: 1fr auto auto;
+      align-items: center;
+      justify-items: start;
+      gap: 4px;
+    }
+    .file-preview-body i {
+      align-self: start;
+      width: 30px;
+      height: 30px;
+    }
+    .file-extension {
+      min-width: 44px;
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: rgba(255,255,255,.72);
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+    .file-preview-label {
+      max-width: 100%;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
     .file-preview.image { background: var(--green-soft); color: #166534; }
     .file-preview.video { background: var(--red-soft); color: #991b1b; }
     .file-preview.link { background: var(--blue-soft); color: #1d4ed8; }
+    .file-preview.pdf { background: var(--red-soft); color: #991b1b; }
+    .file-preview.presentation { background: #fff7ed; color: #c2410c; }
+    .file-preview.spreadsheet { background: var(--green-soft); color: #166534; }
+    .file-preview.document { background: var(--blue-soft); color: #1d4ed8; }
+    .file-preview.archive { background: var(--gold-soft); color: #92400e; }
     .file-name {
       font-weight: 750;
       font-size: 13px;
@@ -800,6 +849,15 @@
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
+    }
+    .file-meta {
+      min-height: 16px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .demand-board {
       display: grid;
@@ -2201,11 +2259,11 @@
         image: product.image && !isGeneratedPlaceholderImage(product.image) ? product.image : generateProductImage(product.name || "产品")
       }));
       data.deliverables = (data.deliverables || []).map(doc => ({
-        type: inferAssetType(doc.name),
         source: "流程自动",
         url: "",
         content: defaultMinuteContent(doc),
-        ...doc
+        ...doc,
+        type: inferAssetType(`${doc.name || ""} ${doc.url || ""}`, doc.mimeType || doc.mime || "")
       }));
       data.dingMeetings = Array.isArray(data.dingMeetings) ? data.dingMeetings : [];
       return data;
@@ -2350,35 +2408,116 @@
       if (name.includes("分发")) return "采购";
       return "产品部";
     }
-    function inferAssetType(name) {
-      if (name.includes("视频") || name.includes("素材") || name.includes("测评")) return "视频";
-      if (name.includes("图片") || name.includes("包装") || name.includes("标准样") || name.includes("样品")) return "图片";
-      if (name.includes("链接") || name.includes("页面")) return "链接";
-      return "文档";
+    function fileExtension(name = "") {
+      const clean = String(name || "").split("?")[0].split("#")[0];
+      const match = clean.match(/\.([a-z0-9]{1,8})$/i);
+      return match ? match[1].toLowerCase() : "";
+    }
+    function assetKind(doc = {}) {
+      const ext = fileExtension(doc.name || doc.url || "");
+      const mime = String(doc.mimeType || doc.mime || "").toLowerCase();
+      const value = `${doc.type || ""} ${doc.name || ""} ${mime} ${ext} ${doc.url || ""}`.toLowerCase();
+      if (mime.startsWith("image/") || /图片|png|jpe?g|webp|gif|svg|heic/.test(value)) return "image";
+      if (mime.startsWith("video/") || /视频|video|mp4|mov|m4v|webm|avi/.test(value)) return "video";
+      if (/pdf/.test(value)) return "pdf";
+      if (/powerpoint|presentation|pptx|ppt|key/.test(value)) return "presentation";
+      if (/spreadsheet|excel|xlsx|xls|csv|numbers|排期表/.test(value)) return "spreadsheet";
+      if (/word|document|docx|doc|pages|prd|文档|纪要|报告|说明|方案|需求|规格书|想法|建议|草案|终版|清单|确认单|确认书|档案/.test(value)) return "document";
+      if (/zip|rar|7z|tar|gz/.test(value)) return "archive";
+      if (/链接|https?:|www\./i.test(value)) return "link";
+      return "file";
+    }
+    function inferAssetType(name, mimeType = "") {
+      const kind = assetKind({ name, mimeType });
+      const labels = {
+        image: "图片",
+        video: "视频",
+        link: "链接",
+        pdf: "PDF",
+        presentation: "演示文稿",
+        spreadsheet: "表格",
+        document: "文档",
+        archive: "压缩包",
+        file: "文件"
+      };
+      return labels[kind] || "文件";
     }
     function assetIcon(doc) {
-      const value = `${doc.type || ""} ${doc.name || ""} ${doc.url || ""}`;
-      if (/视频|video|mp4|mov/i.test(value)) return "file-video";
-      if (/图片|image|png|jpe?g|webp|gif/i.test(value)) return "file-image";
-      if (/链接|https?:|www\\./i.test(value)) return "link";
-      return "file-text";
+      const icons = {
+        image: "file-image",
+        video: "file-video",
+        link: "link",
+        pdf: "file-text",
+        presentation: "presentation",
+        spreadsheet: "file-spreadsheet",
+        document: "file-text",
+        archive: "file-archive",
+        file: "file"
+      };
+      return icons[assetKind(doc)] || "file";
     }
     function isImageAsset(doc) {
-      const value = `${doc.type || ""} ${doc.name || ""} ${doc.url || ""}`;
-      return /图片|image|png|jpe?g|webp|gif|data:image|blob:/i.test(value);
+      return assetKind(doc) === "image" || String(doc.url || "").startsWith("data:image/");
+    }
+    function isVideoAsset(doc) {
+      return assetKind(doc) === "video";
+    }
+    function isPdfAsset(doc) {
+      return assetKind(doc) === "pdf";
+    }
+    function filePreviewLabel(doc) {
+      const labels = {
+        image: "图片预览",
+        video: "视频文件",
+        link: "网页链接",
+        pdf: "PDF 文件",
+        presentation: "演示文稿",
+        spreadsheet: "电子表格",
+        document: "文档资料",
+        archive: "压缩文件",
+        file: "通用文件"
+      };
+      return labels[assetKind(doc)] || "通用文件";
+    }
+    function filePreviewBadge(doc) {
+      const ext = fileExtension(doc.name || doc.url || "");
+      if (ext) return ext;
+      const badges = {
+        image: "IMG",
+        video: "VID",
+        link: "URL",
+        pdf: "PDF",
+        presentation: "PPT",
+        spreadsheet: "XLS",
+        document: "DOC",
+        archive: "ZIP",
+        file: "FILE"
+      };
+      return badges[assetKind(doc)] || "FILE";
+    }
+    function fileMetaText(doc) {
+      const parts = [inferAssetType(doc.name, doc.mimeType || doc.mime || "")];
+      if (doc.size) {
+        const size = Number(doc.size);
+        parts.push(size >= 1024 * 1024 ? `${Math.round(size / 1024 / 102.4) / 10} MB` : `${Math.max(1, Math.round(size / 1024))} KB`);
+      }
+      if (doc.source) parts.push(doc.source);
+      return parts.filter(Boolean).join(" · ");
     }
     function filePreviewHtml(doc) {
       if (isImageAsset(doc) && doc.url) {
         return `<img src="${escapeAttr(doc.url)}" alt="${escapeAttr(doc.name)}" loading="lazy" decoding="async">`;
       }
-      return `<i data-lucide="${assetIcon(doc)}"></i>`;
+      if (isVideoAsset(doc) && doc.url) {
+        return `<video src="${escapeAttr(doc.url)}" muted playsinline preload="metadata"></video>`;
+      }
+      if (isPdfAsset(doc) && doc.url) {
+        return `<object data="${escapeAttr(doc.url)}" type="application/pdf"><div class="file-preview-body"><i data-lucide="${assetIcon(doc)}"></i><span class="file-extension">PDF</span><span class="file-preview-label">PDF 文件</span></div></object>`;
+      }
+      return `<div class="file-preview-body"><i data-lucide="${assetIcon(doc)}"></i><span class="file-extension">${esc(filePreviewBadge(doc))}</span><span class="file-preview-label">${esc(filePreviewLabel(doc))}</span></div>`;
     }
-    function assetPreviewClass(doc) {
-      const icon = assetIcon(doc);
-      if (icon === "file-image") return "image";
-      if (icon === "file-video") return "video";
-      if (icon === "link") return "link";
-      return "";
+    function filePreviewClass(doc) {
+      return assetKind(doc);
     }
     function defaultMinuteContent(doc = {}, force = false) {
       if (!force && !String(doc.name || "").includes("纪要") && !String(doc.name || "").includes("决策")) return "";
@@ -3024,8 +3163,9 @@
       const rows = document.getElementById("deliverableRows");
       const docsEditable = can("editDocs");
       rows.innerHTML = docs.map(d => `<div class="file-card">
-        <div class="file-preview ${assetPreviewClass(d)}">${filePreviewHtml(d)}</div>
+        <div class="file-preview ${filePreviewClass(d)}">${filePreviewHtml(d)}</div>
         <div class="file-name">${esc(d.name)}</div>
+        <div class="file-meta">${esc(fileMetaText(d))}</div>
         <div class="table-actions">
           <button class="mini-action" data-open-doc="${esc(d.id)}"><i data-lucide="external-link"></i>打开</button>
           ${docsEditable ? `<button class="mini-action danger" data-delete-doc="${esc(d.id)}"><i data-lucide="trash-2"></i>删除</button>` : ""}
@@ -3260,7 +3400,9 @@
           name: file.name,
           stage: selectedStage,
           required: false,
-          type: fileType.startsWith("image/") ? "图片" : fileType.startsWith("video/") ? "视频" : "文档",
+          type: inferAssetType(file.name, fileType),
+          mimeType: fileType,
+          size: file.size || 0,
           source: "拖入文件",
           url: "",
           status: "未开始",
