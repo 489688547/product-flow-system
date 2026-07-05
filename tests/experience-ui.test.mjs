@@ -125,11 +125,20 @@ test("workflow task due date uses a date picker and refreshes dashboard data", (
 });
 
 test("workflow task editor allocates enough width for full due dates", () => {
-  assert.match(html, /\.task-edit-row \{[\s\S]*grid-template-columns: 104px minmax\(340px, 1\.7fr\) minmax\(168px, \.8fr\) minmax\(180px, \.85fr\) 142px 72px 120px;/);
+  assert.match(html, /\.task-edit-row \{[\s\S]*grid-template-columns: 104px minmax\(360px, 1\.7fr\) minmax\(168px, \.75fr\) minmax\(180px, \.85fr\) 142px 104px 176px;/);
   assert.match(html, /\.task-edit-row input,\s+\.task-edit-row select \{[\s\S]*width: 100%;[\s\S]*min-width: 0;/);
   assert.match(html, /\.task-edit-row input\[type="date"\] \{[\s\S]*min-width: 132px;[\s\S]*font-variant-numeric: tabular-nums;/);
   assert.match(html, /\.stage-editor \{[\s\S]*overflow-x: auto;/);
   assert.doesNotMatch(html, /grid-template-columns: 104px minmax\(220px, 1\.4fr\) 128px 150px 76px 70px minmax\(150px, \.7fr\)/);
+});
+
+test("workflow task rows use compact action buttons and a done toggle button", () => {
+  assert.match(html, /class="task-state-toggle \$\{t\.done \? "done" : ""\}" data-task-done="\$\{esc\(t\.id\)\}"/);
+  assert.match(html, /t\.done \? "已完成" : "完成"/);
+  assert.match(html, /class="task-row-actions"/);
+  assert.match(html, /\.task-row-actions \{[\s\S]*display: flex;[\s\S]*flex-wrap: nowrap;[\s\S]*justify-content: flex-end;/);
+  assert.match(html, /class="mini-action icon-only danger" title="删除任务" aria-label="删除任务" data-delete-task/);
+  assert.doesNotMatch(html, /<label class="task-label"><input type="checkbox" data-task-field="done"/);
 });
 
 test("product archive actions are discoverable without relying only on icons", () => {

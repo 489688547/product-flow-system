@@ -54,3 +54,9 @@ test("demand table keeps Chinese headers, dates, and actions readable", () => {
   assert.match(html, /\.demand-table td:nth-child\(5\),\s+\.demand-table td:nth-child\(6\),\s+\.demand-table td:nth-child\(7\) \{[\s\S]*white-space: nowrap;/);
   assert.doesNotMatch(html, /来\s*<br|负\s*<br|创建时\s*<br/);
 });
+
+test("workflow editor keeps task actions on one line at laptop widths", () => {
+  assert.match(html, /\.task-row-actions \{[\s\S]*min-width: 0;[\s\S]*flex-wrap: nowrap;/);
+  assert.match(html, /@media \(max-width: 720px\)[\s\S]*\.task-edit-row \{ grid-template-columns: 104px 360px 168px 180px 142px 104px 176px; min-width: 1326px; \}/);
+  assert.match(html, /\.task-row-actions \.mini-action \{[\s\S]*min-height: 32px;/);
+});

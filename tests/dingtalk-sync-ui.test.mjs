@@ -15,7 +15,7 @@ test("workflow tasks can be synced to DingTalk todos through the org people pick
 
 test("DingTalk people picker force-refreshes org before showing colleagues", () => {
   const openSyncModal = html.match(/async function openSyncModal[\s\S]*?function closeSyncModal/)[0];
-  assert.match(openSyncModal, /const refreshedOrg = await syncDingOrgCache\(\{ force: true \}\);/);
+  assert.match(openSyncModal, /const refreshedOrg = await withGlobalLoading\("正在刷新钉钉组织架构", async \(\) => syncDingOrgCache\(\{ force: true \}\)\);/);
   assert.match(openSyncModal, /if \(!refreshedOrg \|\| orgCacheExpired\(\)\)/);
   assert.match(openSyncModal, /if \(!ensureDingSyncReady\(\)\) return;/);
 });
@@ -25,6 +25,18 @@ test("DingTalk sync revalidates selected users after org refresh", () => {
   assert.match(confirmSyncModal, /const refreshedOrg = await syncDingOrgCache\(\{ force: true \}\);/);
   assert.match(confirmSyncModal, /const selected = resolveSelectedSyncUsers\(\);/);
   assert.match(confirmSyncModal, /请选择仍在职且可同步的同事/);
+});
+
+test("DingTalk operations show a fullscreen loading state while waiting", () => {
+  assert.match(html, /id="globalLoading"/);
+  assert.match(html, /function showGlobalLoading\(/);
+  assert.match(html, /async function withGlobalLoading\(/);
+  const openSyncModal = html.match(/async function openSyncModal[\s\S]*?function closeSyncModal/)[0];
+  assert.match(openSyncModal, /await withGlobalLoading\("正在刷新钉钉组织架构", async \(\) => syncDingOrgCache\(\{ force: true \}\)\);/);
+  const confirmSyncModal = html.match(/async function confirmSyncModal[\s\S]*?function completion/)[0];
+  assert.match(confirmSyncModal, /await withGlobalLoading\(syncMeetingAction === "instant" \? "正在拉起钉钉会议" : "正在同步到钉钉", async \(\) => \{/);
+  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?function saveMinutesModal/)[0];
+  assert.match(minutesSync, /await withGlobalLoading\("正在读取钉钉会议纪要", async \(\) => \{/);
 });
 
 test("review meetings can be created as DingTalk calendar events", () => {
@@ -79,4 +91,13 @@ test("instant DingTalk meetings use staff userIds for the video conference JSAPI
   assert.match(html, /const attendeeUserIds = users\.map\(dingUserId\)\.filter\(Boolean\);/);
   assert.match(html, /calleeStaffIds/);
   assert.match(html, /videoConfCall|makeVideoConfCall/);
+});
+
+test("instant DingTalk meetings wait for conference JSAPI readiness before calling", () => {
+  assert.match(html, /function hasDingConferenceApi\(/);
+  assert.match(html, /function waitForDingConferenceApi\(/);
+  const videoCall = html.match(/async function callDingVideoConference[\s\S]*?async function startDingVideoMeeting/)[0];
+  assert.match(videoCall, /const api = await waitForDingConferenceApi\(\);/);
+  assert.match(videoCall, /if \(api\.ready\) api\.ready\(run\);/);
+  assert.match(videoCall, /api\.error\(fail\);/);
 });

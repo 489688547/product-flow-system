@@ -831,7 +831,7 @@
     .stage-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .task-edit-row {
       display: grid;
-      grid-template-columns: 104px minmax(340px, 1.7fr) minmax(168px, .8fr) minmax(180px, .85fr) 142px 72px 120px;
+      grid-template-columns: 104px minmax(360px, 1.7fr) minmax(168px, .75fr) minmax(180px, .85fr) 142px 104px 176px;
       gap: 8px;
       align-items: center;
       padding: 8px 0;
@@ -858,6 +858,57 @@
       min-width: 132px;
       font-variant-numeric: tabular-nums;
     }
+    .task-state-toggle {
+      width: 100%;
+      min-height: 32px;
+      padding: 0 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--control);
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 750;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .task-state-toggle:hover {
+      border-color: #bcd3ff;
+      background: #f7fbff;
+      color: var(--primary);
+    }
+    .task-state-toggle.done {
+      border-color: #bbf7d0;
+      background: var(--green-soft);
+      color: #15803d;
+    }
+    .task-state-toggle:disabled {
+      cursor: not-allowed;
+      opacity: .62;
+    }
+    .task-state-toggle i { width: 15px; height: 15px; }
+    .task-row-actions {
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
+      justify-content: flex-end;
+    }
+    .task-row-actions .mini-action {
+      min-height: 32px;
+      height: 32px;
+      padding: 0 10px;
+      white-space: nowrap;
+    }
+    .task-row-actions .mini-action.icon-only {
+      width: 32px;
+      min-width: 32px;
+      padding: 0;
+    }
+    .task-row-actions .sync-status { white-space: nowrap; }
     .task-edit-head {
       color: var(--muted);
       font-size: 12px;
@@ -1679,6 +1730,41 @@
     }
     .minutes-status.error { color: var(--red); }
     .minutes-status.ok { color: var(--green); }
+    .global-loading {
+      position: fixed;
+      inset: 0;
+      z-index: 80;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(248, 250, 252, .72);
+      backdrop-filter: blur(8px);
+    }
+    .global-loading.open { display: flex; }
+    .global-loading-card {
+      width: min(320px, 100%);
+      padding: 18px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, .14);
+      display: grid;
+      justify-items: center;
+      gap: 9px;
+      text-align: center;
+    }
+    .global-spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid #dbeafe;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    .global-loading-card strong { font-size: 14px; line-height: 1.35; }
+    .global-loading-card span:last-child { color: var(--muted); font-size: 12px; line-height: 1.45; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .toast {
       position: fixed;
       right: 22px;
@@ -1812,7 +1898,7 @@
       .task-table { min-width: 680px; }
       .demand-status-strip { grid-template-columns: 1fr; }
       .package-drop-hint { align-items: flex-start; }
-      .task-edit-row { grid-template-columns: 104px 340px 168px 180px 142px 72px 120px; min-width: 1174px; }
+      .task-edit-row { grid-template-columns: 104px 360px 168px 180px 142px 104px 176px; min-width: 1326px; }
       .sync-meeting-fields { grid-template-columns: 1fr; }
       .dialog-foot { flex-wrap: wrap; }
       .product-profile-hero { grid-template-columns: 1fr; }
@@ -2230,6 +2316,13 @@
     </div>
   </div>
   <div class="toast" id="toast"></div>
+  <div class="global-loading" id="globalLoading" aria-live="polite" aria-busy="true">
+    <div class="global-loading-card">
+      <span class="global-spinner" aria-hidden="true"></span>
+      <strong id="globalLoadingTitle">正在处理</strong>
+      <span id="globalLoadingText">请稍等，不要重复点击。</span>
+    </div>
+  </div>
 
   <script>
     const DATA_MODEL = Object.freeze({
@@ -2505,6 +2598,7 @@
     let minutesProductId = "";
     let minutesMeetingId = "";
     let confirmResolve = null;
+    let globalLoadingDepth = 0;
 
     function loadState() {
       const raw = localStorage.getItem("productFlowState");
@@ -2823,6 +2917,7 @@
       });
     }
     async function checkDingTalkEnvironment({ loginWhenReady = false } = {}) {
+      return withGlobalLoading(loginWhenReady ? "正在检测并登录钉钉" : "正在检测钉钉环境", async () => {
       const env = detectDingTalkEnvironment();
       let backend = null;
       setDingStatus("正在检测钉钉环境和服务端配置...");
@@ -2850,6 +2945,7 @@
       setDingStatus(loginWhenReady ? "钉钉环境、corpId 和服务端配置均已就绪，正在进入系统..." : "钉钉环境、corpId 和服务端配置均已就绪。", "ok");
       if (loginWhenReady) await attemptDingTalkLogin({ force: true });
       return { env, backend };
+      });
     }
     function requestDingAuthCode(corpId) {
       return new Promise((resolve, reject) => {
@@ -2896,6 +2992,7 @@
       syncDingOrgCache({ force: true });
     }
     async function attemptDingTalkLogin({ force = false } = {}) {
+      return withGlobalLoading("正在通过钉钉登录", async () => {
       let env = detectDingTalkEnvironment();
       if (!env.inDingTalk) {
         if (force) await checkDingTalkEnvironment();
@@ -2931,6 +3028,7 @@
       } catch (error) {
         setDingStatus(error.message || "钉钉登录失败", "error");
       }
+      });
     }
     function cryptoId() {
       return "id" + Math.random().toString(16).slice(2) + Date.now().toString(16);
@@ -3512,7 +3610,7 @@
         toast("需要从钉钉登录后才能同步待办或日历。");
         return;
       }
-      const refreshedOrg = await syncDingOrgCache({ force: true });
+      const refreshedOrg = await withGlobalLoading("正在刷新钉钉组织架构", async () => syncDingOrgCache({ force: true }));
       if (!refreshedOrg || orgCacheExpired()) {
         toast("组织架构未刷新成功，为避免发给离职人员，暂不允许同步。");
         return;
@@ -3612,6 +3710,7 @@
       const button = document.getElementById("confirmSyncModal");
       button.disabled = true;
       try {
+        await withGlobalLoading(syncMeetingAction === "instant" ? "正在拉起钉钉会议" : "正在同步到钉钉", async () => {
         const refreshedOrg = await syncDingOrgCache({ force: true });
         if (!refreshedOrg || orgCacheExpired()) {
           toast("组织架构刷新失败，暂不发送钉钉同步。");
@@ -3626,6 +3725,7 @@
         if (syncModalMode === "todo") await syncTaskToDingTodo(selected);
         if (syncModalMode === "meeting" && syncMeetingAction === "schedule") await syncMeetingToDingCalendar(selected);
         if (syncModalMode === "meeting" && syncMeetingAction === "instant") await startDingVideoMeeting(selected);
+        });
       } finally {
         if (document.getElementById("syncModal").classList.contains("open")) {
           button.disabled = false;
@@ -3811,10 +3911,10 @@
       ${tasks.map(t => {
         const todoSync = syncStatusHtml(t.dingTodo, "待办已同步");
         const taskActions = taskEditable
-          ? `<div class="table-actions">
+          ? `<div class="task-row-actions">
               ${currentUser?.source === "dingtalk" ? `<button class="mini-action" data-sync-task="${esc(t.id)}"><i data-lucide="send"></i>同步待办</button>` : ""}
               ${todoSync}
-              <button class="mini-action danger" data-delete-task="${esc(t.id)}"><i data-lucide="trash-2"></i>删除</button>
+              <button class="mini-action icon-only danger" title="删除任务" aria-label="删除任务" data-delete-task="${esc(t.id)}"><i data-lucide="trash-2"></i></button>
             </div>`
           : `<span class="small">只读</span>`;
         return `<div class="task-edit-row ${focusedTaskId === t.id ? "focused" : ""}" data-edit-task="${esc(t.id)}">
@@ -3825,13 +3925,21 @@
         <input data-task-field="owner" value="${esc(t.owner)}" ${disabled}>
         <input data-task-field="deliverable" value="${esc(t.deliverable)}" ${disabled}>
         <input type="date" data-task-field="due" value="${esc(taskDueInputValue(t.due))}" ${disabled}>
-        <label class="task-label"><input type="checkbox" data-task-field="done" ${t.done ? "checked" : ""} ${disabled}><span>${t.done ? "是" : "否"}</span></label>
+        <button type="button" class="task-state-toggle ${t.done ? "done" : ""}" data-task-done="${esc(t.id)}" aria-pressed="${t.done ? "true" : "false"}" ${disabled}>
+          <i data-lucide="${t.done ? "check-circle-2" : "circle"}"></i>${t.done ? "已完成" : "完成"}
+        </button>
         ${taskActions}
       </div>`;
       }).join("") || emptyStateHtml("这个阶段还没有任务", taskEditable ? "点击右上角“加任务”，补充这个阶段需要推进的事项。" : "当前账号只读，暂无这个阶段的任务记录。", "list-plus")}`;
       document.querySelectorAll("[data-edit-task] [data-task-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.type === "date" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateStageTask(input.closest("[data-edit-task]").dataset.editTask, input.dataset.taskField, input.type === "checkbox" ? input.checked : input.value));
+      });
+      document.querySelectorAll("[data-task-done]").forEach(button => {
+        button.addEventListener("click", () => {
+          const task = state.tasks.find(item => item.id === button.dataset.taskDone);
+          if (task) toggleTask(task.id, !task.done);
+        });
       });
       const setStageButton = document.getElementById("setSelectedStage");
       if (setStageButton) setStageButton.addEventListener("click", setSelectedStageAsCurrent);
@@ -4642,6 +4750,7 @@
       button.disabled = true;
       setMinutesMessage("正在读取钉钉云录制文本...");
       try {
+        await withGlobalLoading("正在读取钉钉会议纪要", async () => {
         const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -4656,6 +4765,7 @@
         updateMinutesPosterPreview();
         setMinutesMessage("已读取钉钉会议文本，正在写入资料包。", "ok");
         createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: "钉钉云录制" });
+        });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉会议纪要同步失败", "error");
         toast(error.message || "钉钉会议纪要同步失败");
@@ -4752,9 +4862,48 @@
       const message = error.errorMessage || error.errmsg || error.message || "";
       return [fallback, code && `错误码：${code}`, message && `详情：${message}`].filter(Boolean).join("；");
     }
-    function callDingVideoConference({ title, calleeCorpId, calleeStaffIds }) {
+    function hasDingConferenceApi(api = window.dd) {
+      const conference = api?.biz?.conference || {};
+      return !!(conference.makeVideoConfCall || conference.videoConfCall);
+    }
+    function waitForDingConferenceApi(timeout = 7000) {
       return new Promise((resolve, reject) => {
-        const conference = window.dd?.biz?.conference || {};
+        const readyApi = () => {
+          if (hasDingConferenceApi()) {
+            resolve(window.dd);
+            return true;
+          }
+          return false;
+        };
+        if (readyApi()) return;
+        const started = Date.now();
+        const timer = setInterval(() => {
+          if (readyApi()) {
+            clearInterval(timer);
+            return;
+          }
+          if (Date.now() - started >= timeout) {
+            clearInterval(timer);
+            reject(new Error("当前钉钉客户端没有加载视频会议能力，请从钉钉工作台重新打开或升级钉钉。"));
+          }
+        }, 150);
+        if (window.dd?.ready) {
+          window.dd.ready(() => {
+            if (readyApi()) clearInterval(timer);
+          });
+        }
+        if (window.dd?.error) {
+          window.dd.error(error => {
+            clearInterval(timer);
+            reject(new Error(formatDingJsError(error, "钉钉会议 JSAPI 鉴权失败")));
+          });
+        }
+      });
+    }
+    async function callDingVideoConference({ title, calleeCorpId, calleeStaffIds }) {
+      const api = await waitForDingConferenceApi();
+      return new Promise((resolve, reject) => {
+        const conference = api.biz?.conference || {};
         const videoCall = conference.makeVideoConfCall || conference.videoConfCall;
         if (!videoCall) {
           reject(new Error("当前钉钉客户端不支持发起视频会议，请升级钉钉或改用预约日程。"));
@@ -4771,7 +4920,8 @@
           settled = true;
           reject(new Error(formatDingJsError(error, "钉钉视频会议发起失败")));
         };
-        try {
+        const run = () => {
+          try {
           videoCall.call(conference, {
             title,
             calleeCorpId,
@@ -4781,9 +4931,13 @@
             fail,
             onFail: fail
           });
-        } catch (error) {
-          fail(error);
-        }
+          } catch (error) {
+            fail(error);
+          }
+        };
+        if (api.ready) api.ready(run);
+        else run();
+        if (api.error) api.error(fail);
       });
     }
     async function startDingVideoMeeting(users) {
@@ -5251,6 +5405,30 @@
       el.classList.add("show");
       clearTimeout(window.__toastTimer);
       window.__toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+    }
+    function showGlobalLoading(text = "正在处理") {
+      globalLoadingDepth += 1;
+      const overlay = document.getElementById("globalLoading");
+      const title = document.getElementById("globalLoadingTitle");
+      const desc = document.getElementById("globalLoadingText");
+      if (!overlay || !title || !desc) return;
+      title.textContent = text;
+      desc.textContent = "正在和钉钉同步数据，请稍等。";
+      overlay.classList.add("open");
+    }
+    function hideGlobalLoading() {
+      globalLoadingDepth = Math.max(0, globalLoadingDepth - 1);
+      if (globalLoadingDepth > 0) return;
+      const overlay = document.getElementById("globalLoading");
+      if (overlay) overlay.classList.remove("open");
+    }
+    async function withGlobalLoading(text, work) {
+      showGlobalLoading(text);
+      try {
+        return await work();
+      } finally {
+        hideGlobalLoading();
+      }
     }
     function requestConfirm({ title = "确认操作", message = "这个操作无法撤销。", name = "", confirmText = "确认" } = {}) {
       const modal = document.getElementById("confirmDialog");
