@@ -86,3 +86,20 @@ test("createDingCalendarEvent posts to the primary calendar endpoint", async () 
   assert.match(calls[0].url, /\/v1\.0\/calendar\/users\/organizer-user\/calendars\/primary\/events$/);
   assert.equal(calls[0].options.headers["x-acs-dingtalk-access-token"], "token-1");
 });
+
+test("createDingCalendarEvent uses DingTalk unionIds for the OpenAPI calendar path and attendees", async () => {
+  const calls = [];
+  await createDingCalendarEvent("token-1", {
+    organizerUnionId: "organizer-union",
+    summary: "标准样终审会",
+    startTime: "2026-07-05T14:00:00+08:00",
+    endTime: "2026-07-05T15:00:00+08:00",
+    attendeeUnionIds: ["attendee-union"]
+  }, async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) });
+    return okJson({ id: "event-1" });
+  });
+
+  assert.match(calls[0].url, /\/v1\.0\/calendar\/users\/organizer-union\/calendars\/primary\/events$/);
+  assert.deepEqual(calls[0].body.attendees, [{ id: "attendee-union" }]);
+});

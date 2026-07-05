@@ -21,3 +21,17 @@ test("review meetings can be created as DingTalk calendar events", () => {
   assert.match(html, /\/api\/dingtalk\/calendar\/create/);
   assert.match(html, /dingMeetings/);
 });
+
+test("DingTalk sync errors expose actionable API details in the UI", () => {
+  assert.match(html, /function formatDingSyncError\(/);
+  assert.match(html, /payload\.detail/);
+  assert.match(html, /payload\.detail\?\.code/);
+  assert.match(html, /payload\.detail\?\.message/);
+});
+
+test("review meeting sync sends DingTalk unionIds instead of userIds", () => {
+  assert.match(html, /const attendeeUnionIds = users\.map\(dingUnionId\)\.filter\(Boolean\);/);
+  assert.match(html, /organizerUnionId: currentUser\?\.dingUser\?\.unionid/);
+  assert.match(html, /attendeeUnionIds/);
+  assert.doesNotMatch(html, /const attendeeUserIds = users\.map\(dingUserId\)\.filter\(Boolean\);/);
+});

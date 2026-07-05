@@ -1980,6 +1980,13 @@
     function dingUserLabel(user = {}) {
       return [user.title, ...(user.departmentNames || []), ...(user.roles || []).map(role => role.name || role.groupName || "")].filter(Boolean).join(" · ");
     }
+    function formatDingSyncError(payload = {}, fallback = "钉钉同步失败") {
+      const code = payload.detail?.code || payload.detail?.errcode || payload.detail?.errorCode || "";
+      const detailMessage = payload.detail?.message || payload.detail?.errmsg || payload.detail?.errorMessage || "";
+      const requestId = payload.detail?.requestId || payload.detail?.request_id || "";
+      const parts = [payload.message || fallback, code && `错误码：${code}`, detailMessage && `详情：${detailMessage}`, requestId && `请求ID：${requestId}`];
+      return parts.filter(Boolean).join("；");
+    }
     function orgUsers() {
       return (orgCache?.users || []).filter(user => user && user.active !== false);
     }
@@ -3335,7 +3342,7 @@
           })
         });
         const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload.synced) throw new Error(payload.message || "钉钉待办同步失败");
+        if (!res.ok || !payload.synced) throw new Error(formatDingSyncError(payload, "钉钉待办同步失败"));
         task.dingTodo = {
           todoId: payload.todo?.id || payload.todo?.taskId || "",
           status: "已同步",
@@ -3563,9 +3570,9 @@
       const product = productById(syncTargetId);
       const meeting = meetingRules.find(rule => rule.id === syncMeetingId);
       if (!product || !meeting) return;
-      const attendeeUserIds = users.map(dingUserId).filter(Boolean);
-      if (!attendeeUserIds.length) {
-        toast("选中的同事缺少 userId，无法创建钉钉日程。");
+      const attendeeUnionIds = users.map(dingUnionId).filter(Boolean);
+      if (!attendeeUnionIds.length) {
+        toast("选中的同事缺少 unionId，无法创建钉钉日程。");
         return;
       }
       const startValue = document.getElementById("syncStartTime").value;
@@ -3591,16 +3598,17 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            organizerUserId: currentUser?.dingUser?.userid,
+            organizerUnionId: currentUser?.dingUser?.unionid,
             summary: `${product.name} · ${meeting.title}`,
             description: `${stages[meeting.stage]?.name || ""}\n${meeting.minute}`,
             startTime: start.toISOString(),
             endTime: end.toISOString(),
-            attendeeUserIds
+            attendeeUnionIds,
+            createOnlineMeeting: true
           })
         });
         const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload.synced) throw new Error(payload.message || "钉钉日程创建失败");
+        if (!res.ok || !payload.synced) throw new Error(formatDingSyncError(payload, "钉钉日程创建失败"));
         state.dingMeetings = [
           { ...recordBase, eventId: payload.event?.id || payload.event?.eventId || "", status: "已同步", error: "" },
           ...(state.dingMeetings || []).filter(item => item.id !== recordBase.id)

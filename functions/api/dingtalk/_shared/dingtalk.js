@@ -299,22 +299,27 @@ export function buildDingCalendarEventPayload({
   description = "",
   startTime,
   endTime,
+  attendeeUnionIds = [],
   attendeeUserIds = [],
+  createOnlineMeeting = true,
   timeZone = "Asia/Shanghai"
 } = {}) {
+  const attendeeIds = attendeeUnionIds.length ? attendeeUnionIds : attendeeUserIds;
   return {
     summary: String(summary || "").slice(0, 1024),
     description: String(description || ""),
     start: { dateTime: String(startTime || ""), timeZone },
     end: { dateTime: String(endTime || ""), timeZone },
-    attendees: attendeeUserIds.filter(Boolean).map(id => ({ id }))
+    attendees: attendeeIds.filter(Boolean).map(id => ({ id })),
+    reminders: [{ method: "dingtalk", minutes: 15 }],
+    onlineMeetingInfo: createOnlineMeeting ? { type: "dingtalk" } : undefined
   };
 }
 
 export async function createDingCalendarEvent(accessToken, input = {}, fetchImpl = fetch) {
-  const organizerUserId = String(input.organizerUserId || "");
-  if (!organizerUserId) {
-    const err = new Error("缺少钉钉会议发起人 userId，无法创建日程。");
+  const organizerUnionId = String(input.organizerUnionId || input.organizerUserId || "");
+  if (!organizerUnionId) {
+    const err = new Error("缺少钉钉会议发起人 unionId，无法创建日程。");
     err.status = 400;
     throw err;
   }
@@ -327,7 +332,7 @@ export async function createDingCalendarEvent(accessToken, input = {}, fetchImpl
   return requestDingOpenApi(
     accessToken,
     "POST",
-    `/v1.0/calendar/users/${encodeURIComponent(organizerUserId)}/calendars/primary/events`,
+    `/v1.0/calendar/users/${encodeURIComponent(organizerUnionId)}/calendars/primary/events`,
     body,
     fetchImpl
   );
