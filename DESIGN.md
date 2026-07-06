@@ -48,3 +48,11 @@ No fluid type, no display fonts, no negative letter spacing.
 ## Motion
 
 Use 120-180ms transitions for hover, focus and state feedback. No page-load choreography. Disable transform transitions under `prefers-reduced-motion`.
+
+## Embedded (DingTalk) Webview
+
+- Viewport meta uses `viewport-fit=cover`; small screens pad the shell and toast with `env(safe-area-inset-*)`.
+- Heights prefer `100dvh` (with `100vh` fallback) so DingTalk/iOS bottom bars never cover the sidebar or modal footer.
+- Inputs are at least 16px on ≤720px screens to prevent focus zoom inside embedded webviews.
+- `overscroll-behavior-y: none` avoids pull-to-refresh bounce; controls use `touch-action: manipulation`.
+- Every modal closes on overlay click and Escape; confirm dialogs treat both as cancel.

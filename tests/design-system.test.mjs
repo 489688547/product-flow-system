@@ -32,6 +32,20 @@ test("shared controls use one restrained hover vocabulary", () => {
   assert.match(html, /\.panel, \.card \{[\s\S]*border-radius: var\(--radius-panel\);[\s\S]*box-shadow: var\(--shadow-panel\);/);
 });
 
+test("app respects reduced motion and embedded webview viewports", () => {
+  assert.match(html, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(html, /@supports \(height: 100dvh\)/);
+  assert.match(html, /viewport-fit=cover/);
+  assert.match(html, /overscroll-behavior-y: none;/);
+  assert.match(html, /env\(safe-area-inset-bottom\)/);
+});
+
+test("modals close on overlay click and Escape", () => {
+  assert.match(html, /const modalCloseActions = \{/);
+  assert.match(html, /if \(e\.key !== "Escape"\) return;/);
+  assert.match(html, /if \(e\.target\.id === "syncModal"\) closeSyncModal\(\);/);
+});
+
 test("table row actions use compact non-wrapping button groups", () => {
   assert.match(html, /\.task-table \.table-actions \{[\s\S]*width: 100%;[\s\S]*justify-content: flex-end;[\s\S]*flex-wrap: nowrap;/);
   assert.match(html, /\.task-table \.mini-action \{[\s\S]*height: 30px;[\s\S]*white-space: nowrap;/);

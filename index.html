@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>产品全周期协同系统</title>
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <script src="https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.40/dingtalk.open.js"></script>
@@ -65,8 +65,11 @@
       letter-spacing: 0;
       -webkit-font-smoothing: antialiased;
       text-rendering: optimizeLegibility;
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
     }
     button, input, select, textarea { font: inherit; }
+    button, a, select, input[type="checkbox"] { touch-action: manipulation; }
     button { cursor: pointer; transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .12s ease; }
     button:active { transform: translateY(1px); }
     button:disabled,
@@ -664,7 +667,7 @@
     .product-thumb.small {
       width: 36px;
       height: 36px;
-      border-radius: 7px;
+      border-radius: var(--radius);
     }
     .image-field {
       display: none;
@@ -851,7 +854,7 @@
     .workflow-product-option img {
       width: 34px;
       height: 34px;
-      border-radius: 7px;
+      border-radius: var(--radius);
       border: 1px solid var(--line);
       object-fit: cover;
       background: var(--panel-3);
@@ -916,7 +919,7 @@
       height: 24px;
       display: grid;
       place-items: center;
-      border-radius: 7px;
+      border-radius: var(--radius);
       background: var(--panel-3);
       font-weight: 750;
       font-size: 12px;
@@ -1194,7 +1197,7 @@
     }
     .file-preview {
       height: 104px;
-      border-radius: 7px;
+      border-radius: var(--radius);
       border: 1px solid var(--line);
       background: var(--panel-3);
       display: grid;
@@ -2244,7 +2247,7 @@
       aspect-ratio: 3 / 4;
       object-fit: cover;
       border: 1px solid var(--line);
-      border-radius: 7px;
+      border-radius: var(--radius);
       background: #fff;
     }
     .minutes-status {
@@ -2558,6 +2561,40 @@
       .product-profile-hero { grid-template-columns: 1fr; }
       .product-meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .table-wrap { overflow-x: auto; }
+      .app {
+        padding-left: max(12px, env(safe-area-inset-left));
+        padding-right: max(12px, env(safe-area-inset-right));
+        padding-bottom: max(12px, env(safe-area-inset-bottom));
+      }
+      .modal { padding: 10px; }
+      .dialog { max-height: calc(100vh - 20px); border-radius: 10px; }
+      .dialog-body { padding: 14px; }
+      .dialog-head, .dialog-foot { padding: 12px 14px; }
+      /* 16px 输入避免钉钉/iOS 内嵌 WebView 聚焦时整页放大 */
+      input, select, textarea { font-size: 16px; }
+      .toast { left: 12px; right: 12px; min-width: 0; max-width: none; bottom: max(14px, env(safe-area-inset-bottom)); }
+    }
+    /* 钉钉内嵌 WebView：用动态视口高度避免底部栏遮挡 */
+    @supports (height: 100dvh) {
+      body { min-height: 100dvh; }
+      .app { min-height: 100dvh; }
+      .sidebar { height: calc(100dvh - 32px); }
+      .dialog { max-height: calc(100dvh - 40px); }
+      @media (max-width: 1680px) {
+        .sidebar { height: calc(100dvh - 24px); }
+      }
+      @media (max-width: 720px) {
+        .dialog { max-height: calc(100dvh - 20px); }
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+      button:active { transform: none; }
     }
   </style>
 </head>
@@ -7159,7 +7196,30 @@
     document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
     document.getElementById("feedbackModal").addEventListener("click", e => { if (e.target.id === "feedbackModal") closeFeedbackModal(); });
     document.getElementById("minutesModal").addEventListener("click", e => { if (e.target.id === "minutesModal") closeMinutesModal(); });
+    document.getElementById("syncModal").addEventListener("click", e => { if (e.target.id === "syncModal") closeSyncModal(); });
     document.getElementById("confirmDialog").addEventListener("click", e => { if (e.target.id === "confirmDialog") closeConfirmDialog(false); });
+    const modalCloseActions = {
+      confirmDialog: () => closeConfirmDialog(false),
+      feedbackModal: closeFeedbackModal,
+      minutesModal: closeMinutesModal,
+      syncModal: closeSyncModal,
+      modal: closeModal
+    };
+    document.addEventListener("keydown", e => {
+      if (e.key !== "Escape") return;
+      const ownerMenu = document.getElementById("ownerPickerMenu");
+      if (ownerMenu && !ownerMenu.classList.contains("hidden")) {
+        closeOwnerPicker();
+        return;
+      }
+      for (const [id, close] of Object.entries(modalCloseActions)) {
+        const modal = document.getElementById(id);
+        if (modal?.classList.contains("open")) {
+          close();
+          return;
+        }
+      }
+    });
     document.addEventListener("click", e => {
       if (!e.target.closest(".owner-combobox")) closeOwnerPicker();
       if (!e.target.closest(".table-filter-head")) closeTableFilterMenus();
