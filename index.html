@@ -661,7 +661,7 @@
       border-radius: 8px;
       border: 1px solid var(--line);
       object-fit: cover;
-      background: var(--panel-3);
+      background: var(--panel-3) center / cover no-repeat;
       box-shadow: none;
     }
     .product-thumb.small {
@@ -4570,11 +4570,29 @@
         <div class="product-name"><strong>${esc(product.name)}</strong>${secondary ? `<span class="small">${esc(secondary)}</span>` : ""}</div>
       </div>`;
     }
-    function bindProductImageFallback(root = document) {
-      root.querySelectorAll(".product-thumb").forEach(img => img.addEventListener("error", () => {
-        img.src = img.dataset.fallback || fallbackProductImage(img.alt);
-      }, { once: true }));
+    function applyProductImageFallback(img) {
+      if (!img || img.dataset.fallbackApplied) return;
+      img.dataset.fallbackApplied = "1";
+      img.src = img.dataset.fallback || fallbackProductImage(img.alt || "产品");
     }
+    function bindProductImageFallback(root = document) {
+      root.querySelectorAll(".product-thumb").forEach(img => {
+        // 外网图片加载慢或被墙时，先垫一张本地生成的占位图，不留灰块。
+        if (img.dataset.fallback && !img.style.backgroundImage) {
+          img.style.backgroundImage = `url("${img.dataset.fallback}")`;
+        }
+        if (img.complete && img.naturalWidth === 0 && img.src) {
+          applyProductImageFallback(img);
+          return;
+        }
+        img.addEventListener("error", () => applyProductImageFallback(img), { once: true });
+      });
+    }
+    // error 事件不冒泡但可捕获：兜底所有渲染路径里加载失败的产品图。
+    document.addEventListener("error", event => {
+      const img = event.target;
+      if (img instanceof HTMLImageElement && img.classList.contains("product-thumb")) applyProductImageFallback(img);
+    }, true);
     function renderProductProfilePanel(product) {
       const panel = document.getElementById("productProfilePanel");
       if (!panel || !product) return;
