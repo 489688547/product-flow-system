@@ -11,6 +11,7 @@ import {
   getDingUserByCode,
   getDingUserDetail,
   filterOrgUsers,
+  listDingCalendarEvents,
   mapDingRole,
   publicUser,
   queryDingMeetingMinutesText,
@@ -154,6 +155,21 @@ async function handleDingCalendarCreate(req, res) {
   }
 }
 
+async function handleDingCalendarEvents(req, res) {
+  try {
+    const body = await readBody(req);
+    const accessToken = await getDingAccessToken(process.env);
+    const result = await listDingCalendarEvents(accessToken, body);
+    json(res, 200, { synced: true, ...result });
+  } catch (error) {
+    json(res, error.status || 500, {
+      synced: false,
+      message: error.message || "钉钉日历会议查询失败",
+      detail: error.detail || undefined
+    });
+  }
+}
+
 async function handleDingMeetingMinutes(req, res) {
   try {
     const body = await readBody(req);
@@ -240,6 +256,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/dingtalk/calendar/create" && req.method === "POST") {
     await handleDingCalendarCreate(req, res);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/calendar/events" && req.method === "POST") {
+    await handleDingCalendarEvents(req, res);
     return;
   }
   if (url.pathname === "/api/dingtalk/meeting/minutes" && req.method === "POST") {
