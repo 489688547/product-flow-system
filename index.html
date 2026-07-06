@@ -5909,6 +5909,13 @@
       setMinutesMessage("钉钉接口没有返回这个会议的 AI 纪要/闪记文本，无法自动同步。请换一个可读取的会议，或直接粘贴会议纪要后生成资料。", "error");
       return true;
     }
+    function isUnsupportedDingAiMinutesScope(error = "") {
+      const raw = typeof error === "string" ? error : dingPayloadText(error);
+      return /500205|50205|委托授权需要填写委托类型的权限点/i.test(raw);
+    }
+    function showUnsupportedDingAiMinutesScope(tip = "请直接粘贴钉钉 AI 听记正文后生成资料。") {
+      setMinutesMessage(`钉钉返回 500205：AI 听记读取权限不是当前应用可申请的用户委托权限，不能通过这个授权弹窗自动读取。${tip}`, "error");
+    }
     function meetingCalendarRange() {
       const start = new Date();
       start.setDate(start.getDate() - 14);
@@ -5938,19 +5945,12 @@
     }
     async function detectCalendarMeetingMinutes(events = []) {
       try {
-        let authCode = "";
-        try {
-          authCode = await requestDingDelegatedAuthCode("Minutes.Content.Read");
-        } catch (error) {
-          setMinutesMessage(error.message || "钉钉 AI 听记授权失败，先尝试检测云录制文本。", "error");
-        }
         const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             events,
-            unionId: currentUser?.dingUser?.unionid || "",
-            authCode: authCode || undefined
+            unionId: currentUser?.dingUser?.unionid || ""
           })
         });
         const payload = await res.json().catch(() => ({}));
@@ -6195,6 +6195,10 @@
         await withGlobalLoading("正在读取钉钉会议纪要", async () => {
           let authCode = "";
           if (useAiMinutes) {
+            if (isUnsupportedDingAiMinutesScope("500205 委托授权需要填写委托类型的权限点")) {
+              showUnsupportedDingAiMinutesScope("请直接粘贴钉钉 AI 听记正文后生成资料。");
+              return;
+            }
             authCode = await requestDingDelegatedAuthCode("Minutes.Content.Read");
           }
           const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {

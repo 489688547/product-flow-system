@@ -83,9 +83,9 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /event\.conferenceId/);
   assert.match(html, /function detectCalendarMeetingMinutes\(/);
   const detectMinutes = html.match(/async function detectCalendarMeetingMinutes[\s\S]*?function renderCalendarMeetingOptions/)[0];
-  assert.match(detectMinutes, /requestDingDelegatedAuthCode/);
+  assert.doesNotMatch(detectMinutes, /requestDingDelegatedAuthCode/);
   assert.match(detectMinutes, /events,\s+unionId: currentUser\?\.dingUser\?\.unionid/);
-  assert.match(detectMinutes, /authCode/);
+  assert.doesNotMatch(detectMinutes, /authCode/);
   assert.match(html, /aiMinutesTaskUuid/);
   assert.match(html, /AI 听记链接 \/ taskUuid \/ 云录制 conferenceId/);
   assert.match(html, /manualAiMinutes/);
@@ -101,6 +101,16 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /正在读取钉钉日历会议/);
   assert.doesNotMatch(html, /getDingEnvironment/);
   assert.match(html, /detectDingTalkEnvironment\(\)/);
+});
+
+test("DingTalk AI minutes avoids unsupported delegated auth scope", () => {
+  assert.match(html, /function isUnsupportedDingAiMinutesScope/);
+  assert.match(html, /500205\|50205\|委托授权需要填写委托类型的权限点/);
+  const detectMinutes = html.match(/async function detectCalendarMeetingMinutes[\s\S]*?function renderCalendarMeetingOptions/)[0];
+  assert.doesNotMatch(detectMinutes, /Minutes\.Content\.Read/);
+  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
+  assert.match(minutesSync, /isUnsupportedDingAiMinutesScope/);
+  assert.match(minutesSync, /直接粘贴钉钉 AI 听记正文/);
 });
 
 test("DingTalk sync errors expose actionable API details in the UI", () => {
