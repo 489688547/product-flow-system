@@ -5755,13 +5755,18 @@
       if (!match?.[0]) return "";
       return match[0].replace(/%00/g, "");
     }
-    function renderMinutesPermissionError(payload = {}) {
-      const raw = [
+    function dingPayloadText(payload = {}) {
+      return [
         payload.message,
         payload.detail?.message,
         payload.detail?.errmsg,
-        payload.detail?.errorMessage
+        payload.detail?.errorMessage,
+        payload.detail?.code,
+        payload.code
       ].filter(Boolean).join(" ");
+    }
+    function renderMinutesPermissionError(payload = {}) {
+      const raw = dingPayloadText(payload);
       const scope = raw.match(/\[([A-Za-z0-9_.:-]+)\]/)?.[1] || (raw.includes("VideoConference.Conference.Read") ? "VideoConference.Conference.Read" : "");
       const url = dingPermissionApplyUrl(raw, scope);
       if (!scope && !url) return false;
@@ -5772,6 +5777,12 @@
         <span>缺少钉钉权限：<strong>${esc(scope || "会议纪要读取权限")}</strong>。在开放平台开通后，重新选择会议同步即可。</span>
         ${url ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener">打开权限申请</a>` : ""}
       `;
+      return true;
+    }
+    function renderMinutesRecordingError(payload = {}) {
+      const raw = dingPayloadText(payload);
+      if (!/cloudRecordNotFound|50513/i.test(raw)) return false;
+      setMinutesMessage("这个会议没有钉钉云录制/闪记文本，无法自动同步纪要。请换一个已开启闪记的会议，或直接粘贴会议纪要后生成资料。", "error");
       return true;
     }
     function meetingCalendarRange() {
@@ -5986,6 +5997,7 @@
         const payload = await res.json().catch(() => ({}));
         if (!res.ok || !payload.synced || !payload.text) {
           if (renderMinutesPermissionError(payload)) return;
+          if (renderMinutesRecordingError(payload)) return;
           throw new Error(formatDingSyncError(payload, "钉钉会议纪要同步失败"));
         }
         document.getElementById("minutesText").value = payload.text;

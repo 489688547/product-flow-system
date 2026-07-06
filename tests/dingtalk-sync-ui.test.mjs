@@ -95,6 +95,7 @@ test("DingTalk sync errors expose actionable API details in the UI", () => {
 
 test("DingTalk minutes permission errors show an application permission action", () => {
   assert.match(html, /function renderMinutesPermissionError\(/);
+  assert.match(html, /function dingPayloadText\(/);
   assert.match(html, /VideoConference\.Conference\.Read/);
   assert.match(html, /打开权限申请/);
   assert.match(html, /className = "minutes-status permission"/);
@@ -102,6 +103,15 @@ test("DingTalk minutes permission errors show an application permission action",
   assert.doesNotMatch(html, /dingConfig/);
   const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
   assert.match(minutesSync, /if \(renderMinutesPermissionError\(payload\)\) return;/);
+});
+
+test("DingTalk minutes without cloud recording show a readable recovery message", () => {
+  assert.match(html, /function renderMinutesRecordingError\(/);
+  assert.match(html, /cloudRecordNotFound\|50513/);
+  assert.match(html, /没有钉钉云录制\/闪记文本/);
+  assert.match(html, /直接粘贴会议纪要后生成资料/);
+  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
+  assert.match(minutesSync, /if \(renderMinutesRecordingError\(payload\)\) return;/);
 });
 
 test("review meeting sync sends DingTalk unionIds instead of userIds", () => {
