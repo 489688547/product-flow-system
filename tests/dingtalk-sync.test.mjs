@@ -4,8 +4,13 @@ import {
   buildDingCalendarEventPayload,
   buildDingMeetingMinutesQuery,
   buildDingTodoPayload,
+  extractDingAiMinutesList,
+  extractDingAiMinutesTaskUuid,
+  getDingUserAccessToken,
   createDingCalendarEvent,
   listDingCalendarEvents,
+  queryDingAiMinutesForEvents,
+  queryDingAiMinutesText,
   queryDingMeetingMinutesText,
   queryDingMeetingMinutesTextWithFallback,
   queryDingScheduleConferenceHistory,
@@ -276,4 +281,124 @@ test("queryDingMeetingMinutesTextWithFallback reads minutes from actual conferen
   assert.match(calls[0].url, /\/videoConferences\/schedule-1\/cloudRecords\/getTexts/);
   assert.match(calls[1].url, /\/scheduleConferences\/schedule-1/);
   assert.match(calls[2].url, /\/videoConferences\/real-conf-1\/cloudRecords\/getTexts/);
+});
+
+test("getDingUserAccessToken exchanges auth code for user token", async () => {
+  const calls = [];
+  const token = await getDingUserAccessToken({
+    DINGTALK_APP_KEY: "app-key",
+    DINGTALK_APP_SECRET: "app-secret"
+  }, { authCode: "auth-code-1" }, async (url, options) => {
+    calls.push({ url, body: JSON.parse(options.body) });
+    return okJson({ accessToken: "user-token-1", refreshToken: "refresh-1" });
+  });
+
+  assert.equal(calls[0].url, "https://api.dingtalk.com/v1.0/oauth2/userAccessToken");
+  assert.equal(calls[0].body.clientId, "app-key");
+  assert.equal(calls[0].body.code, "auth-code-1");
+  assert.equal(calls[0].body.grantType, "authorization_code");
+  assert.equal(token.accessToken, "user-token-1");
+});
+
+test("extractDingAiMinutesList reads MCP minutes list payloads", () => {
+  const list = extractDingAiMinutesList({
+    result: {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            result: {
+              minutesDetails: [
+                { taskUuid: "task-1", title: "标准样终审会", createTime: 1783401600000 }
+              ]
+            }
+          })
+        }
+      ]
+    }
+  });
+
+  assert.equal(list[0].taskUuid, "task-1");
+  assert.equal(list[0].title, "标准样终审会");
+});
+
+test("queryDingAiMinutesText reads AI summary through DingTalk MCP", async () => {
+  const calls = [];
+  const result = await queryDingAiMinutesText("user-token-1", {
+    taskUuid: "task-1"
+  }, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    return okJson({
+      result: {
+        content: [
+          { type: "text", text: JSON.stringify({ summary: "AI 纪要：通过标准样。" }) }
+        ]
+      }
+    });
+  });
+
+  assert.match(calls[0].url, /mcp-gw\.dingtalk\.com\/server/);
+  assert.equal(calls[0].options.headers.authorization, "Bearer user-token-1");
+  assert.equal(calls[0].options.headers["x-user-access-token"], "user-token-1");
+  assert.equal(calls[0].body.params.name, "get_minutes_ai_summary");
+  assert.equal(calls[0].body.params.arguments.taskUuid, "task-1");
+  assert.equal(result.text, "AI 纪要：通过标准样。");
+});
+
+test("extractDingAiMinutesTaskUuid accepts DingTalk AI minutes links", () => {
+  assert.equal(
+    extractDingAiMinutesTaskUuid("https://shanji.dingtalk.com/meeting/minutes?taskUuid=abc123"),
+    "abc123"
+  );
+  assert.equal(
+    extractDingAiMinutesTaskUuid("https://shanji.dingtalk.com/app/transcribes/def456?from=share"),
+    "def456"
+  );
+  assert.equal(extractDingAiMinutesTaskUuid("789abc"), "789abc");
+});
+
+test("queryDingAiMinutesForEvents matches calendar meetings to AI minutes taskUuid", async () => {
+  const calls = [];
+  const result = await queryDingAiMinutesForEvents("user-token-1", {
+    events: [
+      {
+        conferenceId: "conf-1",
+        summary: "鹦鹉谷物棒 · 标准样终审会",
+        startTime: "2026-07-05T14:00:00+08:00",
+        endTime: "2026-07-05T15:00:00+08:00"
+      }
+    ]
+  }, async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push(body.params.name);
+    if (body.params.name === "list_by_keyword_and_time_range") {
+      return okJson({
+        result: {
+          structuredContent: {
+            result: {
+              minutesDetails: [
+                {
+                  taskUuid: "task-ai-1",
+                  title: "鹦鹉谷物棒 标准样终审会",
+                  startTime: "2026-07-05T14:05:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      });
+    }
+    return okJson({
+      result: {
+        content: [
+          { type: "text", text: JSON.stringify({ aiSummary: "确认封样标准。" }) }
+        ]
+      }
+    });
+  });
+
+  assert.deepEqual(calls, ["list_by_keyword_and_time_range", "get_minutes_ai_summary"]);
+  assert.equal(result[0].minuteState, "ready");
+  assert.equal(result[0].aiMinutesTaskUuid, "task-ai-1");
+  assert.equal(result[0].minuteText, "确认封样标准。");
 });

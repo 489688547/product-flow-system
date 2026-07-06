@@ -3011,7 +3011,7 @@
         <div class="minutes-grid">
           <div>
             <label class="field">钉钉会议 ID / 录制资源 ID
-              <input id="minutesRecordingId" placeholder="开启云录制（闪记）后的 conferenceId">
+              <input id="minutesRecordingId" placeholder="AI 听记链接 / taskUuid / 云录制 conferenceId">
             </label>
             <div class="calendar-meeting-panel">
               <button class="btn" id="loadCalendarMeetings" type="button"><i data-lucide="calendar-search"></i>从日历选择会议</button>
@@ -3371,6 +3371,7 @@
     let syncSelectedUsers = new Set();
     let minutesProductId = "";
     let minutesMeetingId = "";
+    let minutesSourceType = "";
     let confirmResolve = null;
     let globalLoadingDepth = 0;
 
@@ -5851,12 +5852,36 @@
     }
     function calendarMinuteState(event = {}) {
       if (event.minuteState === "ready") return { text: "可读取", className: "ready" };
+      if (event.minuteState === "found") return { text: "有听记", className: "ready" };
       if (event.minuteState === "empty") return { text: "未返回", className: "empty" };
+      if (event.minuteState === "auth") return { text: "需授权", className: "error" };
       if (event.minuteState === "permission") return { text: "缺权限", className: "error" };
       if (event.minuteState === "error") return { text: "不可读", className: "error" };
       return { text: "检测中", className: "" };
     }
     async function detectCalendarMeetingMinutes(events = []) {
+      const env = getDingEnvironment();
+      const product = productById(minutesProductId);
+      const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
+      try {
+        const authCode = await requestDingAuthCode(env.corpId);
+        const aiRes = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            authCode,
+            events,
+            keyword: [product?.name, meeting?.title].filter(Boolean).join(" "),
+            maxResults: 80
+          })
+        });
+        const aiPayload = await aiRes.json().catch(() => ({}));
+        if (aiRes.ok && aiPayload.synced && Array.isArray(aiPayload.events)) {
+          return aiPayload.events;
+        }
+      } catch {
+        // Fall back to the older cloud-recording text API below.
+      }
       const unionId = currentUser?.dingUser?.unionid || "";
       const checks = events.map(async event => {
         try {
@@ -5907,18 +5932,25 @@
       }).join("") || `<div class="empty">没有找到带会议 ID 的钉钉日历会议。请确认会议来自钉钉日程且已开启云录制（闪记）。</div>`;
       list.querySelectorAll("[data-calendar-conference]").forEach(button => button.addEventListener("click", async () => {
         const event = events.find(item => item.conferenceId === button.dataset.calendarConference);
-        document.getElementById("minutesRecordingId").value = event?.conferenceId || button.dataset.calendarConference || "";
+        minutesSourceType = event?.aiMinutesTaskUuid ? "aiMinutes" : "";
+        document.getElementById("minutesRecordingId").value = event?.aiMinutesTaskUuid || event?.resolvedConferenceId || event?.conferenceId || button.dataset.calendarConference || "";
         renderCalendarMeetingOptions(events);
         if (event?.minuteState === "ready" && event.minuteText) {
           document.getElementById("minutesText").value = event.minuteText;
-          if (event.resolvedConferenceId) document.getElementById("minutesRecordingId").value = event.resolvedConferenceId;
+          if (event.aiMinutesTaskUuid) document.getElementById("minutesRecordingId").value = event.aiMinutesTaskUuid;
+          else if (event.resolvedConferenceId) document.getElementById("minutesRecordingId").value = event.resolvedConferenceId;
           updateMinutesPosterPreview();
           setMinutesMessage(`已选择日历会议：${event.summary || "钉钉会议"}，正在写入资料包。`, "ok");
-          createMeetingMinutesFromText({ productId: minutesProductId, meetingId: minutesMeetingId, text: event.minuteText, source: "钉钉云录制" });
+          createMeetingMinutesFromText({ productId: minutesProductId, meetingId: minutesMeetingId, text: event.minuteText, source: event.aiMinutesTaskUuid ? "钉钉 AI 听记" : "钉钉云录制" });
+          return;
+        }
+        if (event?.minuteState === "found" && event.aiMinutesTaskUuid) {
+          setMinutesMessage(`已找到 AI 听记：${event.aiMinutesTitle || event.summary || "钉钉会议"}，正在读取纪要。`, "ok");
+          await syncMinutesFromDing();
           return;
         }
         if (event?.minuteState === "empty") {
-          setMinutesMessage("钉钉接口没有返回这个会议的 AI 纪要/闪记文本，无法自动同步。请换一个可读取的会议，或直接粘贴会议纪要后生成资料。", "error");
+          setMinutesMessage("没有匹配到这个日历会议对应的 AI 听记或云录制文本。请换一个可读取的会议，或直接粘贴会议纪要后生成资料。", "error");
           return;
         }
         if (event?.minuteState === "permission") {
@@ -5983,7 +6015,8 @@
           const checkedEvents = await detectCalendarMeetingMinutes(events);
           renderCalendarMeetingOptions(checkedEvents);
           const readyCount = checkedEvents.filter(event => event.minuteState === "ready").length;
-          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount} 个可直接读取 AI 纪要/闪记。`, readyCount ? "ok" : "error");
+          const foundCount = checkedEvents.filter(event => event.minuteState === "found").length;
+          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount + foundCount} 个匹配到 AI 听记/纪要。`, readyCount + foundCount ? "ok" : "error");
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉日历会议查询失败", "error");
@@ -6014,7 +6047,8 @@
       document.getElementById("minutesText").value = existing?.content || "";
       document.getElementById("calendarMeetingList").classList.add("hidden");
       document.getElementById("calendarMeetingList").innerHTML = "";
-      setMinutesMessage("需要钉钉会议录制（闪记）的会议 ID；应用还要具备视频会议读权限。");
+      minutesSourceType = "";
+      setMinutesMessage("可以从当前账号日历里匹配钉钉 AI 听记；也可以手动粘贴会议纪要。");
       updateMinutesPosterPreview();
       document.getElementById("minutesModal").classList.add("open");
       if (window.lucide) lucide.createIcons();
@@ -6023,6 +6057,7 @@
       document.getElementById("minutesModal").classList.remove("open");
       minutesProductId = "";
       minutesMeetingId = "";
+      minutesSourceType = "";
     }
     function upsertProductDeliverable(match, nextDoc) {
       const existing = state.deliverables.find(match);
@@ -6099,16 +6134,26 @@
         setMinutesMessage("需要钉钉会议录制（闪记）的会议 ID，才能从钉钉自动同步。", "error");
         return;
       }
+      const manualAiMinutes = /shanji\.dingtalk\.com|taskUuid=|^[0-9a-f]{24,}$/i.test(recordingId);
+      const useAiMinutes = minutesSourceType === "aiMinutes" || manualAiMinutes;
       const button = document.getElementById("syncMinutesFromDing");
       button.disabled = true;
-      setMinutesMessage("正在读取钉钉云录制文本...");
+      setMinutesMessage(useAiMinutes ? "正在读取钉钉 AI 听记..." : "正在读取钉钉云录制文本...");
       try {
         await withGlobalLoading("正在读取钉钉会议纪要", async () => {
+          let authCode = "";
+          if (useAiMinutes) {
+            const env = getDingEnvironment();
+            authCode = await requestDingAuthCode(env.corpId);
+          }
           const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               recordingId,
+              aiMinutesTaskUuid: useAiMinutes ? recordingId : "",
+              sourceType: useAiMinutes ? "aiMinutes" : undefined,
+              authCode: authCode || undefined,
               scheduleConferenceId: recordingId,
               unionId: currentUser?.dingUser?.unionid || ""
             })
@@ -6123,7 +6168,7 @@
           if (payload.resolvedConferenceId) document.getElementById("minutesRecordingId").value = payload.resolvedConferenceId;
           updateMinutesPosterPreview();
           setMinutesMessage("已读取钉钉会议文本，正在写入资料包。", "ok");
-          createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: "钉钉云录制" });
+          createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: payload.source === "aiMinutes" ? "钉钉 AI 听记" : "钉钉云录制" });
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉会议纪要同步失败", "error");

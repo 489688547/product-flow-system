@@ -1,7 +1,10 @@
 import {
   getDingAccessToken,
+  getDingUserAccessToken,
   jsonResponse,
   optionsResponse,
+  queryDingAiMinutesForEvents,
+  queryDingAiMinutesText,
   queryDingMeetingMinutesTextWithFallback
 } from "../_shared/dingtalk.js";
 
@@ -11,6 +14,28 @@ export async function onRequest({ request, env }) {
 
   try {
     const body = await request.json().catch(() => ({}));
+    if (body.authCode && Array.isArray(body.events)) {
+      const userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+      const events = await queryDingAiMinutesForEvents(userToken.accessToken, body);
+      return jsonResponse({
+        synced: true,
+        source: "aiMinutes",
+        events
+      });
+    }
+    if (body.authCode && (body.sourceType === "aiMinutes" || body.aiMinutesTaskUuid)) {
+      const userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+      const result = await queryDingAiMinutesText(userToken.accessToken, {
+        taskUuid: body.aiMinutesTaskUuid || body.recordingId
+      });
+      return jsonResponse({
+        synced: true,
+        source: "aiMinutes",
+        text: result.text,
+        taskUuid: result.taskUuid,
+        raw: result.raw
+      });
+    }
     const accessToken = await getDingAccessToken(env);
     const result = await queryDingMeetingMinutesTextWithFallback(accessToken, body);
     return jsonResponse({

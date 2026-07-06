@@ -57,6 +57,38 @@ export async function getDingAccessToken(env = {}, fetchImpl = fetch) {
   return data.access_token;
 }
 
+export async function getDingUserAccessToken(env = {}, input = {}, fetchImpl = fetch) {
+  const { appKey, appSecret, missing } = getDingCredentials(env);
+  if (missing.length) {
+    const err = new Error(`缺少钉钉应用配置：${missing.join("、")}`);
+    err.status = 501;
+    throw err;
+  }
+  const authCode = String(input.authCode || input.code || "").trim();
+  const refreshToken = String(input.refreshToken || "").trim();
+  if (!authCode && !refreshToken) {
+    const err = new Error("需要用户授权码，才能读取当前账号可见的钉钉 AI 听记。");
+    err.status = 400;
+    throw err;
+  }
+  const body = refreshToken
+    ? { clientId: appKey, clientSecret: appSecret, refreshToken, grantType: "refresh_token" }
+    : { clientId: appKey, clientSecret: appSecret, code: authCode, grantType: "authorization_code" };
+  const res = await fetchImpl("https://api.dingtalk.com/v1.0/oauth2/userAccessToken", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.code || data.errcode || !data.accessToken) {
+    const err = new Error(data.message || data.errmsg || "获取钉钉用户授权失败，无法读取 AI 听记。");
+    err.status = res.ok ? 502 : res.status;
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+
 export async function getDingUserByCode(accessToken, authCode, fetchImpl = fetch) {
   const res = await fetchImpl(`https://oapi.dingtalk.com/topapi/v2/user/getuserinfo?access_token=${encodeURIComponent(accessToken)}`, {
     method: "POST",
@@ -537,6 +569,243 @@ function collectDingTranscriptText(payload = {}) {
     }
   });
   return [...new Set(lines)].join("\n");
+}
+
+const DING_MINUTES_MCP_ENDPOINT = "https://mcp-gw.dingtalk.com/server/1e798e16a79e82eb7933050fbd58ed3ba8934170efb7c92565e39a1fb1c888e1";
+
+function unwrapDingMcpResult(payload = {}) {
+  const root = payload.result || payload;
+  if (root.structuredContent && typeof root.structuredContent === "object") return root.structuredContent;
+  if (root.content && !Array.isArray(root.content) && typeof root.content === "object") return root.content;
+  const blocks = Array.isArray(root.content) ? root.content : [];
+  for (const block of blocks) {
+    const text = String(block?.text || "").trim();
+    if (!text) continue;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return { text };
+    }
+  }
+  return root;
+}
+
+function dingMcpPayloadText(payload = {}) {
+  const root = unwrapDingMcpResult(payload);
+  const text = collectDingTranscriptText(root);
+  if (text) return text;
+  if (typeof root === "string") return root.trim();
+  return String(root.text || root.content || root.summary || root.markdown || "").trim();
+}
+
+export async function callDingMcpTool(userAccessToken, toolName, args = {}, fetchImpl = fetch) {
+  const token = String(userAccessToken || "").trim();
+  if (!token) {
+    const err = new Error("缺少钉钉用户授权，无法读取 AI 听记。");
+    err.status = 401;
+    throw err;
+  }
+  const res = await fetchImpl(DING_MINUTES_MCP_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "accept": "application/json",
+      "authorization": `Bearer ${token}`,
+      "x-user-access-token": token
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: { name: toolName, arguments: args }
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error || data.result?.isError) {
+    const err = new Error(data.error?.message || data.result?.content?.[0]?.text || "钉钉 AI 听记接口调用失败");
+    err.status = res.ok ? 502 : res.status;
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+
+function nestedValue(root, keys = []) {
+  let value = root;
+  for (const key of keys) {
+    if (!value || typeof value !== "object") return undefined;
+    value = value[key];
+  }
+  return value;
+}
+
+function firstArrayByKeys(root, paths = []) {
+  for (const path of paths) {
+    const value = nestedValue(root, path);
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+function normalizeDingAiMinute(item = {}) {
+  const taskUuid = String(item.taskUuid || item.uuid || item.id || item.task_uuid || "").trim();
+  if (!taskUuid) return null;
+  return {
+    taskUuid,
+    title: item.title || item.name || item.minutesTitle || item.subject || "AI 听记",
+    createTime: item.createTime || item.createdAt || item.startTime || item.beginTime || item.gmtCreate || "",
+    startTime: item.startTime || item.beginTime || item.createTime || "",
+    endTime: item.endTime || item.finishTime || item.stopTime || "",
+    creator: item.creator || item.creatorName || item.ownerName || "",
+    raw: item
+  };
+}
+
+export function extractDingAiMinutesList(payload = {}) {
+  const root = unwrapDingMcpResult(payload);
+  const items = firstArrayByKeys(root, [
+    ["result", "minutesDetails"],
+    ["result", "itemList"],
+    ["minutesDetails"],
+    ["itemList"],
+    ["list"],
+    ["items"],
+    ["data"]
+  ]);
+  return items.map(normalizeDingAiMinute).filter(Boolean);
+}
+
+export async function queryDingAiMinutesList(userAccessToken, input = {}, fetchImpl = fetch) {
+  const args = {
+    belongingConditionId: input.belongingConditionId || "noLimit",
+    maxResults: Math.min(Number(input.maxResults) || 50, 100)
+  };
+  if (input.keyword) args.keyword = String(input.keyword);
+  if (input.nextToken) args.nextToken = String(input.nextToken);
+  if (input.createTimeStart) args.createTimeStart = Number(input.createTimeStart);
+  if (input.createTimeEnd) args.createTimeEnd = Number(input.createTimeEnd);
+  const raw = await callDingMcpTool(userAccessToken, "list_by_keyword_and_time_range", args, fetchImpl);
+  return { raw, minutes: extractDingAiMinutesList(raw) };
+}
+
+export async function queryDingAiMinutesText(userAccessToken, input = {}, fetchImpl = fetch) {
+  const taskUuid = extractDingAiMinutesTaskUuid(input.taskUuid || input.recordingId || input.minutesId || "");
+  if (!taskUuid) {
+    const err = new Error("需要 AI 听记 taskUuid，才能读取钉钉 AI 纪要。");
+    err.status = 400;
+    throw err;
+  }
+  const summaryRaw = await callDingMcpTool(userAccessToken, "get_minutes_ai_summary", { taskUuid }, fetchImpl);
+  let text = dingMcpPayloadText(summaryRaw);
+  if (!text) {
+    const transcriptRaw = await callDingMcpTool(userAccessToken, "get_minutes_transcription", { taskUuid }, fetchImpl);
+    text = dingMcpPayloadText(transcriptRaw);
+    if (text) return { text, raw: { summaryRaw, transcriptRaw }, taskUuid };
+  }
+  if (!text) {
+    const err = new Error("钉钉 AI 听记没有返回纪要文本。");
+    err.status = 404;
+    err.detail = summaryRaw;
+    throw err;
+  }
+  return { text, raw: summaryRaw, taskUuid };
+}
+
+export function extractDingAiMinutesTaskUuid(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    const queryUuid = url.searchParams.get("taskUuid");
+    if (queryUuid) return queryUuid.trim();
+    const match = url.pathname.match(/\/transcribes\/([^/?#]+)/);
+    if (match) return decodeURIComponent(match[1]).trim();
+  } catch {}
+  const queryMatch = raw.match(/[?&]taskUuid=([^&#]+)/);
+  if (queryMatch) return decodeURIComponent(queryMatch[1]).trim();
+  const pathMatch = raw.match(/\/transcribes\/([^/?#]+)/);
+  if (pathMatch) return decodeURIComponent(pathMatch[1]).trim();
+  return raw;
+}
+
+function eventTimeMs(value) {
+  const parsed = Date.parse(value || "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function minuteTimeMs(minute = {}) {
+  return eventTimeMs(minute.startTime || minute.createTime || minute.endTime);
+}
+
+function tokenScore(a = "", b = "") {
+  const source = String(a || "");
+  const target = String(b || "");
+  if (!source || !target) return 0;
+  if (source.includes(target) || target.includes(source)) return 4;
+  const tokens = [...new Set(source.split(/[\s·,，、/|｜:：-]+/).filter(token => token.length >= 2))];
+  return tokens.filter(token => target.includes(token)).length;
+}
+
+function matchDingAiMinuteForEvent(event = {}, minutes = []) {
+  const eventStart = eventTimeMs(event.startTime);
+  const eventEnd = eventTimeMs(event.endTime) || eventStart;
+  const eventTitle = event.summary || event.title || "";
+  let best = null;
+  let bestScore = 0;
+  for (const minute of minutes) {
+    const time = minuteTimeMs(minute);
+    const sameWindow = time && eventStart && time >= eventStart - 12 * 60 * 60 * 1000 && time <= eventEnd + 12 * 60 * 60 * 1000;
+    const sameDay = time && eventStart && new Date(time).toDateString() === new Date(eventStart).toDateString();
+    const title = tokenScore(eventTitle, minute.title);
+    const timeScore = sameWindow ? 3 : (sameDay ? 1 : 0);
+    const score = title + timeScore;
+    if (score > bestScore && (sameWindow || title >= 2)) {
+      best = minute;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+export async function queryDingAiMinutesForEvents(userAccessToken, input = {}, fetchImpl = fetch) {
+  const events = Array.isArray(input.events) ? input.events : [];
+  if (!events.length) return [];
+  const starts = events.map(event => eventTimeMs(event.startTime)).filter(Boolean);
+  const ends = events.map(event => eventTimeMs(event.endTime)).filter(Boolean);
+  const createTimeStart = starts.length ? Math.min(...starts) - 24 * 60 * 60 * 1000 : undefined;
+  const createTimeEnd = ends.length ? Math.max(...ends) + 24 * 60 * 60 * 1000 : undefined;
+  const { minutes } = await queryDingAiMinutesList(userAccessToken, {
+    keyword: input.keyword || "",
+    createTimeStart,
+    createTimeEnd,
+    maxResults: input.maxResults || 80
+  }, fetchImpl);
+  const used = new Set();
+  const matched = [];
+  for (const event of events) {
+    const candidates = minutes.filter(minute => !used.has(minute.taskUuid));
+    const minute = matchDingAiMinuteForEvent(event, candidates);
+    if (!minute) {
+      matched.push({ ...event, minuteState: event.minuteState || "empty" });
+      continue;
+    }
+    used.add(minute.taskUuid);
+    let text = "";
+    try {
+      const result = await queryDingAiMinutesText(userAccessToken, { taskUuid: minute.taskUuid }, fetchImpl);
+      text = result.text;
+    } catch {
+      // Keep the taskUuid visible; users can still paste or retry manually.
+    }
+    matched.push({
+      ...event,
+      minuteState: text ? "ready" : "found",
+      minuteText: text,
+      aiMinutesTaskUuid: minute.taskUuid,
+      aiMinutesTitle: minute.title
+    });
+  }
+  return matched;
 }
 
 export async function queryDingMeetingMinutesText(accessToken, input = {}, fetchImpl = fetch) {
