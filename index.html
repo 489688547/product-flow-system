@@ -5860,7 +5860,7 @@
       return { text: "检测中", className: "" };
     }
     async function detectCalendarMeetingMinutes(events = []) {
-      const env = getDingEnvironment();
+      const env = detectDingTalkEnvironment();
       const product = productById(minutesProductId);
       const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
       try {
@@ -6143,7 +6143,7 @@
         await withGlobalLoading("正在读取钉钉会议纪要", async () => {
           let authCode = "";
           if (useAiMinutes) {
-            const env = getDingEnvironment();
+            const env = detectDingTalkEnvironment();
             authCode = await requestDingAuthCode(env.corpId);
           }
           const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {

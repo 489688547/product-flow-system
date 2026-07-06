@@ -98,6 +98,8 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /AI 纪要\/闪记/);
   assert.match(html, /await syncMinutesFromDing\(\);/);
   assert.match(html, /正在读取钉钉日历会议/);
+  assert.doesNotMatch(html, /getDingEnvironment/);
+  assert.match(html, /detectDingTalkEnvironment\(\)/);
 });
 
 test("DingTalk sync errors expose actionable API details in the UI", () => {
