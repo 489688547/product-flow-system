@@ -5828,7 +5828,7 @@
     function renderMinutesRecordingError(payload = {}) {
       const raw = dingPayloadText(payload);
       if (!/cloudRecordNotFound|50513/i.test(raw)) return false;
-      setMinutesMessage("这个会议没有可读取的 AI 纪要/闪记文本，无法自动同步纪要。请换一个有纪要的会议，或直接粘贴会议纪要后生成资料。", "error");
+      setMinutesMessage("钉钉接口没有返回这个会议的 AI 纪要/闪记文本，无法自动同步。请换一个可读取的会议，或直接粘贴会议纪要后生成资料。", "error");
       return true;
     }
     function meetingCalendarRange() {
@@ -5850,8 +5850,8 @@
       return `${mm}-${dd} ${hh}:${min}`;
     }
     function calendarMinuteState(event = {}) {
-      if (event.minuteState === "ready") return { text: "有纪要", className: "ready" };
-      if (event.minuteState === "empty") return { text: "无纪要", className: "empty" };
+      if (event.minuteState === "ready") return { text: "可读取", className: "ready" };
+      if (event.minuteState === "empty") return { text: "未返回", className: "empty" };
       if (event.minuteState === "permission") return { text: "缺权限", className: "error" };
       if (event.minuteState === "error") return { text: "不可读", className: "error" };
       return { text: "检测中", className: "" };
@@ -5911,7 +5911,7 @@
           return;
         }
         if (event?.minuteState === "empty") {
-          setMinutesMessage("这个会议没有可读取的 AI 纪要/闪记文本，无法自动同步纪要。请换一个有纪要的会议，或直接粘贴会议纪要后生成资料。", "error");
+          setMinutesMessage("钉钉接口没有返回这个会议的 AI 纪要/闪记文本，无法自动同步。请换一个可读取的会议，或直接粘贴会议纪要后生成资料。", "error");
           return;
         }
         if (event?.minuteState === "permission") {
@@ -5976,7 +5976,7 @@
           const checkedEvents = await detectCalendarMeetingMinutes(events);
           renderCalendarMeetingOptions(checkedEvents);
           const readyCount = checkedEvents.filter(event => event.minuteState === "ready").length;
-          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount} 个有 AI 纪要/闪记。`, readyCount ? "ok" : "error");
+          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount} 个可直接读取 AI 纪要/闪记。`, readyCount ? "ok" : "error");
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉日历会议查询失败", "error");
