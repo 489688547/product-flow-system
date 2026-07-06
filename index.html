@@ -5750,9 +5750,12 @@
       el.textContent = message;
       el.className = `minutes-status ${type}`.trim();
     }
-    function dingPermissionApplyUrl(text = "") {
-      const match = String(text || "").match(/https:\/\/open-dev\.dingtalk\.com\/appscope\/apply\?[^\s；，。]+/);
-      return match ? match[0] : "";
+    function dingPermissionApplyUrl(text = "", scope = "") {
+      const match = String(text || "").match(/https:\/\/open-dev\.dingtalk\.com\/appscope\/apply\?[^\s；，。\u0000]+/);
+      if (match?.[0] && !match[0].includes("%00")) return match[0];
+      const appKey = dingConfig?.appKey || "";
+      if (!appKey || !scope) return match?.[0]?.replace(/%00.*$/, "") || "";
+      return `https://open-dev.dingtalk.com/appscope/apply?content=${encodeURIComponent(`${appKey}#${scope}`)}`;
     }
     function renderMinutesPermissionError(payload = {}) {
       const raw = [
@@ -5762,7 +5765,7 @@
         payload.detail?.errorMessage
       ].filter(Boolean).join(" ");
       const scope = raw.match(/\[([A-Za-z0-9_.:-]+)\]/)?.[1] || (raw.includes("VideoConference.Conference.Read") ? "VideoConference.Conference.Read" : "");
-      const url = dingPermissionApplyUrl(raw);
+      const url = dingPermissionApplyUrl(raw, scope);
       if (!scope && !url) return false;
       const el = document.getElementById("minutesStatus");
       if (!el) return false;
