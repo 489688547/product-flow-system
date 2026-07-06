@@ -82,10 +82,10 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /userUnionId,\s+timeMin,\s+timeMax,\s+maxResults: 60/);
   assert.match(html, /event\.conferenceId/);
   assert.match(html, /function detectCalendarMeetingMinutes\(/);
-  assert.match(html, /function requestDingDelegatedAuthCode\(/);
-  assert.match(html, /requestDingDelegatedAuthCode\("Minutes\.Content\.Read"\)/);
-  assert.match(html, /h5-common-authority\/auth\/index\.html/);
-  assert.match(html, /authCode,\s+events,/);
+  const detectMinutes = html.match(/async function detectCalendarMeetingMinutes[\s\S]*?function renderCalendarMeetingOptions/)[0];
+  assert.doesNotMatch(detectMinutes, /requestDingDelegatedAuthCode/);
+  assert.doesNotMatch(detectMinutes, /h5-common-authority\/auth\/index\.html/);
+  assert.match(detectMinutes, /events,\s+unionId: currentUser\?\.dingUser\?\.unionid/);
   assert.match(html, /aiMinutesTaskUuid/);
   assert.match(html, /AI 听记链接 \/ taskUuid \/ 云录制 conferenceId/);
   assert.match(html, /manualAiMinutes/);

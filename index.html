@@ -5937,30 +5937,25 @@
       return { text: "检测中", className: "" };
     }
     async function detectCalendarMeetingMinutes(events = []) {
-      const product = productById(minutesProductId);
-      const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
       try {
-        const authCode = await requestDingDelegatedAuthCode("Minutes.Content.Read");
-        const aiRes = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+        const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            authCode,
             events,
-            keyword: [product?.name, meeting?.title].filter(Boolean).join(" "),
-            maxResults: 80
+            unionId: currentUser?.dingUser?.unionid || ""
           })
         });
-        const aiPayload = await aiRes.json().catch(() => ({}));
-        if (aiRes.ok && aiPayload.synced && Array.isArray(aiPayload.events)) {
-          return aiPayload.events;
+        const payload = await res.json().catch(() => ({}));
+        if (res.ok && payload.synced && Array.isArray(payload.events)) {
+          return payload.events;
         }
-        if (renderMinutesPermissionError(aiPayload)) {
+        if (renderMinutesPermissionError(payload)) {
           return events.map(event => ({ ...event, minuteState: "permission" }));
         }
-        return events.map(event => ({ ...event, minuteState: "auth" }));
+        return events.map(event => ({ ...event, minuteState: "empty" }));
       } catch {
-        return events.map(event => ({ ...event, minuteState: "auth" }));
+        return events.map(event => ({ ...event, minuteState: "empty" }));
       }
     }
     function renderCalendarMeetingOptions(events = []) {

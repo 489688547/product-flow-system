@@ -11,6 +11,7 @@ import {
   listDingCalendarEvents,
   queryDingAiMinutesForEvents,
   queryDingAiMinutesText,
+  queryDingCloudMinutesForEvents,
   queryDingMeetingMinutesText,
   queryDingMeetingMinutesTextWithFallback,
   queryDingScheduleConferenceHistory,
@@ -415,6 +416,38 @@ test("queryDingAiMinutesForEvents matches calendar meetings to AI minutes taskUu
   assert.equal(result[0].minuteState, "ready");
   assert.equal(result[0].aiMinutesTaskUuid, "task-ai-1");
   assert.equal(result[0].minuteText, "确认封样标准。");
+});
+
+test("queryDingCloudMinutesForEvents reads calendar conference transcripts with app token", async () => {
+  const calls = [];
+  const result = await queryDingCloudMinutesForEvents("app-token-1", {
+    events: [
+      {
+        conferenceId: "schedule-1",
+        summary: "鹦鹉谷物棒 · 标准样终审会",
+        startTime: "2026-07-05T14:00:00+08:00",
+        endTime: "2026-07-05T15:00:00+08:00"
+      }
+    ],
+    unionId: "union-1"
+  }, async (url, options) => {
+    calls.push(url);
+    if (url.includes("/cloudRecords/getTexts")) {
+      return okJson({
+        result: {
+          paragraphList: [
+            { paragraph: "确认标准样通过。" }
+          ]
+        }
+      });
+    }
+    throw new Error(`unexpected call ${url}`);
+  });
+
+  assert.match(calls[0], /\/v1\.0\/conference\/videoConferences\/schedule-1\/cloudRecords\/getTexts\?unionId=union-1/);
+  assert.equal(result[0].minuteState, "ready");
+  assert.equal(result[0].minuteText, "确认标准样通过。");
+  assert.equal(result[0].resolvedConferenceId, "schedule-1");
 });
 
 test("queryDingAiMinutesForEvents falls back to time range when product keyword misses", async () => {

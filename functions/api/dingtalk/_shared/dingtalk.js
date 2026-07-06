@@ -920,6 +920,39 @@ export async function queryDingMeetingMinutesTextWithFallback(accessToken, input
   }
 }
 
+export async function queryDingCloudMinutesForEvents(accessToken, input = {}, fetchImpl = fetch) {
+  const events = Array.isArray(input.events) ? input.events : [];
+  const checked = [];
+  for (const event of events) {
+    if (!event?.conferenceId) {
+      checked.push({ ...event, minuteState: "empty" });
+      continue;
+    }
+    try {
+      const result = await queryDingMeetingMinutesTextWithFallback(accessToken, {
+        conferenceId: event.conferenceId,
+        recordingId: event.conferenceId,
+        scheduleConferenceId: event.conferenceId,
+        unionId: input.unionId
+      }, fetchImpl);
+      checked.push({
+        ...event,
+        minuteState: "ready",
+        minuteText: result.text,
+        resolvedConferenceId: result.resolvedConferenceId || event.conferenceId
+      });
+    } catch (error) {
+      const raw = JSON.stringify({ message: error.message, detail: error.detail, code: error.code });
+      checked.push({
+        ...event,
+        minuteState: /Forbidden|AccessDenied|Permission|权限/i.test(raw) ? "permission" : "empty",
+        minuteError: error.message || "钉钉会议纪要不可读取"
+      });
+    }
+  }
+  return checked;
+}
+
 export async function loginWithDingTalk({ authCode, corpId }, env = {}, fetchImpl = fetch) {
   if (!authCode) {
     const err = new Error("缺少钉钉免登授权码 authCode");
