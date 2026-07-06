@@ -17,50 +17,61 @@ export async function onRequest({ request, env }) {
     const body = await request.json().catch(() => ({}));
     if (Array.isArray(body.events)) {
       let userToken = null;
+      let aiMinutesError = "";
+      let aiMinutesErrorDetail;
       if (body.authCode) {
         try {
           userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
-        } catch {
+        } catch (error) {
           // The silent auth code may be stale or not exchangeable; fall back to cloud recording detection.
+          aiMinutesError = `用户授权换取失败：${error.message || "未知错误"}`;
+          aiMinutesErrorDetail = error.detail;
           userToken = null;
         }
       }
       if (userToken) {
-        const aiEvents = await queryDingAiMinutesForEvents(userToken.accessToken, body);
-        const unresolvedEvents = aiEvents.filter(event => event.minuteState === "empty" && event.conferenceId);
-        if (unresolvedEvents.length) {
-          try {
-            const accessToken = await getDingAccessToken(env);
-            const cloudEvents = await queryDingCloudMinutesForEvents(accessToken, {
-              ...body,
-              events: unresolvedEvents
-            });
-            const byConference = new Map(cloudEvents.map(event => [event.conferenceId, event]));
-            const events = aiEvents.map(event => {
-              const cloud = byConference.get(event.conferenceId);
-              return cloud?.minuteState === "ready" || cloud?.minuteState === "permission" ? cloud : event;
-            });
-            return jsonResponse({
-              synced: true,
-              source: "aiMinutes",
-              fallbackSource: "cloudRecording",
-              events
-            });
-          } catch {
-            // AI minutes are the primary signal here; keep their states if cloud fallback is unavailable.
+        try {
+          const aiEvents = await queryDingAiMinutesForEvents(userToken.accessToken, body);
+          const unresolvedEvents = aiEvents.filter(event => event.minuteState === "empty" && event.conferenceId);
+          if (unresolvedEvents.length) {
+            try {
+              const accessToken = await getDingAccessToken(env);
+              const cloudEvents = await queryDingCloudMinutesForEvents(accessToken, {
+                ...body,
+                events: unresolvedEvents
+              });
+              const byConference = new Map(cloudEvents.map(event => [event.conferenceId, event]));
+              const events = aiEvents.map(event => {
+                const cloud = byConference.get(event.conferenceId);
+                return cloud?.minuteState === "ready" || cloud?.minuteState === "permission" ? cloud : event;
+              });
+              return jsonResponse({
+                synced: true,
+                source: "aiMinutes",
+                fallbackSource: "cloudRecording",
+                events
+              });
+            } catch {
+              // AI minutes are the primary signal here; keep their states if cloud fallback is unavailable.
+            }
           }
+          return jsonResponse({
+            synced: true,
+            source: "aiMinutes",
+            events: aiEvents
+          });
+        } catch (error) {
+          aiMinutesError = `AI 听记查询失败：${error.message || "未知错误"}`;
+          aiMinutesErrorDetail = error.detail;
         }
-        return jsonResponse({
-          synced: true,
-          source: "aiMinutes",
-          events: aiEvents
-        });
       }
       const accessToken = await getDingAccessToken(env);
       const events = await queryDingCloudMinutesForEvents(accessToken, body);
       return jsonResponse({
         synced: true,
         source: "cloudRecording",
+        aiMinutesError: aiMinutesError || undefined,
+        aiMinutesErrorDetail: aiMinutesErrorDetail || undefined,
         events
       });
     }

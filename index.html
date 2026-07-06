@@ -6017,9 +6017,12 @@
       if (event.minuteState === "error") return { text: "不可读", className: "error" };
       return { text: "检测中", className: "" };
     }
+    let lastAiMinutesDetectError = "";
     async function detectCalendarMeetingMinutes(events = []) {
+      lastAiMinutesDetectError = "";
       try {
         const authCode = await requestDingSilentAuthCode();
+        if (!authCode) lastAiMinutesDetectError = "未拿到钉钉免登授权码，只能检测云录制。";
         const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -6030,6 +6033,10 @@
           })
         });
         const payload = await res.json().catch(() => ({}));
+        if (payload.aiMinutesError) {
+          const code = payload.aiMinutesErrorDetail?.code || payload.aiMinutesErrorDetail?.errcode || "";
+          lastAiMinutesDetectError = `${payload.aiMinutesError}${code ? `（${code}）` : ""}`;
+        }
         if (res.ok && payload.synced && Array.isArray(payload.events)) {
           return payload.events;
         }
@@ -6144,7 +6151,8 @@
           renderCalendarMeetingOptions(checkedEvents);
           const readyCount = checkedEvents.filter(event => event.minuteState === "ready").length;
           const foundCount = checkedEvents.filter(event => event.minuteState === "found").length;
-          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount + foundCount} 个匹配到 AI 听记/纪要。`, readyCount + foundCount ? "ok" : "error");
+          const aiTip = lastAiMinutesDetectError ? ` AI 听记检测受限：${lastAiMinutesDetectError}` : "";
+          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount + foundCount} 个匹配到 AI 听记/纪要。${aiTip}`, readyCount + foundCount ? "ok" : "error");
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉日历会议查询失败", "error");
