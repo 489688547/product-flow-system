@@ -35,11 +35,15 @@ No fluid type, no display fonts, no negative letter spacing.
 ## Components
 
 - Buttons: one primary, one secondary, one ghost style. Icons from Lucide.
+- Button states: secondary and utility actions stay neutral by default; hover uses the same light neutral surface and stronger border. Primary blue is reserved for the main commit action, and destructive red appears only on irreversible actions.
 - Inputs/selects: consistent height, focus ring, native affordance where possible.
+- Table header filters: keep filters inside the relevant table header as a 22px ghost icon next to the label. The label remains visually primary; the icon is neutral by default, uses a subtle surface on hover/expanded/active, and opens a fixed-position menu so it is never clipped by table scroll containers.
+- Table row actions: keep row actions inside a single `.table-actions` group. Icon-only actions are fixed 30px squares, text actions share the same 30px height, and action groups do not wrap inside data tables. If a row only needs edit/delete/convert/open, prefer icon-only buttons with clear `title` and `aria-label` instead of widening the action column for text labels.
 - Badges: semantic color with text, never color-only.
 - Metrics: clickable summary rows with icon, label, count and chevron.
 - Risk cards: compact list items, not oversized warning blocks.
-- Modals: restrained sheet with sticky header/footer and clear action hierarchy.
+- Modals: restrained sheet with sticky header/footer and a scrollable body. Titles stay compact, content uses the same form rhythm as pages, and the footer keeps cancel/secondary actions visually below the primary commit action.
+- Surfaces: panels, rows, cards, package files and settings rows share the same 10px panel radius, 1px border and subtle single-step elevation. Hover may lift one step, but nested card shadows are avoided.
 
 ## Motion
 

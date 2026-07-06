@@ -74,6 +74,17 @@ test("DingTalk minutes sync fails with a recording id guidance instead of fake s
   assert.match(html, /需要钉钉会议录制/);
 });
 
+test("DingTalk minutes can select a calendar meeting before syncing", () => {
+  assert.match(html, /id="loadCalendarMeetings"/);
+  assert.match(html, /id="calendarMeetingList"/);
+  assert.match(html, /\/api\/dingtalk\/calendar\/events/);
+  assert.match(html, /function loadCalendarMeetingsForMinutes\(\)/);
+  assert.match(html, /userUnionId,\s+timeMin,\s+timeMax,\s+maxResults: 60/);
+  assert.match(html, /event\.conferenceId/);
+  assert.match(html, /document\.getElementById\("minutesRecordingId"\)\.value = button\.dataset\.calendarConference \|\| "";/);
+  assert.match(html, /正在读取钉钉日历会议/);
+});
+
 test("DingTalk sync errors expose actionable API details in the UI", () => {
   assert.match(html, /function formatDingSyncError\(/);
   assert.match(html, /payload\.detail/);

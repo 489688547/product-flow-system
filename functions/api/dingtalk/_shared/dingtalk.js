@@ -130,11 +130,30 @@ async function requestDingOpenApi(accessToken, method, path, body, fetchImpl = f
 }
 
 export async function getDingDepartments(accessToken, fetchImpl = fetch, rootDeptId = 1) {
-  const result = await postDingTopApi(accessToken, "/topapi/v2/department/listsub", {
-    dept_id: Number(rootDeptId) || 1,
-    language: "zh_CN"
-  }, fetchImpl);
-  return Array.isArray(result) ? result : result.list || [];
+  const root = Number(rootDeptId) || 1;
+  const departments = [];
+  const visited = new Set();
+  const collected = new Set();
+  async function visit(parentId) {
+    const normalizedParentId = Number(parentId) || 1;
+    if (visited.has(normalizedParentId)) return;
+    visited.add(normalizedParentId);
+    const result = await postDingTopApi(accessToken, "/topapi/v2/department/listsub", {
+      dept_id: normalizedParentId,
+      language: "zh_CN"
+    }, fetchImpl);
+    const children = Array.isArray(result) ? result : result.list || [];
+    for (const child of children) {
+      const childId = Number(child.dept_id || child.deptId);
+      if (childId && !collected.has(childId)) {
+        departments.push(child);
+        collected.add(childId);
+      }
+      await visit(childId);
+    }
+  }
+  await visit(root);
+  return departments;
 }
 
 export async function getDingDepartmentUsers(accessToken, deptId, fetchImpl = fetch) {
@@ -208,6 +227,7 @@ function publicOrgUser(user = {}, departmentsById = new Map()) {
 }
 
 export async function syncDingOrg(accessToken, fetchImpl = fetch, now = new Date(), options = {}) {
+  const rootDeptId = Number(options.rootDeptId || 1) || 1;
   const departments = (await getDingDepartments(accessToken, fetchImpl, options.rootDeptId || 1)).map(dept => ({
     deptId: String(dept.dept_id || dept.deptId || ""),
     parentId: String(dept.parent_id || dept.parentId || "0"),
@@ -215,8 +235,9 @@ export async function syncDingOrg(accessToken, fetchImpl = fetch, now = new Date
   })).filter(dept => dept.deptId && dept.name);
   const departmentsById = new Map(departments.map(dept => [dept.deptId, dept]));
   const byUserId = new Map();
-  for (const dept of departments) {
-    const users = await getDingDepartmentUsers(accessToken, dept.deptId, fetchImpl);
+  const departmentIds = [...new Set([String(rootDeptId), ...departments.map(dept => dept.deptId)])];
+  for (const deptId of departmentIds) {
+    const users = await getDingDepartmentUsers(accessToken, deptId, fetchImpl);
     users.forEach(user => {
       const safeUser = publicOrgUser(user, departmentsById);
       if (safeUser.userId) byUserId.set(safeUser.userId, safeUser);
@@ -346,6 +367,54 @@ export async function createDingCalendarEvent(accessToken, input = {}, fetchImpl
     fetchImpl,
     { "x-client-token": dingClientToken(input.sourceId || `${organizerUnionId}-${input.summary || ""}-${input.startTime || ""}`) }
   );
+}
+
+function normalizeDingCalendarEvent(event = {}) {
+  const onlineMeetingInfo = event.onlineMeetingInfo || {};
+  const start = event.start || {};
+  const end = event.end || {};
+  return {
+    id: event.id || "",
+    summary: event.summary || "",
+    description: event.description || "",
+    startTime: start.dateTime || start.date || "",
+    endTime: end.dateTime || end.date || "",
+    organizer: event.organizer || null,
+    attendees: Array.isArray(event.attendees) ? event.attendees : [],
+    onlineMeetingInfo,
+    conferenceId: onlineMeetingInfo.conferenceId || "",
+    joinUrl: onlineMeetingInfo.url || "",
+    status: event.status || ""
+  };
+}
+
+export async function listDingCalendarEvents(accessToken, input = {}, fetchImpl = fetch) {
+  const userUnionId = String(input.userUnionId || input.organizerUnionId || input.unionId || "").trim();
+  if (!userUnionId) {
+    const err = new Error("缺少当前钉钉账号 unionId，无法查询日历会议。");
+    err.status = 400;
+    throw err;
+  }
+  const query = new URLSearchParams();
+  if (input.timeMin) query.set("timeMin", String(input.timeMin));
+  if (input.timeMax) query.set("timeMax", String(input.timeMax));
+  query.set("showDeleted", "false");
+  query.set("maxResults", String(Math.min(Number(input.maxResults) || 50, 100)));
+  query.set("maxAttendees", String(Math.min(Number(input.maxAttendees) || 20, 100)));
+  if (input.nextToken) query.set("nextToken", String(input.nextToken));
+  const data = await requestDingOpenApi(
+    accessToken,
+    "GET",
+    `/v1.0/calendar/users/${encodeURIComponent(userUnionId)}/calendars/primary/events?${query.toString()}`,
+    null,
+    fetchImpl
+  );
+  const events = (Array.isArray(data.events) ? data.events : []).map(normalizeDingCalendarEvent);
+  return {
+    events,
+    nextToken: data.nextToken || "",
+    syncToken: data.syncToken || ""
+  };
 }
 
 export function buildDingMeetingMinutesQuery(input = {}) {

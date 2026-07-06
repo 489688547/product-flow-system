@@ -50,13 +50,35 @@ test("demand table keeps Chinese headers, dates, and actions readable", () => {
   assert.match(html, /\.demand-table \{[\s\S]*min-width: 1248px;[\s\S]*table-layout: fixed;/);
   assert.match(html, /<col class="demand-col-source">/);
   assert.match(html, /\.demand-col-created \{ width: 96px; \}/);
-  assert.match(html, /\.demand-col-actions \{ width: 172px; \}/);
+  assert.match(html, /\.demand-col-actions \{ width: 132px; \}/);
   assert.match(html, /\.demand-table td:nth-child\(5\),\s+\.demand-table td:nth-child\(6\),\s+\.demand-table td:nth-child\(7\) \{[\s\S]*white-space: nowrap;/);
   assert.doesNotMatch(html, /来\s*<br|负\s*<br|创建时\s*<br/);
 });
 
+test("demand level filter lives in the table header as a compact icon menu", () => {
+  assert.doesNotMatch(html, /\.demand-filter-bar/);
+  assert.match(html, /\.table-filter-trigger \{[\s\S]*width: 22px;[\s\S]*height: 22px;/);
+  assert.match(html, /\.table-filter-trigger i,\s+\.table-filter-trigger svg \{[\s\S]*width: 13px;[\s\S]*height: 13px;/);
+  assert.match(html, /<i data-lucide="filter"><\/i>/);
+  assert.match(html, /\.table-filter-popover \{[\s\S]*position: fixed;[\s\S]*width: 178px;/);
+  assert.match(html, /data-demand-level-filter-toggle aria-label="筛选等级"/);
+  assert.match(html, /id="demandLevelFilterMenu" role="menu" aria-label="筛选需求等级"/);
+  assert.match(html, /function positionTableFilterMenu\(trigger, menu\)/);
+});
+
 test("workflow editor keeps task actions on one line at laptop widths", () => {
   assert.match(html, /\.task-row-actions \{[\s\S]*min-width: 0;[\s\S]*flex-wrap: nowrap;/);
-  assert.match(html, /@media \(max-width: 720px\)[\s\S]*\.task-edit-row \{ grid-template-columns: 104px 360px 168px 180px 142px 104px 176px; min-width: 1326px; \}/);
+  assert.match(html, /@media \(max-width: 720px\)[\s\S]*\.task-edit-row \{ grid-template-columns: 104px 360px 168px 180px 142px 268px; min-width: 1266px; \}/);
   assert.match(html, /\.task-row-actions \.mini-action \{[\s\S]*min-height: 32px;/);
+});
+
+test("workflow stage cards align progress bars and use an inline product switcher", () => {
+  assert.match(html, /\.stage \{[\s\S]*grid-template-rows: 24px 18px 38px 8px 18px;/);
+  assert.match(html, /\.stage-meta \{[\s\S]*min-height: 38px;[\s\S]*-webkit-line-clamp: 2;/);
+  assert.doesNotMatch(html, /id="productSelect"/);
+  assert.doesNotMatch(html, /每个阶段都拆成会前准备、会议\/决策、会后交付、下一阶段准入/);
+  assert.match(html, /\.workflow-product-card \{[\s\S]*grid-template-columns: minmax\(0, 1fr\) 30px;/);
+  assert.match(html, /data-workflow-product-toggle aria-label="切换产品"/);
+  assert.match(html, /id="workflowProductMenu" role="listbox" aria-label="切换产品"/);
+  assert.match(html, /function positionWorkflowProductMenu\(trigger, menu\)/);
 });

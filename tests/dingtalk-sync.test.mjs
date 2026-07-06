@@ -5,6 +5,7 @@ import {
   buildDingMeetingMinutesQuery,
   buildDingTodoPayload,
   createDingCalendarEvent,
+  listDingCalendarEvents,
   queryDingMeetingMinutesText,
   createDingTodoTask
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
@@ -121,6 +122,34 @@ test("createDingCalendarEvent sends DingTalk idempotency client token", async ()
   });
 
   assert.equal(calls[0].options.headers["x-client-token"], "meeting-p1-standard");
+});
+
+test("listDingCalendarEvents queries primary calendar and extracts conference ids", async () => {
+  const calls = [];
+  const result = await listDingCalendarEvents("token-1", {
+    userUnionId: "user-union",
+    timeMin: "2026-07-01T00:00:00.000Z",
+    timeMax: "2026-07-31T23:59:59.999Z"
+  }, async (url, options) => {
+    calls.push({ url, options });
+    return okJson({
+      events: [
+        {
+          id: "event-1",
+          summary: "标准样终审会",
+          start: { dateTime: "2026-07-05T14:00:00+08:00" },
+          end: { dateTime: "2026-07-05T15:00:00+08:00" },
+          onlineMeetingInfo: { conferenceId: "conf-1", type: "dingtalk" }
+        }
+      ]
+    });
+  });
+
+  assert.match(calls[0].url, /\/v1\.0\/calendar\/users\/user-union\/calendars\/primary\/events\?/);
+  assert.match(calls[0].url, /timeMin=2026-07-01T00%3A00%3A00.000Z/);
+  assert.equal(calls[0].options.headers["x-acs-dingtalk-access-token"], "token-1");
+  assert.equal(result.events[0].conferenceId, "conf-1");
+  assert.equal(result.events[0].summary, "标准样终审会");
 });
 
 test("buildDingMeetingMinutesQuery requires a DingTalk cloud recording conference id", () => {

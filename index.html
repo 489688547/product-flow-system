@@ -32,6 +32,7 @@
       --teal: #0891b2;
       --control: #ffffff;
       --control-hover: #f8fafc;
+      --control-border: #d7e0ec;
       --primary: #2563eb;
       --primary-hover: #1d4ed8;
       --primary-ink: #ffffff;
@@ -41,8 +42,15 @@
       --sidebar-muted: #64748b;
       --ring: rgba(37, 99, 235, .22);
       --shadow: none;
+      --shadow-panel: 0 1px 2px rgba(15, 23, 42, .04);
       --shadow-lift: 0 2px 6px rgba(15, 23, 42, .06);
+      --shadow-popover: 0 12px 26px rgba(15, 23, 42, .14);
       --radius: 8px;
+      --radius-panel: 10px;
+      --z-dropdown: 30;
+      --z-floating: 25;
+      --z-modal: 50;
+      --z-loading: 80;
     }
 
     * { box-sizing: border-box; }
@@ -51,7 +59,8 @@
       margin: 0;
       min-height: 100vh;
       color: var(--ink);
-      background: var(--bg);
+      background:
+        linear-gradient(180deg, #f8fafc 0%, var(--bg) 28%, #f3f6fb 100%);
       font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
       letter-spacing: 0;
       -webkit-font-smoothing: antialiased;
@@ -60,6 +69,13 @@
     button, input, select, textarea { font: inherit; }
     button { cursor: pointer; transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .12s ease; }
     button:active { transform: translateY(1px); }
+    button:disabled,
+    input:disabled,
+    select:disabled,
+    textarea:disabled {
+      cursor: not-allowed;
+      opacity: .58;
+    }
     button:focus-visible,
     #todayTasks tr.task-row:focus-visible,
     .sort-button:focus-visible {
@@ -81,8 +97,8 @@
       background: var(--sidebar);
       color: var(--sidebar-ink);
       border: 1px solid var(--line);
-      border-radius: var(--radius);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, .06), 0 10px 24px rgba(15, 23, 42, .04);
+      border-radius: var(--radius-panel);
+      box-shadow: var(--shadow-panel);
       display: flex;
       flex-direction: column;
       gap: 14px;
@@ -135,7 +151,7 @@
       border: 1px solid var(--line);
       border-radius: 12px;
       background: var(--panel);
-      box-shadow: 0 8px 12px rgba(15, 23, 42, .12);
+      box-shadow: 0 18px 44px rgba(15, 23, 42, .14);
       display: grid;
       gap: 18px;
     }
@@ -160,12 +176,12 @@
       text-align: left;
       display: grid;
       gap: 8px;
-      box-shadow: var(--shadow);
+      box-shadow: none;
     }
     .role-card:hover {
       border-color: #93c5fd;
       background: #f8fbff;
-      box-shadow: 0 4px 8px rgba(37, 99, 235, .08);
+      box-shadow: var(--shadow-lift);
     }
     .role-card strong {
       display: flex;
@@ -269,6 +285,35 @@
       box-shadow: inset 0 0 0 1px #bfdbfe;
     }
     .nav i, .btn i, .icon-btn i, .mini-action i { width: 17px; height: 17px; }
+    .floating-feedback {
+      position: fixed;
+      right: 22px;
+      bottom: 84px;
+      z-index: var(--z-floating);
+      min-height: 42px;
+      padding: 0 14px 0 11px;
+      border: 1px solid #bfdbfe;
+      border-radius: 999px;
+      background: #fff;
+      color: var(--primary);
+      box-shadow: var(--shadow-popover);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 750;
+    }
+    .floating-feedback:hover {
+      background: var(--blue-soft);
+      border-color: #93c5fd;
+      color: var(--primary-hover);
+    }
+    .floating-feedback i,
+    .floating-feedback svg {
+      width: 18px;
+      height: 18px;
+    }
     .main {
       min-width: 0;
       max-width: 1540px;
@@ -312,7 +357,7 @@
     }
     .date-filter span { color: var(--muted); font-size: 12px; }
     .btn, .icon-btn, .mini-action {
-      border: 1px solid var(--line);
+      border: 1px solid var(--control-border);
       background: var(--control);
       color: var(--ink);
       border-radius: 8px;
@@ -323,18 +368,19 @@
       gap: 7px;
       padding: 0 12px;
       font-weight: 650;
-      box-shadow: var(--shadow);
+      line-height: 1;
+      box-shadow: none;
     }
-    .btn:hover, .icon-btn:hover, .mini-action:hover { background: #f7fbff; border-color: #bcd3ff; color: var(--primary); }
+    .btn:hover, .icon-btn:hover, .mini-action:hover { background: var(--control-hover); border-color: var(--line-strong); color: var(--ink); }
     .btn.primary {
       border-color: var(--primary);
       background: var(--primary);
       color: var(--primary-ink);
       box-shadow: none;
     }
-    .btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+    .btn.primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); color: #fff; }
     .btn.ghost { background: transparent; border-color: transparent; color: var(--ink-soft); box-shadow: none; }
-    .btn.ghost:hover { background: var(--panel-2); }
+    .btn.ghost:hover { background: var(--panel-2); color: var(--ink); }
     .icon-btn { width: 36px; padding: 0; }
     .mini-action { min-height: 30px; padding: 0 10px; font-size: 12px; color: var(--ink-soft); }
     .mini-action.icon-only {
@@ -363,6 +409,23 @@
       border-color: var(--primary-hover);
       background: var(--primary-hover);
       color: #fff;
+    }
+    .task-table .table-actions {
+      width: 100%;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+      gap: 6px;
+    }
+    .task-table .mini-action {
+      min-height: 30px;
+      height: 30px;
+      padding: 0 9px;
+      white-space: nowrap;
+    }
+    .task-table .mini-action.icon-only {
+      width: 30px;
+      min-width: 30px;
+      padding: 0;
     }
     .screen { display: none; }
     .screen.active { display: block; }
@@ -405,8 +468,8 @@
     .panel, .card {
       border: 1px solid var(--line);
       background: var(--panel);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
+      border-radius: var(--radius-panel);
+      box-shadow: var(--shadow-panel);
     }
     .panel { padding: 18px; }
     .panel-head {
@@ -436,7 +499,7 @@
       border-color: var(--metric-accent-border);
       background: linear-gradient(90deg, var(--metric-accent-soft) 0, #fff 62%);
     }
-    .metric:hover { border-color: var(--metric-accent); background: linear-gradient(90deg, var(--metric-accent-soft) 0, var(--panel-2) 68%); box-shadow: none; }
+    .metric:hover { border-color: var(--metric-accent); background: linear-gradient(90deg, var(--metric-accent-soft) 0, var(--panel-2) 68%); box-shadow: var(--shadow-lift); }
     .metric:focus-visible { outline: 3px solid var(--ring); outline-offset: 2px; }
     .metric-icon {
       width: 36px;
@@ -527,7 +590,7 @@
       font-weight: 600;
       padding: 0 12px 8px;
     }
-    .product-list-head span:last-child { text-align: right; }
+    .product-list-head > span:last-child { text-align: right; }
     .product-row {
       display: grid;
       grid-template-columns: minmax(190px, 1fr) 140px 108px 112px 84px;
@@ -535,8 +598,9 @@
       align-items: center;
       padding: 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel);
+      box-shadow: var(--shadow-panel);
     }
     .product-row.archive-row {
       min-height: 104px;
@@ -574,7 +638,7 @@
     .product-action-menu .mini-action span {
       line-height: 1;
     }
-    .product-row:hover { border-color: #bcd3ff; background: #f9fbff; }
+    .product-row:hover { border-color: #bcd3ff; background: #f9fbff; box-shadow: var(--shadow-lift); }
     .product-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
     .product-name strong, .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .product-identity {
@@ -627,7 +691,7 @@
       margin-bottom: 12px;
       padding: 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
     }
     .product-profile-panel.show { display: grid; }
@@ -669,7 +733,7 @@
       min-height: 58px;
       padding: 9px 10px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: #fff;
       display: grid;
       gap: 4px;
@@ -691,7 +755,7 @@
     .product-discussion-record {
       padding: 10px 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: #fff;
       display: grid;
       gap: 6px;
@@ -707,8 +771,113 @@
       white-space: pre-wrap;
     }
     .workflow-product {
-      margin-top: 12px;
-      max-width: 360px;
+      margin-top: 10px;
+      max-width: 430px;
+      position: relative;
+    }
+    .workflow-product-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 30px;
+      align-items: center;
+      gap: 8px;
+      padding: 4px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: var(--shadow-panel);
+    }
+    .workflow-product-card .product-identity {
+      min-width: 0;
+    }
+    .workflow-product-toggle {
+      width: 30px;
+      height: 30px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink-soft);
+      cursor: pointer;
+      transition: background .16s ease, border-color .16s ease, color .16s ease;
+    }
+    .workflow-product-toggle:hover,
+    .workflow-product-toggle[aria-expanded="true"] {
+      border-color: #bfdbfe;
+      background: var(--blue-soft);
+      color: var(--primary);
+    }
+    .workflow-product-toggle:focus-visible {
+      outline: 2px solid rgba(37, 99, 235, .28);
+      outline-offset: 2px;
+    }
+    .workflow-product-toggle i,
+    .workflow-product-toggle svg {
+      width: 15px;
+      height: 15px;
+      stroke-width: 2.2;
+    }
+    .workflow-product-menu {
+      position: fixed;
+      z-index: var(--z-dropdown);
+      width: 300px;
+      max-height: min(360px, calc(100vh - 32px));
+      overflow-y: auto;
+      padding: 5px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: var(--shadow-popover);
+    }
+    .workflow-product-option {
+      width: 100%;
+      display: grid;
+      grid-template-columns: 34px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      min-height: 46px;
+      padding: 6px 8px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--ink);
+      text-align: left;
+      cursor: pointer;
+    }
+    .workflow-product-option:hover,
+    .workflow-product-option.active {
+      background: var(--blue-soft);
+    }
+    .workflow-product-option img {
+      width: 34px;
+      height: 34px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      object-fit: cover;
+      background: var(--panel-3);
+    }
+    .workflow-product-option strong,
+    .workflow-product-option span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .workflow-product-option strong {
+      font-size: 12px;
+      line-height: 1.25;
+    }
+    .workflow-product-option span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .workflow-product-option i,
+    .workflow-product-option svg {
+      width: 14px;
+      height: 14px;
+      color: var(--primary);
     }
     .stage-map {
       display: grid;
@@ -718,18 +887,19 @@
       padding-bottom: 2px;
     }
     .stage {
-      min-height: 118px;
+      min-height: 128px;
       padding: 10px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       display: grid;
-      align-content: start;
+      grid-template-rows: 24px 18px 38px 8px 18px;
+      align-content: stretch;
       gap: 8px;
       position: relative;
       cursor: pointer;
     }
-    .stage:hover { border-color: #bcd3ff; background: #fff; }
+    .stage:hover { border-color: #bcd3ff; background: #fff; box-shadow: var(--shadow-lift); }
     .stage.current {
       border-color: #93c5fd;
       background: var(--blue-soft);
@@ -752,8 +922,25 @@
       font-size: 12px;
     }
     .stage.current .stage-num { background: var(--blue); color: #fff; }
-    .stage-title { font-weight: 750; font-size: 13px; line-height: 1.28; }
-    .stage-meta { color: var(--muted); font-size: 12px; line-height: 1.38; }
+    .stage-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 750;
+      font-size: 13px;
+      line-height: 1.28;
+    }
+    .stage-meta {
+      min-height: 38px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
     .task-table {
       width: 100%;
       border-collapse: collapse;
@@ -773,7 +960,7 @@
     #dashboard .task-table th:nth-child(6),
     #dashboard .task-table td:nth-child(6) { width: 8%; }
     .task-table th, .task-table td {
-      padding: 11px 10px;
+      padding: 11px 12px;
       border-bottom: 1px solid var(--line);
       vertical-align: top;
       text-align: left;
@@ -781,7 +968,7 @@
     }
     .task-table th {
       color: var(--muted);
-      font-weight: 700;
+      font-weight: 750;
       background: var(--panel-2);
       position: sticky;
       top: 0;
@@ -789,7 +976,7 @@
       white-space: nowrap;
       word-break: keep-all;
     }
-    .task-table tbody tr:hover td { background: var(--panel-2); }
+    .task-table tbody tr:hover td { background: #f9fbff; }
     .task-table tr:last-child td { border-bottom: 0; }
     #todayTasks tr.task-row {
       cursor: pointer;
@@ -811,7 +998,7 @@
       margin-top: 14px;
       padding: 14px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       overflow-x: auto;
     }
@@ -831,7 +1018,7 @@
     .stage-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .task-edit-row {
       display: grid;
-      grid-template-columns: 104px minmax(360px, 1.7fr) minmax(168px, .75fr) minmax(180px, .85fr) 142px 104px 176px;
+      grid-template-columns: 104px minmax(360px, 1.7fr) minmax(168px, .75fr) minmax(180px, .85fr) 142px 268px;
       gap: 8px;
       align-items: center;
       padding: 8px 0;
@@ -858,44 +1045,44 @@
       min-width: 132px;
       font-variant-numeric: tabular-nums;
     }
-    .task-state-toggle {
-      width: 100%;
+    .task-complete-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       min-height: 32px;
-      padding: 0 10px;
+      padding: 0 8px;
       border: 1px solid var(--line);
       border-radius: 8px;
       background: var(--control);
       color: var(--ink-soft);
       font-size: 12px;
       font-weight: 750;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
       white-space: nowrap;
     }
-    .task-state-toggle:hover {
+    .task-complete-check:hover {
       border-color: #bcd3ff;
       background: #f7fbff;
       color: var(--primary);
     }
-    .task-state-toggle.done {
+    .task-complete-check.done {
       border-color: #bbf7d0;
       background: var(--green-soft);
       color: #15803d;
     }
-    .task-state-toggle:disabled {
+    .task-complete-check.disabled {
       cursor: not-allowed;
       opacity: .62;
     }
-    .task-state-toggle i { width: 15px; height: 15px; }
+    .task-complete-check input {
+      margin: 0;
+    }
     .task-row-actions {
       min-width: 0;
       display: flex;
       align-items: center;
       gap: 6px;
       flex-wrap: nowrap;
-      justify-content: flex-end;
+      justify-content: flex-start;
     }
     .task-row-actions .mini-action {
       min-height: 32px;
@@ -924,7 +1111,7 @@
       width: 100%;
       padding: 10px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       color: var(--ink);
       text-align: left;
@@ -933,7 +1120,7 @@
     .check > svg { width: 16px; height: 16px; margin-top: 2px; color: var(--ink-soft); }
     .check strong { font-size: 13px; line-height: 1.35; font-weight: 750; }
     .check .badge { min-height: 22px; min-width: 22px; padding: 0 7px; font-size: 11px; }
-    .check:hover { background: #fff; border-color: #bcd3ff; }
+    .check:hover { background: #fff; border-color: #bcd3ff; box-shadow: var(--shadow-lift); }
     .check input { margin-top: 2px; }
     .check.done { color: var(--muted); }
     .section-gap { margin-top: 14px; }
@@ -996,11 +1183,11 @@
       gap: 8px;
       background: var(--panel);
       border: 1px solid var(--line);
-      border-radius: 8px;
-      box-shadow: var(--shadow);
+      border-radius: 10px;
+      box-shadow: var(--shadow-panel);
       min-height: 214px;
     }
-    .file-card:hover { border-color: #bcd3ff; box-shadow: none; }
+    .file-card:hover { border-color: #bcd3ff; box-shadow: var(--shadow-lift); }
     .file-card.broken {
       border-color: #fecaca;
       background: #fffafa;
@@ -1110,13 +1297,13 @@
       min-height: 58px;
       padding: 9px 10px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       display: grid;
       gap: 3px;
       text-align: left;
     }
-    .demand-status-item:hover { border-color: #bcd3ff; background: #f8fbff; }
+    .demand-status-item:hover { border-color: #bcd3ff; background: #f8fbff; box-shadow: var(--shadow-lift); }
     .demand-status-item.active {
       border-color: #93c5fd;
       background: var(--blue-soft);
@@ -1133,29 +1320,6 @@
       line-height: 1.25;
       white-space: nowrap;
     }
-    .demand-filter-bar {
-      display: flex;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-    .demand-filter-bar label {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      color: var(--muted);
-      font-size: 12px;
-      white-space: nowrap;
-    }
-    .demand-filter-bar select {
-      width: 150px;
-      min-height: 32px;
-      padding: 5px 8px;
-      font-size: 12px;
-      color: var(--ink);
-      background: var(--control);
-    }
     .demand-status-control {
       min-height: 30px;
       width: auto;
@@ -1168,13 +1332,78 @@
     }
     .linked-product {
       padding: 9px;
-      border-radius: 8px;
+      border-radius: 10px;
       border: 1px solid var(--line);
       background: #fff;
     }
     .settings-list {
       display: grid;
       gap: 8px;
+    }
+    .issue-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .issue-stat {
+      min-height: 68px;
+      padding: 11px 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-2);
+      display: grid;
+      gap: 4px;
+    }
+    .issue-stat strong {
+      font-size: 20px;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+    .issue-stat span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .issue-screenshot {
+      width: 86px;
+      height: 54px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      object-fit: cover;
+      background: var(--panel-3);
+      display: block;
+    }
+    .issue-description {
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      color: var(--ink-soft);
+      line-height: 1.45;
+    }
+    .issue-status-control {
+      min-height: 30px;
+      max-width: 108px;
+      padding: 4px 24px 4px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+      background-color: var(--control);
+    }
+    #issues .task-table {
+      min-width: 1040px;
+      table-layout: fixed;
+    }
+    #issues .task-table th:nth-child(1),
+    #issues .task-table td:nth-child(1) { width: 30%; }
+    #issues .task-table th:nth-child(2),
+    #issues .task-table td:nth-child(2) { width: 108px; }
+    #issues .task-table th:nth-child(7),
+    #issues .task-table td:nth-child(7) { width: 72px; }
+    #issues .table-actions {
+      width: auto;
+      justify-content: flex-start;
     }
     .setting-row {
       min-height: 58px;
@@ -1184,8 +1413,13 @@
       align-items: center;
       padding: 10px 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
+    }
+    .setting-row:hover {
+      border-color: var(--line-strong);
+      background: #fff;
+      box-shadow: var(--shadow-lift);
     }
     .setting-row strong {
       display: block;
@@ -1220,11 +1454,12 @@
     .demand-col-source { width: 72px; }
     .demand-col-owner { width: 84px; }
     .demand-col-created { width: 96px; }
-    .demand-col-actions { width: 172px; }
+    .demand-col-actions { width: 132px; }
     .demand-table td { vertical-align: middle; }
     .demand-table th:last-child,
     .demand-table td:last-child {
-      width: 172px;
+      width: 132px;
+      text-align: center;
     }
     .demand-table td:first-child strong {
       display: block;
@@ -1248,7 +1483,7 @@
     }
     .demand-table .table-actions {
       flex-wrap: nowrap;
-      justify-content: flex-end;
+      justify-content: center;
     }
     .demand-table .mini-action {
       white-space: nowrap;
@@ -1272,6 +1507,84 @@
     }
     .sort-button:hover { color: var(--ink); background: transparent; }
     .sort-button i { width: 13px; height: 13px; color: #94a3b8; }
+    .table-filter-head {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 24px;
+      white-space: nowrap;
+    }
+    .table-filter-trigger {
+      width: 22px;
+      height: 22px;
+      min-height: 22px;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      background: transparent;
+      color: #64748b;
+      box-shadow: none;
+      transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+    }
+    .table-filter-trigger:hover,
+    .table-filter-trigger:focus-visible {
+      background: #eef2f7;
+      color: var(--ink);
+    }
+    .table-filter-trigger.active,
+    .table-filter-trigger[aria-expanded="true"] {
+      border-color: transparent;
+      background: #eef4ff;
+      color: var(--primary);
+      box-shadow: inset 0 0 0 1px #bfdbfe;
+    }
+    .table-filter-trigger:focus-visible {
+      outline: 2px solid rgba(37, 99, 235, 0.3);
+      outline-offset: 2px;
+    }
+    .table-filter-trigger i,
+    .table-filter-trigger svg {
+      width: 13px;
+      height: 13px;
+      stroke-width: 2;
+    }
+    .table-filter-popover {
+      position: fixed;
+      z-index: var(--z-dropdown);
+      top: 0;
+      left: 0;
+      width: 178px;
+      padding: 4px;
+      display: grid;
+      gap: 2px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      box-shadow: var(--shadow-popover);
+      overflow: visible;
+    }
+    .table-filter-popover button {
+      min-height: 30px;
+      justify-content: flex-start;
+      border: 0;
+      border-radius: 6px;
+      padding: 6px 8px;
+      background: transparent;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 600;
+      text-align: left;
+      box-shadow: none;
+    }
+    .table-filter-popover button:hover,
+    .table-filter-popover button.active {
+      background: var(--blue-soft);
+      color: var(--primary);
+    }
     .table-actions {
       display: flex;
       align-items: center;
@@ -1293,7 +1606,7 @@
     .table-wrap {
       width: 100%;
       overflow-x: auto;
-      border-radius: 8px;
+      border-radius: 10px;
       border: 1px solid var(--line);
       background: var(--panel);
     }
@@ -1324,6 +1637,33 @@
       gap: 14px;
       flex-wrap: wrap;
       margin-bottom: 12px;
+    }
+    .review-table {
+      min-width: 1180px;
+      table-layout: fixed;
+    }
+    .review-table th:nth-child(1),
+    .review-table td:nth-child(1) { width: 170px; }
+    .review-table th:nth-child(2),
+    .review-table td:nth-child(2) { width: 92px; }
+    .review-table th:nth-child(3),
+    .review-table td:nth-child(3) { width: 240px; }
+    .review-table th:nth-child(4),
+    .review-table td:nth-child(4) { width: 190px; }
+    .review-table th:nth-child(5),
+    .review-table td:nth-child(5) { width: 110px; }
+    .review-table th:nth-child(6),
+    .review-table td:nth-child(6) { width: 284px; }
+    .review-table .table-actions {
+      width: auto;
+      justify-content: flex-start;
+      align-items: center;
+    }
+    .review-table .review-action-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: nowrap;
     }
     .review-progress {
       display: flex;
@@ -1392,12 +1732,12 @@
     .decision {
       padding: 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       display: grid;
       gap: 8px;
     }
-    .decision:hover { border-color: var(--line-strong); background: #fff; }
+    .decision:hover { border-color: var(--line-strong); background: #fff; box-shadow: var(--shadow-lift); }
     .decision strong { font-size: 15px; font-weight: 750; }
     .rules-table {
       width: 100%;
@@ -1435,14 +1775,14 @@
     .lifecycle-row {
       padding: 10px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel);
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-panel);
       font-size: 13px;
     }
     .lifecycle-row > *,
     .lifecycle-head > * { min-width: 0; }
-    .lifecycle-row:hover { border-color: var(--line-strong); background: var(--panel-2); }
+    .lifecycle-row:hover { border-color: var(--line-strong); background: var(--panel-2); box-shadow: var(--shadow-lift); }
     .lifecycle-product-cell {
       display: grid;
       gap: 8px;
@@ -1476,7 +1816,7 @@
     .lifecycle-data-panel {
       padding: 8px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
     }
     .metric-edit-grid label {
@@ -1510,17 +1850,17 @@
       grid-template-columns: repeat(2, minmax(0,1fr));
       gap: 10px;
     }
-    label.field { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+    label.field { display: grid; gap: 6px; font-size: 12px; color: var(--ink-soft); font-weight: 650; }
     input, select, textarea {
       width: 100%;
-      border: 1px solid var(--line-strong);
+      border: 1px solid var(--control-border);
       border-radius: 8px;
       background: var(--control);
       color: var(--ink);
       padding: 9px 10px;
       min-height: 38px;
       outline: none;
-      box-shadow: 0 1px 0 rgba(15, 23, 42, .02);
+      box-shadow: none;
     }
     input::placeholder,
     textarea::placeholder { color: #64748b; }
@@ -1534,7 +1874,135 @@
       background-size: 14px 14px;
     }
     textarea { resize: vertical; min-height: 86px; line-height: 1.45; }
-    input:focus, select:focus, textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 4px var(--ring); }
+    input:hover, select:hover, textarea:hover { border-color: var(--line-strong); }
+    input:focus, select:focus, textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px var(--ring); }
+    .owner-combobox {
+      position: relative;
+      min-width: 0;
+    }
+    .owner-trigger {
+      width: 100%;
+      min-height: 38px;
+      padding: 9px 10px;
+      border: 1px solid var(--control-border);
+      border-radius: 8px;
+      background: var(--control);
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      text-align: left;
+      box-shadow: none;
+    }
+    .owner-trigger.placeholder { color: #64748b; }
+    .owner-trigger:hover,
+    .owner-trigger[aria-expanded="true"] {
+      border-color: var(--line-strong);
+      background: var(--control-hover);
+    }
+    .owner-trigger:focus-visible {
+      outline: 2px solid rgba(37, 99, 235, .28);
+      outline-offset: 2px;
+    }
+    .owner-trigger span {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .owner-trigger i,
+    .owner-trigger svg {
+      width: 15px;
+      height: 15px;
+      color: var(--muted);
+      flex: 0 0 auto;
+    }
+    .owner-menu {
+      position: absolute;
+      z-index: var(--z-dropdown);
+      left: 0;
+      right: 0;
+      top: calc(100% + 6px);
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: var(--shadow-popover);
+    }
+    .owner-search {
+      display: grid;
+      grid-template-columns: 16px minmax(0, 1fr);
+      align-items: center;
+      gap: 7px;
+      padding: 6px 8px;
+      border: 1px solid var(--control-border);
+      border-radius: 8px;
+      background: var(--panel-2);
+    }
+    .owner-search i,
+    .owner-search svg {
+      width: 14px;
+      height: 14px;
+      color: var(--muted);
+    }
+    .owner-search input {
+      min-height: 22px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      box-shadow: none;
+      font-size: 12px;
+    }
+    .owner-options {
+      max-height: 220px;
+      overflow-y: auto;
+      margin-top: 6px;
+      display: grid;
+      gap: 2px;
+    }
+    .owner-option {
+      min-height: 42px;
+      padding: 7px 8px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      color: var(--ink);
+      text-align: left;
+      box-shadow: none;
+    }
+    .owner-option:hover,
+    .owner-option.active {
+      background: var(--blue-soft);
+      color: var(--primary);
+    }
+    .owner-option strong,
+    .owner-option span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .owner-option strong {
+      font-size: 12px;
+      line-height: 1.25;
+    }
+    .owner-option span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.2;
+    }
+    .owner-option i,
+    .owner-option svg {
+      width: 14px;
+      height: 14px;
+      color: var(--primary);
+    }
     input[type="checkbox"] {
       appearance: none;
       -webkit-appearance: none;
@@ -1576,8 +2044,8 @@
       display: none;
       align-items: center;
       justify-content: center;
-      background: rgba(15, 23, 42, .38);
-      z-index: 20;
+      background: rgba(15, 23, 42, .42);
+      z-index: var(--z-modal);
       padding: 20px;
       backdrop-filter: blur(6px);
     }
@@ -1585,13 +2053,57 @@
     .dialog {
       width: min(760px, 100%);
       max-height: calc(100vh - 40px);
-      overflow: auto;
+      overflow: hidden;
       background: var(--panel);
-      border-radius: 8px;
+      border-radius: 12px;
       border: 1px solid var(--line);
-      box-shadow: 0 8px 12px rgba(15,23,42,.18);
+      box-shadow: 0 24px 60px rgba(15,23,42,.22);
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
     }
     .modal.product-modal .dialog { width: min(980px, 100%); }
+    .feedback-dialog { width: min(640px, 100%); }
+    .feedback-shot-field {
+      display: grid;
+      grid-template-columns: 132px minmax(0, 1fr);
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-2);
+    }
+    .feedback-shot-preview {
+      width: 132px;
+      height: 86px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      object-fit: cover;
+      display: none;
+    }
+    .feedback-shot-preview.show { display: block; }
+    .feedback-shot-empty {
+      width: 132px;
+      height: 86px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--muted);
+      display: grid;
+      place-items: center;
+    }
+    .feedback-shot-empty.hidden { display: none !important; }
+    .feedback-shot-empty i,
+    .feedback-shot-empty svg {
+      width: 22px;
+      height: 22px;
+    }
+    .feedback-shot-copy {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
     .confirm-dialog { width: min(420px, 100%); }
     .confirm-message {
       color: var(--muted);
@@ -1611,22 +2123,34 @@
       word-break: break-word;
     }
     .dialog-head, .dialog-foot {
-      padding: 14px 16px;
+      position: sticky;
+      z-index: 1;
+      padding: 14px 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
       border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, .96);
+      backdrop-filter: blur(10px);
     }
-    .dialog-foot { border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
-    .dialog-body { padding: 16px; }
+    .dialog-head {
+      top: 0;
+    }
+    .dialog-head h2 {
+      font-size: 18px;
+      line-height: 1.25;
+      font-weight: 780;
+    }
+    .dialog-foot { bottom: 0; border-top: 1px solid var(--line); border-bottom: 0; justify-content: flex-end; }
+    .dialog-body { padding: 18px; overflow: auto; }
     .sync-dialog { width: min(620px, 100%); }
     .sync-target {
       display: grid;
       gap: 4px;
       padding: 10px 12px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       margin-bottom: 12px;
     }
@@ -1639,7 +2163,7 @@
       margin-bottom: 12px;
       padding: 4px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
     }
     .sync-action-switch button {
@@ -1659,7 +2183,7 @@
     .sync-action-switch button.active {
       background: var(--panel);
       color: var(--primary);
-      box-shadow: var(--shadow);
+      box-shadow: var(--shadow-panel);
     }
     .sync-action-switch i { width: 15px; height: 15px; }
     .sync-hint {
@@ -1683,7 +2207,7 @@
       align-items: center;
       padding: 8px 10px;
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--control);
     }
     .people-row:hover { border-color: var(--line-strong); background: var(--control-hover); }
@@ -1705,7 +2229,7 @@
     }
     .minutes-preview-card {
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       padding: 12px;
       display: grid;
@@ -1730,10 +2254,60 @@
     }
     .minutes-status.error { color: var(--red); }
     .minutes-status.ok { color: var(--green); }
+    .calendar-meeting-panel {
+      margin-top: 10px;
+      display: grid;
+      gap: 8px;
+    }
+    .calendar-meeting-list {
+      max-height: 190px;
+      overflow: auto;
+      display: grid;
+      gap: 6px;
+    }
+    .calendar-meeting-option {
+      width: 100%;
+      min-height: 52px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--control);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+      text-align: left;
+    }
+    .calendar-meeting-option:hover,
+    .calendar-meeting-option.active {
+      border-color: #bfdbfe;
+      background: var(--blue-soft);
+    }
+    .calendar-meeting-option strong,
+    .calendar-meeting-option span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .calendar-meeting-option strong {
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .calendar-meeting-option span {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.25;
+    }
+    .calendar-meeting-option .badge {
+      min-height: 22px;
+      font-size: 11px;
+    }
     .global-loading {
       position: fixed;
       inset: 0;
-      z-index: 80;
+      z-index: var(--z-loading);
       display: none;
       align-items: center;
       justify-content: center;
@@ -1746,9 +2320,9 @@
       width: min(320px, 100%);
       padding: 18px;
       border: 1px solid var(--line);
-      border-radius: 10px;
+      border-radius: 12px;
       background: var(--panel);
-      box-shadow: 0 12px 28px rgba(15, 23, 42, .14);
+      box-shadow: 0 18px 44px rgba(15, 23, 42, .18);
       display: grid;
       justify-items: center;
       gap: 9px;
@@ -1772,19 +2346,19 @@
       min-width: 240px;
       max-width: 360px;
       padding: 12px 14px;
-      border-radius: 8px;
+      border-radius: 10px;
       background: #0f172a;
       color: #fff;
       box-shadow: 0 14px 32px rgba(15,23,42,.24);
       display: none;
-      z-index: 30;
+      z-index: var(--z-dropdown);
       font-size: 13px;
     }
     .toast.show { display: block; }
     .hidden { display: none !important; }
     .empty {
       border: 1px dashed var(--line-strong);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 18px;
       color: var(--muted);
       text-align: center;
@@ -1795,7 +2369,7 @@
       min-height: 168px;
       padding: 28px;
       border: 1px dashed var(--line-strong);
-      border-radius: 8px;
+      border-radius: 10px;
       background: var(--panel-2);
       display: grid;
       place-items: center;
@@ -1888,6 +2462,9 @@
       .role-grid { grid-template-columns: 1fr; }
       .minutes-grid { grid-template-columns: 1fr; }
       .minutes-preview-card img { max-height: 320px; object-fit: contain; }
+      .issue-summary { grid-template-columns: 1fr; }
+      .feedback-shot-field { grid-template-columns: 1fr; }
+      .floating-feedback { right: 16px; bottom: 18px; }
     }
     @media (max-width: 720px) {
       .main { padding: 4px 0 16px; }
@@ -1898,7 +2475,7 @@
       .task-table { min-width: 680px; }
       .demand-status-strip { grid-template-columns: 1fr; }
       .package-drop-hint { align-items: flex-start; }
-      .task-edit-row { grid-template-columns: 104px 360px 168px 180px 142px 104px 176px; min-width: 1326px; }
+      .task-edit-row { grid-template-columns: 104px 360px 168px 180px 142px 268px; min-width: 1266px; }
       .sync-meeting-fields { grid-template-columns: 1fr; }
       .dialog-foot { flex-wrap: wrap; }
       .product-profile-hero { grid-template-columns: 1fr; }
@@ -1949,6 +2526,7 @@
         <button data-screen="workflow"><i data-lucide="git-branch"></i><span>产品进度</span></button>
         <button data-screen="reviews"><i data-lucide="clipboard-check"></i><span>评审决策</span></button>
         <button data-screen="lifecycle"><i data-lucide="activity"></i><span>生命周期</span></button>
+        <button data-screen="issues"><i data-lucide="message-circle-warning"></i><span>BUG 优化</span></button>
         <button data-screen="settings"><i data-lucide="settings"></i><span>设置</span></button>
       </nav>
     </aside>
@@ -1968,7 +2546,6 @@
             <option value="清仓中">清仓中</option>
             <option value="已淘汰">已淘汰</option>
           </select>
-          <select class="hidden" id="productSelect" title="切换产品"></select>
           <button class="btn primary hidden" id="newIdea"><i data-lucide="plus"></i>添加机会</button>
           <div class="user-pill" id="userPill">
             <span id="userRoleName">未登录</span>
@@ -2023,17 +2600,6 @@
               <button class="btn primary" id="addDemand"><i data-lucide="plus"></i>添加机会</button>
             </div>
             <div class="demand-status-strip" id="demandStatusStrip"></div>
-            <div class="demand-filter-bar">
-              <label>等级
-                <select id="demandLevelFilter" aria-label="筛选需求等级">
-                  <option value="all">全部等级</option>
-                  <option value="P0 重点品">P0 重点品</option>
-                  <option value="P1 常规新品">P1 常规新品</option>
-                  <option value="P2 小改/补充品">P2 小改/补充品</option>
-                  <option value="应季品">应季品</option>
-                </select>
-              </label>
-            </div>
             <div class="table-wrap section-gap">
               <table class="task-table demand-table">
                 <colgroup>
@@ -2050,7 +2616,21 @@
                   <tr>
                     <th>机会名称</th>
                     <th>状态</th>
-                    <th>等级</th>
+                    <th>
+                      <span class="table-filter-head">
+                        <span>等级</span>
+                        <button type="button" class="table-filter-trigger" data-demand-level-filter-toggle aria-label="筛选等级" aria-expanded="false">
+                          <i data-lucide="filter"></i>
+                        </button>
+                        <span class="table-filter-popover hidden" id="demandLevelFilterMenu" role="menu" aria-label="筛选需求等级">
+                          <button type="button" data-demand-level-filter="all" role="menuitem">全部等级</button>
+                          <button type="button" data-demand-level-filter="P0 重点品" role="menuitem">P0 重点品</button>
+                          <button type="button" data-demand-level-filter="P1 常规新品" role="menuitem">P1 常规新品</button>
+                          <button type="button" data-demand-level-filter="P2 小改/补充品" role="menuitem">P2 小改/补充品</button>
+                          <button type="button" data-demand-level-filter="应季品" role="menuitem">应季品</button>
+                        </span>
+                      </span>
+                    </th>
                     <th>讨论摘要</th>
                     <th>来源</th>
                     <th>负责人</th>
@@ -2070,12 +2650,55 @@
           <div class="section-toolbar">
             <div class="section-title">
               <h2>产品列表</h2>
-              <p>产品只能从需求池转入开发后生成；这里负责查看状态、阶段、资料和会议记录。</p>
             </div>
           </div>
           <div class="product-list">
-            <div class="product-list-head" aria-hidden="true">
-              <span>产品</span><span>状态</span><span>等级</span><span>阶段</span><span>操作</span>
+            <div class="product-list-head">
+              <span>产品</span>
+              <span class="table-filter-head">
+                <span>状态</span>
+                <button type="button" class="table-filter-trigger" data-product-filter-toggle="status" aria-label="筛选状态" aria-expanded="false">
+                  <i data-lucide="filter"></i>
+                </button>
+                <span class="table-filter-popover hidden" id="productStatusFilterMenu" role="menu" aria-label="筛选产品状态">
+                  <button type="button" data-product-filter="status" data-product-filter-value="all" role="menuitem">全部状态</button>
+                  <button type="button" data-product-filter="status" data-product-filter-value="开发中" role="menuitem">开发中</button>
+                  <button type="button" data-product-filter="status" data-product-filter-value="上市筹备" role="menuitem">上市筹备</button>
+                  <button type="button" data-product-filter="status" data-product-filter-value="维持观察" role="menuitem">维持观察</button>
+                  <button type="button" data-product-filter="status" data-product-filter-value="清仓中" role="menuitem">清仓中</button>
+                  <button type="button" data-product-filter="status" data-product-filter-value="已淘汰" role="menuitem">已淘汰</button>
+                </span>
+              </span>
+              <span class="table-filter-head">
+                <span>等级</span>
+                <button type="button" class="table-filter-trigger" data-product-filter-toggle="level" aria-label="筛选等级" aria-expanded="false">
+                  <i data-lucide="filter"></i>
+                </button>
+                <span class="table-filter-popover hidden" id="productLevelFilterMenu" role="menu" aria-label="筛选产品等级">
+                  <button type="button" data-product-filter="level" data-product-filter-value="all" role="menuitem">全部等级</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="P0 重点品" role="menuitem">P0 重点品</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="P1 常规新品" role="menuitem">P1 常规新品</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="P2 小改/补充品" role="menuitem">P2 小改/补充品</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="应季品" role="menuitem">应季品</button>
+                </span>
+              </span>
+              <span class="table-filter-head">
+                <span>阶段</span>
+                <button type="button" class="table-filter-trigger" data-product-filter-toggle="stage" aria-label="筛选阶段" aria-expanded="false">
+                  <i data-lucide="filter"></i>
+                </button>
+                <span class="table-filter-popover hidden" id="productStageFilterMenu" role="menu" aria-label="筛选产品阶段">
+                  <button type="button" data-product-filter="stage" data-product-filter-value="all" role="menuitem">全部阶段</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="0" role="menuitem">机会准备</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="1" role="menuitem">立项</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="2" role="menuitem">打样研发</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="3" role="menuitem">测试</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="4" role="menuitem">上市筹备</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="5" role="menuitem">上市复盘</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="6" role="menuitem">生命周期</button>
+                </span>
+              </span>
+              <span>操作</span>
             </div>
             <div class="product-list" id="productList"></div>
           </div>
@@ -2087,7 +2710,6 @@
           <div class="panel-head">
             <div>
               <h2>产品进度</h2>
-              <p class="small">每个阶段都拆成会前准备、会议/决策、会后交付、下一阶段准入。</p>
               <div class="workflow-product" id="workflowProduct"></div>
             </div>
             <span class="badge blue" id="workflowStage">-</span>
@@ -2174,8 +2796,33 @@
         </div>
       </section>
 
+      <section class="screen" id="issues">
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2>BUG 优化</h2>
+              <p class="small">员工提交的问题和截图会进入这里，由总经办统一判断优先级和处理状态。</p>
+            </div>
+            <span class="badge blue">总经办</span>
+          </div>
+          <div class="issue-summary" id="issueSummary"></div>
+          <div class="table-wrap">
+            <table class="task-table">
+              <thead>
+                <tr><th>问题描述</th><th>截图</th><th>提交人</th><th>部门/职位</th><th>提交时间</th><th>状态</th><th>操作</th></tr>
+              </thead>
+              <tbody id="issueRows"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
     </main>
   </div>
+
+  <button class="floating-feedback hidden" id="feedbackButton" type="button" aria-label="提出问题">
+    <i data-lucide="message-circle-question"></i><span>提问题</span>
+  </button>
 
   <div class="modal" id="modal">
     <div class="dialog">
@@ -2219,11 +2866,20 @@
               <option>应季品</option>
             </select>
           </label>
-          <label class="field">负责人<input id="formOwner" placeholder="产品部"></label>
+          <label class="field">负责人
+            <div class="owner-combobox" id="ownerCombobox">
+              <button type="button" class="owner-trigger placeholder" id="ownerPickerButton" aria-haspopup="listbox" aria-expanded="false">
+                <span id="ownerPickerLabel">选择负责人</span><i data-lucide="chevron-down"></i>
+              </button>
+              <input type="hidden" id="formOwner">
+              <div class="owner-menu hidden" id="ownerPickerMenu">
+                <div class="owner-search"><i data-lucide="search"></i><input id="ownerSearch" placeholder="搜索姓名、岗位、部门"></div>
+                <div class="owner-options" id="ownerOptions" role="listbox"></div>
+              </div>
+            </div>
+          </label>
           <label class="field">来源部门
-            <select id="formSource">
-              <option>产品部</option><option>运营</option><option>高层</option><option>客服</option><option>品牌</option><option>供应链</option>
-            </select>
+            <select id="formSource"></select>
           </label>
           <label class="field span-all"><span id="formDescLabel">机会描述</span><textarea id="formDesc" placeholder="看到什么市场机会、用户痛点、供应链可能性"></textarea></label>
           <label class="field span-all" id="discussionField">讨论摘要<textarea id="formDiscussion" placeholder="讨论后的判断、争议点、下一步结论"></textarea></label>
@@ -2231,7 +2887,7 @@
       </div>
       <div class="dialog-foot">
         <button class="btn ghost" id="cancelModal">取消</button>
-        <button class="btn primary" id="saveModal"><i data-lucide="save"></i>保存</button>
+        <button class="btn primary" id="saveModal" disabled><i data-lucide="save"></i>保存</button>
       </div>
     </div>
   </div>
@@ -2280,6 +2936,10 @@
             <label class="field">钉钉会议 ID / 录制资源 ID
               <input id="minutesRecordingId" placeholder="开启云录制（闪记）后的 conferenceId">
             </label>
+            <div class="calendar-meeting-panel">
+              <button class="btn" id="loadCalendarMeetings" type="button"><i data-lucide="calendar-search"></i>从日历选择会议</button>
+              <div class="calendar-meeting-list hidden" id="calendarMeetingList"></div>
+            </div>
             <label class="field section-gap">会议纪要文本
               <textarea id="minutesText" placeholder="可从钉钉闪记复制纪要，也可以填写讨论结论、关键争议和行动项。"></textarea>
             </label>
@@ -2315,6 +2975,37 @@
       </div>
     </div>
   </div>
+  <div class="modal" id="feedbackModal" role="dialog" aria-modal="true" aria-labelledby="feedbackTitle">
+    <div class="dialog feedback-dialog">
+      <div class="dialog-head">
+        <h2 id="feedbackTitle">提出问题</h2>
+        <button class="icon-btn" id="closeFeedbackModal" aria-label="关闭"><i data-lucide="x"></i></button>
+      </div>
+      <div class="dialog-body">
+        <div class="form-grid">
+          <label class="field span-all">问题描述
+            <textarea id="feedbackDesc" placeholder="请描述你在哪里遇到问题、期望结果是什么、实际发生了什么"></textarea>
+          </label>
+          <label class="field span-all">截图
+            <div class="feedback-shot-field">
+              <img class="feedback-shot-preview" id="feedbackShotPreview" alt="问题截图预览">
+              <div class="feedback-shot-empty" id="feedbackShotEmpty"><i data-lucide="image"></i></div>
+              <div class="feedback-shot-copy">
+                <strong>上传一张截图</strong>
+                <p class="small">截图是必填项，方便总经办判断页面、按钮或数据位置。</p>
+                <label class="mini-action"><i data-lucide="upload"></i>选择截图<input class="hidden" type="file" id="feedbackShotFile" accept="image/*"></label>
+                <input type="hidden" id="feedbackShot">
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button class="btn ghost" id="cancelFeedbackModal">取消</button>
+        <button class="btn primary" id="saveFeedback" disabled><i data-lucide="send"></i>提交</button>
+      </div>
+    </div>
+  </div>
   <div class="toast" id="toast"></div>
   <div class="global-loading" id="globalLoading" aria-live="polite" aria-busy="true">
     <div class="global-loading-card">
@@ -2331,7 +3022,8 @@
       Task: "阶段任务。通过 productId 归属产品，通过 stage 归属 7 个流程阶段。",
       Deliverable: "资料包文件。通过 productId 归属产品，通过 stage 归属自然产生的流程节点。",
       Review: "评审会议。通过 productId 归属产品，实际通过状态由会议任务完成 + 会议纪要内容共同决定。",
-      Decision: "会议或生命周期决策记录。通过 productId 回溯到产品。"
+      Decision: "会议或生命周期决策记录。通过 productId 回溯到产品。",
+      FeedbackIssue: "员工使用系统时提交的问题反馈。包含问题描述、截图、提交人和处理状态，只在总经办后台集中查看。"
     });
 
     const stages = [
@@ -2427,6 +3119,7 @@
     const productStatuses = ["开发中", "上市筹备", "维持观察", "清仓中", "已淘汰"];
     const demandPoolStatuses = ["待讨论", "讨论中", "已讨论", "暂缓"];
     const allScreens = ["dashboard", "demands", "products", "workflow", "reviews", "lifecycle"];
+    const issueStatuses = ["待处理", "处理中", "已解决"];
     const screenLabels = {
       dashboard: "总览",
       demands: "需求池",
@@ -2434,6 +3127,7 @@
       workflow: "产品进度",
       reviews: "评审决策",
       lifecycle: "生命周期",
+      issues: "BUG 优化",
       settings: "设置"
     };
     const permissionLabels = {
@@ -2582,6 +3276,9 @@
     let selectedStage = currentProduct()?.stage || 0;
     let demandStatusFilter = "all";
     let demandLevelFilter = "all";
+    let productStatusFilter = "all";
+    let productLevelFilter = "all";
+    let productStageFilter = "all";
     let todoDateRange = { start: formatDateInput(defaultTodoWeek.start), end: formatDateInput(defaultTodoWeek.end) };
     let modalMode = "idea";
     let focusedTaskId = "";
@@ -2662,6 +3359,11 @@
       if (!org || org.version !== "org-v1") return;
       orgCache = org;
       localStorage.setItem("productFlowOrgCache", JSON.stringify(org));
+      if (document.getElementById("modal")?.classList.contains("open")) {
+        renderSourceOptions(document.getElementById("formSource")?.value || "");
+        renderOwnerOptions(document.getElementById("ownerSearch")?.value || "");
+        updateModalSaveState();
+      }
     }
     function orgCacheExpired() {
       return !orgCache || Date.now() > Date.parse(orgCache.expiresAt || 0);
@@ -2768,6 +3470,123 @@
       if (!query) return users;
       return users.filter(user => [user.name, user.title, ...(user.departmentNames || []), ...(user.roles || []).map(role => role.name || "")].join(" ").toLowerCase().includes(query));
     }
+    function uniqueStrings(values = []) {
+      return [...new Set(values.map(value => String(value || "").trim()).filter(Boolean))];
+    }
+    function orgDepartmentOptions(selected = "") {
+      const orgNames = uniqueStrings([
+        ...(orgCache?.departments || []).map(dept => dept.name || dept.deptName || dept.departmentName),
+        ...(orgCache?.users || []).flatMap(user => user.departmentNames || [])
+      ]);
+      const fallbackNames = uniqueStrings([
+        ...state.products.map(product => product.source),
+        ...state.demands.map(demand => demand.source),
+        ...currentUserDepartments()
+      ]);
+      return uniqueStrings([selected, ...(orgNames.length ? orgNames : fallbackNames)]);
+    }
+    function ownerFallbackNames(selected = "") {
+      const ding = currentUser?.dingUser || {};
+      return uniqueStrings([
+        selected,
+        ...state.products.map(product => product.owner),
+        ...state.demands.map(demand => demand.owner),
+        ding.name
+      ]);
+    }
+    function ownerCandidates(selected = "") {
+      const users = orgUsers();
+      if (users.length) {
+        const candidates = users.map(user => ({
+          value: user.name || dingUserId(user) || dingUnionId(user),
+          label: user.name || dingUserId(user) || dingUnionId(user),
+          meta: dingUserLabel(user) || "未设置岗位"
+        })).filter(user => user.value);
+        if (selected && !candidates.some(user => user.value === selected)) {
+          candidates.unshift({ value: selected, label: selected, meta: "当前记录" });
+        }
+        return candidates;
+      }
+      return ownerFallbackNames(selected).map(name => ({ value: name, label: name, meta: "本地记录" }));
+    }
+    function filterOwnerCandidates(keyword = "") {
+      const selected = document.getElementById("formOwner")?.value || "";
+      const query = keyword.trim().toLowerCase();
+      const candidates = ownerCandidates(selected);
+      if (!query) return candidates;
+      return candidates.filter(user => [user.label, user.meta].join(" ").toLowerCase().includes(query));
+    }
+    function renderSourceOptions(selected = "") {
+      const select = document.getElementById("formSource");
+      if (!select) return;
+      const options = orgDepartmentOptions(selected);
+      select.innerHTML = `<option value="">选择来源部门</option>${options.map(dept => `<option value="${esc(dept)}">${esc(dept)}</option>`).join("")}`;
+      select.value = selected || "";
+    }
+    function setOwnerPickerValue(value = "") {
+      const input = document.getElementById("formOwner");
+      const label = document.getElementById("ownerPickerLabel");
+      const button = document.getElementById("ownerPickerButton");
+      if (!input || !label || !button) return;
+      input.value = value || "";
+      label.textContent = value || "选择负责人";
+      button.classList.toggle("placeholder", !value);
+      renderOwnerOptions(document.getElementById("ownerSearch")?.value || "");
+      updateModalSaveState();
+    }
+    function renderOwnerOptions(keyword = "") {
+      const list = document.getElementById("ownerOptions");
+      const selected = document.getElementById("formOwner")?.value || "";
+      if (!list) return;
+      const users = filterOwnerCandidates(keyword);
+      list.innerHTML = users.map(user => `
+        <button type="button" class="owner-option ${user.value === selected ? "active" : ""}" data-owner-value="${esc(user.value)}" role="option" aria-selected="${user.value === selected ? "true" : "false"}">
+          <span><strong>${esc(user.label)}</strong><span>${esc(user.meta)}</span></span>
+          ${user.value === selected ? `<i data-lucide="check"></i>` : ""}
+        </button>
+      `).join("") || `<div class="empty">没有匹配的负责人。请先同步钉钉组织架构。</div>`;
+      list.querySelectorAll("[data-owner-value]").forEach(button => button.addEventListener("click", () => {
+        setOwnerPickerValue(button.dataset.ownerValue || "");
+        closeOwnerPicker();
+        if (window.lucide) lucide.createIcons();
+      }));
+    }
+    function closeOwnerPicker() {
+      const menu = document.getElementById("ownerPickerMenu");
+      const button = document.getElementById("ownerPickerButton");
+      if (menu) menu.classList.add("hidden");
+      if (button) button.setAttribute("aria-expanded", "false");
+    }
+    function modalRequiredValues() {
+      return {
+        name: document.getElementById("formName")?.value.trim() || "",
+        owner: document.getElementById("formOwner")?.value.trim() || "",
+        level: document.getElementById("formLevel")?.value || "",
+        source: document.getElementById("formSource")?.value || "",
+        desc: document.getElementById("formDesc")?.value.trim() || ""
+      };
+    }
+    function missingModalFields() {
+      const values = modalRequiredValues();
+      return [
+        ["name", "产品/机会名称"],
+        ["owner", "负责人"],
+        ["level", "产品等级"],
+        ["source", "来源部门"],
+        ["desc", modalMode === "productEdit" ? "产品描述" : "机会描述"]
+      ].filter(([key]) => !values[key]).map(([, label]) => label);
+    }
+    function updateModalSaveState() {
+      const saveButton = document.getElementById("saveModal");
+      if (saveButton) saveButton.disabled = missingModalFields().length > 0;
+    }
+    function validateModalForm() {
+      const missing = missingModalFields();
+      if (!missing.length) return true;
+      toast(`请先填写：${missing.join("、")}`);
+      updateModalSaveState();
+      return false;
+    }
     function ensureDingSyncReady() {
       if (currentUser?.source !== "dingtalk") {
         toast("需要从钉钉登录后才能同步待办或日历。");
@@ -2793,6 +3612,7 @@
     }
     function screenAllowed(screen) {
       if (screen === "settings") return canViewSettings();
+      if (screen === "issues") return canViewSettings();
       if (screen === "deliverables") return currentRole().screens.includes("products");
       return currentRole().screens.includes(screen);
     }
@@ -2877,6 +3697,8 @@
       if (addDemandButton) addDemandButton.classList.toggle("hidden", !can("addIdea"));
       const newIdeaButton = document.getElementById("newIdea");
       if (newIdeaButton && !can("addIdea")) newIdeaButton.classList.add("hidden");
+      const feedbackButton = document.getElementById("feedbackButton");
+      if (feedbackButton) feedbackButton.classList.toggle("hidden", !currentUser);
       renderLogin();
     }
     function dingApiBase() {
@@ -3051,6 +3873,7 @@
         type: inferAssetType(`${doc.name || ""} ${doc.url || ""}`, doc.mimeType || doc.mime || "")
       })));
       data.dingMeetings = Array.isArray(data.dingMeetings) ? data.dingMeetings : [];
+      data.feedbackIssues = Array.isArray(data.feedbackIssues) ? data.feedbackIssues : [];
       return data;
     }
     function productImageSeed(name) {
@@ -3825,6 +4648,7 @@
       renderDeliverables();
       renderReviews();
       renderLifecycle();
+      renderIssues();
       renderSettings();
       applyPermissions();
       if (window.lucide) lucide.createIcons();
@@ -3833,7 +4657,65 @@
     }
     function renderProductSelect() {
       const select = document.getElementById("productSelect");
+      if (!select) return;
       select.innerHTML = state.products.map(p => `<option value="${esc(p.id)}" ${p.id === currentId ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+    }
+    function workflowProductOptionHtml(product) {
+      const fallback = fallbackProductImage(product.name || "产品");
+      const active = product.id === currentId;
+      return `<button class="workflow-product-option ${active ? "active" : ""}" type="button" data-workflow-product="${esc(product.id)}" role="option" aria-selected="${active ? "true" : "false"}">
+        <img class="product-thumb small" src="${esc(productImage(product))}" alt="${esc(product.name)}" data-fallback="${esc(fallback)}" loading="lazy" decoding="async">
+        <span>
+          <strong>${esc(product.name)}</strong>
+          <span>${esc(product.level || "-")} · ${esc(stages[product.stage]?.short || "-")} · ${esc(product.owner || "-")}</span>
+        </span>
+        ${active ? `<i data-lucide="check"></i>` : ""}
+      </button>`;
+    }
+    function closeWorkflowProductMenu() {
+      const menu = document.getElementById("workflowProductMenu");
+      const trigger = document.querySelector("[data-workflow-product-toggle]");
+      if (menu) menu.classList.add("hidden");
+      if (trigger) trigger.setAttribute("aria-expanded", "false");
+    }
+    function positionWorkflowProductMenu(trigger, menu) {
+      if (!trigger || !menu) return;
+      const gap = 7;
+      const edge = 12;
+      const rect = trigger.getBoundingClientRect();
+      const menuWidth = menu.offsetWidth || 300;
+      const menuHeight = menu.scrollHeight || 300;
+      const left = Math.min(window.innerWidth - menuWidth - edge, Math.max(edge, rect.right - menuWidth));
+      const top = Math.min(window.innerHeight - menuHeight - edge, Math.max(edge, rect.bottom + gap));
+      menu.style.left = `${Math.round(left)}px`;
+      menu.style.top = `${Math.round(top)}px`;
+    }
+    function bindWorkflowProductSwitcher(root) {
+      const trigger = root.querySelector("[data-workflow-product-toggle]");
+      const menu = root.querySelector("#workflowProductMenu");
+      if (!trigger || !menu) return;
+      trigger.addEventListener("click", event => {
+        event.stopPropagation();
+        const willOpen = menu.classList.contains("hidden");
+        closeWorkflowProductMenu();
+        if (willOpen) {
+          menu.classList.remove("hidden");
+          trigger.setAttribute("aria-expanded", "true");
+          positionWorkflowProductMenu(trigger, menu);
+        }
+      });
+      menu.addEventListener("click", event => event.stopPropagation());
+      menu.querySelectorAll("[data-workflow-product]").forEach(button => {
+        button.addEventListener("click", () => {
+          const product = productById(button.dataset.workflowProduct);
+          if (!product) return;
+          currentId = product.id;
+          selectedStage = product.stage;
+          activeMinuteDocId = "";
+          closeWorkflowProductMenu();
+          renderAll();
+        });
+      });
     }
     function renderSidebar() {
       const p = currentProduct();
@@ -3884,7 +4766,16 @@
       const workflowStage = document.getElementById("workflowStage");
       if (workflowStage) workflowStage.textContent = stages[p.stage].name;
       const workflowProduct = document.getElementById("workflowProduct");
-      if (workflowProduct) workflowProduct.innerHTML = productIdentityHtml(p, `${p.level} · ${p.owner} · ${p.status}`, { compact: true });
+      if (workflowProduct) {
+        workflowProduct.innerHTML = `<div class="workflow-product-card">
+          ${productIdentityHtml(p, `${p.level} · ${p.owner} · ${p.status}`, { compact: true })}
+          <button class="workflow-product-toggle" type="button" data-workflow-product-toggle aria-label="切换产品" aria-expanded="false" aria-controls="workflowProductMenu"><i data-lucide="chevrons-up-down"></i></button>
+        </div>
+        <div class="workflow-product-menu hidden" id="workflowProductMenu" role="listbox" aria-label="切换产品">
+          ${state.products.map(workflowProductOptionHtml).join("")}
+        </div>`;
+        bindWorkflowProductSwitcher(workflowProduct);
+      }
       document.querySelectorAll("[data-stage]").forEach(el => el.addEventListener("click", () => {
         selectedStage = Number(el.dataset.stage);
         renderAll();
@@ -3911,17 +4802,19 @@
         </div>
       </div>
       <div class="task-edit-row task-edit-head">
-        <span>类别</span><span>任务内容</span><span>责任部门</span><span>交付物</span><span>截止</span><span>完成</span><span>操作</span>
+        <span>类别</span><span>任务内容</span><span>责任部门</span><span>交付物</span><span>截止</span><span>操作</span>
       </div>
       ${tasks.map(t => {
         const todoSync = syncStatusHtml(t.dingTodo, "待办已同步");
-        const taskActions = taskEditable
-          ? `<div class="task-row-actions">
-              ${currentUser?.source === "dingtalk" ? `<button class="mini-action" data-sync-task="${esc(t.id)}"><i data-lucide="send"></i>同步待办</button>` : ""}
-              ${todoSync}
-              <button class="mini-action icon-only danger" title="删除任务" aria-label="删除任务" data-delete-task="${esc(t.id)}"><i data-lucide="trash-2"></i></button>
-            </div>`
-          : `<span class="small">只读</span>`;
+        const taskActions = `<div class="task-row-actions">
+          <label class="task-complete-check ${t.done ? "done" : ""} ${taskEditable ? "" : "disabled"}">
+            <input type="checkbox" data-task-done="${esc(t.id)}" ${t.done ? "checked" : ""} ${disabled}>
+            ${t.done ? "已完成" : "未完成"}
+          </label>
+          <button class="mini-action" data-sync-task="${esc(t.id)}"><i data-lucide="send"></i>同步待办</button>
+          ${todoSync}
+          ${taskEditable ? `<button class="mini-action icon-only danger" title="删除任务" aria-label="删除任务" data-delete-task="${esc(t.id)}"><i data-lucide="trash-2"></i></button>` : ""}
+        </div>`;
         return `<div class="task-edit-row ${focusedTaskId === t.id ? "focused" : ""}" data-edit-task="${esc(t.id)}">
         <select data-task-field="category" ${disabled}>
           ${["会前准备", "会议/决策", "会后交付", "准入条件", "补充任务"].map(v => `<option value="${v}" ${t.category === v ? "selected" : ""}>${v}</option>`).join("")}
@@ -3930,9 +4823,6 @@
         <input data-task-field="owner" value="${esc(t.owner)}" ${disabled}>
         <input data-task-field="deliverable" value="${esc(t.deliverable)}" ${disabled}>
         <input type="date" data-task-field="due" value="${esc(taskDueInputValue(t.due))}" ${disabled}>
-        <button type="button" class="task-state-toggle ${t.done ? "done" : ""}" data-task-done="${esc(t.id)}" aria-pressed="${t.done ? "true" : "false"}" ${disabled}>
-          <i data-lucide="${t.done ? "check-circle-2" : "circle"}"></i>${t.done ? "已完成" : "完成"}
-        </button>
         ${taskActions}
       </div>`;
       }).join("") || emptyStateHtml("这个阶段还没有任务", taskEditable ? "点击右上角“加任务”，补充这个阶段需要推进的事项。" : "当前账号只读，暂无这个阶段的任务记录。", "list-plus")}`;
@@ -3940,10 +4830,10 @@
         const eventName = input.type === "checkbox" || input.type === "date" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateStageTask(input.closest("[data-edit-task]").dataset.editTask, input.dataset.taskField, input.type === "checkbox" ? input.checked : input.value));
       });
-      document.querySelectorAll("[data-task-done]").forEach(button => {
-        button.addEventListener("click", () => {
-          const task = state.tasks.find(item => item.id === button.dataset.taskDone);
-          if (task) toggleTask(task.id, !task.done);
+      document.querySelectorAll("[data-task-done]").forEach(input => {
+        input.addEventListener("change", () => {
+          const task = state.tasks.find(item => item.id === input.dataset.taskDone);
+          if (task) toggleTask(task.id, input.checked);
         });
       });
       const setStageButton = document.getElementById("setSelectedStage");
@@ -4069,6 +4959,58 @@
     function isDemandInPool(demand) {
       return demandPoolStatuses.includes(demand.status) && !demand.productId;
     }
+    function syncDemandLevelFilterMenu() {
+      const trigger = document.querySelector("[data-demand-level-filter-toggle]");
+      const menu = document.getElementById("demandLevelFilterMenu");
+      if (!trigger || !menu) return;
+      const active = demandLevelFilter !== "all";
+      trigger.classList.toggle("active", active);
+      trigger.setAttribute("aria-label", active ? `筛选等级：${demandLevelFilter}` : "筛选等级");
+      menu.querySelectorAll("[data-demand-level-filter]").forEach(btn => {
+        btn.classList.toggle("active", (btn.dataset.demandLevelFilter || "all") === demandLevelFilter);
+      });
+    }
+    function productFilterValue(type) {
+      if (type === "status") return productStatusFilter;
+      if (type === "level") return productLevelFilter;
+      if (type === "stage") return productStageFilter;
+      return "all";
+    }
+    function setProductFilterValue(type, value) {
+      if (type === "status") productStatusFilter = value || "all";
+      if (type === "level") productLevelFilter = value || "all";
+      if (type === "stage") productStageFilter = value || "all";
+    }
+    function syncProductFilterMenus() {
+      document.querySelectorAll("[data-product-filter-toggle]").forEach(trigger => {
+        const type = trigger.dataset.productFilterToggle;
+        const value = productFilterValue(type);
+        const active = value !== "all";
+        trigger.classList.toggle("active", active);
+        const label = type === "status" ? "状态" : type === "level" ? "等级" : "阶段";
+        trigger.setAttribute("aria-label", active ? `筛选${label}：${value}` : `筛选${label}`);
+      });
+      document.querySelectorAll("[data-product-filter]").forEach(button => {
+        button.classList.toggle("active", productFilterValue(button.dataset.productFilter) === (button.dataset.productFilterValue || "all"));
+      });
+    }
+    function positionTableFilterMenu(trigger, menu) {
+      if (!trigger || !menu) return;
+      const gap = 6;
+      const edge = 12;
+      const rect = trigger.getBoundingClientRect();
+      const menuWidth = menu.offsetWidth || 178;
+      const menuHeight = menu.scrollHeight || 178;
+      const left = Math.min(window.innerWidth - menuWidth - edge, Math.max(edge, rect.right - menuWidth));
+      const top = Math.min(window.innerHeight - menuHeight - edge, Math.max(edge, rect.bottom + gap));
+      menu.style.left = `${Math.round(left)}px`;
+      menu.style.top = `${Math.round(top)}px`;
+    }
+    function closeTableFilterMenus() {
+      document.querySelectorAll(".table-filter-popover").forEach(menu => menu.classList.add("hidden"));
+      document.querySelectorAll("[data-demand-level-filter-toggle]").forEach(btn => btn.setAttribute("aria-expanded", "false"));
+      document.querySelectorAll("[data-product-filter-toggle]").forEach(btn => btn.setAttribute("aria-expanded", "false"));
+    }
     function renderDemandPool() {
       const demands = state.demands || [];
       const visibleDemandRecords = demands.filter(isDemandInPool);
@@ -4096,8 +5038,8 @@
                 ${demandPoolStatuses.map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
               </select>`;
           const rowActions = [];
-          if (demandConvertible && d.status === "已讨论") rowActions.push(`<button class="mini-action" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i>转开发</button>`);
-          if (product) rowActions.push(`<button class="mini-action" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i>查看产品</button>`);
+          if (demandConvertible && d.status === "已讨论") rowActions.push(`<button class="mini-action icon-only" title="转入开发" aria-label="转入开发" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i></button>`);
+          if (product) rowActions.push(`<button class="mini-action icon-only" title="查看产品" aria-label="查看产品" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i></button>`);
           if (demandEditable) rowActions.push(`<button class="mini-action icon-only" title="编辑需求" aria-label="编辑需求" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i></button>`);
           if (demandEditable) rowActions.push(`<button class="mini-action icon-only danger" title="删除需求" aria-label="删除需求" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i></button>`);
           return `<tr>
@@ -4113,14 +5055,28 @@
         }).join("") || `<tr><td colspan="8">${emptyStateHtml("暂无需求机会", "当前筛选下没有机会记录。可以切换状态筛选，或添加新的市场反馈、竞品线索和内部想法。", "list-filter")}</td></tr>`;
       }
       document.querySelectorAll("[data-demand-filter]").forEach(btn => btn.addEventListener("click", () => { demandStatusFilter = btn.dataset.demandFilter || "all"; renderDemandPool(); if (window.lucide) lucide.createIcons(); }));
-      const levelFilter = document.getElementById("demandLevelFilter");
-      if (levelFilter) {
-        levelFilter.value = demandLevelFilter;
-        levelFilter.onchange = () => {
-          demandLevelFilter = levelFilter.value || "all";
-          renderDemandPool();
-          if (window.lucide) lucide.createIcons();
+      syncDemandLevelFilterMenu();
+      const levelToggle = document.querySelector("[data-demand-level-filter-toggle]");
+      const levelMenu = document.getElementById("demandLevelFilterMenu");
+      if (levelToggle && levelMenu) {
+        levelToggle.onclick = event => {
+          event.stopPropagation();
+          const willOpen = levelMenu.classList.contains("hidden");
+          closeTableFilterMenus();
+          levelMenu.classList.toggle("hidden", !willOpen);
+          if (willOpen) positionTableFilterMenu(levelToggle, levelMenu);
+          levelToggle.setAttribute("aria-expanded", willOpen ? "true" : "false");
         };
+        levelMenu.querySelectorAll("[data-demand-level-filter]").forEach(btn => {
+          btn.onclick = event => {
+            event.stopPropagation();
+            demandLevelFilter = btn.dataset.demandLevelFilter || "all";
+            closeTableFilterMenus();
+            syncDemandLevelFilterMenu();
+            renderDemandPool();
+            if (window.lucide) lucide.createIcons();
+          };
+        });
       }
       document.querySelectorAll("[data-demand-convert]").forEach(btn => btn.addEventListener("click", () => convertDemandToProduct(btn.dataset.demandConvert)));
       document.querySelectorAll("[data-edit-demand]").forEach(btn => btn.addEventListener("click", () => openModal("demandEdit", btn.dataset.editDemand)));
@@ -4129,7 +5085,10 @@
       document.querySelectorAll("[data-select-product]").forEach(btn => btn.addEventListener("click", () => selectProductAndNavigate(btn.dataset.selectProduct, "products")));
     }
     function renderProducts() {
-      const list = state.products;
+      let list = state.products;
+      if (productStatusFilter !== "all") list = list.filter(product => product.status === productStatusFilter);
+      if (productLevelFilter !== "all") list = list.filter(product => product.level === productLevelFilter);
+      if (productStageFilter !== "all") list = list.filter(product => String(product.stage) === productStageFilter);
       const productEditable = can("editProduct");
       const productDeletable = can("deleteProduct");
       document.getElementById("productList").innerHTML = list.map(p => `<div class="product-row archive-row">
@@ -4145,7 +5104,31 @@
           ${productEditable ? `<button class="mini-action icon-only" title="编辑产品" aria-label="编辑产品" data-edit-product="${esc(p.id)}"><i data-lucide="pencil"></i></button>` : ""}
           ${productDeletable ? `<button class="mini-action icon-only danger" title="删除产品" aria-label="删除产品" data-delete-product="${esc(p.id)}"><i data-lucide="trash-2"></i></button>` : ""}
         </div></div>
-      </div>`).join("") || emptyStateHtml("没有符合筛选条件的产品", "可以切换右上角状态筛选；产品档案只能从需求池转入开发后生成。", "package");
+      </div>`).join("") || emptyStateHtml("没有符合筛选条件的产品", "可以在表头切换状态、等级或阶段筛选；产品档案只能从需求池转入开发后生成。", "package");
+      syncProductFilterMenus();
+      document.querySelectorAll("[data-product-filter-toggle]").forEach(trigger => {
+        trigger.onclick = event => {
+          event.stopPropagation();
+          const type = trigger.dataset.productFilterToggle;
+          const menu = document.getElementById(`product${type.charAt(0).toUpperCase()}${type.slice(1)}FilterMenu`);
+          if (!menu) return;
+          const willOpen = menu.classList.contains("hidden");
+          closeTableFilterMenus();
+          menu.classList.toggle("hidden", !willOpen);
+          if (willOpen) positionTableFilterMenu(trigger, menu);
+          trigger.setAttribute("aria-expanded", willOpen ? "true" : "false");
+        };
+      });
+      document.querySelectorAll("[data-product-filter]").forEach(button => {
+        button.onclick = event => {
+          event.stopPropagation();
+          setProductFilterValue(button.dataset.productFilter, button.dataset.productFilterValue || "all");
+          closeTableFilterMenus();
+          syncProductFilterMenus();
+          renderProducts();
+          if (window.lucide) lucide.createIcons();
+        };
+      });
       document.querySelectorAll("#productList [data-open-product]").forEach(btn => btn.addEventListener("click", () => selectProductAndNavigate(btn.dataset.openProduct, btn.dataset.productTarget || "workflow")));
       document.querySelectorAll("#productList [data-edit-product]").forEach(btn => btn.addEventListener("click", () => openModal("productEdit", btn.dataset.editProduct)));
       document.querySelectorAll("#productList [data-delete-product]").forEach(btn => btn.addEventListener("click", () => deleteProduct(btn.dataset.deleteProduct)));
@@ -4211,7 +5194,7 @@
           <div class="review-progress"><span>会议通过</span><span class="badge ${passedCount === meetings.length ? "green" : "gold"}">${passedCount}/${meetings.length}</span></div>
         </div>
         <div class="table-wrap">
-          <table class="task-table">
+          <table class="task-table review-table">
             <thead><tr><th>会议</th><th>阶段</th><th>纪要 / 决策文件</th><th>责任人</th><th>会议状态</th><th>操作</th></tr></thead>
             <tbody>
               ${states.map(({ meeting, state }) => {
@@ -4295,6 +5278,68 @@
       document.getElementById("ruleRows").innerHTML = rules.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("");
       document.querySelectorAll("[data-product-status]").forEach(select => select.addEventListener("change", () => updateProductStatus(select.dataset.productStatus, select.value)));
       document.querySelectorAll("[data-product-metric]").forEach(input => input.addEventListener("change", () => updateProductMetric(input.dataset.productMetric, input.value)));
+    }
+    function issueSubmitterMeta() {
+      const ding = currentUser?.dingUser || {};
+      const orgUser = currentDingOrgUser();
+      const name = orgUser?.name || ding.name || currentRole().name || "未登录用户";
+      const department = highestByPriority([
+        ...(orgUser?.departmentNames || []),
+        ...(ding.departmentNames || []),
+        currentRole().dept
+      ], departmentPriority);
+      const title = highestByPriority([
+        orgUser?.title,
+        ding.title,
+        ...(orgUser?.roles || []).map(role => role.name || role.groupName || ""),
+        ...(ding.roles || []).map(role => role.name || role.groupName || ""),
+        currentRole().name
+      ], titlePriority);
+      return {
+        name,
+        role: currentUser?.role || "readonly",
+        department,
+        title,
+        label: [department, title].filter(Boolean).join(" / ") || "-"
+      };
+    }
+    function formatIssueTime(date = new Date()) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const hh = String(date.getHours()).padStart(2, "0");
+      const min = String(date.getMinutes()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd} ${hh}:${min}`;
+    }
+    function renderIssues() {
+      const rows = document.getElementById("issueRows");
+      const summary = document.getElementById("issueSummary");
+      if (!rows || !summary) return;
+      const issues = state.feedbackIssues || [];
+      summary.innerHTML = [
+        ["待处理", issues.filter(issue => issue.status === "待处理").length],
+        ["处理中", issues.filter(issue => issue.status === "处理中").length],
+        ["已解决", issues.filter(issue => issue.status === "已解决").length]
+      ].map(([label, count]) => `<div class="issue-stat"><strong>${count}</strong><span>${esc(label)}</span></div>`).join("");
+      rows.innerHTML = issues.map(issue => `
+        <tr>
+          <td><p class="issue-description">${esc(issue.desc)}</p></td>
+          <td><img class="issue-screenshot" src="${esc(issue.screenshot)}" alt="问题截图"></td>
+          <td>${esc(issue.submitter || "-")}</td>
+          <td>${esc(issue.submitterMeta || "-")}</td>
+          <td>${esc(issue.createdAt || "-")}</td>
+          <td>
+            <select class="issue-status-control" data-issue-status="${esc(issue.id)}" aria-label="调整问题状态">
+              ${issueStatuses.map(status => `<option value="${status}" ${issue.status === status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>
+          </td>
+          <td><div class="table-actions">
+            <button class="mini-action icon-only danger" title="删除问题" aria-label="删除问题" data-delete-issue="${esc(issue.id)}"><i data-lucide="trash-2"></i></button>
+          </div></td>
+        </tr>
+      `).join("") || `<tr><td colspan="7">${emptyStateHtml("暂无员工反馈", "右侧悬浮按钮提交的问题会出现在这里。", "message-circle-warning")}</td></tr>`;
+      document.querySelectorAll("[data-issue-status]").forEach(select => select.addEventListener("change", () => updateIssueStatus(select.dataset.issueStatus, select.value)));
+      document.querySelectorAll("[data-delete-issue]").forEach(button => button.addEventListener("click", () => deleteIssue(button.dataset.deleteIssue)));
     }
     function renderSettings() {
       const systemRows = document.getElementById("systemSettingsRows");
@@ -4646,6 +5691,94 @@
       el.textContent = message;
       el.className = `minutes-status ${type}`.trim();
     }
+    function meetingCalendarRange() {
+      const start = new Date();
+      start.setDate(start.getDate() - 14);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date();
+      end.setDate(end.getDate() + 30);
+      end.setHours(23, 59, 59, 999);
+      return { timeMin: start.toISOString(), timeMax: end.toISOString() };
+    }
+    function formatCalendarMeetingTime(value = "") {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value || "-";
+      const mm = String(date.getMonth() + 1).padStart(2, "0");
+      const dd = String(date.getDate()).padStart(2, "0");
+      const hh = String(date.getHours()).padStart(2, "0");
+      const min = String(date.getMinutes()).padStart(2, "0");
+      return `${mm}-${dd} ${hh}:${min}`;
+    }
+    function renderCalendarMeetingOptions(events = []) {
+      const list = document.getElementById("calendarMeetingList");
+      if (!list) return;
+      const currentId = document.getElementById("minutesRecordingId").value.trim();
+      list.classList.remove("hidden");
+      list.innerHTML = events.map(event => `
+        <button type="button" class="calendar-meeting-option ${event.conferenceId === currentId ? "active" : ""}" data-calendar-conference="${esc(event.conferenceId)}" data-calendar-title="${esc(event.summary || "钉钉会议")}">
+          <span><strong>${esc(event.summary || "钉钉会议")}</strong><span>${esc(formatCalendarMeetingTime(event.startTime))} - ${esc(formatCalendarMeetingTime(event.endTime))}</span></span>
+          <span class="badge blue">选择</span>
+        </button>
+      `).join("") || `<div class="empty">没有找到带会议 ID 的钉钉日历会议。请确认会议来自钉钉日程且已开启云录制（闪记）。</div>`;
+      list.querySelectorAll("[data-calendar-conference]").forEach(button => button.addEventListener("click", () => {
+        document.getElementById("minutesRecordingId").value = button.dataset.calendarConference || "";
+        setMinutesMessage(`已选择日历会议：${button.dataset.calendarTitle || "钉钉会议"}。可以点击“从钉钉同步”读取纪要。`, "ok");
+        renderCalendarMeetingOptions(events);
+      }));
+      if (window.lucide) lucide.createIcons();
+    }
+    async function loadCalendarMeetingsForMinutes() {
+      if (currentUser?.source !== "dingtalk") {
+        setMinutesMessage("需要从钉钉登录后才能读取当前账号日历会议。", "error");
+        toast("需要从钉钉登录后才能读取日历会议。");
+        return;
+      }
+      const userUnionId = currentUser?.dingUser?.unionid || "";
+      if (!userUnionId) {
+        setMinutesMessage("当前登录账号缺少 unionId，无法查询日历会议。", "error");
+        return;
+      }
+      const button = document.getElementById("loadCalendarMeetings");
+      button.disabled = true;
+      setMinutesMessage("正在读取当前账号日历会议...");
+      try {
+        await withGlobalLoading("正在读取钉钉日历会议", async () => {
+          const { timeMin, timeMax } = meetingCalendarRange();
+          const product = productById(minutesProductId);
+          const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
+          const res = await fetch(`${dingApiBase()}/api/dingtalk/calendar/events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userUnionId,
+              timeMin,
+              timeMax,
+              maxResults: 60
+            })
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.synced) throw new Error(formatDingSyncError(payload, "钉钉日历会议查询失败"));
+          const keyword = [product?.name, meeting?.title].filter(Boolean).join(" ");
+          const events = (payload.events || [])
+            .filter(event => event.conferenceId)
+            .sort((a, b) => {
+              const aText = `${a.summary || ""} ${a.description || ""}`;
+              const bText = `${b.summary || ""} ${b.description || ""}`;
+              const aMatch = keyword && keyword.split(/\s+/).some(word => word && aText.includes(word)) ? 0 : 1;
+              const bMatch = keyword && keyword.split(/\s+/).some(word => word && bText.includes(word)) ? 0 : 1;
+              if (aMatch !== bMatch) return aMatch - bMatch;
+              return Date.parse(b.startTime || 0) - Date.parse(a.startTime || 0);
+            });
+          renderCalendarMeetingOptions(events);
+          setMinutesMessage(events.length ? `已找到 ${events.length} 个带会议 ID 的日历会议，请选择对应会议。` : "没有找到可同步纪要的钉钉会议。", events.length ? "ok" : "error");
+        });
+      } catch (error) {
+        setMinutesMessage(error.message || "钉钉日历会议查询失败", "error");
+        toast(error.message || "钉钉日历会议查询失败");
+      } finally {
+        button.disabled = false;
+      }
+    }
     function updateMinutesPosterPreview() {
       const product = productById(minutesProductId);
       const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
@@ -4666,6 +5799,8 @@
       document.getElementById("minutesTargetMeta").textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
       document.getElementById("minutesRecordingId").value = "";
       document.getElementById("minutesText").value = existing?.content || "";
+      document.getElementById("calendarMeetingList").classList.add("hidden");
+      document.getElementById("calendarMeetingList").innerHTML = "";
       setMinutesMessage("需要钉钉会议录制（闪记）的会议 ID；应用还要具备视频会议读权限。");
       updateMinutesPosterPreview();
       document.getElementById("minutesModal").classList.add("open");
@@ -5266,8 +6401,9 @@
           : null;
       document.getElementById("formName").value = target?.name || "";
       document.getElementById("formLevel").value = target?.level || "P1 常规新品";
-      document.getElementById("formOwner").value = target?.owner || "赵雨涵";
-      document.getElementById("formSource").value = target?.source || "产品部";
+      document.getElementById("ownerSearch").value = "";
+      renderSourceOptions(target?.source || "");
+      setOwnerPickerValue(target?.owner || "");
       document.getElementById("formDesc").value = target?.desc || "";
       document.getElementById("formDiscussion").value = target?.discussion || "";
       const discussionField = document.getElementById("discussionField");
@@ -5291,13 +6427,17 @@
         document.getElementById("productMetaRows").innerHTML = "";
         document.getElementById("productDiscussionRecord").innerHTML = "";
       }
+      updateModalSaveState();
       document.getElementById("modal").classList.add("open");
+      if (window.lucide) lucide.createIcons();
     }
     function closeModal() {
       document.getElementById("modal").classList.remove("open");
     }
     function saveModal() {
       const name = document.getElementById("formName").value.trim();
+      if (!validateModalForm()) return;
+      const formValues = modalRequiredValues();
       if (!name) {
         toast("请先填写产品/机会名称。");
         return;
@@ -5306,11 +6446,11 @@
         if (denyIfCannot("editDemand")) return;
         const demand = state.demands.find(d => d.id === editingId);
         if (!demand) return;
-        demand.name = name;
-        demand.level = document.getElementById("formLevel").value;
-        demand.owner = document.getElementById("formOwner").value.trim() || "产品部";
-        demand.source = document.getElementById("formSource").value;
-        demand.desc = document.getElementById("formDesc").value.trim() || demand.desc;
+        demand.name = formValues.name;
+        demand.level = formValues.level;
+        demand.owner = formValues.owner;
+        demand.source = formValues.source;
+        demand.desc = formValues.desc;
         demand.discussion = document.getElementById("formDiscussion").value.trim();
         closeModal();
         toast("需求机会已更新。");
@@ -5321,11 +6461,11 @@
         if (denyIfCannot("editProduct")) return;
         const product = productById(editingId);
         if (!product) return;
-        product.name = name;
-        product.level = document.getElementById("formLevel").value;
-        product.owner = document.getElementById("formOwner").value.trim() || "产品部";
-        product.source = document.getElementById("formSource").value;
-        product.desc = document.getElementById("formDesc").value.trim() || product.desc;
+        product.name = formValues.name;
+        product.level = formValues.level;
+        product.owner = formValues.owner;
+        product.source = formValues.source;
+        product.desc = formValues.desc;
         product.image = document.getElementById("formImage").value.trim() || generateProductImage(product.name);
         const demand = sourceDemandForProduct(product);
         if (demand) {
@@ -5342,15 +6482,15 @@
       if (denyIfCannot("addIdea")) return;
       const item = {
         id: cryptoId(),
-        name,
-        level: document.getElementById("formLevel").value,
-        owner: document.getElementById("formOwner").value.trim() || "产品部",
-        source: document.getElementById("formSource").value,
+        name: formValues.name,
+        level: formValues.level,
+        owner: formValues.owner,
+        source: formValues.source,
         status: modalMode === "product" ? "开发中" : "待讨论",
         stage: 0,
         launch: "-",
         sales: 0, score: 0, returnRate: 0, profit: 0,
-        desc: document.getElementById("formDesc").value.trim() || "新机会已进入机会池，等待初筛。"
+        desc: formValues.desc
       };
       state.demands.unshift({
         id: item.id,
@@ -5366,6 +6506,83 @@
           });
       closeModal();
       toast("机会已进入需求池。");
+      renderAll();
+    }
+    function resetFeedbackModal() {
+      document.getElementById("feedbackDesc").value = "";
+      document.getElementById("feedbackShot").value = "";
+      document.getElementById("feedbackShotFile").value = "";
+      const preview = document.getElementById("feedbackShotPreview");
+      preview.removeAttribute("src");
+      preview.classList.remove("show");
+      document.getElementById("feedbackShotEmpty").classList.remove("hidden");
+      updateFeedbackSaveState();
+    }
+    function feedbackRequiredValues() {
+      return {
+        desc: document.getElementById("feedbackDesc")?.value.trim() || "",
+        screenshot: document.getElementById("feedbackShot")?.value || ""
+      };
+    }
+    function updateFeedbackSaveState() {
+      const values = feedbackRequiredValues();
+      const save = document.getElementById("saveFeedback");
+      if (save) save.disabled = !values.desc || !values.screenshot;
+    }
+    function openFeedbackModal() {
+      if (!currentUser) {
+        toast("请先登录后再提交问题。");
+        return;
+      }
+      resetFeedbackModal();
+      document.getElementById("feedbackModal").classList.add("open");
+      if (window.lucide) lucide.createIcons();
+    }
+    function closeFeedbackModal() {
+      document.getElementById("feedbackModal").classList.remove("open");
+    }
+    function saveFeedbackIssue() {
+      const values = feedbackRequiredValues();
+      if (!values.desc || !values.screenshot) {
+        toast("请先填写问题描述并上传截图。");
+        updateFeedbackSaveState();
+        return;
+      }
+      const submitter = issueSubmitterMeta();
+      state.feedbackIssues.unshift({
+        id: cryptoId(),
+        desc: values.desc,
+        screenshot: values.screenshot,
+        submitter: submitter.name,
+        submitterMeta: submitter.label,
+        submitterRole: submitter.role,
+        createdAt: formatIssueTime(),
+        status: "待处理"
+      });
+      closeFeedbackModal();
+      toast("问题已提交，总经办会在 BUG 优化里处理。");
+      renderAll();
+    }
+    function updateIssueStatus(id, status) {
+      if (!canViewSettings()) return;
+      const issue = (state.feedbackIssues || []).find(item => item.id === id);
+      if (!issue || !issueStatuses.includes(status)) return;
+      issue.status = status;
+      toast(`问题状态已调整为：${status}`);
+      renderAll();
+    }
+    async function deleteIssue(id) {
+      if (!canViewSettings()) return;
+      const issue = (state.feedbackIssues || []).find(item => item.id === id);
+      if (!issue) return;
+      if (!await requestConfirm({
+        title: "删除问题反馈",
+        message: "删除后这条员工反馈不会再出现在 BUG 优化列表里。",
+        name: issue.desc,
+        confirmText: "删除"
+      })) return;
+      state.feedbackIssues = (state.feedbackIssues || []).filter(item => item.id !== id);
+      toast("问题反馈已删除。");
       renderAll();
     }
     function updateStageTask(id, field, value) {
@@ -5465,6 +6682,7 @@
       deliverables: ["资料包", "像文件夹一样管理这个产品的文档、图片、视频、链接和会议纪要。"],
       reviews: ["评审决策", "会议任务完成且纪要内容非空，才算评审通过。"],
       lifecycle: ["生命周期看板", "从首月/季度复盘形成决策，再按升级、维持、清仓或淘汰路径推进。"],
+      issues: ["BUG 优化", "集中查看员工提交的问题描述和截图，安排修复或体验优化。"],
       settings: ["系统设置", "总经办维护公司级规则、组织架构状态和岗位权限范围。"]
     };
     function navigateToScreen(screen) {
@@ -5476,8 +6694,7 @@
       document.getElementById("pageTitle").textContent = pageTitles[screen][0];
       document.getElementById("pageSub").textContent = pageTitles[screen][1];
       document.getElementById("statusFilter").classList.add("hidden");
-      document.getElementById("productSelect").classList.toggle("hidden", screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "lifecycle" || screen === "settings");
-      document.getElementById("newIdea").classList.toggle("hidden", !can("addIdea") || screen === "dashboard" || screen === "demands" || screen === "products" || screen === "deliverables" || screen === "reviews" || screen === "lifecycle" || screen === "settings");
+      document.getElementById("newIdea").classList.toggle("hidden", !can("addIdea") || screen === "dashboard" || screen === "demands" || screen === "products" || screen === "workflow" || screen === "deliverables" || screen === "reviews" || screen === "lifecycle" || screen === "issues" || screen === "settings");
     }
     function syncTodoDateInputs() {
       const start = document.getElementById("todoStartDate");
@@ -5490,7 +6707,8 @@
       if (!btn) return;
       navigateToScreen(btn.dataset.screen);
     });
-    document.getElementById("productSelect").addEventListener("change", e => { currentId = e.target.value; selectedStage = currentProduct().stage; activeMinuteDocId = ""; renderAll(); });
+    document.addEventListener("click", closeWorkflowProductMenu);
+    window.addEventListener("resize", closeWorkflowProductMenu);
     const todoStartInput = document.getElementById("todoStartDate");
     if (todoStartInput) todoStartInput.addEventListener("change", e => { todoDateRange.start = e.target.value; renderTasks(); if (window.lucide) lucide.createIcons(); });
     const todoEndInput = document.getElementById("todoEndDate");
@@ -5505,9 +6723,64 @@
     document.getElementById("switchUser").addEventListener("click", logoutUser);
     document.getElementById("newIdea").addEventListener("click", () => openModal("idea"));
     document.getElementById("addDemand").addEventListener("click", () => openModal("idea"));
+    document.getElementById("feedbackButton").addEventListener("click", openFeedbackModal);
+    document.getElementById("closeFeedbackModal").addEventListener("click", closeFeedbackModal);
+    document.getElementById("cancelFeedbackModal").addEventListener("click", closeFeedbackModal);
+    document.getElementById("saveFeedback").addEventListener("click", saveFeedbackIssue);
+    document.getElementById("feedbackDesc").addEventListener("input", updateFeedbackSaveState);
+    document.getElementById("feedbackShotFile").addEventListener("change", e => {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      if (!file.type.startsWith("image/")) {
+        e.target.value = "";
+        toast("请上传图片格式的截图。");
+        updateFeedbackSaveState();
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const value = String(reader.result || "");
+        document.getElementById("feedbackShot").value = value;
+        const preview = document.getElementById("feedbackShotPreview");
+        preview.src = value;
+        preview.classList.add("show");
+        document.getElementById("feedbackShotEmpty").classList.add("hidden");
+        updateFeedbackSaveState();
+      };
+      reader.onerror = () => {
+        e.target.value = "";
+        toast("截图读取失败，请重新选择。");
+        updateFeedbackSaveState();
+      };
+      reader.readAsDataURL(file);
+    });
     document.getElementById("closeModal").addEventListener("click", closeModal);
     document.getElementById("cancelModal").addEventListener("click", closeModal);
     document.getElementById("saveModal").addEventListener("click", saveModal);
+    ["formName", "formLevel", "formSource", "formDesc"].forEach(id => {
+      const field = document.getElementById(id);
+      if (!field) return;
+      const eventName = field.tagName === "SELECT" ? "change" : "input";
+      field.addEventListener(eventName, updateModalSaveState);
+    });
+    document.getElementById("ownerPickerButton").addEventListener("click", event => {
+      event.stopPropagation();
+      const menu = document.getElementById("ownerPickerMenu");
+      const willOpen = menu.classList.contains("hidden");
+      closeOwnerPicker();
+      if (willOpen) {
+        renderOwnerOptions(document.getElementById("ownerSearch").value || "");
+        menu.classList.remove("hidden");
+        document.getElementById("ownerPickerButton").setAttribute("aria-expanded", "true");
+        document.getElementById("ownerSearch").focus();
+        if (window.lucide) lucide.createIcons();
+      }
+    });
+    document.getElementById("ownerPickerMenu").addEventListener("click", event => event.stopPropagation());
+    document.getElementById("ownerSearch").addEventListener("input", event => {
+      renderOwnerOptions(event.target.value || "");
+      if (window.lucide) lucide.createIcons();
+    });
     document.getElementById("closeSyncModal").addEventListener("click", closeSyncModal);
     document.getElementById("cancelSyncModal").addEventListener("click", closeSyncModal);
     document.getElementById("confirmSyncModal").addEventListener("click", confirmSyncModal);
@@ -5516,6 +6789,7 @@
     document.getElementById("cancelMinutesModal").addEventListener("click", closeMinutesModal);
     document.getElementById("saveMinutesModal").addEventListener("click", saveMinutesModal);
     document.getElementById("syncMinutesFromDing").addEventListener("click", syncMinutesFromDing);
+    document.getElementById("loadCalendarMeetings").addEventListener("click", loadCalendarMeetingsForMinutes);
     document.getElementById("minutesText").addEventListener("input", updateMinutesPosterPreview);
     document.getElementById("closeConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
     document.getElementById("cancelConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
@@ -5542,9 +6816,12 @@
       toast("已按产品名称重新生成封面。");
     });
     document.getElementById("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(); });
+    document.getElementById("feedbackModal").addEventListener("click", e => { if (e.target.id === "feedbackModal") closeFeedbackModal(); });
     document.getElementById("minutesModal").addEventListener("click", e => { if (e.target.id === "minutesModal") closeMinutesModal(); });
     document.getElementById("confirmDialog").addEventListener("click", e => { if (e.target.id === "confirmDialog") closeConfirmDialog(false); });
     document.addEventListener("click", e => {
+      if (!e.target.closest(".owner-combobox")) closeOwnerPicker();
+      if (!e.target.closest(".table-filter-head")) closeTableFilterMenus();
       const target = e.target.closest("button");
       if (!target) return;
       if (target.dataset.riskProduct) {
@@ -5568,6 +6845,8 @@
       }
       if (target.id === "completeAllVisible") completeCurrentStage();
     });
+    window.addEventListener("resize", closeTableFilterMenus);
+    window.addEventListener("scroll", closeTableFilterMenus, true);
     document.getElementById("syncModal").addEventListener("click", e => {
       if (e.target.id === "syncModal") closeSyncModal();
       const actionButton = e.target.closest("[data-sync-action]");
