@@ -5720,10 +5720,11 @@
           <span class="badge blue">选择</span>
         </button>
       `).join("") || `<div class="empty">没有找到带会议 ID 的钉钉日历会议。请确认会议来自钉钉日程且已开启云录制（闪记）。</div>`;
-      list.querySelectorAll("[data-calendar-conference]").forEach(button => button.addEventListener("click", () => {
+      list.querySelectorAll("[data-calendar-conference]").forEach(button => button.addEventListener("click", async () => {
         document.getElementById("minutesRecordingId").value = button.dataset.calendarConference || "";
-        setMinutesMessage(`已选择日历会议：${button.dataset.calendarTitle || "钉钉会议"}。可以点击“从钉钉同步”读取纪要。`, "ok");
+        setMinutesMessage(`已选择日历会议：${button.dataset.calendarTitle || "钉钉会议"}，正在同步纪要。`, "ok");
         renderCalendarMeetingOptions(events);
+        await syncMinutesFromDing();
       }));
       if (window.lucide) lucide.createIcons();
     }

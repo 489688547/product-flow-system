@@ -82,6 +82,7 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /userUnionId,\s+timeMin,\s+timeMax,\s+maxResults: 60/);
   assert.match(html, /event\.conferenceId/);
   assert.match(html, /document\.getElementById\("minutesRecordingId"\)\.value = button\.dataset\.calendarConference \|\| "";/);
+  assert.match(html, /await syncMinutesFromDing\(\);/);
   assert.match(html, /正在读取钉钉日历会议/);
 });
 
