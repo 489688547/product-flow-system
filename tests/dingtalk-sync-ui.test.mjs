@@ -94,7 +94,7 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /scheduleConferenceId: recordingId/);
   assert.match(html, /payload\.resolvedConferenceId/);
   assert.match(html, /可读取/);
-  assert.match(html, /未返回/);
+  assert.match(html, /无云录制/);
   assert.match(html, /minute-state/);
   assert.match(html, /AI 纪要\/闪记/);
   assert.match(html, /await syncMinutesFromDing\(\);/);

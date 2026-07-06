@@ -3057,7 +3057,7 @@
             <label class="field section-gap">会议纪要文本
               <textarea id="minutesText" placeholder="可从钉钉闪记复制纪要，也可以填写讨论结论、关键争议和行动项。"></textarea>
             </label>
-            <p class="minutes-status" id="minutesStatus">需要钉钉会议录制（闪记）的会议 ID；应用还要具备视频会议读权限。</p>
+            <p class="minutes-status" id="minutesStatus">开启了云录制的会议可自动同步文本；只有 AI 听记（闪记）的会议，钉钉暂未开放读取接口，请复制正文粘贴到下方。</p>
           </div>
           <aside class="minutes-preview-card">
             <strong>生成资料</strong>
@@ -6011,7 +6011,7 @@
     function calendarMinuteState(event = {}) {
       if (event.minuteState === "ready") return { text: "可读取", className: "ready" };
       if (event.minuteState === "found") return { text: "有听记", className: "ready" };
-      if (event.minuteState === "empty") return { text: "未返回", className: "empty" };
+      if (event.minuteState === "empty") return { text: "无云录制", className: "empty" };
       if (event.minuteState === "auth") return { text: "需授权", className: "error" };
       if (event.minuteState === "permission") return { text: "缺权限", className: "error" };
       if (event.minuteState === "error") return { text: "不可读", className: "error" };
@@ -6085,7 +6085,7 @@
           return;
         }
         if (event?.minuteState === "empty") {
-          setMinutesMessage("没有匹配到这个日历会议对应的 AI 听记或云录制文本。请换一个可读取的会议，或直接粘贴会议纪要后生成资料。", "error");
+          setMinutesMessage("这个会议没有云录制文本。钉钉目前只开放了云录制文本接口（AI 听记暂未开放）：以后开会请开启云录制；本次可打开钉钉闪记复制正文粘贴到下方生成资料。", "error");
           return;
         }
         if (event?.minuteState === "permission") {
@@ -6152,7 +6152,8 @@
           const readyCount = checkedEvents.filter(event => event.minuteState === "ready").length;
           const foundCount = checkedEvents.filter(event => event.minuteState === "found").length;
           const aiTip = lastAiMinutesDetectError ? ` AI 听记检测受限：${lastAiMinutesDetectError}` : "";
-          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount + foundCount} 个匹配到 AI 听记/纪要。${aiTip}`, readyCount + foundCount ? "ok" : "error");
+          const noneTip = readyCount + foundCount ? "" : " 这些会议都没有云录制文本：钉钉暂未开放 AI 听记读取接口，以后开会请开启云录制，本次可手动粘贴纪要正文。";
+          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount + foundCount} 个匹配到 AI 听记/纪要。${noneTip}${aiTip}`, readyCount + foundCount ? "ok" : "error");
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉日历会议查询失败", "error");
