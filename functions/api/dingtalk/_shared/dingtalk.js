@@ -131,9 +131,8 @@ async function requestDingOpenApi(accessToken, method, path, body, fetchImpl = f
 
 export async function getDingDepartments(accessToken, fetchImpl = fetch, rootDeptId = 1) {
   const root = Number(rootDeptId) || 1;
-  const departments = [];
+  const departmentsById = new Map();
   const visited = new Set();
-  const collected = new Set();
   async function visit(parentId) {
     const normalizedParentId = Number(parentId) || 1;
     if (visited.has(normalizedParentId)) return;
@@ -145,15 +144,64 @@ export async function getDingDepartments(accessToken, fetchImpl = fetch, rootDep
     const children = Array.isArray(result) ? result : result.list || [];
     for (const child of children) {
       const childId = Number(child.dept_id || child.deptId);
-      if (childId && !collected.has(childId)) {
-        departments.push(child);
-        collected.add(childId);
+      if (childId && !departmentsById.has(String(childId))) {
+        departmentsById.set(String(childId), child);
       }
       await visit(childId);
     }
   }
   await visit(root);
-  return departments;
+
+  try {
+    const ids = await getDingSubDepartmentIds(accessToken, fetchImpl, root);
+    for (const id of ids) {
+      if (departmentsById.has(String(id))) continue;
+      const detail = await getDingDepartmentDetail(accessToken, id, fetchImpl).catch(() => ({}));
+      departmentsById.set(String(id), {
+        dept_id: id,
+        parent_id: detail.parent_id || detail.parentId || "",
+        name: detail.name || `部门 ${id}`
+      });
+    }
+  } catch (error) {
+    // listsub already collected the visible tree; listsubid is only a completeness fallback.
+  }
+
+  return [...departmentsById.values()];
+}
+
+export async function getDingSubDepartmentIds(accessToken, fetchImpl = fetch, rootDeptId = 1) {
+  const root = Number(rootDeptId) || 1;
+  const ids = [];
+  const visited = new Set();
+  const collected = new Set();
+  async function visit(parentId) {
+    const normalizedParentId = Number(parentId) || 1;
+    if (visited.has(normalizedParentId)) return;
+    visited.add(normalizedParentId);
+    const result = await postDingTopApi(accessToken, "/topapi/v2/department/listsubid", {
+      dept_id: normalizedParentId
+    }, fetchImpl);
+    const children = Array.isArray(result)
+      ? result
+      : result.dept_id_list || result.sub_dept_id_list || result.deptIds || [];
+    for (const value of children) {
+      const childId = Number(value);
+      if (!childId || collected.has(childId)) continue;
+      collected.add(childId);
+      ids.push(childId);
+      await visit(childId);
+    }
+  }
+  await visit(root);
+  return ids;
+}
+
+export async function getDingDepartmentDetail(accessToken, deptId, fetchImpl = fetch) {
+  return postDingTopApi(accessToken, "/topapi/v2/department/get", {
+    dept_id: Number(deptId),
+    language: "zh_CN"
+  }, fetchImpl);
 }
 
 export async function getDingDepartmentUsers(accessToken, deptId, fetchImpl = fetch) {
@@ -164,10 +212,12 @@ export async function getDingDepartmentUsers(accessToken, deptId, fetchImpl = fe
     const result = await postDingTopApi(accessToken, "/topapi/v2/user/list", {
       dept_id: Number(deptId),
       cursor,
+      contain_access_limit: false,
+      order_field: "modify_desc",
       size: 100,
       language: "zh_CN"
     }, fetchImpl);
-    const list = Array.isArray(result.list) ? result.list : [];
+    const list = Array.isArray(result.list) ? result.list : (Array.isArray(result.user_list) ? result.user_list : []);
     users.push(...list);
     hasMore = !!result.has_more;
     cursor = Number(result.next_cursor || cursor + list.length);
@@ -235,9 +285,21 @@ export async function syncDingOrg(accessToken, fetchImpl = fetch, now = new Date
   })).filter(dept => dept.deptId && dept.name);
   const departmentsById = new Map(departments.map(dept => [dept.deptId, dept]));
   const byUserId = new Map();
+  const syncWarnings = [];
   const departmentIds = [...new Set([String(rootDeptId), ...departments.map(dept => dept.deptId)])];
   for (const deptId of departmentIds) {
-    const users = await getDingDepartmentUsers(accessToken, deptId, fetchImpl);
+    let users = [];
+    try {
+      users = await getDingDepartmentUsers(accessToken, deptId, fetchImpl);
+    } catch (error) {
+      syncWarnings.push({
+        deptId,
+        department: departmentsById.get(String(deptId))?.name || (String(deptId) === String(rootDeptId) ? "根部门" : ""),
+        message: error.message || "部门成员读取失败",
+        code: error.detail?.errcode || error.detail?.code || ""
+      });
+      continue;
+    }
     users.forEach(user => {
       const safeUser = publicOrgUser(user, departmentsById);
       if (safeUser.userId) byUserId.set(safeUser.userId, safeUser);
@@ -246,10 +308,11 @@ export async function syncDingOrg(accessToken, fetchImpl = fetch, now = new Date
   const syncedAt = now.toISOString();
   const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
   return {
-    version: "org-v1",
+    version: "org-v2",
     syncedAt,
     expiresAt,
     departments,
+    syncWarnings,
     users: [...byUserId.values()].sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"))
   };
 }

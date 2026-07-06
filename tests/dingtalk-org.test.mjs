@@ -56,7 +56,7 @@ test("syncDingOrg fetches departments and sanitizes user directory", async () =>
 
   const org = await syncDingOrg("token-1", fetchImpl, new Date("2026-07-05T00:00:00.000Z"));
 
-  assert.equal(org.version, "org-v1");
+  assert.equal(org.version, "org-v2");
   assert.equal(org.departments.length, 2);
   assert.equal(org.users.length, 2);
   const productUser = org.users.find(user => user.userId === "u-product");
@@ -136,6 +136,82 @@ test("syncDingOrg recursively fetches nested departments and root users", async 
   assert.deepEqual(org.departments.map(dept => dept.deptId).sort(), ["10", "11", "20"]);
   assert.deepEqual(org.users.map(user => user.userId).sort(), ["u-boss", "u-design", "u-ops", "u-product"]);
   assert.equal(org.users.find(user => user.userId === "u-design").departmentNames[0], "设计组");
+});
+
+test("syncDingOrg discovers departments that listsub omits by using sub department ids", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    const body = options.body ? JSON.parse(options.body) : {};
+    calls.push({ url: String(url), body });
+    if (String(url).includes("/topapi/v2/department/listsubid")) {
+      const children = { 1: [10], 10: [11], 11: [] };
+      return okJson({ errcode: 0, result: { dept_id_list: children[body.dept_id] || [] } });
+    }
+    if (String(url).includes("/topapi/v2/department/listsub")) {
+      return okJson({ errcode: 0, result: body.dept_id === 1 ? [{ dept_id: 10, parent_id: 1, name: "产品部" }] : [] });
+    }
+    if (String(url).includes("/topapi/v2/department/get")) {
+      return okJson({ errcode: 0, result: { dept_id: body.dept_id, parent_id: 10, name: "隐藏设计组" } });
+    }
+    if (String(url).includes("/topapi/v2/user/list")) {
+      return okJson({
+        errcode: 0,
+        result: {
+          has_more: false,
+          list: body.dept_id === 11 ? [{
+            userid: "u-hidden",
+            unionid: "union-hidden",
+            name: "隐藏成员",
+            title: "设计师",
+            dept_id_list: [11],
+            role_list: [{ group_name: "隐藏设计组", name: "设计师" }]
+          }] : []
+        }
+      });
+    }
+    throw new Error(`unexpected url ${url}`);
+  };
+
+  const org = await syncDingOrg("token-1", fetchImpl, new Date("2026-07-05T00:00:00.000Z"));
+  const userListCall = calls.find(call => call.url.includes("/topapi/v2/user/list"));
+
+  assert.equal(org.version, "org-v2");
+  assert.ok(org.departments.some(dept => dept.deptId === "11" && dept.name === "隐藏设计组"));
+  assert.equal(org.users.find(user => user.userId === "u-hidden").departmentNames[0], "隐藏设计组");
+  assert.equal(userListCall.body.contain_access_limit, false);
+  assert.equal(userListCall.body.order_field, "modify_desc");
+});
+
+test("syncDingOrg keeps available users and reports unreadable departments", async () => {
+  const fetchImpl = async (url, options = {}) => {
+    const body = options.body ? JSON.parse(options.body) : {};
+    if (String(url).includes("/topapi/v2/department/listsubid")) {
+      return okJson({ errcode: 0, result: { dept_id_list: [] } });
+    }
+    if (String(url).includes("/topapi/v2/department/listsub")) {
+      return okJson({ errcode: 0, result: [{ dept_id: 10, parent_id: 1, name: "产品部" }] });
+    }
+    if (String(url).includes("/topapi/v2/user/list")) {
+      if (body.dept_id === 10) {
+        return okJson({ errcode: 50004, errmsg: "部门不在权限范围内" });
+      }
+      return okJson({
+        errcode: 0,
+        result: {
+          has_more: false,
+          list: [{ userid: "u-root", unionid: "union-root", name: "根成员", title: "总经理", dept_id_list: [1] }]
+        }
+      });
+    }
+    throw new Error(`unexpected url ${url}`);
+  };
+
+  const org = await syncDingOrg("token-1", fetchImpl, new Date("2026-07-05T00:00:00.000Z"));
+
+  assert.deepEqual(org.users.map(user => user.userId), ["u-root"]);
+  assert.equal(org.syncWarnings.length, 1);
+  assert.equal(org.syncWarnings[0].deptId, "10");
+  assert.equal(org.syncWarnings[0].code, 50004);
 });
 
 test("filterOrgUsers searches name, title, department, and role", () => {

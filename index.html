@@ -1919,16 +1919,18 @@
       flex: 0 0 auto;
     }
     .owner-menu {
-      position: absolute;
-      z-index: var(--z-dropdown);
+      position: fixed;
+      z-index: 70;
       left: 0;
-      right: 0;
-      top: calc(100% + 6px);
+      top: 0;
+      width: 320px;
+      max-width: calc(100vw - 32px);
       padding: 6px;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: var(--panel);
       box-shadow: var(--shadow-popover);
+      transform-origin: top left;
     }
     .owner-search {
       display: grid;
@@ -1955,7 +1957,7 @@
       font-size: 12px;
     }
     .owner-options {
-      max-height: 220px;
+      max-height: min(300px, calc(100vh - 260px));
       overflow-y: auto;
       margin-top: 6px;
       display: grid;
@@ -2254,6 +2256,35 @@
     }
     .minutes-status.error { color: var(--red); }
     .minutes-status.ok { color: var(--green); }
+    .minutes-status.permission {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      background: var(--red-soft);
+      color: #b91c1c;
+    }
+    .minutes-status.permission span {
+      min-width: 0;
+    }
+    .minutes-status.permission a {
+      flex: 0 0 auto;
+      min-height: 30px;
+      padding: 0 10px;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      background: #fff;
+      color: #b91c1c;
+      font-weight: 750;
+      text-decoration: none;
+      white-space: nowrap;
+    }
     .calendar-meeting-panel {
       margin-top: 10px;
       display: grid;
@@ -3350,13 +3381,17 @@
       if (!raw) return null;
       try {
         const parsed = JSON.parse(raw);
-        return parsed && parsed.version === "org-v1" ? parsed : null;
+        if (parsed?.version !== "org-v2") {
+          localStorage.removeItem("productFlowOrgCache");
+          return null;
+        }
+        return parsed;
       } catch (e) {
         return null;
       }
     }
     function saveOrgCache(org) {
-      if (!org || org.version !== "org-v1") return;
+      if (!org || org.version !== "org-v2") return;
       orgCache = org;
       localStorage.setItem("productFlowOrgCache", JSON.stringify(org));
       if (document.getElementById("modal")?.classList.contains("open")) {
@@ -3377,7 +3412,8 @@
         if (!res.ok || !payload.org) throw new Error(payload.message || "钉钉组织架构同步失败");
         saveOrgCache(payload.org);
         applyPermissions();
-        toast(`组织架构已同步：${payload.org.users?.length || 0} 人`);
+        const warningCount = payload.org.syncWarnings?.length || 0;
+        toast(`组织架构已同步：${payload.org.users?.length || 0} 人${warningCount ? `，${warningCount} 个部门无权限读取` : ""}`);
         return orgCache;
       } catch (error) {
         console.warn(error);
@@ -3550,11 +3586,34 @@
         closeOwnerPicker();
         if (window.lucide) lucide.createIcons();
       }));
+      positionOwnerPicker();
+    }
+    function positionOwnerPicker() {
+      const menu = document.getElementById("ownerPickerMenu");
+      const button = document.getElementById("ownerPickerButton");
+      if (!menu || !button || menu.classList.contains("hidden")) return;
+      const rect = button.getBoundingClientRect();
+      const gap = 6;
+      const viewportGap = 16;
+      const width = Math.min(rect.width, window.innerWidth - viewportGap * 2);
+      const belowSpace = window.innerHeight - rect.bottom - viewportGap;
+      const aboveSpace = rect.top - viewportGap;
+      const openAbove = belowSpace < 220 && aboveSpace > belowSpace;
+      const availableHeight = Math.max(160, Math.min(320, openAbove ? aboveSpace - gap : belowSpace - gap));
+      menu.style.width = `${width}px`;
+      menu.style.left = `${Math.max(viewportGap, Math.min(rect.left, window.innerWidth - width - viewportGap))}px`;
+      menu.style.top = `${openAbove ? Math.max(viewportGap, rect.top - availableHeight - gap) : Math.min(window.innerHeight - viewportGap, rect.bottom + gap)}px`;
+      menu.style.maxHeight = `${availableHeight}px`;
+      const options = document.getElementById("ownerOptions");
+      if (options) options.style.maxHeight = `${Math.max(120, availableHeight - 64)}px`;
     }
     function closeOwnerPicker() {
       const menu = document.getElementById("ownerPickerMenu");
       const button = document.getElementById("ownerPickerButton");
-      if (menu) menu.classList.add("hidden");
+      if (menu) {
+        menu.classList.add("hidden");
+        menu.removeAttribute("style");
+      }
       if (button) button.setAttribute("aria-expanded", "false");
     }
     function modalRequiredValues() {
@@ -5691,6 +5750,29 @@
       el.textContent = message;
       el.className = `minutes-status ${type}`.trim();
     }
+    function dingPermissionApplyUrl(text = "") {
+      const match = String(text || "").match(/https:\/\/open-dev\.dingtalk\.com\/appscope\/apply\?[^\s；，。]+/);
+      return match ? match[0] : "";
+    }
+    function renderMinutesPermissionError(payload = {}) {
+      const raw = [
+        payload.message,
+        payload.detail?.message,
+        payload.detail?.errmsg,
+        payload.detail?.errorMessage
+      ].filter(Boolean).join(" ");
+      const scope = raw.match(/\[([A-Za-z0-9_.:-]+)\]/)?.[1] || (raw.includes("VideoConference.Conference.Read") ? "VideoConference.Conference.Read" : "");
+      const url = dingPermissionApplyUrl(raw);
+      if (!scope && !url) return false;
+      const el = document.getElementById("minutesStatus");
+      if (!el) return false;
+      el.className = "minutes-status permission";
+      el.innerHTML = `
+        <span>缺少钉钉权限：<strong>${esc(scope || "会议纪要读取权限")}</strong>。在开放平台开通后，重新选择会议同步即可。</span>
+        ${url ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener">打开权限申请</a>` : ""}
+      `;
+      return true;
+    }
     function meetingCalendarRange() {
       const start = new Date();
       start.setDate(start.getDate() - 14);
@@ -5901,7 +5983,10 @@
           })
         });
         const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload.synced || !payload.text) throw new Error(formatDingSyncError(payload, "钉钉会议纪要同步失败"));
+        if (!res.ok || !payload.synced || !payload.text) {
+          if (renderMinutesPermissionError(payload)) return;
+          throw new Error(formatDingSyncError(payload, "钉钉会议纪要同步失败"));
+        }
         document.getElementById("minutesText").value = payload.text;
         updateMinutesPosterPreview();
         setMinutesMessage("已读取钉钉会议文本，正在写入资料包。", "ok");
@@ -6773,6 +6858,7 @@
         renderOwnerOptions(document.getElementById("ownerSearch").value || "");
         menu.classList.remove("hidden");
         document.getElementById("ownerPickerButton").setAttribute("aria-expanded", "true");
+        positionOwnerPicker();
         document.getElementById("ownerSearch").focus();
         if (window.lucide) lucide.createIcons();
       }
@@ -6848,6 +6934,8 @@
     });
     window.addEventListener("resize", closeTableFilterMenus);
     window.addEventListener("scroll", closeTableFilterMenus, true);
+    window.addEventListener("resize", positionOwnerPicker);
+    window.addEventListener("scroll", positionOwnerPicker, true);
     document.getElementById("syncModal").addEventListener("click", e => {
       if (e.target.id === "syncModal") closeSyncModal();
       const actionButton = e.target.closest("[data-sync-action]");

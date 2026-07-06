@@ -88,6 +88,9 @@ test("demand modal uses organization-backed owner and department selectors", () 
   assert.match(html, /\.\.\.\(orgCache\?\.departments \|\| \[\]\)\.map\(dept => dept\.name \|\| dept\.deptName \|\| dept\.departmentName\)/);
   assert.match(html, /function ownerCandidates\(selected = ""\)/);
   assert.match(html, /const users = orgUsers\(\);[\s\S]*users\.map\(user => \(\{/);
+  assert.match(html, /\.owner-menu \{[\s\S]*position: fixed;/);
+  assert.match(html, /function positionOwnerPicker\(\)/);
+  assert.match(html, /window\.addEventListener\("scroll", positionOwnerPicker, true\);/);
   assert.match(html, /renderSourceOptions\(target\?\.source \|\| ""\);/);
   assert.match(html, /setOwnerPickerValue\(target\?\.owner \|\| ""\);/);
   assert.doesNotMatch(html, /document\.getElementById\("formOwner"\)\.value = target\?\.owner \|\| "赵雨涵";/);

@@ -93,6 +93,15 @@ test("DingTalk sync errors expose actionable API details in the UI", () => {
   assert.match(html, /payload\.detail\?\.message/);
 });
 
+test("DingTalk minutes permission errors show an application permission action", () => {
+  assert.match(html, /function renderMinutesPermissionError\(/);
+  assert.match(html, /VideoConference\.Conference\.Read/);
+  assert.match(html, /打开权限申请/);
+  assert.match(html, /className = "minutes-status permission"/);
+  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
+  assert.match(minutesSync, /if \(renderMinutesPermissionError\(payload\)\) return;/);
+});
+
 test("review meeting sync sends DingTalk unionIds instead of userIds", () => {
   const calendarSync = html.match(/async function syncMeetingToDingCalendar[\s\S]*?function formatDingJsError/)[0];
   assert.match(calendarSync, /const attendeeUnionIds = users\.map\(dingUnionId\)\.filter\(Boolean\);/);

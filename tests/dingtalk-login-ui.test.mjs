@@ -15,6 +15,8 @@ test("environment check continues into login when DingTalk is ready", () => {
 
 test("DingTalk login refreshes organization cache for people picking", () => {
   assert.match(html, /productFlowOrgCache/);
+  assert.match(html, /parsed\?\.version !== "org-v2"/);
+  assert.match(html, /org\.version !== "org-v2"/);
   assert.match(html, /function syncDingOrgCache\(/);
   assert.match(html, /\/api\/dingtalk\/org\/sync/);
   assert.match(html, /syncDingOrgCache\(\{ force: true \}\)/);
