@@ -446,6 +446,7 @@ function normalizeDingCalendarEvent(event = {}) {
     attendees: Array.isArray(event.attendees) ? event.attendees : [],
     onlineMeetingInfo,
     conferenceId: onlineMeetingInfo.conferenceId || "",
+    scheduleConferenceId: onlineMeetingInfo.scheduleConferenceId || onlineMeetingInfo.conferenceId || "",
     joinUrl: onlineMeetingInfo.url || "",
     status: event.status || ""
   };
@@ -556,6 +557,70 @@ export async function queryDingMeetingMinutesText(accessToken, input = {}, fetch
     throw err;
   }
   return { text, raw: data };
+}
+
+function isDingCloudRecordMissing(error = {}) {
+  const raw = JSON.stringify({
+    message: error.message,
+    detail: error.detail,
+    code: error.code
+  });
+  return /cloudRecordNotFound|50513|云录制记录未找到|未开启云录制/i.test(raw);
+}
+
+export async function queryDingScheduleConferenceHistory(accessToken, input = {}, fetchImpl = fetch) {
+  const scheduleConferenceId = String(input.scheduleConferenceId || input.conferenceId || input.recordingId || "").trim();
+  if (!scheduleConferenceId) return [];
+  const query = new URLSearchParams();
+  query.set("maxResults", String(Math.min(Number(input.maxResults) || 20, 100)));
+  if (input.nextToken) query.set("nextToken", String(input.nextToken));
+  const data = await requestDingOpenApi(
+    accessToken,
+    "GET",
+    `/v1.0/conference/videoConferences/scheduleConferences/${encodeURIComponent(scheduleConferenceId)}?${query.toString()}`,
+    null,
+    fetchImpl
+  );
+  return Array.isArray(data.conferenceList) ? data.conferenceList : [];
+}
+
+export async function queryDingMeetingMinutesTextWithFallback(accessToken, input = {}, fetchImpl = fetch) {
+  try {
+    return await queryDingMeetingMinutesText(accessToken, input, fetchImpl);
+  } catch (error) {
+    if (!isDingCloudRecordMissing(error)) throw error;
+    const scheduleConferenceId = input.scheduleConferenceId || input.conferenceId || input.recordingId || "";
+    if (!scheduleConferenceId) throw error;
+    let history;
+    try {
+      history = await queryDingScheduleConferenceHistory(accessToken, { scheduleConferenceId }, fetchImpl);
+    } catch (historyError) {
+      if (/invalidScheduleConferenceId|预约会议id无效/i.test(JSON.stringify(historyError.detail || historyError.message || ""))) throw error;
+      throw historyError;
+    }
+    const candidates = history
+      .map(item => item.conferenceId)
+      .filter(Boolean)
+      .filter(id => id !== scheduleConferenceId);
+    for (const candidateId of candidates) {
+      try {
+        const result = await queryDingMeetingMinutesText(accessToken, {
+          ...input,
+          conferenceId: candidateId,
+          recordingId: candidateId
+        }, fetchImpl);
+        return {
+          ...result,
+          resolvedConferenceId: candidateId,
+          scheduleConferenceId,
+          history
+        };
+      } catch (candidateError) {
+        if (!isDingCloudRecordMissing(candidateError)) throw candidateError;
+      }
+    }
+    throw error;
+  }
 }
 
 export async function loginWithDingTalk({ authCode, corpId }, env = {}, fetchImpl = fetch) {

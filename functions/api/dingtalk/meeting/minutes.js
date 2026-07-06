@@ -2,7 +2,7 @@ import {
   getDingAccessToken,
   jsonResponse,
   optionsResponse,
-  queryDingMeetingMinutesText
+  queryDingMeetingMinutesTextWithFallback
 } from "../_shared/dingtalk.js";
 
 export async function onRequest({ request, env }) {
@@ -12,8 +12,14 @@ export async function onRequest({ request, env }) {
   try {
     const body = await request.json().catch(() => ({}));
     const accessToken = await getDingAccessToken(env);
-    const result = await queryDingMeetingMinutesText(accessToken, body);
-    return jsonResponse({ synced: true, text: result.text, raw: result.raw });
+    const result = await queryDingMeetingMinutesTextWithFallback(accessToken, body);
+    return jsonResponse({
+      synced: true,
+      text: result.text,
+      raw: result.raw,
+      resolvedConferenceId: result.resolvedConferenceId || undefined,
+      scheduleConferenceId: result.scheduleConferenceId || undefined
+    });
   } catch (error) {
     return jsonResponse({
       synced: false,

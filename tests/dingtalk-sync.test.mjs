@@ -7,6 +7,8 @@ import {
   createDingCalendarEvent,
   listDingCalendarEvents,
   queryDingMeetingMinutesText,
+  queryDingMeetingMinutesTextWithFallback,
+  queryDingScheduleConferenceHistory,
   createDingTodoTask
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
 
@@ -149,6 +151,7 @@ test("listDingCalendarEvents queries primary calendar and extracts conference id
   assert.match(calls[0].url, /timeMin=2026-07-01T00%3A00%3A00.000Z/);
   assert.equal(calls[0].options.headers["x-acs-dingtalk-access-token"], "token-1");
   assert.equal(result.events[0].conferenceId, "conf-1");
+  assert.equal(result.events[0].scheduleConferenceId, "conf-1");
   assert.equal(result.events[0].summary, "标准样终审会");
 });
 
@@ -215,4 +218,62 @@ test("queryDingMeetingMinutesText accepts AI summary and action item fields", as
   });
 
   assert.equal(result.text, "AI 纪要：确认标准样方向。\n产品部补齐封样确认书\n运营同步内容素材清单");
+});
+
+test("queryDingScheduleConferenceHistory resolves appointment meetings to actual conference ids", async () => {
+  const calls = [];
+  const result = await queryDingScheduleConferenceHistory("token-1", {
+    scheduleConferenceId: "schedule-1"
+  }, async (url, options) => {
+    calls.push({ url, options });
+    return okJson({
+      conferenceList: [
+        { conferenceId: "real-conf-1", title: "标准样终审会" }
+      ]
+    });
+  });
+
+  assert.match(calls[0].url, /\/v1\.0\/conference\/videoConferences\/scheduleConferences\/schedule-1\?maxResults=20$/);
+  assert.equal(calls[0].options.headers["x-acs-dingtalk-access-token"], "token-1");
+  assert.equal(result[0].conferenceId, "real-conf-1");
+});
+
+test("queryDingMeetingMinutesTextWithFallback reads minutes from actual conference history", async () => {
+  const calls = [];
+  const result = await queryDingMeetingMinutesTextWithFallback("token-1", {
+    recordingId: "schedule-1",
+    scheduleConferenceId: "schedule-1",
+    unionId: "union-1"
+  }, async (url, options) => {
+    calls.push({ url, options });
+    if (url.includes("/scheduleConferences/schedule-1")) {
+      return okJson({
+        conferenceList: [
+          { conferenceId: "real-conf-1", title: "标准样终审会" }
+        ]
+      });
+    }
+    if (url.includes("/videoConferences/real-conf-1/cloudRecords/getTexts")) {
+      return okJson({
+        result: {
+          aiSummary: "AI 纪要：确认封样标准。"
+        }
+      });
+    }
+    return {
+      ok: false,
+      status: 404,
+      json: async () => ({
+        code: "cloudRecordNotFound",
+        message: "云录制记录未找到/未开启云录制"
+      })
+    };
+  });
+
+  assert.equal(result.text, "AI 纪要：确认封样标准。");
+  assert.equal(result.resolvedConferenceId, "real-conf-1");
+  assert.equal(result.scheduleConferenceId, "schedule-1");
+  assert.match(calls[0].url, /\/videoConferences\/schedule-1\/cloudRecords\/getTexts/);
+  assert.match(calls[1].url, /\/scheduleConferences\/schedule-1/);
+  assert.match(calls[2].url, /\/videoConferences\/real-conf-1\/cloudRecords\/getTexts/);
 });

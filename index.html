@@ -5865,12 +5865,18 @@
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               recordingId: event.conferenceId,
+              scheduleConferenceId: event.scheduleConferenceId || event.conferenceId,
               unionId
             })
           });
           const payload = await res.json().catch(() => ({}));
           if (res.ok && payload.synced && payload.text) {
-            return { ...event, minuteState: "ready", minuteText: payload.text };
+            return {
+              ...event,
+              minuteState: "ready",
+              minuteText: payload.text,
+              resolvedConferenceId: payload.resolvedConferenceId || event.conferenceId
+            };
           }
           const raw = dingPayloadText(payload);
           if (/cloudRecordNotFound|50513/i.test(raw)) return { ...event, minuteState: "empty" };
@@ -5905,6 +5911,7 @@
         renderCalendarMeetingOptions(events);
         if (event?.minuteState === "ready" && event.minuteText) {
           document.getElementById("minutesText").value = event.minuteText;
+          if (event.resolvedConferenceId) document.getElementById("minutesRecordingId").value = event.resolvedConferenceId;
           updateMinutesPosterPreview();
           setMinutesMessage(`已选择日历会议：${event.summary || "钉钉会议"}，正在写入资料包。`, "ok");
           createMeetingMinutesFromText({ productId: minutesProductId, meetingId: minutesMeetingId, text: event.minuteText, source: "钉钉云录制" });
@@ -6097,24 +6104,26 @@
       setMinutesMessage("正在读取钉钉云录制文本...");
       try {
         await withGlobalLoading("正在读取钉钉会议纪要", async () => {
-        const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            recordingId,
-            unionId: currentUser?.dingUser?.unionid || ""
-          })
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (!res.ok || !payload.synced || !payload.text) {
-          if (renderMinutesPermissionError(payload)) return;
-          if (renderMinutesRecordingError(payload)) return;
-          throw new Error(formatDingSyncError(payload, "钉钉会议纪要同步失败"));
-        }
-        document.getElementById("minutesText").value = payload.text;
-        updateMinutesPosterPreview();
-        setMinutesMessage("已读取钉钉会议文本，正在写入资料包。", "ok");
-        createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: "钉钉云录制" });
+          const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recordingId,
+              scheduleConferenceId: recordingId,
+              unionId: currentUser?.dingUser?.unionid || ""
+            })
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.synced || !payload.text) {
+            if (renderMinutesPermissionError(payload)) return;
+            if (renderMinutesRecordingError(payload)) return;
+            throw new Error(formatDingSyncError(payload, "钉钉会议纪要同步失败"));
+          }
+          document.getElementById("minutesText").value = payload.text;
+          if (payload.resolvedConferenceId) document.getElementById("minutesRecordingId").value = payload.resolvedConferenceId;
+          updateMinutesPosterPreview();
+          setMinutesMessage("已读取钉钉会议文本，正在写入资料包。", "ok");
+          createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: "钉钉云录制" });
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉会议纪要同步失败", "error");

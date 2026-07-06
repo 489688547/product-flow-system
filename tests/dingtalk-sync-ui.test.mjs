@@ -83,6 +83,9 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /event\.conferenceId/);
   assert.match(html, /function detectCalendarMeetingMinutes\(/);
   assert.match(html, /calendarMinuteState/);
+  assert.match(html, /scheduleConferenceId: event\.scheduleConferenceId \|\| event\.conferenceId/);
+  assert.match(html, /resolvedConferenceId: payload\.resolvedConferenceId \|\| event\.conferenceId/);
+  assert.match(html, /payload\.resolvedConferenceId/);
   assert.match(html, /可读取/);
   assert.match(html, /未返回/);
   assert.match(html, /minute-state/);
