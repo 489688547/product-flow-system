@@ -2683,6 +2683,11 @@
         return force ? null : orgCache;
       }
     }
+    async function ensureDingOrgCache() {
+      if (currentUser?.source !== "dingtalk") return orgCache;
+      if (!orgCacheExpired()) return orgCache;
+      return withGlobalLoading("正在刷新钉钉组织架构", async () => syncDingOrgCache());
+    }
     function dingUserId(user = {}) {
       return user.userId || user.userid || "";
     }
@@ -3610,8 +3615,8 @@
         toast("需要从钉钉登录后才能同步待办或日历。");
         return;
       }
-      const refreshedOrg = await withGlobalLoading("正在刷新钉钉组织架构", async () => syncDingOrgCache({ force: true }));
-      if (!refreshedOrg || orgCacheExpired()) {
+      const cachedOrg = await ensureDingOrgCache();
+      if (!cachedOrg || orgCacheExpired()) {
         toast("组织架构未刷新成功，为避免发给离职人员，暂不允许同步。");
         return;
       }
@@ -3711,8 +3716,8 @@
       button.disabled = true;
       try {
         await withGlobalLoading(syncMeetingAction === "instant" ? "正在拉起钉钉会议" : "正在同步到钉钉", async () => {
-        const refreshedOrg = await syncDingOrgCache({ force: true });
-        if (!refreshedOrg || orgCacheExpired()) {
+        const cachedOrg = await ensureDingOrgCache();
+        if (!cachedOrg || orgCacheExpired()) {
           toast("组织架构刷新失败，暂不发送钉钉同步。");
           return;
         }

@@ -13,18 +13,21 @@ test("workflow tasks can be synced to DingTalk todos through the org people pick
   assert.match(html, /dingTodo/);
 });
 
-test("DingTalk people picker force-refreshes org before showing colleagues", () => {
+test("DingTalk people picker uses cached org unless the cache is missing or expired", () => {
   const openSyncModal = html.match(/async function openSyncModal[\s\S]*?function closeSyncModal/)[0];
-  assert.match(openSyncModal, /const refreshedOrg = await withGlobalLoading\("正在刷新钉钉组织架构", async \(\) => syncDingOrgCache\(\{ force: true \}\)\);/);
-  assert.match(openSyncModal, /if \(!refreshedOrg \|\| orgCacheExpired\(\)\)/);
+  assert.match(html, /async function ensureDingOrgCache\(/);
+  assert.match(openSyncModal, /const cachedOrg = await ensureDingOrgCache\(\);/);
+  assert.match(openSyncModal, /if \(!cachedOrg \|\| orgCacheExpired\(\)\)/);
   assert.match(openSyncModal, /if \(!ensureDingSyncReady\(\)\) return;/);
+  assert.doesNotMatch(openSyncModal, /syncDingOrgCache\(\{ force: true \}\)/);
 });
 
-test("DingTalk sync revalidates selected users after org refresh", () => {
+test("DingTalk sync revalidates selected users from cached organization data", () => {
   const confirmSyncModal = html.match(/async function confirmSyncModal[\s\S]*?function completion/)[0];
-  assert.match(confirmSyncModal, /const refreshedOrg = await syncDingOrgCache\(\{ force: true \}\);/);
+  assert.match(confirmSyncModal, /const cachedOrg = await ensureDingOrgCache\(\);/);
   assert.match(confirmSyncModal, /const selected = resolveSelectedSyncUsers\(\);/);
   assert.match(confirmSyncModal, /请选择仍在职且可同步的同事/);
+  assert.doesNotMatch(confirmSyncModal, /syncDingOrgCache\(\{ force: true \}\)/);
 });
 
 test("DingTalk operations show a fullscreen loading state while waiting", () => {
@@ -32,7 +35,7 @@ test("DingTalk operations show a fullscreen loading state while waiting", () => 
   assert.match(html, /function showGlobalLoading\(/);
   assert.match(html, /async function withGlobalLoading\(/);
   const openSyncModal = html.match(/async function openSyncModal[\s\S]*?function closeSyncModal/)[0];
-  assert.match(openSyncModal, /await withGlobalLoading\("正在刷新钉钉组织架构", async \(\) => syncDingOrgCache\(\{ force: true \}\)\);/);
+  assert.match(openSyncModal, /await ensureDingOrgCache\(\);/);
   const confirmSyncModal = html.match(/async function confirmSyncModal[\s\S]*?function completion/)[0];
   assert.match(confirmSyncModal, /await withGlobalLoading\(syncMeetingAction === "instant" \? "正在拉起钉钉会议" : "正在同步到钉钉", async \(\) => \{/);
   const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?function saveMinutesModal/)[0];
