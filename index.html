@@ -3986,6 +3986,25 @@
       if (!authCode) throw new Error("钉钉授权组件未返回用户授权码。");
       return authCode;
     }
+    async function requestDingSilentAuthCode() {
+      const env = detectDingTalkEnvironment();
+      if (!env.inDingTalk || !env.corpId || !hasDingAuthApi()) return "";
+      try {
+        return await requestDingAuthCode(env.corpId);
+      } catch {
+        return "";
+      }
+    }
+    async function requestDingUserAuthCode(rpcScope) {
+      const silent = await requestDingSilentAuthCode();
+      if (silent) return silent;
+      try {
+        return await requestDingDelegatedAuthCode(rpcScope);
+      } catch (error) {
+        if (isUnsupportedDingAiMinutesScope(error?.message || error)) return "";
+        throw error;
+      }
+    }
     function persistDingUser(payload) {
       const roleKey = roleProfiles[payload.role] ? payload.role : "readonly";
       currentUser = {
@@ -5914,7 +5933,7 @@
       return /500205|50205|委托授权需要填写委托类型的权限点/i.test(raw);
     }
     function showUnsupportedDingAiMinutesScope(tip = "请直接粘贴钉钉 AI 听记正文后生成资料。") {
-      setMinutesMessage(`钉钉返回 500205：AI 听记读取权限不是当前应用可申请的用户委托权限，不能通过这个授权弹窗自动读取。${tip}`, "error");
+      setMinutesMessage(`钉钉返回 500205：当前应用还没有开通 AI 听记的用户授权权限。请在钉钉开放平台「应用详情 → 权限管理」里搜索并申请 AI 听记 / 闪记相关权限点后重试；也可以${tip}`, "error");
     }
     function meetingCalendarRange() {
       const start = new Date();
@@ -5945,11 +5964,13 @@
     }
     async function detectCalendarMeetingMinutes(events = []) {
       try {
+        const authCode = await requestDingSilentAuthCode();
         const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             events,
+            authCode: authCode || undefined,
             unionId: currentUser?.dingUser?.unionid || ""
           })
         });
@@ -6195,11 +6216,11 @@
         await withGlobalLoading("正在读取钉钉会议纪要", async () => {
           let authCode = "";
           if (useAiMinutes) {
-            if (isUnsupportedDingAiMinutesScope("500205 委托授权需要填写委托类型的权限点")) {
+            authCode = await requestDingUserAuthCode("Minutes.Content.Read");
+            if (!authCode) {
               showUnsupportedDingAiMinutesScope("请直接粘贴钉钉 AI 听记正文后生成资料。");
               return;
             }
-            authCode = await requestDingDelegatedAuthCode("Minutes.Content.Read");
           }
           const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
             method: "POST",

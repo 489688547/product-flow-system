@@ -16,8 +16,16 @@ export async function onRequest({ request, env }) {
   try {
     const body = await request.json().catch(() => ({}));
     if (Array.isArray(body.events)) {
+      let userToken = null;
       if (body.authCode) {
-        const userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+        try {
+          userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+        } catch {
+          // The silent auth code may be stale or not exchangeable; fall back to cloud recording detection.
+          userToken = null;
+        }
+      }
+      if (userToken) {
         const aiEvents = await queryDingAiMinutesForEvents(userToken.accessToken, body);
         const unresolvedEvents = aiEvents.filter(event => event.minuteState === "empty" && event.conferenceId);
         if (unresolvedEvents.length) {
