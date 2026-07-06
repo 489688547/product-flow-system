@@ -402,3 +402,59 @@ test("queryDingAiMinutesForEvents matches calendar meetings to AI minutes taskUu
   assert.equal(result[0].aiMinutesTaskUuid, "task-ai-1");
   assert.equal(result[0].minuteText, "确认封样标准。");
 });
+
+test("queryDingAiMinutesForEvents falls back to time range when product keyword misses", async () => {
+  const calls = [];
+  const result = await queryDingAiMinutesForEvents("user-token-1", {
+    keyword: "鹦鹉站杆升级版 立项评审会",
+    events: [
+      {
+        conferenceId: "conf-flow",
+        summary: "产品全周期流程初版同步会",
+        startTime: "2026-07-03T14:00:00+08:00",
+        endTime: "2026-07-03T15:00:00+08:00"
+      }
+    ]
+  }, async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push({ name: body.params.name, args: body.params.arguments });
+    if (body.params.name === "list_by_keyword_and_time_range") {
+      if (body.params.arguments.keyword) {
+        return okJson({ result: { structuredContent: { result: { minutesDetails: [] } } } });
+      }
+      return okJson({
+        result: {
+          structuredContent: {
+            result: {
+              minutesDetails: [
+                {
+                  taskUuid: "task-flow-1",
+                  title: "产品全周期流程初版同步会",
+                  startTime: "2026-07-03T14:02:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      });
+    }
+    return okJson({
+      result: {
+        content: [
+          { type: "text", text: JSON.stringify({ aiSummary: "确认产品流程初版方向。" }) }
+        ]
+      }
+    });
+  });
+
+  assert.deepEqual(calls.map(call => call.name), [
+    "list_by_keyword_and_time_range",
+    "list_by_keyword_and_time_range",
+    "get_minutes_ai_summary"
+  ]);
+  assert.equal(calls[0].args.keyword, "鹦鹉站杆升级版 立项评审会");
+  assert.equal(calls[1].args.keyword, undefined);
+  assert.equal(result[0].minuteState, "ready");
+  assert.equal(result[0].aiMinutesTaskUuid, "task-flow-1");
+  assert.equal(result[0].minuteText, "确认产品流程初版方向。");
+});

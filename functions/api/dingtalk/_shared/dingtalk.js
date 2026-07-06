@@ -774,12 +774,24 @@ export async function queryDingAiMinutesForEvents(userAccessToken, input = {}, f
   const ends = events.map(event => eventTimeMs(event.endTime)).filter(Boolean);
   const createTimeStart = starts.length ? Math.min(...starts) - 24 * 60 * 60 * 1000 : undefined;
   const createTimeEnd = ends.length ? Math.max(...ends) + 24 * 60 * 60 * 1000 : undefined;
-  const { minutes } = await queryDingAiMinutesList(userAccessToken, {
+  let { minutes } = await queryDingAiMinutesList(userAccessToken, {
     keyword: input.keyword || "",
     createTimeStart,
     createTimeEnd,
     maxResults: input.maxResults || 80
   }, fetchImpl);
+  if (input.keyword) {
+    const fallback = await queryDingAiMinutesList(userAccessToken, {
+      createTimeStart,
+      createTimeEnd,
+      maxResults: input.maxResults || 80
+    }, fetchImpl);
+    const byTaskUuid = new Map(minutes.map(minute => [minute.taskUuid, minute]));
+    fallback.minutes.forEach(minute => {
+      if (!byTaskUuid.has(minute.taskUuid)) byTaskUuid.set(minute.taskUuid, minute);
+    });
+    minutes = [...byTaskUuid.values()];
+  }
   const used = new Set();
   const matched = [];
   for (const event of events) {
