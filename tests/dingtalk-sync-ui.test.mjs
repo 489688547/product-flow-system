@@ -98,8 +98,8 @@ test("DingTalk minutes permission errors show an application permission action",
   assert.match(html, /VideoConference\.Conference\.Read/);
   assert.match(html, /打开权限申请/);
   assert.match(html, /className = "minutes-status permission"/);
-  assert.match(html, /!match\[0\]\.includes\("%00"\)/);
-  assert.match(html, /encodeURIComponent\(`\$\{appKey\}#\$\{scope\}`\)/);
+  assert.match(html, /replace\(\/%00\/g, ""\)/);
+  assert.doesNotMatch(html, /dingConfig/);
   const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
   assert.match(minutesSync, /if \(renderMinutesPermissionError\(payload\)\) return;/);
 });

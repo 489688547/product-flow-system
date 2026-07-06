@@ -5752,10 +5752,8 @@
     }
     function dingPermissionApplyUrl(text = "", scope = "") {
       const match = String(text || "").match(/https:\/\/open-dev\.dingtalk\.com\/appscope\/apply\?[^\s；，。\u0000]+/);
-      if (match?.[0] && !match[0].includes("%00")) return match[0];
-      const appKey = dingConfig?.appKey || "";
-      if (!appKey || !scope) return match?.[0]?.replace(/%00.*$/, "") || "";
-      return `https://open-dev.dingtalk.com/appscope/apply?content=${encodeURIComponent(`${appKey}#${scope}`)}`;
+      if (!match?.[0]) return "";
+      return match[0].replace(/%00/g, "");
     }
     function renderMinutesPermissionError(payload = {}) {
       const raw = [
