@@ -5938,12 +5938,19 @@
     }
     async function detectCalendarMeetingMinutes(events = []) {
       try {
+        let authCode = "";
+        try {
+          authCode = await requestDingDelegatedAuthCode("Minutes.Content.Read");
+        } catch (error) {
+          setMinutesMessage(error.message || "钉钉 AI 听记授权失败，先尝试检测云录制文本。", "error");
+        }
         const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             events,
-            unionId: currentUser?.dingUser?.unionid || ""
+            unionId: currentUser?.dingUser?.unionid || "",
+            authCode: authCode || undefined
           })
         });
         const payload = await res.json().catch(() => ({}));

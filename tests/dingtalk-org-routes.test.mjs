@@ -4,6 +4,7 @@ import { onRequest as syncOrgRequest } from "../functions/api/dingtalk/org/sync.
 import { onRequest as createTodoRequest } from "../functions/api/dingtalk/todo/create.js";
 import { onRequest as createCalendarRequest } from "../functions/api/dingtalk/calendar/create.js";
 import { onRequest as listCalendarRequest } from "../functions/api/dingtalk/calendar/events.js";
+import { onRequest as meetingMinutesRequest } from "../functions/api/dingtalk/meeting/minutes.js";
 
 test("org sync route reports missing DingTalk credentials", async () => {
   const response = await syncOrgRequest({
@@ -56,4 +57,76 @@ test("calendar events route validates DingTalk credentials", async () => {
 
   assert.equal(response.status, 501);
   assert.match(body.message, /缺少钉钉应用配置/);
+});
+
+test("meeting minutes route uses user AI minutes when calendar events include authCode", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (String(url).includes("/v1.0/oauth2/userAccessToken")) {
+      return new Response(JSON.stringify({ accessToken: "user-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("mcp-gw.dingtalk.com")) {
+      const body = JSON.parse(options.body);
+      if (body.params.name === "list_by_keyword_and_time_range") {
+        return new Response(JSON.stringify({
+          result: {
+            structuredContent: {
+              result: {
+                minutesDetails: [
+                  {
+                    taskUuid: "task-ai-1",
+                    title: "鹦鹉谷物棒 标准样终审会",
+                    startTime: "2026-07-05T14:05:00+08:00"
+                  }
+                ]
+              }
+            }
+          }
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        result: {
+          content: [
+            { type: "text", text: JSON.stringify({ aiSummary: "确认封样标准。" }) }
+          ]
+        }
+      }), { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  try {
+    const response = await meetingMinutesRequest({
+      request: new Request("https://flow.example.com/api/dingtalk/meeting/minutes", {
+        method: "POST",
+        body: JSON.stringify({
+          authCode: "auth-code-1",
+          events: [
+            {
+              conferenceId: "conf-1",
+              summary: "鹦鹉谷物棒 · 标准样终审会",
+              startTime: "2026-07-05T14:00:00+08:00",
+              endTime: "2026-07-05T15:00:00+08:00"
+            }
+          ]
+        })
+      }),
+      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.source, "aiMinutes");
+    assert.equal(body.events[0].minuteState, "ready");
+    assert.equal(body.events[0].aiMinutesTaskUuid, "task-ai-1");
+    assert.equal(body.events[0].minuteText, "确认封样标准。");
+    assert.deepEqual(calls.map(call => JSON.parse(call.options.body || "{}")?.params?.name).filter(Boolean), [
+      "list_by_keyword_and_time_range",
+      "get_minutes_ai_summary"
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });

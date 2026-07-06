@@ -3,6 +3,7 @@ import {
   getDingUserAccessToken,
   jsonResponse,
   optionsResponse,
+  queryDingAiMinutesForEvents,
   queryDingAiMinutesText,
   queryDingCloudMinutesForEvents,
   queryDingMeetingMinutesTextWithFallback
@@ -15,6 +16,38 @@ export async function onRequest({ request, env }) {
   try {
     const body = await request.json().catch(() => ({}));
     if (Array.isArray(body.events)) {
+      if (body.authCode) {
+        const userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+        const aiEvents = await queryDingAiMinutesForEvents(userToken.accessToken, body);
+        const unresolvedEvents = aiEvents.filter(event => event.minuteState === "empty" && event.conferenceId);
+        if (unresolvedEvents.length) {
+          try {
+            const accessToken = await getDingAccessToken(env);
+            const cloudEvents = await queryDingCloudMinutesForEvents(accessToken, {
+              ...body,
+              events: unresolvedEvents
+            });
+            const byConference = new Map(cloudEvents.map(event => [event.conferenceId, event]));
+            const events = aiEvents.map(event => {
+              const cloud = byConference.get(event.conferenceId);
+              return cloud?.minuteState === "ready" || cloud?.minuteState === "permission" ? cloud : event;
+            });
+            return jsonResponse({
+              synced: true,
+              source: "aiMinutes",
+              fallbackSource: "cloudRecording",
+              events
+            });
+          } catch {
+            // AI minutes are the primary signal here; keep their states if cloud fallback is unavailable.
+          }
+        }
+        return jsonResponse({
+          synced: true,
+          source: "aiMinutes",
+          events: aiEvents
+        });
+      }
       const accessToken = await getDingAccessToken(env);
       const events = await queryDingCloudMinutesForEvents(accessToken, body);
       return jsonResponse({
