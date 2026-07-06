@@ -688,6 +688,21 @@ export async function queryDingAiMinutesList(userAccessToken, input = {}, fetchI
   return { raw, minutes: extractDingAiMinutesList(raw) };
 }
 
+async function queryDingAiMinutesListWithScopeFallback(userAccessToken, input = {}, fetchImpl = fetch) {
+  const primary = await queryDingAiMinutesList(userAccessToken, input, fetchImpl);
+  if (primary.minutes.length || input.belongingConditionId) return primary;
+  const byTaskUuid = new Map(primary.minutes.map(minute => [minute.taskUuid, minute]));
+  const raw = [primary.raw];
+  for (const belongingConditionId of ["created", "shared"]) {
+    const scoped = await queryDingAiMinutesList(userAccessToken, { ...input, belongingConditionId }, fetchImpl);
+    raw.push(scoped.raw);
+    scoped.minutes.forEach(minute => {
+      if (!byTaskUuid.has(minute.taskUuid)) byTaskUuid.set(minute.taskUuid, minute);
+    });
+  }
+  return { raw, minutes: [...byTaskUuid.values()] };
+}
+
 export async function queryDingAiMinutesText(userAccessToken, input = {}, fetchImpl = fetch) {
   const taskUuid = extractDingAiMinutesTaskUuid(input.taskUuid || input.recordingId || input.minutesId || "");
   if (!taskUuid) {
@@ -774,14 +789,14 @@ export async function queryDingAiMinutesForEvents(userAccessToken, input = {}, f
   const ends = events.map(event => eventTimeMs(event.endTime)).filter(Boolean);
   const createTimeStart = starts.length ? Math.min(...starts) - 24 * 60 * 60 * 1000 : undefined;
   const createTimeEnd = ends.length ? Math.max(...ends) + 24 * 60 * 60 * 1000 : undefined;
-  let { minutes } = await queryDingAiMinutesList(userAccessToken, {
+  let { minutes } = await queryDingAiMinutesListWithScopeFallback(userAccessToken, {
     keyword: input.keyword || "",
     createTimeStart,
     createTimeEnd,
     maxResults: input.maxResults || 80
   }, fetchImpl);
   if (input.keyword) {
-    const fallback = await queryDingAiMinutesList(userAccessToken, {
+    const fallback = await queryDingAiMinutesListWithScopeFallback(userAccessToken, {
       createTimeStart,
       createTimeEnd,
       maxResults: input.maxResults || 80

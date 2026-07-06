@@ -320,6 +320,20 @@ test("extractDingAiMinutesList reads MCP minutes list payloads", () => {
 
   assert.equal(list[0].taskUuid, "task-1");
   assert.equal(list[0].title, "标准样终审会");
+
+  const wrappedList = extractDingAiMinutesList({
+    result: {
+      content: {
+        result: {
+          itemList: [
+            { uuid: "task-2", name: "产品全周期流程初版同步会", startTime: "2026-07-03T14:00:00+08:00" }
+          ]
+        }
+      }
+    }
+  });
+  assert.equal(wrappedList[0].taskUuid, "task-2");
+  assert.equal(wrappedList[0].title, "产品全周期流程初版同步会");
 });
 
 test("queryDingAiMinutesText reads AI summary through DingTalk MCP", async () => {
@@ -450,11 +464,58 @@ test("queryDingAiMinutesForEvents falls back to time range when product keyword 
   assert.deepEqual(calls.map(call => call.name), [
     "list_by_keyword_and_time_range",
     "list_by_keyword_and_time_range",
+    "list_by_keyword_and_time_range",
+    "list_by_keyword_and_time_range",
     "get_minutes_ai_summary"
   ]);
   assert.equal(calls[0].args.keyword, "鹦鹉站杆升级版 立项评审会");
-  assert.equal(calls[1].args.keyword, undefined);
+  assert.equal(calls[1].args.belongingConditionId, "created");
+  assert.equal(calls[2].args.belongingConditionId, "shared");
+  assert.equal(calls[3].args.keyword, undefined);
   assert.equal(result[0].minuteState, "ready");
   assert.equal(result[0].aiMinutesTaskUuid, "task-flow-1");
   assert.equal(result[0].minuteText, "确认产品流程初版方向。");
+});
+
+test("queryDingAiMinutesForEvents checks created and shared minutes when all scope is empty", async () => {
+  const scopes = [];
+  const result = await queryDingAiMinutesForEvents("user-token-1", {
+    events: [
+      {
+        conferenceId: "conf-shared",
+        summary: "星星水壶升级方案同步及执行节点确认会",
+        startTime: "2026-07-02T15:00:00+08:00",
+        endTime: "2026-07-02T16:00:00+08:00"
+      }
+    ]
+  }, async (url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.params.name === "list_by_keyword_and_time_range") {
+      scopes.push(body.params.arguments.belongingConditionId);
+      if (body.params.arguments.belongingConditionId !== "shared") {
+        return okJson({ result: { content: { result: { itemList: [] } } } });
+      }
+      return okJson({
+        result: {
+          content: {
+            result: {
+              itemList: [
+                {
+                  taskUuid: "task-shared-1",
+                  title: "星星水壶升级方案同步及执行节点确认会",
+                  startTime: "2026-07-02T15:05:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      });
+    }
+    return okJson({ result: { content: [{ type: "text", text: JSON.stringify({ summary: "确认执行节点。" }) }] } });
+  });
+
+  assert.deepEqual(scopes, ["noLimit", "created", "shared"]);
+  assert.equal(result[0].minuteState, "ready");
+  assert.equal(result[0].aiMinutesTaskUuid, "task-shared-1");
+  assert.equal(result[0].minuteText, "确认执行节点。");
 });
