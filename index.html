@@ -3363,6 +3363,7 @@
     let activeMinuteDocId = "";
     let currentUser = loadUser();
     let orgCache = loadOrgCache();
+    let dingBackendConfig = null;
     let dingAutoLoginTried = false;
     let syncModalMode = "";
     let syncTargetId = "";
@@ -3812,6 +3813,12 @@
       if (location.protocol === "file:" || (isLocal && location.port !== "8127")) return "http://127.0.0.1:8127";
       return "";
     }
+    async function loadDingBackendConfig({ force = false } = {}) {
+      if (dingBackendConfig && !force) return dingBackendConfig;
+      const res = await fetch(`${dingApiBase()}/api/dingtalk/config`);
+      dingBackendConfig = await res.json();
+      return dingBackendConfig;
+    }
     function setDingStatus(text, type = "") {
       const el = document.getElementById("dingStatus");
       if (!el) return;
@@ -3855,8 +3862,7 @@
       let backend = null;
       setDingStatus("正在检测钉钉环境和服务端配置...");
       try {
-        const res = await fetch(`${dingApiBase()}/api/dingtalk/config`);
-        backend = await res.json();
+        backend = await loadDingBackendConfig({ force: true });
       } catch (e) {
         backend = { configured: false, message: "钉钉登录服务不可用" };
       }
@@ -3908,6 +3914,77 @@
         else run();
         if (api.error) api.error(fail);
       });
+    }
+    function normalizeDingOpenAuthResult(raw) {
+      if (!raw) return {};
+      if (typeof raw === "string") {
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return {};
+        }
+      }
+      return raw;
+    }
+    function callDingOpenModal(options) {
+      return new Promise((resolve, reject) => {
+        const openModal = window.dd?.biz?.util?.openModal;
+        if (typeof openModal !== "function") {
+          reject(new Error("当前钉钉客户端不支持授权组件，请升级钉钉后重试。"));
+          return;
+        }
+        let settled = false;
+        const done = value => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+        const fail = error => {
+          if (settled) return;
+          settled = true;
+          reject(new Error(typeof error === "string" ? error : JSON.stringify(error || {})));
+        };
+        try {
+          const result = openModal({
+            ...options,
+            onSuccess: done,
+            success: done,
+            onFail: fail,
+            fail
+          });
+          if (result && typeof result.then === "function") result.then(done).catch(fail);
+          else if (result !== undefined) done(result);
+        } catch (error) {
+          fail(error.message || error);
+        }
+      });
+    }
+    async function requestDingDelegatedAuthCode(rpcScope) {
+      const env = detectDingTalkEnvironment();
+      if (!env.inDingTalk || !env.corpId) {
+        throw new Error("需要从钉钉工作台打开应用，才能授权读取 AI 听记。");
+      }
+      const backend = await loadDingBackendConfig();
+      if (!backend.configured || !backend.clientId) {
+        throw new Error("钉钉服务端缺少 AppKey，无法打开用户授权组件。");
+      }
+      const query = new URLSearchParams({
+        type: "0",
+        clientId: backend.clientId,
+        corpId: env.corpId,
+        rpcScope
+      });
+      const raw = await callDingOpenModal({
+        url: `https://n.dingtalk.com/dingding/h5-common-authority/auth/index.html?${query.toString()}`,
+        size: "middle",
+        title: "授权申请"
+      });
+      const data = normalizeDingOpenAuthResult(raw);
+      if (data.status === "cancel" || data === null) throw new Error("已取消钉钉 AI 听记授权。");
+      if (data.status && data.status !== "ok") throw new Error("钉钉 AI 听记授权失败，请稍后重试。");
+      const authCode = data.result?.authCode || data.authCode || data.code;
+      if (!authCode) throw new Error("钉钉授权组件未返回用户授权码。");
+      return authCode;
     }
     function persistDingUser(payload) {
       const roleKey = roleProfiles[payload.role] ? payload.role : "readonly";
@@ -5860,11 +5937,10 @@
       return { text: "检测中", className: "" };
     }
     async function detectCalendarMeetingMinutes(events = []) {
-      const env = detectDingTalkEnvironment();
       const product = productById(minutesProductId);
       const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
       try {
-        const authCode = await requestDingAuthCode(env.corpId);
+        const authCode = await requestDingDelegatedAuthCode("Minutes.Content.Read");
         const aiRes = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -5879,39 +5955,13 @@
         if (aiRes.ok && aiPayload.synced && Array.isArray(aiPayload.events)) {
           return aiPayload.events;
         }
-      } catch {
-        // Fall back to the older cloud-recording text API below.
-      }
-      const unionId = currentUser?.dingUser?.unionid || "";
-      const checks = events.map(async event => {
-        try {
-          const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              recordingId: event.conferenceId,
-              scheduleConferenceId: event.scheduleConferenceId || event.conferenceId,
-              unionId
-            })
-          });
-          const payload = await res.json().catch(() => ({}));
-          if (res.ok && payload.synced && payload.text) {
-            return {
-              ...event,
-              minuteState: "ready",
-              minuteText: payload.text,
-              resolvedConferenceId: payload.resolvedConferenceId || event.conferenceId
-            };
-          }
-          const raw = dingPayloadText(payload);
-          if (/cloudRecordNotFound|50513/i.test(raw)) return { ...event, minuteState: "empty" };
-          if (/AccessTokenPermissionDenied|VideoConference\.Conference\.Read/i.test(raw)) return { ...event, minuteState: "permission" };
-          return { ...event, minuteState: "error" };
-        } catch {
-          return { ...event, minuteState: "error" };
+        if (renderMinutesPermissionError(aiPayload)) {
+          return events.map(event => ({ ...event, minuteState: "permission" }));
         }
-      });
-      return Promise.all(checks);
+        return events.map(event => ({ ...event, minuteState: "auth" }));
+      } catch {
+        return events.map(event => ({ ...event, minuteState: "auth" }));
+      }
     }
     function renderCalendarMeetingOptions(events = []) {
       const list = document.getElementById("calendarMeetingList");
@@ -6143,8 +6193,7 @@
         await withGlobalLoading("正在读取钉钉会议纪要", async () => {
           let authCode = "";
           if (useAiMinutes) {
-            const env = detectDingTalkEnvironment();
-            authCode = await requestDingAuthCode(env.corpId);
+            authCode = await requestDingDelegatedAuthCode("Minutes.Content.Read");
           }
           const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
             method: "POST",

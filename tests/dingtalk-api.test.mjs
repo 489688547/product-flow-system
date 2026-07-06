@@ -12,6 +12,7 @@ test("buildConfigResponse reports missing Cloudflare environment variables", () 
   assert.deepEqual(result, {
     configured: false,
     missing: ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET"],
+    clientId: "",
     callbackUrl: "https://flow.example.com/?corpId=$CORPID$"
   });
 });
@@ -24,6 +25,7 @@ test("buildConfigResponse accepts DingTalk app credentials", () => {
 
   assert.equal(result.configured, true);
   assert.deepEqual(result.missing, []);
+  assert.equal(result.clientId, "app-key");
   assert.equal(result.callbackUrl, "https://flow.example.com/?corpId=$CORPID$");
 });
 

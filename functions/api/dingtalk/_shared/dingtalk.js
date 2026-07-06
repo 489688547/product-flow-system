@@ -29,11 +29,12 @@ export function getDingCredentials(env = {}) {
 }
 
 export function buildConfigResponse(env = {}, origin = "") {
-  const { missing } = getDingCredentials(env);
+  const { appKey, missing } = getDingCredentials(env);
   const normalizedOrigin = String(origin || "").replace(/\/$/, "");
   return {
     configured: missing.length === 0,
     missing,
+    clientId: appKey || "",
     callbackUrl: `${normalizedOrigin}/?corpId=$CORPID$`
   };
 }
