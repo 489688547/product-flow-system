@@ -2291,49 +2291,95 @@
       gap: 8px;
     }
     .calendar-meeting-list {
-      max-height: 190px;
+      max-height: 220px;
       overflow: auto;
       display: grid;
-      gap: 6px;
+      gap: 8px;
+      padding-right: 2px;
     }
     .calendar-meeting-option {
       width: 100%;
-      min-height: 52px;
-      padding: 8px 10px;
+      min-height: 58px;
+      padding: 9px 10px;
       border: 1px solid var(--line);
       border-radius: 10px;
-      background: var(--control);
+      background: #fff;
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
-      gap: 10px;
+      gap: 12px;
       align-items: center;
       text-align: left;
+      box-shadow: none;
+      cursor: pointer;
     }
     .calendar-meeting-option:hover,
     .calendar-meeting-option.active {
       border-color: #bfdbfe;
       background: var(--blue-soft);
     }
-    .calendar-meeting-option strong,
-    .calendar-meeting-option span {
+    .calendar-meeting-option:focus-visible {
+      outline: 2px solid rgba(37, 99, 235, .28);
+      outline-offset: 2px;
+    }
+    .calendar-meeting-main {
+      min-width: 0;
+      display: grid;
+      gap: 3px;
+    }
+    .calendar-meeting-main strong,
+    .calendar-meeting-time {
       display: block;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
-    .calendar-meeting-option strong {
+    .calendar-meeting-main strong {
+      margin: 0;
+      color: var(--ink);
       font-size: 12px;
-      line-height: 1.3;
+      line-height: 1.35;
+      font-weight: 760;
     }
-    .calendar-meeting-option span {
-      margin-top: 3px;
+    .calendar-meeting-time {
       color: var(--muted);
       font-size: 11px;
-      line-height: 1.25;
+      line-height: 1.3;
     }
-    .calendar-meeting-option .badge {
-      min-height: 22px;
+    .calendar-meeting-meta {
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      min-width: 80px;
+    }
+    .minute-state {
+      min-height: 24px;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: var(--muted);
       font-size: 11px;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+    .minute-state.ready {
+      border-color: #bbf7d0;
+      background: var(--green-soft);
+      color: #15803d;
+    }
+    .minute-state.empty {
+      border-color: #fed7aa;
+      background: var(--amber-soft);
+      color: #b45309;
+    }
+    .minute-state.error {
+      border-color: #fecaca;
+      background: var(--red-soft);
+      color: #b91c1c;
     }
     .global-loading {
       position: fixed;
@@ -5782,7 +5828,7 @@
     function renderMinutesRecordingError(payload = {}) {
       const raw = dingPayloadText(payload);
       if (!/cloudRecordNotFound|50513/i.test(raw)) return false;
-      setMinutesMessage("这个会议没有钉钉云录制/闪记文本，无法自动同步纪要。请换一个已开启闪记的会议，或直接粘贴会议纪要后生成资料。", "error");
+      setMinutesMessage("这个会议没有可读取的 AI 纪要/闪记文本，无法自动同步纪要。请换一个有纪要的会议，或直接粘贴会议纪要后生成资料。", "error");
       return true;
     }
     function meetingCalendarRange() {
@@ -5803,21 +5849,76 @@
       const min = String(date.getMinutes()).padStart(2, "0");
       return `${mm}-${dd} ${hh}:${min}`;
     }
+    function calendarMinuteState(event = {}) {
+      if (event.minuteState === "ready") return { text: "有纪要", className: "ready" };
+      if (event.minuteState === "empty") return { text: "无纪要", className: "empty" };
+      if (event.minuteState === "permission") return { text: "缺权限", className: "error" };
+      if (event.minuteState === "error") return { text: "不可读", className: "error" };
+      return { text: "检测中", className: "" };
+    }
+    async function detectCalendarMeetingMinutes(events = []) {
+      const unionId = currentUser?.dingUser?.unionid || "";
+      const checks = events.map(async event => {
+        try {
+          const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recordingId: event.conferenceId,
+              unionId
+            })
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (res.ok && payload.synced && payload.text) {
+            return { ...event, minuteState: "ready", minuteText: payload.text };
+          }
+          const raw = dingPayloadText(payload);
+          if (/cloudRecordNotFound|50513/i.test(raw)) return { ...event, minuteState: "empty" };
+          if (/AccessTokenPermissionDenied|VideoConference\.Conference\.Read/i.test(raw)) return { ...event, minuteState: "permission" };
+          return { ...event, minuteState: "error" };
+        } catch {
+          return { ...event, minuteState: "error" };
+        }
+      });
+      return Promise.all(checks);
+    }
     function renderCalendarMeetingOptions(events = []) {
       const list = document.getElementById("calendarMeetingList");
       if (!list) return;
       const currentId = document.getElementById("minutesRecordingId").value.trim();
       list.classList.remove("hidden");
-      list.innerHTML = events.map(event => `
+      list.innerHTML = events.map(event => {
+        const state = calendarMinuteState(event);
+        return `
         <button type="button" class="calendar-meeting-option ${event.conferenceId === currentId ? "active" : ""}" data-calendar-conference="${esc(event.conferenceId)}" data-calendar-title="${esc(event.summary || "钉钉会议")}">
-          <span><strong>${esc(event.summary || "钉钉会议")}</strong><span>${esc(formatCalendarMeetingTime(event.startTime))} - ${esc(formatCalendarMeetingTime(event.endTime))}</span></span>
-          <span class="badge blue">选择</span>
+          <span class="calendar-meeting-main">
+            <strong>${esc(event.summary || "钉钉会议")}</strong>
+            <span class="calendar-meeting-time">${esc(formatCalendarMeetingTime(event.startTime))} - ${esc(formatCalendarMeetingTime(event.endTime))}</span>
+          </span>
+          <span class="calendar-meeting-meta"><span class="minute-state ${state.className}">${state.text}</span></span>
         </button>
-      `).join("") || `<div class="empty">没有找到带会议 ID 的钉钉日历会议。请确认会议来自钉钉日程且已开启云录制（闪记）。</div>`;
+      `;
+      }).join("") || `<div class="empty">没有找到带会议 ID 的钉钉日历会议。请确认会议来自钉钉日程且已开启云录制（闪记）。</div>`;
       list.querySelectorAll("[data-calendar-conference]").forEach(button => button.addEventListener("click", async () => {
-        document.getElementById("minutesRecordingId").value = button.dataset.calendarConference || "";
-        setMinutesMessage(`已选择日历会议：${button.dataset.calendarTitle || "钉钉会议"}，正在同步纪要。`, "ok");
+        const event = events.find(item => item.conferenceId === button.dataset.calendarConference);
+        document.getElementById("minutesRecordingId").value = event?.conferenceId || button.dataset.calendarConference || "";
         renderCalendarMeetingOptions(events);
+        if (event?.minuteState === "ready" && event.minuteText) {
+          document.getElementById("minutesText").value = event.minuteText;
+          updateMinutesPosterPreview();
+          setMinutesMessage(`已选择日历会议：${event.summary || "钉钉会议"}，正在写入资料包。`, "ok");
+          createMeetingMinutesFromText({ productId: minutesProductId, meetingId: minutesMeetingId, text: event.minuteText, source: "钉钉云录制" });
+          return;
+        }
+        if (event?.minuteState === "empty") {
+          setMinutesMessage("这个会议没有可读取的 AI 纪要/闪记文本，无法自动同步纪要。请换一个有纪要的会议，或直接粘贴会议纪要后生成资料。", "error");
+          return;
+        }
+        if (event?.minuteState === "permission") {
+          setMinutesMessage("当前应用还缺少会议读权限，开通权限后再同步纪要。", "error");
+          return;
+        }
+        setMinutesMessage(`已选择日历会议：${button.dataset.calendarTitle || "钉钉会议"}，正在同步纪要。`, "ok");
         await syncMinutesFromDing();
       }));
       if (window.lucide) lucide.createIcons();
@@ -5863,9 +5964,19 @@
               const bMatch = keyword && keyword.split(/\s+/).some(word => word && bText.includes(word)) ? 0 : 1;
               if (aMatch !== bMatch) return aMatch - bMatch;
               return Date.parse(b.startTime || 0) - Date.parse(a.startTime || 0);
-            });
+            })
+            .slice(0, 20)
+            .map(event => ({ ...event, minuteState: "checking" }));
           renderCalendarMeetingOptions(events);
-          setMinutesMessage(events.length ? `已找到 ${events.length} 个带会议 ID 的日历会议，请选择对应会议。` : "没有找到可同步纪要的钉钉会议。", events.length ? "ok" : "error");
+          if (!events.length) {
+            setMinutesMessage("没有找到可同步纪要的钉钉会议。", "error");
+            return;
+          }
+          setMinutesMessage(`已找到 ${events.length} 个带会议 ID 的日历会议，正在检测是否有 AI 纪要/闪记...`, "ok");
+          const checkedEvents = await detectCalendarMeetingMinutes(events);
+          renderCalendarMeetingOptions(checkedEvents);
+          const readyCount = checkedEvents.filter(event => event.minuteState === "ready").length;
+          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount} 个有 AI 纪要/闪记。`, readyCount ? "ok" : "error");
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉日历会议查询失败", "error");

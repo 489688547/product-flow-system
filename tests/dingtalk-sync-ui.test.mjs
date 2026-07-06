@@ -81,7 +81,12 @@ test("DingTalk minutes can select a calendar meeting before syncing", () => {
   assert.match(html, /function loadCalendarMeetingsForMinutes\(\)/);
   assert.match(html, /userUnionId,\s+timeMin,\s+timeMax,\s+maxResults: 60/);
   assert.match(html, /event\.conferenceId/);
-  assert.match(html, /document\.getElementById\("minutesRecordingId"\)\.value = button\.dataset\.calendarConference \|\| "";/);
+  assert.match(html, /function detectCalendarMeetingMinutes\(/);
+  assert.match(html, /calendarMinuteState/);
+  assert.match(html, /有纪要/);
+  assert.match(html, /无纪要/);
+  assert.match(html, /minute-state/);
+  assert.match(html, /AI 纪要\/闪记/);
   assert.match(html, /await syncMinutesFromDing\(\);/);
   assert.match(html, /正在读取钉钉日历会议/);
 });
@@ -108,7 +113,7 @@ test("DingTalk minutes permission errors show an application permission action",
 test("DingTalk minutes without cloud recording show a readable recovery message", () => {
   assert.match(html, /function renderMinutesRecordingError\(/);
   assert.match(html, /cloudRecordNotFound\|50513/);
-  assert.match(html, /没有钉钉云录制\/闪记文本/);
+  assert.match(html, /没有可读取的 AI 纪要\/闪记文本/);
   assert.match(html, /直接粘贴会议纪要后生成资料/);
   const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
   assert.match(minutesSync, /if \(renderMinutesRecordingError\(payload\)\) return;/);

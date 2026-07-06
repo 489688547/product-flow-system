@@ -500,19 +500,40 @@ function collectDingTranscriptText(payload = {}) {
   const root = payload.result || payload;
   const paragraphs = Array.isArray(root.paragraphList) ? root.paragraphList : [];
   const lines = [];
+  const pushText = value => {
+    const text = String(value || "").trim();
+    if (text) lines.push(text);
+  };
   paragraphs.forEach(paragraph => {
-    const paragraphText = String(paragraph.paragraph || paragraph.text || "").trim();
-    if (paragraphText) lines.push(paragraphText);
+    pushText(paragraph.paragraph || paragraph.text);
     const sentences = Array.isArray(paragraph.sentenceList) ? paragraph.sentenceList : [];
     sentences.forEach(sentence => {
-      const text = String(sentence.sentence || sentence.text || "").trim();
-      if (text) lines.push(text);
+      pushText(sentence.sentence || sentence.text);
     });
   });
   const sentences = Array.isArray(root.sentences) ? root.sentences : [];
   sentences.forEach(sentence => {
-    const text = String(sentence.sentence || sentence.text || "").trim();
-    if (text) lines.push(text);
+    pushText(sentence.sentence || sentence.text);
+  });
+  [
+    root.summary,
+    root.aiSummary,
+    root.meetingSummary,
+    root.smartSummary,
+    root.minutes,
+    root.minute,
+    root.conclusion,
+    root.decision,
+    root.actionItems,
+    root.todoList
+  ].forEach(value => {
+    if (Array.isArray(value)) {
+      value.forEach(item => pushText(typeof item === "object" ? item.text || item.content || item.summary || item.title : item));
+    } else if (value && typeof value === "object") {
+      Object.values(value).forEach(item => pushText(typeof item === "object" ? item.text || item.content || item.summary || item.title : item));
+    } else {
+      pushText(value);
+    }
   });
   return [...new Set(lines)].join("\n");
 }

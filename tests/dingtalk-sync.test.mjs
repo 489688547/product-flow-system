@@ -198,3 +198,21 @@ test("queryDingMeetingMinutesText also accepts wrapped transcript payloads", asy
 
   assert.equal(result.text, "包装方向通过。\n供应链下周确认报价。");
 });
+
+test("queryDingMeetingMinutesText accepts AI summary and action item fields", async () => {
+  const result = await queryDingMeetingMinutesText("token-1", {
+    conferenceId: "conf-ai"
+  }, async () => {
+    return okJson({
+      result: {
+        aiSummary: "AI 纪要：确认标准样方向。",
+        actionItems: [
+          { title: "产品部补齐封样确认书" },
+          { text: "运营同步内容素材清单" }
+        ]
+      }
+    });
+  });
+
+  assert.equal(result.text, "AI 纪要：确认标准样方向。\n产品部补齐封样确认书\n运营同步内容素材清单");
+});
