@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { onRequest as syncOrgRequest } from "../functions/api/dingtalk/org/sync.js";
 import { onRequest as createTodoRequest } from "../functions/api/dingtalk/todo/create.js";
 import { onRequest as createCalendarRequest } from "../functions/api/dingtalk/calendar/create.js";
+import { onRequest as readDocRequest } from "../functions/api/dingtalk/doc/read.js";
 import { onRequest as listCalendarRequest } from "../functions/api/dingtalk/calendar/events.js";
 import { onRequest as meetingMinutesRequest } from "../functions/api/dingtalk/meeting/minutes.js";
 
@@ -50,6 +51,20 @@ test("calendar events route validates DingTalk credentials", async () => {
     request: new Request("https://flow.example.com/api/dingtalk/calendar/events", {
       method: "POST",
       body: JSON.stringify({ userUnionId: "user-union" })
+    }),
+    env: {}
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 501);
+  assert.match(body.message, /缺少钉钉应用配置/);
+});
+
+test("document read route validates DingTalk credentials", async () => {
+  const response = await readDocRequest({
+    request: new Request("https://flow.example.com/api/dingtalk/doc/read", {
+      method: "POST",
+      body: JSON.stringify({ docUrl: "https://alidocs.dingtalk.com/i/nodes/R4GpnMqJzG0yOgN5fkEmq24w8Ke0xjE3" })
     }),
     env: {}
   });

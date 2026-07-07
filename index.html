@@ -3047,17 +3047,16 @@
         </div>
         <div class="minutes-grid">
           <div>
-            <label class="field">钉钉会议 ID / 录制资源 ID
-              <input id="minutesRecordingId" placeholder="AI 听记链接 / taskUuid / 云录制 conferenceId">
+            <label class="field">钉钉文档链接
+              <input id="minutesDocUrl" placeholder="粘贴 alidocs.dingtalk.com 文档链接">
             </label>
             <div class="calendar-meeting-panel">
-              <button class="btn" id="loadCalendarMeetings" type="button"><i data-lucide="calendar-search"></i>从日历选择会议</button>
-              <div class="calendar-meeting-list hidden" id="calendarMeetingList"></div>
+              <button class="btn" id="importMinutesFromDoc" type="button"><i data-lucide="file-input"></i>从文档导入</button>
             </div>
             <label class="field section-gap">会议纪要文本
-              <textarea id="minutesText" placeholder="可从钉钉闪记复制纪要，也可以填写讨论结论、关键争议和行动项。"></textarea>
+              <textarea id="minutesText" placeholder="可从钉钉文档导入，也可以直接粘贴讨论结论、关键争议和行动项。"></textarea>
             </label>
-            <p class="minutes-status" id="minutesStatus">开启了云录制的会议可自动同步文本；只有 AI 听记（闪记）的会议，钉钉暂未开放读取接口，请复制正文粘贴到下方。</p>
+            <p class="minutes-status" id="minutesStatus">粘贴钉钉文档链接后导入正文，或直接粘贴纪要正文生成资料。</p>
           </div>
           <aside class="minutes-preview-card">
             <strong>生成资料</strong>
@@ -3068,7 +3067,6 @@
       </div>
       <div class="dialog-foot">
         <button class="btn ghost" id="cancelMinutesModal">取消</button>
-        <button class="btn" id="syncMinutesFromDing"><i data-lucide="cloud-download"></i>从钉钉同步</button>
         <button class="btn primary" id="saveMinutesModal"><i data-lucide="image-plus"></i>生成资料</button>
       </div>
     </div>
@@ -3409,7 +3407,6 @@
     let syncSelectedUsers = new Set();
     let minutesProductId = "";
     let minutesMeetingId = "";
-    let minutesSourceType = "";
     let confirmResolve = null;
     let globalLoadingDepth = 0;
 
@@ -3952,96 +3949,6 @@
         if (api.error) api.error(fail);
       });
     }
-    function normalizeDingOpenAuthResult(raw) {
-      if (!raw) return {};
-      if (typeof raw === "string") {
-        try {
-          return JSON.parse(raw);
-        } catch {
-          return {};
-        }
-      }
-      return raw;
-    }
-    function callDingOpenModal(options) {
-      return new Promise((resolve, reject) => {
-        const openModal = window.dd?.biz?.util?.openModal;
-        if (typeof openModal !== "function") {
-          reject(new Error("当前钉钉客户端不支持授权组件，请升级钉钉后重试。"));
-          return;
-        }
-        let settled = false;
-        const done = value => {
-          if (settled) return;
-          settled = true;
-          resolve(value);
-        };
-        const fail = error => {
-          if (settled) return;
-          settled = true;
-          reject(new Error(typeof error === "string" ? error : JSON.stringify(error || {})));
-        };
-        try {
-          const result = openModal({
-            ...options,
-            onSuccess: done,
-            success: done,
-            onFail: fail,
-            fail
-          });
-          if (result && typeof result.then === "function") result.then(done).catch(fail);
-          else if (result !== undefined) done(result);
-        } catch (error) {
-          fail(error.message || error);
-        }
-      });
-    }
-    async function requestDingDelegatedAuthCode(rpcScope) {
-      const env = detectDingTalkEnvironment();
-      if (!env.inDingTalk || !env.corpId) {
-        throw new Error("需要从钉钉工作台打开应用，才能授权读取 AI 听记。");
-      }
-      const backend = await loadDingBackendConfig();
-      if (!backend.configured || !backend.clientId) {
-        throw new Error("钉钉服务端缺少 AppKey，无法打开用户授权组件。");
-      }
-      const query = new URLSearchParams({
-        type: "0",
-        clientId: backend.clientId,
-        corpId: env.corpId,
-        rpcScope
-      });
-      const raw = await callDingOpenModal({
-        url: `https://n.dingtalk.com/dingding/h5-common-authority/auth/index.html?${query.toString()}`,
-        size: "middle",
-        title: "授权申请"
-      });
-      const data = normalizeDingOpenAuthResult(raw);
-      if (data.status === "cancel" || data === null) throw new Error("已取消钉钉 AI 听记授权。");
-      if (data.status && data.status !== "ok") throw new Error("钉钉 AI 听记授权失败，请稍后重试。");
-      const authCode = data.result?.authCode || data.authCode || data.code;
-      if (!authCode) throw new Error("钉钉授权组件未返回用户授权码。");
-      return authCode;
-    }
-    async function requestDingSilentAuthCode() {
-      const env = detectDingTalkEnvironment();
-      if (!env.inDingTalk || !env.corpId || !hasDingAuthApi()) return "";
-      try {
-        return await requestDingAuthCode(env.corpId);
-      } catch {
-        return "";
-      }
-    }
-    async function requestDingUserAuthCode(rpcScope) {
-      const silent = await requestDingSilentAuthCode();
-      if (silent) return silent;
-      try {
-        return await requestDingDelegatedAuthCode(rpcScope);
-      } catch (error) {
-        if (isUnsupportedDingAiMinutesScope(error?.message || error)) return "";
-        throw error;
-      }
-    }
     function persistDingUser(payload) {
       const roleKey = roleProfiles[payload.role] ? payload.role : "readonly";
       currentUser = {
@@ -4418,8 +4325,9 @@
     function cleanMinuteLines(text = "") {
       return String(text || "")
         .split(/\r?\n|[。；;]/)
-        .map(line => line.replace(/^[-*•\d.\s、]+/, "").trim())
-        .filter(Boolean)
+        // 去掉 markdown 标记（#、>、-、*、•、序号）和加粗符号，避免原样进入纪要图。
+        .map(line => line.replace(/^[#>\-*•\d.\s、]+/, "").replace(/\*\*/g, "").replace(/`/g, "").trim())
+        .filter(line => line && !/^[|:\-\s]+$/.test(line))
         .slice(0, 80);
     }
     function pickMinuteLines(lines, keywords, fallbackStart = 0, count = 3) {
@@ -4433,6 +4341,7 @@
       for (let index = 0; index < value.length; index += max) chunks.push(value.slice(index, index + max));
       return chunks.length ? chunks.slice(0, 2) : ["-"];
     }
+    const POSTER_FONT = "-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif";
     function posterTextLines(text = "", x = 0, y = 0, options = {}) {
       const lines = splitPosterLine(text, options.max || 24);
       return lines.map((line, index) => `<text x="${x}" y="${y + index * (options.lineHeight || 24)}" fill="${options.fill || "#111827"}" font-size="${options.size || 18}" font-weight="${options.weight || 500}">${esc(line)}</text>`).join("");
@@ -4450,41 +4359,73 @@
     function generateMeetingMinutesPoster({ product, meeting, text }) {
       const summary = summarizeMeetingMinutes(text);
       const title = `${product?.name || "产品"} · ${meeting?.title || "会议纪要"}`;
-      const subtitle = `${product?.level || ""} / ${stages[meeting?.stage]?.name || ""} / ${meeting?.owner || ""}`.replace(/^ \/ /, "");
-      const card = (x, y, w, h, color, heading, lines) => `
-        <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18" fill="#fff" stroke="${color}" opacity=".98"/>
-        <text x="${x + 24}" y="${y + 38}" fill="${color}" font-size="20" font-weight="800">${esc(heading)}</text>
-        ${lines.slice(0, 4).map((line, index) => posterTextLines(`• ${line}`, x + 24, y + 76 + index * 42, { max: 28, size: 16, fill: "#111827", lineHeight: 20 })).join("")}
-      `;
+      const subtitle = `${product?.level || ""} / ${stages[meeting?.stage]?.name || ""} / ${meeting?.owner || ""}`.replace(/^ \/ /, "").replace(/\/ *$/, "").trim();
+      const dateLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
+      // 分区徽标：编号胶囊 + 标题，颜色区分主题。
+      const sectionHead = (x, y, num, label, color) => `
+        <rect x="${x}" y="${y - 26}" width="52" height="34" rx="10" fill="${color}"/>
+        <text x="${x + 26}" y="${y - 3}" fill="#ffffff" font-size="19" font-weight="800" text-anchor="middle" font-family="${POSTER_FONT}">${num}</text>
+        <text x="${x + 68}" y="${y}" fill="#0f172a" font-size="27" font-weight="800" font-family="${POSTER_FONT}">${esc(label)}</text>`;
+      // 带左侧色条和轻投影的白卡。
+      const listCard = (x, y, w, h, color, tint, heading, lines) => `
+        <g filter="url(#posterShadow)"><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="18" fill="#ffffff"/></g>
+        <rect x="${x}" y="${y}" width="6" height="${h}" rx="3" fill="${color}"/>
+        <rect x="${x + 22}" y="${y + 22}" width="${heading.length * 17 + 30}" height="30" rx="8" fill="${tint}"/>
+        <text x="${x + 37}" y="${y + 43}" fill="${color}" font-size="18" font-weight="800" font-family="${POSTER_FONT}">${esc(heading)}</text>
+        ${(lines.length ? lines : ["暂无记录"]).slice(0, 4).map((line, index) => `
+          <circle cx="${x + 30}" cy="${y + 80 + index * 40}" r="3.5" fill="${color}"/>
+          ${posterTextLines(line, x + 46, y + 85 + index * 40, { max: 26, size: 16, fill: "#1f2937", weight: 500, lineHeight: 19 })}`).join("")}`;
       const actions = summary.actions.slice(0, 4);
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600">
-        <rect width="1200" height="1600" fill="#ffffff"/>
-        <text x="70" y="88" fill="#111827" font-size="36" font-weight="850">${esc(title)}</text>
-        <text x="70" y="124" fill="#64748b" font-size="20">${esc(subtitle || "会议纪要重点图")}</text>
-        <line x1="70" y1="164" x2="1130" y2="164" stroke="#dbe3ee" stroke-width="3"/>
-        <text x="70" y="226" fill="#0284c7" font-size="28" font-weight="850">01 · 核心结论</text>
-        <rect x="70" y="252" width="1060" height="310" rx="22" fill="#eef9fd"/>
-        ${card(92, 284, 500, 236, "#0284c7", "会议决策", summary.conclusions)}
-        ${card(608, 284, 500, 236, "#0f766e", "关键判断", summary.demands)}
-        <text x="70" y="636" fill="#d97706" font-size="28" font-weight="850">02 · 风险与卡点</text>
-        <rect x="70" y="662" width="1060" height="266" rx="22" fill="#fff7ed"/>
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1600" viewBox="0 0 1200 1600" font-family="${POSTER_FONT}">
+        <defs>
+          <linearGradient id="posterBg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#f7f9fc"/><stop offset="1" stop-color="#eef2f7"/>
+          </linearGradient>
+          <linearGradient id="posterHead" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#1e3a8a"/><stop offset="1" stop-color="#2563eb"/>
+          </linearGradient>
+          <filter id="posterShadow" x="-6%" y="-6%" width="112%" height="118%">
+            <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.10"/>
+          </filter>
+        </defs>
+        <rect width="1200" height="1600" fill="url(#posterBg)"/>
+        <g filter="url(#posterShadow)"><rect x="70" y="56" width="1060" height="150" rx="22" fill="url(#posterHead)"/></g>
+        <circle cx="128" cy="112" r="26" fill="#ffffff" opacity=".18"/>
+        <text x="128" y="122" fill="#ffffff" font-size="26" font-weight="850" text-anchor="middle">纪</text>
+        <text x="176" y="118" fill="#ffffff" font-size="34" font-weight="850">${esc(title)}</text>
+        <text x="176" y="158" fill="#dbe6ff" font-size="19" font-weight="500">${esc(subtitle || "会议纪要重点图")}</text>
+        <rect x="176" y="172" width="${dateLabel.length * 12 + 44}" height="26" rx="13" fill="#ffffff" opacity=".16"/>
+        <text x="198" y="190" fill="#ffffff" font-size="15" font-weight="600">📅 ${esc(dateLabel)}</text>
+        ${sectionHead(70, 268, "01", "核心结论", "#2563eb")}
+        ${listCard(70, 288, 512, 250, "#2563eb", "#eff4ff", "会议决策", summary.conclusions)}
+        ${listCard(618, 288, 512, 250, "#0d9488", "#effaf7", "关键判断", summary.demands)}
+        ${sectionHead(70, 618, "02", "风险与卡点", "#ea580c")}
+        <g filter="url(#posterShadow)"><rect x="70" y="638" width="1060" height="212" rx="18" fill="#ffffff"/></g>
+        <rect x="70" y="638" width="6" height="212" rx="3" fill="#ea580c"/>
         ${summary.risks.slice(0, 4).map((line, index) => `
-          <rect x="${100 + index * 250}" y="716" width="220" height="128" rx="12" fill="#fff" stroke="#fed7aa"/>
-          ${posterTextLines(line, 122 + index * 250, 766, { max: 13, size: 17, fill: "#111827", weight: 700, lineHeight: 26 })}
-        `).join("")}
-        <text x="70" y="1002" fill="#16a34a" font-size="28" font-weight="850">03 · 后续行动项</text>
-        <rect x="70" y="1028" width="1060" height="360" rx="22" fill="#f0fdf4"/>
-        <rect x="100" y="1084" width="1000" height="52" rx="10" fill="#dcfce7"/>
-        <text x="132" y="1118" fill="#166534" font-size="18" font-weight="800">行动项</text>
-        <text x="720" y="1118" fill="#166534" font-size="18" font-weight="800">状态</text>
-        ${actions.map((line, index) => `
-          <line x1="100" y1="${1168 + index * 54}" x2="1100" y2="${1168 + index * 54}" stroke="#dbeafe"/>
-          ${posterTextLines(line, 132, 1204 + index * 54, { max: 40, size: 17, fill: "#111827", lineHeight: 21 })}
-          <rect x="720" y="${1180 + index * 54}" width="76" height="26" rx="7" fill="#eef2ff"/>
-          <text x="740" y="${1199 + index * 54}" fill="#475569" font-size="14" font-weight="700">待启动</text>
-        `).join("")}
-        <rect x="70" y="1440" width="1060" height="72" rx="18" fill="#f8fafc" stroke="#e2e8f0"/>
-        <text x="104" y="1485" fill="#334155" font-size="18" font-weight="750">资料由产品全周期协同系统根据会议纪要自动生成，可在资料包继续打开、删除或重新生成。</text>
+          <rect x="${104 + index * 252}" y="672" width="232" height="146" rx="14" fill="#fff7ed" stroke="#fed7aa"/>
+          <circle cx="${128 + index * 252}" cy="704" r="12" fill="#fb923c"/>
+          <text x="${128 + index * 252}" y="710" fill="#ffffff" font-size="14" font-weight="800" text-anchor="middle">${index + 1}</text>
+          ${posterTextLines(line, 152 + index * 252, 709, { max: 12, size: 15, fill: "#7c2d12", weight: 700, lineHeight: 22 })}
+          ${line.length > 24 ? posterTextLines(line.slice(24), 128 + index * 252, 762, { max: 15, size: 14, fill: "#9a3412", weight: 500, lineHeight: 20 }) : ""}`).join("")}
+        ${sectionHead(70, 918, "03", "后续行动项", "#16a34a")}
+        <g filter="url(#posterShadow)"><rect x="70" y="938" width="1060" height="452" rx="18" fill="#ffffff"/></g>
+        <rect x="70" y="938" width="6" height="452" rx="3" fill="#16a34a"/>
+        <rect x="102" y="968" width="996" height="48" rx="10" fill="#f0fdf4"/>
+        <text x="134" y="999" fill="#166534" font-size="17" font-weight="800">行动项</text>
+        <text x="960" y="999" fill="#166534" font-size="17" font-weight="800">状态</text>
+        ${(actions.length ? actions : ["按会议决策继续推进后续任务"]).map((line, index) => `
+          <rect x="102" y="${1032 + index * 76}" width="996" height="64" rx="12" fill="${index % 2 ? "#f8fafc" : "#ffffff"}" stroke="#e5eaf1"/>
+          <circle cx="${134}" cy="${1064 + index * 76}" r="14" fill="#dcfce7"/>
+          <text x="134" y="${1070 + index * 76}" fill="#166534" font-size="15" font-weight="800" text-anchor="middle">${index + 1}</text>
+          ${posterTextLines(line, 166, 1058 + index * 76, { max: 34, size: 16, fill: "#1f2937", weight: 500, lineHeight: 20 })}
+          <rect x="948" y="${1050 + index * 76}" width="96" height="30" rx="15" fill="#eef2ff"/>
+          <circle cx="972" cy="${1065 + index * 76}" r="4" fill="#6366f1"/>
+          <text x="986" y="${1070 + index * 76}" fill="#4338ca" font-size="14" font-weight="700">待启动</text>`).join("")}
+        <rect x="70" y="1440" width="1060" height="80" rx="18" fill="#ffffff" stroke="#e2e8f0"/>
+        <circle cx="108" cy="1480" r="6" fill="#2563eb"/>
+        <text x="130" y="1476" fill="#334155" font-size="16" font-weight="700">产品全周期协同系统 · 会议纪要重点图</text>
+        <text x="130" y="1500" fill="#94a3b8" font-size="14" font-weight="500">根据会议纪要自动生成，可在资料包继续打开、删除或重新生成。</text>
       </svg>`;
       return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
     }
@@ -5972,195 +5913,10 @@
       if (!el) return false;
       el.className = "minutes-status permission";
       el.innerHTML = `
-        <span>缺少钉钉权限：<strong>${esc(scope || "会议纪要读取权限")}</strong>。在开放平台开通后，重新选择会议同步即可。</span>
+        <span>缺少钉钉权限：<strong>${esc(scope || "钉钉文档读取权限")}</strong>。在开放平台开通后，重新点击导入即可。</span>
         ${url ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener">打开权限申请</a>` : ""}
       `;
       return true;
-    }
-    function renderMinutesRecordingError(payload = {}) {
-      const raw = dingPayloadText(payload);
-      if (!/cloudRecordNotFound|50513/i.test(raw)) return false;
-      setMinutesMessage("钉钉接口没有返回这个会议的 AI 纪要/闪记文本，无法自动同步。请换一个可读取的会议，或直接粘贴会议纪要后生成资料。", "error");
-      return true;
-    }
-    function isUnsupportedDingAiMinutesScope(error = "") {
-      const raw = typeof error === "string" ? error : dingPayloadText(error);
-      return /500205|50205|委托授权需要填写委托类型的权限点/i.test(raw);
-    }
-    function showUnsupportedDingAiMinutesScope(tip = "请直接粘贴钉钉 AI 听记正文后生成资料。") {
-      setMinutesMessage(`钉钉返回 500205：当前应用还没有开通 AI 听记的用户授权权限。请在钉钉开放平台「应用详情 → 权限管理」里搜索并申请 AI 听记 / 闪记相关权限点后重试；也可以${tip}`, "error");
-    }
-    function meetingCalendarRange() {
-      const start = new Date();
-      start.setDate(start.getDate() - 14);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date();
-      end.setDate(end.getDate() + 30);
-      end.setHours(23, 59, 59, 999);
-      return { timeMin: start.toISOString(), timeMax: end.toISOString() };
-    }
-    function formatCalendarMeetingTime(value = "") {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return value || "-";
-      const mm = String(date.getMonth() + 1).padStart(2, "0");
-      const dd = String(date.getDate()).padStart(2, "0");
-      const hh = String(date.getHours()).padStart(2, "0");
-      const min = String(date.getMinutes()).padStart(2, "0");
-      return `${mm}-${dd} ${hh}:${min}`;
-    }
-    function calendarMinuteState(event = {}) {
-      if (event.minuteState === "ready") return { text: "可读取", className: "ready" };
-      if (event.minuteState === "found") return { text: "有听记", className: "ready" };
-      if (event.minuteState === "empty") return { text: "无云录制", className: "empty" };
-      if (event.minuteState === "auth") return { text: "需授权", className: "error" };
-      if (event.minuteState === "permission") return { text: "缺权限", className: "error" };
-      if (event.minuteState === "error") return { text: "不可读", className: "error" };
-      return { text: "检测中", className: "" };
-    }
-    let lastAiMinutesDetectError = "";
-    async function detectCalendarMeetingMinutes(events = []) {
-      lastAiMinutesDetectError = "";
-      try {
-        const authCode = await requestDingSilentAuthCode();
-        if (!authCode) lastAiMinutesDetectError = "未拿到钉钉免登授权码，只能检测云录制。";
-        const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            events,
-            authCode: authCode || undefined,
-            unionId: currentUser?.dingUser?.unionid || ""
-          })
-        });
-        const payload = await res.json().catch(() => ({}));
-        if (payload.aiMinutesError) {
-          const code = payload.aiMinutesErrorDetail?.code || payload.aiMinutesErrorDetail?.errcode || "";
-          lastAiMinutesDetectError = `${payload.aiMinutesError}${code ? `（${code}）` : ""}`;
-        }
-        if (res.ok && payload.synced && Array.isArray(payload.events)) {
-          return payload.events;
-        }
-        if (renderMinutesPermissionError(payload)) {
-          return events.map(event => ({ ...event, minuteState: "permission" }));
-        }
-        return events.map(event => ({ ...event, minuteState: "empty" }));
-      } catch {
-        return events.map(event => ({ ...event, minuteState: "empty" }));
-      }
-    }
-    function renderCalendarMeetingOptions(events = []) {
-      const list = document.getElementById("calendarMeetingList");
-      if (!list) return;
-      const currentId = document.getElementById("minutesRecordingId").value.trim();
-      list.classList.remove("hidden");
-      list.innerHTML = events.map(event => {
-        const state = calendarMinuteState(event);
-        return `
-        <button type="button" class="calendar-meeting-option ${event.conferenceId === currentId ? "active" : ""}" data-calendar-conference="${esc(event.conferenceId)}" data-calendar-title="${esc(event.summary || "钉钉会议")}">
-          <span class="calendar-meeting-main">
-            <strong>${esc(event.summary || "钉钉会议")}</strong>
-            <span class="calendar-meeting-time">${esc(formatCalendarMeetingTime(event.startTime))} - ${esc(formatCalendarMeetingTime(event.endTime))}</span>
-          </span>
-          <span class="calendar-meeting-meta"><span class="minute-state ${state.className}">${state.text}</span></span>
-        </button>
-      `;
-      }).join("") || `<div class="empty">没有找到带会议 ID 的钉钉日历会议。请确认会议来自钉钉日程且已开启云录制（闪记）。</div>`;
-      list.querySelectorAll("[data-calendar-conference]").forEach(button => button.addEventListener("click", async () => {
-        const event = events.find(item => item.conferenceId === button.dataset.calendarConference);
-        minutesSourceType = event?.aiMinutesTaskUuid ? "aiMinutes" : "";
-        document.getElementById("minutesRecordingId").value = event?.aiMinutesTaskUuid || event?.resolvedConferenceId || event?.conferenceId || button.dataset.calendarConference || "";
-        renderCalendarMeetingOptions(events);
-        if (event?.minuteState === "ready" && event.minuteText) {
-          document.getElementById("minutesText").value = event.minuteText;
-          if (event.aiMinutesTaskUuid) document.getElementById("minutesRecordingId").value = event.aiMinutesTaskUuid;
-          else if (event.resolvedConferenceId) document.getElementById("minutesRecordingId").value = event.resolvedConferenceId;
-          updateMinutesPosterPreview();
-          setMinutesMessage(`已选择日历会议：${event.summary || "钉钉会议"}，正在写入资料包。`, "ok");
-          createMeetingMinutesFromText({ productId: minutesProductId, meetingId: minutesMeetingId, text: event.minuteText, source: event.aiMinutesTaskUuid ? "钉钉 AI 听记" : "钉钉云录制" });
-          return;
-        }
-        if (event?.minuteState === "found" && event.aiMinutesTaskUuid) {
-          setMinutesMessage(`已找到 AI 听记：${event.aiMinutesTitle || event.summary || "钉钉会议"}，正在读取纪要。`, "ok");
-          await syncMinutesFromDing();
-          return;
-        }
-        if (event?.minuteState === "empty") {
-          setMinutesMessage("这个会议没有云录制文本。钉钉目前只开放了云录制文本接口（AI 听记暂未开放）：以后开会请开启云录制；本次可打开钉钉闪记复制正文粘贴到下方生成资料。", "error");
-          return;
-        }
-        if (event?.minuteState === "permission") {
-          setMinutesMessage("当前应用还缺少会议读权限，开通权限后再同步纪要。", "error");
-          return;
-        }
-        setMinutesMessage(`已选择日历会议：${button.dataset.calendarTitle || "钉钉会议"}，正在同步纪要。`, "ok");
-        await syncMinutesFromDing();
-      }));
-      if (window.lucide) lucide.createIcons();
-    }
-    async function loadCalendarMeetingsForMinutes() {
-      if (currentUser?.source !== "dingtalk") {
-        setMinutesMessage("需要从钉钉登录后才能读取当前账号日历会议。", "error");
-        toast("需要从钉钉登录后才能读取日历会议。");
-        return;
-      }
-      const userUnionId = currentUser?.dingUser?.unionid || "";
-      if (!userUnionId) {
-        setMinutesMessage("当前登录账号缺少 unionId，无法查询日历会议。", "error");
-        return;
-      }
-      const button = document.getElementById("loadCalendarMeetings");
-      button.disabled = true;
-      setMinutesMessage("正在读取当前账号日历会议...");
-      try {
-        await withGlobalLoading("正在读取钉钉日历会议", async () => {
-          const { timeMin, timeMax } = meetingCalendarRange();
-          const product = productById(minutesProductId);
-          const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
-          const res = await fetch(`${dingApiBase()}/api/dingtalk/calendar/events`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userUnionId,
-              timeMin,
-              timeMax,
-              maxResults: 60
-            })
-          });
-          const payload = await res.json().catch(() => ({}));
-          if (!res.ok || !payload.synced) throw new Error(formatDingSyncError(payload, "钉钉日历会议查询失败"));
-          const keyword = [product?.name, meeting?.title].filter(Boolean).join(" ");
-          const events = (payload.events || [])
-            .filter(event => event.conferenceId)
-            .sort((a, b) => {
-              const aText = `${a.summary || ""} ${a.description || ""}`;
-              const bText = `${b.summary || ""} ${b.description || ""}`;
-              const aMatch = keyword && keyword.split(/\s+/).some(word => word && aText.includes(word)) ? 0 : 1;
-              const bMatch = keyword && keyword.split(/\s+/).some(word => word && bText.includes(word)) ? 0 : 1;
-              if (aMatch !== bMatch) return aMatch - bMatch;
-              return Date.parse(b.startTime || 0) - Date.parse(a.startTime || 0);
-            })
-            .slice(0, 20)
-            .map(event => ({ ...event, minuteState: "checking" }));
-          renderCalendarMeetingOptions(events);
-          if (!events.length) {
-            setMinutesMessage("没有找到可同步纪要的钉钉会议。", "error");
-            return;
-          }
-          setMinutesMessage(`已找到 ${events.length} 个带会议 ID 的日历会议，正在检测是否有 AI 纪要/闪记...`, "ok");
-          const checkedEvents = await detectCalendarMeetingMinutes(events);
-          renderCalendarMeetingOptions(checkedEvents);
-          const readyCount = checkedEvents.filter(event => event.minuteState === "ready").length;
-          const foundCount = checkedEvents.filter(event => event.minuteState === "found").length;
-          const aiTip = lastAiMinutesDetectError ? ` AI 听记检测受限：${lastAiMinutesDetectError}` : "";
-          const noneTip = readyCount + foundCount ? "" : " 这些会议都没有云录制文本：钉钉暂未开放 AI 听记读取接口，以后开会请开启云录制，本次可手动粘贴纪要正文。";
-          setMinutesMessage(`已找到 ${checkedEvents.length} 个带会议 ID 的日历会议，其中 ${readyCount + foundCount} 个匹配到 AI 听记/纪要。${noneTip}${aiTip}`, readyCount + foundCount ? "ok" : "error");
-        });
-      } catch (error) {
-        setMinutesMessage(error.message || "钉钉日历会议查询失败", "error");
-        toast(error.message || "钉钉日历会议查询失败");
-      } finally {
-        button.disabled = false;
-      }
     }
     function updateMinutesPosterPreview() {
       const product = productById(minutesProductId);
@@ -6180,12 +5936,9 @@
       const existing = meetingMinute(product, meeting).doc;
       document.getElementById("minutesTargetTitle").textContent = meeting.title;
       document.getElementById("minutesTargetMeta").textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
-      document.getElementById("minutesRecordingId").value = "";
+      document.getElementById("minutesDocUrl").value = "";
       document.getElementById("minutesText").value = existing?.content || "";
-      document.getElementById("calendarMeetingList").classList.add("hidden");
-      document.getElementById("calendarMeetingList").innerHTML = "";
-      minutesSourceType = "";
-      setMinutesMessage("可以从当前账号日历里匹配钉钉 AI 听记；也可以手动粘贴会议纪要。");
+      setMinutesMessage("粘贴钉钉文档链接导入正文，或直接粘贴会议纪要。");
       updateMinutesPosterPreview();
       document.getElementById("minutesModal").classList.add("open");
       if (window.lucide) lucide.createIcons();
@@ -6194,7 +5947,6 @@
       document.getElementById("minutesModal").classList.remove("open");
       minutesProductId = "";
       minutesMeetingId = "";
-      minutesSourceType = "";
     }
     function upsertProductDeliverable(match, nextDoc) {
       const existing = state.deliverables.find(match);
@@ -6262,57 +6014,41 @@
       renderAll();
       return minuteDoc;
     }
-    async function syncMinutesFromDing() {
+    async function importMinutesFromDingDoc() {
       const product = productById(minutesProductId);
       const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
       if (!product || !meeting) return;
-      const recordingId = document.getElementById("minutesRecordingId").value.trim();
-      if (!recordingId) {
-        setMinutesMessage("需要钉钉会议录制（闪记）的会议 ID，才能从钉钉自动同步。", "error");
+      const docUrl = document.getElementById("minutesDocUrl").value.trim();
+      if (!docUrl) {
+        setMinutesMessage("请先粘贴钉钉文档链接。", "error");
         return;
       }
-      const manualAiMinutes = /shanji\.dingtalk\.com|taskUuid=|^[0-9a-f]{24,}$/i.test(recordingId);
-      const useAiMinutes = minutesSourceType === "aiMinutes" || manualAiMinutes;
-      const button = document.getElementById("syncMinutesFromDing");
+      const button = document.getElementById("importMinutesFromDoc");
       button.disabled = true;
-      setMinutesMessage(useAiMinutes ? "正在读取钉钉 AI 听记..." : "正在读取钉钉云录制文本...");
+      setMinutesMessage("正在读取钉钉文档...");
       try {
-        await withGlobalLoading("正在读取钉钉会议纪要", async () => {
-          let authCode = "";
-          if (useAiMinutes) {
-            authCode = await requestDingUserAuthCode("Minutes.Content.Read");
-            if (!authCode) {
-              showUnsupportedDingAiMinutesScope("请直接粘贴钉钉 AI 听记正文后生成资料。");
-              return;
-            }
-          }
-          const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+        await withGlobalLoading("正在读取钉钉文档", async () => {
+          const res = await fetch(`${dingApiBase()}/api/dingtalk/doc/read`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              recordingId,
-              aiMinutesTaskUuid: useAiMinutes ? recordingId : "",
-              sourceType: useAiMinutes ? "aiMinutes" : undefined,
-              authCode: authCode || undefined,
-              scheduleConferenceId: recordingId,
-              unionId: currentUser?.dingUser?.unionid || ""
+              docUrl,
+              operatorUnionId: currentUser?.dingUser?.unionid || currentUser?.dingUser?.unionId || ""
             })
           });
           const payload = await res.json().catch(() => ({}));
           if (!res.ok || !payload.synced || !payload.text) {
             if (renderMinutesPermissionError(payload)) return;
-            if (renderMinutesRecordingError(payload)) return;
-            throw new Error(formatDingSyncError(payload, "钉钉会议纪要同步失败"));
+            throw new Error(formatDingSyncError(payload, "钉钉文档读取失败"));
           }
           document.getElementById("minutesText").value = payload.text;
-          if (payload.resolvedConferenceId) document.getElementById("minutesRecordingId").value = payload.resolvedConferenceId;
           updateMinutesPosterPreview();
-          setMinutesMessage("已读取钉钉会议文本，正在写入资料包。", "ok");
-          createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: payload.source === "aiMinutes" ? "钉钉 AI 听记" : "钉钉云录制" });
+          setMinutesMessage(`已从钉钉文档「${payload.title || "会议纪要"}」导入正文，正在生成资料。`, "ok");
+          createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: "钉钉文档导入" });
         });
       } catch (error) {
-        setMinutesMessage(error.message || "钉钉会议纪要同步失败", "error");
-        toast(error.message || "钉钉会议纪要同步失败");
+        setMinutesMessage(error.message || "钉钉文档读取失败", "error");
+        toast(error.message || "钉钉文档读取失败");
       } finally {
         button.disabled = false;
       }
@@ -7193,8 +6929,7 @@
     document.getElementById("closeMinutesModal").addEventListener("click", closeMinutesModal);
     document.getElementById("cancelMinutesModal").addEventListener("click", closeMinutesModal);
     document.getElementById("saveMinutesModal").addEventListener("click", saveMinutesModal);
-    document.getElementById("syncMinutesFromDing").addEventListener("click", syncMinutesFromDing);
-    document.getElementById("loadCalendarMeetings").addEventListener("click", loadCalendarMeetingsForMinutes);
+    document.getElementById("importMinutesFromDoc").addEventListener("click", importMinutesFromDingDoc);
     document.getElementById("minutesText").addEventListener("input", updateMinutesPosterPreview);
     document.getElementById("closeConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
     document.getElementById("cancelConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));

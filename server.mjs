@@ -14,6 +14,7 @@ import {
   listDingCalendarEvents,
   mapDingRole,
   publicUser,
+  queryDingDocTextFromUrl,
   queryDingMeetingMinutesText,
   syncDingOrg
 } from "./functions/api/dingtalk/_shared/dingtalk.js";
@@ -185,6 +186,30 @@ async function handleDingMeetingMinutes(req, res) {
   }
 }
 
+async function handleDingDocRead(req, res) {
+  try {
+    const body = await readBody(req);
+    const accessToken = await getDingAccessToken(process.env);
+    const result = await queryDingDocTextFromUrl(accessToken, {
+      ...body,
+      operatorUnionId: body.operatorUnionId || body.unionId || process.env.DINGTALK_OPERATOR_UNION_ID || process.env.DINGTALK_OPERATOR_ID || ""
+    });
+    json(res, 200, {
+      synced: true,
+      title: result.title,
+      docKey: result.docKey,
+      docUrl: result.docUrl,
+      text: result.text
+    });
+  } catch (error) {
+    json(res, error.status || 500, {
+      synced: false,
+      message: error.message || "钉钉文档读取失败",
+      detail: error.detail || undefined
+    });
+  }
+}
+
 function handleDingOrgStatus(res) {
   json(res, 200, {
     configured: buildConfigResponse(process.env, "").configured,
@@ -264,6 +289,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/dingtalk/meeting/minutes" && req.method === "POST") {
     await handleDingMeetingMinutes(req, res);
+    return;
+  }
+  if (url.pathname === "/api/dingtalk/doc/read" && req.method === "POST") {
+    await handleDingDocRead(req, res);
     return;
   }
   await serveStatic(req, res);

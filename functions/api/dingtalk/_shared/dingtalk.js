@@ -514,6 +514,183 @@ export async function listDingCalendarEvents(accessToken, input = {}, fetchImpl 
   };
 }
 
+export function extractDingDocNodeId(value = "") {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const url = new URL(raw);
+    const match = url.pathname.match(/\/i\/nodes\/([^/?#]+)/);
+    if (match?.[1]) return decodeURIComponent(match[1]).trim();
+  } catch {}
+  const match = raw.match(/\/i\/nodes\/([^/?#\s]+)/);
+  if (match?.[1]) return decodeURIComponent(match[1]).trim();
+  return /^[a-zA-Z0-9_-]{16,}$/.test(raw) ? raw : "";
+}
+
+function textFromDingDocValue(value, lines) {
+  if (value == null) return;
+  if (typeof value === "string" || typeof value === "number") {
+    const text = String(value).trim();
+    if (text && !/^[-\w]{16,}$/.test(text) && !/^https?:\/\//i.test(text)) lines.push(text);
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(item => textFromDingDocValue(item, lines));
+    return;
+  }
+  if (typeof value !== "object") return;
+  [
+    value.text,
+    value.content,
+    value.plainText,
+    value.markdown,
+    value.title,
+    value.name
+  ].forEach(item => textFromDingDocValue(item, lines));
+  [
+    value.paragraph,
+    value.heading,
+    value.bullet,
+    value.ordered,
+    value.todo,
+    value.callout,
+    value.quote,
+    value.code,
+    value.table,
+    value.list,
+    value.children,
+    value.elements,
+    value.rows,
+    value.cells
+  ].forEach(item => textFromDingDocValue(item, lines));
+}
+
+export function flattenDingDocBlocks(blocks = []) {
+  const lines = [];
+  (Array.isArray(blocks) ? blocks : []).forEach(block => textFromDingDocValue(block, lines));
+  return [...new Set(lines.map(line => line.replace(/\s+/g, " ").trim()).filter(Boolean))].join("\n");
+}
+
+function firstArrayFromDingDocPayload(payload = {}) {
+  const root = payload.result || payload;
+  for (const path of [
+    ["blocks"],
+    ["blockList"],
+    ["blockElements"],
+    ["items"],
+    ["list"],
+    ["data"],
+    ["result", "blocks"],
+    ["result", "blockList"],
+    ["result", "blockElements"]
+  ]) {
+    const value = nestedValue(root, path);
+    if (Array.isArray(value)) return value;
+  }
+  return [];
+}
+
+function firstDingDocNodeMeta(payload = {}) {
+  const root = payload.result || payload;
+  const queue = [root];
+  while (queue.length) {
+    const value = queue.shift();
+    if (!value || typeof value !== "object") continue;
+    const docKey = value.docKey || value.nodeId || value.dentryUuid || value.dentryId || value.id;
+    if (docKey) {
+      return {
+        docKey: String(docKey),
+        title: value.title || value.name || value.nodeName || "钉钉文档",
+        contentType: value.contentType || value.nodeType || value.type || "",
+        extension: value.extension || value.fileExtension || ""
+      };
+    }
+    Object.values(value).forEach(child => {
+      if (child && typeof child === "object") queue.push(child);
+    });
+  }
+  return { docKey: "", title: "钉钉文档", contentType: "", extension: "" };
+}
+
+export async function queryDingDocNodeByUrl(accessToken, input = {}, fetchImpl = fetch) {
+  const operatorId = String(input.operatorUnionId || input.unionId || input.operatorId || "").trim();
+  const docUrl = String(input.docUrl || input.url || "").trim();
+  if (!operatorId) {
+    const err = new Error("缺少当前钉钉账号 unionId，无法读取钉钉文档。");
+    err.status = 400;
+    throw err;
+  }
+  if (!docUrl) {
+    const err = new Error("请先粘贴钉钉文档链接。");
+    err.status = 400;
+    throw err;
+  }
+  const data = await requestDingOpenApi(
+    accessToken,
+    "POST",
+    `/v2.0/wiki/nodes/queryByUrl?operatorId=${encodeURIComponent(operatorId)}`,
+    {
+      url: docUrl,
+      option: {
+        withStatisticalInfo: false,
+        withPermissionRole: false
+      }
+    },
+    fetchImpl
+  );
+  return { ...firstDingDocNodeMeta(data), raw: data };
+}
+
+export async function queryDingDocTextFromUrl(accessToken, input = {}, fetchImpl = fetch) {
+  const operatorId = String(input.operatorUnionId || input.unionId || input.operatorId || "").trim();
+  const docUrl = String(input.docUrl || input.url || "").trim();
+  if (!operatorId) {
+    const err = new Error("缺少当前钉钉账号 unionId，无法读取钉钉文档。");
+    err.status = 400;
+    throw err;
+  }
+  if (!/https?:\/\/(ali)?docs?\.dingtalk\./i.test(docUrl)) {
+    const err = new Error("请粘贴有效的钉钉文档链接。");
+    err.status = 400;
+    throw err;
+  }
+  let node = {
+    docKey: extractDingDocNodeId(docUrl),
+    title: "钉钉文档",
+    contentType: "",
+    extension: ""
+  };
+  if (!node.docKey) node = await queryDingDocNodeByUrl(accessToken, { docUrl, operatorUnionId: operatorId }, fetchImpl);
+  if (!node.docKey) {
+    const err = new Error("无法从这个钉钉文档链接识别文档 ID。");
+    err.status = 400;
+    throw err;
+  }
+  const query = new URLSearchParams({ operatorId });
+  const data = await requestDingOpenApi(
+    accessToken,
+    "GET",
+    `/v1.0/doc/suites/documents/${encodeURIComponent(node.docKey)}/blocks?${query.toString()}`,
+    null,
+    fetchImpl
+  );
+  const blocks = firstArrayFromDingDocPayload(data);
+  const text = flattenDingDocBlocks(blocks);
+  if (!text) {
+    const err = new Error("钉钉文档没有返回可生成纪要的正文。请确认链接是在线文档，并且当前账号有阅读权限。");
+    err.status = 404;
+    err.detail = data;
+    throw err;
+  }
+  return {
+    title: node.title || "钉钉文档",
+    docKey: node.docKey,
+    docUrl,
+    text,
+    raw: data
+  };
+}
+
 export function buildDingMeetingMinutesQuery(input = {}) {
   const conferenceId = String(input.conferenceId || input.recordingId || input.meetingId || "").trim();
   if (!conferenceId) {

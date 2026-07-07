@@ -38,8 +38,8 @@ test("DingTalk operations show a fullscreen loading state while waiting", () => 
   assert.match(openSyncModal, /await ensureDingOrgCache\(\);/);
   const confirmSyncModal = html.match(/async function confirmSyncModal[\s\S]*?function completion/)[0];
   assert.match(confirmSyncModal, /await withGlobalLoading\(syncMeetingAction === "instant" \? "正在拉起钉钉会议" : "正在同步到钉钉", async \(\) => \{/);
-  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?function saveMinutesModal/)[0];
-  assert.match(minutesSync, /await withGlobalLoading\("正在读取钉钉会议纪要", async \(\) => \{/);
+  const minutesDocImport = html.match(/async function importMinutesFromDingDoc[\s\S]*?function saveMinutesModal/)[0];
+  assert.match(minutesDocImport, /await withGlobalLoading\("正在读取钉钉文档", async \(\) => \{/);
 });
 
 test("review meetings can be created as DingTalk calendar events", () => {
@@ -68,57 +68,22 @@ test("review meetings can import DingTalk minutes into the product package", () 
   assert.match(html, /重点纪要图/);
 });
 
-test("DingTalk minutes sync fails with a recording id guidance instead of fake success", () => {
-  assert.match(html, /\/api\/dingtalk\/meeting\/minutes/);
-  assert.match(html, /minutesRecordingId/);
-  assert.match(html, /需要钉钉会议录制/);
+test("review meetings can import minutes from a DingTalk document link", () => {
+  assert.match(html, /id="minutesDocUrl"/);
+  assert.match(html, /function importMinutesFromDingDoc\(/);
+  assert.match(html, /\/api\/dingtalk\/doc\/read/);
+  assert.match(html, /钉钉文档链接/);
+  assert.match(html, /从文档导入/);
+  assert.match(html, /文档导入/);
 });
 
-test("DingTalk minutes can select a calendar meeting before syncing", () => {
-  assert.match(html, /id="loadCalendarMeetings"/);
-  assert.match(html, /id="calendarMeetingList"/);
-  assert.match(html, /\/api\/dingtalk\/calendar\/events/);
-  assert.match(html, /function loadCalendarMeetingsForMinutes\(\)/);
-  assert.match(html, /userUnionId,\s+timeMin,\s+timeMax,\s+maxResults: 60/);
-  assert.match(html, /event\.conferenceId/);
-  assert.match(html, /function detectCalendarMeetingMinutes\(/);
-  const detectMinutes = html.match(/async function detectCalendarMeetingMinutes[\s\S]*?function renderCalendarMeetingOptions/)[0];
-  assert.doesNotMatch(detectMinutes, /requestDingDelegatedAuthCode/);
-  assert.match(detectMinutes, /const authCode = await requestDingSilentAuthCode\(\);/);
-  assert.match(detectMinutes, /events,\s+authCode: authCode \|\| undefined,\s+unionId: currentUser\?\.dingUser\?\.unionid/);
-  assert.match(html, /aiMinutesTaskUuid/);
-  assert.match(html, /AI 听记链接 \/ taskUuid \/ 云录制 conferenceId/);
-  assert.match(html, /manualAiMinutes/);
-  assert.match(html, /有听记/);
-  assert.match(html, /calendarMinuteState/);
-  assert.match(html, /scheduleConferenceId: recordingId/);
-  assert.match(html, /payload\.resolvedConferenceId/);
-  assert.match(html, /可读取/);
-  assert.match(html, /无云录制/);
-  assert.match(html, /minute-state/);
-  assert.match(html, /AI 纪要\/闪记/);
-  assert.match(html, /await syncMinutesFromDing\(\);/);
-  assert.match(html, /正在读取钉钉日历会议/);
-  assert.doesNotMatch(html, /getDingEnvironment/);
-  assert.match(html, /detectDingTalkEnvironment\(\)/);
-});
-
-test("DingTalk AI minutes prefer silent user auth and degrade gracefully on 500205", () => {
-  assert.match(html, /function isUnsupportedDingAiMinutesScope/);
-  assert.match(html, /500205\|50205\|委托授权需要填写委托类型的权限点/);
-  assert.match(html, /async function requestDingSilentAuthCode\(/);
-  assert.match(html, /async function requestDingUserAuthCode\(/);
-  const userAuth = html.match(/async function requestDingUserAuthCode[\s\S]*?function persistDingUser/)[0];
-  assert.match(userAuth, /const silent = await requestDingSilentAuthCode\(\);/);
-  assert.match(userAuth, /requestDingDelegatedAuthCode\(rpcScope\)/);
-  assert.match(userAuth, /isUnsupportedDingAiMinutesScope/);
-  const detectMinutes = html.match(/async function detectCalendarMeetingMinutes[\s\S]*?function renderCalendarMeetingOptions/)[0];
-  assert.doesNotMatch(detectMinutes, /Minutes\.Content\.Read/);
-  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
-  assert.match(minutesSync, /requestDingUserAuthCode\("Minutes\.Content\.Read"\)/);
-  assert.match(minutesSync, /showUnsupportedDingAiMinutesScope/);
-  assert.match(minutesSync, /直接粘贴钉钉 AI 听记正文/);
-  assert.match(html, /权限管理」里搜索并申请 AI 听记/);
+test("DingTalk minutes import no longer depends on meeting ids or calendar meetings", () => {
+  assert.doesNotMatch(html, /id="minutesRecordingId"/);
+  assert.doesNotMatch(html, /id="loadCalendarMeetings"/);
+  assert.doesNotMatch(html, /id="calendarMeetingList"/);
+  assert.doesNotMatch(html, /id="syncMinutesFromDing"/);
+  assert.match(html, /id="minutesDocUrl"/);
+  assert.match(html, /id="importMinutesFromDoc"/);
 });
 
 test("DingTalk sync errors expose actionable API details in the UI", () => {
@@ -132,21 +97,11 @@ test("DingTalk minutes permission errors show an application permission action",
   assert.match(html, /function renderMinutesPermissionError\(/);
   assert.match(html, /function dingPayloadText\(/);
   assert.match(html, /VideoConference\.Conference\.Read/);
+  assert.match(html, /钉钉文档读取权限/);
+  assert.match(html, /重新点击导入/);
   assert.match(html, /打开权限申请/);
   assert.match(html, /className = "minutes-status permission"/);
-  assert.match(html, /replace\(\/%00\/g, ""\)/);
   assert.doesNotMatch(html, /dingConfig/);
-  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
-  assert.match(minutesSync, /if \(renderMinutesPermissionError\(payload\)\) return;/);
-});
-
-test("DingTalk minutes without cloud recording show a readable recovery message", () => {
-  assert.match(html, /function renderMinutesRecordingError\(/);
-  assert.match(html, /cloudRecordNotFound\|50513/);
-  assert.match(html, /钉钉接口没有返回这个会议的 AI 纪要\/闪记文本/);
-  assert.match(html, /直接粘贴会议纪要后生成资料/);
-  const minutesSync = html.match(/async function syncMinutesFromDing[\s\S]*?async function syncMeetingToDingCalendar/)[0];
-  assert.match(minutesSync, /if \(renderMinutesRecordingError\(payload\)\) return;/);
 });
 
 test("review meeting sync sends DingTalk unionIds instead of userIds", () => {

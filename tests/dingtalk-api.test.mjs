@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildConfigResponse,
+  extractDingDocNodeId,
+  flattenDingDocBlocks,
   mapDingRole,
   publicUser
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
@@ -59,3 +61,22 @@ test("publicUser masks mobile and preserves department and role metadata", () =>
   assert.deepEqual(result.roles, [{ name: "管理员" }]);
 }
 );
+
+test("extractDingDocNodeId supports alidocs node URLs", () => {
+  assert.equal(
+    extractDingDocNodeId("https://alidocs.dingtalk.com/i/nodes/R4GpnMqJzG0yOgN5fkEmq24w8Ke0xjE3?iframeQuery=x"),
+    "R4GpnMqJzG0yOgN5fkEmq24w8Ke0xjE3"
+  );
+});
+
+test("flattenDingDocBlocks extracts readable text from common block shapes", () => {
+  const text = flattenDingDocBlocks([
+    { blockType: "heading", heading: { text: "样品评审会" } },
+    { blockType: "paragraph", paragraph: { text: "结论：通过，继续打样。" } },
+    { type: "list", children: [{ text: "行动项：产品补齐资料包。" }] }
+  ]);
+
+  assert.match(text, /样品评审会/);
+  assert.match(text, /结论：通过/);
+  assert.match(text, /行动项：产品补齐资料包/);
+});
