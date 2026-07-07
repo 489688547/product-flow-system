@@ -93,6 +93,7 @@ test("review meetings can import minutes from a DingTalk calendar meeting picker
   assert.match(html, /requestDingAuthCode/);
   assert.match(html, /从日历选择会议/);
   assert.match(html, /有纪要/);
+  assert.doesNotMatch(html, /已选择/);
   assert.doesNotMatch(html, /id="minutesAiUrl"/);
 });
 

@@ -1035,31 +1035,49 @@ export async function queryDingAiMinutesForEvents(userAccessToken, input = {}, f
   }
   const used = new Set();
   const matched = [];
-  for (const event of events) {
-    const candidates = minutes.filter(minute => !used.has(minute.taskUuid));
-    const minute = matchDingAiMinuteForEvent(event, candidates);
-    if (!minute) {
-      matched.push({ ...event, minuteState: event.minuteState || "empty" });
-      continue;
+  const matchEvents = async (eventIndexes, sourceMinutes) => {
+    for (const index of eventIndexes) {
+      const event = events[index];
+      const candidates = sourceMinutes.filter(minute => !used.has(minute.taskUuid));
+      const minute = matchDingAiMinuteForEvent(event, candidates);
+      if (!minute) {
+        matched[index] = { ...event, minuteState: event.minuteState || "empty" };
+        continue;
+      }
+      used.add(minute.taskUuid);
+      let text = "";
+      let posterUrl = "";
+      try {
+        const result = await queryDingAiMinutesText(userAccessToken, { taskUuid: minute.taskUuid }, fetchImpl);
+        text = result.text;
+        posterUrl = result.posterUrl || "";
+      } catch {
+        // Keep the taskUuid visible; users can still retry from the selected meeting.
+      }
+      matched[index] = {
+        ...event,
+        minuteState: text ? "ready" : "found",
+        minuteText: text,
+        minutePosterUrl: posterUrl,
+        aiMinutesTaskUuid: minute.taskUuid,
+        aiMinutesTitle: minute.title
+      };
     }
-    used.add(minute.taskUuid);
-    let text = "";
-    let posterUrl = "";
-    try {
-      const result = await queryDingAiMinutesText(userAccessToken, { taskUuid: minute.taskUuid }, fetchImpl);
-      text = result.text;
-      posterUrl = result.posterUrl || "";
-    } catch {
-      // Keep the taskUuid visible; users can still paste or retry manually.
-    }
-    matched.push({
-      ...event,
-      minuteState: text ? "ready" : "found",
-      minuteText: text,
-      minutePosterUrl: posterUrl,
-      aiMinutesTaskUuid: minute.taskUuid,
-      aiMinutesTitle: minute.title
+  };
+  await matchEvents(events.map((_, index) => index), minutes);
+  const emptyIndexes = matched
+    .map((event, index) => event?.minuteState === "empty" ? index : -1)
+    .filter(index => index >= 0);
+  if (emptyIndexes.length) {
+    const loose = await queryDingAiMinutesListWithScopeFallback(userAccessToken, {
+      maxResults: input.maxResults || 80
+    }, fetchImpl);
+    const byTaskUuid = new Map(minutes.map(minute => [minute.taskUuid, minute]));
+    loose.minutes.forEach(minute => {
+      if (!byTaskUuid.has(minute.taskUuid)) byTaskUuid.set(minute.taskUuid, minute);
     });
+    minutes = [...byTaskUuid.values()];
+    await matchEvents(emptyIndexes, minutes);
   }
   return matched;
 }

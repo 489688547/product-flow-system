@@ -543,6 +543,56 @@ test("queryDingAiMinutesForEvents falls back to time range when product keyword 
   assert.equal(result[0].minuteText, "确认产品流程初版方向。");
 });
 
+test("queryDingAiMinutesForEvents matches same-title minutes outside the calendar date window", async () => {
+  const calls = [];
+  const result = await queryDingAiMinutesForEvents("user-token-1", {
+    keyword: "星星水壶",
+    events: [
+      {
+        conferenceId: "conf-star",
+        summary: "星星水壶主推款式与内容展示方案讨论会",
+        startTime: "2026-06-25T15:00:00+08:00",
+        endTime: "2026-06-25T16:00:00+08:00"
+      }
+    ]
+  }, async (url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.params.name === "list_by_keyword_and_time_range") {
+      calls.push(body.params.arguments);
+      if (body.params.arguments.createTimeStart || body.params.arguments.createTimeEnd) {
+        return okJson({ result: { structuredContent: { result: { minutesDetails: [] } } } });
+      }
+      return okJson({
+        result: {
+          structuredContent: {
+            result: {
+              minutesDetails: [
+                {
+                  taskUuid: "task-star-1",
+                  title: "星星水壶主推款式与内容展示方案讨论会",
+                  startTime: "2026-07-02T14:52:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      });
+    }
+    return okJson({
+      result: {
+        content: [
+          { type: "text", text: JSON.stringify({ aiSummary: "确认主推款式和内容展示方案。" }) }
+        ]
+      }
+    });
+  });
+
+  assert.ok(calls.some(call => !call.createTimeStart && !call.createTimeEnd), "should retry without a calendar-date time window");
+  assert.equal(result[0].minuteState, "ready");
+  assert.equal(result[0].aiMinutesTaskUuid, "task-star-1");
+  assert.equal(result[0].minuteText, "确认主推款式和内容展示方案。");
+});
+
 test("queryDingAiMinutesForEvents checks created and shared minutes when all scope is empty", async () => {
   const scopes = [];
   const result = await queryDingAiMinutesForEvents("user-token-1", {

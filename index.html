@@ -1349,7 +1349,10 @@
       gap: 16px;
       align-items: start;
     }
-    .settings-layout > .panel:last-child { grid-column: 1 / -1; }
+    .settings-col { display: grid; gap: 16px; align-content: start; min-width: 0; }
+    .settings-layout > .panel-wide { grid-column: 1 / -1; }
+    #systemSettingsRows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
     .config-list { display: grid; gap: 10px; }
     .config-row {
       display: grid;
@@ -1511,6 +1514,20 @@
     .setting-row .small {
       margin-top: 3px;
       line-height: 1.4;
+    }
+    .setting-row input {
+      width: 200px;
+      padding: 7px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font: inherit;
+      font-size: 12px;
+      color: var(--ink);
+      background: #fff;
+    }
+    .setting-row input:focus {
+      outline: none;
+      border-color: var(--line-strong);
     }
     .permission-chips {
       display: flex;
@@ -2681,7 +2698,9 @@
       .setting-row { grid-template-columns: 1fr; align-items: start; }
       .permission-chips { justify-content: flex-start; max-width: none; }
       .role-grid { grid-template-columns: 1fr; }
+      #systemSettingsRows { grid-template-columns: 1fr; }
       .settings-layout { grid-template-columns: 1fr; }
+      .setting-row input { width: 100%; }
       .config-row { grid-template-columns: 28px 1fr; }
       .config-row .config-field-goal { grid-column: 1 / -1; }
       .minutes-grid { grid-template-columns: 1fr; }
@@ -3032,44 +3051,57 @@
 
       <section class="screen" id="settings">
         <div class="settings-layout">
-          <section class="panel page-section">
-            <div class="panel-head">
-              <div>
-                <h2>流程阶段</h2>
-                <p class="small">配置七个阶段的简称和目标，改动会应用到产品进度、总览和纪要标签。</p>
+          <div class="settings-col">
+            <section class="panel page-section">
+              <div class="panel-head">
+                <div>
+                  <h2>流程阶段</h2>
+                  <p class="small">配置七个阶段的简称和目标，改动会应用到产品进度、总览和纪要标签。</p>
+                </div>
+                <button class="btn ghost" id="resetConfigBtn" type="button"><i data-lucide="rotate-ccw"></i>恢复默认</button>
               </div>
-              <button class="btn ghost" id="resetConfigBtn" type="button"><i data-lucide="rotate-ccw"></i>恢复默认</button>
-            </div>
-            <div class="config-list" id="stageConfigRows"></div>
-          </section>
-          <section class="panel page-section">
-            <div class="panel-head">
-              <div>
-                <h2>评审会议规则</h2>
-                <p class="small">配置每个评审会议的责任部门和适用的产品等级，等级决定哪些产品需要开这个会。</p>
+              <div class="config-list" id="stageConfigRows"></div>
+            </section>
+            <section class="panel page-section">
+              <div class="panel-head">
+                <div>
+                  <h2>生命周期决策路径</h2>
+                  <p class="small">配置四条决策路径的执行动作和交付物，应用到生命周期看板。</p>
+                </div>
               </div>
-            </div>
-            <div class="config-list" id="meetingConfigRows"></div>
-          </section>
-          <section class="panel page-section">
-            <div class="panel-head">
-              <div>
-                <h2>生命周期决策路径</h2>
-                <p class="small">配置四条决策路径的执行动作和交付物，应用到生命周期看板。</p>
+              <div class="config-list" id="lifecycleConfigRows"></div>
+            </section>
+          </div>
+          <div class="settings-col">
+            <section class="panel page-section">
+              <div class="panel-head">
+                <div>
+                  <h2>评审会议规则</h2>
+                  <p class="small">配置每个评审会议的责任部门和适用的产品等级，等级决定哪些产品需要开这个会。</p>
+                </div>
               </div>
-            </div>
-            <div class="config-list" id="lifecycleConfigRows"></div>
-          </section>
-          <section class="panel page-section">
+              <div class="config-list" id="meetingConfigRows"></div>
+            </section>
+          </div>
+          <section class="panel page-section panel-wide">
             <div class="panel-head">
               <div>
-                <h2>系统信息与人员权限</h2>
-                <p class="small">登录方式、组织架构状态，以及各岗位可进入的页面和可编辑范围。</p>
+                <h2>系统信息</h2>
+                <p class="small">登录方式、组织架构状态和设置入口的可见范围，可见范围支持直接修改。</p>
               </div>
               <span class="badge blue">总经办</span>
             </div>
             <div class="settings-list" id="systemSettingsRows"></div>
-            <div class="settings-list" id="permissionRows"></div>
+          </section>
+          <section class="panel page-section panel-wide">
+            <div class="panel-head">
+              <div>
+                <h2>人员权限</h2>
+                <p class="small">勾选每个岗位可进入的页面和可执行的操作，改动立即生效并自动保存。</p>
+              </div>
+              <span class="badge blue">总经办</span>
+            </div>
+            <div class="settings-list role-grid" id="permissionRows"></div>
           </section>
         </div>
       </section>
@@ -3541,8 +3573,11 @@
     const CONFIG_DEFAULTS = {
       stages: stages.map(stage => ({ short: stage.short, goal: stage.goal })),
       meetings: meetingRules.map(rule => ({ owner: rule.owner, levels: [...rule.levels] })),
-      lifecycle: Object.fromEntries(Object.entries(lifecyclePaths).map(([key, path]) => [key, { action: path.action, deliverable: path.deliverable }]))
+      lifecycle: Object.fromEntries(Object.entries(lifecyclePaths).map(([key, path]) => [key, { action: path.action, deliverable: path.deliverable }])),
+      roles: Object.fromEntries(Object.entries(roleProfiles).map(([key, role]) => [key, { screens: [...role.screens], permissions: { ...role.permissions } }])),
+      settingsDepts: ["总经办"]
     };
+    let settingsVisibilityDepts = [...CONFIG_DEFAULTS.settingsDepts];
     function applyConfigOverrides(config = {}) {
       const stageCfg = config.stages || {};
       Object.entries(stageCfg).forEach(([index, value]) => {
@@ -3565,11 +3600,27 @@
         if (typeof value.action === "string" && value.action.trim()) path.action = value.action.trim();
         if (typeof value.deliverable === "string" && value.deliverable.trim()) path.deliverable = value.deliverable.trim();
       });
+      const roleCfg = config.roles || {};
+      Object.entries(roleCfg).forEach(([key, value]) => {
+        const role = roleProfiles[key];
+        if (!role || !value || key === "readonly") return;
+        if (Array.isArray(value.screens) && value.screens.length) role.screens = allScreens.filter(screen => value.screens.includes(screen));
+        if (value.permissions && typeof value.permissions === "object") Object.keys(permissionLabels).forEach(permission => {
+          if (typeof value.permissions[permission] === "boolean") role.permissions[permission] = value.permissions[permission];
+        });
+      });
+      const systemCfg = config.system || {};
+      if (Array.isArray(systemCfg.settingsDepts)) {
+        const depts = systemCfg.settingsDepts.map(item => String(item || "").trim()).filter(Boolean);
+        if (depts.length) settingsVisibilityDepts = depts;
+      }
     }
     function resetConfigToDefaults() {
       CONFIG_DEFAULTS.stages.forEach((value, index) => { stages[index].short = value.short; stages[index].goal = value.goal; });
       CONFIG_DEFAULTS.meetings.forEach((value, index) => { meetingRules[index].owner = value.owner; meetingRules[index].levels = [...value.levels]; });
       Object.entries(CONFIG_DEFAULTS.lifecycle).forEach(([key, value]) => { lifecyclePaths[key].action = value.action; lifecyclePaths[key].deliverable = value.deliverable; });
+      Object.entries(CONFIG_DEFAULTS.roles).forEach(([key, value]) => { roleProfiles[key].screens = [...value.screens]; roleProfiles[key].permissions = { ...value.permissions }; });
+      settingsVisibilityDepts = [...CONFIG_DEFAULTS.settingsDepts];
     }
     const defaultProducts = [
       { id: "p1", name: "鹦鹉谷物棒", level: "P1 常规新品", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, launch: "2026-08-15", sales: 0, score: 0, returnRate: 0, profit: 0, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。" },
@@ -3749,7 +3800,7 @@
       ].map(item => String(item || "").trim()).filter(Boolean))];
     }
     function canViewSettings() {
-      return currentUserDepartments().some(department => department.includes("总经办"));
+      return currentUserDepartments().some(department => settingsVisibilityDepts.some(keyword => department.includes(keyword)));
     }
     function currentUserDisplayName() {
       if (!currentUser) return "未登录";
@@ -5860,9 +5911,9 @@
       if (resetBtn && !resetBtn.dataset.bound) {
         resetBtn.dataset.bound = "1";
         resetBtn.addEventListener("click", async () => {
-          if (!await requestConfirm({ title: "恢复默认配置", message: "会把流程阶段、评审会议和生命周期路径全部还原为系统默认。", confirmText: "恢复默认" })) return;
+          if (!await requestConfirm({ title: "恢复默认配置", message: "会把流程阶段、评审会议、生命周期路径、人员权限和设置可见范围全部还原为系统默认。", confirmText: "恢复默认" })) return;
           resetConfigToDefaults();
-          updateConfig(config => { delete config.stages; delete config.meetings; delete config.lifecycle; });
+          updateConfig(config => { delete config.stages; delete config.meetings; delete config.lifecycle; delete config.roles; delete config.system; });
           toast("已恢复默认流程与规则配置。");
           renderAll();
         });
@@ -5876,7 +5927,6 @@
       const systemSettings = [
         ["登录方式", "钉钉免登，按组织架构和岗位自动匹配权限。", currentUser?.source === "dingtalk" ? "钉钉账号" : "本地测试"],
         ["组织架构", orgUserCount ? `已缓存 ${deptCount} 个部门、${orgUserCount} 位人员。` : "尚未拿到钉钉组织架构缓存。", orgUserCount ? "已同步" : "待同步"],
-        ["设置可见范围", "只有当前用户部门包含“总经办”时才显示设置入口。", currentDepartments],
         ["流程阶段", `产品进度使用 ${stages.length} 个阶段，需求池转开发后自动生成任务、资料和评审。`, `${stages.length} 阶段`],
         ["资料与会议", "资料包、评审纪要、会议决策和钉钉同步记录按产品复用。", "按产品关联"]
       ];
@@ -5885,23 +5935,77 @@
           <div><strong>${esc(title)}</strong><p class="small">${esc(desc)}</p></div>
           <span class="badge blue">${esc(status)}</span>
         </div>
-      `).join("");
-      const visibleRoles = Object.entries(roleProfiles).filter(([key]) => key !== "readonly");
-      permissionRows.innerHTML = visibleRoles.map(([key, role]) => {
-        const screens = [...role.screens, ...(key === currentUser?.role && canViewSettings() ? ["settings"] : [])]
-          .map(screen => screenLabels[screen] || screen)
-          .join(" / ");
-        const permissions = Object.keys(role.permissions || {}).filter(permission => role.permissions[permission]);
-        return `<div class="setting-row">
-          <div>
-            <strong>${esc(role.name)}</strong>
-            <p class="small">${esc(role.dept)} · 可见页面：${esc(screens || "-")}</p>
-          </div>
-          <div class="permission-chips">
-            ${permissions.map(permission => `<span class="badge">${esc(permissionLabels[permission] || permission)}</span>`).join("") || `<span class="badge">只读</span>`}
-          </div>
+      `).join("") + `
+        <div class="setting-row">
+          <div><strong>设置可见范围</strong><p class="small">部门名称包含以下关键词的成员可进入设置和 BUG 优化页，多个关键词用 / 分隔。你当前部门：${esc(currentDepartments)}</p></div>
+          <input id="settingsDeptsInput" value="${escapeAttr(settingsVisibilityDepts.join(" / "))}" aria-label="设置可见范围部门关键词">
         </div>`;
-      }).join("");
+      const deptInput = document.getElementById("settingsDeptsInput");
+      if (deptInput) deptInput.addEventListener("change", () => {
+        const depts = deptInput.value.split(/[\/、，,;；\s]+/).map(item => item.trim()).filter(Boolean);
+        if (!depts.length) {
+          deptInput.value = settingsVisibilityDepts.join(" / ");
+          toast("至少保留一个部门关键词。");
+          return;
+        }
+        if (!currentUserDepartments().some(department => depts.some(keyword => department.includes(keyword)))) {
+          deptInput.value = settingsVisibilityDepts.join(" / ");
+          toast("这个范围不包含你所在的部门，会把你自己挡在设置页外，已还原。");
+          return;
+        }
+        settingsVisibilityDepts = depts;
+        updateConfig(config => { config.system = { ...(config.system || {}), settingsDepts: depts }; });
+        toast("设置可见范围已更新。");
+        renderAll();
+      });
+      const visibleRoles = Object.entries(roleProfiles).filter(([key]) => key !== "readonly");
+      permissionRows.innerHTML = visibleRoles.map(([key, role]) => `
+        <div class="config-card">
+          <div class="config-card-head">
+            <strong>${esc(role.name)}</strong>
+            <span class="badge">${esc(role.dept)}</span>
+          </div>
+          <p class="small">${esc(role.desc)}</p>
+          <div class="config-levels" role="group" aria-label="可见页面">
+            <span class="config-levels-label">可见页面</span>
+            ${allScreens.map(screen => `
+              <label class="config-check"><input type="checkbox" data-role-screen="${esc(screen)}" data-role-key="${esc(key)}" ${role.screens.includes(screen) ? "checked" : ""}>${esc(screenLabels[screen] || screen)}</label>`).join("")}
+          </div>
+          <div class="config-levels" role="group" aria-label="操作权限">
+            <span class="config-levels-label">操作权限</span>
+            ${Object.keys(permissionLabels).map(permission => `
+              <label class="config-check"><input type="checkbox" data-role-permission="${esc(permission)}" data-role-key="${esc(key)}" ${role.permissions[permission] ? "checked" : ""}>${esc(permissionLabels[permission])}</label>`).join("")}
+          </div>
+        </div>`).join("");
+      permissionRows.querySelectorAll("[data-role-screen]").forEach(box => box.addEventListener("change", () => {
+        const role = roleProfiles[box.dataset.roleKey];
+        if (!role) return;
+        const screen = box.dataset.roleScreen;
+        let screens = box.checked ? [...new Set([...role.screens, screen])] : role.screens.filter(item => item !== screen);
+        if (!screens.length) { box.checked = true; toast("每个岗位至少保留一个可见页面。"); return; }
+        screens = allScreens.filter(item => screens.includes(item));
+        role.screens = screens;
+        updateConfig(config => {
+          config.roles = config.roles || {};
+          config.roles[box.dataset.roleKey] = { ...(config.roles[box.dataset.roleKey] || {}), screens };
+        });
+        toast(`${role.name} 的可见页面已更新。`);
+        renderAll();
+      }));
+      permissionRows.querySelectorAll("[data-role-permission]").forEach(box => box.addEventListener("change", () => {
+        const role = roleProfiles[box.dataset.roleKey];
+        if (!role) return;
+        const permission = box.dataset.rolePermission;
+        role.permissions[permission] = box.checked;
+        updateConfig(config => {
+          config.roles = config.roles || {};
+          const entry = { ...(config.roles[box.dataset.roleKey] || {}) };
+          entry.permissions = { ...(entry.permissions || {}), [permission]: box.checked };
+          config.roles[box.dataset.roleKey] = entry;
+        });
+        toast(`${role.name}：${permissionLabels[permission] || permission}${box.checked ? "已开启" : "已关闭"}。`);
+        renderAll();
+      }));
     }
     function toggleTask(id, done) {
       if (denyIfCannot("editTasks")) return;
@@ -6440,14 +6544,13 @@
         const start = formatCalendarMeetingTime(item.startTime);
         const end = formatCalendarMeetingTime(item.endTime);
         const status = calendarMeetingStatus(item);
-        return `<button class="calendar-meeting-option ${active ? "active" : ""}" type="button" data-calendar-meeting-key="${escapeAttr(key)}">
+        return `<button class="calendar-meeting-option ${active ? "active" : ""}" type="button" aria-pressed="${active ? "true" : "false"}" data-calendar-meeting-key="${escapeAttr(key)}">
           <span class="calendar-meeting-main">
             <strong>${esc(item.aiMinutesTitle || item.summary || item.title || "钉钉会议")}</strong>
             <small>${esc([start && end ? `${start} - ${end}` : (start || end), item.location].filter(Boolean).join(" · ") || "钉钉日历会议")}</small>
           </span>
           <span class="calendar-meeting-meta">
             <span class="badge ${status.className}">${status.label}</span>
-            <span class="badge ${active ? "blue" : ""}">${active ? "已选择" : "选择"}</span>
           </span>
         </button>`;
       }).join("");
@@ -6530,7 +6633,7 @@
       selectedCalendarMeetingKey = calendarMeetingKey(selected);
       renderCalendarMeetingList();
       const status = calendarMeetingStatus(selected);
-      setMinutesMessage(`已选择「${selected.aiMinutesTitle || selected.summary || selected.title || "钉钉会议"}」，状态：${status.label}。`, selected.minuteText || selected.aiMinutesTaskUuid ? "ok" : "");
+      setMinutesMessage(`当前会议「${selected.aiMinutesTitle || selected.summary || selected.title || "钉钉会议"}」，状态：${status.label}。`, selected.minuteText || selected.aiMinutesTaskUuid ? "ok" : "");
     }
     async function importMinutesFromDingAi() {
       const product = productById(minutesProductId);

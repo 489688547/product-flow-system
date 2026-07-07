@@ -131,7 +131,8 @@ test("settings page is only visible to general office users and shows permission
   assert.match(html, /人员权限/);
   assert.match(html, /function currentUserDepartments\(/);
   assert.match(html, /function canViewSettings\(/);
-  assert.match(html, /department\.includes\("总经办"\)/);
+  assert.match(html, /settingsDepts: \["总经办"\]/);
+  assert.match(html, /settingsVisibilityDepts\.some\(keyword => department\.includes\(keyword\)\)/);
   assert.match(html, /if \(screen === "settings"\) return canViewSettings\(\);/);
   assert.match(html, /function renderSettings\(/);
   assert.match(html, /renderSettings\(\);/);
