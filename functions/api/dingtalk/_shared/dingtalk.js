@@ -771,9 +771,54 @@ function unwrapDingMcpResult(payload = {}) {
 function dingMcpPayloadText(payload = {}) {
   const root = unwrapDingMcpResult(payload);
   const text = collectDingTranscriptText(root);
-  if (text) return text;
-  if (typeof root === "string") return root.trim();
-  return String(root.text || root.content || root.summary || root.markdown || "").trim();
+  if (text) return stripMarkdownImages(text);
+  if (typeof root === "string") return stripMarkdownImages(root.trim());
+  return stripMarkdownImages(String(root.text || root.content || root.fullSummary || root.summary || root.aiSummary || root.markdown || "").trim());
+}
+
+function stripMarkdownImages(text = "") {
+  return String(text || "")
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
+    .replace(/<img[^>]*>/gi, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function collectStringValues(value, lines = []) {
+  if (value == null) return lines;
+  if (typeof value === "string" || typeof value === "number") {
+    lines.push(String(value));
+    return lines;
+  }
+  if (Array.isArray(value)) {
+    value.forEach(item => collectStringValues(item, lines));
+    return lines;
+  }
+  if (typeof value === "object") {
+    Object.values(value).forEach(item => collectStringValues(item, lines));
+  }
+  return lines;
+}
+
+export function extractDingAiMinutesPosterUrls(payload = {}) {
+  const root = unwrapDingMcpResult(payload);
+  const urls = [];
+  const seen = new Set();
+  const addUrl = value => {
+    const url = String(value || "").trim();
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    urls.push(url);
+  };
+  collectStringValues(root).forEach(text => {
+    for (const match of String(text).matchAll(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/g)) {
+      addUrl(match[1]);
+    }
+    for (const match of String(text).matchAll(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/gi)) {
+      addUrl(match[1]);
+    }
+  });
+  return urls;
 }
 
 export async function callDingMcpTool(userAccessToken, toolName, args = {}, fetchImpl = fetch) {
@@ -889,11 +934,14 @@ export async function queryDingAiMinutesText(userAccessToken, input = {}, fetchI
     throw err;
   }
   const summaryRaw = await callDingMcpTool(userAccessToken, "get_minutes_ai_summary", { taskUuid }, fetchImpl);
+  const posterUrls = extractDingAiMinutesPosterUrls(summaryRaw);
   let text = dingMcpPayloadText(summaryRaw);
   if (!text) {
     const transcriptRaw = await callDingMcpTool(userAccessToken, "get_minutes_transcription", { taskUuid }, fetchImpl);
     text = dingMcpPayloadText(transcriptRaw);
-    if (text) return { text, raw: { summaryRaw, transcriptRaw }, taskUuid };
+    const transcriptPosterUrls = extractDingAiMinutesPosterUrls(transcriptRaw);
+    const mergedPosterUrls = [...new Set([...posterUrls, ...transcriptPosterUrls])];
+    if (text) return { text, raw: { summaryRaw, transcriptRaw }, taskUuid, posterUrl: mergedPosterUrls[0] || "", posterUrls: mergedPosterUrls };
   }
   if (!text) {
     const err = new Error("钉钉 AI 听记没有返回纪要文本。");
@@ -901,7 +949,7 @@ export async function queryDingAiMinutesText(userAccessToken, input = {}, fetchI
     err.detail = summaryRaw;
     throw err;
   }
-  return { text, raw: summaryRaw, taskUuid };
+  return { text, raw: summaryRaw, taskUuid, posterUrl: posterUrls[0] || "", posterUrls };
 }
 
 export function extractDingAiMinutesTaskUuid(value = "") {
@@ -996,9 +1044,11 @@ export async function queryDingAiMinutesForEvents(userAccessToken, input = {}, f
     }
     used.add(minute.taskUuid);
     let text = "";
+    let posterUrl = "";
     try {
       const result = await queryDingAiMinutesText(userAccessToken, { taskUuid: minute.taskUuid }, fetchImpl);
       text = result.text;
+      posterUrl = result.posterUrl || "";
     } catch {
       // Keep the taskUuid visible; users can still paste or retry manually.
     }
@@ -1006,6 +1056,7 @@ export async function queryDingAiMinutesForEvents(userAccessToken, input = {}, f
       ...event,
       minuteState: text ? "ready" : "found",
       minuteText: text,
+      minutePosterUrl: posterUrl,
       aiMinutesTaskUuid: minute.taskUuid,
       aiMinutesTitle: minute.title
     });

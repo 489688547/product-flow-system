@@ -40,6 +40,7 @@ test("DingTalk operations show a fullscreen loading state while waiting", () => 
   assert.match(confirmSyncModal, /await withGlobalLoading\(syncMeetingAction === "instant" \? "正在拉起钉钉会议" : "正在同步到钉钉", async \(\) => \{/);
   const minutesDocImport = html.match(/async function importMinutesFromDingDoc[\s\S]*?function saveMinutesModal/)[0];
   assert.match(minutesDocImport, /await withGlobalLoading\("正在读取钉钉文档", async \(\) => \{/);
+  assert.match(html, /await withGlobalLoading\("正在读取钉钉 AI 听记", async \(\) => \{/);
 });
 
 test("review meetings can be created as DingTalk calendar events", () => {
@@ -77,6 +78,16 @@ test("review meetings can import minutes from a DingTalk document link", () => {
   assert.match(html, /文档导入/);
 });
 
+test("review meetings can import minutes from a DingTalk AI transcript link", () => {
+  assert.match(html, /id="minutesAiUrl"/);
+  assert.match(html, /id="importMinutesFromAi"/);
+  assert.match(html, /function importMinutesFromDingAi\(/);
+  assert.match(html, /\/api\/dingtalk\/meeting\/minutes/);
+  assert.match(html, /sourceType: "aiMinutes"/);
+  assert.match(html, /requestDingAuthCode/);
+  assert.match(html, /钉钉 AI 听记链接/);
+});
+
 test("DingTalk minutes import no longer depends on meeting ids or calendar meetings", () => {
   assert.doesNotMatch(html, /id="minutesRecordingId"/);
   assert.doesNotMatch(html, /id="loadCalendarMeetings"/);
@@ -84,6 +95,8 @@ test("DingTalk minutes import no longer depends on meeting ids or calendar meeti
   assert.doesNotMatch(html, /id="syncMinutesFromDing"/);
   assert.match(html, /id="minutesDocUrl"/);
   assert.match(html, /id="importMinutesFromDoc"/);
+  assert.match(html, /id="minutesAiUrl"/);
+  assert.match(html, /id="importMinutesFromAi"/);
 });
 
 test("DingTalk sync errors expose actionable API details in the UI", () => {

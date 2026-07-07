@@ -5,6 +5,7 @@ import {
   buildDingMeetingMinutesQuery,
   buildDingTodoPayload,
   extractDingAiMinutesList,
+  extractDingAiMinutesPosterUrls,
   extractDingAiMinutesTaskUuid,
   getDingUserAccessToken,
   createDingCalendarEvent,
@@ -360,6 +361,37 @@ test("queryDingAiMinutesText reads AI summary through DingTalk MCP", async () =>
   assert.equal(result.text, "AI 纪要：通过标准样。");
 });
 
+test("queryDingAiMinutesText extracts DingTalk AI summary poster image", async () => {
+  const posterUrl = "https://ai-tingji-summary-visualization.oss-cn-hangzhou.aliyuncs.com/data/poster.png?Expires=1783000000";
+  const result = await queryDingAiMinutesText("user-token-1", {
+    taskUuid: "task-poster-1"
+  }, async () => okJson({
+    result: {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            fullSummary: `# 样品评审会\n\n![纪要图](${posterUrl})\n\n确认标准样通过。`
+          })
+        }
+      ]
+    }
+  }));
+
+  assert.equal(result.posterUrl, posterUrl);
+  assert.deepEqual(result.posterUrls, [posterUrl]);
+  assert.match(result.text, /确认标准样通过/);
+});
+
+test("extractDingAiMinutesPosterUrls finds markdown and html image urls", () => {
+  assert.deepEqual(extractDingAiMinutesPosterUrls({
+    fullSummary: `![封面](https://example.com/a.png?x=1)\n<img src="https://example.com/b.jpg">`
+  }), [
+    "https://example.com/a.png?x=1",
+    "https://example.com/b.jpg"
+  ]);
+});
+
 test("extractDingAiMinutesTaskUuid accepts DingTalk AI minutes links", () => {
   assert.equal(
     extractDingAiMinutesTaskUuid("https://shanji.dingtalk.com/meeting/minutes?taskUuid=abc123"),
@@ -406,7 +438,7 @@ test("queryDingAiMinutesForEvents matches calendar meetings to AI minutes taskUu
     return okJson({
       result: {
         content: [
-          { type: "text", text: JSON.stringify({ aiSummary: "确认封样标准。" }) }
+      { type: "text", text: JSON.stringify({ aiSummary: "确认封样标准。", fullSummary: "![纪要图](https://example.com/meeting-poster.png)" }) }
         ]
       }
     });
@@ -416,6 +448,7 @@ test("queryDingAiMinutesForEvents matches calendar meetings to AI minutes taskUu
   assert.equal(result[0].minuteState, "ready");
   assert.equal(result[0].aiMinutesTaskUuid, "task-ai-1");
   assert.equal(result[0].minuteText, "确认封样标准。");
+  assert.equal(result[0].minutePosterUrl, "https://example.com/meeting-poster.png");
 });
 
 test("queryDingCloudMinutesForEvents reads calendar conference transcripts with app token", async () => {

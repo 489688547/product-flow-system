@@ -3112,7 +3112,11 @@
             <label class="field">钉钉文档链接
               <input id="minutesDocUrl" placeholder="粘贴 alidocs.dingtalk.com 文档链接">
             </label>
+            <label class="field">钉钉 AI 听记链接
+              <input id="minutesAiUrl" placeholder="粘贴 shanji.dingtalk.com 听记链接或 taskUuid">
+            </label>
             <div class="calendar-meeting-panel">
+              <button class="btn" id="importMinutesFromAi" type="button"><i data-lucide="sparkles"></i>从听记导入</button>
               <button class="btn" id="importMinutesFromDoc" type="button"><i data-lucide="file-input"></i>从文档导入</button>
             </div>
             <label class="field section-gap">会议纪要文本
@@ -3469,6 +3473,7 @@
     let syncSelectedUsers = new Set();
     let minutesProductId = "";
     let minutesMeetingId = "";
+    let minutesRemotePosterUrl = "";
     let confirmResolve = null;
     let globalLoadingDepth = 0;
 
@@ -5999,7 +6004,11 @@
       const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
       const text = document.getElementById("minutesText")?.value || defaultMinuteContent({ name: meeting?.minute, stage: meeting?.stage, owner: meeting?.owner }, true);
       const preview = document.getElementById("minutesPosterPreview");
-      if (preview && product && meeting) preview.src = generateMeetingMinutesPoster({ product, meeting, text });
+      if (preview && product && meeting) preview.src = minutesRemotePosterUrl || generateMeetingMinutesPoster({ product, meeting, text });
+    }
+    function handleMinutesTextInput() {
+      minutesRemotePosterUrl = "";
+      updateMinutesPosterPreview();
     }
     function openMinutesModal(payload) {
       if (denyIfCannot("editReviews")) return;
@@ -6009,12 +6018,14 @@
       if (!product || !meeting) return;
       minutesProductId = product.id;
       minutesMeetingId = meeting.id;
+      minutesRemotePosterUrl = "";
       const existing = meetingMinute(product, meeting).doc;
       document.getElementById("minutesTargetTitle").textContent = meeting.title;
       document.getElementById("minutesTargetMeta").textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
       document.getElementById("minutesDocUrl").value = "";
+      document.getElementById("minutesAiUrl").value = "";
       document.getElementById("minutesText").value = existing?.content || "";
-      setMinutesMessage("粘贴钉钉文档链接导入正文，或直接粘贴会议纪要。");
+      setMinutesMessage("粘贴钉钉 AI 听记链接可同步原始纪要图；也可以导入钉钉文档或直接粘贴正文。");
       updateMinutesPosterPreview();
       document.getElementById("minutesModal").classList.add("open");
       if (window.lucide) lucide.createIcons();
@@ -6023,6 +6034,7 @@
       document.getElementById("minutesModal").classList.remove("open");
       minutesProductId = "";
       minutesMeetingId = "";
+      minutesRemotePosterUrl = "";
     }
     function upsertProductDeliverable(match, nextDoc) {
       const existing = state.deliverables.find(match);
@@ -6033,7 +6045,7 @@
       state.deliverables.unshift(nextDoc);
       return nextDoc;
     }
-    function createMeetingMinutesFromText({ productId, meetingId, text, source = "手动导入" } = {}) {
+    function createMeetingMinutesFromText({ productId, meetingId, text, source = "手动导入", posterUrl = "" } = {}) {
       if (denyIfCannot("editReviews")) return null;
       const product = productById(productId);
       const meeting = meetingRules.find(rule => rule.id === meetingId);
@@ -6056,7 +6068,7 @@
         updated: "今天",
         content
       });
-      const posterUrl = generateMeetingMinutesPoster({ product, meeting, text: content });
+      const finalPosterUrl = posterUrl || generateMeetingMinutesPoster({ product, meeting, text: content });
       upsertProductDeliverable(doc => doc.productId === product.id && doc.stage === meeting.stage && doc.name === `${meeting.title}重点纪要图`, {
         id: cryptoId(),
         productId: product.id,
@@ -6064,10 +6076,10 @@
         stage: meeting.stage,
         required: false,
         type: "image",
-        mimeType: "image/svg+xml",
-        size: posterUrl.length,
+        mimeType: posterUrl ? "image/png" : "image/svg+xml",
+        size: finalPosterUrl.length,
         source: "会议纪要生成",
-        url: posterUrl,
+        url: finalPosterUrl,
         status: "已归档",
         owner: meeting.owner,
         updated: "今天",
@@ -6125,6 +6137,59 @@
       } catch (error) {
         setMinutesMessage(error.message || "钉钉文档读取失败", "error");
         toast(error.message || "钉钉文档读取失败");
+      } finally {
+        button.disabled = false;
+      }
+    }
+    async function importMinutesFromDingAi() {
+      const product = productById(minutesProductId);
+      const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
+      if (!product || !meeting) return;
+      const aiMinutesTaskUuid = document.getElementById("minutesAiUrl").value.trim();
+      if (!aiMinutesTaskUuid) {
+        setMinutesMessage("请先粘贴钉钉 AI 听记链接或 taskUuid。", "error");
+        return;
+      }
+      const button = document.getElementById("importMinutesFromAi");
+      button.disabled = true;
+      setMinutesMessage("正在读取钉钉 AI 听记...");
+      try {
+        await withGlobalLoading("正在读取钉钉 AI 听记", async () => {
+          const env = detectDingTalkEnvironment();
+          if (!env.inDingTalk || !env.corpId) {
+            throw new Error("AI 听记导入需要从钉钉工作台打开应用，才能取得当前账号授权。");
+          }
+          await waitForDingApi();
+          const authCode = await requestDingAuthCode(env.corpId);
+          const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              authCode,
+              sourceType: "aiMinutes",
+              aiMinutesTaskUuid
+            })
+          });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok || !payload.synced || !payload.text) {
+            if (renderMinutesPermissionError(payload)) return;
+            throw new Error(formatDingSyncError(payload, "钉钉 AI 听记读取失败"));
+          }
+          minutesRemotePosterUrl = payload.posterUrl || "";
+          document.getElementById("minutesText").value = payload.text;
+          updateMinutesPosterPreview();
+          setMinutesMessage(payload.posterUrl ? "已读取钉钉 AI 听记正文和纪要图，正在写入资料包。" : "已读取钉钉 AI 听记正文，未发现纪要图，正在生成本地重点图。", "ok");
+          createMeetingMinutesFromText({
+            productId: product.id,
+            meetingId: meeting.id,
+            text: payload.text,
+            source: "钉钉 AI 听记导入",
+            posterUrl: payload.posterUrl || ""
+          });
+        });
+      } catch (error) {
+        setMinutesMessage(error.message || "钉钉 AI 听记读取失败", "error");
+        toast(error.message || "钉钉 AI 听记读取失败");
       } finally {
         button.disabled = false;
       }
@@ -7005,8 +7070,9 @@
     document.getElementById("closeMinutesModal").addEventListener("click", closeMinutesModal);
     document.getElementById("cancelMinutesModal").addEventListener("click", closeMinutesModal);
     document.getElementById("saveMinutesModal").addEventListener("click", saveMinutesModal);
+    document.getElementById("importMinutesFromAi").addEventListener("click", importMinutesFromDingAi);
     document.getElementById("importMinutesFromDoc").addEventListener("click", importMinutesFromDingDoc);
-    document.getElementById("minutesText").addEventListener("input", updateMinutesPosterPreview);
+    document.getElementById("minutesText").addEventListener("input", handleMinutesTextInput);
     document.getElementById("closeConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
     document.getElementById("cancelConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));
     document.getElementById("confirmDialogAction").addEventListener("click", () => closeConfirmDialog(true));

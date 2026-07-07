@@ -75,6 +75,8 @@ test("empty placeholder package files are pruned from defaults and restored stat
 test("meeting minutes poster is saved as an openable image asset", () => {
   assert.match(html, /function generateMeetingMinutesPoster\(/);
   assert.match(html, /data:image\/svg\+xml;charset=utf-8/);
+  assert.match(html, /posterUrl \|\| generateMeetingMinutesPoster/);
+  assert.match(html, /posterUrl \? "image\/png" : "image\/svg\+xml"/);
   assert.match(html, /type: "image"/);
   assert.match(html, /source: "会议纪要生成"/);
 });

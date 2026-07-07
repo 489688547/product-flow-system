@@ -84,6 +84,8 @@ export async function onRequest({ request, env }) {
         synced: true,
         source: "aiMinutes",
         text: result.text,
+        posterUrl: result.posterUrl || "",
+        posterUrls: result.posterUrls || [],
         taskUuid: result.taskUuid,
         raw: result.raw
       });
