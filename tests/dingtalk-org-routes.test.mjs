@@ -74,11 +74,74 @@ test("document read route validates DingTalk credentials", async () => {
   assert.match(body.message, /缺少钉钉应用配置/);
 });
 
-test("meeting minutes route uses user AI minutes when calendar events include authCode", async () => {
+test("meeting minutes route uses conference id cloud recording before AI minutes", async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
+    if (String(url).includes("/gettoken")) {
+      return new Response(JSON.stringify({ errcode: 0, access_token: "app-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("/cloudRecords/getTexts")) {
+      return new Response(JSON.stringify({
+        result: {
+          paragraphList: [
+            { paragraph: "确认封样标准。" }
+          ]
+        }
+      }), { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  try {
+    const response = await meetingMinutesRequest({
+      request: new Request("https://flow.example.com/api/dingtalk/meeting/minutes", {
+        method: "POST",
+        body: JSON.stringify({
+          authCode: "auth-code-1",
+          events: [
+            {
+              conferenceId: "conf-1",
+              summary: "鹦鹉谷物棒 · 标准样终审会",
+              startTime: "2026-07-05T14:00:00+08:00",
+              endTime: "2026-07-05T15:00:00+08:00"
+            }
+          ]
+        })
+      }),
+      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.source, "cloudRecording");
+    assert.equal(body.events[0].minuteState, "ready");
+    assert.equal(body.events[0].minuteText, "确认封样标准。");
+    assert.match(calls[1].url, /\/v1\.0\/conference\/videoConferences\/conf-1\/cloudRecords\/getTexts/);
+    assert.equal(calls.some(call => call.url.includes("mcp-gw.dingtalk.com")), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("meeting minutes route falls back to AI minutes only when conference id has no recording", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (String(url).includes("/gettoken")) {
+      return new Response(JSON.stringify({ errcode: 0, access_token: "app-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("/cloudRecords/getTexts")) {
+      return new Response(JSON.stringify({
+        code: "cloudRecordNotFound",
+        message: "cloud record not found"
+      }), { status: 404 });
+    }
+    if (String(url).includes("/scheduleConferences/")) {
+      return new Response(JSON.stringify({ conferenceList: [] }), { status: 200 });
+    }
     if (String(url).includes("/v1.0/oauth2/userAccessToken")) {
       return new Response(JSON.stringify({ accessToken: "user-token-1" }), { status: 200 });
     }
@@ -133,14 +196,12 @@ test("meeting minutes route uses user AI minutes when calendar events include au
     const body = await response.json();
 
     assert.equal(response.status, 200);
-    assert.equal(body.source, "aiMinutes");
+    assert.equal(body.source, "cloudRecording");
+    assert.equal(body.fallbackSource, "aiMinutes");
     assert.equal(body.events[0].minuteState, "ready");
     assert.equal(body.events[0].aiMinutesTaskUuid, "task-ai-1");
     assert.equal(body.events[0].minuteText, "确认封样标准。");
-    assert.deepEqual(calls.map(call => JSON.parse(call.options.body || "{}")?.params?.name).filter(Boolean), [
-      "list_by_keyword_and_time_range",
-      "get_minutes_ai_summary"
-    ]);
+    assert.equal(calls.some(call => call.url.includes("mcp-gw.dingtalk.com")), true);
   } finally {
     globalThis.fetch = originalFetch;
   }

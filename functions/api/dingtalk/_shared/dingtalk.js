@@ -876,9 +876,9 @@ function normalizeDingAiMinute(item = {}) {
   return {
     taskUuid,
     title: item.title || item.name || item.minutesTitle || item.subject || "AI 听记",
-    createTime: item.createTime || item.createdAt || item.startTime || item.beginTime || item.gmtCreate || "",
-    startTime: item.startTime || item.beginTime || item.createTime || "",
-    endTime: item.endTime || item.finishTime || item.stopTime || "",
+    createTime: item.createTime || item.createdAt || item.startTime || item.startTimeISO || item.beginTime || item.gmtCreate || "",
+    startTime: item.startTime || item.startTimeISO || item.beginTime || item.createTime || "",
+    endTime: item.endTime || item.endTimeISO || item.finishTime || item.stopTime || "",
     creator: item.creator || item.creatorName || item.ownerName || "",
     raw: item
   };
@@ -970,6 +970,11 @@ export function extractDingAiMinutesTaskUuid(value = "") {
 }
 
 function eventTimeMs(value) {
+  if (value == null || value === "") return 0;
+  const numeric = Number(value);
+  if (Number.isFinite(numeric) && String(value).trim() !== "") {
+    return numeric > 0 && numeric < 10000000000 ? numeric * 1000 : numeric;
+  }
   const parsed = Date.parse(value || "");
   return Number.isFinite(parsed) ? parsed : 0;
 }
@@ -982,9 +987,12 @@ function tokenScore(a = "", b = "") {
   const source = String(a || "");
   const target = String(b || "");
   if (!source || !target) return 0;
-  if (source.includes(target) || target.includes(source)) return 4;
+  const normalizedSource = source.replace(/[\s·,，、/|｜:：\-—_（）()【】\[\]{}<>《》]+/g, "");
+  const normalizedTarget = target.replace(/[\s·,，、/|｜:：\-—_（）()【】\[\]{}<>《》]+/g, "");
+  if (source.includes(target) || target.includes(source) || normalizedSource.includes(normalizedTarget) || normalizedTarget.includes(normalizedSource)) return 4;
   const tokens = [...new Set(source.split(/[\s·,，、/|｜:：-]+/).filter(token => token.length >= 2))];
-  return tokens.filter(token => target.includes(token)).length;
+  const separatedScore = tokens.filter(token => target.includes(token)).length * 2;
+  return separatedScore;
 }
 
 function matchDingAiMinuteForEvent(event = {}, minutes = []) {
@@ -1000,7 +1008,9 @@ function matchDingAiMinuteForEvent(event = {}, minutes = []) {
     const title = tokenScore(eventTitle, minute.title);
     const timeScore = sameWindow ? 3 : (sameDay ? 1 : 0);
     const score = title + timeScore;
-    if (score > bestScore && (sameWindow || title >= 2)) {
+    const strongTitleMatch = title >= 4;
+    const timedTitleMatch = (sameWindow && title >= 1) || (sameDay && title >= 2);
+    if (score > bestScore && (strongTitleMatch || timedTitleMatch)) {
       best = minute;
       bestScore = score;
     }

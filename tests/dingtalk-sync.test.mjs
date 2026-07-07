@@ -593,6 +593,42 @@ test("queryDingAiMinutesForEvents matches same-title minutes outside the calenda
   assert.equal(result[0].minuteText, "确认主推款式和内容展示方案。");
 });
 
+test("queryDingAiMinutesForEvents does not attach unrelated same-window recordings", async () => {
+  const result = await queryDingAiMinutesForEvents("user-token-1", {
+    events: [
+      {
+        conferenceId: "conf-interview",
+        summary: "面试",
+        startTime: "2026-07-06T15:30:00+08:00",
+        endTime: "2026-07-06T16:30:00+08:00"
+      }
+    ]
+  }, async (url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.params.name === "list_by_keyword_and_time_range") {
+      return okJson({
+        result: {
+          structuredContent: {
+            result: {
+              itemList: [
+                {
+                  uuid: "task-test-1",
+                  title: "test",
+                  startTime: "2026-07-06T18:35:25+08:00"
+                }
+              ]
+            }
+          }
+        }
+      });
+    }
+    throw new Error(`unexpected call ${body.params.name}`);
+  });
+
+  assert.equal(result[0].minuteState, "empty");
+  assert.equal(result[0].aiMinutesTaskUuid, undefined);
+});
+
 test("queryDingAiMinutesForEvents checks created and shared minutes when all scope is empty", async () => {
   const scopes = [];
   const result = await queryDingAiMinutesForEvents("user-token-1", {
