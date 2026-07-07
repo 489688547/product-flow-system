@@ -1702,14 +1702,76 @@
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
     }
+    .minute-poster-view {
+      display: grid;
+      gap: 10px;
+    }
+    .minute-poster-frame {
+      border: 1px solid var(--line);
+      border-radius: var(--radius-panel);
+      background: var(--panel-2);
+      padding: 12px;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+    }
+    .minute-poster-frame img {
+      width: 100%;
+      max-width: 620px;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: var(--shadow-lift);
+      display: block;
+    }
+    .minute-poster-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .minute-poster-caption {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+    .minute-poster-caption i { width: 15px; height: 15px; color: var(--primary); }
+    .minute-doc-source {
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+    .minute-doc-source > summary {
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink-soft);
+      list-style: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      user-select: none;
+    }
+    .minute-doc-source > summary::-webkit-details-marker { display: none; }
+    .minute-doc-source > summary::before {
+      content: "▸";
+      color: var(--muted);
+      transition: transform .15s ease;
+    }
+    .minute-doc-source[open] > summary::before { transform: rotate(90deg); }
     .minute-doc-body {
-      min-height: 420px;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      padding: 4px 0;
+      width: 100%;
+      min-height: 320px;
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-2);
+      padding: 12px 14px;
       font-size: 14px;
       line-height: 1.72;
+      resize: vertical;
     }
     .review-meta {
       display: flex;
@@ -5360,6 +5422,16 @@
       const reviewEditable = can("editReviews");
       const reviewDisabled = reviewEditable ? "" : "disabled";
       if (activeDoc) {
+        const posterDoc = state.deliverables.find(doc => doc.productId === product.id && isImageAsset(doc) && String(doc.name || "").includes("重点纪要图") && doc.content === activeDoc.content)
+          || state.deliverables.find(doc => doc.productId === product.id && doc.stage === activeDoc.stage && isImageAsset(doc) && String(doc.name || "").includes("重点纪要图"));
+        const posterBlock = posterDoc ? `
+          <div class="minute-poster-view">
+            <div class="minute-poster-frame"><img src="${esc(posterDoc.url)}" alt="${esc(posterDoc.name)}" loading="lazy"></div>
+            <div class="minute-poster-actions">
+              <span class="minute-poster-caption"><i data-lucide="image"></i>重点纪要图 · 会议要点已整理成图，可直接转发或存档</span>
+              <a class="btn ghost" href="${esc(posterDoc.url)}" download="${esc(activeDoc.name || "会议纪要")}.svg"><i data-lucide="download"></i>下载图片</a>
+            </div>
+          </div>` : "";
         document.getElementById("reviewList").innerHTML = `<div class="minute-doc">
           <div class="split-row">
             <button class="btn ghost" id="backToMeetings"><i data-lucide="arrow-left"></i>返回会议列表</button>
@@ -5371,7 +5443,11 @@
             <label class="field">阶段<input value="${esc(stages[activeDoc.stage]?.name || "-")}" disabled></label>
             <label class="field">负责人<input value="${esc(activeDoc.owner || "")}" data-minute-field="owner" data-minute-id="${esc(activeDoc.id)}" ${reviewDisabled}></label>
           </div>
-          <textarea class="minute-doc-body" data-minute-field="content" data-minute-id="${esc(activeDoc.id)}" ${reviewDisabled}>${esc(activeDoc.content || defaultMinuteContent(activeDoc))}</textarea>
+          ${posterBlock}
+          <details class="minute-doc-source"${posterBlock ? "" : " open"}>
+            <summary>纪要原文（可编辑）</summary>
+            <textarea class="minute-doc-body" data-minute-field="content" data-minute-id="${esc(activeDoc.id)}" ${reviewDisabled}>${esc(activeDoc.content || defaultMinuteContent(activeDoc))}</textarea>
+          </details>
         </div>`;
         document.getElementById("backToMeetings").addEventListener("click", () => {
           activeMinuteDocId = "";
