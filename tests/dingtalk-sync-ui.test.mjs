@@ -98,6 +98,12 @@ test("review meetings can import minutes from a DingTalk calendar meeting picker
   assert.doesNotMatch(html, /id="minutesAiUrl"/);
 });
 
+test("calendar minutes matching sends the current DingTalk unionId", () => {
+  const loadCalendarMeetings = html.match(/async function loadCalendarMeetings[\s\S]*?function selectCalendarMeetingOption/)[0];
+  assert.match(loadCalendarMeetings, /const unionId = currentUser\?\.dingUser\?\.unionid/);
+  assert.match(loadCalendarMeetings, /body: JSON\.stringify\(\{\s*authCode,\s*unionId,/);
+});
+
 test("DingTalk minutes import no longer asks users to provide meeting ids manually", () => {
   assert.doesNotMatch(html, /id="minutesRecordingId"/);
   assert.doesNotMatch(html, /id="syncMinutesFromDing"/);

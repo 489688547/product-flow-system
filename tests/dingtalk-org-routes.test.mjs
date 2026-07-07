@@ -79,6 +79,9 @@ test("meeting minutes route uses conference id cloud recording before AI minutes
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
+    if (String(url).includes("/v1.0/oauth2/userAccessToken")) {
+      return new Response(JSON.stringify({ accessToken: "user-token-1" }), { status: 200 });
+    }
     if (String(url).includes("/gettoken")) {
       return new Response(JSON.stringify({ errcode: 0, access_token: "app-token-1" }), { status: 200 });
     }
@@ -118,7 +121,7 @@ test("meeting minutes route uses conference id cloud recording before AI minutes
     assert.equal(body.source, "cloudRecording");
     assert.equal(body.events[0].minuteState, "ready");
     assert.equal(body.events[0].minuteText, "确认封样标准。");
-    assert.match(calls[1].url, /\/v1\.0\/conference\/videoConferences\/conf-1\/cloudRecords\/getTexts/);
+    assert.ok(calls.some(call => /\/v1\.0\/conference\/videoConferences\/conf-1\/cloudRecords\/getTexts/.test(call.url)));
     assert.equal(calls.some(call => call.url.includes("mcp-gw.dingtalk.com")), false);
   } finally {
     globalThis.fetch = originalFetch;
@@ -202,6 +205,59 @@ test("meeting minutes route falls back to AI minutes only when conference id has
     assert.equal(body.events[0].aiMinutesTaskUuid, "task-ai-1");
     assert.equal(body.events[0].minuteText, "确认封样标准。");
     assert.equal(calls.some(call => call.url.includes("mcp-gw.dingtalk.com")), true);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("meeting minutes route exchanges auth code before slow cloud recording checks", async () => {
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (String(url).includes("/gettoken")) {
+      return new Response(JSON.stringify({ errcode: 0, access_token: "app-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("/v1.0/oauth2/userAccessToken")) {
+      return new Response(JSON.stringify({ accessToken: "user-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("/cloudRecords/getTexts")) {
+      return new Response(JSON.stringify({ code: "cloudRecordNotFound", message: "cloud record not found" }), { status: 404 });
+    }
+    if (String(url).includes("/scheduleConferences/")) {
+      return new Response(JSON.stringify({ conferenceList: [] }), { status: 200 });
+    }
+    if (String(url).includes("mcp-gw.dingtalk.com")) {
+      const body = JSON.parse(options.body);
+      if (body.params.name === "list_by_keyword_and_time_range") {
+        return new Response(JSON.stringify({ result: { structuredContent: { result: { minutesDetails: [] } } } }), { status: 200 });
+      }
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  try {
+    const response = await meetingMinutesRequest({
+      request: new Request("https://flow.example.com/api/dingtalk/meeting/minutes", {
+        method: "POST",
+        body: JSON.stringify({
+          authCode: "auth-code-1",
+          unionId: "union-1",
+          events: [
+            { conferenceId: "conf-1", summary: "会议 1", startTime: "2026-07-07T14:00:00+08:00", endTime: "2026-07-07T15:00:00+08:00" },
+            { conferenceId: "conf-2", summary: "会议 2", startTime: "2026-07-07T15:00:00+08:00", endTime: "2026-07-07T16:00:00+08:00" }
+          ]
+        })
+      }),
+      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    });
+    await response.json();
+
+    const userTokenIndex = calls.findIndex(call => call.url.includes("/v1.0/oauth2/userAccessToken"));
+    const cloudIndex = calls.findIndex(call => call.url.includes("/cloudRecords/getTexts"));
+    assert.ok(userTokenIndex >= 0, "should exchange auth code for user token");
+    assert.ok(cloudIndex >= 0, "should still check cloud recording by conference id");
+    assert.ok(userTokenIndex < cloudIndex, "auth code must be exchanged before slow cloud recording calls");
   } finally {
     globalThis.fetch = originalFetch;
   }

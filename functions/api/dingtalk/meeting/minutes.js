@@ -24,6 +24,15 @@ export async function onRequest({ request, env }) {
       let cloudError = "";
       let cloudErrorDetail;
       const eventKey = event => event.clientKey || event.conferenceId || event.id || `${event.summary || event.title || ""}|${event.startTime || ""}`;
+      if (body.authCode) {
+        try {
+          userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+        } catch (error) {
+          aiMinutesError = `用户授权换取失败：${error.message || "未知错误"}`;
+          aiMinutesErrorDetail = error.detail;
+          userToken = null;
+        }
+      }
       try {
         const accessToken = await getDingAccessToken(env);
         cloudEvents = await queryDingCloudMinutesForEvents(accessToken, body);
@@ -34,9 +43,8 @@ export async function onRequest({ request, env }) {
       }
       let events = cloudEvents.length ? cloudEvents : body.events.map(event => ({ ...event, minuteState: event.minuteState || "empty" }));
       const unresolvedEvents = events.filter(event => event.minuteState === "empty");
-      if (unresolvedEvents.length && body.authCode) {
+      if (unresolvedEvents.length && userToken) {
         try {
-          userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
           const aiEvents = await queryDingAiMinutesForEvents(userToken.accessToken, {
             ...body,
             events: unresolvedEvents
