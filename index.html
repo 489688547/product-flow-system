@@ -1343,6 +1343,85 @@
       display: grid;
       gap: 8px;
     }
+    .settings-layout {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      align-items: start;
+    }
+    .settings-layout > .panel:last-child { grid-column: 1 / -1; }
+    .config-list { display: grid; gap: 10px; }
+    .config-row {
+      display: grid;
+      grid-template-columns: 28px 150px minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-2);
+    }
+    .config-index {
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: 7px;
+      background: var(--blue-soft);
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .config-field {
+      display: grid;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--muted);
+      min-width: 0;
+    }
+    .config-field input,
+    .config-field textarea {
+      border: 1px solid var(--control-border);
+      border-radius: 8px;
+      background: var(--control);
+      padding: 7px 9px;
+      font-size: 13px;
+      color: var(--ink);
+      width: 100%;
+      resize: vertical;
+    }
+    .config-field input:focus,
+    .config-field textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px var(--ring); outline: none; }
+    .config-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-2);
+    }
+    .config-card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .config-card-head strong { font-size: 14px; }
+    .config-levels {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px 14px;
+    }
+    .config-levels-label { font-size: 11px; color: var(--muted); }
+    .config-check {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
     .issue-summary {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2602,6 +2681,9 @@
       .setting-row { grid-template-columns: 1fr; align-items: start; }
       .permission-chips { justify-content: flex-start; max-width: none; }
       .role-grid { grid-template-columns: 1fr; }
+      .settings-layout { grid-template-columns: 1fr; }
+      .config-row { grid-template-columns: 28px 1fr; }
+      .config-row .config-field-goal { grid-column: 1 / -1; }
       .minutes-grid { grid-template-columns: 1fr; }
       .minutes-preview-card img { max-height: 320px; object-fit: contain; }
       .issue-summary { grid-template-columns: 1fr; }
@@ -2949,24 +3031,44 @@
       </section>
 
       <section class="screen" id="settings">
-        <div class="layout-main">
+        <div class="settings-layout">
           <section class="panel page-section">
             <div class="panel-head">
               <div>
-                <h2>系统设置</h2>
-                <p class="small">公司级规则、钉钉组织架构和流程默认配置，只对总经办开放。</p>
+                <h2>流程阶段</h2>
+                <p class="small">配置七个阶段的简称和目标，改动会应用到产品进度、总览和纪要标签。</p>
               </div>
-              <span class="badge blue">总经办</span>
+              <button class="btn ghost" id="resetConfigBtn" type="button"><i data-lucide="rotate-ccw"></i>恢复默认</button>
             </div>
-            <div class="settings-list" id="systemSettingsRows"></div>
+            <div class="config-list" id="stageConfigRows"></div>
           </section>
           <section class="panel page-section">
             <div class="panel-head">
               <div>
-                <h2>人员权限</h2>
-                <p class="small">按岗位查看能进入的页面和可编辑的数据范围。</p>
+                <h2>评审会议规则</h2>
+                <p class="small">配置每个评审会议的责任部门和适用的产品等级，等级决定哪些产品需要开这个会。</p>
               </div>
             </div>
+            <div class="config-list" id="meetingConfigRows"></div>
+          </section>
+          <section class="panel page-section">
+            <div class="panel-head">
+              <div>
+                <h2>生命周期决策路径</h2>
+                <p class="small">配置四条决策路径的执行动作和交付物，应用到生命周期看板。</p>
+              </div>
+            </div>
+            <div class="config-list" id="lifecycleConfigRows"></div>
+          </section>
+          <section class="panel page-section">
+            <div class="panel-head">
+              <div>
+                <h2>系统信息与人员权限</h2>
+                <p class="small">登录方式、组织架构状态，以及各岗位可进入的页面和可编辑范围。</p>
+              </div>
+              <span class="badge blue">总经办</span>
+            </div>
+            <div class="settings-list" id="systemSettingsRows"></div>
             <div class="settings-list" id="permissionRows"></div>
           </section>
         </div>
@@ -3112,11 +3214,10 @@
             <label class="field">钉钉文档链接
               <input id="minutesDocUrl" placeholder="粘贴 alidocs.dingtalk.com 文档链接">
             </label>
-            <label class="field">钉钉 AI 听记链接
-              <input id="minutesAiUrl" placeholder="粘贴 shanji.dingtalk.com 听记链接或 taskUuid">
-            </label>
             <div class="calendar-meeting-panel">
-              <button class="btn" id="importMinutesFromAi" type="button"><i data-lucide="sparkles"></i>从听记导入</button>
+              <button class="btn" id="loadCalendarMeetings" type="button"><i data-lucide="calendar-search"></i>从日历选择会议</button>
+              <div class="calendar-meeting-list hidden" id="calendarMeetingList"></div>
+              <button class="btn" id="importMinutesFromAi" type="button" disabled><i data-lucide="sparkles"></i>导入选中会议纪要</button>
               <button class="btn" id="importMinutesFromDoc" type="button"><i data-lucide="file-input"></i>从文档导入</button>
             </div>
             <label class="field section-gap">会议纪要文本
@@ -3435,6 +3536,41 @@
       }
     };
 
+    const PRODUCT_LEVELS = ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"];
+    // 记录出厂默认，用于「恢复默认」以及计算改动。
+    const CONFIG_DEFAULTS = {
+      stages: stages.map(stage => ({ short: stage.short, goal: stage.goal })),
+      meetings: meetingRules.map(rule => ({ owner: rule.owner, levels: [...rule.levels] })),
+      lifecycle: Object.fromEntries(Object.entries(lifecyclePaths).map(([key, path]) => [key, { action: path.action, deliverable: path.deliverable }]))
+    };
+    function applyConfigOverrides(config = {}) {
+      const stageCfg = config.stages || {};
+      Object.entries(stageCfg).forEach(([index, value]) => {
+        const stage = stages[Number(index)];
+        if (!stage || !value) return;
+        if (typeof value.short === "string" && value.short.trim()) stage.short = value.short.trim();
+        if (typeof value.goal === "string" && value.goal.trim()) stage.goal = value.goal.trim();
+      });
+      const meetingCfg = config.meetings || {};
+      Object.entries(meetingCfg).forEach(([id, value]) => {
+        const rule = meetingRules.find(item => item.id === id);
+        if (!rule || !value) return;
+        if (typeof value.owner === "string" && value.owner.trim()) rule.owner = value.owner.trim();
+        if (Array.isArray(value.levels)) rule.levels = value.levels.filter(level => PRODUCT_LEVELS.includes(level));
+      });
+      const lifecycleCfg = config.lifecycle || {};
+      Object.entries(lifecycleCfg).forEach(([key, value]) => {
+        const path = lifecyclePaths[key];
+        if (!path || !value) return;
+        if (typeof value.action === "string" && value.action.trim()) path.action = value.action.trim();
+        if (typeof value.deliverable === "string" && value.deliverable.trim()) path.deliverable = value.deliverable.trim();
+      });
+    }
+    function resetConfigToDefaults() {
+      CONFIG_DEFAULTS.stages.forEach((value, index) => { stages[index].short = value.short; stages[index].goal = value.goal; });
+      CONFIG_DEFAULTS.meetings.forEach((value, index) => { meetingRules[index].owner = value.owner; meetingRules[index].levels = [...value.levels]; });
+      Object.entries(CONFIG_DEFAULTS.lifecycle).forEach(([key, value]) => { lifecyclePaths[key].action = value.action; lifecyclePaths[key].deliverable = value.deliverable; });
+    }
     const defaultProducts = [
       { id: "p1", name: "鹦鹉谷物棒", level: "P1 常规新品", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, launch: "2026-08-15", sales: 0, score: 0, returnRate: 0, profit: 0, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。" },
       { id: "p2", name: "仓鼠冻干零食", level: "P0 重点品", owner: "叶津成", source: "运营", status: "维持观察", stage: 6, launch: "2026-06-01", sales: 5000, score: 4.6, returnRate: 0.08, profit: 0.32, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。" },
@@ -3450,6 +3586,8 @@
     const APP_VERSION = "2026-07-03-product-flow-v4";
     const defaultTodoWeek = currentWeekRange();
     let state = loadState();
+    if (!state.config || typeof state.config !== "object") state.config = {};
+    applyConfigOverrides(state.config);
     let currentId = state.currentId || state.products[0].id;
     let selectedStage = currentProduct()?.stage || 0;
     let demandStatusFilter = "all";
@@ -3474,6 +3612,9 @@
     let minutesProductId = "";
     let minutesMeetingId = "";
     let minutesRemotePosterUrl = "";
+    let minutesPosterTitleOverride = "";
+    let calendarMeetingOptions = [];
+    let selectedCalendarMeetingKey = "";
     let confirmResolve = null;
     let globalLoadingDepth = 0;
 
@@ -4423,9 +4564,9 @@
         actions: pickMinuteLines(fallback, ["行动", "待办", "负责", "提交", "补齐", "确认", "下周", "尽快"], 3, 5)
       };
     }
-    function generateMeetingMinutesPoster({ product, meeting, text }) {
+    function generateMeetingMinutesPoster({ product, meeting, text, titleOverride = "" }) {
       const summary = summarizeMeetingMinutes(text);
-      const title = `${product?.name || "产品"} · ${meeting?.title || "会议纪要"}`;
+      const title = titleOverride || `${product?.name || "产品"} · ${meeting?.title || "会议纪要"}`;
       const subtitle = `${product?.level || ""} / ${stages[meeting?.stage]?.name || ""} / ${meeting?.owner || ""}`.replace(/^ \/ /, "").replace(/\/ *$/, "").trim();
       const dateLabel = new Date().toLocaleDateString("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" });
       // 分区徽标：编号胶囊 + 标题，颜色区分主题。
@@ -5620,7 +5761,112 @@
       document.querySelectorAll("[data-issue-status]").forEach(select => select.addEventListener("change", () => updateIssueStatus(select.dataset.issueStatus, select.value)));
       document.querySelectorAll("[data-delete-issue]").forEach(button => button.addEventListener("click", () => deleteIssue(button.dataset.deleteIssue)));
     }
+    function updateConfig(mutate) {
+      if (!state.config || typeof state.config !== "object") state.config = {};
+      mutate(state.config);
+      saveState();
+    }
+    function renderStageConfig() {
+      const host = document.getElementById("stageConfigRows");
+      if (!host) return;
+      host.innerHTML = stages.map((stage, index) => `
+        <div class="config-row">
+          <span class="config-index">${index + 1}</span>
+          <label class="config-field config-field-short">简称<input value="${esc(stage.short)}" data-stage-field="short" data-stage-index="${index}" maxlength="12"></label>
+          <label class="config-field config-field-goal">阶段目标<input value="${esc(stage.goal)}" data-stage-field="goal" data-stage-index="${index}"></label>
+        </div>`).join("");
+      host.querySelectorAll("[data-stage-field]").forEach(input => input.addEventListener("change", () => {
+        const index = Number(input.dataset.stageIndex);
+        const field = input.dataset.stageField;
+        const value = input.value.trim();
+        if (!value) { input.value = stages[index][field]; return; }
+        stages[index][field] = value;
+        updateConfig(config => {
+          config.stages = config.stages || {};
+          config.stages[index] = { ...(config.stages[index] || {}), [field]: value };
+        });
+        renderAll();
+      }));
+    }
+    function renderMeetingConfig() {
+      const host = document.getElementById("meetingConfigRows");
+      if (!host) return;
+      host.innerHTML = meetingRules.map(rule => `
+        <div class="config-card">
+          <div class="config-card-head">
+            <strong>${esc(rule.title)}</strong>
+            <span class="badge">${esc(stages[rule.stage]?.short || "-")}</span>
+          </div>
+          <label class="config-field">责任部门<input value="${esc(rule.owner)}" data-meeting-field="owner" data-meeting-id="${esc(rule.id)}"></label>
+          <div class="config-levels" role="group" aria-label="适用产品等级">
+            <span class="config-levels-label">适用等级</span>
+            ${PRODUCT_LEVELS.map(level => `
+              <label class="config-check"><input type="checkbox" data-meeting-level="${esc(level)}" data-meeting-id="${esc(rule.id)}" ${rule.levels.includes(level) ? "checked" : ""}>${esc(level)}</label>`).join("")}
+          </div>
+        </div>`).join("");
+      host.querySelectorAll("[data-meeting-field]").forEach(input => input.addEventListener("change", () => {
+        const rule = meetingRules.find(item => item.id === input.dataset.meetingId);
+        const value = input.value.trim();
+        if (!rule || !value) { if (rule) input.value = rule.owner; return; }
+        rule.owner = value;
+        updateConfig(config => {
+          config.meetings = config.meetings || {};
+          config.meetings[rule.id] = { ...(config.meetings[rule.id] || {}), owner: value };
+        });
+        renderAll();
+      }));
+      host.querySelectorAll("[data-meeting-level]").forEach(box => box.addEventListener("change", () => {
+        const rule = meetingRules.find(item => item.id === box.dataset.meetingId);
+        if (!rule) return;
+        const level = box.dataset.meetingLevel;
+        let levels = box.checked ? [...new Set([...rule.levels, level])] : rule.levels.filter(item => item !== level);
+        if (!levels.length) { box.checked = true; toast("每个评审会议至少要适用一个产品等级。"); return; }
+        levels = PRODUCT_LEVELS.filter(item => levels.includes(item));
+        rule.levels = levels;
+        updateConfig(config => {
+          config.meetings = config.meetings || {};
+          config.meetings[rule.id] = { ...(config.meetings[rule.id] || {}), levels };
+        });
+        renderAll();
+      }));
+    }
+    function renderLifecycleConfig() {
+      const host = document.getElementById("lifecycleConfigRows");
+      if (!host) return;
+      host.innerHTML = Object.entries(lifecyclePaths).map(([key, path]) => `
+        <div class="config-card">
+          <div class="config-card-head"><strong>${esc(path.title)}</strong><span class="badge ${esc(path.cls)}">${esc(key)}</span></div>
+          <label class="config-field">执行动作<textarea rows="2" data-lifecycle-field="action" data-lifecycle-key="${esc(key)}">${esc(path.action)}</textarea></label>
+          <label class="config-field">交付物<input value="${esc(path.deliverable)}" data-lifecycle-field="deliverable" data-lifecycle-key="${esc(key)}"></label>
+        </div>`).join("");
+      host.querySelectorAll("[data-lifecycle-field]").forEach(input => input.addEventListener("change", () => {
+        const key = input.dataset.lifecycleKey;
+        const field = input.dataset.lifecycleField;
+        const value = input.value.trim();
+        if (!lifecyclePaths[key] || !value) { if (lifecyclePaths[key]) input.value = lifecyclePaths[key][field]; return; }
+        lifecyclePaths[key][field] = value;
+        updateConfig(config => {
+          config.lifecycle = config.lifecycle || {};
+          config.lifecycle[key] = { ...(config.lifecycle[key] || {}), [field]: value };
+        });
+        renderAll();
+      }));
+    }
     function renderSettings() {
+      renderStageConfig();
+      renderMeetingConfig();
+      renderLifecycleConfig();
+      const resetBtn = document.getElementById("resetConfigBtn");
+      if (resetBtn && !resetBtn.dataset.bound) {
+        resetBtn.dataset.bound = "1";
+        resetBtn.addEventListener("click", async () => {
+          if (!await requestConfirm({ title: "恢复默认配置", message: "会把流程阶段、评审会议和生命周期路径全部还原为系统默认。", confirmText: "恢复默认" })) return;
+          resetConfigToDefaults();
+          updateConfig(config => { delete config.stages; delete config.meetings; delete config.lifecycle; });
+          toast("已恢复默认流程与规则配置。");
+          renderAll();
+        });
+      }
       const systemRows = document.getElementById("systemSettingsRows");
       const permissionRows = document.getElementById("permissionRows");
       if (!systemRows || !permissionRows) return;
@@ -6004,10 +6250,11 @@
       const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
       const text = document.getElementById("minutesText")?.value || defaultMinuteContent({ name: meeting?.minute, stage: meeting?.stage, owner: meeting?.owner }, true);
       const preview = document.getElementById("minutesPosterPreview");
-      if (preview && product && meeting) preview.src = minutesRemotePosterUrl || generateMeetingMinutesPoster({ product, meeting, text });
+      if (preview && product && meeting) preview.src = minutesRemotePosterUrl || generateMeetingMinutesPoster({ product, meeting, text, titleOverride: minutesPosterTitleOverride });
     }
     function handleMinutesTextInput() {
       minutesRemotePosterUrl = "";
+      minutesPosterTitleOverride = "";
       updateMinutesPosterPreview();
     }
     function openMinutesModal(payload) {
@@ -6019,13 +6266,16 @@
       minutesProductId = product.id;
       minutesMeetingId = meeting.id;
       minutesRemotePosterUrl = "";
+      minutesPosterTitleOverride = "";
+      calendarMeetingOptions = [];
+      selectedCalendarMeetingKey = "";
       const existing = meetingMinute(product, meeting).doc;
       document.getElementById("minutesTargetTitle").textContent = meeting.title;
       document.getElementById("minutesTargetMeta").textContent = `${product.name} · ${stages[meeting.stage]?.short || "-"} · ${meeting.owner}`;
       document.getElementById("minutesDocUrl").value = "";
-      document.getElementById("minutesAiUrl").value = "";
       document.getElementById("minutesText").value = existing?.content || "";
-      setMinutesMessage("粘贴钉钉 AI 听记链接可同步原始纪要图；也可以导入钉钉文档或直接粘贴正文。");
+      renderCalendarMeetingList();
+      setMinutesMessage("从钉钉日历选择会议，系统会自动匹配 AI 听记和原始纪要图；也可以导入钉钉文档或直接粘贴正文。");
       updateMinutesPosterPreview();
       document.getElementById("minutesModal").classList.add("open");
       if (window.lucide) lucide.createIcons();
@@ -6035,6 +6285,9 @@
       minutesProductId = "";
       minutesMeetingId = "";
       minutesRemotePosterUrl = "";
+      minutesPosterTitleOverride = "";
+      calendarMeetingOptions = [];
+      selectedCalendarMeetingKey = "";
     }
     function upsertProductDeliverable(match, nextDoc) {
       const existing = state.deliverables.find(match);
@@ -6045,7 +6298,7 @@
       state.deliverables.unshift(nextDoc);
       return nextDoc;
     }
-    function createMeetingMinutesFromText({ productId, meetingId, text, source = "手动导入", posterUrl = "" } = {}) {
+    function createMeetingMinutesFromText({ productId, meetingId, text, source = "手动导入", posterUrl = "", titleOverride = "", sourceTitle = "" } = {}) {
       if (denyIfCannot("editReviews")) return null;
       const product = productById(productId);
       const meeting = meetingRules.find(rule => rule.id === meetingId);
@@ -6068,7 +6321,7 @@
         updated: "今天",
         content
       });
-      const finalPosterUrl = posterUrl || generateMeetingMinutesPoster({ product, meeting, text: content });
+      const finalPosterUrl = posterUrl || generateMeetingMinutesPoster({ product, meeting, text: content, titleOverride });
       upsertProductDeliverable(doc => doc.productId === product.id && doc.stage === meeting.stage && doc.name === `${meeting.title}重点纪要图`, {
         id: cryptoId(),
         productId: product.id,
@@ -6090,8 +6343,8 @@
       state.decisions.unshift({
         id: cryptoId(),
         productId: product.id,
-        title: `${meeting.title}纪要已归档`,
-        body: `已从${source}生成「${meeting.minute}」和重点纪要图，并写入产品资料包。`,
+        title: `${sourceTitle || meeting.title}纪要已归档`,
+        body: `已从${source}生成「${sourceTitle || meeting.minute}」和重点纪要图，并写入产品资料包。`,
         date: "今天"
       });
       currentId = product.id;
@@ -6129,10 +6382,20 @@
             if (renderMinutesPermissionError(payload)) return;
             throw new Error(formatDingSyncError(payload, "钉钉文档读取失败"));
           }
+          minutesRemotePosterUrl = payload.posterUrl || "";
+          minutesPosterTitleOverride = payload.title || "";
           document.getElementById("minutesText").value = payload.text;
           updateMinutesPosterPreview();
           setMinutesMessage(`已从钉钉文档「${payload.title || "会议纪要"}」导入正文，正在生成资料。`, "ok");
-          createMeetingMinutesFromText({ productId: product.id, meetingId: meeting.id, text: payload.text, source: "钉钉文档导入" });
+          createMeetingMinutesFromText({
+            productId: product.id,
+            meetingId: meeting.id,
+            text: payload.text,
+            source: "钉钉文档导入",
+            posterUrl: payload.posterUrl || "",
+            titleOverride: payload.title,
+            sourceTitle: payload.title
+          });
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉文档读取失败", "error");
@@ -6141,33 +6404,178 @@
         button.disabled = false;
       }
     }
+    function formatCalendarMeetingTime(value) {
+      if (!value) return "";
+      const date = new Date(Number(value) || value);
+      if (Number.isNaN(date.getTime())) return String(value);
+      return date.toLocaleString("zh-CN", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+    }
+    async function requestDingMinutesAuthCode() {
+      const env = detectDingTalkEnvironment();
+      if (!env.inDingTalk || !env.corpId) {
+        throw new Error("听记导入需要从钉钉工作台打开应用，才能取得当前账号授权。");
+      }
+      await waitForDingApi();
+      return requestDingAuthCode(env.corpId);
+    }
+    function calendarMeetingKey(item) {
+      return item.clientKey || item.aiMinutesTaskUuid || item.conferenceId || item.id || "";
+    }
+    function calendarMeetingStatus(item = {}) {
+      if (item.minuteText) return { label: "有纪要", className: "green" };
+      if (item.minuteState === "permission") return { label: "权限不足", className: "red" };
+      if (item.aiMinutesTaskUuid || item.minuteState === "found") return { label: "找到听记", className: "blue" };
+      return { label: "无纪要", className: "" };
+    }
+    function renderCalendarMeetingList() {
+      const list = document.getElementById("calendarMeetingList");
+      const importButton = document.getElementById("importMinutesFromAi");
+      if (!list || !importButton) return;
+      list.classList.toggle("hidden", !calendarMeetingOptions.length);
+      const selected = calendarMeetingOptions.find(item => calendarMeetingKey(item) === selectedCalendarMeetingKey);
+      importButton.disabled = !(selected?.minuteText || selected?.aiMinutesTaskUuid);
+      list.innerHTML = calendarMeetingOptions.map(item => {
+        const key = calendarMeetingKey(item);
+        const active = key && key === selectedCalendarMeetingKey;
+        const start = formatCalendarMeetingTime(item.startTime);
+        const end = formatCalendarMeetingTime(item.endTime);
+        const status = calendarMeetingStatus(item);
+        return `<button class="calendar-meeting-option ${active ? "active" : ""}" type="button" data-calendar-meeting-key="${escapeAttr(key)}">
+          <span class="calendar-meeting-main">
+            <strong>${esc(item.aiMinutesTitle || item.summary || item.title || "钉钉会议")}</strong>
+            <small>${esc([start && end ? `${start} - ${end}` : (start || end), item.location].filter(Boolean).join(" · ") || "钉钉日历会议")}</small>
+          </span>
+          <span class="calendar-meeting-meta">
+            <span class="badge ${status.className}">${status.label}</span>
+            <span class="badge ${active ? "blue" : ""}">${active ? "已选择" : "选择"}</span>
+          </span>
+        </button>`;
+      }).join("");
+      if (window.lucide) lucide.createIcons();
+    }
+    async function loadCalendarMeetings() {
+      const product = productById(minutesProductId);
+      const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
+      if (!product || !meeting) return;
+      const unionId = currentUser?.dingUser?.unionid || currentUser?.dingUser?.unionId || currentUser?.dingUnionId || "";
+      if (!unionId) {
+        setMinutesMessage("当前账号缺少 unionId，无法读取钉钉日历。请重新登录钉钉应用。", "error");
+        return;
+      }
+      const button = document.getElementById("loadCalendarMeetings");
+      button.disabled = true;
+      setMinutesMessage("正在读取钉钉日历会议...");
+      try {
+        await withGlobalLoading("正在读取钉钉日历会议", async () => {
+          const authCode = await requestDingMinutesAuthCode();
+          const now = new Date();
+          const timeMin = new Date(now.getTime() - 21 * 24 * 60 * 60 * 1000).toISOString();
+          const timeMax = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+          const calendarRes = await fetch(`${dingApiBase()}/api/dingtalk/calendar/events`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userUnionId: unionId,
+              timeMin,
+              timeMax,
+              maxResults: 50
+            })
+          });
+          const calendarPayload = await calendarRes.json().catch(() => ({}));
+          if (!calendarRes.ok || !calendarPayload.synced) {
+            throw new Error(formatDingSyncError(calendarPayload, "钉钉日历会议读取失败"));
+          }
+          const events = (Array.isArray(calendarPayload.events) ? calendarPayload.events : [])
+            .filter(event => event.summary || event.title || event.conferenceId)
+            .map((event, index) => ({ ...event, clientKey: event.id || event.conferenceId || `${event.startTime || "event"}-${index}` }));
+          if (!events.length) {
+            calendarMeetingOptions = [];
+            selectedCalendarMeetingKey = "";
+            renderCalendarMeetingList();
+            setMinutesMessage("当前时间范围没有可选择的钉钉日历会议。");
+            return;
+          }
+          const minutesRes = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              authCode,
+              events,
+              keyword: product.name,
+              maxResults: 80
+            })
+          });
+          const minutesPayload = await minutesRes.json().catch(() => ({}));
+          if (!minutesRes.ok || !minutesPayload.synced) {
+            if (renderMinutesPermissionError(minutesPayload)) return;
+            throw new Error(formatDingSyncError(minutesPayload, "钉钉会议纪要匹配失败"));
+          }
+          calendarMeetingOptions = Array.isArray(minutesPayload.events) ? minutesPayload.events : events;
+          const preferred = calendarMeetingOptions.find(item => item.minuteText || item.aiMinutesTaskUuid) || calendarMeetingOptions[0];
+          selectedCalendarMeetingKey = calendarMeetingKey(preferred);
+          renderCalendarMeetingList();
+          const readyCount = calendarMeetingOptions.filter(item => item.minuteText || item.aiMinutesTaskUuid).length;
+          setMinutesMessage(`已读取 ${calendarMeetingOptions.length} 个日历会议，${readyCount} 个可导入纪要。`, readyCount ? "ok" : "");
+        });
+      } catch (error) {
+        setMinutesMessage(error.message || "钉钉日历会议读取失败", "error");
+        toast(error.message || "钉钉日历会议读取失败");
+      } finally {
+        button.disabled = false;
+      }
+    }
+    function selectCalendarMeetingOption(key) {
+      const selected = calendarMeetingOptions.find(item => calendarMeetingKey(item) === key);
+      if (!selected) return;
+      selectedCalendarMeetingKey = calendarMeetingKey(selected);
+      renderCalendarMeetingList();
+      const status = calendarMeetingStatus(selected);
+      setMinutesMessage(`已选择「${selected.aiMinutesTitle || selected.summary || selected.title || "钉钉会议"}」，状态：${status.label}。`, selected.minuteText || selected.aiMinutesTaskUuid ? "ok" : "");
+    }
     async function importMinutesFromDingAi() {
       const product = productById(minutesProductId);
       const meeting = meetingRules.find(rule => rule.id === minutesMeetingId);
       if (!product || !meeting) return;
-      const aiMinutesTaskUuid = document.getElementById("minutesAiUrl").value.trim();
-      if (!aiMinutesTaskUuid) {
-        setMinutesMessage("请先粘贴钉钉 AI 听记链接或 taskUuid。", "error");
+      const selected = calendarMeetingOptions.find(item => calendarMeetingKey(item) === selectedCalendarMeetingKey);
+      if (!selected) {
+        setMinutesMessage("请先从钉钉日历列表选择一个会议。", "error");
+        return;
+      }
+      const selectedTitle = selected.aiMinutesTitle || selected.summary || selected.title || "钉钉会议";
+      if (!selected.minuteText && !selected.aiMinutesTaskUuid) {
+        setMinutesMessage(`「${selectedTitle}」还没有返回可导入的 AI 纪要。`, "error");
         return;
       }
       const button = document.getElementById("importMinutesFromAi");
       button.disabled = true;
-      setMinutesMessage("正在读取钉钉 AI 听记...");
+      setMinutesMessage("正在导入钉钉会议纪要...");
       try {
-        await withGlobalLoading("正在读取钉钉 AI 听记", async () => {
-          const env = detectDingTalkEnvironment();
-          if (!env.inDingTalk || !env.corpId) {
-            throw new Error("AI 听记导入需要从钉钉工作台打开应用，才能取得当前账号授权。");
+        await withGlobalLoading("正在导入钉钉会议纪要", async () => {
+          if (selected.minuteText) {
+            minutesRemotePosterUrl = selected.minutePosterUrl || "";
+            minutesPosterTitleOverride = selectedTitle;
+            document.getElementById("minutesText").value = selected.minuteText;
+            updateMinutesPosterPreview();
+            setMinutesMessage(selected.minutePosterUrl ? "已读取钉钉 AI 纪要正文和纪要图，正在写入资料包。" : "已读取钉钉 AI 纪要正文，未发现纪要图，正在生成本地重点图。", "ok");
+            createMeetingMinutesFromText({
+              productId: product.id,
+              meetingId: meeting.id,
+              text: selected.minuteText,
+              source: "钉钉日历会议导入",
+              posterUrl: selected.minutePosterUrl || "",
+              titleOverride: selectedTitle,
+              sourceTitle: selectedTitle
+            });
+            return;
           }
-          await waitForDingApi();
-          const authCode = await requestDingAuthCode(env.corpId);
+          const authCode = await requestDingMinutesAuthCode();
           const res = await fetch(`${dingApiBase()}/api/dingtalk/meeting/minutes`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               authCode,
               sourceType: "aiMinutes",
-              aiMinutesTaskUuid
+              aiMinutesTaskUuid: selected.aiMinutesTaskUuid
             })
           });
           const payload = await res.json().catch(() => ({}));
@@ -6176,6 +6584,7 @@
             throw new Error(formatDingSyncError(payload, "钉钉 AI 听记读取失败"));
           }
           minutesRemotePosterUrl = payload.posterUrl || "";
+          minutesPosterTitleOverride = selectedTitle;
           document.getElementById("minutesText").value = payload.text;
           updateMinutesPosterPreview();
           setMinutesMessage(payload.posterUrl ? "已读取钉钉 AI 听记正文和纪要图，正在写入资料包。" : "已读取钉钉 AI 听记正文，未发现纪要图，正在生成本地重点图。", "ok");
@@ -6184,7 +6593,9 @@
             meetingId: meeting.id,
             text: payload.text,
             source: "钉钉 AI 听记导入",
-            posterUrl: payload.posterUrl || ""
+            posterUrl: payload.posterUrl || "",
+            titleOverride: selectedTitle,
+            sourceTitle: selectedTitle
           });
         });
       } catch (error) {
@@ -7070,7 +7481,12 @@
     document.getElementById("closeMinutesModal").addEventListener("click", closeMinutesModal);
     document.getElementById("cancelMinutesModal").addEventListener("click", closeMinutesModal);
     document.getElementById("saveMinutesModal").addEventListener("click", saveMinutesModal);
+    document.getElementById("loadCalendarMeetings").addEventListener("click", loadCalendarMeetings);
     document.getElementById("importMinutesFromAi").addEventListener("click", importMinutesFromDingAi);
+    document.getElementById("calendarMeetingList").addEventListener("click", event => {
+      const option = event.target.closest("[data-calendar-meeting-key]");
+      if (option) selectCalendarMeetingOption(option.dataset.calendarMeetingKey);
+    });
     document.getElementById("importMinutesFromDoc").addEventListener("click", importMinutesFromDingDoc);
     document.getElementById("minutesText").addEventListener("input", handleMinutesTextInput);
     document.getElementById("closeConfirmDialog").addEventListener("click", () => closeConfirmDialog(false));

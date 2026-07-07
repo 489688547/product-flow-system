@@ -4,6 +4,7 @@ import {
   jsonResponse,
   optionsResponse,
   queryDingAiMinutesForEvents,
+  queryDingAiMinutesList,
   queryDingAiMinutesText,
   queryDingCloudMinutesForEvents,
   queryDingMeetingMinutesTextWithFallback
@@ -73,6 +74,19 @@ export async function onRequest({ request, env }) {
         aiMinutesError: aiMinutesError || undefined,
         aiMinutesErrorDetail: aiMinutesErrorDetail || undefined,
         events
+      });
+    }
+    if (body.authCode && body.sourceType === "aiMinutesList") {
+      const userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+      const result = await queryDingAiMinutesList(userToken.accessToken, {
+        keyword: body.keyword || "",
+        maxResults: body.maxResults || 30
+      });
+      return jsonResponse({
+        synced: true,
+        source: "aiMinutesList",
+        minutes: result.minutes,
+        raw: result.raw
       });
     }
     if (body.authCode && (body.sourceType === "aiMinutes" || body.aiMinutesTaskUuid)) {

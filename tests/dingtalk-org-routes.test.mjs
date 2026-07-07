@@ -187,3 +187,54 @@ test("meeting minutes route returns DingTalk AI minutes poster url", async () =>
     globalThis.fetch = originalFetch;
   }
 });
+
+test("meeting minutes route lists selectable DingTalk AI minutes", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options = {}) => {
+    if (String(url).includes("/v1.0/oauth2/userAccessToken")) {
+      return new Response(JSON.stringify({ accessToken: "user-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("mcp-gw.dingtalk.com")) {
+      const body = JSON.parse(options.body);
+      assert.equal(body.params.name, "list_by_keyword_and_time_range");
+      return new Response(JSON.stringify({
+        result: {
+          structuredContent: {
+            result: {
+              minutesDetails: [
+                {
+                  taskUuid: "task-ai-1",
+                  title: "产品全周期流程初版同步会",
+                  startTime: "2026-07-03T14:00:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      }), { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  try {
+    const response = await meetingMinutesRequest({
+      request: new Request("https://flow.example.com/api/dingtalk/meeting/minutes", {
+        method: "POST",
+        body: JSON.stringify({
+          authCode: "auth-code-1",
+          sourceType: "aiMinutesList",
+          maxResults: 20
+        })
+      }),
+      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.source, "aiMinutesList");
+    assert.equal(body.minutes[0].taskUuid, "task-ai-1");
+    assert.equal(body.minutes[0].title, "产品全周期流程初版同步会");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
