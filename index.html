@@ -4,7 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>产品全周期协同系统</title>
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet" />
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
   <script src="https://g.alicdn.com/dingding/dingtalk-jsapi/3.0.40/dingtalk.open.js"></script>
   <style>
     :root {
@@ -68,7 +70,7 @@
       overscroll-behavior-y: none;
       -webkit-tap-highlight-color: transparent;
     }
-    button, input, select, textarea { font: inherit; }
+    button, input, select, textarea, [contenteditable] { font: inherit; }
     button, a, select, input[type="checkbox"] { touch-action: manipulation; }
     button { cursor: pointer; transition: background-color .16s ease, border-color .16s ease, color .16s ease, box-shadow .16s ease, transform .12s ease; }
     button:active { transform: translateY(1px); }
@@ -908,13 +910,13 @@
       padding-bottom: 2px;
     }
     .stage {
-      min-height: 128px;
+      min-height: 142px;
       padding: 10px;
       border: 1px solid var(--line);
       border-radius: 10px;
       background: var(--panel-2);
       display: grid;
-      grid-template-rows: 24px 18px 38px 8px 18px;
+      grid-template-rows: 24px 18px 22px 36px 8px 18px;
       align-content: stretch;
       gap: 8px;
       position: relative;
@@ -932,6 +934,11 @@
     }
     .stage.done { background: #fff; color: var(--ink-soft); }
     .stage.locked { opacity: .58; }
+    .stage.skipped {
+      background: #f8fafc;
+      color: var(--muted);
+    }
+    .stage.skipped .progress-fill { background: var(--line-strong); }
     .stage-num {
       width: 24px;
       height: 24px;
@@ -952,6 +959,25 @@
       font-size: 13px;
       line-height: 1.28;
     }
+    .stage-mode {
+      width: fit-content;
+      max-width: 100%;
+      min-height: 20px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 7px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: var(--panel);
+      font-size: 11px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+    .stage-mode.blue { border-color: #bfdbfe; background: var(--blue-soft); color: var(--primary); }
+    .stage-mode.gold { border-color: #fed7aa; background: var(--gold-soft); color: var(--gold); }
+    .stage-mode.green { border-color: #bbf7d0; background: var(--green-soft); color: var(--green); }
+    .stage-mode.muted { border-color: var(--line); background: var(--panel-3); color: var(--muted); }
     .stage-meta {
       min-height: 38px;
       color: var(--muted);
@@ -1041,6 +1067,45 @@
     }
     .stage-editor-title strong { font-size: 14px; line-height: 1.3; font-weight: 750; }
     .stage-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .stage-flow-rule {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 10px 12px;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .stage-flow-rule strong {
+      color: var(--ink-soft);
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .stage-flow-rule > span:last-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stage-skip-note {
+      display: grid;
+      gap: 4px;
+      padding: 18px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 10px;
+      background: #fff;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .stage-skip-note strong {
+      color: var(--ink);
+      font-size: 14px;
+    }
     .level-decision {
       display: grid;
       grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.2fr) auto;
@@ -2245,7 +2310,7 @@
       height: 34px;
       border-radius: 7px;
     }
-    input, select, textarea {
+    input, select, textarea, .rich-editor {
       width: 100%;
       border: 1px solid var(--control-border);
       border-radius: 8px;
@@ -2268,8 +2333,116 @@
       background-size: 14px 14px;
     }
     textarea { resize: vertical; min-height: 86px; line-height: 1.45; }
-    input:hover, select:hover, textarea:hover { border-color: var(--line-strong); }
-    input:focus, select:focus, textarea:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px var(--ring); }
+    input:hover, select:hover, textarea:hover, .rich-editor:hover { border-color: var(--line-strong); }
+    input:focus, select:focus, textarea:focus, .rich-editor:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px var(--ring); }
+    .rich-field {
+      display: grid;
+      gap: 6px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .rich-editor {
+      min-height: 104px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .rich-editor.ql-container {
+      min-height: 116px;
+      padding: 0;
+      border-radius: 0 0 8px 8px;
+      border-color: var(--control-border);
+      font: inherit;
+      background: var(--control);
+    }
+    .rich-field .ql-toolbar.ql-snow {
+      border-color: var(--control-border);
+      border-radius: 8px 8px 0 0;
+      background: var(--panel-2);
+      padding: 6px 8px;
+    }
+    .rich-field .ql-toolbar.ql-snow + .ql-container.ql-snow {
+      border-top: 0;
+    }
+    .rich-field .ql-toolbar button {
+      min-height: 24px;
+      border-radius: 6px;
+    }
+    .rich-field .ql-toolbar button:hover,
+    .rich-field .ql-toolbar button.ql-active,
+    .rich-field .ql-toolbar .ql-picker-label:hover {
+      background: #eef4ff;
+      color: var(--primary);
+    }
+    .rich-field .ql-editor {
+      min-height: 116px;
+      max-height: 260px;
+      overflow: auto;
+      padding: 10px;
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .rich-field .ql-editor.ql-blank::before {
+      left: 10px;
+      right: 10px;
+      color: #64748b;
+      font-style: normal;
+      font-weight: 500;
+    }
+    .rich-editor.fallback.empty::before {
+      content: attr(data-placeholder);
+      color: #64748b;
+      font-weight: 500;
+      pointer-events: none;
+    }
+    .rich-editor p,
+    .rich-editor div,
+    .ql-editor p,
+    .ql-editor div,
+    .rich-content p,
+    .rich-content div {
+      margin: 0 0 6px;
+    }
+    .rich-editor ul,
+    .rich-editor ol,
+    .ql-editor ul,
+    .ql-editor ol,
+    .rich-content ul,
+    .rich-content ol {
+      margin: 4px 0 6px 18px;
+      padding: 0;
+    }
+    .rich-editor img,
+    .ql-editor img,
+    .rich-content img {
+      display: inline-block;
+      max-width: min(100%, 320px);
+      max-height: 180px;
+      margin: 6px 6px 2px 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      object-fit: contain;
+      background: #fff;
+      vertical-align: top;
+    }
+    .rich-content {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .rich-content.compact {
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .rich-content.compact img {
+      width: 34px;
+      height: 34px;
+      object-fit: cover;
+    }
     .owner-combobox {
       position: relative;
       min-width: 0;
@@ -3100,14 +3273,14 @@
               <div class="decision"><strong>1. 收集机会</strong><p class="small">一句话、链接、截图或用户反馈先进入池子。</p></div>
               <div class="decision"><strong>2. 讨论判断</strong><p class="small">补齐市场、用户、供应链和资源判断。</p></div>
               <div class="decision"><strong>3. 形成结论</strong><p class="small">明确是否继续推进和建议产品定级。</p></div>
-              <div class="decision"><strong>4. 转入开发</strong><p class="small">生成产品档案，进入立项阶段。</p></div>
+              <div class="decision"><strong>4. 进入立项</strong><p class="small">生成产品档案，进入立项。</p></div>
             </div>
           </section>
           <section class="panel">
             <div class="section-toolbar">
               <div class="section-title">
                 <h2>需求池列表</h2>
-                <p>用一张列表管理所有机会，可筛选、编辑、暂停、恢复或转入产品开发。</p>
+                <p>用一张列表管理所有机会，可筛选、编辑、暂停、恢复或进入立项。</p>
               </div>
               <button class="btn primary" id="addDemand"><i data-lucide="plus"></i>添加机会</button>
             </div>
@@ -3426,15 +3599,20 @@
           <label class="field">来源部门
             <select id="formSource"></select>
           </label>
-          <label class="field span-all"><span id="formDescLabel">机会描述</span><textarea id="formDesc" placeholder="看到什么市场机会、用户痛点、供应链可能性"></textarea></label>
-          <div class="field span-all demand-images-field" id="demandImagesField">
+          <div class="field span-all rich-field">
             <div class="field-row">
-              <span>机会图片</span>
-              <label class="mini-action"><i data-lucide="image-plus"></i>添加图片<input class="hidden" type="file" id="formDemandImages" accept="image/*" multiple></label>
+              <span id="formDescLabel">机会描述</span>
             </div>
-            <div class="demand-image-preview" id="demandImagePreview"></div>
+            <div class="rich-editor quill-editor" id="formDesc" data-placeholder="看到什么市场机会、用户痛点、供应链可能性"></div>
+            <input class="rich-editor-file hidden" type="file" data-rich-file="formDesc" accept="image/*" multiple>
           </div>
-          <label class="field span-all" id="discussionField">讨论摘要<textarea id="formDiscussion" placeholder="讨论后的判断、争议点、下一步结论"></textarea></label>
+          <div class="field span-all rich-field" id="discussionField">
+            <div class="field-row">
+              <span>讨论摘要</span>
+            </div>
+            <div class="rich-editor quill-editor" id="formDiscussion" data-placeholder="讨论后的判断、争议点、下一步结论"></div>
+            <input class="rich-editor-file hidden" type="file" data-rich-file="formDiscussion" accept="image/*" multiple>
+          </div>
         </div>
       </div>
       <div class="dialog-foot">
@@ -3571,7 +3749,7 @@
   <script>
     const DATA_MODEL = Object.freeze({
       Product: "核心对象。承载等级、阶段、状态、负责人、产品复盘数据和统一产品图片。",
-      Demand: "需求池机会。讨论完成并转入开发后，通过 productId 关联 Product。",
+      Demand: "需求池机会。讨论完成并进入立项后，通过 productId 关联 Product。",
       Task: "阶段任务。通过 productId 归属产品，通过 stage 归属 7 个流程阶段。",
       Deliverable: "资料包文件。通过 productId 归属产品，通过 stage 归属自然产生的流程节点。",
       Review: "评审会议。通过 productId 归属产品，实际通过状态由会议任务完成 + 会议纪要内容共同决定。",
@@ -3602,6 +3780,60 @@
       "P2 小改/补充品": "P2 验证级",
       "应季品": "P3 常规级"
     };
+    const PRODUCT_LEVEL_FLOW_RULES = Object.freeze({
+      "P0 战略级": {
+        usage: "走完整七阶段流程",
+        core: "完整 PRD、跨部门评审、标准样封样、测试验证、上市启动会和首周/首月/季度复盘。",
+        stages: [
+          { mode: "必跑", note: "头脑风暴必须召开，补齐 2-3 家比价。" },
+          { mode: "必跑", note: "正式评审会，完整 PRD。" },
+          { mode: "必跑", note: "高层全程参与，评审签字。" },
+          { mode: "必跑", note: "内部、外部和第三方检测。" },
+          { mode: "必跑", note: "上市启动会和终审会。" },
+          { mode: "每月复盘", note: "首周、首月和月度复盘。" },
+          { mode: "决策", note: "季度去留、升级、清仓或淘汰决策。" }
+        ]
+      },
+      "P1 增长级": {
+        usage: "保留完整主流程，但简化部分会议和资料深度",
+        core: "标准 PRD、关键样品确认、核心测试、上市对齐、首月及后续阶段复盘。",
+        stages: [
+          { mode: "建议", note: "头脑风暴建议召开，补齐 2-3 家比价。" },
+          { mode: "必跑", note: "正式评审会，完整 PRD。" },
+          { mode: "简化", note: "关键节点运营参与。" },
+          { mode: "简化", note: "内部和外部测试，第三方视情况。" },
+          { mode: "必跑", note: "上市启动会和终审会。" },
+          { mode: "两月复盘", note: "首月后每两个月复盘。" },
+          { mode: "决策", note: "根据复盘进入升级、维持或退出。" }
+        ]
+      },
+      "P2 验证级": {
+        usage: "重点走立项—验证—试销复盘",
+        core: "必须写清验证假设、投入上限、验证周期、通过标准和退出条件；验证完成即做去留决策。",
+        stages: [
+          { mode: "简化", note: "无头脑风暴，补齐 1 家询价。" },
+          { mode: "必跑", note: "简化评审，精简 PRD 和验证边界。" },
+          { mode: "产品判断", note: "产品部自行判断样品是否满足验证目标。" },
+          { mode: "轻验证", note: "仅内部 3-5 人验证。" },
+          { mode: "线上同步", note: "线上同步试销节奏和基础资料。" },
+          { mode: "季度复盘", note: "按验证周期做试销复盘。" },
+          { mode: "决策", note: "通过、继续验证、暂停或退出。" }
+        ]
+      },
+      "P3 常规级": {
+        usage: "走轻量化开发流程",
+        core: "简版需求单、基础样品核验、基础上架资料和 30 天简版复盘；控制库存和开发周期。",
+        stages: [
+          { mode: "轻量", note: "仅初筛判断。" },
+          { mode: "轻量", note: "一页概念和线上确认。" },
+          { mode: "不涉及", note: "不进入打样评审。" },
+          { mode: "不涉及", note: "不进入测试评审。" },
+          { mode: "不涉及", note: "不进入上市筹备会议。" },
+          { mode: "30天复盘", note: "30 天简版复盘，控制库存和周期。" },
+          { mode: "季度复盘", note: "季度经营复盘，判断维持或退出。" }
+        ]
+      }
+    });
     const ALL_LEVELS = [...PRODUCT_LEVELS];
     // 每条默认任务标注适用的产品定级（依据《产品定级规则》：P0 重资源和决策，P1 重增长，P2 重验证，P3 重低成本常规经营）。
     const taskRow = (category, title, owner, deliverable, levels = [...ALL_LEVELS]) => ({ category, title, owner, deliverable, levels });
@@ -3609,43 +3841,51 @@
       [
         taskRow("会前准备", "高层提出战略目标，产品部倒推产品矩阵与排期", "产品部", "产品矩阵建议 / 产品排期表", ["P0 战略级"]),
         taskRow("会前准备", "任何部门提交机会，一句话、链接、截图都可进入机会池", "全员", "机会记录"),
-        taskRow("会议/决策", "5-10 分钟初筛沟通，确认是否值得继续看", "产品 / 运营 / 高层", "初筛结论"),
+        taskRow("会前准备", "头脑风暴前补齐 2-3 家供应商比价和机会依据", "产品 / 供应链", "比价记录 / 机会依据", ["P0 战略级", "P1 增长级"]),
+        taskRow("会前准备", "不召开头脑风暴，补齐 1 家询价和验证假设", "产品 / 供应链", "询价记录 / 验证假设", ["P2 验证级"]),
+        taskRow("会前准备", "仅做初筛判断，确认是否进入常规开发", "产品部", "初筛结论", ["P3 常规级"]),
         taskRow("会议/决策", "机会头脑风暴会：运营、客服、品牌、供应链补充信息、碰撞想法", "产品 / 运营 / 客服 / 品牌 / 供应链", "头脑风暴纪要", ["P0 战略级", "P1 增长级"]),
-        taskRow("会后交付", "供应链摸底成本、周期和可做性（P0 比价 2-3 家，P3 常规级 1 家即可）", "供应链/采购", "供应链反馈"),
-        taskRow("准入条件", "形成《产品初步想法》，至少一方认为值得继续看", "产品部", "产品初步想法")
+        taskRow("准入条件", "形成《产品初步想法》，至少一方认为值得继续看", "产品部", "产品初步想法", ["P0 战略级", "P1 增长级", "P2 验证级"])
       ],
       [
-        taskRow("会前准备", "粗线条调研竞品、差评、供应链和内容卖点", "产品部", "调研笔记"),
-        taskRow("会前准备", "撰写 PRD 草案并提前 2 天发出（P3 可用精简版）", "产品部", "PRD 草案"),
-        taskRow("会议/决策", "立项评审会：产品讲 PRD，运营判断销售，高层拍板，并正式确认产品等级", "高层 / 产品 / 运营 / 品牌", "立项评审纪要"),
-        taskRow("会后交付", "明确产品等级、首批定量、资源分配和关键 deadline", "产品部", "决策记录"),
-        taskRow("准入条件", "PRD 终版冻结并通知相关方", "产品部", "PRD 终版")
+        taskRow("会前准备", "粗线条调研竞品、差评、供应链和内容卖点", "产品部", "调研笔记", ["P0 战略级", "P1 增长级", "P2 验证级"]),
+        taskRow("会前准备", "撰写 PRD 草案并提前 2 天发出", "产品部", "PRD 草案", ["P0 战略级", "P1 增长级"]),
+        taskRow("会前准备", "写清验证假设、投入上限、验证周期和退出条件", "产品部", "精简 PRD / 验证方案", ["P2 验证级"]),
+        taskRow("会前准备", "一页纸概念和线上确认记录即可进入常规开发", "产品部", "一页纸概念 / 线上确认", ["P3 常规级"]),
+        taskRow("会议/决策", "立项评审会：产品讲 PRD，运营判断销售，高层拍板，并正式确认产品等级", "高层 / 产品 / 运营 / 品牌", "立项评审纪要", ["P0 战略级", "P1 增长级", "P2 验证级"]),
+        taskRow("会后交付", "明确产品等级、首批定量、资源分配和关键 deadline", "产品部", "决策记录", ["P0 战略级", "P1 增长级", "P2 验证级"]),
+        taskRow("准入条件", "PRD 终版冻结并通知相关方", "产品部", "PRD 终版", ["P0 战略级", "P1 增长级"]),
+        taskRow("准入条件", "验证方案确认后进入小范围试做", "产品部", "验证准入记录", ["P2 验证级"])
       ],
       [
-        taskRow("会前准备", "整理打样需求，向工厂同步制造素材和测试素材需求", "产品 / 供应链", "打样需求单"),
-        taskRow("会议/决策", "样品内部评审，老板看感觉、运营看卖相、品牌看调性", "高层 / 运营 / 品牌 / 产品", "样品修改意见清单", ["P0 战略级", "P1 增长级", "P3 常规级"]),
-        taskRow("会前准备", "包装设计需求、初稿评审、终稿确认、包装实样确认", "产品 / 设计 / 品牌 / 运营", "包装设计修改意见", ["P0 战略级", "P1 增长级", "P3 常规级"]),
+        taskRow("会前准备", "整理打样需求，向工厂同步制造素材和测试素材需求", "产品 / 供应链", "打样需求单", ["P0 战略级", "P1 增长级"]),
+        taskRow("会前准备", "产品部自行判断样品是否满足验证目标", "产品部", "样品验证判断", ["P2 验证级"]),
+        taskRow("会议/决策", "样品内部评审，老板看感觉、运营看卖相、品牌看调性", "高层 / 运营 / 品牌 / 产品", "样品修改意见清单", ["P0 战略级", "P1 增长级"]),
+        taskRow("会前准备", "包装设计需求、初稿评审、终稿确认、包装实样确认", "产品 / 设计 / 品牌 / 运营", "包装设计修改意见", ["P0 战略级", "P1 增长级"]),
         taskRow("会议/决策", "标准样终审与封样，确认大货唯一标准", "高层 / 产品 / 运营 / 品牌", "标准样封样确认书", ["P0 战略级", "P1 增长级", "P2 验证级"]),
-        taskRow("准入条件", "品质规格书绑定标准样，必要时启动专利申请", "产品部", "产品品质规格书")
+        taskRow("准入条件", "品质规格书绑定标准样，必要时启动专利申请", "产品部", "产品品质规格书", ["P0 战略级", "P1 增长级", "P2 验证级"])
       ],
       [
-        taskRow("会前准备", "制定测试类型、数量、通过标准、周期和反馈方式", "产品部", "产品测试方案"),
-        taskRow("会前准备", "准备样品、内测反馈表，招募内部和外部体验用户（P3 仅做基础核验）", "产品 / 运营 / 客服", "样品分发记录"),
-        taskRow("会后交付", "回收反馈，记录真实使用素材和对比测评素材", "产品部", "内测反馈表"),
-        taskRow("会后交付", "汇总定量评分、好评点、问题点和结论", "产品部", "产品测试验证报告"),
-        taskRow("准入条件", "测试结果评审明确通过、修改后重测或终止（P3 产品部自行判断）", "高层 / 产品 / 运营 / 品牌", "测试结果评审纪要", ["P0 战略级", "P1 增长级", "P3 常规级"])
+        taskRow("会前准备", "制定测试类型、数量、通过标准、周期和反馈方式", "产品部", "产品测试方案", ["P0 战略级", "P1 增长级", "P2 验证级"]),
+        taskRow("会前准备", "准备样品、内测反馈表，招募内部和外部体验用户", "产品 / 运营 / 客服", "样品分发记录", ["P0 战略级", "P1 增长级"]),
+        taskRow("会后交付", "回收反馈，记录真实使用素材和对比测评素材", "产品部", "内测反馈表", ["P0 战略级", "P1 增长级"]),
+        taskRow("会后交付", "只做 3-5 人内部验证，记录是否通过标准和退出条件", "产品部", "内部验证记录", ["P2 验证级"]),
+        taskRow("会后交付", "汇总定量评分、好评点、问题点和结论", "产品部", "产品测试验证报告", ["P0 战略级", "P1 增长级", "P2 验证级"]),
+        taskRow("准入条件", "测试结果评审明确通过、修改后重测或终止", "高层 / 产品 / 运营 / 品牌", "测试结果评审纪要", ["P0 战略级", "P1 增长级"])
       ],
       [
-        taskRow("会前准备", "归档上市版资料包：PRD、品质规格书、测试报告、标准样资料", "产品部", "产品资料包"),
-        taskRow("会前准备", "大货到仓验收，对照标准样和品质规格书抽检", "供应链 / 产品", "大货验收记录"),
-        taskRow("会后交付", "实物分发给运营、设计、品牌、直播、客服并签收", "采购", "样品分发签收表"),
-        taskRow("会议/决策", "上市启动会统一上市日、各部门 deadline 和依赖关系（P3 可线上同步）", "产品部 / 全部门", "上市筹备任务清单", ["P0 战略级", "P1 增长级", "P3 常规级"]),
-        taskRow("准入条件", "各部门交付物按节点产出，上市日期无异议", "产品部", "上市时间轴")
+        taskRow("会前准备", "归档上市版资料包：PRD、品质规格书、测试报告、标准样资料", "产品部", "产品资料包", ["P0 战略级", "P1 增长级"]),
+        taskRow("会前准备", "大货到仓验收，对照标准样和品质规格书抽检", "供应链 / 产品", "大货验收记录", ["P0 战略级", "P1 增长级"]),
+        taskRow("会前准备", "线上同步试销节奏、基础上架资料和库存上限", "产品 / 运营 / 供应链", "试销同步记录", ["P2 验证级"]),
+        taskRow("会后交付", "实物分发给运营、设计、品牌、直播、客服并签收", "采购", "样品分发签收表", ["P0 战略级", "P1 增长级"]),
+        taskRow("会议/决策", "上市启动会统一上市日、各部门 deadline 和依赖关系", "产品部 / 全部门", "上市筹备任务清单", ["P0 战略级", "P1 增长级"]),
+        taskRow("准入条件", "各部门交付物按节点产出，上市日期无异议", "产品部", "上市时间轴", ["P0 战略级", "P1 增长级", "P2 验证级"])
       ],
       [
         taskRow("会前准备", "运营上架并启动内容和直播排期，客服启用 FAQ", "运营 / 客服", "上架链接 / FAQ"),
         taskRow("会后交付", "首周汇总销售、流量、转化和用户问题", "运营 / 客服", "首周数据速览", ["P0 战略级", "P1 增长级", "P3 常规级"]),
         taskRow("会议/决策", "首月深度复盘，判断推广问题、产品问题或市场变化", "产品 / 运营 / 客服 / 供应链", "首月复盘报告", ["P0 战略级", "P1 增长级"]),
+        taskRow("会后交付", "P2 验证复盘：对照验证假设、投入上限和退出条件做去留判断", "产品 / 运营", "验证复盘记录", ["P2 验证级"]),
         taskRow("会后交付", "P3 动态调整：监控日/周销量趋势和季节窗口，判断追加订货或停止补货", "运营 / 供应链", "补货申请 / 库存处理预案", ["P3 常规级"]),
         taskRow("会议/决策", "季度复盘，结合销量、评分、退货率、利润做去留判断", "高层 / 产品 / 运营", "季度产品决策记录"),
         taskRow("准入条件", "产品进入明确复盘状态", "产品部", "产品复盘状态")
@@ -3676,7 +3916,7 @@
       { id: "sample", title: "样品评审会", stage: 2, minute: "样品评审会议纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["样品内部评审", "样品评审"], levels: ["P0 战略级", "P1 增长级"] },
       { id: "standard", title: "标准样终审会", stage: 2, minute: "标准样封样确认书", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["标准样终审", "封样"], levels: ["P0 战略级", "P1 增长级", "P2 验证级"] },
       { id: "test", title: "测试结果评审会", stage: 3, minute: "测试结果评审纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["测试结果评审"], levels: ["P0 战略级", "P1 增长级"] },
-      { id: "launch", title: "上市启动会", stage: 4, minute: "上市启动会议纪要", owner: "产品 / 运营 / 品牌 / 供应链", keywords: ["上市启动会"], levels: ["P0 战略级", "P1 增长级", "P3 常规级"] },
+      { id: "launch", title: "上市启动会", stage: 4, minute: "上市启动会议纪要", owner: "产品 / 运营 / 品牌 / 供应链", keywords: ["上市启动会"], levels: ["P0 战略级", "P1 增长级", "P2 验证级"] },
       { id: "first-month", title: "首月深度复盘会", stage: 5, minute: "首月复盘报告", owner: "产品 / 运营 / 客服 / 供应链", keywords: ["首月深度复盘", "首月复盘"], levels: ["P0 战略级", "P1 增长级"] },
       { id: "quarter", title: "季度产品复盘会", stage: 5, minute: "季度产品决策记录", owner: "高层 / 产品 / 运营", keywords: ["季度复盘", "季度产品复盘"], levels: ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"] },
       { id: "product-review", title: "产品复盘决策会", stage: 6, minute: "产品复盘决策纪要", owner: "高层 / 产品 / 运营 / 供应链", keywords: ["确认升级方向", "制定清仓方案", "产品复盘"], levels: ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"] }
@@ -3708,10 +3948,12 @@
         summary: "正式确认是否做、怎么做、按什么产品等级投入资源。",
         levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "必须召开", "P3 常规级": "必须召开" },
         actions: [
-          { dept: "产品", text: "提交 PRD 草案、竞品和用户需求依据，并在会中正式确认产品等级。" },
-          { dept: "运营", text: "判断销售场景、内容表达、首批量和上线节奏。" },
-          { dept: "品牌", text: "确认命名、包装调性和品牌表达边界。" },
-          { dept: "高层", text: "拍板资源投入、首批定量、关键 deadline 和是否继续推进。" }
+          { dept: "产品", text: "提交 PRD 草案、竞品和用户需求依据，并在会中正式确认产品等级。", levels: ["P0 战略级", "P1 增长级"] },
+          { dept: "产品", text: "提交精简 PRD、验证假设、投入上限和退出条件。", levels: ["P2 验证级"] },
+          { dept: "产品", text: "提交一页纸概念、线上确认记录和常规开发判断。", levels: ["P3 常规级"] },
+          { dept: "运营", text: "判断销售场景、内容表达、首批量和上线节奏。", levels: ["P0 战略级", "P1 增长级", "P2 验证级"] },
+          { dept: "品牌", text: "确认命名、包装调性和品牌表达边界。", levels: ["P0 战略级", "P1 增长级"] },
+          { dept: "高层", text: "拍板资源投入、首批定量、关键 deadline 和是否继续推进。", levels: ["P0 战略级", "P1 增长级", "P2 验证级"] }
         ]
       },
       {
@@ -3721,7 +3963,7 @@
         minute: "标准样封样确认书",
         owner: "高层 / 产品 / 运营 / 品牌",
         summary: "把 PRD 转成可量产标准，确认样品、包装和大货唯一标准。",
-        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "必须召开", "P3 常规级": "简化确认" },
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "产品判断", "P3 常规级": "不涉及" },
         actions: [
           { dept: "产品", text: "整理打样需求、品质规格书和修改清单。" },
           { dept: "供应链", text: "确认工艺、成本、周期、可替代材料和大货稳定性。" },
@@ -3736,7 +3978,7 @@
         minute: "测试结果评审纪要",
         owner: "高层 / 产品 / 运营 / 品牌",
         summary: "基于测试反馈决定通过、修改后重测或终止。",
-        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "产品判断", "P3 常规级": "基础核验" },
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "产品判断", "P3 常规级": "不涉及" },
         actions: [
           { dept: "产品", text: "汇总评分、问题点、好评点和测试结论。" },
           { dept: "运营", text: "判断内容素材、卖点表达和上市风险。" },
@@ -3751,7 +3993,7 @@
         minute: "上市启动会议纪要",
         owner: "产品 / 运营 / 品牌 / 供应链",
         summary: "统一上市日、部门 deadline、资料包和依赖关系。",
-        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "线上同步", "P3 常规级": "线上同步" },
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "线上同步", "P3 常规级": "不涉及" },
         actions: [
           { dept: "产品", text: "检查 PRD、品质规格书、测试报告、标准样资料是否齐全。" },
           { dept: "供应链", text: "确认大货验收、入仓和样品分发签收。" },
@@ -3814,7 +4056,7 @@
     const permissionLabels = {
       addIdea: "新增机会",
       editDemand: "编辑需求",
-      convertDemand: "转开发",
+      convertDemand: "立项",
       editProduct: "编辑产品",
       deleteProduct: "删除产品",
       editTasks: "编辑任务",
@@ -4038,6 +4280,7 @@
     let confirmResolve = null;
     let globalLoadingDepth = 0;
     let demandImageValues = [];
+    const richEditors = {};
     let sharedStateReady = false;
     let sharedStateApplying = false;
     let sharedStateSaveTimer = null;
@@ -4392,7 +4635,7 @@
         owner: document.getElementById("formOwner")?.value.trim() || "",
         level: document.getElementById("formLevel")?.value || "",
         source: document.getElementById("formSource")?.value || "",
-        desc: document.getElementById("formDesc")?.value.trim() || ""
+        desc: getRichEditorHtml("formDesc")
       };
     }
     function missingModalFields() {
@@ -4702,6 +4945,32 @@
       const level = normalizeProductLevel(product?.level);
       return product?.levelConfirmed === false ? `${level}（待立项确认）` : level;
     }
+    function productLevelFlowRule(product) {
+      return PRODUCT_LEVEL_FLOW_RULES[normalizeProductLevel(product?.level)] || PRODUCT_LEVEL_FLOW_RULES["P1 增长级"];
+    }
+    function stageLevelPolicy(product, stageIndex) {
+      const rule = productLevelFlowRule(product);
+      return rule.stages[stageIndex] || { mode: "简化", note: rule.usage };
+    }
+    function stageAppliesToProduct(product, stageIndex) {
+      return stageLevelPolicy(product, stageIndex).mode !== "不涉及";
+    }
+    function stageLevelMode(product, stageIndex) {
+      return stageLevelPolicy(product, stageIndex).mode;
+    }
+    function nextApplicableStage(product, fromStage) {
+      for (let index = fromStage + 1; index < stages.length; index += 1) {
+        if (stageAppliesToProduct(product, index)) return index;
+      }
+      return fromStage;
+    }
+    function stageLevelModeClass(mode = "") {
+      if (mode.includes("不涉及")) return "muted";
+      if (mode.includes("必跑") || mode.includes("决策")) return "blue";
+      if (mode.includes("简化") || mode.includes("建议") || mode.includes("轻") || mode.includes("线上")) return "gold";
+      if (mode.includes("复盘")) return "green";
+      return "";
+    }
     function normalizeState(data) {
       data.products = (data.products || []).map(product => ({
         ...product,
@@ -4723,6 +4992,7 @@
         type: inferAssetType(`${doc.name || ""} ${doc.url || ""}`, doc.mimeType || doc.mime || "")
       })));
       data.tasks = normalizeStageTaskCategories(data.tasks || []);
+      data.tasks = ensureLevelTemplateTasks(data);
       data.tasks = ensureMeetingPreparationTasks(data);
       data.dingMeetings = Array.isArray(data.dingMeetings) ? data.dingMeetings : [];
       data.feedbackIssues = Array.isArray(data.feedbackIssues) ? data.feedbackIssues : [];
@@ -4801,6 +5071,190 @@
           url: String(image.url || "")
         }));
     }
+    function sanitizeRichHtml(raw = "") {
+      const template = document.createElement("template");
+      template.innerHTML = String(raw || "");
+      const allowedTags = new Set(["B", "STRONG", "I", "EM", "U", "BR", "P", "DIV", "UL", "OL", "LI", "IMG"]);
+      const cleanNode = node => {
+        [...node.childNodes].forEach(child => {
+          if (child.nodeType !== Node.ELEMENT_NODE) return;
+          const tag = child.tagName;
+          if (tag === "SCRIPT" || tag === "STYLE" || tag === "IFRAME") {
+            child.remove();
+            return;
+          }
+          if (!allowedTags.has(tag)) {
+            const fragment = document.createDocumentFragment();
+            while (child.firstChild) fragment.appendChild(child.firstChild);
+            child.replaceWith(fragment);
+            cleanNode(node);
+            return;
+          }
+          const imageSrc = tag === "IMG" ? (child.getAttribute("src") || child.src || "") : "";
+          [...child.attributes].forEach(attr => child.removeAttribute(attr.name));
+          if (tag === "IMG") {
+            const src = imageSrc;
+            if (!String(src).startsWith("data:image/")) {
+              child.remove();
+              return;
+            }
+            child.setAttribute("src", src);
+            child.setAttribute("alt", "插图");
+            child.setAttribute("loading", "lazy");
+            child.setAttribute("decoding", "async");
+          }
+          cleanNode(child);
+        });
+      };
+      cleanNode(template.content);
+      return template.innerHTML.trim();
+    }
+    function richTextPlain(value = "") {
+      const div = document.createElement("div");
+      div.innerHTML = sanitizeRichHtml(value);
+      return div.textContent.replace(/\s+/g, " ").trim();
+    }
+    function richTextHasImage(value = "") {
+      const div = document.createElement("div");
+      div.innerHTML = sanitizeRichHtml(value);
+      return !!div.querySelector("img");
+    }
+    function firstRichTextImage(value = "") {
+      const div = document.createElement("div");
+      div.innerHTML = sanitizeRichHtml(value);
+      return div.querySelector("img")?.getAttribute("src") || "";
+    }
+    function richTextHtml(value, fallback = "-") {
+      const safe = sanitizeRichHtml(value || "");
+      if (!richTextPlain(safe) && !richTextHasImage(safe)) return `<span class="small">${esc(fallback)}</span>`;
+      return `<div class="rich-content compact">${safe}</div>`;
+    }
+    function initializeRichTextEditors() {
+      document.querySelectorAll(".quill-editor").forEach(editor => initRichTextEditor(editor.id));
+    }
+    function initRichTextEditor(id) {
+      const editor = document.getElementById(id);
+      if (!editor || richEditors[id]) return richEditors[id] || null;
+      if (!window.Quill) {
+        editor.classList.add("fallback", "empty");
+        editor.contentEditable = "true";
+        editor.setAttribute("role", "textbox");
+        editor.setAttribute("aria-multiline", "true");
+        editor.addEventListener("input", () => {
+          updateRichEditorPlaceholder(id);
+          updateModalSaveState();
+        });
+        editor.addEventListener("paste", handleRichEditorPaste);
+        return null;
+      }
+      const placeholder = editor.dataset.placeholder || "";
+      richEditors[id] = new Quill(editor, {
+        theme: "snow",
+        placeholder,
+        modules: {
+          toolbar: [
+            ["bold", "italic", "underline"],
+            [{ list: "ordered" }, { list: "bullet" }],
+            ["link", "image"],
+            ["clean"]
+          ]
+        }
+      });
+      const toolbar = richEditors[id].getModule("toolbar");
+      toolbar.addHandler("image", () => selectRichTextImage(id));
+      richEditors[id].on("text-change", () => {
+        updateRichEditorPlaceholder(id);
+        updateModalSaveState();
+      });
+      updateRichEditorPlaceholder(id);
+      return richEditors[id];
+    }
+    function richEditorRoot(id) {
+      return richEditors[id]?.root || document.getElementById(id);
+    }
+    function updateRichEditorPlaceholder(id) {
+      const editor = richEditorRoot(id);
+      if (!editor) return;
+      const html = sanitizeRichHtml(editor.innerHTML);
+      const target = richEditors[id] ? document.getElementById(id) : editor;
+      target?.classList.toggle("empty", !richTextPlain(html) && !richTextHasImage(html));
+    }
+    function getRichEditorHtml(id) {
+      const editor = richEditorRoot(id);
+      if (!editor) return "";
+      const html = sanitizeRichHtml(editor.innerHTML);
+      if (!richTextPlain(html) && !richTextHasImage(html)) return "";
+      return html;
+    }
+    function setRichEditorHtml(id, html = "") {
+      const editor = richEditorRoot(id);
+      if (!editor) return;
+      const safe = sanitizeRichHtml(html || "");
+      if (richEditors[id]) {
+        richEditors[id].clipboard.dangerouslyPasteHTML(safe, "silent");
+      } else {
+        editor.innerHTML = safe;
+      }
+      updateRichEditorPlaceholder(id);
+    }
+    function selectRichTextImage(id) {
+      const input = document.querySelector(`.rich-editor-file[data-rich-file="${CSS.escape(id)}"]`);
+      if (!input) return;
+      input.click();
+    }
+    function insertRichEditorImage(id, image) {
+      const editor = richEditorRoot(id);
+      if (!editor || !image?.url) return;
+      if (richEditors[id]) {
+        const quill = richEditors[id];
+        const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
+        quill.insertEmbed(range.index, "image", image.url, "user");
+        quill.setSelection(range.index + 1, 0, "silent");
+      } else {
+        editor.focus();
+        document.execCommand("insertHTML", false, `<img src="${esc(image.url)}" alt="${esc(image.name || "插图")}">`);
+      }
+      updateRichEditorPlaceholder(id);
+      updateModalSaveState();
+    }
+    function addRichEditorImages(id, files = []) {
+      const editor = document.getElementById(id);
+      if (!editor) return;
+      const existing = editor.querySelectorAll("img").length;
+      const incoming = [...files].filter(Boolean);
+      const remaining = Math.max(0, 8 - existing);
+      if (!remaining) {
+        toast("单个富文本字段最多插入 8 张图片。");
+        return;
+      }
+      incoming.slice(0, remaining).forEach(file => {
+        if (!String(file.type || "").startsWith("image/")) {
+          toast(`已跳过「${file.name}」，请上传图片。`);
+          return;
+        }
+        if (Number(file.size || 0) > 2 * 1024 * 1024) {
+          toast(`「${file.name}」超过 2MB，未保存。`);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => insertRichEditorImage(id, { name: file.name || "插图", url: String(reader.result || "") });
+        reader.onerror = () => toast(`「${file.name}」读取失败，请重新选择。`);
+        reader.readAsDataURL(file);
+      });
+      if (incoming.length > remaining) toast("已达到 8 张上限，超出的图片未加入。");
+    }
+    function handleRichEditorPaste(event) {
+      const editor = event.target.closest(".rich-editor");
+      if (!editor) return;
+      event.preventDefault();
+      const clipboard = event.clipboardData || window.clipboardData;
+      const html = clipboard?.getData("text/html") || "";
+      const text = clipboard?.getData("text/plain") || "";
+      const safe = html ? sanitizeRichHtml(html) : esc(text).replace(/\n/g, "<br>");
+      document.execCommand("insertHTML", false, safe);
+      updateRichEditorPlaceholder(editor.id);
+      updateModalSaveState();
+    }
     function getDemandImageValues() {
       return normalizeDemandImages(demandImageValues);
     }
@@ -4857,7 +5311,7 @@
     }
     function buildInitialTasks(products) {
       return products.flatMap(product => [
-        ...stageTemplates.flatMap((rows, stageIndex) => rows.filter(isDefaultPreparationTask).filter(row => row.levels.includes(normalizeProductLevel(product.level))).map((row, idx) => ({
+        ...stageTemplates.flatMap((rows, stageIndex) => rows.filter(isDefaultPreparationTask).filter(row => row.levels.includes(normalizeProductLevel(product.level)) && stageAppliesToProduct(product, stageIndex)).map((row, idx) => ({
         id: cryptoId(),
         productId: product.id,
         stage: stageIndex,
@@ -4866,13 +5320,60 @@
         owner: row.owner,
         deliverable: row.deliverable,
         due: dueByStage(stageIndex, idx),
-        done: product.stage > stageIndex
+        done: product.stage > stageIndex,
+        systemDefault: true
         }))),
         ...buildMeetingPreparationTasks(product)
       ]);
     }
-    function meetingPreparationTaskKey(task) {
-      return [task.productId, task.stage, task.owner, task.title].join("|");
+    function taskSignature(task) {
+      return [Number(task.stage || 0), task.category || "", task.title || "", task.owner || "", task.deliverable || ""].join("|");
+    }
+    function taskKey(task) {
+      return [task.productId || "", taskSignature(task)].join("|");
+    }
+    function defaultTaskSignaturesForLevel(product, level) {
+      return new Set(buildInitialTasks([{ ...product, level }]).map(taskSignature));
+    }
+    function defaultTaskSignaturesForAnyLevel(product) {
+      const signatures = new Set();
+      PRODUCT_LEVELS.forEach(level => {
+        defaultTaskSignaturesForLevel(product, level).forEach(signature => signatures.add(signature));
+      });
+      return signatures;
+    }
+    function isGeneratedDefaultTask(product, task) {
+      return !!task.systemDefault || defaultTaskSignaturesForAnyLevel(product).has(taskSignature(task));
+    }
+    function syncProductDefaultTasks(data, product) {
+      const currentDefaults = buildInitialTasks([product]);
+      const currentDefaultSignatures = new Set(currentDefaults.map(taskSignature));
+      const seenCurrentDefaults = new Set();
+      data.tasks = (data.tasks || []).filter(task => {
+        if (task.productId !== product.id) return true;
+        const signature = taskSignature(task);
+        if (isGeneratedDefaultTask(product, task) && !currentDefaultSignatures.has(signature)) return false;
+        if (currentDefaultSignatures.has(signature)) {
+          if (seenCurrentDefaults.has(signature)) return false;
+          task.systemDefault = true;
+          seenCurrentDefaults.add(signature);
+        }
+        return true;
+      });
+      const existing = new Set(data.tasks.filter(task => task.productId === product.id).map(taskSignature));
+      currentDefaults.forEach(task => {
+        const signature = taskSignature(task);
+        if (existing.has(signature)) return;
+        data.tasks.push(task);
+        existing.add(signature);
+      });
+      return data.tasks;
+    }
+    function ensureLevelTemplateTasks(data) {
+      (data.products || []).forEach(product => {
+        syncProductDefaultTasks(data, product);
+      });
+      return data.tasks;
     }
     function buildMeetingPreparationTasks(product) {
       return stages.flatMap((_stage, stageIndex) => stageMeetingNodes(product, stageIndex).flatMap((node, nodeIndex) => meetingDepartmentActions(node, product).map((action, actionIndex) => ({
@@ -4884,14 +5385,15 @@
         owner: action.dept,
         deliverable: `${node.title}准备材料`,
         due: dueByStage(node.stage, 8 + nodeIndex * 6 + actionIndex),
-        done: product.stage > node.stage
+        done: product.stage > node.stage,
+        systemDefault: true
       }))));
     }
     function ensureMeetingPreparationTasks(data) {
-      const existing = new Set((data.tasks || []).map(meetingPreparationTaskKey));
+      const existing = new Set((data.tasks || []).map(taskKey));
       (data.products || []).forEach(product => {
         buildMeetingPreparationTasks(product).forEach(task => {
-          const key = meetingPreparationTaskKey(task);
+          const key = taskKey(task);
           if (existing.has(key)) return;
           data.tasks.push(task);
           existing.add(key);
@@ -5267,7 +5769,8 @@
       return productById(currentId) || state.products[0];
     }
     function productTasks(productId = currentId) {
-      return state.tasks.filter(t => t.productId === productId);
+      const product = productById(productId);
+      return state.tasks.filter(t => t.productId === productId && (!product || stageAppliesToProduct(product, t.stage)));
     }
     function productDeliverables(productId = currentId) {
       return state.deliverables.filter(d => d.productId === productId);
@@ -5318,7 +5821,7 @@
       const compact = options.compact ? " compact" : "";
       const thumb = options.compact ? "product-thumb small" : "product-thumb";
       const fallback = fallbackProductImage(product.name || "产品");
-      const secondary = meta || product.desc || "";
+      const secondary = meta || richTextPlain(product.desc || "");
       return `<div class="product-identity${compact}">
         <img class="${thumb}" src="${esc(productImage(product))}" alt="${esc(product.name)}" data-fallback="${esc(fallback)}" loading="lazy" decoding="async">
         <div class="product-name"><strong>${esc(product.name)}</strong>${secondary ? `<span class="small">${esc(secondary)}</span>` : ""}</div>
@@ -5368,7 +5871,7 @@
         : "来源机会：未关联需求池记录";
       document.getElementById("productDiscussionRecord").innerHTML = `
         <strong>需求讨论记录</strong>
-        <p>${esc(record.discussion)}</p>
+        ${richTextHtml(record.discussion, "暂无需求讨论记录。")}
         <p class="small">${esc(demandMeta)}</p>
       `;
     }
@@ -5413,14 +5916,14 @@
       return `<span class="sync-status ${ok ? "ok" : "error"}" title="${esc(record.error || record.assignees?.join("、") || "")}"><i data-lucide="${icon}"></i>${esc(text)}</span>`;
     }
     function requiredMeetings(product) {
-      return meetingRules.filter(rule => rule.levels.includes(normalizeProductLevel(product.level)));
+      return meetingRules.filter(rule => rule.levels.includes(normalizeProductLevel(product.level)) && stageAppliesToProduct(product, rule.stage));
     }
     function meetingRuleForNode(node) {
       return meetingRules.find(rule => rule.id === node.id) || node;
     }
     function stageMeetingNodes(product, stageIndex) {
       const level = normalizeProductLevel(product.level);
-      return meetingNodeRules.filter(node => node.stage === stageIndex && (node.levelMode?.[level] || "不涉及") !== "不涉及");
+      return meetingNodeRules.filter(node => stageAppliesToProduct(product, stageIndex) && node.stage === stageIndex && (node.levelMode?.[level] || "不涉及") !== "不涉及");
     }
     function meetingDepartmentActions(node, product) {
       const level = normalizeProductLevel(product.level);
@@ -5809,15 +6312,18 @@
     function renderStageMaps() {
       const p = currentProduct();
       const html = stages.map((s, i) => {
+        const policy = stageLevelPolicy(p, i);
+        const applies = stageAppliesToProduct(p, i);
         const cls = `${i < p.stage ? "done" : i === p.stage ? "current" : "locked"} ${i === selectedStage ? "selected" : ""}`;
         const stageTasks = productTasks(p.id).filter(t => t.stage === i);
         const done = stageTasks.filter(t => t.done).length;
-        return `<div class="stage ${cls}" data-stage="${i}">
+        return `<div class="stage ${cls} ${!applies ? "skipped" : ""}" data-stage="${i}">
           <div class="stage-num">${i + 1}</div>
           <div class="stage-title">${esc(s.short)}</div>
-          <div class="stage-meta">${esc(s.goal)}</div>
-          <div class="progress-track"><div class="progress-fill" style="width:${stageTasks.length ? done / stageTasks.length * 100 : 0}%"></div></div>
-          <div class="small">${done}/${stageTasks.length} 任务完成</div>
+          <span class="stage-mode ${esc(stageLevelModeClass(policy.mode))}">${esc(policy.mode)}</span>
+          <div class="stage-meta">${esc(policy.note || s.goal)}</div>
+          <div class="progress-track"><div class="progress-fill" style="width:${applies && stageTasks.length ? done / stageTasks.length * 100 : 0}%"></div></div>
+          <div class="small">${applies ? `${done}/${stageTasks.length} 任务完成` : "该等级不涉及"}</div>
         </div>`;
       }).join("");
       const stageMap = document.getElementById("stageMap");
@@ -5867,21 +6373,33 @@
       const p = currentProduct();
       const stage = stages[selectedStage];
       const tasks = productTasks(p.id).filter(t => t.stage === selectedStage);
+      const policy = stageLevelPolicy(p, selectedStage);
+      const applies = stageAppliesToProduct(p, selectedStage);
       const taskEditable = can("editTasks");
       const productReturnable = can("convertDemand") && can("deleteProduct");
       const disabled = taskEditable ? "" : "disabled";
       editor.innerHTML = `<div class="stage-editor-head">
         <div class="stage-editor-title">
           <strong>${selectedStage + 1}. ${esc(stage.name)}</strong>
-          <span class="small">${esc(stage.goal)}</span>
+          <span class="small">${esc(policy.note || stage.goal)}</span>
         </div>
         <div class="stage-editor-actions ${taskEditable || productReturnable ? "" : "hidden"}">
-          ${taskEditable ? `<button class="mini-action" id="setSelectedStage"><i data-lucide="flag"></i>${selectedStage === p.stage ? "当前阶段" : "设为当前阶段"}</button>
+          ${taskEditable && applies ? `<button class="mini-action" id="setSelectedStage"><i data-lucide="flag"></i>${selectedStage === p.stage ? "当前阶段" : "设为当前阶段"}</button>
           <button class="mini-action" id="addSelectedStageTask"><i data-lucide="list-plus"></i>加任务</button>` : ""}
           ${productReturnable ? `<button class="mini-action danger" data-return-product-demand="${esc(p.id)}"><i data-lucide="undo-2"></i>退回需求池</button>` : ""}
         </div>
       </div>
+      <div class="stage-flow-rule">
+        <span class="stage-mode ${esc(stageLevelModeClass(policy.mode))}">${esc(policy.mode)}</span>
+        <strong>${esc(productLevelFlowRule(p).usage)}</strong>
+        <span>${esc(productLevelFlowRule(p).core)}</span>
+      </div>
       ${levelDecisionHtml(p, taskEditable)}
+      ${!applies ? `<div class="stage-skip-note">
+        <strong>该等级不走这个阶段</strong>
+        <span>${esc(policy.note)} 后续统计、待办和阶段推进会自动跳过这里。</span>
+      </div>` : ""}
+      ${applies ? `
       ${stageMeetingNodesHtml(p, taskEditable)}
       <div class="task-edit-row task-edit-head">
         <span>类别</span><span>任务内容</span><span>责任部门</span><span>交付物</span><span>截止</span><span>操作</span>
@@ -5907,7 +6425,11 @@
         <input type="date" data-task-field="due" value="${esc(taskDueInputValue(t.due))}" ${disabled}>
         ${taskActions}
       </div>`;
-      }).join("") || emptyStateHtml("这个阶段还没有任务", taskEditable ? "点击右上角“加任务”，补充这个阶段需要推进的事项。" : "当前账号只读，暂无这个阶段的任务记录。", "list-plus")}`;
+      }).join("") || emptyStateHtml("这个阶段还没有任务", taskEditable ? "点击右上角“加任务”，补充这个阶段需要推进的事项。" : "当前账号只读，暂无这个阶段的任务记录。", "list-plus")}` : ""}`;
+      if (!stageAppliesToProduct(p, selectedStage)) {
+        if (window.lucide) lucide.createIcons();
+        return;
+      }
       document.querySelectorAll("[data-edit-task] [data-task-field]").forEach(input => {
         const eventName = input.type === "checkbox" || input.type === "date" || input.tagName === "SELECT" ? "change" : "input";
         input.addEventListener(eventName, () => updateStageTask(input.closest("[data-edit-task]").dataset.editTask, input.dataset.taskField, input.type === "checkbox" ? input.checked : input.value));
@@ -6123,15 +6645,19 @@
                 ${demandPoolStatuses.map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
               </select>`;
           const rowActions = [];
-          if (demandConvertible && d.status === "已讨论") rowActions.push(`<button class="mini-action demand-convert-action" title="转入开发" aria-label="转入开发" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i>转开发</button>`);
+          if (demandConvertible) {
+            const convertDisabled = d.status !== "已讨论";
+            const convertClass = `mini-action demand-convert-action${convertDisabled ? " disabled" : ""}`;
+            rowActions.push(`<button class="${convertClass}" title="${convertDisabled ? "讨论完成后才能立项" : "进入立项"}" aria-label="${convertDisabled ? "讨论完成后才能立项" : "进入立项"}" data-demand-convert="${esc(d.id)}" ${convertDisabled ? "disabled aria-disabled=\"true\"" : ""}><i data-lucide="git-branch-plus"></i>立项</button>`);
+          }
           if (product) rowActions.push(`<button class="mini-action icon-only" title="查看产品" aria-label="查看产品" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i></button>`);
           if (demandEditable) rowActions.push(`<button class="mini-action icon-only" title="编辑需求" aria-label="编辑需求" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i></button>`);
           if (demandEditable) rowActions.push(`<button class="mini-action icon-only danger" title="删除需求" aria-label="删除需求" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i></button>`);
           return `<tr>
-            <td><strong>${esc(d.name)}</strong><p class="small">${esc(d.desc)}</p>${demandImageStripHtml(d.images)}${product ? productIdentityHtml(product, "已生成产品档案", { compact: true }) : ""}</td>
+            <td><strong>${esc(d.name)}</strong>${richTextHtml(d.desc, "暂无机会描述")}${demandImageStripHtml(d.images)}${product ? productIdentityHtml(product, "已生成产品档案", { compact: true }) : ""}</td>
             <td>${statusCell}</td>
             <td>${esc(d.level)}</td>
-            <td><p class="small">${esc(d.discussion || "-")}</p></td>
+            <td>${richTextHtml(d.discussion, "-")}</td>
             <td>${esc(d.source)}</td>
             <td>${esc(d.owner)}</td>
             <td>${esc(d.created || "-")}</td>
@@ -6189,7 +6715,7 @@
           ${productEditable ? `<button class="mini-action icon-only" title="编辑产品" aria-label="编辑产品" data-edit-product="${esc(p.id)}"><i data-lucide="pencil"></i></button>` : ""}
           ${productDeletable ? `<button class="mini-action icon-only danger" title="删除产品" aria-label="删除产品" data-delete-product="${esc(p.id)}"><i data-lucide="trash-2"></i></button>` : ""}
         </div></div>
-      </div>`).join("") || emptyStateHtml("没有符合筛选条件的产品", "可以在表头切换状态、等级或阶段筛选；产品档案只能从需求池转入开发后生成。", "package");
+      </div>`).join("") || emptyStateHtml("没有符合筛选条件的产品", "可以在表头切换状态、等级或阶段筛选；产品档案只能从需求池进入立项后生成。", "package");
       syncProductFilterMenus();
       document.querySelectorAll("[data-product-filter-toggle]").forEach(trigger => {
         trigger.onclick = event => {
@@ -6563,7 +7089,7 @@
       const systemSettings = [
         ["登录方式", "钉钉免登，按组织架构和岗位自动匹配权限。", currentUser?.source === "dingtalk" ? "钉钉账号" : "本地测试"],
         ["组织架构", orgUserCount ? `已缓存 ${deptCount} 个部门、${orgUserCount} 位人员。` : "尚未拿到钉钉组织架构缓存。", orgUserCount ? "已同步" : "待同步"],
-        ["流程阶段", `产品进度使用 ${stages.length} 个阶段，需求池转开发后自动生成任务、资料和评审。`, `${stages.length} 阶段`],
+        ["流程阶段", `产品进度使用 ${stages.length} 个阶段，需求池进入立项后自动生成任务、资料和评审。`, `${stages.length} 阶段`],
         ["资料与会议", "资料包、评审纪要、会议决策和钉钉同步记录按产品复用。", "按产品关联"]
       ];
       systemRows.innerHTML = systemSettings.map(([title, desc, status]) => `
@@ -6918,10 +7444,10 @@
         toast(!ready.levelOk ? "立项阶段需要先在立项会上确认产品等级。" : "当前阶段还有任务、交付物或评审未完成，系统不建议推进。");
         return;
       }
-      if (p.stage < stages.length - 1) {
-        p.stage += 1;
-        if (p.stage === 4) p.status = "上市筹备";
-        if (p.stage === 6) p.status = "维持观察";
+      const nextStage = nextApplicableStage(p, p.stage);
+      if (nextStage > p.stage) {
+        p.stage = nextStage;
+        updateProductStatusByStage(p);
         toast(`已进入：${stages[p.stage].name}`);
       } else {
         toast("已经在产品复盘阶段。");
@@ -7732,7 +8258,7 @@
         if (demand.productId === id) {
           demand.productId = "";
           demand.status = "已讨论";
-          demand.discussion = "原产品档案已删除，可重新评估后再次转入开发。";
+          demand.discussion = "原产品档案已删除，可重新评估后再次进入立项。";
         }
       });
       currentId = state.products[0].id;
@@ -7803,6 +8329,11 @@
         renderAll();
         return;
       }
+      if (demand.status !== "已讨论") {
+        toast("需求讨论完成后才能进入立项。");
+        renderAll();
+        return;
+      }
       const product = {
         id: cryptoId(),
         name: demand.name,
@@ -7815,7 +8346,7 @@
         stage: 1,
         launch: "-",
         sales: 0, score: 0, returnRate: 0, profit: 0,
-        image: normalizeDemandImages(demand.images)[0]?.url || generateProductImage(demand.name),
+        image: firstRichTextImage(demand.desc) || normalizeDemandImages(demand.images)[0]?.url || generateProductImage(demand.name),
         desc: demand.desc,
       };
       state.products.unshift(product);
@@ -7825,16 +8356,16 @@
       state.decisions.unshift({
         id: cryptoId(),
         productId: product.id,
-        title: "需求池转入开发",
+        title: "需求池进入立项",
         body: `机会「${demand.name}」已讨论通过，进入产品立项阶段，产品等级需在立项评审会上正式确认。`,
         date: "今天"
       });
       demand.status = "已转开发";
       demand.productId = product.id;
-      demand.discussion = "已转开发：自动生成产品档案，当前进入产品立项阶段。";
+      demand.discussion = "已进入立项：自动生成产品档案，当前进入产品立项阶段。";
       currentId = product.id;
       selectedStage = product.stage;
-      toast("已生成产品档案，并进入产品立项阶段。");
+      toast("已生成产品档案，并进入立项。");
       renderAll();
     }
     function openModal(mode, id = "") {
@@ -7860,17 +8391,15 @@
       document.getElementById("ownerSearch").value = "";
       renderSourceOptions(target?.source || "");
       setOwnerPickerValue(target?.owner || "");
-      document.getElementById("formDesc").value = target?.desc || "";
-      document.getElementById("formDiscussion").value = target?.discussion || "";
+      setRichEditorHtml("formDesc", target?.desc || "");
+      setRichEditorHtml("formDiscussion", target?.discussion || "");
       const discussionField = document.getElementById("discussionField");
-      const demandImagesField = document.getElementById("demandImagesField");
       const productProfilePanel = document.getElementById("productProfilePanel");
       const imageField = document.getElementById("imageField");
       const imageInput = document.getElementById("formImage");
       const imagePreview = document.getElementById("formImagePreview");
       document.getElementById("formDescLabel").textContent = mode === "productEdit" ? "产品描述" : "机会描述";
       discussionField.classList.toggle("hidden", mode === "productEdit");
-      demandImagesField.classList.toggle("hidden", mode === "productEdit");
       productProfilePanel.classList.toggle("show", mode === "productEdit");
       imageField.classList.toggle("show", mode === "productEdit");
       if (mode === "productEdit") {
@@ -7879,7 +8408,6 @@
         setImagePreview(image, target?.name || "产品");
         renderProductProfilePanel(target);
       } else {
-        setDemandImageValues(target?.images || []);
         imageInput.value = "";
         imagePreview.onerror = null;
         imagePreview.removeAttribute("src");
@@ -7910,8 +8438,7 @@
         demand.owner = formValues.owner;
         demand.source = formValues.source;
         demand.desc = formValues.desc;
-        demand.images = getDemandImageValues();
-        demand.discussion = document.getElementById("formDiscussion").value.trim();
+        demand.discussion = getRichEditorHtml("formDiscussion");
         closeModal();
         toast("需求机会已更新。");
         renderAll();
@@ -7927,6 +8454,10 @@
         if (product.stage <= 1 && previousLevel !== product.level) {
           product.levelConfirmed = false;
           product.levelReason = "";
+        }
+        if (previousLevel !== product.level) {
+          syncProductDefaultTasks(state, product);
+          if (!stageAppliesToProduct(product, product.stage)) product.stage = nextApplicableStage(product, 1);
         }
         product.owner = formValues.owner;
         product.source = formValues.source;
@@ -7967,8 +8498,7 @@
             productId: "",
             created: "今天",
             desc: item.desc,
-            images: getDemandImageValues(),
-            discussion: document.getElementById("formDiscussion").value.trim() || "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品定级。"
+            discussion: getRichEditorHtml("formDiscussion") || "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品定级。"
           });
       closeModal();
       toast("机会已进入需求池。");
@@ -8062,6 +8592,10 @@
     function addTaskForSelectedStage() {
       if (denyIfCannot("editTasks")) return;
       const p = currentProduct();
+      if (!stageAppliesToProduct(p, selectedStage)) {
+        toast("该产品等级不走这个阶段，不能添加阶段任务。");
+        return;
+      }
       const task = {
         id: cryptoId(),
         productId: p.id,
@@ -8090,6 +8624,8 @@
       p.levelDecidedAt = "今天";
       const demand = sourceDemandForProduct(p);
       if (demand) demand.level = level;
+      syncProductDefaultTasks(state, p);
+      if (!stageAppliesToProduct(p, p.stage)) p.stage = nextApplicableStage(p, 1);
       state.decisions.unshift({
         id: cryptoId(),
         productId: p.id,
@@ -8120,6 +8656,10 @@
       if (denyIfCannot("editTasks")) return;
       const p = currentProduct();
       if (!p || selectedStage === p.stage) return;
+      if (!stageAppliesToProduct(p, selectedStage)) {
+        toast("该产品等级不走这个阶段，不能设为当前阶段。");
+        return;
+      }
       const movingBack = selectedStage < p.stage;
       const warning = movingBack
         ? "这会把后续阶段的任务完成状态清除，相关评审状态也会退回未开始；已经归档的资料和会议纪要会保留。"
@@ -8272,7 +8812,8 @@
     document.getElementById("closeModal").addEventListener("click", closeModal);
     document.getElementById("cancelModal").addEventListener("click", closeModal);
     document.getElementById("saveModal").addEventListener("click", saveModal);
-    ["formName", "formLevel", "formSource", "formDesc"].forEach(id => {
+    initializeRichTextEditors();
+    ["formName", "formLevel", "formSource"].forEach(id => {
       const field = document.getElementById(id);
       if (!field) return;
       const eventName = field.tagName === "SELECT" ? "change" : "input";
@@ -8297,15 +8838,11 @@
           renderOwnerOptions(event.target.value || "");
           if (window.lucide) lucide.createIcons();
         });
-        document.getElementById("formDemandImages").addEventListener("change", event => {
-          addDemandImageFiles(event.target.files || []);
-          event.target.value = "";
-        });
-        document.getElementById("demandImagePreview").addEventListener("click", event => {
-          const removeButton = event.target.closest("[data-remove-demand-image]");
-          if (!removeButton) return;
-          demandImageValues = getDemandImageValues().filter(image => image.id !== removeButton.dataset.removeDemandImage);
-          renderDemandImagePreview();
+        document.querySelectorAll(".rich-editor-file").forEach(input => {
+          input.addEventListener("change", event => {
+            addRichEditorImages(input.dataset.richFile || "", event.target.files || []);
+            event.target.value = "";
+          });
         });
         document.getElementById("closeSyncModal").addEventListener("click", closeSyncModal);
     document.getElementById("cancelSyncModal").addEventListener("click", closeSyncModal);

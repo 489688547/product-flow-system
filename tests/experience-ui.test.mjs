@@ -65,19 +65,35 @@ test("demand pool keeps status transitions in the status select and row actions 
   assert.doesNotMatch(html, /data-demand-resume/);
   assert.match(html, /\.demand-table \.table-actions \{[\s\S]*flex-wrap: nowrap;[\s\S]*justify-content: flex-end;/);
   assert.match(html, /\.demand-table th:last-child,\s+\.demand-table td:last-child \{[\s\S]*width: 168px;[\s\S]*text-align: right;/);
-  assert.match(html, /class="mini-action demand-convert-action" title="转入开发" aria-label="转入开发" data-demand-convert/);
-  assert.match(html, /data-lucide="git-branch-plus"><\/i>转开发/);
+  assert.match(html, /class="\$\{convertClass\}" title="\$\{convertDisabled \? "讨论完成后才能立项" : "进入立项"\}" aria-label="\$\{convertDisabled \? "讨论完成后才能立项" : "进入立项"\}" data-demand-convert="\$\{esc\(d\.id\)\}" \$\{convertDisabled \? "disabled aria-disabled=\\"true\\"" : ""\}/);
+  assert.match(html, /data-lucide="git-branch-plus"><\/i>立项/);
   assert.match(html, /class="mini-action icon-only" title="编辑需求" aria-label="编辑需求" data-edit-demand/);
   assert.match(html, /class="mini-action icon-only danger" title="删除需求" aria-label="删除需求" data-delete-demand/);
 });
 
-test("demand discussion summary is editable from the demand modal", () => {
+test("demand description and discussion summary use a reusable Quill rich text component", () => {
   assert.match(html, /id="discussionField"/);
-  assert.match(html, /<textarea id="formDiscussion" placeholder="讨论后的判断、争议点、下一步结论"><\/textarea>/);
+  assert.match(html, /quill@2\.0\.3\/dist\/quill\.snow\.css/);
+  assert.match(html, /quill@2\.0\.3\/dist\/quill\.js/);
+  assert.match(html, /class="rich-editor quill-editor" id="formDesc"/);
+  assert.match(html, /class="rich-editor quill-editor" id="formDiscussion"/);
+  assert.match(html, /class="rich-editor-file hidden" type="file" data-rich-file="formDesc" accept="image\/\*" multiple/);
+  assert.match(html, /class="rich-editor-file hidden" type="file" data-rich-file="formDiscussion" accept="image\/\*" multiple/);
+  assert.doesNotMatch(html, /id="demandImagesField"/);
+  assert.doesNotMatch(html, /id="formDemandImages"/);
+  assert.doesNotMatch(html, /formDescRichImages/);
+  assert.doesNotMatch(html, /formDiscussionRichImages/);
+  assert.match(html, /function initializeRichTextEditors\(\)/);
+  assert.match(html, /new Quill\(editor, \{/);
+  assert.match(html, /toolbar\.addHandler\("image", \(\) => selectRichTextImage\(id\)\);/);
+  assert.match(html, /function getRichEditorHtml\(id\)/);
+  assert.match(html, /function setRichEditorHtml\(id, html = ""\)/);
+  assert.match(html, /function addRichEditorImages\(id, files = \[\]\)/);
+  assert.match(html, /function richTextHtml\(value, fallback = "-"\)/);
   assert.match(html, /discussionField\.classList\.toggle\("hidden", mode === "productEdit"\)/);
-  assert.match(html, /document\.getElementById\("formDiscussion"\)\.value = target\?\.discussion \|\| "";/);
-  assert.match(html, /demand\.discussion = document\.getElementById\("formDiscussion"\)\.value\.trim\(\);/);
-  assert.match(html, /discussion: document\.getElementById\("formDiscussion"\)\.value\.trim\(\) \|\| "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品定级。"/);
+  assert.match(html, /setRichEditorHtml\("formDiscussion", target\?\.discussion \|\| ""\);/);
+  assert.match(html, /demand\.discussion = getRichEditorHtml\("formDiscussion"\);/);
+  assert.match(html, /discussion: getRichEditorHtml\("formDiscussion"\) \|\| "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品定级。"/);
 });
 
 test("demand modal uses organization-backed owner and department selectors", () => {
@@ -112,15 +128,14 @@ test("demand modal requires name owner level source and description before save"
   assert.doesNotMatch(html, /owner: document\.getElementById\("formOwner"\)\.value\.trim\(\) \|\| "产品部"/);
 });
 
-test("demand opportunity descriptions can include uploaded images", () => {
-  assert.match(html, /id="demandImagesField"/);
-  assert.match(html, /id="formDemandImages"/);
-  assert.match(html, /id="demandImagePreview"/);
-  assert.match(html, /function setDemandImageValues/);
-  assert.match(html, /function demandImageStripHtml/);
-  assert.match(html, /demand\.images = getDemandImageValues\(\)/);
-  assert.match(html, /images: getDemandImageValues\(\)/);
+test("standalone demand image uploads are replaced by rich text image embeds", () => {
+  assert.match(html, /data-rich-file="formDesc"/);
+  assert.match(html, /data-rich-file="formDiscussion"/);
+  assert.match(html, /function selectRichTextImage\(id\)/);
+  assert.match(html, /function addRichEditorImages\(id, files = \[\]\)/);
   assert.match(html, /reader\.readAsDataURL\(file\)/);
+  assert.doesNotMatch(html, /demand\.images = getDemandImageValues\(\)/);
+  assert.doesNotMatch(html, /images: getDemandImageValues\(\)/);
 });
 
 test("product archive edit modal reuses product data and shows demand discussion", () => {
@@ -229,6 +244,45 @@ test("workflow stages expose meeting nodes and move department actions into prep
   assert.match(html, /category: "会前准备",/);
 });
 
+test("workflow is simplified by product level rules instead of showing every stage as equal", () => {
+  assert.match(html, /const PRODUCT_LEVEL_FLOW_RULES = Object\.freeze\(\{/);
+  assert.match(html, /"P0 战略级": \{[\s\S]*usage: "走完整七阶段流程"/);
+  assert.match(html, /"P1 增长级": \{[\s\S]*usage: "保留完整主流程，但简化部分会议和资料深度"/);
+  assert.match(html, /"P2 验证级": \{[\s\S]*usage: "重点走立项—验证—试销复盘"/);
+  assert.match(html, /"P3 常规级": \{[\s\S]*usage: "走轻量化开发流程"/);
+  assert.match(html, /function stageLevelPolicy\(product, stageIndex\)/);
+  assert.match(html, /function stageAppliesToProduct\(product, stageIndex\)/);
+  assert.match(html, /function stageLevelMode\(product, stageIndex\)/);
+  assert.match(html, /class="stage-mode \$\{esc\(stageLevelModeClass\(policy\.mode\)\)\}"/);
+  assert.match(html, /class="stage \${cls} \${!applies \? "skipped" : ""}"/);
+  assert.match(html, /if \(!stageAppliesToProduct\(p, selectedStage\)\)/);
+  assert.match(html, /该等级不走这个阶段/);
+  assert.match(html, /\{ mode: "不涉及", note: "不进入打样评审。" \}/);
+});
+
+test("level-specific task templates follow the simplified grading table", () => {
+  assert.match(html, /taskRow\("会前准备", "头脑风暴前补齐 2-3 家供应商比价和机会依据"/);
+  assert.match(html, /taskRow\("会前准备", "不召开头脑风暴，补齐 1 家询价和验证假设"/);
+  assert.match(html, /taskRow\("会前准备", "写清验证假设、投入上限、验证周期和退出条件"/);
+  assert.match(html, /taskRow\("会前准备", "一页纸概念和线上确认记录即可进入常规开发"/);
+  assert.match(html, /taskRow\("会前准备", "产品部自行判断样品是否满足验证目标"/);
+  assert.match(html, /taskRow\("会后交付", "只做 3-5 人内部验证，记录是否通过标准和退出条件"/);
+  assert.doesNotMatch(html, /P3 常规级 1 家即可/);
+  assert.match(html, /row\.levels\.includes\(normalizeProductLevel\(product\.level\)\) && stageAppliesToProduct\(product, stageIndex\)/);
+});
+
+test("changing product level resyncs default workflow tasks without deleting custom tasks", () => {
+  assert.match(html, /function syncProductDefaultTasks\(data, product\)/);
+  assert.match(html, /function isGeneratedDefaultTask\(product, task\)/);
+  assert.match(html, /function defaultTaskSignaturesForAnyLevel\(product\)/);
+  assert.match(html, /const currentDefaultSignatures = new Set\(currentDefaults\.map\(taskSignature\)\);/);
+  assert.match(html, /if \(isGeneratedDefaultTask\(product, task\) && !currentDefaultSignatures\.has\(signature\)\) return false;/);
+  assert.match(html, /if \(seenCurrentDefaults\.has\(signature\)\) return false;/);
+  assert.match(html, /systemDefault: true/);
+  assert.match(html, /syncProductDefaultTasks\(state, product\);/);
+  assert.doesNotMatch(html, /state\.tasks = ensureLevelTemplateTasks\(state\);/);
+});
+
 test("workflow meeting nodes use a compact summary instead of heavy nested cards", () => {
   assert.match(html, /meeting-node-card meeting-node-compact/);
   assert.match(html, /class="meeting-node-line"/);
@@ -245,7 +299,7 @@ test("workflow default tasks are meeting preparation and meeting pass is based o
   assert.match(html, /category: defaultStageTaskCategory\(row\),/);
   assert.match(html, /function isDefaultPreparationTask\(row\)[\s\S]*return row\.category !== "会议\/决策";/);
   assert.match(html, /rows\.filter\(isDefaultPreparationTask\)/);
-  assert.match(html, /\.filter\(row => row\.levels\.includes\(normalizeProductLevel\(product\.level\)\)\)/);
+  assert.match(html, /\.filter\(row => row\.levels\.includes\(normalizeProductLevel\(product\.level\)\) && stageAppliesToProduct\(product, stageIndex\)\)/);
   assert.match(html, /const defaultMeetingTaskTitles = new Set/);
   assert.match(html, /\.filter\(task => !defaultMeetingTaskTitles\.has\(task\.title\)\)/);
   assert.match(html, /title: row\.title,/);

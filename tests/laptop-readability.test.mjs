@@ -73,7 +73,8 @@ test("workflow editor keeps task actions on one line at laptop widths", () => {
 });
 
 test("workflow stage cards align progress bars and use an inline product switcher", () => {
-  assert.match(html, /\.stage \{[\s\S]*grid-template-rows: 24px 18px 38px 8px 18px;/);
+  assert.match(html, /\.stage \{[\s\S]*grid-template-rows: 24px 18px 22px 36px 8px 18px;/);
+  assert.match(html, /\.stage-mode \{[\s\S]*font-size: 11px;[\s\S]*white-space: nowrap;/);
   assert.match(html, /\.stage-meta \{[\s\S]*min-height: 38px;[\s\S]*-webkit-line-clamp: 2;/);
   assert.doesNotMatch(html, /id="productSelect"/);
   assert.doesNotMatch(html, /每个阶段都拆成会前准备、会议\/决策、会后交付、下一阶段准入/);
