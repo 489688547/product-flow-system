@@ -28,6 +28,33 @@ DINGTALK_APP_SECRET=你的钉钉 AppSecret
 
 如果 Cloudflare 同时配置 Production 和 Preview 环境，两个环境都要设置，至少 Production 必须设置。
 
+## 公司共享数据库
+
+这个系统给全公司使用时，需求池、产品档案、任务、资料包、会议纪要、产品复盘、员工提交的问题反馈都必须走 Cloudflare D1 共享数据库；浏览器 `localStorage` 只作为本地缓存和数据库异常时的兜底。
+
+在 Cloudflare 控制台创建一个 D1 数据库，例如：
+
+```text
+product-flow-system
+```
+
+然后进入 Pages 项目：
+
+```text
+Settings -> Functions -> D1 database bindings
+```
+
+添加绑定：
+
+```text
+Variable name: PRODUCT_FLOW_DB
+D1 database: product-flow-system
+```
+
+Production 和 Preview 环境都建议绑定。没有这个绑定时，页面会提示“共享数据库未配置”，不同账号的数据不会同步。
+
+数据库表会由 `/api/state` 函数首次访问时自动创建，不需要手工执行 SQL。
+
 ## 钉钉接口权限
 
 在钉钉开发者后台的应用权限里，需要同时开通：

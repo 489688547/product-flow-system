@@ -263,6 +263,55 @@ test("meeting minutes route exchanges auth code before slow cloud recording chec
   }
 });
 
+test("meeting minutes route returns diagnostics when no calendar event can be matched to AI minutes", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options = {}) => {
+    if (String(url).includes("/gettoken")) {
+      return new Response(JSON.stringify({ errcode: 0, access_token: "app-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("/v1.0/oauth2/userAccessToken")) {
+      return new Response(JSON.stringify({ accessToken: "user-token-1" }), { status: 200 });
+    }
+    if (String(url).includes("/cloudRecords/getTexts")) {
+      return new Response(JSON.stringify({ code: "cloudRecordNotFound", message: "cloud record not found" }), { status: 404 });
+    }
+    if (String(url).includes("/scheduleConferences/")) {
+      return new Response(JSON.stringify({ conferenceList: [] }), { status: 200 });
+    }
+    if (String(url).includes("mcp-gw.dingtalk.com")) {
+      return new Response(JSON.stringify({ result: { structuredContent: { result: { minutesDetails: [] } } } }), { status: 200 });
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  };
+
+  try {
+    const response = await meetingMinutesRequest({
+      request: new Request("https://flow.example.com/api/dingtalk/meeting/minutes", {
+        method: "POST",
+        body: JSON.stringify({
+          authCode: "auth-code-1",
+          unionId: "union-1",
+          events: [
+            { conferenceId: "conf-1", summary: "星星水壶升级方案同步及执行节点确认会", startTime: "2026-07-02T15:00:00+08:00", endTime: "2026-07-02T16:00:00+08:00" }
+          ]
+        })
+      }),
+      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.diagnostics.requestedEvents, 1);
+    assert.equal(body.diagnostics.userTokenReady, true);
+    assert.equal(body.diagnostics.aiAttempted, true);
+    assert.equal(body.diagnostics.cloudReady, 0);
+    assert.equal(body.diagnostics.aiReady, 0);
+    assert.equal(body.diagnostics.unresolved, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("meeting minutes route returns DingTalk AI minutes poster url", async () => {
   const originalFetch = globalThis.fetch;
   const posterUrl = "https://ai-tingji-summary-visualization.oss-cn-hangzhou.aliyuncs.com/data/poster.png?Expires=1783000000";

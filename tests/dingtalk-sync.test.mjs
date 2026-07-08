@@ -671,3 +671,60 @@ test("queryDingAiMinutesForEvents checks created and shared minutes when all sco
   assert.equal(result[0].aiMinutesTaskUuid, "task-shared-1");
   assert.equal(result[0].minuteText, "确认执行节点。");
 });
+
+test("queryDingAiMinutesForEvents checks created and shared minutes when noLimit returns unrelated minutes", async () => {
+  const scopes = [];
+  const result = await queryDingAiMinutesForEvents("user-token-1", {
+    events: [
+      {
+        conferenceId: "conf-star",
+        summary: "星星水壶升级方案同步及执行节点确认会",
+        startTime: "2026-07-02T15:00:00+08:00",
+        endTime: "2026-07-02T16:00:00+08:00"
+      }
+    ]
+  }, async (url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.params.name === "list_by_keyword_and_time_range") {
+      scopes.push(body.params.arguments.belongingConditionId);
+      if (body.params.arguments.belongingConditionId === "created") {
+        return okJson({
+          result: {
+            content: {
+              result: {
+                itemList: [
+                  {
+                    taskUuid: "task-created-star",
+                    title: "星星水壶升级方案同步及执行节点确认会",
+                    startTime: "2026-07-02T14:52:17+08:00"
+                  }
+                ]
+              }
+            }
+          }
+        });
+      }
+      return okJson({
+        result: {
+          content: {
+            result: {
+              itemList: [
+                {
+                  taskUuid: "task-unrelated",
+                  title: "面试",
+                  startTime: "2026-07-06T15:30:00+08:00"
+                }
+              ]
+            }
+          }
+        }
+      });
+    }
+    return okJson({ result: { content: [{ type: "text", text: JSON.stringify({ summary: "确认升级方案节点。" }) }] } });
+  });
+
+  assert.deepEqual(scopes, ["noLimit", "noLimit", "created", "shared"]);
+  assert.equal(result[0].minuteState, "ready");
+  assert.equal(result[0].aiMinutesTaskUuid, "task-created-star");
+  assert.equal(result[0].minuteText, "确认升级方案节点。");
+});

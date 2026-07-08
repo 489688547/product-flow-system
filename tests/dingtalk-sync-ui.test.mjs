@@ -104,6 +104,15 @@ test("calendar minutes matching sends the current DingTalk unionId", () => {
   assert.match(loadCalendarMeetings, /body: JSON\.stringify\(\{\s*authCode,\s*unionId,/);
 });
 
+test("calendar minutes matching exposes backend diagnostics instead of only showing zero importable minutes", () => {
+  const loadCalendarMeetings = html.match(/async function loadCalendarMeetings[\s\S]*?function selectCalendarMeetingOption/)[0];
+  assert.match(html, /function formatMinutesDiagnostics\(/);
+  assert.match(loadCalendarMeetings, /formatMinutesDiagnostics\(minutesPayload\)/);
+  assert.match(loadCalendarMeetings, /minutesPayload\.diagnostics/);
+  assert.match(html, /AI 听记/);
+  assert.match(html, /云录制/);
+});
+
 test("DingTalk minutes import no longer asks users to provide meeting ids manually", () => {
   assert.doesNotMatch(html, /id="minutesRecordingId"/);
   assert.doesNotMatch(html, /id="syncMinutesFromDing"/);

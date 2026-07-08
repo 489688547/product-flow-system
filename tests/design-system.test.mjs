@@ -50,5 +50,9 @@ test("table row actions use compact non-wrapping button groups", () => {
   assert.match(html, /\.task-table \.table-actions \{[\s\S]*width: 100%;[\s\S]*justify-content: flex-end;[\s\S]*flex-wrap: nowrap;/);
   assert.match(html, /\.task-table \.mini-action \{[\s\S]*height: 30px;[\s\S]*white-space: nowrap;/);
   assert.match(html, /\.task-table \.mini-action\.icon-only \{[\s\S]*width: 30px;[\s\S]*min-width: 30px;/);
+  assert.match(html, /\.task-table tbody td \{[\s\S]*height: 52px;[\s\S]*vertical-align: middle;/);
+  assert.match(html, /\.task-table \.table-actions \{[\s\S]*min-height: 30px;/);
+  assert.match(html, /\.review-table \.review-action-group \{[\s\S]*padding: 0;[\s\S]*border: 0;[\s\S]*background: transparent;/);
   assert.match(design, /Table row actions: keep row actions inside a single `\.table-actions` group/);
+  assert.match(design, /Table row height:/);
 });

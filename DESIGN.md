@@ -38,7 +38,9 @@ No fluid type, no display fonts, no negative letter spacing.
 - Button states: secondary and utility actions stay neutral by default; hover uses the same light neutral surface and stronger border. Primary blue is reserved for the main commit action, and destructive red appears only on irreversible actions.
 - Inputs/selects: consistent height, focus ring, native affordance where possible.
 - Table header filters: keep filters inside the relevant table header as a 22px ghost icon next to the label. The label remains visually primary; the icon is neutral by default, uses a subtle surface on hover/expanded/active, and opens a fixed-position menu so it is never clipped by table scroll containers.
-- Table row actions: keep row actions inside a single `.table-actions` group. Icon-only actions are fixed 30px squares, text actions share the same 30px height, and action groups do not wrap inside data tables. If a row only needs edit/delete/convert/open, prefer icon-only buttons with clear `title` and `aria-label` instead of widening the action column for text labels.
+- Table row actions: keep row actions inside a single `.table-actions` group. Icon-only actions are fixed 30px squares, text actions share the same 30px height, and action groups do not wrap inside data tables. Use short text labels for ambiguous state-changing actions such as “转开发”; use icon-only buttons only for universally understood edit/delete/open actions with clear `title` and `aria-label`.
+- Table action columns: action columns shrink to the actual control group width and align controls to the right. Do not reserve a large fixed action column that leaves empty space before buttons; give spare width to description, task, document, or decision columns.
+- Table row height: data-table body cells use one shared 52px minimum row rhythm, vertical middle alignment, and unframed row action groups. A button should never be the reason one row becomes taller than neighboring rows.
 - Badges: semantic color with text, never color-only.
 - Metrics: clickable summary rows with icon, label, count and chevron.
 - Risk cards: compact list items, not oversized warning blocks.

@@ -23,10 +23,23 @@ export async function onRequest({ request, env }) {
       let cloudEvents = [];
       let cloudError = "";
       let cloudErrorDetail;
+      const diagnostics = {
+        requestedEvents: body.events.length,
+        userTokenReady: false,
+        cloudReady: 0,
+        cloudPermission: 0,
+        cloudEmpty: 0,
+        aiAttempted: false,
+        aiReady: 0,
+        aiFound: 0,
+        aiPermission: 0,
+        unresolved: body.events.length
+      };
       const eventKey = event => event.clientKey || event.conferenceId || event.id || `${event.summary || event.title || ""}|${event.startTime || ""}`;
       if (body.authCode) {
         try {
           userToken = await getDingUserAccessToken(env, { authCode: body.authCode });
+          diagnostics.userTokenReady = true;
         } catch (error) {
           aiMinutesError = `用户授权换取失败：${error.message || "未知错误"}`;
           aiMinutesErrorDetail = error.detail;
@@ -42,8 +55,12 @@ export async function onRequest({ request, env }) {
         cloudEvents = body.events.map(event => ({ ...event, minuteState: event.minuteState || "empty" }));
       }
       let events = cloudEvents.length ? cloudEvents : body.events.map(event => ({ ...event, minuteState: event.minuteState || "empty" }));
+      diagnostics.cloudReady = events.filter(event => event.minuteState === "ready").length;
+      diagnostics.cloudPermission = events.filter(event => event.minuteState === "permission").length;
+      diagnostics.cloudEmpty = events.filter(event => event.minuteState === "empty").length;
       const unresolvedEvents = events.filter(event => event.minuteState === "empty");
       if (unresolvedEvents.length && userToken) {
+        diagnostics.aiAttempted = true;
         try {
           const aiEvents = await queryDingAiMinutesForEvents(userToken.accessToken, {
             ...body,
@@ -59,10 +76,15 @@ export async function onRequest({ request, env }) {
           aiMinutesErrorDetail = error.detail;
         }
       }
+      diagnostics.aiReady = events.filter(event => event.aiMinutesTaskUuid && event.minuteState === "ready").length;
+      diagnostics.aiFound = events.filter(event => event.aiMinutesTaskUuid && event.minuteState === "found").length;
+      diagnostics.aiPermission = events.filter(event => event.minuteState === "permission").length;
+      diagnostics.unresolved = events.filter(event => !event.minuteText && !event.aiMinutesTaskUuid).length;
       return jsonResponse({
         synced: true,
         source: "cloudRecording",
         fallbackSource: body.authCode ? "aiMinutes" : undefined,
+        diagnostics,
         cloudError: cloudError || undefined,
         cloudErrorDetail: cloudErrorDetail || undefined,
         aiMinutesError: aiMinutesError || undefined,

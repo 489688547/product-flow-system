@@ -258,6 +258,20 @@
       font-size: 12px;
       font-weight: 700;
     }
+    .user-pill #switchUser {
+      min-height: 30px;
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border-color: var(--line);
+      background: var(--panel);
+      color: var(--ink-soft);
+    }
+    .user-pill #switchUser:hover {
+      border-color: var(--line-strong);
+      background: var(--panel-2);
+      color: var(--ink);
+    }
     .permission-note {
       color: var(--muted);
       font-size: 12px;
@@ -403,11 +417,14 @@
       border-color: #fca5a5;
       background: #fef2f2;
     }
+    .mini-action.demand-convert-action,
     .mini-action[data-demand-convert] {
+      min-width: 72px;
       border-color: var(--primary);
       background: var(--primary);
       color: var(--primary-ink);
     }
+    .mini-action.demand-convert-action:hover,
     .mini-action[data-demand-convert]:hover {
       border-color: var(--primary-hover);
       background: var(--primary-hover);
@@ -415,6 +432,7 @@
     }
     .task-table .table-actions {
       width: 100%;
+      min-height: 30px;
       justify-content: flex-end;
       flex-wrap: nowrap;
       gap: 6px;
@@ -582,7 +600,7 @@
     .product-list-head,
     .product-row.archive-row {
       display: grid;
-      grid-template-columns: minmax(360px, 1fr) 108px 68px 104px 506px;
+      grid-template-columns: minmax(360px, 1fr) 108px 68px 104px max-content;
       gap: 10px;
       align-items: center;
     }
@@ -965,9 +983,13 @@
     .task-table th, .task-table td {
       padding: 11px 12px;
       border-bottom: 1px solid var(--line);
-      vertical-align: top;
+      vertical-align: middle;
       text-align: left;
       line-height: 1.45;
+    }
+    .task-table tbody td {
+      height: 52px;
+      vertical-align: middle;
     }
     .task-table th {
       color: var(--muted);
@@ -1019,6 +1041,56 @@
     }
     .stage-editor-title strong { font-size: 14px; line-height: 1.3; font-weight: 750; }
     .stage-editor-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .level-decision {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(320px, 1.2fr) auto;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+    }
+    .level-decision.confirmed {
+      border-color: #bbf7d0;
+      background: var(--green-soft);
+    }
+    .level-decision-title {
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+    .level-decision-title strong {
+      font-size: 13px;
+      line-height: 1.35;
+      font-weight: 750;
+    }
+    .level-decision-fields {
+      display: grid;
+      grid-template-columns: 150px minmax(180px, 1fr);
+      gap: 8px;
+      min-width: 0;
+    }
+    .level-decision-fields select,
+    .level-decision-fields input {
+      width: 100%;
+      min-width: 0;
+      min-height: 32px;
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+    .level-confirm-action {
+      min-width: 96px;
+      border-color: var(--primary);
+      background: var(--primary);
+      color: var(--primary-ink);
+    }
+    .level-confirm-action:hover {
+      border-color: var(--primary-hover);
+      background: var(--primary-hover);
+      color: #fff;
+    }
     .task-edit-row {
       display: grid;
       grid-template-columns: 104px minmax(360px, 1.7fr) minmax(168px, .75fr) minmax(180px, .85fr) 142px 268px;
@@ -1485,10 +1557,13 @@
     #issues .task-table th:nth-child(2),
     #issues .task-table td:nth-child(2) { width: 108px; }
     #issues .task-table th:nth-child(7),
-    #issues .task-table td:nth-child(7) { width: 72px; }
+    #issues .task-table td:nth-child(7) {
+      width: 64px;
+      text-align: right;
+    }
     #issues .table-actions {
       width: auto;
-      justify-content: flex-start;
+      justify-content: flex-end;
     }
     .setting-row {
       min-height: 58px;
@@ -1553,12 +1628,12 @@
     .demand-col-source { width: 72px; }
     .demand-col-owner { width: 84px; }
     .demand-col-created { width: 96px; }
-    .demand-col-actions { width: 132px; }
+    .demand-col-actions { width: 168px; }
     .demand-table td { vertical-align: middle; }
     .demand-table th:last-child,
     .demand-table td:last-child {
-      width: 132px;
-      text-align: center;
+      width: 168px;
+      text-align: right;
     }
     .demand-table td:first-child strong {
       display: block;
@@ -1582,7 +1657,7 @@
     }
     .demand-table .table-actions {
       flex-wrap: nowrap;
-      justify-content: center;
+      justify-content: flex-end;
     }
     .demand-table .mini-action {
       white-space: nowrap;
@@ -1688,7 +1763,9 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      min-height: 30px;
     }
     .sync-status {
       display: inline-flex;
@@ -1746,16 +1823,19 @@
     .review-table th:nth-child(2),
     .review-table td:nth-child(2) { width: 92px; }
     .review-table th:nth-child(3),
-    .review-table td:nth-child(3) { width: 240px; }
+    .review-table td:nth-child(3) { width: 340px; }
     .review-table th:nth-child(4),
     .review-table td:nth-child(4) { width: 190px; }
     .review-table th:nth-child(5),
     .review-table td:nth-child(5) { width: 110px; }
     .review-table th:nth-child(6),
-    .review-table td:nth-child(6) { width: 284px; }
+    .review-table td:nth-child(6) {
+      width: 156px;
+      text-align: right;
+    }
     .review-table .table-actions {
       width: auto;
-      justify-content: flex-start;
+      justify-content: flex-end;
       align-items: center;
     }
     .review-table .review-action-group {
@@ -1763,6 +1843,10 @@
       align-items: center;
       gap: 6px;
       flex-wrap: nowrap;
+      white-space: nowrap;
+      padding: 0;
+      border: 0;
+      background: transparent;
     }
     .review-progress {
       display: flex;
@@ -1878,13 +1962,84 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      flex-wrap: wrap;
-      padding: 4px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: var(--panel-2);
+      flex-wrap: nowrap;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
     }
     .review-action-group:empty { display: none; }
+    .meeting-node-list {
+      display: grid;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+    .meeting-node-card {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      box-shadow: var(--shadow-panel);
+      overflow: hidden;
+    }
+    .meeting-node-card.meeting-node-compact {
+      background: #fff;
+    }
+    .meeting-node-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+    .meeting-node-title {
+      display: grid;
+      gap: 5px;
+      min-width: 0;
+    }
+    .meeting-node-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex-wrap: wrap;
+    }
+    .meeting-node-title strong {
+      font-size: 14px;
+      font-weight: 750;
+      line-height: 1.35;
+    }
+    .meeting-node-summary {
+      max-width: 52ch;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .meeting-node-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.3;
+    }
+    .meeting-node-meta span + span::before {
+      content: "/";
+      margin-right: 8px;
+      color: var(--line-strong);
+    }
+    .meeting-node-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      flex-wrap: wrap;
+      flex: 0 0 auto;
+    }
     .decision-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2012,6 +2167,84 @@
       gap: 10px;
     }
     label.field { display: grid; gap: 6px; font-size: 12px; color: var(--ink-soft); font-weight: 650; }
+    .field-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .demand-images-field {
+      display: grid;
+      gap: 8px;
+      color: var(--ink-soft);
+      font-size: 12px;
+      font-weight: 650;
+    }
+    .demand-image-preview,
+    .demand-image-strip {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .demand-image-preview {
+      min-height: 42px;
+      padding: 8px;
+      border: 1px dashed var(--line-strong);
+      border-radius: 10px;
+      background: var(--panel-2);
+    }
+    .demand-image-empty {
+      min-height: 28px;
+      display: inline-flex;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .demand-image-item {
+      position: relative;
+      width: 46px;
+      height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #fff;
+      flex: 0 0 auto;
+    }
+    .demand-image-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .demand-image-item button {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 18px;
+      height: 18px;
+      border: 0;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, .72);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+    .demand-image-item button i,
+    .demand-image-item button svg {
+      width: 12px;
+      height: 12px;
+    }
+    .demand-image-strip {
+      margin-top: 7px;
+      max-width: 240px;
+    }
+    .demand-image-strip .demand-image-item {
+      width: 34px;
+      height: 34px;
+      border-radius: 7px;
+    }
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--control-border);
@@ -2672,8 +2905,10 @@
         gap: 10px;
       }
       .demand-status-strip { grid-template-columns: repeat(6, minmax(84px, 1fr)); overflow-x: auto; }
+      .level-decision { grid-template-columns: 1fr; }
+      .level-decision-fields { grid-template-columns: 1fr; }
       .product-list-head,
-      .product-row.archive-row { grid-template-columns: minmax(320px, 1fr) 104px 64px 92px 486px; }
+      .product-row.archive-row { grid-template-columns: minmax(320px, 1fr) 104px 64px 92px max-content; }
       .product-action-menu .mini-action { min-width: 56px; }
     }
     @media (max-width: 1100px) {
@@ -2802,7 +3037,7 @@
         <button data-screen="products"><i data-lucide="package"></i><span>产品档案</span></button>
         <button data-screen="workflow"><i data-lucide="git-branch"></i><span>产品进度</span></button>
         <button data-screen="reviews"><i data-lucide="clipboard-check"></i><span>评审决策</span></button>
-        <button data-screen="lifecycle"><i data-lucide="activity"></i><span>生命周期</span></button>
+        <button data-screen="lifecycle"><i data-lucide="activity"></i><span>产品复盘</span></button>
         <button data-screen="issues"><i data-lucide="message-circle-warning"></i><span>BUG 优化</span></button>
         <button data-screen="settings"><i data-lucide="settings"></i><span>设置</span></button>
       </nav>
@@ -2864,7 +3099,7 @@
             <div class="decision-grid">
               <div class="decision"><strong>1. 收集机会</strong><p class="small">一句话、链接、截图或用户反馈先进入池子。</p></div>
               <div class="decision"><strong>2. 讨论判断</strong><p class="small">补齐市场、用户、供应链和资源判断。</p></div>
-              <div class="decision"><strong>3. 形成结论</strong><p class="small">明确是否继续推进和建议产品等级。</p></div>
+              <div class="decision"><strong>3. 形成结论</strong><p class="small">明确是否继续推进和建议产品定级。</p></div>
               <div class="decision"><strong>4. 转入开发</strong><p class="small">生成产品档案，进入立项阶段。</p></div>
             </div>
           </section>
@@ -2901,10 +3136,10 @@
                         </button>
                         <span class="table-filter-popover hidden" id="demandLevelFilterMenu" role="menu" aria-label="筛选需求等级">
                           <button type="button" data-demand-level-filter="all" role="menuitem">全部等级</button>
-                          <button type="button" data-demand-level-filter="P0 重点品" role="menuitem">P0 重点品</button>
-                          <button type="button" data-demand-level-filter="P1 常规新品" role="menuitem">P1 常规新品</button>
-                          <button type="button" data-demand-level-filter="P2 小改/补充品" role="menuitem">P2 小改/补充品</button>
-                          <button type="button" data-demand-level-filter="应季品" role="menuitem">应季品</button>
+                          <button type="button" data-demand-level-filter="P0 战略级" role="menuitem">P0 战略级</button>
+                          <button type="button" data-demand-level-filter="P1 增长级" role="menuitem">P1 增长级</button>
+                          <button type="button" data-demand-level-filter="P2 验证级" role="menuitem">P2 验证级</button>
+                          <button type="button" data-demand-level-filter="P3 常规级" role="menuitem">P3 常规级</button>
                         </span>
                       </span>
                     </th>
@@ -2953,10 +3188,10 @@
                 </button>
                 <span class="table-filter-popover hidden" id="productLevelFilterMenu" role="menu" aria-label="筛选产品等级">
                   <button type="button" data-product-filter="level" data-product-filter-value="all" role="menuitem">全部等级</button>
-                  <button type="button" data-product-filter="level" data-product-filter-value="P0 重点品" role="menuitem">P0 重点品</button>
-                  <button type="button" data-product-filter="level" data-product-filter-value="P1 常规新品" role="menuitem">P1 常规新品</button>
-                  <button type="button" data-product-filter="level" data-product-filter-value="P2 小改/补充品" role="menuitem">P2 小改/补充品</button>
-                  <button type="button" data-product-filter="level" data-product-filter-value="应季品" role="menuitem">应季品</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="P0 战略级" role="menuitem">P0 战略级</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="P1 增长级" role="menuitem">P1 增长级</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="P2 验证级" role="menuitem">P2 验证级</button>
+                  <button type="button" data-product-filter="level" data-product-filter-value="P3 常规级" role="menuitem">P3 常规级</button>
                 </span>
               </span>
               <span class="table-filter-head">
@@ -2972,7 +3207,7 @@
                   <button type="button" data-product-filter="stage" data-product-filter-value="3" role="menuitem">测试</button>
                   <button type="button" data-product-filter="stage" data-product-filter-value="4" role="menuitem">上市筹备</button>
                   <button type="button" data-product-filter="stage" data-product-filter-value="5" role="menuitem">上市复盘</button>
-                  <button type="button" data-product-filter="stage" data-product-filter-value="6" role="menuitem">生命周期</button>
+                  <button type="button" data-product-filter="stage" data-product-filter-value="6" role="menuitem">产品复盘</button>
                 </span>
               </span>
               <span>操作</span>
@@ -3025,8 +3260,8 @@
         <section class="panel">
           <div class="panel-head">
             <div>
-              <h2>生命周期决策标准</h2>
-              <p class="small">第六阶段复盘形成明确决策，第七阶段按路径执行，不让产品进入无人管理状态。</p>
+              <h2>产品复盘标准</h2>
+              <p class="small">第六、七阶段用于上市后复盘和去留决策，不让产品进入无人管理状态。</p>
             </div>
             <span class="badge violet">复盘规则</span>
           </div>
@@ -3041,7 +3276,7 @@
         <section class="panel section-gap">
           <div class="panel-head">
             <div>
-              <h2>产品生命周期列表</h2>
+              <h2>产品复盘列表</h2>
               <p class="small">先看产品是否已进入复盘，再看明确决策和下一步执行动作。</p>
             </div>
           </div>
@@ -3065,8 +3300,8 @@
             <section class="panel page-section">
               <div class="panel-head">
                 <div>
-                  <h2>生命周期决策路径</h2>
-                  <p class="small">配置四条决策路径的执行动作和交付物，应用到生命周期看板。</p>
+                  <h2>产品复盘决策路径</h2>
+                  <p class="small">配置四条决策路径的执行动作和交付物，应用到产品复盘看板。</p>
                 </div>
               </div>
               <div class="config-list" id="lifecycleConfigRows"></div>
@@ -3157,7 +3392,7 @@
               <div class="product-profile-title">
                 <div>
                   <strong id="productProfileTitle">产品资料</strong>
-                  <p class="small" id="productProfileSub">从需求池、产品进度、资料包和生命周期记录汇总。</p>
+                  <p class="small" id="productProfileSub">从需求池、产品进度、资料包和产品复盘记录汇总。</p>
                 </div>
                 <span class="badge blue" id="productProfileBadge">产品档案</span>
               </div>
@@ -3170,10 +3405,10 @@
           <label class="field">产品/机会名称<input id="formName" placeholder="例如：鹦鹉谷物棒升级版"></label>
           <label class="field">产品等级
             <select id="formLevel">
-              <option>P0 重点品</option>
-              <option>P1 常规新品</option>
-              <option>P2 小改/补充品</option>
-              <option>应季品</option>
+              <option>P0 战略级</option>
+              <option>P1 增长级</option>
+              <option>P2 验证级</option>
+              <option>P3 常规级</option>
             </select>
           </label>
           <label class="field">负责人
@@ -3192,6 +3427,13 @@
             <select id="formSource"></select>
           </label>
           <label class="field span-all"><span id="formDescLabel">机会描述</span><textarea id="formDesc" placeholder="看到什么市场机会、用户痛点、供应链可能性"></textarea></label>
+          <div class="field span-all demand-images-field" id="demandImagesField">
+            <div class="field-row">
+              <span>机会图片</span>
+              <label class="mini-action"><i data-lucide="image-plus"></i>添加图片<input class="hidden" type="file" id="formDemandImages" accept="image/*" multiple></label>
+            </div>
+            <div class="demand-image-preview" id="demandImagePreview"></div>
+          </div>
           <label class="field span-all" id="discussionField">讨论摘要<textarea id="formDiscussion" placeholder="讨论后的判断、争议点、下一步结论"></textarea></label>
         </div>
       </div>
@@ -3328,12 +3570,12 @@
 
   <script>
     const DATA_MODEL = Object.freeze({
-      Product: "核心对象。承载等级、阶段、状态、负责人、生命周期数据和统一产品图片。",
+      Product: "核心对象。承载等级、阶段、状态、负责人、产品复盘数据和统一产品图片。",
       Demand: "需求池机会。讨论完成并转入开发后，通过 productId 关联 Product。",
       Task: "阶段任务。通过 productId 归属产品，通过 stage 归属 7 个流程阶段。",
       Deliverable: "资料包文件。通过 productId 归属产品，通过 stage 归属自然产生的流程节点。",
       Review: "评审会议。通过 productId 归属产品，实际通过状态由会议任务完成 + 会议纪要内容共同决定。",
-      Decision: "会议或生命周期决策记录。通过 productId 回溯到产品。",
+      Decision: "会议或产品复盘决策记录。通过 productId 回溯到产品。",
       FeedbackIssue: "员工使用系统时提交的问题反馈。包含问题描述、截图、提交人和处理状态，只在总经办后台集中查看。"
     });
 
@@ -3344,66 +3586,79 @@
       { name: "测试验证", short: "测试", goal: "验证产品力、风险和内容素材" },
       { name: "上市筹备", short: "上市筹备", goal: "统一资料包、实物、时间表和交付物" },
       { name: "上市与复盘", short: "上市复盘", goal: "看首周、首月和季度表现" },
-      { name: "生命周期管理", short: "生命周期", goal: "升级、维持、清仓或淘汰" }
+      { name: "产品复盘与决策", short: "产品复盘", goal: "根据上市表现决定升级、维持、清仓或淘汰" }
     ];
+    const productReview = Object.freeze({
+      label: "产品复盘",
+      stageIndexes: [5, 6],
+      scope: "第六、七阶段"
+    });
 
     const TASK_CATEGORIES = ["会前准备", "会议/决策", "会后交付", "准入条件"];
-    const ALL_LEVELS = ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"];
-    // 每条默认任务标注适用的产品定级（依据《产品全周期流程表》：P0 走完整流程，P1 保留关键决策，P2 以验证为核心，应季品关注时间窗口）。
+    const PRODUCT_LEVELS = ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"];
+    const LEGACY_LEVEL_MAP = {
+      "P0 重点品": "P0 战略级",
+      "P1 常规新品": "P1 增长级",
+      "P2 小改/补充品": "P2 验证级",
+      "应季品": "P3 常规级"
+    };
+    const ALL_LEVELS = [...PRODUCT_LEVELS];
+    // 每条默认任务标注适用的产品定级（依据《产品定级规则》：P0 重资源和决策，P1 重增长，P2 重验证，P3 重低成本常规经营）。
     const taskRow = (category, title, owner, deliverable, levels = [...ALL_LEVELS]) => ({ category, title, owner, deliverable, levels });
     const stageTemplates = [
       [
-        taskRow("会前准备", "高层提出战略目标，产品部倒推产品矩阵与排期", "产品部", "产品矩阵建议 / 产品排期表", ["P0 重点品"]),
+        taskRow("会前准备", "高层提出战略目标，产品部倒推产品矩阵与排期", "产品部", "产品矩阵建议 / 产品排期表", ["P0 战略级"]),
         taskRow("会前准备", "任何部门提交机会，一句话、链接、截图都可进入机会池", "全员", "机会记录"),
         taskRow("会议/决策", "5-10 分钟初筛沟通，确认是否值得继续看", "产品 / 运营 / 高层", "初筛结论"),
-        taskRow("会议/决策", "机会头脑风暴会：运营、客服、品牌、供应链补充信息、碰撞想法", "产品 / 运营 / 客服 / 品牌 / 供应链", "头脑风暴纪要", ["P0 重点品", "P1 常规新品"]),
-        taskRow("会后交付", "供应链摸底成本、周期和可做性（P0 比价 2-3 家，小改品 1 家即可）", "供应链/采购", "供应链反馈"),
+        taskRow("会议/决策", "机会头脑风暴会：运营、客服、品牌、供应链补充信息、碰撞想法", "产品 / 运营 / 客服 / 品牌 / 供应链", "头脑风暴纪要", ["P0 战略级", "P1 增长级"]),
+        taskRow("会后交付", "供应链摸底成本、周期和可做性（P0 比价 2-3 家，P3 常规级 1 家即可）", "供应链/采购", "供应链反馈"),
         taskRow("准入条件", "形成《产品初步想法》，至少一方认为值得继续看", "产品部", "产品初步想法")
       ],
       [
         taskRow("会前准备", "粗线条调研竞品、差评、供应链和内容卖点", "产品部", "调研笔记"),
-        taskRow("会前准备", "撰写 PRD 草案并提前 2 天发出（小改/补充品可用精简版）", "产品部", "PRD 草案"),
-        taskRow("会议/决策", "立项评审会：产品讲 PRD，运营判断销售，高层拍板（小改品可线上确认）", "高层 / 产品 / 运营 / 品牌", "立项评审纪要"),
-        taskRow("会后交付", "明确产品等级、首批定量、资源分配和关键 deadline（应季品标注季节窗口）", "产品部", "决策记录"),
+        taskRow("会前准备", "撰写 PRD 草案并提前 2 天发出（P3 可用精简版）", "产品部", "PRD 草案"),
+        taskRow("会议/决策", "立项评审会：产品讲 PRD，运营判断销售，高层拍板，并正式确认产品等级", "高层 / 产品 / 运营 / 品牌", "立项评审纪要"),
+        taskRow("会后交付", "明确产品等级、首批定量、资源分配和关键 deadline", "产品部", "决策记录"),
         taskRow("准入条件", "PRD 终版冻结并通知相关方", "产品部", "PRD 终版")
       ],
       [
         taskRow("会前准备", "整理打样需求，向工厂同步制造素材和测试素材需求", "产品 / 供应链", "打样需求单"),
-        taskRow("会议/决策", "样品内部评审，老板看感觉、运营看卖相、品牌看调性", "高层 / 运营 / 品牌 / 产品", "样品修改意见清单", ["P0 重点品", "P1 常规新品", "应季品"]),
-        taskRow("会前准备", "包装设计需求、初稿评审、终稿确认、包装实样确认", "产品 / 设计 / 品牌 / 运营", "包装设计修改意见", ["P0 重点品", "P1 常规新品", "应季品"]),
-        taskRow("会议/决策", "标准样终审与封样，确认大货唯一标准", "高层 / 产品 / 运营 / 品牌", "标准样封样确认书", ["P0 重点品", "P1 常规新品", "P2 小改/补充品"]),
+        taskRow("会议/决策", "样品内部评审，老板看感觉、运营看卖相、品牌看调性", "高层 / 运营 / 品牌 / 产品", "样品修改意见清单", ["P0 战略级", "P1 增长级", "P3 常规级"]),
+        taskRow("会前准备", "包装设计需求、初稿评审、终稿确认、包装实样确认", "产品 / 设计 / 品牌 / 运营", "包装设计修改意见", ["P0 战略级", "P1 增长级", "P3 常规级"]),
+        taskRow("会议/决策", "标准样终审与封样，确认大货唯一标准", "高层 / 产品 / 运营 / 品牌", "标准样封样确认书", ["P0 战略级", "P1 增长级", "P2 验证级"]),
         taskRow("准入条件", "品质规格书绑定标准样，必要时启动专利申请", "产品部", "产品品质规格书")
       ],
       [
         taskRow("会前准备", "制定测试类型、数量、通过标准、周期和反馈方式", "产品部", "产品测试方案"),
-        taskRow("会前准备", "准备样品、内测反馈表，招募内部和外部体验用户（小改品仅内部试用）", "产品 / 运营 / 客服", "样品分发记录"),
+        taskRow("会前准备", "准备样品、内测反馈表，招募内部和外部体验用户（P3 仅做基础核验）", "产品 / 运营 / 客服", "样品分发记录"),
         taskRow("会后交付", "回收反馈，记录真实使用素材和对比测评素材", "产品部", "内测反馈表"),
         taskRow("会后交付", "汇总定量评分、好评点、问题点和结论", "产品部", "产品测试验证报告"),
-        taskRow("准入条件", "测试结果评审明确通过、修改后重测或终止（小改品产品部自行判断）", "高层 / 产品 / 运营 / 品牌", "测试结果评审纪要", ["P0 重点品", "P1 常规新品", "应季品"])
+        taskRow("准入条件", "测试结果评审明确通过、修改后重测或终止（P3 产品部自行判断）", "高层 / 产品 / 运营 / 品牌", "测试结果评审纪要", ["P0 战略级", "P1 增长级", "P3 常规级"])
       ],
       [
         taskRow("会前准备", "归档上市版资料包：PRD、品质规格书、测试报告、标准样资料", "产品部", "产品资料包"),
         taskRow("会前准备", "大货到仓验收，对照标准样和品质规格书抽检", "供应链 / 产品", "大货验收记录"),
         taskRow("会后交付", "实物分发给运营、设计、品牌、直播、客服并签收", "采购", "样品分发签收表"),
-        taskRow("会议/决策", "上市启动会统一上市日、各部门 deadline 和依赖关系（小改品线上同步即可）", "产品部 / 全部门", "上市筹备任务清单", ["P0 重点品", "P1 常规新品", "应季品"]),
+        taskRow("会议/决策", "上市启动会统一上市日、各部门 deadline 和依赖关系（P3 可线上同步）", "产品部 / 全部门", "上市筹备任务清单", ["P0 战略级", "P1 增长级", "P3 常规级"]),
         taskRow("准入条件", "各部门交付物按节点产出，上市日期无异议", "产品部", "上市时间轴")
       ],
       [
         taskRow("会前准备", "运营上架并启动内容和直播排期，客服启用 FAQ", "运营 / 客服", "上架链接 / FAQ"),
-        taskRow("会后交付", "首周汇总销售、流量、转化和用户问题", "运营 / 客服", "首周数据速览", ["P0 重点品", "P1 常规新品", "应季品"]),
-        taskRow("会议/决策", "首月深度复盘，判断推广问题、产品问题或市场变化", "产品 / 运营 / 客服 / 供应链", "首月复盘报告", ["P0 重点品", "P1 常规新品"]),
-        taskRow("会后交付", "应季品动态调整：监控日/周销量趋势和季节窗口，判断追加订货或停止补货", "运营 / 供应链", "应季品补货申请 / 过季库存处理预案", ["应季品"]),
+        taskRow("会后交付", "首周汇总销售、流量、转化和用户问题", "运营 / 客服", "首周数据速览", ["P0 战略级", "P1 增长级", "P3 常规级"]),
+        taskRow("会议/决策", "首月深度复盘，判断推广问题、产品问题或市场变化", "产品 / 运营 / 客服 / 供应链", "首月复盘报告", ["P0 战略级", "P1 增长级"]),
+        taskRow("会后交付", "P3 动态调整：监控日/周销量趋势和季节窗口，判断追加订货或停止补货", "运营 / 供应链", "补货申请 / 库存处理预案", ["P3 常规级"]),
         taskRow("会议/决策", "季度复盘，结合销量、评分、退货率、利润做去留判断", "高层 / 产品 / 运营", "季度产品决策记录"),
-        taskRow("准入条件", "产品进入明确生命周期状态", "产品部", "生命周期状态")
+        taskRow("准入条件", "产品进入明确复盘状态", "产品部", "产品复盘状态")
       ],
       [
         taskRow("会议/决策", "路径 A：确认升级方向，走简化或完整开发流程", "产品 / 运营 / 供应链", "产品升级方案"),
         taskRow("会后交付", "路径 B：维持运营，继续监控销量、评分、退货率、利润", "运营 / 产品", "季度数据追踪"),
         taskRow("会议/决策", "路径 C：制定清仓方案，确认价格、渠道、周期和底线", "产品 / 运营 / 供应链 / 财务", "产品清仓方案"),
         taskRow("会后交付", "路径 D：下架链接、处理库存、客服知识库更新", "运营 / 供应链 / 客服", "产品下架确认单"),
-        taskRow("准入条件", "归档全生命周期文档和淘汰原因", "产品部", "产品生命周期档案")
+        taskRow("准入条件", "归档全流程复盘文档和淘汰原因", "产品部", "产品复盘档案")
       ]
     ];
+    const defaultMeetingTaskTitles = new Set(stageTemplates.flatMap(rows => rows.filter(row => !isDefaultPreparationTask(row)).map(row => row.title)));
 
     const deliverableTemplates = [
       ["产品初步想法", 0, true], ["产品矩阵建议", 0, false], ["产品排期表", 0, false],
@@ -3412,19 +3667,128 @@
       ["产品测试方案", 3, true], ["产品内测反馈表", 3, false], ["产品测试验证报告", 3, true], ["测试结果评审纪要", 3, true],
       ["产品资料包", 4, true], ["产品样品分发签收表", 4, false], ["上市筹备任务清单", 4, true],
       ["首周数据速览", 5, false], ["首月复盘报告", 5, true], ["季度产品决策记录", 5, true],
-      ["产品升级方案", 6, false], ["产品清仓方案", 6, false], ["产品下架确认单", 6, false], ["产品生命周期档案", 6, true]
+      ["产品升级方案", 6, false], ["产品清仓方案", 6, false], ["产品下架确认单", 6, false], ["产品复盘档案", 6, true]
     ];
 
     const meetingRules = [
-      { id: "planning", title: "规划终审会", stage: 0, minute: "规划终审会议纪要", owner: "高层 / 产品", keywords: ["初筛", "规划终审", "战略目标"], levels: ["P0 重点品"] },
-      { id: "project", title: "立项评审会", stage: 1, minute: "立项评审会议纪要", owner: "高层 / 产品 / 运营", keywords: ["立项评审"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"] },
-      { id: "sample", title: "样品评审会", stage: 2, minute: "样品评审会议纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["样品内部评审", "样品评审"], levels: ["P0 重点品", "P1 常规新品"] },
-      { id: "standard", title: "标准样终审会", stage: 2, minute: "标准样封样确认书", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["标准样终审", "封样"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品"] },
-      { id: "test", title: "测试结果评审会", stage: 3, minute: "测试结果评审纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["测试结果评审"], levels: ["P0 重点品", "P1 常规新品"] },
-      { id: "launch", title: "上市启动会", stage: 4, minute: "上市启动会议纪要", owner: "产品 / 运营 / 品牌 / 供应链", keywords: ["上市启动会"], levels: ["P0 重点品", "P1 常规新品", "应季品"] },
-      { id: "first-month", title: "首月深度复盘会", stage: 5, minute: "首月复盘报告", owner: "产品 / 运营 / 客服 / 供应链", keywords: ["首月深度复盘", "首月复盘"], levels: ["P0 重点品", "P1 常规新品"] },
-      { id: "quarter", title: "季度产品复盘会", stage: 5, minute: "季度产品决策记录", owner: "高层 / 产品 / 运营", keywords: ["季度复盘", "季度产品复盘"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"] },
-      { id: "lifecycle", title: "生命周期决策会", stage: 6, minute: "生命周期决策纪要", owner: "高层 / 产品 / 运营 / 供应链", keywords: ["确认升级方向", "制定清仓方案", "生命周期"], levels: ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"] }
+      { id: "opportunity-brainstorm", title: "机会头脑风暴会", stage: 0, minute: "机会头脑风暴纪要", owner: "产品 / 运营 / 客服 / 品牌 / 供应链", keywords: ["机会头脑风暴", "头脑风暴"], levels: ["P0 战略级", "P1 增长级"] },
+      { id: "project", title: "立项评审会", stage: 1, minute: "立项评审会议纪要", owner: "高层 / 产品 / 运营", keywords: ["立项评审"], levels: ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"] },
+      { id: "sample", title: "样品评审会", stage: 2, minute: "样品评审会议纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["样品内部评审", "样品评审"], levels: ["P0 战略级", "P1 增长级"] },
+      { id: "standard", title: "标准样终审会", stage: 2, minute: "标准样封样确认书", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["标准样终审", "封样"], levels: ["P0 战略级", "P1 增长级", "P2 验证级"] },
+      { id: "test", title: "测试结果评审会", stage: 3, minute: "测试结果评审纪要", owner: "高层 / 产品 / 运营 / 品牌", keywords: ["测试结果评审"], levels: ["P0 战略级", "P1 增长级"] },
+      { id: "launch", title: "上市启动会", stage: 4, minute: "上市启动会议纪要", owner: "产品 / 运营 / 品牌 / 供应链", keywords: ["上市启动会"], levels: ["P0 战略级", "P1 增长级", "P3 常规级"] },
+      { id: "first-month", title: "首月深度复盘会", stage: 5, minute: "首月复盘报告", owner: "产品 / 运营 / 客服 / 供应链", keywords: ["首月深度复盘", "首月复盘"], levels: ["P0 战略级", "P1 增长级"] },
+      { id: "quarter", title: "季度产品复盘会", stage: 5, minute: "季度产品决策记录", owner: "高层 / 产品 / 运营", keywords: ["季度复盘", "季度产品复盘"], levels: ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"] },
+      { id: "product-review", title: "产品复盘决策会", stage: 6, minute: "产品复盘决策纪要", owner: "高层 / 产品 / 运营 / 供应链", keywords: ["确认升级方向", "制定清仓方案", "产品复盘"], levels: ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"] }
+    ];
+
+    const meetingNodeRules = [
+      {
+        id: "opportunity-brainstorm",
+        stage: 0,
+        title: "机会头脑风暴会",
+        minute: "机会头脑风暴纪要",
+        owner: "产品 / 运营 / 客服 / 品牌 / 供应链",
+        summary: "把模糊机会放到一张桌上判断，不同等级决定会议深度和参与部门。",
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "建议召开", "P2 验证级": "可选", "P3 常规级": "不涉及" },
+        actions: [
+          { dept: "产品", text: "提前 2 天说明讨论方向，整理机会背景、初筛判断和待确认问题。" },
+          { dept: "运营", text: "准备一线市场反馈、用户近期高频需求和渠道机会。" },
+          { dept: "客服", text: "准备用户高频痛点、投诉点和真实使用场景。" },
+          { dept: "品牌", text: "判断品牌调性、内容表达和品类扩展空间。" },
+          { dept: "供应链", text: "准备成本周期预估、材料工艺和供应可行性。" }
+        ]
+      },
+      {
+        id: "project",
+        stage: 1,
+        title: "立项评审会",
+        minute: "立项评审会议纪要",
+        owner: "高层 / 产品 / 运营 / 品牌",
+        summary: "正式确认是否做、怎么做、按什么产品等级投入资源。",
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "必须召开", "P3 常规级": "必须召开" },
+        actions: [
+          { dept: "产品", text: "提交 PRD 草案、竞品和用户需求依据，并在会中正式确认产品等级。" },
+          { dept: "运营", text: "判断销售场景、内容表达、首批量和上线节奏。" },
+          { dept: "品牌", text: "确认命名、包装调性和品牌表达边界。" },
+          { dept: "高层", text: "拍板资源投入、首批定量、关键 deadline 和是否继续推进。" }
+        ]
+      },
+      {
+        id: "standard",
+        stage: 2,
+        title: "样品与标准样评审",
+        minute: "标准样封样确认书",
+        owner: "高层 / 产品 / 运营 / 品牌",
+        summary: "把 PRD 转成可量产标准，确认样品、包装和大货唯一标准。",
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "必须召开", "P3 常规级": "简化确认" },
+        actions: [
+          { dept: "产品", text: "整理打样需求、品质规格书和修改清单。" },
+          { dept: "供应链", text: "确认工艺、成本、周期、可替代材料和大货稳定性。" },
+          { dept: "运营", text: "判断卖相、内容素材可拍性和用户感知。" },
+          { dept: "品牌", text: "确认包装设计、视觉调性和标准样封样信息。" }
+        ]
+      },
+      {
+        id: "test",
+        stage: 3,
+        title: "测试结果评审会",
+        minute: "测试结果评审纪要",
+        owner: "高层 / 产品 / 运营 / 品牌",
+        summary: "基于测试反馈决定通过、修改后重测或终止。",
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "产品判断", "P3 常规级": "基础核验" },
+        actions: [
+          { dept: "产品", text: "汇总评分、问题点、好评点和测试结论。" },
+          { dept: "运营", text: "判断内容素材、卖点表达和上市风险。" },
+          { dept: "客服", text: "补充用户理解成本、售后风险和 FAQ 需求。" },
+          { dept: "高层", text: "确认通过、修改后重测或终止。" }
+        ]
+      },
+      {
+        id: "launch",
+        stage: 4,
+        title: "上市启动会",
+        minute: "上市启动会议纪要",
+        owner: "产品 / 运营 / 品牌 / 供应链",
+        summary: "统一上市日、部门 deadline、资料包和依赖关系。",
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "线上同步", "P3 常规级": "线上同步" },
+        actions: [
+          { dept: "产品", text: "检查 PRD、品质规格书、测试报告、标准样资料是否齐全。" },
+          { dept: "供应链", text: "确认大货验收、入仓和样品分发签收。" },
+          { dept: "运营", text: "确认上架计划、内容排期、直播排期和转化素材。" },
+          { dept: "品牌", text: "确认详情页、包装、品牌内容和对外表达。" }
+        ]
+      },
+      {
+        id: "quarter",
+        stage: 5,
+        title: "上市复盘会",
+        minute: "季度产品决策记录",
+        owner: "高层 / 产品 / 运营 / 客服 / 供应链",
+        summary: "第六阶段复盘首周、首月和季度表现，形成初步去留判断。",
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "建议召开", "P3 常规级": "数据复盘" },
+        actions: [
+          { dept: "运营", text: "提供销量、流量、转化、利润和内容表现。" },
+          { dept: "客服", text: "提供用户反馈、差评原因、退换货和 FAQ 更新。" },
+          { dept: "供应链", text: "提供库存、补货周期、成本变化和清仓可行性。" },
+          { dept: "产品", text: "综合判断推广问题、产品问题或市场变化，并形成行动项。" }
+        ]
+      },
+      {
+        id: "product-review",
+        stage: 6,
+        title: "产品复盘决策会",
+        minute: "产品复盘决策纪要",
+        owner: "高层 / 产品 / 运营 / 供应链 / 财务",
+        summary: "第七阶段根据复盘数据决定升级、维持、清仓退出或淘汰下架。",
+        levelMode: { "P0 战略级": "必须召开", "P1 增长级": "必须召开", "P2 验证级": "必须召开", "P3 常规级": "必须召开" },
+        actions: [
+          { dept: "产品", text: "提出升级、维持、清仓或淘汰建议和依据。" },
+          { dept: "运营", text: "确认继续推广、降价清仓、下架节奏和渠道动作。" },
+          { dept: "供应链", text: "确认库存消耗、补货停止、供应商和物料处理。" },
+          { dept: "财务", text: "确认利润底线、清仓价格和损益影响。" }
+        ]
+      }
     ];
 
     const rules = [
@@ -3443,7 +3807,7 @@
       products: "产品档案",
       workflow: "产品进度",
       reviews: "评审决策",
-      lifecycle: "生命周期",
+      lifecycle: "产品复盘",
       issues: "BUG 优化",
       settings: "设置"
     };
@@ -3456,14 +3820,14 @@
       editTasks: "编辑任务",
       editDocs: "维护资料",
       editReviews: "维护评审",
-      editLifecycleStatus: "生命周期",
+      editLifecycleStatus: "产品复盘",
       editMetrics: "经营数据"
     };
     const roleProfiles = {
       executive: {
         name: "高层 / 老板",
         dept: "管理层",
-        desc: "查看全部流程，能处理关键评审、生命周期和最终调整。",
+        desc: "查看全部流程，能处理关键评审、产品复盘和最终调整。",
         icon: "crown",
         screens: allScreens,
         permissions: {
@@ -3476,7 +3840,7 @@
       product: {
         name: "产品部",
         dept: "产品负责人",
-        desc: "管理需求、产品档案、阶段任务、资料包、会议纪要和生命周期。",
+        desc: "管理需求、产品档案、阶段任务、资料包、会议纪要和产品复盘。",
         icon: "badge-check",
         screens: allScreens,
         permissions: {
@@ -3516,7 +3880,7 @@
       supply: {
         name: "供应链",
         dept: "供应链部门",
-        desc: "查看开发进度和生命周期，维护打样、验收、库存相关任务和资料。",
+        desc: "查看开发进度和产品复盘，维护打样、验收、库存相关任务和资料。",
         icon: "truck",
         screens: ["dashboard", "products", "workflow", "lifecycle"],
         permissions: { editTasks: true, editDocs: true, editMetrics: true }
@@ -3524,7 +3888,7 @@
       finance: {
         name: "财务",
         dept: "财务部门",
-        desc: "查看产品和生命周期，维护利润、清仓相关经营数据。",
+        desc: "查看产品和产品复盘，维护利润、清仓相关经营数据。",
         icon: "calculator",
         screens: ["dashboard", "products", "lifecycle"],
         permissions: { editMetrics: true }
@@ -3547,7 +3911,7 @@
       "升级": {
         title: "路径A：产品升级",
         condition: "季度复盘决策为升级",
-        action: "确认升级方向，判断小改走简化流程、大改回到打样至上市筹备。",
+        action: "确认升级方向，判断常规调整走简化流程，重大升级回到打样至上市筹备。",
         deliverable: "产品升级方案 / 新旧切换方案 / 升级版首月复盘报告",
         cls: "green"
       },
@@ -3569,12 +3933,11 @@
         title: "路径D：淘汰下架",
         condition: "直接下架或清仓价值极低",
         action: "各平台下架链接，处理剩余库存，归档淘汰原因和复盘总结。",
-        deliverable: "产品下架确认单 / 产品生命周期档案",
+        deliverable: "产品下架确认单 / 产品复盘档案",
         cls: "red"
       }
     };
 
-    const PRODUCT_LEVELS = ["P0 重点品", "P1 常规新品", "P2 小改/补充品", "应季品"];
     // 记录出厂默认，用于「恢复默认」以及计算改动。
     const CONFIG_DEFAULTS = {
       stages: stages.map(stage => ({ short: stage.short, goal: stage.goal })),
@@ -3597,7 +3960,7 @@
         const rule = meetingRules.find(item => item.id === id);
         if (!rule || !value) return;
         if (typeof value.owner === "string" && value.owner.trim()) rule.owner = value.owner.trim();
-        if (Array.isArray(value.levels)) rule.levels = value.levels.filter(level => PRODUCT_LEVELS.includes(level));
+        if (Array.isArray(value.levels)) rule.levels = value.levels.map(normalizeProductLevel).filter(level => PRODUCT_LEVELS.includes(level));
       });
       const lifecycleCfg = config.lifecycle || {};
       Object.entries(lifecycleCfg).forEach(([key, value]) => {
@@ -3629,15 +3992,15 @@
       settingsVisibilityDepts = [...CONFIG_DEFAULTS.settingsDepts];
     }
     const defaultProducts = [
-      { id: "p1", name: "鹦鹉谷物棒", level: "P1 常规新品", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, launch: "2026-08-15", sales: 0, score: 0, returnRate: 0, profit: 0, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。" },
-      { id: "p2", name: "仓鼠冻干零食", level: "P0 重点品", owner: "叶津成", source: "运营", status: "维持观察", stage: 6, launch: "2026-06-01", sales: 5000, score: 4.6, returnRate: 0.08, profit: 0.32, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。" },
-      { id: "p3", name: "兔用草架旧款", level: "P2 小改/补充品", owner: "赵雨涵", source: "客服", status: "清仓中", stage: 6, launch: "2025-09-20", sales: 300, score: 3.8, returnRate: 0.19, profit: 0.06, desc: "评分下滑，库存进入清仓处理。" }
+      { id: "p1", name: "鹦鹉谷物棒", level: "P1 增长级", levelConfirmed: true, levelReason: "立项评审会确认有明确增长价值。", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, launch: "2026-08-15", sales: 0, score: 0, returnRate: 0, profit: 0, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。" },
+      { id: "p2", name: "仓鼠冻干零食", level: "P0 战略级", levelConfirmed: true, levelReason: "核心业务防守与年度目标相关。", owner: "叶津成", source: "运营", status: "维持观察", stage: 6, launch: "2026-06-01", sales: 5000, score: 4.6, returnRate: 0.08, profit: 0.32, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。" },
+      { id: "p3", name: "兔用草架旧款", level: "P2 验证级", levelConfirmed: true, levelReason: "老品调整以验证是否继续投入为主。", owner: "赵雨涵", source: "客服", status: "清仓中", stage: 6, launch: "2025-09-20", sales: 300, score: 3.8, returnRate: 0.19, profit: 0.06, desc: "评分下滑，库存进入清仓处理。" }
     ];
 
     const defaultDemands = [
-      { id: "d1", name: "鹦鹉站杆升级版", level: "P1 常规新品", owner: "叶津成", source: "客服", status: "待讨论", productId: "", created: "今天", desc: "用户反馈站杆稳定性和清洁便利性有优化空间，需要判断是否做结构升级。", discussion: "待讨论：补充用户痛点、现有差评、供应链可行性和预估成本。" },
-      { id: "d2", name: "仓鼠夏季降温窝", level: "应季品", owner: "赵雨涵", source: "运营", status: "讨论中", productId: "", created: "今天", desc: "夏季搜索和内容热度上升，运营希望提前评估应季品窗口。", discussion: "讨论中：需要确认开发周期、上市窗口、首批铺货和过季库存预案。" },
-      { id: "d3", name: "兔用草架旧款包装微调", level: "P2 小改/补充品", owner: "赵雨涵", source: "品牌", status: "暂缓", productId: "", created: "06-30", desc: "品牌提出包装视觉老旧，但当前清仓优先级更高。", discussion: "暂缓：等库存处理后再判断是否升级包装。" }
+      { id: "d1", name: "鹦鹉站杆升级版", level: "P1 增长级", owner: "叶津成", source: "客服", status: "待讨论", productId: "", created: "今天", desc: "用户反馈站杆稳定性和清洁便利性有优化空间，需要判断是否做结构升级。", discussion: "待讨论：补充用户痛点、现有差评、供应链可行性和预估成本。" },
+      { id: "d2", name: "仓鼠夏季降温窝", level: "P3 常规级", owner: "赵雨涵", source: "运营", status: "讨论中", productId: "", created: "今天", desc: "夏季搜索和内容热度上升，运营希望提前评估应季窗口。", discussion: "讨论中：需要确认开发周期、上市窗口、首批铺货和过季库存预案。" },
+      { id: "d3", name: "兔用草架旧款包装微调", level: "P2 验证级", owner: "赵雨涵", source: "品牌", status: "暂缓", productId: "", created: "06-30", desc: "品牌提出包装视觉老旧，但当前清仓优先级更高。", discussion: "暂缓：等库存处理后再判断是否升级包装。" }
     ];
 
     const APP_VERSION = "2026-07-03-product-flow-v4";
@@ -3674,6 +4037,11 @@
     let selectedCalendarMeetingKey = "";
     let confirmResolve = null;
     let globalLoadingDepth = 0;
+    let demandImageValues = [];
+    let sharedStateReady = false;
+    let sharedStateApplying = false;
+    let sharedStateSaveTimer = null;
+    let sharedStateLastError = "";
 
     function loadState() {
       const raw = localStorage.getItem("productFlowState");
@@ -3692,14 +4060,69 @@
         deliverables: buildInitialDeliverables(defaultProducts),
         reviews: buildInitialReviews(defaultProducts),
         decisions: [
-          { id: cryptoId(), productId: "p1", title: "立项评审通过", body: "按 P1 常规新品推进，首批按 2 个月销量预估，进入打样研发阶段。", date: "2026-06-24" },
+          { id: cryptoId(), productId: "p1", title: "立项评审通过", body: "按 P1 增长级推进，首批按 2 个月销量预估，进入打样研发阶段。", date: "2026-06-24" },
           { id: cryptoId(), productId: "p2", title: "首月复盘结论", body: "销量达标、评分较高，建议维持观察并准备加大推广。", date: "2026-07-01" }
         ]
       });
     }
-    function saveState() {
+    function saveState({ remote = true } = {}) {
       state.currentId = currentId;
       localStorage.setItem("productFlowState", JSON.stringify(state));
+      if (remote) scheduleSharedStateSave();
+    }
+    function companyStateUpdatedBy() {
+      const user = currentUser?.dingUser || {};
+      return user.name || currentUserDisplayName() || currentUser?.role || "";
+    }
+    function scheduleSharedStateSave() {
+      if (!sharedStateReady || sharedStateApplying) return;
+      clearTimeout(sharedStateSaveTimer);
+      sharedStateSaveTimer = setTimeout(() => {
+        persistSharedState().catch(error => {
+          sharedStateLastError = error.message || "公司共享数据同步失败。";
+          console.warn(sharedStateLastError);
+        });
+      }, 450);
+    }
+    async function persistSharedState() {
+      const response = await fetch("/api/state", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state, updatedBy: companyStateUpdatedBy() })
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.synced === false) {
+        throw new Error(payload.message || "公司共享数据同步失败。");
+      }
+      sharedStateLastError = "";
+      return payload;
+    }
+    async function syncSharedStateOnStartup() {
+      try {
+        const response = await fetch("/api/state");
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.message || "公司共享数据读取失败。");
+        sharedStateReady = true;
+        if (payload.state) {
+          sharedStateApplying = true;
+          state = normalizeState(payload.state);
+          applyConfigOverrides(state.config || {});
+          currentId = state.currentId || state.products[0]?.id || currentId;
+          selectedStage = currentProduct()?.stage || 0;
+          saveState({ remote: false });
+          renderAll();
+          sharedStateApplying = false;
+          return;
+        }
+        await persistSharedState();
+      } catch (error) {
+        sharedStateReady = false;
+        sharedStateLastError = error.message || "公司共享数据同步失败。";
+        console.warn(sharedStateLastError);
+        if (sharedStateLastError.includes("PRODUCT_FLOW_DB")) toast("共享数据库未配置，当前数据只保存在本机。");
+      } finally {
+        sharedStateApplying = false;
+      }
     }
     function loadUser() {
       const raw = localStorage.getItem("productFlowUser");
@@ -4271,10 +4694,26 @@
     function cryptoId() {
       return "id" + Math.random().toString(16).slice(2) + Date.now().toString(16);
     }
+    function normalizeProductLevel(level) {
+      const value = String(level || "").trim();
+      return LEGACY_LEVEL_MAP[value] || (PRODUCT_LEVELS.includes(value) ? value : "P1 增长级");
+    }
+    function productLevelText(product) {
+      const level = normalizeProductLevel(product?.level);
+      return product?.levelConfirmed === false ? `${level}（待立项确认）` : level;
+    }
     function normalizeState(data) {
       data.products = (data.products || []).map(product => ({
         ...product,
+        level: normalizeProductLevel(product.level),
+        levelConfirmed: typeof product.levelConfirmed === "boolean" ? product.levelConfirmed : Number(product.stage || 0) > 1,
+        levelReason: product.levelReason || "",
         image: product.image && !isGeneratedPlaceholderImage(product.image) ? product.image : generateProductImage(product.name || "产品")
+      }));
+      data.demands = (data.demands || []).map(demand => ({
+        ...demand,
+        level: normalizeProductLevel(demand.level),
+        images: normalizeDemandImages(demand.images)
       }));
       data.deliverables = pruneUnopenableDeliverables((data.deliverables || []).map(doc => ({
         source: "流程自动",
@@ -4283,6 +4722,8 @@
         ...doc,
         type: inferAssetType(`${doc.name || ""} ${doc.url || ""}`, doc.mimeType || doc.mime || "")
       })));
+      data.tasks = normalizeStageTaskCategories(data.tasks || []);
+      data.tasks = ensureMeetingPreparationTasks(data);
       data.dingMeetings = Array.isArray(data.dingMeetings) ? data.dingMeetings : [];
       data.feedbackIssues = Array.isArray(data.feedbackIssues) ? data.feedbackIssues : [];
       return data;
@@ -4350,18 +4791,125 @@
       };
       preview.src = src || generateProductImage(name);
     }
+    function normalizeDemandImages(images = []) {
+      return (Array.isArray(images) ? images : [])
+        .filter(image => image && String(image.url || "").startsWith("data:image/"))
+        .slice(0, 6)
+        .map(image => ({
+          id: image.id || cryptoId(),
+          name: String(image.name || "机会图片").slice(0, 80),
+          url: String(image.url || "")
+        }));
+    }
+    function getDemandImageValues() {
+      return normalizeDemandImages(demandImageValues);
+    }
+    function setDemandImageValues(images = []) {
+      demandImageValues = normalizeDemandImages(images);
+      renderDemandImagePreview();
+    }
+    function demandImageStripHtml(images = []) {
+      const list = normalizeDemandImages(images);
+      if (!list.length) return "";
+      return `<div class="demand-image-strip">${list.map(image => `<span class="demand-image-item" title="${esc(image.name)}"><img src="${esc(image.url)}" alt="${esc(image.name)}"></span>`).join("")}</div>`;
+    }
+    function renderDemandImagePreview() {
+      const preview = document.getElementById("demandImagePreview");
+      if (!preview) return;
+      const list = getDemandImageValues();
+      preview.innerHTML = list.length
+        ? list.map(image => `<span class="demand-image-item" title="${esc(image.name)}">
+            <img src="${esc(image.url)}" alt="${esc(image.name)}">
+            <button type="button" aria-label="删除图片" data-remove-demand-image="${esc(image.id)}"><i data-lucide="x"></i></button>
+          </span>`).join("")
+        : `<span class="demand-image-empty">可以上传用户截图、竞品图或市场反馈图片。</span>`;
+      if (window.lucide) lucide.createIcons();
+    }
+    function addDemandImageFiles(files = []) {
+      const incoming = [...files].filter(Boolean);
+      const current = getDemandImageValues();
+      const remaining = Math.max(0, 6 - current.length);
+      if (!remaining) {
+        toast("最多上传 6 张机会图片。");
+        return;
+      }
+      incoming.slice(0, remaining).forEach(file => {
+        if (!String(file.type || "").startsWith("image/")) {
+          toast(`已跳过「${file.name}」，请上传图片。`);
+          return;
+        }
+        if (Number(file.size || 0) > 2 * 1024 * 1024) {
+          toast(`「${file.name}」超过 2MB，未保存。`);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          demandImageValues = normalizeDemandImages([
+            ...demandImageValues,
+            { id: cryptoId(), name: file.name || "机会图片", url: String(reader.result || "") }
+          ]);
+          renderDemandImagePreview();
+        };
+        reader.onerror = () => toast(`「${file.name}」读取失败，请重新选择。`);
+        reader.readAsDataURL(file);
+      });
+      if (incoming.length > remaining) toast("已达到 6 张上限，超出的图片未加入。");
+    }
     function buildInitialTasks(products) {
-      return products.flatMap(product => stageTemplates.flatMap((rows, stageIndex) => rows.map((row, idx) => ({
+      return products.flatMap(product => [
+        ...stageTemplates.flatMap((rows, stageIndex) => rows.filter(isDefaultPreparationTask).filter(row => row.levels.includes(normalizeProductLevel(product.level))).map((row, idx) => ({
         id: cryptoId(),
         productId: product.id,
         stage: stageIndex,
-        category: row[0],
-        title: row[1],
-        owner: row[2],
-        deliverable: row[3],
+        category: defaultStageTaskCategory(row),
+        title: row.title,
+        owner: row.owner,
+        deliverable: row.deliverable,
         due: dueByStage(stageIndex, idx),
         done: product.stage > stageIndex
+        }))),
+        ...buildMeetingPreparationTasks(product)
+      ]);
+    }
+    function meetingPreparationTaskKey(task) {
+      return [task.productId, task.stage, task.owner, task.title].join("|");
+    }
+    function buildMeetingPreparationTasks(product) {
+      return stages.flatMap((_stage, stageIndex) => stageMeetingNodes(product, stageIndex).flatMap((node, nodeIndex) => meetingDepartmentActions(node, product).map((action, actionIndex) => ({
+        id: cryptoId(),
+        productId: product.id,
+        stage: node.stage,
+        category: "会前准备",
+        title: action.text,
+        owner: action.dept,
+        deliverable: `${node.title}准备材料`,
+        due: dueByStage(node.stage, 8 + nodeIndex * 6 + actionIndex),
+        done: product.stage > node.stage
       }))));
+    }
+    function ensureMeetingPreparationTasks(data) {
+      const existing = new Set((data.tasks || []).map(meetingPreparationTaskKey));
+      (data.products || []).forEach(product => {
+        buildMeetingPreparationTasks(product).forEach(task => {
+          const key = meetingPreparationTaskKey(task);
+          if (existing.has(key)) return;
+          data.tasks.push(task);
+          existing.add(key);
+        });
+      });
+      return data.tasks;
+    }
+    function defaultStageTaskCategory(row) {
+      return "会前准备";
+    }
+    function isDefaultPreparationTask(row) {
+      return row.category !== "会议/决策";
+    }
+    function normalizeStageTaskCategories(tasks = []) {
+      return tasks.filter(task => !defaultMeetingTaskTitles.has(task.title)).map(task => {
+        if (["会议/决策", "会后交付", "准入条件"].includes(task.category)) task.category = "会前准备";
+        return task;
+      });
     }
     function buildInitialDeliverables(products) {
       return [];
@@ -4752,7 +5300,7 @@
         meta: [
           ["产品状态", product.status || "-"],
           ["当前阶段", stage.short],
-          ["产品等级", product.level || "-"],
+          ["产品等级", productLevelText(product)],
           ["负责人", product.owner || "-"],
           ["来源部门", product.source || demand?.source || "-"],
           ["计划上市", product.launch || "-"],
@@ -4805,7 +5353,7 @@
       const record = productArchiveRecord(product);
       const stage = stages[product.stage] || { short: "-", name: "-" };
       document.getElementById("productProfileTitle").textContent = product.name || "产品资料";
-      document.getElementById("productProfileSub").textContent = `${product.level || "-"} · ${stage.name || stage.short} · ${product.owner || "-"}`;
+      document.getElementById("productProfileSub").textContent = `${productLevelText(product)} · ${stage.name || stage.short} · ${product.owner || "-"}`;
       const badge = document.getElementById("productProfileBadge");
       badge.textContent = product.status || "产品档案";
       badge.className = `badge ${badgeClass(product.status || "")}`;
@@ -4865,7 +5413,56 @@
       return `<span class="sync-status ${ok ? "ok" : "error"}" title="${esc(record.error || record.assignees?.join("、") || "")}"><i data-lucide="${icon}"></i>${esc(text)}</span>`;
     }
     function requiredMeetings(product) {
-      return meetingRules.filter(rule => rule.levels.includes(product.level));
+      return meetingRules.filter(rule => rule.levels.includes(normalizeProductLevel(product.level)));
+    }
+    function meetingRuleForNode(node) {
+      return meetingRules.find(rule => rule.id === node.id) || node;
+    }
+    function stageMeetingNodes(product, stageIndex) {
+      const level = normalizeProductLevel(product.level);
+      return meetingNodeRules.filter(node => node.stage === stageIndex && (node.levelMode?.[level] || "不涉及") !== "不涉及");
+    }
+    function meetingDepartmentActions(node, product) {
+      const level = normalizeProductLevel(product.level);
+      return (node.actions || []).filter(action => !action.levels || action.levels.includes(level));
+    }
+    function meetingNodeModeClass(mode) {
+      if (mode.includes("必须")) return "red";
+      if (mode.includes("建议") || mode.includes("简化") || mode.includes("线上")) return "gold";
+      if (mode.includes("可选") || mode.includes("产品判断") || mode.includes("数据")) return "blue";
+      return "";
+    }
+    function stageMeetingNodesHtml(product, editable) {
+      const nodes = stageMeetingNodes(product, selectedStage);
+      if (!nodes.length) return "";
+      return `<div class="meeting-node-list">
+        ${nodes.map(node => {
+          const rule = meetingRuleForNode(node);
+          const mode = node.levelMode?.[normalizeProductLevel(product.level)] || "不涉及";
+          const meetingKey = `${esc(product.id)}|${esc(rule.id)}`;
+          const canHandle = editable && product.stage >= node.stage;
+          return `<section class="meeting-node-card meeting-node-compact">
+            <div class="meeting-node-head">
+              <div class="meeting-node-title">
+                <div class="meeting-node-line">
+                  <strong>${esc(node.title)}</strong>
+                  <span class="meeting-node-summary" title="${esc(node.summary)}">${esc(node.summary)}</span>
+                </div>
+                <div class="meeting-node-meta">
+                  <span>${esc(node.owner)}</span>
+                  <span>${esc(node.minute)}</span>
+                  <span>${esc(productReview.stageIndexes.includes(node.stage) ? productReview.scope : stages[node.stage]?.short || "")}</span>
+                </div>
+              </div>
+              <div class="meeting-node-actions">
+                <span class="badge ${meetingNodeModeClass(mode)}">${esc(mode)}</span>
+                ${canHandle ? `<button class="mini-action" data-create-meeting="${meetingKey}" data-schedule-meeting="${meetingKey}"><i data-lucide="calendar-plus"></i>预约日程</button>
+                <button class="mini-action" data-import-minutes="${meetingKey}"><i data-lucide="file-input"></i>同步纪要</button>` : ""}
+              </div>
+            </div>
+          </section>`;
+        }).join("")}
+      </div>`;
     }
     function meetingMinute(product, meeting) {
       const docs = productDeliverables(product.id);
@@ -4885,8 +5482,8 @@
     function meetingStatus(product, meeting) {
       const task = meetingTask(product, meeting);
       const minutes = meetingMinute(product, meeting);
-      const taskDone = !!task && task.done;
-      const passed = taskDone && minutes.hasMinutes;
+      const taskDone = minutes.hasMinutes || !!task && task.done;
+      const passed = minutes.hasMinutes;
       return { task, minutes, taskDone, passed };
     }
     function meetingReviewState(product, meeting) {
@@ -5037,7 +5634,8 @@
       const tasksOk = tasks.every(t => t.done);
       const docsOk = requiredDocs.every(d => d.status === "已归档" || d.status === "已审核");
       const reviewOk = currentReview.every(r => meetingStatus(product, r).passed);
-      return { tasksOk, docsOk, reviewOk, ready: tasksOk && docsOk && reviewOk };
+      const levelOk = product.stage !== 1 || product.levelConfirmed === true;
+      return { tasksOk, docsOk, reviewOk, levelOk, ready: tasksOk && docsOk && reviewOk && levelOk };
     }
     function lifecycleDecision(p) {
       if (p.score >= 4.5 && p.sales >= 4000 && p.returnRate <= .1 && p.profit >= .25) return ["升级", "销量达标、评分高、退货率低，建议加大推广或做升级版。", "green"];
@@ -5054,7 +5652,7 @@
           path: "先完成上市筹备",
           action: "完成当前阶段任务，上市后进入首周跟进和首月复盘。",
           deliverable: "上市资料包 / 首周数据速览",
-          reason: "产品尚未上市，生命周期判断不能提前替代开发流程。"
+          reason: "产品尚未上市，产品复盘判断不能提前替代开发流程。"
         };
       }
       if (p.stage === 5) {
@@ -5130,7 +5728,7 @@
         <img class="product-thumb small" src="${esc(productImage(product))}" alt="${esc(product.name)}" data-fallback="${esc(fallback)}" loading="lazy" decoding="async">
         <span>
           <strong>${esc(product.name)}</strong>
-          <span>${esc(product.level || "-")} · ${esc(stages[product.stage]?.short || "-")} · ${esc(product.owner || "-")}</span>
+          <span>${esc(productLevelText(product))} · ${esc(stages[product.stage]?.short || "-")} · ${esc(product.owner || "-")}</span>
         </span>
         ${active ? `<i data-lucide="check"></i>` : ""}
       </button>`;
@@ -5231,7 +5829,7 @@
       const workflowProduct = document.getElementById("workflowProduct");
       if (workflowProduct) {
         workflowProduct.innerHTML = `<div class="workflow-product-card">
-          ${productIdentityHtml(p, `${p.level} · ${p.owner} · ${p.status}`, { compact: true })}
+          ${productIdentityHtml(p, `${productLevelText(p)} · ${p.owner} · ${p.status}`, { compact: true })}
           <button class="workflow-product-toggle" type="button" data-workflow-product-toggle aria-label="切换产品" aria-expanded="false" aria-controls="workflowProductMenu"><i data-lucide="chevrons-up-down"></i></button>
         </div>
         <div class="workflow-product-menu hidden" id="workflowProductMenu" role="listbox" aria-label="切换产品">
@@ -5243,6 +5841,25 @@
         selectedStage = Number(el.dataset.stage);
         renderAll();
       }));
+    }
+    function levelDecisionHtml(product, editable) {
+      if (selectedStage !== 1) return "";
+      const confirmed = product.levelConfirmed === true;
+      const disabled = editable ? "" : "disabled";
+      const level = normalizeProductLevel(product.level);
+      return `<div class="level-decision ${confirmed ? "confirmed" : ""}">
+        <div class="level-decision-title">
+          <strong>产品正式定级</strong>
+          <span class="small">${confirmed ? `已在立项阶段确认：${esc(level)}` : "需要在立项评审会上确认，确认后才作为后续会议和资源投入依据。"}</span>
+        </div>
+        <div class="level-decision-fields">
+          <select id="projectLevelSelect" aria-label="产品正式等级" ${disabled}>
+            ${PRODUCT_LEVELS.map(item => `<option value="${esc(item)}" ${item === level ? "selected" : ""}>${esc(item)}</option>`).join("")}
+          </select>
+          <input id="projectLevelReason" placeholder="定级依据：战略价值、商业价值、风险、资源投入" value="${esc(product.levelReason || "")}" ${disabled}>
+        </div>
+        ${editable ? `<button class="mini-action level-confirm-action" id="confirmProjectLevel" type="button"><i data-lucide="badge-check"></i>${confirmed ? "更新定级" : "确认定级"}</button>` : `<span class="badge ${confirmed ? "green" : "gold"}">${confirmed ? "已确认" : "待确认"}</span>`}
+      </div>`;
     }
     function renderStageEditor() {
       const editor = document.getElementById("stageEditor");
@@ -5264,6 +5881,8 @@
           ${productReturnable ? `<button class="mini-action danger" data-return-product-demand="${esc(p.id)}"><i data-lucide="undo-2"></i>退回需求池</button>` : ""}
         </div>
       </div>
+      ${levelDecisionHtml(p, taskEditable)}
+      ${stageMeetingNodesHtml(p, taskEditable)}
       <div class="task-edit-row task-edit-head">
         <span>类别</span><span>任务内容</span><span>责任部门</span><span>交付物</span><span>截止</span><span>操作</span>
       </div>
@@ -5303,6 +5922,9 @@
       if (setStageButton) setStageButton.addEventListener("click", setSelectedStageAsCurrent);
       const addTaskButton = document.getElementById("addSelectedStageTask");
       if (addTaskButton) addTaskButton.addEventListener("click", addTaskForSelectedStage);
+      const confirmLevelButton = document.getElementById("confirmProjectLevel");
+      if (confirmLevelButton) confirmLevelButton.addEventListener("click", confirmProjectLevel);
+      document.querySelectorAll("#stageEditor [data-import-minutes]").forEach(btn => btn.addEventListener("click", () => openMinutesModal(btn.dataset.importMinutes)));
       document.querySelectorAll("[data-return-product-demand]").forEach(btn => btn.addEventListener("click", () => returnProductToDemand(btn.dataset.returnProductDemand)));
       if (focusedTaskId) {
         requestAnimationFrame(() => {
@@ -5380,10 +6002,10 @@
       if (statusLines) {
         statusLines.innerHTML = [
           ["当前阶段", stages[p.stage].name],
-          ["产品等级", p.level],
+          ["产品等级", productLevelText(p)],
           ["负责人", p.owner],
           ["计划上市", p.launch || "-"],
-          ["生命周期判断", decision[0]]
+          ["复盘判断", decision[0]]
         ].map(([k, v]) => `<div class="status-line"><span class="small">${esc(k)}</span><strong>${esc(v)}</strong></div>`).join("");
       }
       const risks = [];
@@ -5492,7 +6114,7 @@
       const table = document.getElementById("demandTableRows");
       if (table) {
         let visibleDemands = demandStatusFilter === "all" ? visibleDemandRecords : visibleDemandRecords.filter(demand => demand.status === demandStatusFilter);
-        if (demandLevelFilter !== "all") visibleDemands = visibleDemands.filter(demand => demand.level === demandLevelFilter);
+        if (demandLevelFilter !== "all") visibleDemands = visibleDemands.filter(demand => normalizeProductLevel(demand.level) === demandLevelFilter);
         table.innerHTML = visibleDemands.map(d => {
           const product = d.productId ? productById(d.productId) : null;
           const statusCell = !demandEditable
@@ -5501,12 +6123,12 @@
                 ${demandPoolStatuses.map(status => `<option value="${status}" ${d.status === status ? "selected" : ""}>${status}</option>`).join("")}
               </select>`;
           const rowActions = [];
-          if (demandConvertible && d.status === "已讨论") rowActions.push(`<button class="mini-action icon-only" title="转入开发" aria-label="转入开发" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i></button>`);
+          if (demandConvertible && d.status === "已讨论") rowActions.push(`<button class="mini-action demand-convert-action" title="转入开发" aria-label="转入开发" data-demand-convert="${esc(d.id)}"><i data-lucide="git-branch-plus"></i>转开发</button>`);
           if (product) rowActions.push(`<button class="mini-action icon-only" title="查看产品" aria-label="查看产品" data-select-product="${esc(product.id)}"><i data-lucide="mouse-pointer-2"></i></button>`);
           if (demandEditable) rowActions.push(`<button class="mini-action icon-only" title="编辑需求" aria-label="编辑需求" data-edit-demand="${esc(d.id)}"><i data-lucide="pencil"></i></button>`);
           if (demandEditable) rowActions.push(`<button class="mini-action icon-only danger" title="删除需求" aria-label="删除需求" data-delete-demand="${esc(d.id)}"><i data-lucide="trash-2"></i></button>`);
           return `<tr>
-            <td><strong>${esc(d.name)}</strong><p class="small">${esc(d.desc)}</p>${product ? productIdentityHtml(product, "已生成产品档案", { compact: true }) : ""}</td>
+            <td><strong>${esc(d.name)}</strong><p class="small">${esc(d.desc)}</p>${demandImageStripHtml(d.images)}${product ? productIdentityHtml(product, "已生成产品档案", { compact: true }) : ""}</td>
             <td>${statusCell}</td>
             <td>${esc(d.level)}</td>
             <td><p class="small">${esc(d.discussion || "-")}</p></td>
@@ -5550,20 +6172,20 @@
     function renderProducts() {
       let list = state.products;
       if (productStatusFilter !== "all") list = list.filter(product => product.status === productStatusFilter);
-      if (productLevelFilter !== "all") list = list.filter(product => product.level === productLevelFilter);
+      if (productLevelFilter !== "all") list = list.filter(product => normalizeProductLevel(product.level) === productLevelFilter);
       if (productStageFilter !== "all") list = list.filter(product => String(product.stage) === productStageFilter);
       const productEditable = can("editProduct");
       const productDeletable = can("deleteProduct");
       document.getElementById("productList").innerHTML = list.map(p => `<div class="product-row archive-row">
         ${productIdentityHtml(p, p.desc)}
         <span class="badge ${badgeClass(p.status)}">${esc(p.status)}</span>
-        <span class="product-level">${esc(p.level.split(" ")[0])}</span>
+        <span class="product-level" title="${esc(productLevelText(p))}">${esc(normalizeProductLevel(p.level).split(" ")[0])}</span>
         <span class="product-stage">${esc(stages[p.stage].short)}</span>
         <div class="product-action-menu"><div class="table-actions product-actions">
           ${screenAllowed("workflow") ? `<button class="mini-action" title="产品进度" aria-label="产品进度" data-open-product="${esc(p.id)}" data-product-target="workflow"><i data-lucide="git-branch"></i><span>进度</span></button>` : ""}
           <button class="mini-action" title="资料包" aria-label="资料包" data-open-product="${esc(p.id)}" data-product-target="deliverables"><i data-lucide="folder-check"></i><span>资料</span></button>
           ${screenAllowed("reviews") ? `<button class="mini-action" title="会议决策" aria-label="会议决策" data-open-product="${esc(p.id)}" data-product-target="reviews"><i data-lucide="clipboard-check"></i><span>评审</span></button>` : ""}
-          ${screenAllowed("lifecycle") ? `<button class="mini-action" title="生命周期" aria-label="生命周期" data-open-product="${esc(p.id)}" data-product-target="lifecycle"><i data-lucide="activity"></i><span>生命周期</span></button>` : ""}
+          ${screenAllowed("lifecycle") ? `<button class="mini-action" title="产品复盘" aria-label="产品复盘" data-open-product="${esc(p.id)}" data-product-target="lifecycle"><i data-lucide="activity"></i><span>复盘</span></button>` : ""}
           ${productEditable ? `<button class="mini-action icon-only" title="编辑产品" aria-label="编辑产品" data-edit-product="${esc(p.id)}"><i data-lucide="pencil"></i></button>` : ""}
           ${productDeletable ? `<button class="mini-action icon-only danger" title="删除产品" aria-label="删除产品" data-delete-product="${esc(p.id)}"><i data-lucide="trash-2"></i></button>` : ""}
         </div></div>
@@ -5667,8 +6289,8 @@
       const passedCount = states.filter(row => row.state.passed).length;
       document.getElementById("reviewList").innerHTML = `<div>
         <div class="review-summary">
-          ${productIdentityHtml(product, `${product.level} · 当前 ${stages[product.stage].short}`, { compact: true })}
-          <div class="review-progress"><span>会议通过</span><span class="badge ${passedCount === meetings.length ? "green" : "gold"}">${passedCount}/${meetings.length}</span></div>
+          ${productIdentityHtml(product, `${productLevelText(product)} · 当前 ${stages[product.stage].short}`, { compact: true })}
+          <div class="review-progress"><span>会议节点来自产品进度</span><span class="badge ${passedCount === meetings.length ? "green" : "gold"}">${passedCount}/${meetings.length}</span></div>
         </div>
         <div class="table-wrap">
           <table class="task-table review-table">
@@ -5690,6 +6312,7 @@
                   ? `<button class="mini-action" data-import-minutes="${meetingKey}"><i data-lucide="file-input"></i>${state.minutes.hasMinutes ? "重新生成" : "同步纪要"}</button>`
                   : "";
                 const minutesAction = [
+                  `<button class="mini-action" data-open-meeting-stage="${esc(meeting.stage)}"><i data-lucide="git-branch"></i>进度</button>`,
                   state.minutes.doc && state.minutes.hasMinutes ? `<button class="mini-action" data-open-meeting-doc="${esc(product.id)}|${esc(state.minutes.doc.id)}"><i data-lucide="folder-open"></i>查看纪要</button>` : "",
                   importMinutesAction
                 ].filter(Boolean).join("");
@@ -5713,6 +6336,13 @@
       document.querySelectorAll("[data-import-minutes]").forEach(btn => btn.addEventListener("click", () => openMinutesModal(btn.dataset.importMinutes)));
       document.querySelectorAll("[data-add-minutes]").forEach(btn => btn.addEventListener("click", () => addMeetingMinutes(btn.dataset.addMinutes)));
       document.querySelectorAll("[data-open-meeting-doc]").forEach(btn => btn.addEventListener("click", () => openMeetingDoc(btn.dataset.openMeetingDoc)));
+      document.querySelectorAll("[data-open-meeting-stage]").forEach(btn => btn.addEventListener("click", () => openMeetingStage(btn.dataset.openMeetingStage)));
+    }
+    function openMeetingStage(stageIndex) {
+      selectedStage = Number(stageIndex) || 0;
+      navigateToScreen("workflow");
+      renderAll();
+      toast(`已切换到：${stages[selectedStage]?.short || "产品进度"}`);
     }
     function renderLifecycle() {
       document.getElementById("lifecyclePathCards").innerHTML = Object.entries(lifecyclePaths).map(([decision, path]) => `
@@ -5735,7 +6365,7 @@
         const metricDisabled = can("editMetrics") ? "" : "disabled";
         return `<div class="lifecycle-row">
           <div class="lifecycle-product-cell">
-            ${productIdentityHtml(p, `${p.level} · ${p.owner || "-"} · ${stages[p.stage]?.short || "-"}`, { compact: true })}
+            ${productIdentityHtml(p, `${productLevelText(p)} · ${p.owner || "-"} · ${stages[p.stage]?.short || "-"}`, { compact: true })}
             ${statusControl}
           </div>
           <div class="metric-stack"><strong>${esc(flow.reviewNode)}</strong><span>${esc(p.launch || "未定上市日")}</span></div>
@@ -5917,7 +6547,7 @@
       if (resetBtn && !resetBtn.dataset.bound) {
         resetBtn.dataset.bound = "1";
         resetBtn.addEventListener("click", async () => {
-          if (!await requestConfirm({ title: "恢复默认配置", message: "会把流程阶段、评审会议、生命周期路径、人员权限和设置可见范围全部还原为系统默认。", confirmText: "恢复默认" })) return;
+          if (!await requestConfirm({ title: "恢复默认配置", message: "会把流程阶段、评审会议、产品复盘路径、人员权限和设置可见范围全部还原为系统默认。", confirmText: "恢复默认" })) return;
           resetConfigToDefaults();
           updateConfig(config => { delete config.stages; delete config.meetings; delete config.lifecycle; delete config.roles; delete config.system; });
           toast("已恢复默认流程与规则配置。");
@@ -6285,7 +6915,7 @@
       const p = currentProduct();
       const ready = stageReady(p);
       if (!ready.ready) {
-        toast("当前阶段还有任务、交付物或评审未完成，系统不建议推进。");
+        toast(!ready.levelOk ? "立项阶段需要先在立项会上确认产品等级。" : "当前阶段还有任务、交付物或评审未完成，系统不建议推进。");
         return;
       }
       if (p.stage < stages.length - 1) {
@@ -6294,7 +6924,7 @@
         if (p.stage === 6) p.status = "维持观察";
         toast(`已进入：${stages[p.stage].name}`);
       } else {
-        toast("已经在生命周期管理阶段。");
+        toast("已经在产品复盘阶段。");
       }
       renderAll();
     }
@@ -6316,7 +6946,7 @@
       }
       review.status = "已通过";
       review.result = "通过，进入下一节点";
-      state.decisions.unshift({ id: cryptoId(), productId: p.id, title: `${review.title}通过`, body: `会议结论：${p.name} 当前阶段通过，后续按 ${p.level} 流程继续推进。`, date: "今天" });
+      state.decisions.unshift({ id: cryptoId(), productId: p.id, title: `${review.title}通过`, body: `会议结论：${p.name} 当前阶段通过，后续按 ${normalizeProductLevel(p.level)} 流程继续推进。`, date: "今天" });
       toast("评审已通过，并写入决策记录。");
       renderAll();
     }
@@ -6340,6 +6970,23 @@
         payload.detail?.code,
         payload.code
       ].filter(Boolean).join(" ");
+    }
+    function formatMinutesDiagnostics(payload = {}) {
+      const diagnostics = payload.diagnostics || {};
+      const parts = [];
+      const cloudReady = Number(diagnostics.cloudReady || 0);
+      const aiReady = Number(diagnostics.aiReady || 0) + Number(diagnostics.aiFound || 0);
+      const unresolved = Number(diagnostics.unresolved || 0);
+      if (payload.cloudError) parts.push(payload.cloudError);
+      if (payload.aiMinutesError) parts.push(payload.aiMinutesError);
+      if (!diagnostics.userTokenReady && payload.fallbackSource === "aiMinutes") parts.push("未拿到当前账号授权，AI 听记没有执行查询");
+      if (diagnostics.requestedEvents && !cloudReady && !aiReady && !payload.cloudError && !payload.aiMinutesError) {
+        const aiState = diagnostics.aiAttempted ? `AI 听记匹配 0 个` : "AI 听记未执行";
+        parts.push(`云录制匹配 0 个，${aiState}，未匹配 ${unresolved || diagnostics.requestedEvents} 个`);
+      }
+      if (diagnostics.cloudPermission) parts.push(`云录制权限不足 ${diagnostics.cloudPermission} 个`);
+      if (diagnostics.aiPermission && diagnostics.aiPermission !== diagnostics.cloudPermission) parts.push(`AI 听记权限不足 ${diagnostics.aiPermission} 个`);
+      return parts.filter(Boolean).join("；");
     }
     function renderMinutesPermissionError(payload = {}) {
       const raw = dingPayloadText(payload);
@@ -6625,7 +7272,12 @@
           selectedCalendarMeetingKey = calendarMeetingKey(preferred);
           renderCalendarMeetingList();
           const readyCount = calendarMeetingOptions.filter(item => item.minuteText || item.aiMinutesTaskUuid).length;
-          setMinutesMessage(`已读取 ${calendarMeetingOptions.length} 个日历会议，${readyCount} 个可导入纪要。`, readyCount ? "ok" : "");
+          const hasBackendDiagnostics = Boolean(minutesPayload.diagnostics);
+          const diagnostics = formatMinutesDiagnostics(minutesPayload);
+          setMinutesMessage(
+            [`已读取 ${calendarMeetingOptions.length} 个日历会议，${readyCount} 个可导入纪要。`, diagnostics].filter(Boolean).join(" "),
+            readyCount ? "ok" : (diagnostics || hasBackendDiagnostics ? "error" : "")
+          );
         });
       } catch (error) {
         setMinutesMessage(error.message || "钉钉日历会议读取失败", "error");
@@ -7000,7 +7652,7 @@
       const demand = state.demands.find(d => d.id === id);
       if (!demand || demand.status === "已转开发") return;
       const discussionByStatus = {
-        "待讨论": "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品等级。",
+        "待讨论": "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品定级。",
         "讨论中": "讨论中：请补充市场空间、用户痛点、竞品情况、供应链可行性和资源投入。",
         "已讨论": "讨论结论：方向成立，建议转入产品立项，继续补齐 PRD、首批定量和资源投入判断。",
         "暂缓": "暂缓：当前信息、资源或时机不足，后续重新评估。"
@@ -7094,7 +7746,7 @@
       demand = {
         id: cryptoId(),
         name: product.name,
-        level: product.level,
+        level: normalizeProductLevel(product.level),
         owner: product.owner,
         source: product.source || "产品进度",
         status: "已讨论",
@@ -7154,14 +7806,16 @@
       const product = {
         id: cryptoId(),
         name: demand.name,
-        level: demand.level,
+        level: normalizeProductLevel(demand.level),
+        levelConfirmed: false,
+        levelReason: "",
         owner: demand.owner,
         source: demand.source,
         status: "开发中",
         stage: 1,
         launch: "-",
         sales: 0, score: 0, returnRate: 0, profit: 0,
-        image: generateProductImage(demand.name),
+        image: normalizeDemandImages(demand.images)[0]?.url || generateProductImage(demand.name),
         desc: demand.desc,
       };
       state.products.unshift(product);
@@ -7172,7 +7826,7 @@
         id: cryptoId(),
         productId: product.id,
         title: "需求池转入开发",
-        body: `机会「${demand.name}」已讨论通过，进入产品立项阶段。`,
+        body: `机会「${demand.name}」已讨论通过，进入产品立项阶段，产品等级需在立项评审会上正式确认。`,
         date: "今天"
       });
       demand.status = "已转开发";
@@ -7202,19 +7856,21 @@
           ? productById(id)
           : null;
       document.getElementById("formName").value = target?.name || "";
-      document.getElementById("formLevel").value = target?.level || "P1 常规新品";
+      document.getElementById("formLevel").value = target?.level ? normalizeProductLevel(target.level) : "P1 增长级";
       document.getElementById("ownerSearch").value = "";
       renderSourceOptions(target?.source || "");
       setOwnerPickerValue(target?.owner || "");
       document.getElementById("formDesc").value = target?.desc || "";
       document.getElementById("formDiscussion").value = target?.discussion || "";
       const discussionField = document.getElementById("discussionField");
+      const demandImagesField = document.getElementById("demandImagesField");
       const productProfilePanel = document.getElementById("productProfilePanel");
       const imageField = document.getElementById("imageField");
       const imageInput = document.getElementById("formImage");
       const imagePreview = document.getElementById("formImagePreview");
       document.getElementById("formDescLabel").textContent = mode === "productEdit" ? "产品描述" : "机会描述";
       discussionField.classList.toggle("hidden", mode === "productEdit");
+      demandImagesField.classList.toggle("hidden", mode === "productEdit");
       productProfilePanel.classList.toggle("show", mode === "productEdit");
       imageField.classList.toggle("show", mode === "productEdit");
       if (mode === "productEdit") {
@@ -7223,6 +7879,7 @@
         setImagePreview(image, target?.name || "产品");
         renderProductProfilePanel(target);
       } else {
+        setDemandImageValues(target?.images || []);
         imageInput.value = "";
         imagePreview.onerror = null;
         imagePreview.removeAttribute("src");
@@ -7249,10 +7906,11 @@
         const demand = state.demands.find(d => d.id === editingId);
         if (!demand) return;
         demand.name = formValues.name;
-        demand.level = formValues.level;
+        demand.level = normalizeProductLevel(formValues.level);
         demand.owner = formValues.owner;
         demand.source = formValues.source;
         demand.desc = formValues.desc;
+        demand.images = getDemandImageValues();
         demand.discussion = document.getElementById("formDiscussion").value.trim();
         closeModal();
         toast("需求机会已更新。");
@@ -7264,7 +7922,12 @@
         const product = productById(editingId);
         if (!product) return;
         product.name = formValues.name;
-        product.level = formValues.level;
+        const previousLevel = normalizeProductLevel(product.level);
+        product.level = normalizeProductLevel(formValues.level);
+        if (product.stage <= 1 && previousLevel !== product.level) {
+          product.levelConfirmed = false;
+          product.levelReason = "";
+        }
         product.owner = formValues.owner;
         product.source = formValues.source;
         product.desc = formValues.desc;
@@ -7285,7 +7948,7 @@
       const item = {
         id: cryptoId(),
         name: formValues.name,
-        level: formValues.level,
+        level: normalizeProductLevel(formValues.level),
         owner: formValues.owner,
         source: formValues.source,
         status: modalMode === "product" ? "开发中" : "待讨论",
@@ -7304,7 +7967,8 @@
             productId: "",
             created: "今天",
             desc: item.desc,
-            discussion: document.getElementById("formDiscussion").value.trim() || "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品等级。"
+            images: getDemandImageValues(),
+            discussion: document.getElementById("formDiscussion").value.trim() || "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品定级。"
           });
       closeModal();
       toast("机会已进入需求池。");
@@ -7413,13 +8077,62 @@
       toast(`已添加到：${stages[selectedStage].short}`);
       renderAll();
     }
-    function setSelectedStageAsCurrent() {
+    function confirmProjectLevel() {
       if (denyIfCannot("editTasks")) return;
       const p = currentProduct();
+      if (!p || selectedStage !== 1) return;
+      const level = normalizeProductLevel(document.getElementById("projectLevelSelect")?.value || p.level);
+      const reason = document.getElementById("projectLevelReason")?.value.trim() || "立项评审会确认";
+      const oldLevel = normalizeProductLevel(p.level);
+      p.level = level;
+      p.levelConfirmed = true;
+      p.levelReason = reason;
+      p.levelDecidedAt = "今天";
+      const demand = sourceDemandForProduct(p);
+      if (demand) demand.level = level;
+      state.decisions.unshift({
+        id: cryptoId(),
+        productId: p.id,
+        title: oldLevel === level ? "产品正式定级" : "产品等级调整",
+        body: `立项评审会确认「${p.name}」定级为 ${level}。依据：${reason}`,
+        date: "今天"
+      });
+      toast(`已确认产品等级：${level}`);
+      renderAll();
+    }
+    function clearFutureStageProgress(product, stageIndex) {
+      state.tasks.forEach(task => {
+        if (task.productId === product.id && task.stage > stageIndex) task.done = false;
+      });
+      state.reviews.forEach(review => {
+        if (review.productId === product.id && review.stage > stageIndex && review.status === "已通过") {
+          review.status = "未开始";
+          review.result = "-";
+        }
+      });
+    }
+    function updateProductStatusByStage(product) {
+      if (product.stage < 4) product.status = "开发中";
+      if (product.stage === 4 || product.stage === 5) product.status = "上市筹备";
+      if (product.stage === 6) product.status = "维持观察";
+    }
+    async function setSelectedStageAsCurrent() {
+      if (denyIfCannot("editTasks")) return;
+      const p = currentProduct();
+      if (!p || selectedStage === p.stage) return;
+      const movingBack = selectedStage < p.stage;
+      const warning = movingBack
+        ? "这会把后续阶段的任务完成状态清除，相关评审状态也会退回未开始；已经归档的资料和会议纪要会保留。"
+        : "这会手动跳过前面阶段的系统校验，可能造成任务、纪要或资料缺失。";
+      if (!await requestConfirm({
+        title: "调整当前阶段",
+        message: `${p.name} 将从「${stages[p.stage].name}」调整为「${stages[selectedStage].name}」。${warning}`,
+        name: p.name,
+        confirmText: "确认调整"
+      })) return;
+      if (selectedStage < p.stage) clearFutureStageProgress(p, selectedStage);
       p.stage = selectedStage;
-      if (p.stage < 4) p.status = "开发中";
-      if (p.stage === 4 || p.stage === 5) p.status = "上市筹备";
-      if (p.stage === 6) p.status = "维持观察";
+      updateProductStatusByStage(p);
       toast(`当前进度已调整为：${stages[p.stage].name}`);
       renderAll();
     }
@@ -7482,8 +8195,8 @@
       products: ["产品档案", "每个产品的状态、等级、阶段和负责人。"],
       workflow: ["产品进度", "按阶段、任务、会议、交付物和准入条件推进。"],
       deliverables: ["资料包", "像文件夹一样管理这个产品的文档、图片、视频、链接和会议纪要。"],
-      reviews: ["评审决策", "会议任务完成且纪要内容非空，才算评审通过。"],
-      lifecycle: ["生命周期看板", "从首月/季度复盘形成决策，再按升级、维持、清仓或淘汰路径推进。"],
+      reviews: ["评审决策", "必开会议有纪要后，才算评审通过。"],
+      lifecycle: ["产品复盘", "第六、七阶段从首月/季度复盘形成决策，再按升级、维持、清仓或淘汰路径推进。"],
       issues: ["BUG 优化", "集中查看员工提交的问题描述和截图，安排修复或体验优化。"],
       settings: ["系统设置", "总经办维护公司级规则、组织架构状态和岗位权限范围。"]
     };
@@ -7580,11 +8293,21 @@
       }
     });
     document.getElementById("ownerPickerMenu").addEventListener("click", event => event.stopPropagation());
-    document.getElementById("ownerSearch").addEventListener("input", event => {
-      renderOwnerOptions(event.target.value || "");
-      if (window.lucide) lucide.createIcons();
-    });
-    document.getElementById("closeSyncModal").addEventListener("click", closeSyncModal);
+        document.getElementById("ownerSearch").addEventListener("input", event => {
+          renderOwnerOptions(event.target.value || "");
+          if (window.lucide) lucide.createIcons();
+        });
+        document.getElementById("formDemandImages").addEventListener("change", event => {
+          addDemandImageFiles(event.target.files || []);
+          event.target.value = "";
+        });
+        document.getElementById("demandImagePreview").addEventListener("click", event => {
+          const removeButton = event.target.closest("[data-remove-demand-image]");
+          if (!removeButton) return;
+          demandImageValues = getDemandImageValues().filter(image => image.id !== removeButton.dataset.removeDemandImage);
+          renderDemandImagePreview();
+        });
+        document.getElementById("closeSyncModal").addEventListener("click", closeSyncModal);
     document.getElementById("cancelSyncModal").addEventListener("click", closeSyncModal);
     document.getElementById("confirmSyncModal").addEventListener("click", confirmSyncModal);
     document.getElementById("syncPeopleSearch").addEventListener("input", renderPeoplePicker);
@@ -7687,6 +8410,7 @@
     });
     syncTodoDateInputs();
     renderAll();
+    syncSharedStateOnStartup();
     if (currentUser?.source === "dingtalk") syncDingOrgCache();
   </script>
 </body>

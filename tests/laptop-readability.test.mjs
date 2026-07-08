@@ -17,7 +17,7 @@ test("app shell uses a narrower navigation rail before mobile collapse", () => {
 });
 
 test("product archive header and rows share laptop column widths", () => {
-  assert.match(html, /@media \(max-width: 1680px\)[\s\S]*\.product-list-head,\s+\.product-row\.archive-row \{ grid-template-columns: minmax\(320px, 1fr\) 104px 64px 92px 486px; \}/);
+  assert.match(html, /@media \(max-width: 1680px\)[\s\S]*\.product-list-head,\s+\.product-row\.archive-row \{ grid-template-columns: minmax\(320px, 1fr\) 104px 64px 92px max-content; \}/);
 });
 
 test("sidebar uses a light collaboration-tool tone instead of a dark blue rail", () => {
@@ -50,7 +50,7 @@ test("demand table keeps Chinese headers, dates, and actions readable", () => {
   assert.match(html, /\.demand-table \{[\s\S]*min-width: 1248px;[\s\S]*table-layout: fixed;/);
   assert.match(html, /<col class="demand-col-source">/);
   assert.match(html, /\.demand-col-created \{ width: 96px; \}/);
-  assert.match(html, /\.demand-col-actions \{ width: 132px; \}/);
+  assert.match(html, /\.demand-col-actions \{ width: 168px; \}/);
   assert.match(html, /\.demand-table td:nth-child\(5\),\s+\.demand-table td:nth-child\(6\),\s+\.demand-table td:nth-child\(7\) \{[\s\S]*white-space: nowrap;/);
   assert.doesNotMatch(html, /来\s*<br|负\s*<br|创建时\s*<br/);
 });

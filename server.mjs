@@ -1,5 +1,5 @@
 import http from "node:http";
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -21,6 +21,8 @@ import {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.DINGTALK_PORT || 8127);
+const LOCAL_DATA_DIR = path.join(__dirname, ".local-data");
+const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 let orgCache = null;
 
 loadDotEnv();
@@ -62,6 +64,54 @@ function readBody(req) {
       }
     });
   });
+}
+
+async function readLocalCompanyState() {
+  try {
+    const raw = await readFile(LOCAL_STATE_PATH, "utf8");
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function validateCompanyState(state) {
+  const requiredArrays = ["demands", "products", "tasks", "deliverables", "reviews", "feedbackIssues"];
+  if (!state || typeof state !== "object" || Array.isArray(state)) return "缺少有效的产品流程状态数据。";
+  const missing = requiredArrays.filter(key => !Array.isArray(state[key]));
+  return missing.length ? `状态数据缺少必要列表：${missing.join("、")}` : "";
+}
+
+async function handleState(req, res) {
+  try {
+    if (req.method === "GET") {
+      const stored = await readLocalCompanyState();
+      json(res, 200, stored ? { synced: true, ...stored } : { synced: false, state: null });
+      return;
+    }
+    if (req.method !== "POST") {
+      json(res, 405, { message: "Method not allowed" });
+      return;
+    }
+    const body = await readBody(req);
+    const message = validateCompanyState(body.state);
+    if (message) {
+      json(res, 400, { synced: false, message });
+      return;
+    }
+    const updatedAt = new Date().toISOString();
+    const payload = {
+      state: body.state,
+      version: String(body.state.version || "unknown"),
+      updatedAt,
+      updatedBy: String(body.updatedBy || "").slice(0, 80)
+    };
+    await mkdir(LOCAL_DATA_DIR, { recursive: true });
+    await writeFile(LOCAL_STATE_PATH, JSON.stringify(payload, null, 2));
+    json(res, 200, { synced: true, version: payload.version, updatedAt });
+  } catch (error) {
+    json(res, 500, { synced: false, message: error.message || "公司共享数据同步失败。" });
+  }
 }
 
 async function handleDingLogin(req, res) {
@@ -257,6 +307,10 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (url.pathname === "/api/dingtalk/config") {
     json(res, 200, buildConfigResponse(process.env, url.origin));
+    return;
+  }
+  if (url.pathname === "/api/state") {
+    await handleState(req, res);
     return;
   }
   if (url.pathname === "/api/dingtalk/login" && req.method === "POST") {

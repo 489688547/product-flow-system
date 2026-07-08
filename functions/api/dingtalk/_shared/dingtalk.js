@@ -913,7 +913,8 @@ export async function queryDingAiMinutesList(userAccessToken, input = {}, fetchI
 
 async function queryDingAiMinutesListWithScopeFallback(userAccessToken, input = {}, fetchImpl = fetch) {
   const primary = await queryDingAiMinutesList(userAccessToken, input, fetchImpl);
-  if (primary.minutes.length || input.belongingConditionId) return primary;
+  if (input.belongingConditionId) return primary;
+  if (primary.minutes.length && !input.forceScopeFallback) return primary;
   const byTaskUuid = new Map(primary.minutes.map(minute => [minute.taskUuid, minute]));
   const raw = [primary.raw];
   for (const belongingConditionId of ["created", "shared"]) {
@@ -1080,7 +1081,8 @@ export async function queryDingAiMinutesForEvents(userAccessToken, input = {}, f
     .filter(index => index >= 0);
   if (emptyIndexes.length) {
     const loose = await queryDingAiMinutesListWithScopeFallback(userAccessToken, {
-      maxResults: input.maxResults || 80
+      maxResults: input.maxResults || 80,
+      forceScopeFallback: true
     }, fetchImpl);
     const byTaskUuid = new Map(minutes.map(minute => [minute.taskUuid, minute]));
     loose.minutes.forEach(minute => {

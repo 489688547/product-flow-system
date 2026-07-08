@@ -41,12 +41,12 @@ test("demand pool uses compact header filters instead of outside selects or sort
   assert.match(html, /<span>等级<\/span>/);
   assert.match(html, /class="table-filter-trigger" data-demand-level-filter-toggle/);
   assert.match(html, /data-demand-level-filter="all"/);
-  assert.match(html, /data-demand-level-filter="P0 重点品"/);
+  assert.match(html, /data-demand-level-filter="P0 战略级"/);
   assert.match(html, /<th>来源<\/th>/);
   assert.match(html, /<th>负责人<\/th>/);
   assert.match(html, /<th>创建时间<\/th>/);
   assert.match(html, /let demandLevelFilter = "all";/);
-  assert.match(html, /visibleDemands = visibleDemands\.filter\(demand => demand\.level === demandLevelFilter\);/);
+  assert.match(html, /visibleDemands = visibleDemands\.filter\(demand => normalizeProductLevel\(demand\.level\) === demandLevelFilter\);/);
   assert.match(html, /function syncDemandLevelFilterMenu\(\)/);
   assert.match(html, /demandLevelFilter = btn\.dataset\.demandLevelFilter \|\| "all";/);
 });
@@ -63,9 +63,10 @@ test("demand pool keeps status transitions in the status select and row actions 
   assert.doesNotMatch(html, /data-demand-finish/);
   assert.doesNotMatch(html, /data-demand-pause/);
   assert.doesNotMatch(html, /data-demand-resume/);
-  assert.match(html, /\.demand-table \.table-actions \{[\s\S]*flex-wrap: nowrap;[\s\S]*justify-content: center;/);
-  assert.match(html, /\.demand-table th:last-child,\s+\.demand-table td:last-child \{[\s\S]*width: 132px;[\s\S]*text-align: center;/);
-  assert.match(html, /class="mini-action icon-only" title="转入开发" aria-label="转入开发" data-demand-convert/);
+  assert.match(html, /\.demand-table \.table-actions \{[\s\S]*flex-wrap: nowrap;[\s\S]*justify-content: flex-end;/);
+  assert.match(html, /\.demand-table th:last-child,\s+\.demand-table td:last-child \{[\s\S]*width: 168px;[\s\S]*text-align: right;/);
+  assert.match(html, /class="mini-action demand-convert-action" title="转入开发" aria-label="转入开发" data-demand-convert/);
+  assert.match(html, /data-lucide="git-branch-plus"><\/i>转开发/);
   assert.match(html, /class="mini-action icon-only" title="编辑需求" aria-label="编辑需求" data-edit-demand/);
   assert.match(html, /class="mini-action icon-only danger" title="删除需求" aria-label="删除需求" data-delete-demand/);
 });
@@ -76,7 +77,7 @@ test("demand discussion summary is editable from the demand modal", () => {
   assert.match(html, /discussionField\.classList\.toggle\("hidden", mode === "productEdit"\)/);
   assert.match(html, /document\.getElementById\("formDiscussion"\)\.value = target\?\.discussion \|\| "";/);
   assert.match(html, /demand\.discussion = document\.getElementById\("formDiscussion"\)\.value\.trim\(\);/);
-  assert.match(html, /discussion: document\.getElementById\("formDiscussion"\)\.value\.trim\(\) \|\| "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品等级。"/);
+  assert.match(html, /discussion: document\.getElementById\("formDiscussion"\)\.value\.trim\(\) \|\| "待讨论：补充用户痛点、市场空间、供应链可行性和建议产品定级。"/);
 });
 
 test("demand modal uses organization-backed owner and department selectors", () => {
@@ -109,6 +110,17 @@ test("demand modal requires name owner level source and description before save"
   assert.match(html, /if \(!validateModalForm\(\)\) return;/);
   assert.match(html, /const formValues = modalRequiredValues\(\);/);
   assert.doesNotMatch(html, /owner: document\.getElementById\("formOwner"\)\.value\.trim\(\) \|\| "产品部"/);
+});
+
+test("demand opportunity descriptions can include uploaded images", () => {
+  assert.match(html, /id="demandImagesField"/);
+  assert.match(html, /id="formDemandImages"/);
+  assert.match(html, /id="demandImagePreview"/);
+  assert.match(html, /function setDemandImageValues/);
+  assert.match(html, /function demandImageStripHtml/);
+  assert.match(html, /demand\.images = getDemandImageValues\(\)/);
+  assert.match(html, /images: getDemandImageValues\(\)/);
+  assert.match(html, /reader\.readAsDataURL\(file\)/);
 });
 
 test("product archive edit modal reuses product data and shows demand discussion", () => {
@@ -150,6 +162,15 @@ test("workflow can return a product back to the demand pool and clear progress d
   assert.match(html, /demand\.status = "已讨论"/);
 });
 
+test("setting workflow stage requires confirmation and clears future task state when moving back", () => {
+  assert.match(html, /async function setSelectedStageAsCurrent\(\)/);
+  assert.match(html, /await requestConfirm\(\{[\s\S]*title: "调整当前阶段"[\s\S]*confirmText: "确认调整"/);
+  assert.match(html, /function clearFutureStageProgress\(product, stageIndex\)/);
+  assert.match(html, /if \(task\.productId === product\.id && task\.stage > stageIndex\) task\.done = false;/);
+  assert.match(html, /if \(review\.productId === product\.id && review\.stage > stageIndex && review\.status === "已通过"\)/);
+  assert.match(html, /if \(selectedStage < p\.stage\) clearFutureStageProgress\(p, selectedStage\);/);
+});
+
 test("dashboard task rows use row affordance instead of an arrow icon", () => {
   assert.doesNotMatch(html, /class="task-link" data-open-task="\$\{esc\(t\.id\)\}"><i data-lucide="external-link"><\/i>/);
   assert.match(html, /<tr class="task-row" data-open-task="\$\{esc\(t\.id\)\}" tabindex="0">/);
@@ -187,6 +208,82 @@ test("workflow task rows use compact action buttons and a done toggle button", (
   assert.doesNotMatch(html, /class="task-state-toggle/);
 });
 
+test("workflow stages expose meeting nodes and move department actions into preparation tasks", () => {
+  assert.match(html, /const meetingNodeRules = \[/);
+  assert.match(html, /function stageMeetingNodes\(product, stageIndex\)/);
+  assert.match(html, /function meetingDepartmentActions\(node, product\)/);
+  assert.match(html, /function buildMeetingPreparationTasks\(product\)/);
+  assert.match(html, /function ensureMeetingPreparationTasks\(data\)/);
+  assert.match(html, /class="meeting-node-list"/);
+  assert.match(html, /机会头脑风暴会/);
+  assert.match(html, /P0 战略级[\s\S]*必须召开/);
+  assert.match(html, /P1 增长级[\s\S]*建议召开/);
+  assert.match(html, /P2 验证级[\s\S]*可选/);
+  assert.match(html, /P3 常规级[\s\S]*不涉及/);
+  assert.match(html, /运营[\s\S]*一线市场反馈/);
+  assert.match(html, /客服[\s\S]*高频痛点/);
+  assert.match(html, /供应链[\s\S]*成本周期预估/);
+  assert.match(html, /\.\.\.buildMeetingPreparationTasks\(product\)/);
+  assert.match(html, /owner: action\.dept,/);
+  assert.match(html, /title: action\.text,/);
+  assert.match(html, /category: "会前准备",/);
+});
+
+test("workflow meeting nodes use a compact summary instead of heavy nested cards", () => {
+  assert.match(html, /meeting-node-card meeting-node-compact/);
+  assert.match(html, /class="meeting-node-line"/);
+  assert.match(html, /<span class="meeting-node-summary" title="\$\{esc\(node\.summary\)\}">/);
+  assert.doesNotMatch(html, /<span class="small">\$\{esc\(node\.summary\)\}<\/span>/);
+  assert.doesNotMatch(html, /class="department-action-list"/);
+  assert.doesNotMatch(html, /class="department-action-chip"/);
+  assert.doesNotMatch(html, /class="department-action-grid"/);
+  assert.doesNotMatch(html, /class="department-action-card"/);
+});
+
+test("workflow default tasks are meeting preparation and meeting pass is based on minutes", () => {
+  assert.match(html, /function defaultStageTaskCategory\(row\)[\s\S]*return "会前准备";/);
+  assert.match(html, /category: defaultStageTaskCategory\(row\),/);
+  assert.match(html, /function isDefaultPreparationTask\(row\)[\s\S]*return row\.category !== "会议\/决策";/);
+  assert.match(html, /rows\.filter\(isDefaultPreparationTask\)/);
+  assert.match(html, /\.filter\(row => row\.levels\.includes\(normalizeProductLevel\(product\.level\)\)\)/);
+  assert.match(html, /const defaultMeetingTaskTitles = new Set/);
+  assert.match(html, /\.filter\(task => !defaultMeetingTaskTitles\.has\(task\.title\)\)/);
+  assert.match(html, /title: row\.title,/);
+  assert.match(html, /owner: row\.owner,/);
+  assert.match(html, /deliverable: row\.deliverable,/);
+  assert.match(html, /const taskDone = minutes\.hasMinutes \|\| !!task && task\.done;/);
+  assert.match(html, /const passed = minutes\.hasMinutes;/);
+  assert.match(html, /必开会议有纪要后，才算评审通过。/);
+  assert.doesNotMatch(html, /会议任务完成且纪要内容非空，才算评审通过。/);
+});
+
+test("product level stays as one field and is formally confirmed in project approval", () => {
+  assert.match(html, /const PRODUCT_LEVELS = \["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"\]/);
+  assert.match(html, /function levelDecisionHtml\(product, editable\)/);
+  assert.match(html, /产品正式定级/);
+  assert.match(html, /p\.level = level;/);
+  assert.match(html, /p\.levelConfirmed = true;/);
+  assert.match(html, /levelConfirmed: false,/);
+  assert.match(html, /const levelOk = product\.stage !== 1 \|\| product\.levelConfirmed === true;/);
+  assert.doesNotMatch(html, /referenceLevel|suggestedLevel|formalLevel/);
+});
+
+test("review decisions are a meeting summary sourced from product progress", () => {
+  assert.match(html, /必开会议有纪要后，才算评审通过。/);
+  assert.match(html, /会议节点来自产品进度/);
+  assert.match(html, /const meetings = requiredMeetings\(product\);/);
+  assert.match(html, /meetingStatus\(product, meeting\)/);
+  assert.match(html, /data-open-meeting-stage/);
+});
+
+test("lifecycle language is replaced by product review for stages six and seven", () => {
+  assert.match(html, /产品复盘/);
+  assert.match(html, /第六、七阶段/);
+  assert.match(html, /productReview/);
+  assert.doesNotMatch(html, /<span>生命周期<\/span>/);
+  assert.doesNotMatch(html, /<h1>生命周期<\/h1>/);
+});
+
 test("product archive actions are discoverable without relying only on icons", () => {
   assert.match(html, /class="product-action-menu"/);
   assert.match(html, /<span>进度<\/span>/);
@@ -195,11 +292,11 @@ test("product archive actions are discoverable without relying only on icons", (
 });
 
 test("product archive page uses header filters and aligned list columns", () => {
-  assert.match(html, /\.product-list-head,\s+\.product-row\.archive-row \{[\s\S]*grid-template-columns: minmax\(360px, 1fr\) 108px 68px 104px 506px;/);
+  assert.match(html, /\.product-list-head,\s+\.product-row\.archive-row \{[\s\S]*grid-template-columns: minmax\(360px, 1fr\) 108px 68px 104px max-content;/);
   assert.match(html, /\.product-list-head \{[\s\S]*padding: 0 12px 8px;/);
   assert.match(html, /\.product-row\.archive-row \{[\s\S]*min-height: 104px;/);
   assert.match(html, /\.product-row\.archive-row > \.badge,\s+\.product-row\.archive-row > \.product-level,\s+\.product-row\.archive-row > \.product-stage \{[\s\S]*justify-self: start;/);
-  assert.match(html, /<span class="product-level">\$\{esc\(p\.level\.split\(" "\)\[0\]\)\}<\/span>/);
+  assert.match(html, /<span class="product-level" title="\$\{esc\(productLevelText\(p\)\)\}">\$\{esc\(normalizeProductLevel\(p\.level\)\.split\(" "\)\[0\]\)\}<\/span>/);
   assert.match(html, /document\.getElementById\("statusFilter"\)\.classList\.add\("hidden"\);/);
   assert.doesNotMatch(html, /产品只能从需求池转入开发后生成；这里负责查看状态、阶段、资料和会议记录。/);
   assert.match(html, /data-product-filter-toggle="status"/);
@@ -207,7 +304,7 @@ test("product archive page uses header filters and aligned list columns", () => 
   assert.match(html, /data-product-filter-toggle="stage"/);
   assert.match(html, /let productStatusFilter = "all";/);
   assert.match(html, /if \(productStatusFilter !== "all"\) list = list\.filter\(product => product\.status === productStatusFilter\);/);
-  assert.match(html, /if \(productLevelFilter !== "all"\) list = list\.filter\(product => product\.level === productLevelFilter\);/);
+  assert.match(html, /if \(productLevelFilter !== "all"\) list = list\.filter\(product => normalizeProductLevel\(product\.level\) === productLevelFilter\);/);
   assert.match(html, /if \(productStageFilter !== "all"\) list = list\.filter\(product => String\(product\.stage\) === productStageFilter\);/);
   assert.match(html, /function syncProductFilterMenus\(\)/);
   assert.doesNotMatch(html, /document\.getElementById\("statusFilter"\)\.classList\.toggle\("hidden", screen !== "products"\)/);
@@ -222,7 +319,7 @@ test("package manager exposes drag and drop affordance and file empty state", ()
 test("review and lifecycle pages group actions and editable data areas", () => {
   assert.match(html, /class="review-action-group"/);
   assert.match(html, /class="task-table review-table"/);
-  assert.match(html, /\.review-table \.table-actions \{[\s\S]*width: auto;[\s\S]*justify-content: flex-start;/);
+  assert.match(html, /\.review-table \.table-actions \{[\s\S]*width: auto;[\s\S]*justify-content: flex-end;/);
   assert.match(html, /class="lifecycle-data-panel"/);
   assert.match(html, /class="metric-input"/);
 });
