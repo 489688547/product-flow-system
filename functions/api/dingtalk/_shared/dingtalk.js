@@ -420,6 +420,48 @@ export async function createDingTodoTask(accessToken, input = {}, fetchImpl = fe
   );
 }
 
+export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
+  const creatorUnionId = String(input.creatorUnionId || "");
+  const todoId = String(input.todoId || "");
+  if (!creatorUnionId || !todoId) {
+    const err = new Error("缺少钉钉创建人 unionId 或待办 ID，无法更新待办。");
+    err.status = 400;
+    throw err;
+  }
+  if (!input.executorUnionIds?.length) {
+    const err = new Error("请至少选择一个待办执行人。");
+    err.status = 400;
+    throw err;
+  }
+  const body = {
+    subject: String(input.subject || "").slice(0, 1024),
+    description: String(input.description || ""),
+    dueTime: Number(input.dueTime) || 0,
+    executorIds: input.executorUnionIds.filter(Boolean),
+    participantIds: (input.participantUnionIds || []).filter(Boolean),
+    done: Boolean(input.done)
+  };
+  const result = await requestDingOpenApi(
+    accessToken,
+    "PUT",
+    `/v1.0/todo/users/${encodeURIComponent(creatorUnionId)}/tasks/${encodeURIComponent(todoId)}?operatorId=${encodeURIComponent(creatorUnionId)}`,
+    body,
+    fetchImpl
+  );
+  return { ...result, id: todoId, updated: true };
+}
+
+export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
+  if (!Number(input.dueTime)) {
+    const err = new Error("请先设置任务截止日期，再同步到钉钉待办。");
+    err.status = 400;
+    throw err;
+  }
+  return input.todoId
+    ? updateDingTodoTask(accessToken, input, fetchImpl)
+    : createDingTodoTask(accessToken, input, fetchImpl);
+}
+
 export function buildDingCalendarEventPayload({
   summary,
   description = "",
