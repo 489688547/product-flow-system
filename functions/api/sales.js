@@ -1,5 +1,7 @@
 const META_ID = "sales-meta";
-const INSERT_CHUNK = 100;
+// Cloudflare D1 allows at most 100 bound parameters per statement; 10 rows × 9 columns = 90.
+const INSERT_CHUNK = 10;
+const BATCH_STATEMENTS = 40;
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -71,6 +73,7 @@ function validRow(row) {
 }
 
 async function insertRows(db, rows) {
+  const statements = [];
   for (let index = 0; index < rows.length; index += INSERT_CHUNK) {
     const chunk = rows.slice(index, index + INSERT_CHUNK);
     const placeholders = chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
@@ -79,14 +82,20 @@ async function insertRows(db, rows) {
       Number(row.qty) || 0, Number(row.sales) || 0, Number(row.netSales) || 0,
       Number(row.grossProfit) || 0, Number(row.refund) || 0, Number(row.cost) || 0
     ]);
-    await db.prepare(`INSERT INTO product_sales_daily (code, date, platform, qty, sales, net_sales, gross_profit, refund, cost)
+    statements.push(db.prepare(`INSERT INTO product_sales_daily (code, date, platform, qty, sales, net_sales, gross_profit, refund, cost)
       VALUES ${placeholders}
       ON CONFLICT(code, date, platform) DO UPDATE SET
         qty = excluded.qty, sales = excluded.sales, net_sales = excluded.net_sales,
         gross_profit = excluded.gross_profit, refund = excluded.refund, cost = excluded.cost`)
-      .bind(...values)
-      .run();
+      .bind(...values));
   }
+  if (typeof db.batch === "function") {
+    for (let index = 0; index < statements.length; index += BATCH_STATEMENTS) {
+      await db.batch(statements.slice(index, index + BATCH_STATEMENTS));
+    }
+    return;
+  }
+  for (const statement of statements) await statement.run();
 }
 
 function mapDbRow(row) {
@@ -128,7 +137,12 @@ export async function onRequest({ request, env }) {
       const body = await request.json().catch(() => ({}));
       const rows = (Array.isArray(body.rows) ? body.rows : []).filter(validRow);
       if (!rows.length) return jsonResponse({ synced: false, message: "没有可保存的销售数据行。" }, 400);
-      const months = [...new Set(rows.map(row => String(row.date).slice(0, 7)))].sort();
+      const monthRows = {};
+      rows.forEach(row => {
+        const month = String(row.date).slice(0, 7);
+        monthRows[month] = (monthRows[month] || 0) + 1;
+      });
+      const months = Object.keys(monthRows).sort();
       for (const month of months) {
         await db.prepare("DELETE FROM product_sales_daily WHERE substr(date, 1, 7) = ?").bind(month).run();
       }
@@ -137,7 +151,7 @@ export async function onRequest({ request, env }) {
       const importedAt = new Date().toISOString();
       meta.titles = { ...meta.titles, ...(body.titles && typeof body.titles === "object" ? body.titles : {}) };
       meta.imports = [
-        { id: `import-${Date.now()}`, months, rows: rows.length, source: String(body.source || "").slice(0, 120), importedBy: String(body.importedBy || "").slice(0, 80), importedAt },
+        { id: `import-${Date.now()}`, months, monthRows, rows: rows.length, source: String(body.source || "").slice(0, 120), importedBy: String(body.importedBy || "").slice(0, 80), importedAt },
         ...meta.imports.filter(item => !item.months?.some(month => months.includes(month)))
       ].slice(0, 60);
       await writeMeta(db, meta);
