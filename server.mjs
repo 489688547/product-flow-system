@@ -329,6 +329,10 @@ const server = http.createServer(async (req, res) => {
     await handleState(req, res);
     return;
   }
+  if (url.pathname === "/api/sales") {
+    json(res, 501, { synced: false, message: "本地测试模式没有 D1 数据库，销售数据将保存在浏览器本地。" });
+    return;
+  }
   if (url.pathname === "/api/dingtalk/login" && req.method === "POST") {
     await handleDingLogin(req, res);
     return;
