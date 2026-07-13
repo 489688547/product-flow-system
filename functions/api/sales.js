@@ -1,6 +1,6 @@
 const META_ID = "sales-meta";
-// Cloudflare D1 allows at most 100 bound parameters per statement; 10 rows × 9 columns = 90.
-const INSERT_CHUNK = 10;
+// Cloudflare D1 allows at most 100 bound parameters per statement; 9 rows × 11 columns = 99.
+const INSERT_CHUNK = 9;
 const BATCH_STATEMENTS = 40;
 
 function jsonResponse(payload, status = 200) {
@@ -41,6 +41,8 @@ async function ensureSalesTables(db) {
     gross_profit REAL NOT NULL DEFAULT 0,
     refund REAL NOT NULL DEFAULT 0,
     cost REAL NOT NULL DEFAULT 0,
+    pre_ship_refund REAL NOT NULL DEFAULT 0,
+    post_ship_refund REAL NOT NULL DEFAULT 0,
     PRIMARY KEY (code, date, platform)
   )`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS product_sales_meta (
@@ -48,6 +50,14 @@ async function ensureSalesTables(db) {
     payload TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`).run();
+  // Tables created before the pre/post-ship split need the extra columns.
+  for (const column of ["pre_ship_refund", "post_ship_refund"]) {
+    try {
+      await db.prepare(`ALTER TABLE product_sales_daily ADD COLUMN ${column} REAL NOT NULL DEFAULT 0`).run();
+    } catch {
+      // Column already exists.
+    }
+  }
 }
 
 async function readMeta(db) {
@@ -76,17 +86,19 @@ async function insertRows(db, rows) {
   const statements = [];
   for (let index = 0; index < rows.length; index += INSERT_CHUNK) {
     const chunk = rows.slice(index, index + INSERT_CHUNK);
-    const placeholders = chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+    const placeholders = chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
     const values = chunk.flatMap(row => [
       String(row.code), String(row.date), String(row.platform || "未知平台"),
       Number(row.qty) || 0, Number(row.sales) || 0, Number(row.netSales) || 0,
-      Number(row.grossProfit) || 0, Number(row.refund) || 0, Number(row.cost) || 0
+      Number(row.grossProfit) || 0, Number(row.refund) || 0, Number(row.cost) || 0,
+      Number(row.preShipRefund) || 0, Number(row.postShipRefund) || 0
     ]);
-    statements.push(db.prepare(`INSERT INTO product_sales_daily (code, date, platform, qty, sales, net_sales, gross_profit, refund, cost)
+    statements.push(db.prepare(`INSERT INTO product_sales_daily (code, date, platform, qty, sales, net_sales, gross_profit, refund, cost, pre_ship_refund, post_ship_refund)
       VALUES ${placeholders}
       ON CONFLICT(code, date, platform) DO UPDATE SET
         qty = excluded.qty, sales = excluded.sales, net_sales = excluded.net_sales,
-        gross_profit = excluded.gross_profit, refund = excluded.refund, cost = excluded.cost`)
+        gross_profit = excluded.gross_profit, refund = excluded.refund, cost = excluded.cost,
+        pre_ship_refund = excluded.pre_ship_refund, post_ship_refund = excluded.post_ship_refund`)
       .bind(...values));
   }
   if (typeof db.batch === "function") {
@@ -108,7 +120,9 @@ function mapDbRow(row) {
     netSales: Number(row.net_sales) || 0,
     grossProfit: Number(row.gross_profit) || 0,
     refund: Number(row.refund) || 0,
-    cost: Number(row.cost) || 0
+    cost: Number(row.cost) || 0,
+    preShipRefund: Number(row.pre_ship_refund) || 0,
+    postShipRefund: Number(row.post_ship_refund) || 0
   };
 }
 
@@ -129,7 +143,7 @@ export async function onRequest({ request, env }) {
       }
       const codes = codesParam.split(",").map(code => code.trim()).filter(Boolean).slice(0, 50);
       const placeholders = codes.map(() => "?").join(", ");
-      const result = await db.prepare(`SELECT code, date, platform, qty, sales, net_sales, gross_profit, refund, cost
+      const result = await db.prepare(`SELECT code, date, platform, qty, sales, net_sales, gross_profit, refund, cost, pre_ship_refund, post_ship_refund
         FROM product_sales_daily WHERE code IN (${placeholders}) ORDER BY date`).bind(...codes).all();
       return jsonResponse({ synced: true, rows: (result?.results || []).map(mapDbRow) });
     }
