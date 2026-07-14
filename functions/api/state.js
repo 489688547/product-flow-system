@@ -66,9 +66,12 @@ async function writeCompanyState(db, state, updatedBy = "") {
   return { version, updatedAt };
 }
 
-export async function onRequest({ request, env }) {
+export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (!["GET", "POST"].includes(request.method)) return jsonResponse({ message: "Method not allowed" }, 405);
+  if (request.method === "POST" && data.session?.role === "readonly") {
+    return jsonResponse({ synced: false, message: "只读账号不能修改公司共享数据。" }, 403);
+  }
 
   const db = stateDatabase(env);
   if (!db) {
@@ -84,7 +87,7 @@ export async function onRequest({ request, env }) {
       return jsonResponse(stored ? { synced: true, ...stored } : { synced: false, state: null });
     }
     const body = await request.json().catch(() => ({}));
-    const saved = await writeCompanyState(db, body.state, body.updatedBy || "");
+    const saved = await writeCompanyState(db, body.state, data.session?.name || body.updatedBy || "");
     return jsonResponse({ synced: true, ...saved });
   } catch (error) {
     return jsonResponse({

@@ -118,6 +118,15 @@ export async function getDingUserDetail(accessToken, userid, fetchImpl = fetch) 
   return data.result || {};
 }
 
+export async function getDingCurrentUser(userAccessToken, fetchImpl = fetch) {
+  return requestDingOpenApi(userAccessToken, "GET", "/v1.0/contact/users/me", null, fetchImpl);
+}
+
+export async function getDingUserByUnionId(accessToken, unionId, fetchImpl = fetch) {
+  if (!unionId) return {};
+  return postDingTopApi(accessToken, "/topapi/user/getbyunionid", { unionid: unionId }, fetchImpl);
+}
+
 async function postDingTopApi(accessToken, path, body, fetchImpl = fetch) {
   const res = await fetchImpl(`https://oapi.dingtalk.com${path}?access_token=${encodeURIComponent(accessToken)}`, {
     method: "POST",
@@ -291,6 +300,84 @@ export function publicUser(basic = {}, detail = {}) {
     deptIds: detail.dept_id_list || [],
     roles: detail.role_list || []
   };
+}
+
+function dingDepartmentName(user = {}) {
+  const roles = Array.isArray(user.role_list) ? user.role_list : [];
+  const group = roles.find(role => role.group_name && !/默认|角色/i.test(role.group_name));
+  return group?.group_name || "";
+}
+
+function preferredDepartmentId(user = {}) {
+  const deptIds = Array.isArray(user.dept_id_list) ? user.dept_id_list : [];
+  const leaders = Array.isArray(user.leader_in_dept) ? user.leader_in_dept : [];
+  const leaderIndex = leaders.findIndex(value => value === true || value === "true" || value === 1);
+  return deptIds[leaderIndex >= 0 ? leaderIndex : 0] || "";
+}
+
+async function resolveDingDepartmentName(accessToken, user = {}, fetchImpl = fetch) {
+  const deptId = preferredDepartmentId(user);
+  if (!deptId) return dingDepartmentName(user);
+  const department = await getDingDepartmentDetail(accessToken, deptId, fetchImpl).catch(() => ({}));
+  return department.name || dingDepartmentName(user);
+}
+
+function normalizedSessionIdentity({ corpId, basic = {}, detail = {}, department = "" }) {
+  const userId = detail.userid || basic.userid || "";
+  const unionId = detail.unionid || basic.unionid || basic.unionId || "";
+  const combined = { ...basic, ...detail };
+  return {
+    corpId: corpId || "",
+    userId,
+    unionId,
+    name: detail.name || basic.name || basic.nick || userId,
+    role: mapDingRole(combined),
+    department: department || dingDepartmentName(combined),
+    title: detail.title || basic.title || "",
+    avatar: detail.avatar || basic.avatarUrl || basic.avatar || ""
+  };
+}
+
+function assertEnterpriseEmployee(identity = {}, detail = {}) {
+  if (!identity.userId || detail.active === false) {
+    const error = new Error("当前钉钉账号不在当前企业的在职组织架构中，无法进入系统。");
+    error.status = 403;
+    throw error;
+  }
+  return identity;
+}
+
+export async function getDingBrowserIdentity(code, env = {}, fetchImpl = fetch) {
+  const userToken = await getDingUserAccessToken(env, { code }, fetchImpl);
+  const current = await getDingCurrentUser(userToken.accessToken, fetchImpl);
+  const appToken = await getDingAccessToken(env, fetchImpl);
+  const enterprise = await getDingUserByUnionId(appToken, current.unionId || current.unionid, fetchImpl);
+  const detail = await getDingUserDetail(appToken, enterprise.userid, fetchImpl);
+  const department = await resolveDingDepartmentName(appToken, detail, fetchImpl);
+  return assertEnterpriseEmployee(normalizedSessionIdentity({
+    corpId: env.DINGTALK_CORP_ID || env.DINGTALK_CORPID || "",
+    basic: { ...current, userid: enterprise.userid, unionid: current.unionId || current.unionid },
+    detail,
+    department
+  }), detail);
+}
+
+export async function getDingEmbeddedIdentity(authCode, corpId, env = {}, fetchImpl = fetch) {
+  if (!authCode) {
+    const error = new Error("缺少钉钉免登授权码 authCode");
+    error.status = 400;
+    throw error;
+  }
+  const accessToken = await getDingAccessToken(env, fetchImpl);
+  const basic = await getDingUserByCode(accessToken, authCode, fetchImpl);
+  const detail = await getDingUserDetail(accessToken, basic.userid, fetchImpl);
+  const department = await resolveDingDepartmentName(accessToken, detail, fetchImpl);
+  return assertEnterpriseEmployee(normalizedSessionIdentity({
+    corpId: corpId || env.DINGTALK_CORP_ID || env.DINGTALK_CORPID || "",
+    basic,
+    detail,
+    department
+  }), detail);
 }
 
 function publicOrgUser(user = {}, departmentsById = new Map()) {

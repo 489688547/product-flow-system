@@ -1,0 +1,396 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createAuthD1Mock } from "./helpers/auth-d1-mock.mjs";
+import {
+  createSession,
+  readSession,
+  revokeSession,
+  upsertOrgMembers
+} from "../functions/api/auth/_shared/session.js";
+import { onRequest as apiMiddleware } from "../functions/api/_middleware.js";
+import { onRequest as stateRequest } from "../functions/api/state.js";
+import { onRequest as startBrowserLogin } from "../functions/api/auth/dingtalk/start.js";
+import { onRequest as finishBrowserLogin } from "../functions/api/auth/dingtalk/callback.js";
+import { onRequest as embeddedLogin } from "../functions/api/auth/dingtalk/embedded.js";
+import { onRequest as legacyEmbeddedLogin } from "../functions/api/dingtalk/login.js";
+import { onRequest as getCurrentSession } from "../functions/api/auth/session.js";
+import { onRequest as logout } from "../functions/api/auth/logout.js";
+
+const identity = {
+  corpId: "ding-company",
+  userId: "user-1",
+  unionId: "union-1",
+  name: "周荣庆",
+  role: "executive",
+  department: "总经办",
+  title: "总经理"
+};
+
+function requestWithCookie(cookie) {
+  return new Request("https://flow.example.com/api/state", {
+    headers: { cookie }
+  });
+}
+
+test("server session stores only a token hash and resolves an active employee", async () => {
+  const db = createAuthD1Mock();
+  const created = await createSession(identity, "browser", { PRODUCT_FLOW_DB: db });
+
+  assert.match(created.cookie, /^pfs_session=/);
+  assert.equal(db.dumpSessions().length, 1);
+  assert.equal(db.dumpSessions()[0].id_hash.includes(created.token), false);
+
+  const session = await readSession(requestWithCookie(created.cookie), { PRODUCT_FLOW_DB: db });
+  assert.equal(session.unionId, "union-1");
+  assert.equal(session.loginMode, "browser");
+});
+
+test("expired server sessions cannot be read", async () => {
+  const db = createAuthD1Mock();
+  const created = await createSession(identity, "embedded", { PRODUCT_FLOW_DB: db });
+  const row = db.dumpSessions()[0];
+  db.setSessionExpires(row.id_hash, "2000-01-01T00:00:00.000Z");
+
+  const session = await readSession(requestWithCookie(created.cookie), { PRODUCT_FLOW_DB: db });
+  assert.equal(session, null);
+});
+
+test("logout revokes a server session without exposing the raw token", async () => {
+  const db = createAuthD1Mock();
+  const created = await createSession(identity, "browser", { PRODUCT_FLOW_DB: db });
+  const request = requestWithCookie(created.cookie);
+
+  assert.equal(await revokeSession(request, { PRODUCT_FLOW_DB: db }), true);
+  assert.equal(await readSession(request, { PRODUCT_FLOW_DB: db }), null);
+  assert.equal(db.dumpSessions()[0].revoked_at !== null, true);
+});
+
+test("browser login start redirects to DingTalk with a protected callback state", async () => {
+  const response = await startBrowserLogin({
+    request: new Request("https://flow.example.com/api/auth/dingtalk/start"),
+    env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+  });
+
+  assert.equal(response.status, 302);
+  const location = new URL(response.headers.get("location"));
+  assert.equal(location.origin, "https://login.dingtalk.com");
+  assert.equal(location.searchParams.get("client_id"), "app-key");
+  assert.equal(location.searchParams.get("redirect_uri"), "https://flow.example.com/api/auth/dingtalk/callback");
+  assert.ok(location.searchParams.get("state"));
+  assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
+  assert.match(response.headers.get("set-cookie"), /HttpOnly/);
+});
+
+test("browser OAuth callback rejects a mismatched state", async () => {
+  const response = await finishBrowserLogin({
+    request: new Request("https://flow.example.com/api/auth/dingtalk/callback?code=auth-code&state=wrong", {
+      headers: { cookie: "pfs_oauth_state=expected" }
+    }),
+    env: {
+      PRODUCT_FLOW_DB: createAuthD1Mock(),
+      DINGTALK_APP_KEY: "app-key",
+      DINGTALK_APP_SECRET: "app-secret",
+      DINGTALK_CORP_ID: "ding-company"
+    }
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 400);
+  assert.match(body.message, /登录校验已失效/);
+});
+
+test("browser OAuth callback creates a server session for an enterprise employee", async () => {
+  const db = createAuthD1Mock();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const value = String(url);
+    if (value.includes("/v1.0/oauth2/userAccessToken")) {
+      return Response.json({ accessToken: "user-token", unionId: "union-1" });
+    }
+    if (value.includes("/v1.0/contact/users/me")) {
+      return Response.json({ unionId: "union-1", nick: "周荣庆", avatarUrl: "" });
+    }
+    if (value.includes("/gettoken")) {
+      return Response.json({ errcode: 0, access_token: "app-token" });
+    }
+    if (value.includes("/topapi/user/getbyunionid")) {
+      return Response.json({ errcode: 0, result: { userid: "user-1" } });
+    }
+    if (value.includes("/topapi/v2/user/get")) {
+      return Response.json({
+        errcode: 0,
+        result: {
+          userid: "user-1",
+          unionid: "union-1",
+          name: "周荣庆",
+          title: "总经理",
+          dept_id_list: [1],
+          role_list: [{ group_name: "系统角色", name: "主管理员" }],
+          active: true
+        }
+      });
+    }
+    if (value.includes("/topapi/v2/department/get")) {
+      return Response.json({ errcode: 0, result: { dept_id: 1, parent_id: 0, name: "总经办" } });
+    }
+    throw new Error(`unexpected fetch ${value}`);
+  };
+
+  try {
+    const response = await finishBrowserLogin({
+      request: new Request("https://flow.example.com/api/auth/dingtalk/callback?code=auth-code&state=expected", {
+        headers: { cookie: "pfs_oauth_state=expected" }
+      }),
+      env: {
+        PRODUCT_FLOW_DB: db,
+        DINGTALK_APP_KEY: "app-key",
+        DINGTALK_APP_SECRET: "app-secret",
+        DINGTALK_CORP_ID: "ding-company"
+      }
+    });
+
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), "https://flow.example.com/?login=success");
+    assert.match(response.headers.get("set-cookie"), /pfs_session=/);
+    const sessionResponse = await getCurrentSession({
+      request: requestWithCookie(response.headers.get("set-cookie")),
+      env: { PRODUCT_FLOW_DB: db }
+    });
+    const body = await sessionResponse.json();
+    assert.equal(body.authenticated, true);
+    assert.equal(body.user.name, "周荣庆");
+    assert.equal(body.user.department, "总经办");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("browser OAuth rejects a DingTalk account outside the enterprise", async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const value = String(url);
+    if (value.includes("/v1.0/oauth2/userAccessToken")) return Response.json({ accessToken: "user-token" });
+    if (value.includes("/v1.0/contact/users/me")) return Response.json({ unionId: "external-union", nick: "外部用户" });
+    if (value.includes("/gettoken")) return Response.json({ errcode: 0, access_token: "app-token" });
+    if (value.includes("/topapi/user/getbyunionid")) return Response.json({ errcode: 0, result: {} });
+    throw new Error(`unexpected fetch ${value}`);
+  };
+
+  try {
+    const response = await finishBrowserLogin({
+      request: new Request("https://flow.example.com/api/auth/dingtalk/callback?code=auth-code&state=expected", {
+        headers: { cookie: "pfs_oauth_state=expected" }
+      }),
+      env: {
+        PRODUCT_FLOW_DB: createAuthD1Mock(),
+        DINGTALK_APP_KEY: "app-key",
+        DINGTALK_APP_SECRET: "app-secret",
+        DINGTALK_CORP_ID: "ding-company"
+      }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 403);
+    assert.match(body.message, /当前企业/);
+    assert.equal(response.headers.get("set-cookie")?.includes("pfs_session=") || false, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("embedded DingTalk login creates the same public session model", async () => {
+  const db = createAuthD1Mock();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const value = String(url);
+    if (value.includes("/gettoken")) return Response.json({ errcode: 0, access_token: "app-token" });
+    if (value.includes("/topapi/v2/user/getuserinfo")) {
+      return Response.json({ errcode: 0, result: { userid: "user-1", unionid: "union-1" } });
+    }
+    if (value.includes("/topapi/v2/user/get")) {
+      return Response.json({
+        errcode: 0,
+        result: {
+          userid: "user-1",
+          unionid: "union-1",
+          name: "周荣庆",
+          title: "总经理",
+          dept_id_list: [1],
+          role_list: [{ group_name: "系统角色", name: "主管理员" }],
+          active: true
+        }
+      });
+    }
+    if (value.includes("/topapi/v2/department/get")) {
+      return Response.json({ errcode: 0, result: { dept_id: 1, parent_id: 0, name: "总经办" } });
+    }
+    throw new Error(`unexpected fetch ${value}`);
+  };
+
+  try {
+    const response = await embeddedLogin({
+      request: new Request("https://flow.example.com/api/auth/dingtalk/embedded", {
+        method: "POST",
+        body: JSON.stringify({ authCode: "embedded-code", corpId: "ding-company" })
+      }),
+      env: {
+        PRODUCT_FLOW_DB: db,
+        DINGTALK_APP_KEY: "app-key",
+        DINGTALK_APP_SECRET: "app-secret",
+        DINGTALK_CORP_ID: "ding-company"
+      }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.authenticated, true);
+    assert.equal(body.user.loginMode, "embedded");
+    assert.equal(body.user.department, "总经办");
+    assert.match(response.headers.get("set-cookie"), /pfs_session=/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("legacy embedded login delegates to the unified server session", async () => {
+  const db = createAuthD1Mock();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const value = String(url);
+    if (value.includes("/gettoken")) return Response.json({ errcode: 0, access_token: "app-token" });
+    if (value.includes("/topapi/v2/user/getuserinfo")) {
+      return Response.json({ errcode: 0, result: { userid: "user-1", unionid: "union-1" } });
+    }
+    if (value.includes("/topapi/v2/user/get")) {
+      return Response.json({
+        errcode: 0,
+        result: {
+          userid: "user-1",
+          unionid: "union-1",
+          name: "周荣庆",
+          title: "总经理",
+          dept_id_list: [1],
+          role_list: [{ group_name: "系统角色", name: "主管理员" }],
+          active: true
+        }
+      });
+    }
+    if (value.includes("/topapi/v2/department/get")) {
+      return Response.json({ errcode: 0, result: { dept_id: 1, parent_id: 0, name: "总经办" } });
+    }
+    throw new Error(`unexpected fetch ${value}`);
+  };
+
+  try {
+    const response = await legacyEmbeddedLogin({
+      request: new Request("https://flow.example.com/api/dingtalk/login", {
+        method: "POST",
+        body: JSON.stringify({ authCode: "embedded-code", corpId: "ding-company" })
+      }),
+      env: {
+        PRODUCT_FLOW_DB: db,
+        DINGTALK_APP_KEY: "app-key",
+        DINGTALK_APP_SECRET: "app-secret",
+        DINGTALK_CORP_ID: "ding-company"
+      }
+    });
+
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get("set-cookie") || "", /pfs_session=/);
+    assert.equal(db.dumpSessions().length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("logout clears and revokes the current session", async () => {
+  const db = createAuthD1Mock();
+  const created = await createSession(identity, "browser", { PRODUCT_FLOW_DB: db });
+  const request = new Request("https://flow.example.com/api/auth/logout", {
+    method: "POST",
+    headers: { cookie: created.cookie }
+  });
+
+  const response = await logout({ request, env: { PRODUCT_FLOW_DB: db } });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("set-cookie"), /Max-Age=0/);
+  assert.equal(await readSession(request, { PRODUCT_FLOW_DB: db }), null);
+});
+
+test("API middleware blocks anonymous company data", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/state"),
+    env: { PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 401);
+  assert.equal(continued, false);
+  assert.equal(body.authenticated, false);
+});
+
+test("API middleware attaches an authenticated session before continuing", async () => {
+  const db = createAuthD1Mock();
+  const created = await createSession(identity, "browser", { PRODUCT_FLOW_DB: db });
+  const context = {
+    request: requestWithCookie(created.cookie),
+    env: { PRODUCT_FLOW_DB: db },
+    data: {},
+    next: async () => Response.json({ ok: true })
+  };
+
+  const response = await apiMiddleware(context);
+  assert.equal(response.status, 200);
+  assert.equal(context.data.session.name, "周荣庆");
+});
+
+test("API middleware keeps login bootstrap routes public", async () => {
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/auth/session"),
+    env: {},
+    data: {},
+    next: async () => new Response("public", { status: 200 })
+  });
+  assert.equal(await response.text(), "public");
+});
+
+test("readonly sessions cannot write shared company state", async () => {
+  const response = await stateRequest({
+    request: new Request("https://flow.example.com/api/state", {
+      method: "POST",
+      body: JSON.stringify({ state: {} })
+    }),
+    env: { PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: { session: { role: "readonly", name: "只读访客" } }
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.match(body.message, /只读/);
+});
+
+test("organization sync persists the active employee cache", async () => {
+  const db = createAuthD1Mock();
+  await upsertOrgMembers(db, {
+    syncedAt: "2026-07-14T08:00:00.000Z",
+    users: [{
+      userId: "user-1",
+      unionId: "union-1",
+      name: "周荣庆",
+      title: "总经理",
+      departmentNames: ["总经办"],
+      role: "executive",
+      active: true
+    }]
+  }, "ding-company");
+
+  assert.equal(db.dumpMembers().length, 1);
+  assert.equal(db.dumpMembers()[0].department, "总经办");
+  assert.equal(db.dumpMembers()[0].active, 1);
+});

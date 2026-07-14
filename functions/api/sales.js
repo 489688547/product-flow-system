@@ -126,8 +126,11 @@ function mapDbRow(row) {
   };
 }
 
-export async function onRequest({ request, env }) {
+export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
+  if (["POST", "DELETE"].includes(request.method) && data.session?.role === "readonly") {
+    return jsonResponse({ synced: false, message: "只读账号不能修改销售数据。" }, 403);
+  }
   const db = salesDatabase(env);
   if (!db) {
     return jsonResponse({ synced: false, message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，销售数据只能保存在本机浏览器。" }, 501);

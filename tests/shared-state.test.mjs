@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
@@ -97,9 +97,12 @@ test("state API persists company data including demand pool and issue submission
 });
 
 test("frontend loads and saves product flow state through the shared state API", () => {
-  assert.match(html, /async function syncSharedStateOnStartup\(/);
-  assert.match(html, /async function persistSharedState\(/);
-  assert.match(html, /fetch\("\/api\/state"/);
-  assert.match(html, /feedbackIssues/);
-  assert.match(html, /saveState\(\{ remote: false \}\)/);
+  assert.match(html, /<script[^>]+type="module"[^>]+src="\/assets\//);
+  const assetsDir = new URL("../assets/", import.meta.url);
+  const javascript = readdirSync(assetsDir)
+    .filter(name => name.endsWith(".js"))
+    .map(name => readFileSync(new URL(name, assetsDir), "utf8"))
+    .join("\n");
+  assert.match(javascript, /\/api\/state/);
+  assert.match(javascript, /feedbackIssues/);
 });

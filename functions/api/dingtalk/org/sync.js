@@ -4,6 +4,7 @@ import {
   optionsResponse,
   syncDingOrg
 } from "../_shared/dingtalk.js";
+import { upsertOrgMembers } from "../../auth/_shared/session.js";
 
 export async function onRequest({ request, env }) {
   if (request.method === "OPTIONS") return optionsResponse();
@@ -14,6 +15,10 @@ export async function onRequest({ request, env }) {
     const org = await syncDingOrg(accessToken, fetch, new Date(), {
       rootDeptId: env.DINGTALK_ROOT_DEPT_ID || 1
     });
+    const db = env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+    if (db) {
+      await upsertOrgMembers(db, org, env.DINGTALK_CORP_ID || env.DINGTALK_CORPID || "");
+    }
     return jsonResponse({ synced: true, org });
   } catch (error) {
     return jsonResponse({
