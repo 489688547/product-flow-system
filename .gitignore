@@ -3,4 +3,5 @@
 node_modules/
 .local-data/
 dist/
+.wrangler/
 .superpowers/
