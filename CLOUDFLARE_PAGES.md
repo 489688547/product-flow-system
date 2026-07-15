@@ -4,9 +4,17 @@
 
 这个项目可以直接接入 Cloudflare Pages：
 
-- 前端入口：`index.html`
+- 前端发布入口：`cloudflare-entry.html`（由 `_redirects` 接管根路径）
 - Cloudflare Functions：`functions/api/dingtalk/config.js`、`functions/api/dingtalk/login.js`
 - 不需要构建命令。
+
+发布前先在本地生成并提交生产资源：
+
+```bash
+npm run release:pages
+```
+
+仓库中的 `index.html` 保留给 Vite 本地开发；Pages 继续使用“无构建、发布仓库根目录”的现有配置。
 
 `.env` 只用于本地调试，不能提交到 GitHub。
 
