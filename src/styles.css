@@ -701,6 +701,78 @@ main { min-width: 0; overflow-x: hidden; }
 .cover-editable:hover .cover-edit-overlay, .cover-editable:focus-within .cover-edit-overlay { opacity: 1; }
 .disabled-action-tip { display: inline-flex; cursor: not-allowed; }
 .disabled-action-tip .btn:disabled { pointer-events: none; }
+.modal-footer-spacer { flex: 1; }
+
+/* Annual product planning */
+.planning-page { gap: var(--space-4); }
+.planning-year-picker { height: var(--control-height); display: inline-flex; align-items: center; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
+.planning-year-picker button { width: 30px; height: 28px; border: 0; border-radius: 6px; display: grid; place-items: center; color: var(--text-secondary); background: transparent; }
+.planning-year-picker button:hover { color: var(--text-primary); background: var(--surface-hover); }
+.planning-year-picker strong { min-width: 92px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; }
+.planning-demand-tray, .planning-timeline-section { border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.planning-section-heading { min-height: 58px; padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); border-bottom: 1px solid var(--border); }
+.planning-section-heading p { margin-top: 2px; font-size: 12px; }
+.planning-section-heading > span { flex: 0 0 auto; color: var(--text-tertiary); font-size: 12px; font-weight: 650; }
+.planning-demand-list { min-height: 76px; padding: var(--space-3); display: flex; align-items: center; gap: var(--space-2); overflow-x: auto; }
+.planning-demand-chip { flex: 0 0 auto; width: 230px; min-height: 52px; padding: 6px; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast); }
+.planning-demand-chip.is-draggable { cursor: grab; }
+.planning-demand-chip.is-draggable:active { cursor: grabbing; }
+.planning-demand-chip:hover { border-color: var(--border-strong); background: var(--surface-hover); box-shadow: 0 3px 10px oklch(20% .02 258 / .05); }
+.planning-demand-chip img { width: 40px; height: 40px; border-radius: 7px; object-fit: cover; background: var(--surface-subtle); }
+.planning-demand-chip strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.planning-arrange-button { width: 30px; padding: 0 !important; }
+.planning-arrange-button svg { margin: 0; }
+.planning-arrange-button { font-size: 0; }
+.planning-tray-empty { width: 100%; color: var(--text-tertiary); text-align: center; font-size: 13px; }
+.planning-legend { display: flex; align-items: center; gap: var(--space-3); font-size: 12px; font-weight: 650; }
+.planning-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.planning-legend span::before { content: ""; width: 18px; height: 6px; border-radius: 3px; }
+.planning-legend .development::before { background: var(--accent); }
+.planning-legend .launch::before { background: var(--success); }
+.planning-timeline-scroll { overflow-x: auto; }
+.planning-timeline { min-width: 1120px; }
+.planning-timeline-header, .planning-timeline-row { display: grid; grid-template-columns: 224px minmax(864px, 1fr); }
+.planning-timeline-header { height: 38px; color: var(--text-tertiary); font-size: 12px; font-weight: 650; border-bottom: 1px solid var(--border); background: var(--surface-subtle); }
+.planning-product-column { position: sticky; left: 0; z-index: 3; min-width: 0; padding: 0 var(--space-3); display: flex; align-items: center; background: inherit; border-right: 1px solid var(--border); }
+.planning-month-header, .planning-month-cells { display: grid; grid-template-columns: repeat(12, minmax(72px, 1fr)); }
+.planning-month-header span { display: grid; place-items: center; border-right: 1px solid var(--border); white-space: nowrap; }
+.planning-timeline-row { min-height: 76px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.planning-timeline-row:last-child { border-bottom: 0; }
+.planning-product-info { gap: var(--space-2); }
+.planning-product-info img { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 7px; object-fit: cover; background: var(--surface-subtle); }
+.planning-product-info strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.planning-product-info small { margin-top: 2px; display: flex; align-items: center; gap: 3px; color: var(--warning); }
+.planning-track { position: relative; min-width: 0; min-height: 76px; }
+.planning-month-cells { position: absolute; inset: 0; }
+.planning-month-drop { border-right: 1px solid var(--border); transition: background-color var(--transition-fast); }
+.planning-month-drop:hover { background: var(--accent-soft); }
+.planning-bar { position: absolute; z-index: 2; height: 26px; min-width: 30px; padding: 0 8px; border: 0; border-radius: 6px; display: flex; align-items: center; gap: 7px; overflow: hidden; color: white; box-shadow: 0 1px 2px oklch(20% .02 258 / .12); transition: filter var(--transition-fast), transform var(--transition-fast); }
+.planning-bar:hover { filter: brightness(.96); transform: translateY(-1px); }
+.planning-bar span { flex: 0 0 auto; font-size: 11px; font-weight: 750; }
+.planning-bar small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: inherit; opacity: .88; }
+.planning-bar.development { top: 9px; background: var(--accent); }
+.planning-bar.launch { top: 41px; background: var(--success); }
+.planning-empty-row .planning-product-column { color: var(--text-tertiary); font-size: 12px; }
+.planning-empty-row .planning-track p { position: absolute; z-index: 1; inset: 0; margin: 0; display: grid; place-items: center; pointer-events: none; color: var(--text-tertiary); font-size: 12px; }
+.planning-modal-product { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.planning-modal-product img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; background: var(--surface); }
+.planning-modal-product strong { font-size: 15px; }
+.planning-modal-product p { font-size: 12px; }
+.planning-date-grid { margin-top: var(--space-4); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.planning-date-grid fieldset { min-width: 0; margin: 0; padding: var(--space-3); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); }
+.planning-date-grid legend { padding: 0 4px; color: var(--text-primary); font-size: 13px; font-weight: 700; }
+.planning-date-grid label { min-width: 0; display: grid; gap: 5px; color: var(--text-secondary); font-size: 12px; font-weight: 650; }
+.planning-date-grid .date-picker-trigger { width: 100%; }
+
+@media (max-width: 900px) {
+  .planning-section-heading { align-items: flex-start; }
+  .planning-date-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .planning-demand-chip { width: 210px; }
+  .planning-date-grid fieldset { grid-template-columns: 1fr; }
+}
 .sales-workflow-tip { margin-top: 4px; color: var(--text-secondary); font-size: 12px; }
 .sales-workflow-tip strong { color: var(--text-primary); }
 .kuaimai-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 650; margin-top: 4px; }

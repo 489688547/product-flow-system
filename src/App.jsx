@@ -1,4 +1,4 @@
-import { Archive, Bug, ChevronDown, ClipboardList, GitBranch, Home, LogOut, Settings } from "lucide-react";
+import { Archive, Bug, CalendarRange, ChevronDown, ClipboardList, GitBranch, Home, LogOut, Settings } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductArchivePage } from "./features/archive/ProductArchivePage.jsx";
 import { DashboardPage } from "./features/dashboard/DashboardPage.jsx";
@@ -8,6 +8,7 @@ import { IssuePage } from "./features/issues/IssuePage.jsx";
 import { PackagePage } from "./features/packages/PackagePage.jsx";
 import { ProductProgressPage } from "./features/progress/ProductProgressPage.jsx";
 import { SettingsPage } from "./features/settings/SettingsPage.jsx";
+import { ProductPlanningPage } from "./features/planning/ProductPlanningPage.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
 import { canViewNavigation } from "./domain/permissions.js";
 import { useAuth } from "./state/AuthProvider.jsx";
@@ -15,6 +16,7 @@ import { useAuth } from "./state/AuthProvider.jsx";
 const NAV = [
   ["dashboard", "总览", Home],
   ["demands", "需求池", ClipboardList],
+  ["planning", "产品规划", CalendarRange],
   ["progress", "产品进度", GitBranch],
   ["archive", "产品档案", Archive],
   ["issues", "问题反馈", Bug],
@@ -75,6 +77,7 @@ export default function App() {
   const pages = {
     dashboard: <DashboardPage onNavigate={navigate} onOpenProgress={openProgress} />,
     demands: <DemandPoolPage onProjectCreated={productId => openProgress(productId, 1)} />,
+    planning: <ProductPlanningPage />,
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} />,
     packages: <PackagePage />,

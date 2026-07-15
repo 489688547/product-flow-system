@@ -86,6 +86,41 @@ test("new app exposes all core product workflow pages", () => {
   assert.match(app, /hashchange/);
 });
 
+test("annual product planning reuses demands in a twelve-month editable timeline", () => {
+  const app = read("src/App.jsx");
+  const page = read("src/features/planning/ProductPlanningPage.jsx");
+  const tray = read("src/features/planning/PlanningDemandTray.jsx");
+  const timeline = read("src/features/planning/AnnualPlanningTimeline.jsx");
+  const modal = read("src/features/planning/ProductPlanModal.jsx");
+  const button = read("src/ui/Button.jsx");
+  const styles = read("src/styles.css");
+
+  assert.match(app, /CalendarRange/);
+  assert.match(app, /\["demands", "需求池"[\s\S]*\["planning", "产品规划"[\s\S]*\["progress", "产品进度"/);
+  assert.match(app, /planning: <ProductPlanningPage/);
+  assert.match(page, /<DemandModal/);
+  assert.match(page, /canEditProductPlanning/);
+  assert.match(page, /disabledReason=/);
+  assert.match(button, /disabledReason/);
+  assert.match(button, /disabled-action-tip/);
+  assert.match(tray, /application\/x-product-demand-id/);
+  assert.match(tray, /draggable=\{canEdit\}/);
+  assert.match(tray, /\/>安排/);
+  assert.match(timeline, /Array\.from\(\{ length: 12 \}/);
+  assert.match(timeline, /timelineSegment/);
+  assert.match(timeline, />开发</);
+  assert.match(timeline, />上线</);
+  assert.match(timeline, /来源需求已删除/);
+  assert.match(modal, /DatePickerField/);
+  assert.match(modal, /validateProductPlan/);
+  assert.match(modal, /window\.confirm\("确认删除这条产品规划/);
+  assert.match(styles, /\.planning-timeline/);
+  assert.match(styles, /\.planning-product-column/);
+  assert.match(styles, /\.planning-bar\.development/);
+  assert.match(styles, /\.planning-bar\.launch/);
+  assert.match(styles, /grid-template-columns: repeat\(12, minmax\(72px, 1fr\)\)/);
+});
+
 test("dashboard uses aligned section headers plus reusable product thumbnails in task and risk rows", () => {
   const dashboard = read("src/features/dashboard/DashboardPage.jsx");
   const styles = read("src/styles.css");
