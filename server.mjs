@@ -19,6 +19,12 @@ import {
   syncDingTodoTask,
   syncDingOrg
 } from "./functions/api/dingtalk/_shared/dingtalk.js";
+import {
+  callKuaimai,
+  kuaimaiConfigFromEnv,
+  pullKuaimaiDay,
+  refreshKuaimaiSession
+} from "./functions/api/kuaimai/_shared/kuaimai.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.DINGTALK_PORT || 8127);
@@ -81,6 +87,55 @@ function validateCompanyState(state) {
   if (!state || typeof state !== "object" || Array.isArray(state)) return "缺少有效的产品流程状态数据。";
   const missing = requiredArrays.filter(key => !Array.isArray(state[key]));
   return missing.length ? `状态数据缺少必要列表：${missing.join("、")}` : "";
+}
+
+async function handleKuaimaiStatus(res) {
+  const config = kuaimaiConfigFromEnv(process.env);
+  if (!config.ready) {
+    json(res, 200, { connected: false, configured: false, message: "缺少快麦API配置（.env 里的 KUAIMAI_* 变量）。" });
+    return;
+  }
+  try {
+    const payload = await callKuaimai("open.system.time.get", {}, config);
+    json(res, 200, { connected: true, configured: true, serverTime: payload.time || payload.systemTime || payload.date || "", traceId: payload.trace_id || "" });
+  } catch (error) {
+    json(res, 200, { connected: false, configured: true, message: error.message || "快麦接口连接失败。" });
+  }
+}
+
+async function handleKuaimaiRefresh(res) {
+  const config = kuaimaiConfigFromEnv(process.env);
+  if (!config.ready || !config.refreshToken) {
+    json(res, 400, { refreshed: false, message: "缺少快麦API配置或refreshToken。" });
+    return;
+  }
+  try {
+    const session = await refreshKuaimaiSession(config);
+    json(res, 200, { refreshed: true, expiresIn: session?.expiresIn ?? null, refreshedAt: new Date().toISOString() });
+  } catch (error) {
+    const rateLimited = /限流|频繁|一小时|too many/i.test(error.message || "");
+    json(res, rateLimited ? 200 : 502, { refreshed: false, rateLimited, message: error.message || "刷新会话失败。" });
+  }
+}
+
+async function handleKuaimaiPull(res, url) {
+  const config = kuaimaiConfigFromEnv(process.env);
+  if (!config.ready) {
+    json(res, 400, { message: "缺少快麦API配置。" });
+    return;
+  }
+  const date = String(url.searchParams.get("date") || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    json(res, 400, { message: "缺少要同步的日期参数（YYYY-MM-DD）。" });
+    return;
+  }
+  const pageNo = Math.max(1, Number(url.searchParams.get("pageNo")) || 1);
+  try {
+    const result = await pullKuaimaiDay(config, { date, pageNo, maxPages: 8 });
+    json(res, 200, { synced: true, ...result });
+  } catch (error) {
+    json(res, 502, { synced: false, message: error.message || "快麦订单拉取失败。" });
+  }
 }
 
 async function handleState(req, res) {
@@ -331,6 +386,18 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/sales") {
     json(res, 501, { synced: false, message: "本地测试模式没有 D1 数据库，销售数据将保存在浏览器本地。" });
+    return;
+  }
+  if (url.pathname === "/api/kuaimai/status" && req.method === "GET") {
+    await handleKuaimaiStatus(res);
+    return;
+  }
+  if (url.pathname === "/api/kuaimai/refresh" && req.method === "POST") {
+    await handleKuaimaiRefresh(res);
+    return;
+  }
+  if (url.pathname === "/api/kuaimai/pull" && req.method === "GET") {
+    await handleKuaimaiPull(res, url);
     return;
   }
   if (url.pathname === "/api/dingtalk/login" && req.method === "POST") {

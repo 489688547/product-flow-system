@@ -126,11 +126,8 @@ function mapDbRow(row) {
   };
 }
 
-export async function onRequest({ request, env, data = {} }) {
+export async function onRequest({ request, env }) {
   if (request.method === "OPTIONS") return optionsResponse();
-  if (["POST", "DELETE"].includes(request.method) && data.session?.role === "readonly") {
-    return jsonResponse({ synced: false, message: "只读账号不能修改销售数据。" }, 403);
-  }
   const db = salesDatabase(env);
   if (!db) {
     return jsonResponse({ synced: false, message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，销售数据只能保存在本机浏览器。" }, 501);
@@ -160,16 +157,26 @@ export async function onRequest({ request, env, data = {} }) {
         monthRows[month] = (monthRows[month] || 0) + 1;
       });
       const months = Object.keys(monthRows).sort();
-      for (const month of months) {
-        await db.prepare("DELETE FROM product_sales_daily WHERE substr(date, 1, 7) = ?").bind(month).run();
+      // replaceScope=dates：只覆盖本次数据涉及的具体日期（快麦API按日同步用），
+      // 默认按整月覆盖（Excel整月导入用）。
+      const dateScope = body.replaceScope === "dates";
+      if (dateScope) {
+        const dates = [...new Set(rows.map(row => String(row.date)))];
+        for (const day of dates) {
+          await db.prepare("DELETE FROM product_sales_daily WHERE date = ?").bind(day).run();
+        }
+      } else {
+        for (const month of months) {
+          await db.prepare("DELETE FROM product_sales_daily WHERE substr(date, 1, 7) = ?").bind(month).run();
+        }
       }
       await insertRows(db, rows);
       const meta = await readMeta(db);
       const importedAt = new Date().toISOString();
       meta.titles = { ...meta.titles, ...(body.titles && typeof body.titles === "object" ? body.titles : {}) };
       meta.imports = [
-        { id: `import-${Date.now()}`, months, monthRows, rows: rows.length, source: String(body.source || "").slice(0, 120), importedBy: String(body.importedBy || "").slice(0, 80), importedAt },
-        ...meta.imports.filter(item => !item.months?.some(month => months.includes(month)))
+        { id: `import-${Date.now()}`, months, monthRows, rows: rows.length, scope: dateScope ? "dates" : "months", source: String(body.source || "").slice(0, 120), importedBy: String(body.importedBy || "").slice(0, 80), importedAt },
+        ...meta.imports.filter(item => dateScope ? item.scope === "months" || !item.months?.some(month => months.includes(month)) : !item.months?.some(month => months.includes(month)))
       ].slice(0, 60);
       await writeMeta(db, meta);
       return jsonResponse({ synced: true, months, rows: rows.length, importedAt });
