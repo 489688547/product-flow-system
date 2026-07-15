@@ -46,6 +46,11 @@ function PlanningBar({ type, label, segment, onClick, canEdit }) {
   );
 }
 
+function levelTone(level) {
+  const prefix = String(level || "").trim().slice(0, 2).toLowerCase();
+  return ["p0", "p1", "p2", "p3"].includes(prefix) ? prefix : "pending";
+}
+
 export function AnnualPlanningTimeline({ year, plans, demands, canEdit, onDropDemand, onEditPlan }) {
   const demandMap = new Map(demands.map(demand => [demand.id, demand]));
   const visiblePlans = plans.filter(plan => planIntersectsYear(plan, year));
@@ -55,9 +60,9 @@ export function AnnualPlanningTimeline({ year, plans, demands, canEdit, onDropDe
       <div className="planning-section-heading">
         <div>
           <h2 id="planning-timeline-title">{year} 年度规划</h2>
-          <p>每条记录独立安排，支持跨月和重复规划。</p>
+          <p>每个产品保留一条规划，覆盖开发开始至预计上线的完整周期。</p>
         </div>
-        <div className="planning-legend" aria-label="时间带图例"><span className="development">开发</span><span className="launch">上线</span></div>
+        <div className="planning-legend" aria-label="时间带图例"><span className="period">开发至上线</span></div>
       </div>
       <div className="planning-timeline-scroll">
         <div className="planning-timeline">
@@ -74,13 +79,15 @@ export function AnnualPlanningTimeline({ year, plans, demands, canEdit, onDropDe
                   <img src={snapshot?.image || generateProductCover(snapshot?.name)} alt="" width="36" height="36" />
                   <div>
                     <strong>{snapshot?.name || "未命名产品"}</strong>
+                    <span className={`level-badge planning-level-badge level-${levelTone(snapshot?.planningLevel || snapshot?.level)}`}>
+                      {(snapshot?.planningLevelIsReference ?? snapshot?.levelIsReference) ? "参考 " : ""}{snapshot?.planningLevel || snapshot?.level || "未定级"}
+                    </span>
                     {!demand ? <small><AlertTriangle size={12} aria-hidden="true" />来源需求已删除</small> : null}
                   </div>
                 </div>
                 <div className="planning-track">
                   <TimelineDropCells canEdit={canEdit} onDropDemand={onDropDemand} />
-                  <PlanningBar type="development" label="开发" segment={timelineSegment(plan.developmentStart, plan.developmentEnd, year)} canEdit={canEdit} onClick={() => onEditPlan(plan)} />
-                  <PlanningBar type="launch" label="上线" segment={timelineSegment(plan.launchStart, plan.launchEnd, year)} canEdit={canEdit} onClick={() => onEditPlan(plan)} />
+                  <PlanningBar type="period" label="开发至上线" segment={timelineSegment(plan.developmentStart, plan.launchDate, year)} canEdit={canEdit} onClick={() => onEditPlan(plan)} />
                 </div>
               </div>
             );

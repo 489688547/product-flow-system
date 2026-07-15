@@ -94,7 +94,7 @@ test("new app exposes all core product workflow pages", () => {
   assert.match(app, /hashchange/);
 });
 
-test("annual product planning reuses demands in a twelve-month editable timeline", () => {
+test("annual product planning uses one development-to-launch period and overwrites duplicate demand plans", () => {
   const app = read("src/App.jsx");
   const page = read("src/features/planning/ProductPlanningPage.jsx");
   const tray = read("src/features/planning/PlanningDemandTray.jsx");
@@ -107,6 +107,7 @@ test("annual product planning reuses demands in a twelve-month editable timeline
   assert.match(app, /\["demands", "需求池"[\s\S]*\["planning", "产品规划"[\s\S]*\["progress", "产品进度"/);
   assert.match(app, /planning: <ProductPlanningPage/);
   assert.match(page, /<DemandModal/);
+  assert.match(page, /buildPlanningCandidates/);
   assert.match(page, /canEditProductPlanning/);
   assert.match(page, /disabledReason=/);
   assert.match(button, /disabledReason/);
@@ -116,19 +117,27 @@ test("annual product planning reuses demands in a twelve-month editable timeline
   assert.match(button, /export function IconAction\(\{ label, children, className = "", disabled = false, disabledReason = ""/);
   assert.match(tray, /application\/x-product-demand-id/);
   assert.match(tray, /draggable=\{canEdit\}/);
+  assert.match(tray, /level-badge/);
   assert.match(tray, /\/>安排/);
+  assert.doesNotMatch(tray, /需求池产品/);
   assert.match(timeline, /Array\.from\(\{ length: 12 \}/);
   assert.match(timeline, /timelineSegment/);
-  assert.match(timeline, />开发</);
-  assert.match(timeline, />上线</);
+  assert.match(timeline, /开发至上线/);
+  assert.match(timeline, /level-badge/);
   assert.match(timeline, /来源需求已删除/);
+  assert.match(page, /existingPlan/);
+  assert.match(page, /levelConfirmed/);
   assert.match(modal, /DatePickerField/);
+  assert.match(modal, /开发开始/);
+  assert.match(modal, /预计上线/);
+  assert.doesNotMatch(modal, /launchStart/);
+  assert.doesNotMatch(modal, /developmentEnd/);
   assert.match(modal, /validateProductPlan/);
   assert.match(modal, /window\.confirm\("确认删除这条产品规划/);
   assert.match(styles, /\.planning-timeline/);
   assert.match(styles, /\.planning-product-column/);
-  assert.match(styles, /\.planning-bar\.development/);
-  assert.match(styles, /\.planning-bar\.launch/);
+  assert.match(styles, /\.planning-bar\.period/);
+  assert.doesNotMatch(styles, /\.planning-bar\.launch/);
   assert.match(styles, /grid-template-columns: repeat\(12, minmax\(68px, 1fr\)\)/);
 });
 
@@ -309,7 +318,7 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /window\.confirm\("确认删除这个任务/);
   assert.match(page, /returnProductToDemand/);
   assert.match(page, /className="compact quiet-danger"/);
-  assert.match(page, /progress-header-actions/);
+  assert.match(page, /progress-overview-toolbar/);
   assert.match(page, /data-testid="add-stage-task"/);
   assert.match(page, /data-testid="return-product-demand"/);
   assert.match(page, /data-testid="sync-task-todo"/);
@@ -368,7 +377,25 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(read("src/styles.css"), /\.stage-card em\.policy-required\s*\{[\s\S]*background: var\(--primary-soft\);/);
   assert.match(read("src/styles.css"), /\.stage-card em\.policy-suggested\s*\{[\s\S]*background: var\(--warning-soft\);/);
   assert.match(read("src/styles.css"), /\.stage-grid\s*\{[^}]*grid-template-columns: repeat\(5,/s);
-  assert.match(read("src/styles.css"), /\.progress-header-actions\s*\{\s*margin-top: 76px;/);
+  assert.match(read("src/styles.css"), /\.progress-overview-toolbar\s*\{/);
+});
+
+test("product progress reuses the shared development-to-launch schedule", () => {
+  const page = read("src/features/progress/ProductProgressPage.jsx");
+  const componentPath = resolve(root, "src/features/progress/ProductScheduleSummary.jsx");
+  const styles = read("src/styles.css");
+  assert.ok(existsSync(componentPath));
+  const summary = read("src/features/progress/ProductScheduleSummary.jsx");
+  assert.match(page, /buildProductScheduleSummary/);
+  assert.match(page, /<ProductScheduleSummary/);
+  assert.match(page, /progress-overview-toolbar/);
+  assert.ok(page.indexOf("<ProductPicker") < page.indexOf("<ProductScheduleSummary"));
+  assert.ok(page.indexOf("<ProductScheduleSummary") < page.indexOf("return-product-demand"));
+  assert.match(summary, /未设置排期/);
+  assert.match(summary, /前往产品规划/);
+  assert.match(summary, /schedule-progress-ring/);
+  assert.match(styles, /\.product-schedule-summary\s*\{/);
+  assert.match(styles, /\.schedule-progress-ring\.overdue\s*\{/);
 });
 
 test("task deliverable modal supports DingTalk documents and rich text", () => {

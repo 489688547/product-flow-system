@@ -389,7 +389,10 @@ export function ProductFlowProvider({ children }) {
       createdAt: now,
       updatedAt: now
     }]);
-    commitState(current => ({ ...current, productPlans: [plan, ...(current.productPlans || [])] }));
+    commitState(current => ({
+      ...current,
+      productPlans: [plan, ...(current.productPlans || []).filter(item => item.demandId !== plan.demandId)]
+    }));
     return plan.id;
   }, [currentUser?.name]);
 

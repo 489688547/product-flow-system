@@ -1,3 +1,5 @@
+import { visibleDemandPool } from "./productFlow.js";
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 function cleanDate(value) {
@@ -11,38 +13,98 @@ function cleanText(value) {
   return String(value || "").trim();
 }
 
+function firstCleanDate(...values) {
+  for (const value of values) {
+    const date = cleanDate(value);
+    if (date) return date;
+  }
+  return "";
+}
+
+function updatedTime(plan) {
+  const time = Date.parse(plan.updatedAt || plan.createdAt || "");
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function planningLevel(demand, product) {
+  const confirmed = Boolean(product?.levelConfirmed);
+  return {
+    planningLevel: confirmed ? product.level : (demand?.level || product?.referenceLevel || product?.level || "未定级"),
+    planningLevelIsReference: !confirmed
+  };
+}
+
+export function buildPlanningCandidates(demands = [], products = []) {
+  const demandList = Array.isArray(demands) ? demands : [];
+  const productList = Array.isArray(products) ? products : [];
+  const candidates = visibleDemandPool(demandList).map(demand => ({
+    ...demand,
+    ...planningLevel(demand, null),
+    planningSource: "demand"
+  }));
+
+  productList
+    .filter(product => Number(product?.stage) >= 1 && Number(product?.stage) < 5)
+    .forEach(product => {
+      const sourceDemand = demandList.find(demand => demand?.productId === product.id) || null;
+      candidates.push({
+        ...(sourceDemand || {}),
+        id: sourceDemand?.id || `product:${product.id}`,
+        productId: product.id,
+        name: product.name || sourceDemand?.name || "未命名产品",
+        image: product.image || sourceDemand?.image || "",
+        ...planningLevel(sourceDemand, product),
+        planningSource: "progress"
+      });
+    });
+
+  return candidates;
+}
+
 export function normalizeProductPlans(value) {
   if (!Array.isArray(value)) return [];
-  return value.map((plan, index) => ({
-    id: cleanText(plan?.id) || `plan-${index + 1}`,
-    demandId: cleanText(plan?.demandId),
-    demandSnapshot: {
-      name: cleanText(plan?.demandSnapshot?.name || plan?.demandName) || "未命名产品",
-      image: cleanText(plan?.demandSnapshot?.image || plan?.demandImage)
-    },
-    developmentStart: cleanDate(plan?.developmentStart),
-    developmentEnd: cleanDate(plan?.developmentEnd),
-    launchStart: cleanDate(plan?.launchStart),
-    launchEnd: cleanDate(plan?.launchEnd),
-    createdBy: cleanText(plan?.createdBy),
-    createdAt: cleanText(plan?.createdAt),
-    updatedAt: cleanText(plan?.updatedAt)
-  }));
+  const normalized = value.map((plan, index) => {
+    const demandId = cleanText(plan?.demandId);
+    return {
+      id: cleanText(plan?.id) || `plan-${index + 1}`,
+      demandId,
+      demandSnapshot: {
+        name: cleanText(plan?.demandSnapshot?.name || plan?.demandName) || "未命名产品",
+        image: cleanText(plan?.demandSnapshot?.image || plan?.demandImage),
+        level: cleanText(plan?.demandSnapshot?.level || plan?.level),
+        levelIsReference: plan?.demandSnapshot?.levelIsReference !== false,
+        productId: cleanText(plan?.demandSnapshot?.productId || plan?.productId)
+      },
+      developmentStart: cleanDate(plan?.developmentStart),
+      launchDate: firstCleanDate(plan?.launchDate, plan?.launchEnd, plan?.launchStart, plan?.developmentEnd),
+      createdBy: cleanText(plan?.createdBy),
+      createdAt: cleanText(plan?.createdAt),
+      updatedAt: cleanText(plan?.updatedAt)
+    };
+  });
+  const output = [];
+  const demandIndexes = new Map();
+  normalized.forEach(plan => {
+    if (!plan.demandId) return output.push(plan);
+    const existingIndex = demandIndexes.get(plan.demandId);
+    if (existingIndex == null) {
+      demandIndexes.set(plan.demandId, output.length);
+      output.push(plan);
+    } else if (updatedTime(plan) > updatedTime(output[existingIndex])) {
+      output[existingIndex] = plan;
+    }
+  });
+  return output;
 }
 
 export function validateProductPlan(input = {}) {
   const developmentStart = cleanDate(input.developmentStart);
-  const developmentEnd = cleanDate(input.developmentEnd);
-  const launchStart = cleanDate(input.launchStart);
-  const launchEnd = cleanDate(input.launchEnd);
-  if (![developmentStart, developmentEnd, launchStart, launchEnd].every(Boolean)) {
-    return { valid: false, reason: "请完整填写预计开发和上线时间。" };
+  const launchDate = cleanDate(input.launchDate);
+  if (!developmentStart || !launchDate) {
+    return { valid: false, reason: "请填写开发开始日期和预计上线日期。" };
   }
-  if (developmentEnd < developmentStart) {
-    return { valid: false, reason: "预计开发结束时间不能早于开始时间。" };
-  }
-  if (launchEnd < launchStart) {
-    return { valid: false, reason: "预计上线结束时间不能早于开始时间。" };
+  if (launchDate < developmentStart) {
+    return { valid: false, reason: "预计上线日期不能早于开发开始日期。" };
   }
   return { valid: true, reason: "" };
 }
@@ -56,8 +118,7 @@ function rangeIntersectsYear(start, end, year) {
 export function planIntersectsYear(plan, year) {
   const numericYear = Number(year);
   if (!Number.isInteger(numericYear)) return false;
-  return rangeIntersectsYear(plan?.developmentStart, plan?.developmentEnd, numericYear)
-    || rangeIntersectsYear(plan?.launchStart, plan?.launchEnd, numericYear);
+  return rangeIntersectsYear(plan?.developmentStart, plan?.launchDate, numericYear);
 }
 
 export function timelineSegment(start, end, year) {

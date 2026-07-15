@@ -17,9 +17,11 @@ import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { ProductPicker } from "../../ui/ProductPicker.jsx";
 import { buildTaskMeetingPayload, buildTaskTodoPayload } from "../../domain/dingTalk.js";
+import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
 import { buildTaskTodoSnapshot, normalizeTaskDueDate, todoSyncStatus } from "../../domain/taskTodo.js";
 import { MeetingScheduleModal } from "./MeetingScheduleModal.jsx";
 import { ProductGradingModal } from "./ProductGradingModal.jsx";
+import { ProductScheduleSummary } from "./ProductScheduleSummary.jsx";
 import { TaskCategorySelect } from "./TaskCategorySelect.jsx";
 import { TaskDeliverableModal } from "./TaskDeliverableModal.jsx";
 import { TaskDeliverables } from "./TaskDeliverables.jsx";
@@ -71,6 +73,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const tasks = useMemo(() => tasksForProductStage(state, selectedProduct, selectedStage), [state, selectedProduct, selectedStage]);
   if (!selectedProduct) return <section className="page"><div className="empty-state">暂无产品</div></section>;
 
+  const productSchedule = buildProductScheduleSummary(selectedProduct, state.productPlans, state.demands).schedule;
   const selectedPolicy = stagePolicy(selectedProduct, selectedStage);
   const hasFormalGrading = hasFormalProductGrading(selectedProduct);
   const handleAddTask = () => {
@@ -153,12 +156,14 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
       <PageHeader
         title="产品进度"
         description="按产品定级查看适用阶段和任务。"
-        identity={<ProductPicker products={state.products} value={selectedProduct.id} onChange={setCurrentProduct} />}
-      >
-        <div className="toolbar-actions progress-header-actions">
-          <Button className="compact quiet-danger" data-testid="return-product-demand" onClick={handleReturnProduct}><RotateCcw size={16} />退回需求池</Button>
-        </div>
-      </PageHeader>
+        identity={(
+          <div className="progress-overview-toolbar">
+            <ProductPicker products={state.products} value={selectedProduct.id} onChange={setCurrentProduct} />
+            <ProductScheduleSummary schedule={productSchedule} onOpenPlanning={() => onNavigate?.("planning")} />
+            <Button className="compact quiet-danger" data-testid="return-product-demand" onClick={handleReturnProduct}><RotateCcw size={16} />退回需求池</Button>
+          </div>
+        )}
+      />
       <div className="stage-grid">
         {progressStages.map(stage => {
           const policy = stagePolicy(selectedProduct, stage.index);

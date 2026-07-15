@@ -2,7 +2,8 @@ import { CalendarRange, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { canEditProductPlanning } from "../../domain/permissions.js";
-import { generateProductCover, visibleDemandPool } from "../../domain/productFlow.js";
+import { buildPlanningCandidates } from "../../domain/productPlanning.js";
+import { generateProductCover } from "../../domain/productFlow.js";
 import { Button } from "../../ui/Button.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DemandModal } from "../demands/DemandModal.jsx";
@@ -13,12 +14,19 @@ import { ProductPlanModal } from "./ProductPlanModal.jsx";
 function monthDefaults(year, monthIndex) {
   const month = String(monthIndex + 1).padStart(2, "0");
   const lastDay = new Date(year, monthIndex + 1, 0).getDate();
-  const middle = Math.min(15, lastDay);
   return {
     developmentStart: `${year}-${month}-01`,
-    developmentEnd: `${year}-${month}-${String(middle).padStart(2, "0")}`,
-    launchStart: `${year}-${month}-${String(Math.min(middle + 1, lastDay)).padStart(2, "0")}`,
-    launchEnd: `${year}-${month}-${String(lastDay).padStart(2, "0")}`
+    launchDate: `${year}-${month}-${String(lastDay).padStart(2, "0")}`
+  };
+}
+
+function enrichPlanningDemand(demand, products) {
+  const product = products.find(item => item.id === demand.productId);
+  const levelConfirmed = Boolean(product?.levelConfirmed);
+  return {
+    ...demand,
+    planningLevel: levelConfirmed ? product.level : (demand.level || product?.referenceLevel || "未定级"),
+    planningLevelIsReference: !levelConfirmed
   };
 }
 
@@ -28,23 +36,49 @@ export function ProductPlanningPage() {
   const [demandModalOpen, setDemandModalOpen] = useState(false);
   const [planModal, setPlanModal] = useState(null);
   const canEdit = canEditProductPlanning(currentUser);
-  const demands = useMemo(() => visibleDemandPool(state.demands), [state.demands]);
+  const allDemands = useMemo(
+    () => (state.demands || []).map(demand => enrichPlanningDemand(demand, state.products || [])),
+    [state.demands, state.products]
+  );
+  const candidates = useMemo(
+    () => buildPlanningCandidates(state.demands || [], state.products || []),
+    [state.demands, state.products]
+  );
+  const planningRecords = useMemo(() => {
+    const records = new Map(allDemands.map(demand => [demand.id, demand]));
+    candidates.forEach(candidate => records.set(candidate.id, candidate));
+    return [...records.values()];
+  }, [allDemands, candidates]);
 
-  const openNewPlan = (demand, monthIndex = new Date().getMonth()) => {
+  const openNewPlan = (demand, monthIndex = new Date().getMonth(), replaceDates = false) => {
     if (!canEdit) return;
-    setPlanModal({ demand, plan: null, initialDates: monthDefaults(year, monthIndex) });
+    const existingPlan = (state.productPlans || []).find(plan => (
+      plan.demandId === demand.id || (demand.productId && plan.demandSnapshot?.productId === demand.productId)
+    )) || null;
+    setPlanModal({
+      demand,
+      plan: existingPlan,
+      initialDates: !existingPlan || replaceDates ? monthDefaults(year, monthIndex) : null
+    });
   };
   const openDroppedDemand = (demandId, monthIndex) => {
-    const demand = demands.find(item => item.id === demandId);
-    if (demand) openNewPlan(demand, monthIndex);
+    const demand = candidates.find(item => item.id === demandId);
+    if (demand) openNewPlan(demand, monthIndex, true);
   };
   const openExistingPlan = plan => {
-    const demand = demands.find(item => item.id === plan.demandId) || null;
+    const demand = planningRecords.find(item => item.id === plan.demandId || (plan.demandSnapshot?.productId && item.productId === plan.demandSnapshot.productId)) || null;
     setPlanModal({ demand, plan, initialDates: null });
   };
   const savePlan = form => {
-    if (planModal.plan) updateProductPlan(planModal.plan.id, form);
-    else addProductPlan({ ...form, demandId: planModal.demand.id, demandSnapshot: { name: planModal.demand.name, image: planModal.demand.image || generateProductCover(planModal.demand.name) } });
+    const demandSnapshot = {
+      name: planModal.demand?.name || planModal.plan?.demandSnapshot?.name,
+      image: planModal.demand?.image || planModal.plan?.demandSnapshot?.image || generateProductCover(planModal.demand?.name),
+      level: planModal.demand?.planningLevel || planModal.plan?.demandSnapshot?.level,
+      levelIsReference: planModal.demand?.planningLevelIsReference ?? planModal.plan?.demandSnapshot?.levelIsReference,
+      productId: planModal.demand?.productId || planModal.plan?.demandSnapshot?.productId
+    };
+    if (planModal.plan) updateProductPlan(planModal.plan.id, { ...form, demandSnapshot });
+    else addProductPlan({ ...form, demandId: planModal.demand.id, demandSnapshot });
     setPlanModal(null);
   };
   const saveDemand = form => {
@@ -54,7 +88,7 @@ export function ProductPlanningPage() {
 
   return (
     <section className="page planning-page">
-      <PageHeader title="产品规划" description="把需求池产品拆进年度节奏，统一查看预计开发和上线窗口。">
+      <PageHeader title="产品规划" description="把待规划产品拆进年度节奏，统一查看预计开发和上线窗口。">
         <div className="planning-year-picker" aria-label="规划年份">
           <button type="button" onClick={() => setYear(value => value - 1)} aria-label="上一年"><ChevronLeft size={16} /></button>
           <strong><CalendarRange size={16} aria-hidden="true" />{year} 年</strong>
@@ -62,8 +96,8 @@ export function ProductPlanningPage() {
         </div>
         <Button variant="primary" disabled={!canEdit} disabledReason="只有产品部和总经办可以添加需求机会" onClick={() => setDemandModalOpen(true)}><Plus size={16} aria-hidden="true" />添加需求机会</Button>
       </PageHeader>
-      <PlanningDemandTray demands={demands} canEdit={canEdit} onArrange={openNewPlan} />
-      <AnnualPlanningTimeline year={year} plans={state.productPlans || []} demands={demands} canEdit={canEdit} onDropDemand={openDroppedDemand} onEditPlan={openExistingPlan} />
+      <PlanningDemandTray demands={candidates} canEdit={canEdit} onArrange={openNewPlan} />
+      <AnnualPlanningTimeline year={year} plans={state.productPlans || []} demands={planningRecords} canEdit={canEdit} onDropDemand={openDroppedDemand} onEditPlan={openExistingPlan} />
       <DemandModal open={demandModalOpen} currentUser={currentUser} orgCache={orgCache} onClose={() => setDemandModalOpen(false)} onSave={saveDemand} />
       <ProductPlanModal
         open={Boolean(planModal)}

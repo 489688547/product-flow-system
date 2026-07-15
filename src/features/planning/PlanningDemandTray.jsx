@@ -4,16 +4,14 @@ import { generateProductCover } from "../../domain/productFlow.js";
 
 export const PRODUCT_DEMAND_DRAG_TYPE = "application/x-product-demand-id";
 
+function levelTone(level) {
+  const prefix = String(level || "").trim().slice(0, 2).toLowerCase();
+  return ["p0", "p1", "p2", "p3"].includes(prefix) ? prefix : "pending";
+}
+
 export function PlanningDemandTray({ demands, canEdit, onArrange }) {
   return (
-    <section className="planning-demand-tray" aria-labelledby="planning-demand-title">
-      <div className="planning-section-heading">
-        <div>
-          <h2 id="planning-demand-title">需求池产品</h2>
-          <p>拖入下方月份安排开发和上线时间，安排后仍保留在需求池。</p>
-        </div>
-        <span>{demands.length} 个产品</span>
-      </div>
+    <section className="planning-demand-tray" aria-label="待规划产品">
       <div className="planning-demand-list">
         {demands.map(demand => (
           <article
@@ -27,7 +25,12 @@ export function PlanningDemandTray({ demands, canEdit, onArrange }) {
             }}
           >
             <img src={demand.image || generateProductCover(demand.name)} alt="" width="40" height="40" />
-            <strong title={demand.name}>{demand.name}</strong>
+            <div className="planning-demand-copy">
+              <strong title={demand.name}>{demand.name}</strong>
+              <span className={`level-badge planning-level-badge level-${levelTone(demand.planningLevel)}`}>
+                {demand.planningLevelIsReference ? "参考 " : ""}{demand.planningLevel || "未定级"}
+              </span>
+            </div>
             <Button
               className="compact planning-arrange-button"
               disabled={!canEdit}
@@ -38,7 +41,7 @@ export function PlanningDemandTray({ demands, canEdit, onArrange }) {
             </Button>
           </article>
         ))}
-        {!demands.length ? <div className="planning-tray-empty">需求池暂无可规划产品</div> : null}
+        {!demands.length ? <div className="planning-tray-empty">暂无可规划产品</div> : null}
       </div>
     </section>
   );
