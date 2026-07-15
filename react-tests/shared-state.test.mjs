@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, moveProductToStage, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
 import { normalizeClientState } from "../src/state/stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../src/domain/sessionUser.js";
-import { canEditFeature, canViewFeature, canViewNavigation, DEFAULT_PERMISSIONS } from "../src/domain/permissions.js";
+import { canEditFeature, canEditProductPlanning, canViewFeature, canViewNavigation, DEFAULT_PERMISSIONS } from "../src/domain/permissions.js";
 import { createDemandRecord, formatDemandCreatedAt } from "../src/domain/demandDate.js";
 
 async function loadStateRequest() {
@@ -69,6 +69,7 @@ test("React app ships a Cloudflare Pages state API backed by one company D1 row"
     decisions: [{ id: "decision1", productId: "p1", title: "立项结论" }],
     dingMeetings: [{ id: "meeting1", productId: "p1", title: "钉钉会议" }],
     feedbackIssues: [{ id: "bug1", desc: "按钮点不动", screenshot: "data:image/png;base64,aaa" }],
+    productPlans: [{ id: "plan1", demandId: "d1", developmentStart: "2026-08-01", developmentEnd: "2026-09-01", launchStart: "2026-09-01", launchEnd: "2026-09-15" }],
     config: { productLevels: ["P0 战略级"] },
     orgCache: { departments: [{ id: "dept1", name: "总经办" }], users: [{ userid: "u1", name: "周总" }], syncedAt: "2026-07-09T00:00:00.000Z" },
     settings: { settingsDepts: ["总经办"] }
@@ -95,6 +96,7 @@ test("React app ships a Cloudflare Pages state API backed by one company D1 row"
   assert.equal(body.state.decisions[0].title, "立项结论");
   assert.equal(body.state.dingMeetings[0].title, "钉钉会议");
   assert.equal(body.state.orgCache.users[0].name, "周总");
+  assert.equal(body.state.productPlans[0].id, "plan1");
   assert.equal(body.updatedBy, "周总");
 });
 
@@ -104,6 +106,7 @@ test("company state model keeps shared operational fields through normalization"
   assert.ok(Array.isArray(defaults.dingMeetings));
   assert.ok(defaults.config && typeof defaults.config === "object");
   assert.ok(defaults.orgCache && typeof defaults.orgCache === "object");
+  assert.ok(Array.isArray(defaults.productPlans));
 
   const normalized = normalizeClientState({
     decisions: [{ id: "decision1", title: "保留决策" }],
@@ -116,6 +119,18 @@ test("company state model keeps shared operational fields through normalization"
   assert.equal(normalized.dingMeetings[0].title, "保留会议");
   assert.deepEqual(normalized.config.stages, ["立项"]);
   assert.equal(normalized.orgCache.users[0].name, "周总");
+  assert.deepEqual(normalized.productPlans, []);
+});
+
+test("planning is visible to everyone and editable only by product or executive departments", () => {
+  const executive = { department: "总经办", departments: ["总经办"], title: "总经理" };
+  const productLegacy = { department: "产品团队", departments: ["产品团队"], title: "产品经理" };
+  const operator = { department: "运营部", departments: ["运营部"], title: "运营" };
+
+  assert.equal(canViewNavigation(DEFAULT_PERMISSIONS, operator, "planning"), true);
+  assert.equal(canEditProductPlanning(executive), true);
+  assert.equal(canEditProductPlanning(productLegacy), true);
+  assert.equal(canEditProductPlanning(operator), false);
 });
 
 test("permission defaults separate navigation visibility from feature editing", () => {
@@ -208,6 +223,21 @@ test("legacy executive department labels migrate to the DingTalk organization na
 
   assert.equal(normalized.tasks[0].ownerDept, "产品部 / 总经办 / 运营");
   assert.equal(normalized.tasks[0].title, "立项评审由总经办拍板");
+});
+
+test("legacy product team labels migrate to the single DingTalk product department", () => {
+  const normalized = normalizeClientState({
+    orgCache: {
+      departments: [{ id: "legacy-product", name: "产品团队" }],
+      users: [{ userid: "u-product", name: "产品经理", department: "产品团队", departments: ["产品团队"] }]
+    },
+    tasks: [{ id: "legacy-product-task", productId: "p1", stage: 1, title: "整理需求", ownerDept: "产品团队" }]
+  });
+
+  assert.equal(normalized.orgCache.departments[0].name, "产品部");
+  assert.equal(normalized.orgCache.users[0].department, "产品部");
+  assert.deepEqual(normalized.orgCache.users[0].departments, ["产品部"]);
+  assert.equal(normalized.tasks[0].ownerDept, "产品部");
 });
 
 test("legacy task and template categories normalize without losing execution state", () => {

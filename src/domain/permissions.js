@@ -1,6 +1,7 @@
 export const NAV_PERMISSION_ITEMS = [
   { key: "dashboard", label: "总览" },
   { key: "demands", label: "需求池" },
+  { key: "planning", label: "产品规划" },
   { key: "progress", label: "产品进度" },
   { key: "archive", label: "产品档案" },
   { key: "issues", label: "问题反馈" },
@@ -16,6 +17,7 @@ export const DEFAULT_PERMISSIONS = {
   navigation: {
     dashboard: { departments: ["*"] },
     demands: { departments: ["*"] },
+    planning: { departments: ["*"] },
     progress: { departments: ["*"] },
     archive: { departments: ["*"] },
     issues: { departments: ["总经办"] },
@@ -39,7 +41,9 @@ export const DEFAULT_PERMISSIONS = {
 
 function cleanArray(value, fallback = []) {
   const items = Array.isArray(value) ? value : fallback;
-  return [...new Set(items.map(item => String(item || "").trim()).filter(Boolean))];
+  return [...new Set(items
+    .map(item => String(item || "").trim().replaceAll("产品团队", "产品部"))
+    .filter(Boolean))];
 }
 
 export function normalizePermissions(input = {}) {
@@ -61,7 +65,13 @@ export function normalizePermissions(input = {}) {
 }
 
 function userDepartments(user) {
-  return [...new Set([user?.department, ...(user?.departments || [])].map(item => String(item || "").trim()).filter(Boolean))];
+  return [...new Set([user?.department, ...(user?.departments || [])]
+    .map(item => String(item || "").trim().replaceAll("产品团队", "产品部"))
+    .filter(Boolean))];
+}
+
+export function canEditProductPlanning(user) {
+  return userDepartments(user).some(department => ["产品部", "总经办"].includes(department));
 }
 
 export function canManagePermissions(user) {

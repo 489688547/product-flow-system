@@ -25,7 +25,7 @@ function validateStatePayload(state) {
     error.status = 400;
     throw error;
   }
-  const requiredArrays = ["demands", "products", "tasks", "deliverables", "reviews", "feedbackIssues"];
+  const requiredArrays = ["demands", "products", "tasks", "deliverables", "reviews", "feedbackIssues", "productPlans"];
   const missing = requiredArrays.filter(key => !Array.isArray(state[key]));
   if (missing.length) {
     const error = new Error(`状态数据缺少必要列表：${missing.join("、")}`);

@@ -3,9 +3,14 @@ import { normalizeTaskDueDate } from "../domain/taskTodo.js";
 import { normalizePermissions } from "../domain/permissions.js";
 import { normalizeSkuCodes } from "../domain/salesData.js";
 import { normalizeDemandCreatedAt } from "../domain/demandDate.js";
+import { normalizeProductPlans } from "../domain/productPlanning.js";
 
 function normalizeOrganizationLabels(value) {
-  if (typeof value === "string") return value.replaceAll(["高", "层"].join(""), "总经办");
+  if (typeof value === "string") {
+    return value
+      .replaceAll(["高", "层"].join(""), "总经办")
+      .replaceAll("产品团队", "产品部");
+  }
   if (Array.isArray(value)) return value.map(normalizeOrganizationLabels);
   if (value && typeof value === "object") {
     return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, normalizeOrganizationLabels(item)]));
@@ -88,6 +93,7 @@ export function normalizeClientState(input) {
   state.decisions = Array.isArray(state.decisions) ? state.decisions : [];
   state.dingMeetings = (Array.isArray(state.dingMeetings) ? state.dingMeetings : []).map(meeting => ({ ...meeting, stage: normalizeWorkflowStage(meeting.stage) }));
   state.feedbackIssues = Array.isArray(state.feedbackIssues) ? state.feedbackIssues : [];
+  state.productPlans = normalizeProductPlans(state.productPlans);
   state.config = state.config && typeof state.config === "object" ? state.config : defaults.config;
   const incomingOrg = state.orgCache && typeof state.orgCache === "object" ? state.orgCache : {};
   state.orgCache = {

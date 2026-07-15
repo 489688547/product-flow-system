@@ -70,6 +70,7 @@ test("state API persists company data including demand pool and issue submission
     reviews: [{ id: "r1", productId: "p1", title: "评审会" }],
     decisions: [{ id: "x1", title: "结论" }],
     feedbackIssues: [{ id: "bug1", desc: "按钮点不动", screenshot: "data:image/png;base64,aaa" }],
+    productPlans: [{ id: "plan1", demandId: "d1", developmentStart: "2026-08-01", developmentEnd: "2026-09-01", launchStart: "2026-09-01", launchEnd: "2026-09-15" }],
     config: { stages: [] }
   };
 
@@ -93,16 +94,20 @@ test("state API persists company data including demand pool and issue submission
   assert.equal(get.status, 200);
   assert.equal(body.state.demands[0].name, "新机会");
   assert.equal(body.state.feedbackIssues[0].desc, "按钮点不动");
+  assert.equal(body.state.productPlans[0].id, "plan1");
   assert.equal(body.updatedBy, "周总");
 });
 
 test("frontend loads and saves product flow state through the shared state API", () => {
-  assert.match(html, /<script[^>]+type="module"[^>]+src="\/assets\//);
-  const assetsDir = new URL("../assets/", import.meta.url);
-  const javascript = readdirSync(assetsDir)
-    .filter(name => name.endsWith(".js"))
-    .map(name => readFileSync(new URL(name, assetsDir), "utf8"))
-    .join("\n");
+  assert.match(html, /<script[^>]+type="module"[^>]+src="\/(?:src|assets)\//);
+  const sourceEntry = /src="\/src\//.test(html);
+  const javascript = sourceEntry
+    ? ["../src/state/ProductFlowProvider.jsx", "../src/state/stateApi.js"].map(path => readFileSync(new URL(path, import.meta.url), "utf8")).join("\n")
+    : readdirSync(new URL("../assets/", import.meta.url))
+      .filter(name => name.endsWith(".js"))
+      .map(name => readFileSync(new URL(name, new URL("../assets/", import.meta.url)), "utf8"))
+      .join("\n");
   assert.match(javascript, /\/api\/state/);
   assert.match(javascript, /feedbackIssues/);
+  assert.match(javascript, /productPlans/);
 });

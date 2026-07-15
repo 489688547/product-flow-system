@@ -18,6 +18,7 @@ import { buildTaskTodoSnapshot } from "../domain/taskTodo.js";
 import { sharedStateApiUrl } from "./stateApi.js";
 import { createDemandRecord } from "../domain/demandDate.js";
 import { useAuth } from "./AuthProvider.jsx";
+import { normalizeProductPlans, validateProductPlan } from "../domain/productPlanning.js";
 
 const ProductFlowContext = createContext(null);
 const STORAGE_KEY = "productFlowState";
@@ -370,6 +371,37 @@ export function ProductFlowProvider({ children }) {
     commitState(current => ({ ...current, deliverables: (current.deliverables || []).filter(file => file.id !== id) }));
   }, []);
 
+  const addProductPlan = useCallback(input => {
+    const validation = validateProductPlan(input);
+    if (!validation.valid) throw new Error(validation.reason);
+    const now = new Date().toISOString();
+    const [plan] = normalizeProductPlans([{
+      ...input,
+      id: `plan-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      createdBy: currentUser?.name || "",
+      createdAt: now,
+      updatedAt: now
+    }]);
+    commitState(current => ({ ...current, productPlans: [plan, ...(current.productPlans || [])] }));
+    return plan.id;
+  }, [currentUser?.name]);
+
+  const updateProductPlan = useCallback((id, patch) => {
+    commitState(current => {
+      const existing = (current.productPlans || []).find(plan => plan.id === id);
+      if (!existing) return current;
+      const merged = { ...existing, ...patch, id, updatedAt: new Date().toISOString() };
+      const validation = validateProductPlan(merged);
+      if (!validation.valid) throw new Error(validation.reason);
+      const [normalized] = normalizeProductPlans([merged]);
+      return { ...current, productPlans: current.productPlans.map(plan => plan.id === id ? normalized : plan) };
+    });
+  }, []);
+
+  const deleteProductPlan = useCallback(id => {
+    commitState(current => ({ ...current, productPlans: (current.productPlans || []).filter(plan => plan.id !== id) }));
+  }, []);
+
   const updateReviewMinutes = useCallback((id, minutes) => {
     commitState(current => ({
       ...current,
@@ -416,11 +448,14 @@ export function ProductFlowProvider({ children }) {
     syncProductDefaults,
     addDeliverable,
     deleteDeliverable,
+    addProductPlan,
+    updateProductPlan,
+    deleteProductPlan,
     updateReviewMinutes,
     addFeedbackIssue,
     updateSettings,
     updateTaskTemplates
-  }), [state, currentUser, orgCache, loading, sharedError, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, deleteDeliverable, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
+  }), [state, currentUser, orgCache, loading, sharedError, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, deleteDeliverable, addProductPlan, updateProductPlan, deleteProductPlan, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
 
   return <ProductFlowContext.Provider value={value}>{children}</ProductFlowContext.Provider>;
 }

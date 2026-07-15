@@ -607,6 +607,7 @@ export function createDefaultState() {
     decisions: [],
     dingMeetings: [],
     feedbackIssues: [],
+    productPlans: [],
     config: {
       productLevels: PRODUCT_LEVELS,
       stageRules: PRODUCT_LEVEL_FLOW_RULES
