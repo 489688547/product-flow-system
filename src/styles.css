@@ -226,7 +226,8 @@ main { min-width: 0; overflow-x: hidden; }
 
 .readonly-field { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-subtle); }
 .readonly-field span { color: var(--text-tertiary); font-size: 12px; }
-.grading-intro { display: flex; align-items: baseline; gap: 12px; padding: 12px 14px; border-radius: 7px; background: var(--surface-subtle); }
+.grading-intro { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 12px; padding: 12px 14px; border-radius: 7px; background: var(--surface-subtle); }
+.grading-intro em { padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-style: normal; font-weight: 700; }
 .grading-intro span { color: var(--text-secondary); }
 .grading-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 18px; margin-top: 16px; align-items: start; }
 .grading-form { display: grid; gap: 14px; }

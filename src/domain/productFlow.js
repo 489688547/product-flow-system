@@ -149,8 +149,8 @@ export const PRODUCT_LEVEL_FLOW_RULES = {
 };
 
 const DEFAULT_PRODUCTS = [
-  { id: "p1", name: "鹦鹉谷物棒", level: "P1 增长级", levelConfirmed: true, requester: "周荣庆", productManager: "赵雨涵", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。", image: "https://images.unsplash.com/photo-1552728089-57bdde30beb3?auto=format&fit=crop&w=240&q=80" },
-  { id: "p2", name: "仓鼠冻干零食", level: "P0 战略级", levelConfirmed: true, requester: "陈菲", productManager: "叶津成", owner: "叶津成", source: "运营", status: "维持观察", stage: 5, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。", image: "https://images.unsplash.com/photo-1425082661705-1834bfd09dca?auto=format&fit=crop&w=240&q=80" }
+  { id: "p1", name: "鹦鹉谷物棒", level: "P1 增长级", referenceLevel: "P1 增长级", levelConfirmed: true, grading: { answers: { strategy: 4, salesScale: 3, commercialValue: 3, resourceDemand: 4, risks: {} } }, requester: "周荣庆", productManager: "赵雨涵", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。", image: "https://images.unsplash.com/photo-1552728089-57bdde30beb3?auto=format&fit=crop&w=240&q=80" },
+  { id: "p2", name: "仓鼠冻干零食", level: "P0 战略级", referenceLevel: "P0 战略级", levelConfirmed: true, grading: { answers: { strategy: 5, salesScale: 4, commercialValue: 4, resourceDemand: 5, risks: {} } }, requester: "陈菲", productManager: "叶津成", owner: "叶津成", source: "运营", status: "维持观察", stage: 5, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。", image: "https://images.unsplash.com/photo-1425082661705-1834bfd09dca?auto=format&fit=crop&w=240&q=80" }
 ];
 
 export const REVIEW_MEETINGS = [
@@ -260,6 +260,10 @@ export function calculateProductGrade(input = {}) {
     riskNote,
     ...gradingManagement(level, riskBand)
   };
+}
+
+export function hasFormalProductGrading(product) {
+  return Boolean(product?.levelConfirmed && calculateProductGrade(product?.grading?.answers || {}).complete);
 }
 
 export function orgDepartments(orgCache = DEFAULT_ORG_CACHE) {
@@ -648,6 +652,7 @@ export function convertDemandToProject(state, demandId, options = {}) {
     id: productId,
     name: demand.name,
     level: normalizeProductLevel(demand.level),
+    referenceLevel: normalizeProductLevel(demand.level),
     requester: demand.requester || demand.owner || "",
     productManager: "",
     owner: "",

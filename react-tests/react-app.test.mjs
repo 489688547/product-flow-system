@@ -400,6 +400,7 @@ test("initiation grading is calculated in a modal and cannot be changed by a pla
   assert.match(progress, /产品负责人/);
   assert.match(progress, /searchInMenu/);
   assert.match(progress, /查看定级打分/);
+  assert.match(progress, /referenceLevel/);
   assert.match(progress, /level-badge/);
   assert.match(orgSelect, /searchInMenu/);
   assert.match(orgSelect, /org-select-trigger/);
@@ -412,6 +413,7 @@ test("initiation grading is calculated in a modal and cannot be changed by a pla
   assert.match(modal, /RESERVE_LEVEL/);
   assert.match(modal, /自动退回需求池/);
   assert.match(modal, /产品等级/);
+  assert.match(modal, /product\?\.referenceLevel/);
   assert.match(modal, /风险等级/);
   assert.match(modal, /推进方式/);
   assert.match(productFlow, /30-100万/);
@@ -506,6 +508,7 @@ test("product archive is a reusable product record surface with edit and linked 
   assert.match(archive, /ProductPackageModal/);
   assert.match(modal, /产品名称/);
   assert.match(modal, /产品等级/);
+  assert.match(modal, /参考等级/);
   assert.match(modal, /提需人/);
   assert.match(modal, /产品经理/);
   assert.match(modal, /departmentFilter="产品"/);

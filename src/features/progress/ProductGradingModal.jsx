@@ -2,6 +2,7 @@ import { AlertTriangle, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   calculateProductGrade,
+  hasFormalProductGrading,
   PRODUCT_GRADING_DIMENSIONS,
   PRODUCT_GRADING_RISKS,
   RESERVE_LEVEL
@@ -29,12 +30,12 @@ export function ProductGradingModal({ open, product, canEdit = false, onClose, o
   return (
     <Modal
       open={open}
-      title={product?.levelConfirmed ? "查看定级打分" : "产品定级"}
+      title={hasFormalProductGrading(product) ? "查看定级打分" : "产品定级"}
       size="large"
       onClose={onClose}
       footer={canEdit ? <><Button onClick={onClose}>取消</Button><Button variant={isReserve ? "danger" : "primary"} disabled={!result.complete} onClick={() => onSave(answers)}>{isReserve ? "退回需求池" : "确认定级"}</Button></> : null}
     >
-      <div className="grading-intro"><strong>{product?.name}</strong><span>价值与资源决定产品等级；C2 单独判断风险，并调整管理强度和推进方式。</span></div>
+      <div className="grading-intro"><strong>{product?.name}</strong><em>需求池参考等级：{product?.referenceLevel || product?.level || "未填写"}</em><span>价值与资源决定正式产品等级；C2 单独判断风险，并调整管理强度和推进方式。</span></div>
       <div className="grading-layout">
         <div className="grading-form">
           {PRODUCT_GRADING_DIMENSIONS.map(dimension => (

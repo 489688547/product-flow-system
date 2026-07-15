@@ -51,7 +51,7 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
       </section>
       <div className="form-grid">
         <label>产品/机会名称<input name="demand-name" autoComplete="off" value={form.name} onChange={event => set({ name: event.target.value })} placeholder="例如：鹦鹉谷物棒升级版…" /></label>
-        <label>产品等级<select name="demand-level" value={form.level} onChange={event => set({ level: event.target.value })}>{(form.level === RESERVE_LEVEL ? [RESERVE_LEVEL, ...PRODUCT_LEVELS] : PRODUCT_LEVELS).map(level => <option key={level}>{level}</option>)}</select></label>
+        <label>参考等级<select name="demand-level" value={form.level} onChange={event => set({ level: event.target.value })}>{(form.level === RESERVE_LEVEL ? [RESERVE_LEVEL, ...PRODUCT_LEVELS] : PRODUCT_LEVELS).map(level => <option key={level}>{level}</option>)}</select></label>
         <label>提需人<OrgSelect type="user" value={form.requester} onChange={requester => set({ requester })} orgCache={orgCache} placeholder="选择提需人…" /></label>
         <label>来源部门<OrgSelect type="department" value={form.source} onChange={source => set({ source })} orgCache={orgCache} placeholder="选择来源部门…" /></label>
       </div>

@@ -205,7 +205,25 @@ test("legacy product level labels migrate to the formal grading vocabulary", () 
   });
 
   assert.equal(normalized.products[0].level, "P1 增长级");
+  assert.equal(normalized.products[0].referenceLevel, "P1 增长级");
+  assert.equal(normalized.products[0].levelConfirmed, false);
+});
+
+test("only products with complete grading answers count as formally graded", () => {
+  const normalized = normalizeClientState({
+    demands: [],
+    products: [{
+      id: "p-graded",
+      name: "正式定级产品",
+      level: "P2 验证级",
+      levelConfirmed: true,
+      stage: 2,
+      grading: { answers: { strategy: 3, salesScale: 3, commercialValue: 3, resourceDemand: 3, risks: {} } }
+    }]
+  });
+
   assert.equal(normalized.products[0].levelConfirmed, true);
+  assert.equal(normalized.products[0].referenceLevel, "P2 验证级");
 });
 
 test("legacy task deadlines migrate to full ISO dates from production state", () => {
@@ -471,6 +489,9 @@ test("converting a discussed demand into project writes a shared decision record
   assert.equal(product.stage, 1);
   assert.equal(product.requester, demand.requester);
   assert.equal(product.productManager, "");
+  assert.equal(product.referenceLevel, demand.level);
+  assert.equal(product.levelConfirmed, false);
+  assert.equal(product.grading, undefined);
   assert.match(decision.title, /进入立项/);
   assert.equal(converted.tasks.some(task => task.productId === product.id && task.stage === 0), false);
 });

@@ -2,6 +2,7 @@ import { CalendarCheck2, CalendarPlus, Flag, Plus, RotateCcw, Send, Trash2 } fro
 import { useEffect, useMemo, useState } from "react";
 import {
   deliverablesForTask,
+  hasFormalProductGrading,
   STAGES,
   stagePolicy,
   taskCategoryActions,
@@ -71,6 +72,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   if (!selectedProduct) return <section className="page"><div className="empty-state">暂无产品</div></section>;
 
   const selectedPolicy = stagePolicy(selectedProduct, selectedStage);
+  const hasFormalGrading = hasFormalProductGrading(selectedProduct);
   const handleAddTask = () => {
     addTask({
       productId: selectedProduct.id,
@@ -180,8 +182,8 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             <Button data-testid="add-stage-task" onClick={handleAddTask}><Plus size={16} />加任务</Button>
             <Button
               data-testid="set-current-stage"
-              disabled={selectedStage === selectedProduct.stage || !selectedPolicy.applies || (selectedStage > 1 && (!selectedProduct.productManager || !selectedProduct.levelConfirmed))}
-              title={!selectedPolicy.applies ? "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !selectedProduct.levelConfirmed) ? "请先确认产品负责人和产品定级" : undefined}
+              disabled={selectedStage === selectedProduct.stage || !selectedPolicy.applies || (selectedStage > 1 && (!selectedProduct.productManager || !hasFormalGrading))}
+              disabledReason={!selectedPolicy.applies ? "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !hasFormalGrading) ? "请先确认产品负责人和产品定级" : selectedStage === selectedProduct.stage ? "这已经是当前阶段" : ""}
               onClick={handleSetCurrentStage}
             ><Flag size={16} />{selectedStage === selectedProduct.stage ? "当前阶段" : "设为当前阶段"}</Button>
           </div>
@@ -204,11 +206,12 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             <div className="project-assignment-item project-grade-action">
               <div className="project-grade-value">
                 <span className="project-assignment-label">产品定级</span>
-                <strong className={`level-badge level-${productLevelTone(selectedProduct.levelConfirmed ? selectedProduct.level : "")}`}>
-                  {selectedProduct.levelConfirmed ? selectedProduct.level : "待定级"}
-                </strong>
-              </div>
-              <Button className="compact" disabled={!selectedProduct.productManager} title={!selectedProduct.productManager ? "请先选择产品负责人" : undefined} onClick={() => setGradingOpen(true)}>{selectedProduct.levelConfirmed ? "查看定级打分" : "定级"}</Button>
+                    <strong className={`level-badge level-${productLevelTone(hasFormalGrading ? selectedProduct.level : "")}`}>
+                      {hasFormalGrading ? selectedProduct.level : "待定级"}
+                    </strong>
+                    <small>参考定级：{selectedProduct.referenceLevel || selectedProduct.level}</small>
+                  </div>
+                  <Button className="compact" disabled={!selectedProduct.productManager} disabledReason={!selectedProduct.productManager ? "请先选择产品负责人" : ""} onClick={() => setGradingOpen(true)}>{hasFormalGrading ? "查看定级打分" : "定级"}</Button>
             </div>
           </div>
         ) : null}
