@@ -367,6 +367,13 @@ export function ProductFlowProvider({ children }) {
     }));
   }, []);
 
+  const updateDeliverable = useCallback((id, patch) => {
+    commitState(current => ({
+      ...current,
+      deliverables: (current.deliverables || []).map(file => file.id === id ? { ...file, ...patch, id } : file)
+    }));
+  }, []);
+
   const deleteDeliverable = useCallback(id => {
     commitState(current => ({ ...current, deliverables: (current.deliverables || []).filter(file => file.id !== id) }));
   }, []);
@@ -447,6 +454,7 @@ export function ProductFlowProvider({ children }) {
     setProductStage,
     syncProductDefaults,
     addDeliverable,
+    updateDeliverable,
     deleteDeliverable,
     addProductPlan,
     updateProductPlan,
@@ -455,7 +463,7 @@ export function ProductFlowProvider({ children }) {
     addFeedbackIssue,
     updateSettings,
     updateTaskTemplates
-  }), [state, currentUser, orgCache, loading, sharedError, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, deleteDeliverable, addProductPlan, updateProductPlan, deleteProductPlan, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
+  }), [state, currentUser, orgCache, loading, sharedError, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, updateDeliverable, deleteDeliverable, addProductPlan, updateProductPlan, deleteProductPlan, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
 
   return <ProductFlowContext.Provider value={value}>{children}</ProductFlowContext.Provider>;
 }

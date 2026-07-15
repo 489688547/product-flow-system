@@ -44,7 +44,7 @@ export function PermissionSettings({ permissions, orgCache, onSave }) {
           <div><h2>权限设置</h2><p>控制不同部门能看到的左侧页面；总经办始终拥有全部权限。</p></div>
           <div className="settings-save-actions">
             <span className={`settings-save-status ${hasChanges ? "dirty" : saved ? "success" : ""}`}>{hasChanges ? "有未保存修改" : saved ? "权限已保存" : "当前权限已保存"}</span>
-            <Button variant="primary" disabled={!hasChanges} onClick={handleSave}><Save size={16} />保存权限</Button>
+            <Button variant="primary" disabled={!hasChanges} disabledReason="权限设置没有未保存的修改" onClick={handleSave}><Save size={16} />保存权限</Button>
           </div>
         </div>
         <div className="permission-matrix" role="table" aria-label="导航权限">

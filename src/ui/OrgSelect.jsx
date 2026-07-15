@@ -28,7 +28,7 @@ export function OrgSelect({ type = "user", value = "", onChange, orgCache, place
     ? (type === "department" ? normalizeDepartmentSelection(value, orgCache) : String(value || "")).split(" / ").filter(Boolean)
     : [String(value || "").trim()].filter(Boolean), [multiple, orgCache, type, value]);
   const selected = items.find(item => item.value === selectedValues[0]);
-  const selectedLabel = multiple ? selectedValues.join(" / ") : selected?.value;
+  const selectedLabel = multiple ? selectedValues.join(" / ") : selected?.value || selectedValues[0];
   const normalizedQuery = query.trim().toLowerCase();
   const filteredItems = items
     .filter(item => !normalizedQuery || item.label.toLowerCase().includes(normalizedQuery))

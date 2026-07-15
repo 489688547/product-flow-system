@@ -22,6 +22,14 @@ test("project uses React Vite and Tailwind v4 as the new frontend foundation", (
   assert.match(read("src/styles.css"), /@import "tailwindcss";/);
 });
 
+test("deliverable preview recognizes image data URLs without saved MIME metadata", async () => {
+  const { deliverableKind, canDownloadDeliverable } = await import("../src/domain/deliverables.js");
+  assert.equal(deliverableKind({ name: "会议纪要图", url: "data:image/svg+xml,%3Csvg%3E%3C/svg%3E" }), "image");
+  assert.equal(canDownloadDeliverable({ url: "data:image/png;base64,AA==" }, "https://example.com"), true);
+  assert.equal(canDownloadDeliverable({ url: "/files/report.pdf" }, "https://example.com"), true);
+  assert.equal(canDownloadDeliverable({ url: "https://alidocs.dingtalk.com/i/nodes/abc" }, "https://example.com"), false);
+});
+
 test("domain model keeps product-flow rules independent from React components", () => {
   const domain = read("src/domain/productFlow.js");
   assert.match(domain, /export const PRODUCT_LEVELS/);
@@ -103,6 +111,9 @@ test("annual product planning reuses demands in a twelve-month editable timeline
   assert.match(page, /disabledReason=/);
   assert.match(button, /disabledReason/);
   assert.match(button, /disabled-action-tip/);
+  assert.match(button, /data-disabled-reason/);
+  assert.match(button, /tabIndex="0"/);
+  assert.match(button, /export function IconAction\(\{ label, children, className = "", disabled = false, disabledReason = ""/);
   assert.match(tray, /application\/x-product-demand-id/);
   assert.match(tray, /draggable=\{canEdit\}/);
   assert.match(tray, /\/>安排/);
@@ -118,7 +129,7 @@ test("annual product planning reuses demands in a twelve-month editable timeline
   assert.match(styles, /\.planning-product-column/);
   assert.match(styles, /\.planning-bar\.development/);
   assert.match(styles, /\.planning-bar\.launch/);
-  assert.match(styles, /grid-template-columns: repeat\(12, minmax\(72px, 1fr\)\)/);
+  assert.match(styles, /grid-template-columns: repeat\(12, minmax\(68px, 1fr\)\)/);
 });
 
 test("dashboard uses aligned section headers plus reusable product thumbnails in task and risk rows", () => {
@@ -204,6 +215,9 @@ test("demand pool supports rich text, status filtering, and clear project conver
   assert.match(modal, /type="file"/);
   assert.match(modal, /accept="image\/\*"/);
   assert.match(modal, /generateProductCover\(form\.name\)/);
+  assert.doesNotMatch(modal, /使用自动封面/);
+  assert.match(modal, /type="user"[\s\S]*searchInMenu/);
+  assert.match(modal, /type="department"[\s\S]*searchInMenu/);
   assert.match(page, /demand\.image/);
   assert.match(page, /generateProductCover\(form\.name\)/);
   assert.doesNotMatch(modal, /<label>负责人/);
@@ -252,6 +266,7 @@ test("all searchable and custom dropdowns render through a viewport floating lay
   assert.match(productPicker, /<FloatingMenu/);
   assert.match(org, /<FloatingMenu/);
   assert.doesNotMatch(org, /<datalist/);
+  assert.match(org, /selected\?\.value \|\| selectedValues\[0\]/);
   assert.match(styles, /\.floating-menu-layer\s*\{[\s\S]*z-index: 80;/);
 });
 
@@ -537,16 +552,29 @@ test("review decisions are editable meeting records tied to product progress", (
   assert.doesNotMatch(reviews, /<span className="muted">-<\/span>/);
 });
 
-test("package manager supports Apple-like file cards with add open and delete actions", () => {
+test("package manager uses preview-first file cards with edit download and delete actions", () => {
   const packages = read("src/features/packages/PackagePage.jsx");
+  const preview = read("src/ui/DeliverablePreviewModal.jsx");
+  const store = read("src/state/ProductFlowProvider.jsx");
   assert.match(packages, /data-testid="package-dropzone"/);
   assert.match(packages, /addDeliverable/);
+  assert.match(packages, /updateDeliverable/);
   assert.match(packages, /deleteDeliverable/);
   assert.match(packages, /window\.confirm\("确认删除这个文件/);
-  assert.match(packages, /window\.open/);
+  assert.doesNotMatch(packages, /window\.open/);
   assert.match(packages, /file-card/);
-  assert.match(packages, /打开/);
+  assert.match(packages, /file-card-overlay/);
+  assert.match(packages, /file-card-main/);
+  assert.match(packages, /canDownloadDeliverable/);
+  assert.match(packages, /编辑/);
+  assert.match(packages, /下载/);
   assert.match(packages, /删除/);
+  assert.match(packages, /isBrokenDeliverable/);
+  assert.match(preview, /deliverableKind/);
+  assert.match(preview, /deliverable-image-preview/);
+  assert.match(preview, /deliverable-video-preview/);
+  assert.match(preview, /deliverable-file-frame/);
+  assert.match(store, /const updateDeliverable/);
 });
 
 test("issue feedback and settings pages persist company-wide operational data", () => {

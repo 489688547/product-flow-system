@@ -49,7 +49,7 @@ export function TaskDeliverableModal({ open, task, product, onClose, onSave }) {
       open={open}
       title="添加交付物"
       onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!valid} onClick={save}>添加</Button></>}
+      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!valid} disabledReason="请填写名称和有效的钉钉文档链接或富文本内容" onClick={save}>添加</Button></>}
     >
       <div className="deliverable-type-tabs" role="tablist" aria-label="交付物类型">
         <button type="button" className={type === "dingtalk-doc" ? "active" : ""} onClick={() => setType("dingtalk-doc")}><Link2 size={16} />钉钉文档</button>

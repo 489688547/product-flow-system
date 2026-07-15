@@ -33,7 +33,7 @@ export function ProductGradingModal({ open, product, canEdit = false, onClose, o
       title={hasFormalProductGrading(product) ? "查看定级打分" : "产品定级"}
       size="large"
       onClose={onClose}
-      footer={canEdit ? <><Button onClick={onClose}>取消</Button><Button variant={isReserve ? "danger" : "primary"} disabled={!result.complete} onClick={() => onSave(answers)}>{isReserve ? "退回需求池" : "确认定级"}</Button></> : null}
+      footer={canEdit ? <><Button onClick={onClose}>取消</Button><Button variant={isReserve ? "danger" : "primary"} disabled={!result.complete} disabledReason="请完成四项基础评分" onClick={() => onSave(answers)}>{isReserve ? "退回需求池" : "确认定级"}</Button></> : null}
     >
       <div className="grading-intro"><strong>{product?.name}</strong><em>需求池参考等级：{product?.referenceLevel || product?.level || "未填写"}</em><span>价值与资源决定正式产品等级；C2 单独判断风险，并调整管理强度和推进方式。</span></div>
       <div className="grading-layout">
@@ -45,7 +45,7 @@ export function ProductGradingModal({ open, product, canEdit = false, onClose, o
                 {dimension.options.map((label, index) => {
                   const score = index + 1;
                   const active = answers[dimension.key] === score;
-                  return <button type="button" key={score} className={active ? "active" : ""} aria-pressed={active} disabled={!canEdit} onClick={() => setScore(dimension.key, score)}><b>{score}</b><span>{label}</span>{active ? <Check size={14} /> : null}</button>;
+                  return <button type="button" key={score} className={active ? "active" : ""} aria-pressed={active} disabled={!canEdit} title={!canEdit ? "只有产品负责人可以修改定级打分" : undefined} onClick={() => setScore(dimension.key, score)}><b>{score}</b><span>{label}</span>{active ? <Check size={14} /> : null}</button>;
                 })}
               </div>
             </fieldset>
@@ -53,7 +53,7 @@ export function ProductGradingModal({ open, product, canEdit = false, onClose, o
           <fieldset className="grading-dimension grading-risks">
             <legend>C2. 风险核查</legend>
             <div className="grading-risk-grid">
-              {PRODUCT_GRADING_RISKS.map(risk => <label key={risk.key}><input type="checkbox" disabled={!canEdit} checked={Boolean(answers.risks?.[risk.key])} onChange={() => toggleRisk(risk.key)} /><span>{risk.label}</span><em>+{risk.adjustment}</em></label>)}
+              {PRODUCT_GRADING_RISKS.map(risk => <label key={risk.key} title={!canEdit ? "只有产品负责人可以修改风险评分" : undefined}><input type="checkbox" disabled={!canEdit} checked={Boolean(answers.risks?.[risk.key])} onChange={() => toggleRisk(risk.key)} /><span>{risk.label}</span><em>+{risk.adjustment}</em></label>)}
             </div>
           </fieldset>
         </div>

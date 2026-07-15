@@ -124,7 +124,7 @@ export function DemandPoolPage({ onProjectCreated }) {
     { key: "createdAt", header: "创建时间", render: demand => formatDemandCreatedAt(demand.createdAt) },
     { key: "actions", header: "操作", render: demand => (
       <TableActions>
-        <Button data-testid="convert-demand" className="compact" disabled={!canConvertDemandToProject(demand)} onClick={() => {
+        <Button data-testid="convert-demand" className="compact" disabled={!canConvertDemandToProject(demand)} disabledReason={demand.productId ? "该需求已经进入立项" : "需求状态变为已讨论后才能立项"} onClick={() => {
           const productId = convertDemand(demand.id);
           onProjectCreated?.(productId);
         }}><GitBranchPlus size={16} />立项</Button>

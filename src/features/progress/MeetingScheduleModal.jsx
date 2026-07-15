@@ -69,6 +69,7 @@ export function MeetingScheduleModal({ open, task, product, currentUser, orgCach
       setSubmitting(false);
     }
   };
+  const submitDisabledReason = submitting ? "正在同步，请稍候" : !selectedUsers.length ? "请至少选择一名参会人" : "";
 
   return (
     <>
@@ -77,7 +78,7 @@ export function MeetingScheduleModal({ open, task, product, currentUser, orgCach
         title="预约钉钉会议"
         size="small"
         onClose={() => !submitting && onClose()}
-        footer={<><Button disabled={submitting} onClick={onClose}>取消</Button><Button variant="primary" disabled={submitting || !selectedUsers.length} onClick={submit}><CalendarPlus size={16} />同步到钉钉日程</Button></>}
+        footer={<><Button disabled={submitting} disabledReason="正在同步，请稍候" onClick={onClose}>取消</Button><Button variant="primary" disabled={Boolean(submitDisabledReason)} disabledReason={submitDisabledReason} onClick={submit}><CalendarPlus size={16} />同步到钉钉日程</Button></>}
       >
         <div className="meeting-context">
           <strong>{task?.title || "会议任务"}</strong>
@@ -93,7 +94,7 @@ export function MeetingScheduleModal({ open, task, product, currentUser, orgCach
           {filteredUsers.map(user => {
             const selected = selectedUnionIds.includes(user.unionid);
             return (
-              <button key={user.userid || user.name} type="button" disabled={!user.unionid} className={selected ? "selected" : ""} onClick={() => toggleUser(user)}>
+              <button key={user.userid || user.name} type="button" disabled={!user.unionid} title={!user.unionid ? "该成员缺少钉钉身份，不能加入日程" : undefined} className={selected ? "selected" : ""} onClick={() => toggleUser(user)}>
                 <span className="meeting-attendee-avatar">{user.name.slice(0, 1)}</span>
                 <span><strong>{user.name}</strong><small>{user.department} / {user.title}{!user.unionid ? " · 缺少钉钉身份" : ""}</small></span>
                 <span className="meeting-attendee-check">{selected ? <Check size={14} /> : null}</span>

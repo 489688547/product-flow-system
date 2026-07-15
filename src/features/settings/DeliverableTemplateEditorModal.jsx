@@ -32,7 +32,7 @@ export function DeliverableTemplateEditorModal({ open, task, onClose, onSave }) 
       open={open}
       title={`${task?.title || "任务"} · 交付物模板`}
       onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!valid} onClick={() => onSave(documents.map(document => ({ ...document, name: document.name.trim(), url: document.url.trim() })))}>保存模板</Button></>}
+      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={!valid} disabledReason="请补全模板名称和有效的钉钉文档链接" onClick={() => onSave(documents.map(document => ({ ...document, name: document.name.trim(), url: document.url.trim() })))}>保存模板</Button></>}
     >
       <div className="deliverable-template-editor">
         <div className="template-modal-intro"><Link2 size={17} /><span>配置完成后，产品任务可直接打开这些钉钉文档模板。</span></div>

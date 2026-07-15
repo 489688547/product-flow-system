@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, moveProductToStage, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
+import { deliverableKind, isBrokenDeliverable } from "../src/domain/deliverables.js";
 import { normalizeClientState } from "../src/state/stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../src/domain/sessionUser.js";
 import { canEditFeature, canEditProductPlanning, canViewFeature, canViewNavigation, DEFAULT_PERMISSIONS } from "../src/domain/permissions.js";
@@ -550,6 +551,17 @@ test("task deliverables reuse records from the product package", () => {
   const rows = deliverablesForTask({ ...state, deliverables: [linked, unrelated] }, "task-1");
 
   assert.deepEqual(rows, [linked]);
+});
+
+test("deliverable previews distinguish supported files and broken records", () => {
+  assert.equal(deliverableKind({ type: "image/png", url: "data:image/png;base64,abc" }), "image");
+  assert.equal(deliverableKind({ type: "application/pdf", url: "data:application/pdf;base64,abc" }), "pdf");
+  assert.equal(deliverableKind({ type: "video/mp4", url: "data:video/mp4;base64,abc" }), "video");
+  assert.equal(deliverableKind({ type: "dingtalk-doc", url: "https://alidocs.dingtalk.com/i/nodes/demo" }), "link");
+  assert.equal(deliverableKind({ type: "richtext", content: "<p>会议结论</p>" }), "richtext");
+  assert.equal(isBrokenDeliverable({ type: "richtext", content: "" }), true);
+  assert.equal(isBrokenDeliverable({ type: "doc", url: "#" }), true);
+  assert.equal(isBrokenDeliverable({ type: "image", url: "data:image/png;base64,abc" }), false);
 });
 
 test("grading follows the Excel one-vote rule for O-level reserve", () => {

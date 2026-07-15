@@ -54,6 +54,7 @@ export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }
   };
   const status = task ? todoSyncStatus(task) : "未同步";
   const normalizedDue = normalizeTaskDueDate(task?.due);
+  const submitDisabledReason = submitting ? "正在同步，请稍候" : !normalizedDue ? "请先设置任务截止日期" : !selectedUsers.length ? "请至少选择一名执行人" : "";
 
   return (
     <>
@@ -62,7 +63,7 @@ export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }
         title={task?.dingTodo?.id ? "更新钉钉待办" : "同步到钉钉待办"}
         size="small"
         onClose={() => !submitting && onClose()}
-        footer={<><Button disabled={submitting} onClick={onClose}>取消</Button><Button variant="primary" disabled={submitting || !normalizedDue || !selectedUsers.length} onClick={submit}><Send size={16} />{task?.dingTodo?.id ? "更新待办" : "发送待办"}</Button></>}
+        footer={<><Button disabled={submitting} disabledReason="正在同步，请稍候" onClick={onClose}>取消</Button><Button variant="primary" disabled={Boolean(submitDisabledReason)} disabledReason={submitDisabledReason} onClick={submit}><Send size={16} />{task?.dingTodo?.id ? "更新待办" : "发送待办"}</Button></>}
       >
         <div className="meeting-context todo-context">
           <strong>{task?.title || "产品任务"}</strong>
@@ -75,7 +76,7 @@ export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }
           {filteredUsers.map(user => {
             const selected = selectedUnionIds.includes(user.unionid);
             return (
-              <button key={user.userid || user.name} type="button" disabled={!user.unionid} className={selected ? "selected" : ""} onClick={() => toggleUser(user)}>
+              <button key={user.userid || user.name} type="button" disabled={!user.unionid} title={!user.unionid ? "该成员缺少钉钉身份，不能接收待办" : undefined} className={selected ? "selected" : ""} onClick={() => toggleUser(user)}>
                 <span className="meeting-attendee-avatar">{user.name.slice(0, 1)}</span>
                 <span><strong>{user.name}</strong><small>{user.department} / {user.title}{!user.unionid ? " · 缺少钉钉身份" : ""}</small></span>
                 <span className="meeting-attendee-check">{selected ? <Check size={14} /> : null}</span>

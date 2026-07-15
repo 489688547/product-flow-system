@@ -1,4 +1,4 @@
-import { ImagePlus, Trash2 } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { generateProductCover, PRODUCT_LEVELS, RESERVE_LEVEL } from "../../domain/productFlow.js";
 import { Button } from "../../ui/Button.jsx";
@@ -31,7 +31,7 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
       onClose={onClose}
       footer={<>
         <Button onClick={onClose}>取消</Button>
-        <Button variant="primary" disabled={missing} onClick={() => onSave(form)}>保存</Button>
+        <Button variant="primary" disabled={missing} disabledReason="请填写名称、提需人、来源部门和机会描述" onClick={() => onSave(form)}>保存</Button>
       </>}
     >
       <section className="demand-cover-field" aria-label="产品图片">
@@ -45,15 +45,14 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
               {form.image ? "更换图片" : "上传图片"}
               <input type="file" accept="image/*" onChange={event => { readImage(event.target.files?.[0]); event.target.value = ""; }} />
             </label>
-            {form.image ? <Button className="compact" onClick={() => set({ image: "" })}><Trash2 size={15} aria-hidden="true" />使用自动封面</Button> : null}
           </div>
         </div>
       </section>
       <div className="form-grid">
         <label>产品/机会名称<input name="demand-name" autoComplete="off" value={form.name} onChange={event => set({ name: event.target.value })} placeholder="例如：鹦鹉谷物棒升级版…" /></label>
         <label>参考等级<select name="demand-level" value={form.level} onChange={event => set({ level: event.target.value })}>{(form.level === RESERVE_LEVEL ? [RESERVE_LEVEL, ...PRODUCT_LEVELS] : PRODUCT_LEVELS).map(level => <option key={level}>{level}</option>)}</select></label>
-        <label>提需人<OrgSelect type="user" value={form.requester} onChange={requester => set({ requester })} orgCache={orgCache} placeholder="选择提需人…" /></label>
-        <label>来源部门<OrgSelect type="department" value={form.source} onChange={source => set({ source })} orgCache={orgCache} placeholder="选择来源部门…" /></label>
+        <label>提需人<OrgSelect type="user" value={form.requester} onChange={requester => set({ requester })} orgCache={orgCache} placeholder="选择提需人…" searchInMenu /></label>
+        <label>来源部门<OrgSelect type="department" value={form.source} onChange={source => set({ source })} orgCache={orgCache} placeholder="选择来源部门…" searchInMenu /></label>
       </div>
       <label className="full-field">机会描述<RichTextEditor value={form.desc} onChange={desc => set({ desc })} placeholder="看到什么市场机会、用户痛点、供应链可能性…" /></label>
       <label className="full-field">讨论摘要<RichTextEditor value={form.discussion} onChange={discussion => set({ discussion })} placeholder="讨论后的判断、争议点、下一步结论…" /></label>

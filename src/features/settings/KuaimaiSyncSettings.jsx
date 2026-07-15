@@ -115,6 +115,7 @@ export function KuaimaiSyncSettings({ canEdit = false, currentUser }) {
   const statusText = !status ? "正在检查连接…"
     : status.connected ? `已连接（网关时间 ${status.serverTime || "未知"}）`
     : status.configured === false ? "未配置" : `连接失败：${status.message || "未知错误"}`;
+  const syncDisabledReason = syncing ? "销售数据正在同步" : !status?.connected ? "请先完成快麦接口连接" : !range.from || !range.to ? "请选择完整的同步日期范围" : "";
 
   return (
     <section className="section-panel settings-kuaimai">
@@ -134,7 +135,7 @@ export function KuaimaiSyncSettings({ canEdit = false, currentUser }) {
         <div className="kuaimai-sync-controls">
           <label>从<input type="date" value={range.from} max={shanghaiDateString(0)} onChange={event => setRange(current => ({ ...current, from: event.target.value }))} /></label>
           <label>到<input type="date" value={range.to} max={shanghaiDateString(0)} onChange={event => setRange(current => ({ ...current, to: event.target.value }))} /></label>
-          <Button variant="primary" disabled={syncing || !status?.connected || !range.from || !range.to} onClick={handleSync}>
+          <Button variant="primary" disabled={Boolean(syncDisabledReason)} disabledReason={syncDisabledReason} onClick={handleSync}>
             <CloudDownload size={16} />{syncing ? "同步中…" : "开始同步"}
           </Button>
         </div>

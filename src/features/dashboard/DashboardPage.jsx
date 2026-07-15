@@ -61,7 +61,7 @@ export function DashboardPage({ onNavigate, onOpenProgress }) {
       <div className="metric-grid">
         <button className="metric-card" onClick={() => onNavigate("demands")}><ClipboardList aria-hidden="true" /><span><strong>{visibleDemandPool(state.demands).length}</strong><small>需求池</small></span></button>
         <button className="metric-card" onClick={() => onNavigate("progress")}><GitBranch aria-hidden="true" /><span><strong>{state.products.length}</strong><small>流程中产品</small></span></button>
-        <button className="metric-card" onClick={openFirstTodo} disabled={!departmentTasks.length}><ListTodo aria-hidden="true" /><span><strong>{departmentTasks.length}</strong><small>待办事项</small></span></button>
+        <button className="metric-card" onClick={openFirstTodo} disabled={!departmentTasks.length} title={!departmentTasks.length ? "当前筛选范围内没有待办事项" : undefined}><ListTodo aria-hidden="true" /><span><strong>{departmentTasks.length}</strong><small>待办事项</small></span></button>
       </div>
       <div className="dashboard-grid">
         <section className="section-panel">
