@@ -2,59 +2,25 @@
 
 ## Style Direction
 
-内部产品工具，参考 shadcn/ui、Linear、Raycast 和 Apple 系统应用的克制质感。界面以浅色工作区、深色导航、清晰边界、轻量状态色和紧凑信息密度为主。
+浅色、克制的产品工作台，参考 Linear、Apple 系统应用和成熟钉钉工作台应用。
 
-## Color Tokens
-
-- Background: cool light workspace, not cream or beige.
-- Surface: white cards and panels.
-- Sidebar: near-black charcoal, used only for app shell identity.
-- Primary: vivid blue for active navigation, primary actions and focus rings.
-- Semantic: green success, amber warning, red risk, violet review/lifecycle accents.
-- Muted text: dark enough for AA contrast on light surfaces.
+设计执行以 `frontend-design-principles`、`impeccable` 和 `web-design-guidelines` 为主，不使用偏营销展示的 `high-end-visual-design`。
 
 ## Typography
 
-Use the system font stack: SF Pro / PingFang SC / Segoe UI / Microsoft YaHei. Product UI uses one family with a tight scale:
-
-- Page title: 24px, 700.
-- Panel title: 15-16px, 700.
-- Body/table: 13px.
-- Helper text: 12px, with sufficient contrast.
-
-No fluid type, no display fonts, no negative letter spacing.
+使用系统字体。页面标题 24px，区块标题 15-16px，正文和表格 13px，辅助文字 12px。
 
 ## Layout
 
-- App shell: fixed-width left rail plus responsive main content.
-- Main content: max-width bounded, centered in available workspace.
-- Cards and panels: 8px radius, 1px border, subtle shadow only when useful.
-- Tables: sticky header, clear row hover, stable column rhythm.
-- Mobile/tablet: sidebar becomes compact horizontal nav; dense tables scroll horizontally.
+固定左侧导航和响应式主工作区。间距使用 4px 基础网格，常用间距为 8px 和 12px。表格保持表头单行、稳定列宽和水平滚动；设置页使用无嵌套卡片的矩阵结构。
 
 ## Components
 
-- Buttons: one primary, one secondary, one ghost style. Icons from Lucide.
-- Button states: secondary and utility actions stay neutral by default; hover uses the same light neutral surface and stronger border. Primary blue is reserved for the main commit action, and destructive red appears only on irreversible actions.
-- Inputs/selects: consistent height, focus ring, native affordance where possible.
-- Table header filters: keep filters inside the relevant table header as a 22px ghost icon next to the label. The label remains visually primary; the icon is neutral by default, uses a subtle surface on hover/expanded/active, and opens a fixed-position menu so it is never clipped by table scroll containers.
-- Table row actions: keep row actions inside a single `.table-actions` group. Icon-only actions are fixed 30px squares, text actions share the same 30px height, and action groups do not wrap inside data tables. Use short text labels for ambiguous state-changing actions such as “转开发”; use icon-only buttons only for universally understood edit/delete/open actions with clear `title` and `aria-label`.
-- Table action columns: action columns shrink to the actual control group width and align controls to the right. Do not reserve a large fixed action column that leaves empty space before buttons; give spare width to description, task, document, or decision columns.
-- Table row height: data-table body cells use one shared 52px minimum row rhythm, vertical middle alignment, and unframed row action groups. A button should never be the reason one row becomes taller than neighboring rows.
-- Badges: semantic color with text, never color-only.
-- Metrics: clickable summary rows with icon, label, count and chevron.
-- Risk cards: compact list items, not oversized warning blocks.
-- Modals: restrained sheet with sticky header/footer and a scrollable body. Titles stay compact, content uses the same form rhythm as pages, and the footer keeps cancel/secondary actions visually below the primary commit action.
-- Surfaces: panels, rows, cards, package files and settings rows share the same 10px panel radius, 1px border and subtle single-step elevation. Hover may lift one step, but nested card shadows are avoided.
+- 主操作使用蓝色，普通操作使用中性按钮，危险操作只用于不可逆动作。
+- 权限范围使用组织架构下拉多选，不使用自由文本录入。
+- 所有下拉通过浮层渲染，避免被表格和面板裁切。
+- 加载、错误、禁用、选中状态必须清楚且一致。
 
-## Motion
+## Embedded DingTalk Webview
 
-Use 120-180ms transitions for hover, focus and state feedback. No page-load choreography. Disable transform transitions under `prefers-reduced-motion`.
-
-## Embedded (DingTalk) Webview
-
-- Viewport meta uses `viewport-fit=cover`; small screens pad the shell and toast with `env(safe-area-inset-*)`.
-- Heights prefer `100dvh` (with `100vh` fallback) so DingTalk/iOS bottom bars never cover the sidebar or modal footer.
-- Inputs are at least 16px on ≤720px screens to prevent focus zoom inside embedded webviews.
-- `overscroll-behavior-y: none` avoids pull-to-refresh bounce; controls use `touch-action: manipulation`.
-- Every modal closes on overlay click and Escape; confirm dialogs treat both as cancel.
+避免大请求使用 `keepalive`；错误提示使用明确中文。布局使用动态视口高度并适配安全区。
