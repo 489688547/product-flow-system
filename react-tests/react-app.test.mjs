@@ -286,7 +286,8 @@ test("product progress derives stages and tasks from the selected product level"
   const meetingModal = read("src/features/progress/MeetingScheduleModal.jsx");
   const datePicker = read("src/ui/DatePickerField.jsx");
   const pkg = JSON.parse(read("package.json"));
-  assert.match(page, /stagePolicy\(selectedProduct, stage\.index\)/);
+  assert.match(page, /productStagePolicy\(state, selectedProduct, stage\.index\)/);
+  assert.match(page, /productStagePolicy\(state, selectedProduct, selectedStage\)/);
   assert.match(page, /tasksForProductStage\(state, selectedProduct, selectedStage\)/);
   assert.doesNotMatch(page, /advanceProductStage/);
   assert.doesNotMatch(page, /完成当前阶段并进入下一阶段/);

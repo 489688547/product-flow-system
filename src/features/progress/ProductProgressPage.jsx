@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   deliverablesForTask,
   hasFormalProductGrading,
+  productStagePolicy,
   STAGES,
-  stagePolicy,
   taskCategoryActions,
   tasksForProductStage
 } from "../../domain/productFlow.js";
@@ -32,7 +32,7 @@ import { TaskTemplateModal } from "./TaskTemplateModal.jsx";
 import { TodoSyncModal } from "./TodoSyncModal.jsx";
 
 function stagePolicyTone(mode) {
-  if (mode === "不涉及") return "skipped";
+  if (mode === "不涉及" || mode === "跳过") return "skipped";
   if (mode === "必走" || mode === "核心测试" || mode === "关键节点") return "required";
   if (mode.includes("复盘") || mode.includes("月") || mode.includes("天")) return "review";
   return "suggested";
@@ -89,7 +89,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     launchDate: productSchedule.launchDate
   }), [selectedProduct, productSales.rows, productSchedule.launchDate]);
   if (!selectedProduct) return <section className="page"><div className="empty-state">暂无产品</div></section>;
-  const selectedPolicy = stagePolicy(selectedProduct, selectedStage);
+  const selectedPolicy = productStagePolicy(state, selectedProduct, selectedStage);
   const hasFormalGrading = hasFormalProductGrading(selectedProduct);
   const monthlyGmvTarget = normalizeMonthlyGmvTarget(selectedProduct.monthlyGmvTarget);
   const saveMonthlyGmvTarget = () => {
@@ -188,7 +188,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
       />
       <div className="stage-grid">
         {progressStages.map(stage => {
-          const policy = stagePolicy(selectedProduct, stage.index);
+          const policy = productStagePolicy(state, selectedProduct, stage.index);
           const stageTasks = tasksForProductStage(state, selectedProduct, stage.index);
           const done = stageTasks.filter(task => task.done).length;
           return (
@@ -196,21 +196,21 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
               <span className="stage-num">{stage.index}</span>
               <strong>{stage.short}</strong>
               <em className={`policy-${stagePolicyTone(policy.mode)}`}>{stagePolicyLabel(policy.mode)}</em>
-              <p>{policy.applies ? stage.goal : "该等级不涉及"}</p>
-              <small>{policy.applies ? `${done}/${stageTasks.length} 任务完成` : "该等级不涉及"}</small>
+              <p>{policy.applies ? stage.goal : policy.reason === "no-default-tasks" ? "未配置默认任务" : "该等级不涉及"}</p>
+              <small>{policy.applies ? `${done}/${stageTasks.length} 任务完成` : policy.reason === "no-default-tasks" ? "可直接跳过" : "该等级不涉及"}</small>
             </button>
           );
         })}
       </div>
       <div className="section-panel">
         <div className="section-head">
-          <div><h2>{selectedStage}. {STAGES[selectedStage].title}</h2><p>{selectedPolicy.applies ? selectedPolicy.usage : "该等级不走这个阶段。"}</p></div>
+          <div><h2>{selectedStage}. {STAGES[selectedStage].title}</h2><p>{selectedPolicy.usage}</p></div>
           <div className="toolbar-actions">
             <Button data-testid="add-stage-task" onClick={handleAddTask}><Plus size={16} />加任务</Button>
             <Button
               data-testid="set-current-stage"
               disabled={selectedStage === selectedProduct.stage || !selectedPolicy.applies || (selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading))}
-              disabledReason={!selectedPolicy.applies ? "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading) ? "请先确认产品负责人、平均月 GMV 和产品定级" : selectedStage === selectedProduct.stage ? "这已经是当前阶段" : ""}
+              disabledReason={!selectedPolicy.applies ? selectedPolicy.reason === "no-default-tasks" ? "该阶段没有默认任务，可直接选择后续阶段" : "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading) ? "请先确认产品负责人、平均月 GMV 和产品定级" : selectedStage === selectedProduct.stage ? "这已经是当前阶段" : ""}
               onClick={handleSetCurrentStage}
             ><Flag size={16} />{selectedStage === selectedProduct.stage ? "当前阶段" : "设为当前阶段"}</Button>
           </div>
@@ -261,7 +261,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             </div>
           </div>
         ) : null}
-        {selectedPolicy.applies ? <DataTable className="task-table" minWidth={880} columns={columns} rows={tasks} empty={<div className="empty-state">暂无任务</div>} /> : <div className="empty-state">该等级不涉及这个阶段，不需要维护任务。</div>}
+        {selectedPolicy.applies ? <DataTable className="task-table" minWidth={880} columns={columns} rows={tasks} empty={<div className="empty-state">暂无任务</div>} /> : <div className="empty-state">{selectedPolicy.reason === "no-default-tasks" ? "设置中未配置该阶段的默认任务，流程可直接跳过；需要临时执行时可添加任务。" : "该等级不涉及这个阶段，不需要维护任务。"}</div>}
       </div>
       <MeetingScheduleModal
         open={Boolean(meetingTask)}

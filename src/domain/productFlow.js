@@ -418,6 +418,28 @@ export function taskTemplatesForProductStage(state, product, stageIndex) {
   return templates.filter(template => template.level === level && Number(template.stage) === Number(stageIndex));
 }
 
+export function productStagePolicy(state, product, stageIndex) {
+  const policy = stagePolicy(product, stageIndex);
+  if (!policy.applies) return { ...policy, reason: "level-rule" };
+
+  const hasDefaults = taskTemplatesForProductStage(state, product, stageIndex).length > 0;
+  if (hasDefaults) return { ...policy, reason: "default-tasks" };
+
+  const hasManualTasks = (state?.tasks || []).some(task => (
+    task.productId === product?.id
+    && Number(task.stage) === Number(stageIndex)
+    && !task.systemDefault
+  ));
+  if (hasManualTasks) return { ...policy, reason: "manual-tasks" };
+
+  return {
+    mode: "跳过",
+    applies: false,
+    usage: "该阶段未配置默认任务，可直接跳过。",
+    reason: "no-default-tasks"
+  };
+}
+
 function defaultStageTasks(state, product, stageIndex) {
   return taskTemplatesForProductStage(state, product, stageIndex).map(template => ({
     id: `${product.id}-template-${template.id}`,

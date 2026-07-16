@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, hasFormalProductGrading, moveProductToStage, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
+import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, hasFormalProductGrading, moveProductToStage, productStagePolicy, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
 import { deliverableKind, isBrokenDeliverable } from "../src/domain/deliverables.js";
 import { normalizeClientState } from "../src/state/stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../src/domain/sessionUser.js";
@@ -333,6 +333,36 @@ test("workflow task templates are isolated by product level and stage", () => {
   assert.ok(p0Development.every(template => template.level === "P0 战略级" && template.stage === 2));
   const departmentNames = new Set(state.orgCache.departments.map(department => department.name));
   assert.ok(DEFAULT_TASK_TEMPLATES.every(template => departmentNames.has(template.ownerDept)));
+});
+
+test("product stages without configured defaults are skippable unless they contain manual work", () => {
+  const state = createDefaultState();
+  const product = state.products.find(item => item.level === "P1 增长级");
+  const withoutDevelopmentDefaults = updateWorkflowTaskTemplates(
+    state,
+    state.settings.taskTemplates.filter(template => !(template.level === product.level && template.stage === 2))
+  );
+
+  assert.deepEqual(productStagePolicy(withoutDevelopmentDefaults, product, 2), {
+    mode: "跳过",
+    applies: false,
+    usage: "该阶段未配置默认任务，可直接跳过。",
+    reason: "no-default-tasks"
+  });
+
+  const withManualTask = {
+    ...withoutDevelopmentDefaults,
+    tasks: [...withoutDevelopmentDefaults.tasks, {
+      id: "manual-development-task",
+      productId: product.id,
+      stage: 2,
+      title: "临时研发任务",
+      systemDefault: false
+    }]
+  };
+
+  assert.equal(productStagePolicy(withManualTask, product, 2).applies, true);
+  assert.equal(productStagePolicy(withManualTask, product, 2).reason, "manual-tasks");
 });
 
 test("updating workflow templates preserves product execution state and manual tasks", () => {
