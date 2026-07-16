@@ -108,3 +108,15 @@ test("monthly report transitions and incentive settlement are audited", () => {
   assert.equal(settled.incentiveProjects[0].finalReward, 3000);
   assert.equal(settled.auditLogs[0].action, "settle");
 });
+
+test("governed no-op reconciliation preserves state identity", () => {
+  const state = createDefaultPlatformState();
+  const sameTodos = reducePlatformState(state, { type: "replace_personal_todos", todos: state.personalTodos });
+  assert.equal(sameTodos, state);
+  const sameReports = reducePlatformState(state, {
+    type: "ensure_monthly_reports",
+    month: "2026-06",
+    departments: ["运营部", "品牌部"]
+  });
+  assert.equal(sameReports, state);
+});

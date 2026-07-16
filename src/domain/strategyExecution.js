@@ -507,7 +507,7 @@ export function reducePlatformState(input, action = {}) {
 
   if (action.type === "replace_personal_todos") {
     const personalTodos = Array.isArray(action.todos) ? action.todos.map(item => ({ ...item, dingTodo: { ...(item.dingTodo || {}) } })) : [];
-    if (JSON.stringify(personalTodos) === JSON.stringify(state.personalTodos)) return state;
+    if (JSON.stringify(personalTodos) === JSON.stringify(state.personalTodos)) return input;
     return { ...state, updatedAt: timestamp, personalTodos };
   }
 
@@ -618,7 +618,7 @@ export function reducePlatformState(input, action = {}) {
 
   if (action.type === "ensure_monthly_reports") {
     const monthlyReports = ensureMonthlyReports(state, action.month, action.departments);
-    if (monthlyReports.length === state.monthlyReports.length) return state;
+    if (monthlyReports.length === state.monthlyReports.length) return input;
     return audit({ ...state, updatedAt: timestamp, monthlyReports }, {
       actor: action.actor,
       action: "generate",
