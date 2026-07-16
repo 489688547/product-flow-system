@@ -25,6 +25,8 @@ test("platform provider reconciles personal todos and safely writes back allowed
   assert.match(provider, /refreshPersonalTodoStatuses/);
   assert.match(provider, /setPersonalTodoDone/);
   assert.match(provider, /\/api\/dingtalk\/todo\/list/);
+  assert.match(provider, /window\.location\.pathname\}#home/);
+  assert.doesNotMatch(provider, /window\.location\.pathname\}#company/);
   assert.match(provider, /complete_milestone/);
   assert.match(provider, /complete_product_task/);
   assert.match(provider, /updateTask/);

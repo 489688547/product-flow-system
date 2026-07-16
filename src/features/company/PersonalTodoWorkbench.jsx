@@ -35,7 +35,7 @@ function syncState(todo) {
 }
 
 function TodoRow({ todo, busy, onOpen, onToggle, onSync }) {
-  const source = SOURCE_META[todo.sourceType] || { label: "平台待办", route: "company" };
+  const source = SOURCE_META[todo.sourceType] || { label: "平台待办", route: "home" };
   const sync = syncState(todo);
   const done = todo.status === "done";
   const confirmation = done && todo.completedFrom === "dingtalk" && todo.sourceType === "decision"

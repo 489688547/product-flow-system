@@ -137,7 +137,7 @@ export function PlatformProvider({ children }) {
   }, [dispatch, state.decisionRequests, state.projects]);
 
   const syncPersonalTodoRecord = useCallback(async todo => {
-    const payload = buildPersonalTodoPayload(todo, currentUser, `${window.location.origin}${window.location.pathname}#company`);
+    const payload = buildPersonalTodoPayload(todo, currentUser, `${window.location.origin}${window.location.pathname}#home`);
     try {
       const response = await fetch("/api/dingtalk/todo/sync", {
         method: "POST",
