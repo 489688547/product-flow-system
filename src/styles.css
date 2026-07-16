@@ -975,6 +975,17 @@ main { min-width: 0; overflow-x: hidden; }
 .strategy-objective-rail button:hover { border-color: var(--border-strong); background: var(--surface-hover); }
 .strategy-objective-rail button > span:first-child { min-width: 0; flex: 1; display: grid; gap: 2px; }
 .strategy-objective-rail small { color: var(--text-tertiary); }
+.cockpit-strategy-list { display: grid; }
+.cockpit-strategy-row { width: 100%; min-height: 68px; padding: 9px var(--space-3); border: 0; border-top: 1px solid var(--border); background: var(--surface); display: grid; grid-template-columns: minmax(280px, 1.35fr) minmax(200px, .75fr) 120px 88px; align-items: center; gap: var(--space-3); color: var(--text-secondary); text-align: left; }
+.cockpit-strategy-row:first-child { border-top: 0; }
+.cockpit-strategy-row:hover { background: var(--surface-hover); }
+.cockpit-strategy-row > span:first-child, .cockpit-strategy-support { min-width: 0; display: grid; gap: 2px; }
+.cockpit-strategy-row > span:first-child strong { color: var(--text-primary); }
+.cockpit-strategy-row small { overflow: hidden; color: var(--text-tertiary); text-overflow: ellipsis; white-space: nowrap; }
+.cockpit-strategy-progress { display: grid; gap: 5px; }
+.cockpit-strategy-progress > span { height: 6px; overflow: hidden; border-radius: 999px; background: var(--surface-subtle); }
+.cockpit-strategy-progress i { height: 100%; display: block; border-radius: inherit; background: var(--accent); }
+.cockpit-strategy-support strong { color: var(--text-primary); font-size: 17px; font-variant-numeric: tabular-nums; }
 .project-portfolio-table { min-width: 760px; overflow-x: auto; }
 .project-portfolio-head, .project-portfolio-table > button { min-width: 760px; display: grid; grid-template-columns: minmax(260px, 1.7fr) 100px 100px 110px 88px; align-items: center; gap: var(--space-3); padding: 8px var(--space-3); }
 .project-portfolio-head { min-height: 36px; color: var(--text-tertiary); background: var(--surface-subtle); font-size: 11px; font-weight: 700; }
@@ -1290,6 +1301,7 @@ main { min-width: 0; overflow-x: hidden; }
   .personal-todo-title-line, .personal-todo-meta { align-items: flex-start; flex-wrap: wrap; }
   .personal-todo-title-line > strong { width: 100%; }
   .personal-todo-meta > span + span::before { display: none; }
+  .cockpit-strategy-row { min-width: 760px; }
   .execution-strategy-header { align-items: flex-start; }
   .attainment-count { margin-left: 46px; justify-items: start; }
   .required-result-row { min-width: 760px; }

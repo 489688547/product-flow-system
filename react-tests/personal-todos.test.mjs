@@ -66,6 +66,18 @@ test("governed execution work projects only explicit personal responsibilities",
   assert.equal(todos.find(todo => todo.sourceId === "mr1").assigneeName, "叶经理");
 });
 
+test("unassigned governed records do not crash personal todo projection", () => {
+  const todos = reconcilePersonalTodos({
+    platformState: normalizePlatformState({
+      departmentCommitments: [{ id: "c1", title: "待分配承诺", status: "office_review", reviewerName: "" }],
+      monthlyReports: [{ id: "mr-empty", month: "2026-06", department: "供应链部", owner: "", status: "draft" }]
+    }),
+    orgCache: { users: USERS },
+    now: "2026-07-16T08:00:00.000Z"
+  });
+  assert.equal(todos.some(todo => ["c1", "mr-empty"].includes(todo.sourceId)), false);
+});
+
 test("reconciliation preserves sync metadata and cancels removed assignments", () => {
   const existingTodos = [
     {

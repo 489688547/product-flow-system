@@ -1,7 +1,8 @@
-import { AlertTriangle, ArrowRight, CircleHelp, Flag, GitBranch, Target } from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeDollarSign, CircleHelp, Flag, GitBranch, Target } from "lucide-react";
 import { useMemo, useState } from "react";
 import { personalTodosForUser } from "../../domain/personalTodos.js";
 import { buildExecutiveSummary } from "../../domain/strategyExecution.js";
+import { strategyAttainment } from "../../domain/executionGovernance.js";
 import { canManagePermissions } from "../../domain/permissions.js";
 import { usePlatform } from "../../state/PlatformProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
@@ -9,20 +10,27 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { HealthBadge } from "./HealthBadge.jsx";
 import { PersonalTodoWorkbench } from "./PersonalTodoWorkbench.jsx";
 
-function MetricStrip({ summary }) {
+function MetricStrip({ summary, state }) {
+  const attained = state.strategies.filter(strategy => strategyAttainment(state, strategy.id).attained).length;
   const items = [
-    [summary.counts.offTrack, "偏离目标", "danger"],
-    [summary.counts.atRisk, "风险目标", "warning"],
+    [`${attained}/${state.strategies.length}`, "战略达成", attained === state.strategies.length ? "" : "warning"],
+    [state.departmentCommitments.filter(item => ["returned", "at_risk", "off_track"].includes(item.status)).length, "部门承诺异常", "danger"],
     [summary.offTrackProjects.length + summary.atRiskProjects.length, "异常项目", "warning"],
     [summary.pendingDecisions.length, "待决策", "info"],
-    [summary.openRisks.filter(risk => ["critical", "high"].includes(risk.severity)).length, "重大风险", "danger"]
+    [state.incentiveProjects.filter(item => !["closed", "cancelled"].includes(item.status)).length, "激励项目", "info"],
+    [state.monthlyReports.filter(item => item.status !== "frozen").length, "月报待处理", "warning"]
   ];
   return <div className="company-status-strip">{items.map(([value, label, tone]) => <div key={label} className={`company-status-item ${tone}`}><strong>{value}</strong><span>{label}</span></div>)}</div>;
 }
 
 function CompanyCockpit({ summary, state, onNavigate }) {
+  const governedStrategies = state.strategies.filter(item => !item.archived).map(strategy => ({
+    strategy,
+    attainment: strategyAttainment(state, strategy.id),
+    commitments: state.departmentCommitments.filter(item => item.strategyId === strategy.id && !item.archived)
+  }));
   return <>
-    <MetricStrip summary={summary} />
+    <MetricStrip summary={summary} state={state} />
     <div className="executive-priority-grid">
       <section className="company-work-section executive-decisions">
         <div className="panel-title"><CircleHelp size={18} /><h2>待决策事项</h2><button type="button" onClick={() => onNavigate("projects")}>查看全部</button></div>
@@ -39,9 +47,32 @@ function CompanyCockpit({ summary, state, onNavigate }) {
       </section>
     </div>
     <section className="company-work-section strategy-map-section">
-      <div className="panel-title"><Target size={18} /><h2>战略执行地图</h2><button type="button" onClick={() => onNavigate("strategy")}>进入战略中心</button></div>
-      {summary.strategies.map(item => <div className="strategy-map-row" key={item.strategy.id}><div className="strategy-map-title"><span><strong>{item.strategy.name}</strong><small>{item.strategy.owner} · {item.strategy.year}</small></span><HealthBadge health={item.health} /></div><div className="strategy-objective-rail">{item.objectiveResults.map(result => <button key={result.objective.id} onClick={() => onNavigate("strategy")}><span><strong>{result.objective.title}</strong><small>{result.objective.quarter} · 信心 {result.objective.confidence ?? "—"}%</small></span><HealthBadge health={result.health} /></button>)}</div></div>)}
+      <div className="panel-title"><Target size={18} /><h2>三大战略达成 · 战略执行地图</h2><button type="button" onClick={() => onNavigate("strategy")}>进入战略中心</button></div>
+      <div className="cockpit-strategy-list">
+        {governedStrategies.map(({ strategy, attainment, commitments }) => {
+          const abnormal = commitments.filter(item => ["returned", "at_risk", "off_track"].includes(item.status)).length;
+          const percentage = attainment.total ? Math.round(attainment.completed / attainment.total * 100) : 0;
+          return <button type="button" className="cockpit-strategy-row" key={strategy.id} onClick={() => onNavigate("strategy")}>
+            <span><strong>{strategy.name}</strong><small>{strategy.successStandard}</small></span>
+            <span className="cockpit-strategy-progress"><span><i style={{ width: `${percentage}%` }} /></span><small>{attainment.completed}/{attainment.total} 必达结果已核验</small></span>
+            <span className="cockpit-strategy-support"><strong>{commitments.length}</strong><small>部门承诺{abnormal ? ` · ${abnormal} 项异常` : ""}</small></span>
+            <HealthBadge health={attainment.attained ? "completed" : abnormal ? "off_track" : "at_risk"} />
+          </button>;
+        })}
+      </div>
     </section>
+    <div className="executive-priority-grid">
+      <section className="company-work-section">
+        <div className="panel-title"><BadgeDollarSign size={18} /><h2>部门激励项目</h2><button type="button" onClick={() => onNavigate("incentives")}>进入激励中心</button></div>
+        {state.incentiveProjects.slice(0, 5).map(project => <button key={project.id} className="company-work-row" onClick={() => onNavigate("incentives")}><span><strong>{project.name}</strong><small>{project.department} · {project.owner} · 奖金上限 ¥{Number(project.rewardCap || 0).toLocaleString("zh-CN")}</small></span><span className={`execution-status ${project.status === "closed" ? "success" : project.status === "pending_approval" ? "warning" : "info"}`}><i />{project.status === "closed" ? "已结项" : project.status === "pending_approval" ? "待审批" : "执行中"}</span></button>)}
+        {!state.incentiveProjects.length ? <div className="empty-state">当前没有激励项目。</div> : null}
+      </section>
+      <section className="company-work-section">
+        <div className="panel-title"><Target size={18} /><h2>部门月报进度</h2><button type="button" onClick={() => onNavigate("reviews")}>进入经营检查</button></div>
+        {state.monthlyReports.filter(item => item.status !== "frozen").slice(0, 5).map(report => <button key={report.id} className="company-work-row" onClick={() => onNavigate("reviews")}><span><strong>{report.department} · {report.month}</strong><small>{report.owner || "待指定负责人"} · {report.status === "submitted" ? "待总经办审核" : report.status === "approved" ? "待会议冻结" : report.status === "returned" ? "已退回修改" : "待填写"}</small></span><ArrowRight size={16} /></button>)}
+        {!state.monthlyReports.some(item => item.status !== "frozen") ? <div className="empty-state">本期月报已全部冻结。</div> : null}
+      </section>
+    </div>
     <section className="company-work-section">
       <div className="panel-title"><GitBranch size={18} /><h2>重点项目组合</h2><button type="button" onClick={() => onNavigate("projects")}>进入项目中心</button></div>
       <div className="project-portfolio-table" role="table" aria-label="重点项目组合">

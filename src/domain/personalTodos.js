@@ -14,11 +14,11 @@ const SOURCE_CONFIG = {
 };
 
 function identityUnionId(user = {}) {
-  return String(user.unionid || user.unionId || "").trim();
+  return String(user?.unionid || user?.unionId || "").trim();
 }
 
 function identityUserId(user = {}) {
-  return String(user.userid || user.userId || "").trim();
+  return String(user?.userid || user?.userId || "").trim();
 }
 
 function cleanDate(value) {

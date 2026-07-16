@@ -89,7 +89,10 @@ function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensur
   const [month, setMonth] = useState(previousMonth);
   const [editor, setEditor] = useState(null);
   const [action, setAction] = useState(null);
-  const departments = useMemo(() => (orgCache?.departments || []).map(item => typeof item === "string" ? item : item?.name).filter(Boolean), [orgCache?.departments]);
+  const departments = useMemo(() => [...new Set((orgCache?.departments || [])
+    .map(item => typeof item === "string" ? item : item?.name)
+    .map(name => String(name || "").replaceAll("产品团队", "产品部").trim())
+    .filter(name => name && name !== "其他"))], [orgCache?.departments]);
   useEffect(() => {
     if (executive && departments.length) ensureReports(month, departments);
   }, [departments, ensureReports, executive, month]);
