@@ -44,10 +44,20 @@ test("platform API requires a D1 database binding", async () => {
   const response = await onRequest({
     request: new Request("https://flow.example.com/api/platform"),
     env: {},
-    data: { session: { name: "周总", role: "executive" } }
+    data: { session: { name: "周总", role: "executive", department: "总经办" } }
   });
   assert.equal(response.status, 501);
   assert.match((await response.json()).message, /PRODUCT_FLOW_DB/);
+});
+
+test("platform API rejects users outside 总经办", async () => {
+  const response = await onRequest({
+    request: new Request("https://flow.example.com/api/platform"),
+    env: { PRODUCT_FLOW_DB: createD1Mock() },
+    data: { session: { name: "产品负责人", role: "product", department: "产品部" } }
+  });
+  assert.equal(response.status, 403);
+  assert.match((await response.json()).message, /总经办/);
 });
 
 test("platform API rejects readonly writes", async () => {
@@ -89,14 +99,14 @@ test("platform API stores strategy entities as separate D1 records", async () =>
   const post = await onRequest({
     request: new Request("https://flow.example.com/api/platform", { method: "POST", body: JSON.stringify({ state }) }),
     env: { PRODUCT_FLOW_DB: db },
-    data: { session: { name: "周总", role: "executive" } }
+    data: { session: { name: "周总", role: "executive", department: "总经办" } }
   });
   assert.equal(post.status, 200);
 
   const get = await onRequest({
     request: new Request("https://flow.example.com/api/platform"),
     env: { PRODUCT_FLOW_DB: db },
-    data: { session: { name: "周总", role: "executive" } }
+    data: { session: { name: "周总", role: "executive", department: "总经办" } }
   });
   const payload = await get.json();
   assert.equal(get.status, 200);

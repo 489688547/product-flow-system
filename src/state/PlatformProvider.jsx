@@ -39,7 +39,7 @@ function errorMessage(error, fallback) {
   return /load failed|failed to fetch/i.test(message) ? fallback : message || fallback;
 }
 
-export function PlatformProvider({ children }) {
+export function PlatformProvider({ children, enabled = true }) {
   const { user } = useAuth();
   const { state: productState, currentUser, orgCache, updateTask } = useProductFlow();
   const [state, setState] = useState(loadLocalState);
@@ -49,6 +49,11 @@ export function PlatformProvider({ children }) {
   const firstSave = useRef(true);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(false);
+      setError("");
+      return undefined;
+    }
     let alive = true;
     async function loadSharedPlatform() {
       try {
@@ -71,9 +76,10 @@ export function PlatformProvider({ children }) {
     }
     loadSharedPlatform();
     return () => { alive = false; };
-  }, [apiUrl]);
+  }, [apiUrl, enabled]);
 
   useEffect(() => {
+    if (!enabled) return undefined;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     if (firstSave.current) {
       firstSave.current = false;
@@ -96,7 +102,7 @@ export function PlatformProvider({ children }) {
       }
     }, 600);
     return () => clearTimeout(timer);
-  }, [apiUrl, state]);
+  }, [apiUrl, enabled, state]);
 
   const dispatch = useCallback(action => {
     setState(current => reducePlatformState(current, {
@@ -106,6 +112,7 @@ export function PlatformProvider({ children }) {
   }, [user?.name]);
 
   useEffect(() => {
+    if (!enabled) return;
     setState(current => {
       const personalTodos = reconcilePersonalTodos({
         platformState: current,
@@ -117,6 +124,7 @@ export function PlatformProvider({ children }) {
       return reducePlatformState(current, { type: "replace_personal_todos", todos: personalTodos });
     });
   }, [
+    enabled,
     orgCache,
     productState.products,
     productState.tasks,

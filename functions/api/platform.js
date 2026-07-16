@@ -1,4 +1,5 @@
 import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
+import { canAccessCompanyPlatform } from "../../src/domain/permissions.js";
 
 const COLLECTIONS = [
   "strategies",
@@ -120,6 +121,9 @@ async function readPlatformState(db) {
 export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (!["GET", "POST"].includes(request.method)) return jsonResponse({ message: "Method not allowed" }, 405);
+  if (!canAccessCompanyPlatform(data.session)) {
+    return jsonResponse({ synced: false, message: "当前仅总经办可访问经营执行平台。" }, 403);
+  }
   if (request.method === "POST" && data.session?.role === "readonly") {
     return jsonResponse({ synced: false, message: "只读账号不能修改战略执行数据。" }, 403);
   }

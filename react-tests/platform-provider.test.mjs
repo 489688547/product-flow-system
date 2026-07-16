@@ -6,7 +6,7 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8"
 
 test("company platform mounts a dedicated shared provider", () => {
   assert.match(read("src/main.jsx"), /PlatformProvider/);
-  assert.match(read("src/main.jsx"), /<PlatformProvider>/);
+  assert.match(read("src/main.jsx"), /<PlatformProvider enabled=\{hasCompanyAccess\}>/);
   assert.match(read("src/state/PlatformProvider.jsx"), /reducePlatformState/);
   assert.match(read("src/state/PlatformProvider.jsx"), /platformExecutionState/);
 });

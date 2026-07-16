@@ -533,7 +533,8 @@ test("browser users see DingTalk login before company data mounts", () => {
 
   assert.match(main, /<AuthProvider>/);
   assert.match(main, /<AuthGate>/);
-  assert.match(main, /<AuthGate>[\s\S]*<ProductFlowProvider>/);
+  assert.match(main, /function AuthenticatedApp\(\)[\s\S]*<ProductFlowProvider>/);
+  assert.match(main, /<AuthGate>[\s\S]*<AuthenticatedApp \/>/);
   assert.match(authProvider, /status: "checking"/);
   assert.match(authSession, /\/api\/auth\/session/);
   assert.match(authSession, /\/api\/auth\/logout/);

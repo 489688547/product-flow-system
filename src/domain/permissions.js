@@ -77,9 +77,14 @@ export function normalizePermissions(input = {}) {
 }
 
 function userDepartments(user) {
-  return [...new Set([user?.department, ...(user?.departments || [])]
-    .map(item => String(item || "").trim().replaceAll("产品团队", "产品部"))
+  return [...new Set([user?.department, ...(user?.departments || []), ...(user?.departmentNames || [])]
+    .flatMap(item => String(item || "").split(/\s*(?:\/|、|,|，|;|；|\|)\s*/))
+    .map(item => item.trim().replaceAll("产品团队", "产品部"))
     .filter(Boolean))];
+}
+
+export function canAccessCompanyPlatform(user) {
+  return userDepartments(user).includes("总经办");
 }
 
 export function canEditProductPlanning(user) {
@@ -87,7 +92,7 @@ export function canEditProductPlanning(user) {
 }
 
 export function canManagePermissions(user) {
-  return userDepartments(user).includes("总经办");
+  return canAccessCompanyPlatform(user);
 }
 
 function matchesScope(user, departments = [], titles = []) {
