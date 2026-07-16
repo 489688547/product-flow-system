@@ -22,7 +22,9 @@ test("severe child health cannot be averaged away", () => {
 test("platform state normalizes every shared collection", () => {
   const state = normalizePlatformState({ strategies: [] });
   [
-    "strategies", "objectives", "metrics", "projects", "milestones", "risks",
+    "strategies", "requiredResults", "departmentCommitments", "commitmentMilestones",
+    "incentiveProjects", "departmentRewardBudgets", "monthlyReports", "reportCorrections",
+    "objectives", "metrics", "projects", "milestones", "risks",
     "decisionRequests", "personalTodos", "statusUpdates", "monthlySnapshots", "appLinks", "appEvents",
     "appRegistry", "auditLogs"
   ].forEach(key => assert.ok(Array.isArray(state[key]), `${key} should be an array`));

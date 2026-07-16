@@ -2,6 +2,13 @@ const DAY_MS = 86400000;
 
 export const PLATFORM_COLLECTIONS = [
   "strategies",
+  "requiredResults",
+  "departmentCommitments",
+  "commitmentMilestones",
+  "incentiveProjects",
+  "departmentRewardBudgets",
+  "monthlyReports",
+  "reportCorrections",
   "objectives",
   "metrics",
   "projects",
@@ -98,10 +105,32 @@ export function createDefaultPlatformState() {
     updatedAt: "2026-07-16T00:00:00.000Z",
     strategies: [
       {
-        id: "strategy-growth-2026",
-        name: "建立可持续的品类增长引擎",
-        intent: "用更高成功率的新品和重点渠道增长，形成可重复的经营能力。",
-        successStandard: "核心品类收入与利润同步增长，重点项目按期交付。",
+        id: "strategy-organization-2026",
+        name: "组织建设",
+        intent: "建立清晰的岗位职责、跨部门协作边界和可持续的数据资产机制。",
+        successStandard: "全部组织建设必达结果完成并经总经办核验。",
+        owner: "周荣庆",
+        year: 2026,
+        status: "active",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-07-16T00:00:00.000Z"
+      },
+      {
+        id: "strategy-bird-gmv-2026",
+        name: "鸟类销量突破",
+        intent: "形成鸟类产品、内容、渠道、供应和财务协同增长能力。",
+        successStandard: "12 月鸟类单月 GMV 达到 100 万元，并完成配套必达结果。",
+        owner: "周荣庆",
+        year: 2026,
+        status: "active",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-07-16T00:00:00.000Z"
+      },
+      {
+        id: "strategy-hamster-brand-2026",
+        name: "仓鼠品牌升级",
+        intent: "通过品牌、产品、渠道和服务协同提升仓鼠品类品牌排名。",
+        successStandard: "全部品牌升级必达结果完成并经总经办核验。",
         owner: "周荣庆",
         year: 2026,
         status: "active",
@@ -109,10 +138,24 @@ export function createDefaultPlatformState() {
         updatedAt: "2026-07-16T00:00:00.000Z"
       }
     ],
+    requiredResults: [
+      { id: "result-org-roles", strategyId: "strategy-organization-2026", title: "完成岗位职责与跨部门协作边界", acceptanceStandard: "全公司岗位说明书与跨部门协作边界通过总经办验收。", owner: "人事行政部", dueDate: "2026-09-30", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "result-org-data", strategyId: "strategy-organization-2026", title: "形成核心经营数据资产机制", acceptanceStandard: "核心部门数据台账按约定频率稳定更新一个月。", owner: "总经办", dueDate: "2026-10-31", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "result-bird-gmv", strategyId: "strategy-bird-gmv-2026", title: "12 月鸟类单月 GMV 达到 100 万元", acceptanceStandard: "财务确认的 12 月鸟类实付 GMV 不低于 100 万元。", owner: "运营部", dueDate: "2026-12-31", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "result-bird-supply", strategyId: "strategy-bird-gmv-2026", title: "鸟类核心产品供应稳定", acceptanceStandard: "核心产品断货率控制在 10% 以内并建立备选供应商。", owner: "供应链团队", dueDate: "2026-12-31", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "result-hamster-rank", strategyId: "strategy-hamster-brand-2026", title: "仓鼠品类品牌排名稳定提升", acceptanceStandard: "目标平台品牌排名达到公司确认的目标位次并保持一个月。", owner: "运营部", dueDate: "2026-12-31", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "result-hamster-visual", strategyId: "strategy-hamster-brand-2026", title: "完成仓鼠品牌视觉与内容标准升级", acceptanceStandard: "VI 手册定稿并应用到核心平台和重点产品。", owner: "品牌部", dueDate: "2026-09-30", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" }
+    ],
+    departmentCommitments: [],
+    commitmentMilestones: [],
+    incentiveProjects: [],
+    departmentRewardBudgets: [],
+    monthlyReports: [],
+    reportCorrections: [],
     objectives: [
       {
         id: "objective-q3-new-products",
-        strategyId: "strategy-growth-2026",
+        strategyId: "strategy-hamster-brand-2026",
         title: "三季度形成两款可规模化增长的核心新品",
         quarter: "2026-Q3",
         owner: "叶津成",
@@ -145,7 +188,7 @@ export function createDefaultPlatformState() {
     projects: [
       {
         id: "project-hamster-freeze-dried",
-        strategyId: "strategy-growth-2026",
+        strategyId: "strategy-hamster-brand-2026",
         objectiveId: "objective-q3-new-products",
         name: "仓鼠冻干零食规模化上市",
         goal: "完成产品验证并形成稳定增长方案。",
