@@ -97,7 +97,7 @@ export function DashboardPage({ onNavigate, onOpenProgress }) {
                 <ProductThumb product={product} />
                 <span className="flow-product-copy">
                   <strong>{product.name}</strong>
-                  <small><em className={`level-badge ${levelTone(product.level)}`}>{String(product.level || "未定级").split(" ")[0]}</em><span>{schedule.label}</span></small>
+                  <small><em className={`level-badge ${levelTone(product.levelConfirmed ? product.level : "")}`}>{product.levelConfirmed ? String(product.level).split(" ")[0] : "待定级"}</em><span>{schedule.label}</span></small>
                 </span>
                 <ScheduleRing schedule={schedule} />
               </button>

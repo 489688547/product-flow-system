@@ -9,8 +9,8 @@ export function LoginPage({ error = "", onRetry }) {
     <main className="auth-screen">
       <section className="auth-panel" aria-labelledby="auth-title">
         <header className="auth-brand">
-          <span className="auth-brand-mark" aria-hidden="true">P</span>
-          <span><strong>产品全周期</strong><small>流程协同系统</small></span>
+          <span className="auth-brand-mark" aria-hidden="true">企</span>
+          <span><strong>经营执行平台</strong><small>战略与业务协同</small></span>
         </header>
         <div className="auth-copy">
           <span className="auth-context"><Building2 size={16} aria-hidden="true" /> 企业成员登录</span>

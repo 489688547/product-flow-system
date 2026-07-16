@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { canEditProductPlanning } from "../../domain/permissions.js";
 import { buildPlanningCandidates } from "../../domain/productPlanning.js";
+import { normalizeExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { generateProductCover } from "../../domain/productFlow.js";
 import { Button } from "../../ui/Button.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
@@ -25,8 +26,10 @@ function enrichPlanningDemand(demand, products) {
   const levelConfirmed = Boolean(product?.levelConfirmed);
   return {
     ...demand,
-    planningLevel: levelConfirmed ? product.level : (demand.level || product?.referenceLevel || "未定级"),
-    planningLevelIsReference: !levelConfirmed
+    planningLevel: levelConfirmed ? product.level : "未定级",
+    planningLevelConfirmed: levelConfirmed,
+    planningLevelIsReference: false,
+    expectedLaunchMonth: normalizeExpectedLaunchMonth(product?.expectedLaunchMonth || demand.expectedLaunchMonth)
   };
 }
 
@@ -73,8 +76,10 @@ export function ProductPlanningPage() {
     const demandSnapshot = {
       name: planModal.demand?.name || planModal.plan?.demandSnapshot?.name,
       image: planModal.demand?.image || planModal.plan?.demandSnapshot?.image || generateProductCover(planModal.demand?.name),
-      level: planModal.demand?.planningLevel || planModal.plan?.demandSnapshot?.level,
-      levelIsReference: planModal.demand?.planningLevelIsReference ?? planModal.plan?.demandSnapshot?.levelIsReference,
+      level: planModal.demand?.planningLevelConfirmed ? planModal.demand.planningLevel : (planModal.plan?.demandSnapshot?.levelConfirmed ? planModal.plan.demandSnapshot.level : ""),
+      levelConfirmed: Boolean(planModal.demand?.planningLevelConfirmed ?? planModal.plan?.demandSnapshot?.levelConfirmed),
+      levelIsReference: false,
+      expectedLaunchMonth: normalizeExpectedLaunchMonth(planModal.demand?.expectedLaunchMonth || planModal.plan?.demandSnapshot?.expectedLaunchMonth),
       productId: planModal.demand?.productId || planModal.plan?.demandSnapshot?.productId
     };
     if (planModal.plan) updateProductPlan(planModal.plan.id, { ...form, demandSnapshot });

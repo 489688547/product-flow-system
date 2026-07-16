@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { generateProductCover } from "../../domain/productFlow.js";
 import { planIntersectsYear, timelineSegment } from "../../domain/productPlanning.js";
 import { PRODUCT_DEMAND_DRAG_TYPE } from "./PlanningDemandTray.jsx";
@@ -73,14 +74,16 @@ export function AnnualPlanningTimeline({ year, plans, demands, canEdit, onDropDe
           {visiblePlans.map(plan => {
             const demand = demandMap.get(plan.demandId);
             const snapshot = demand || plan.demandSnapshot;
+            const levelConfirmed = Boolean(snapshot?.planningLevelConfirmed ?? snapshot?.levelConfirmed);
+            const level = snapshot?.planningLevel || snapshot?.level || "未定级";
             return (
               <div className="planning-timeline-row" key={plan.id}>
                 <div className="planning-product-column planning-product-info">
                   <img src={snapshot?.image || generateProductCover(snapshot?.name)} alt="" width="36" height="36" />
                   <div>
                     <strong>{snapshot?.name || "未命名产品"}</strong>
-                    <span className={`level-badge planning-level-badge level-${levelTone(snapshot?.planningLevel || snapshot?.level)}`}>
-                      {(snapshot?.planningLevelIsReference ?? snapshot?.levelIsReference) ? "参考 " : ""}{snapshot?.planningLevel || snapshot?.level || "未定级"}
+                    <span className={`level-badge planning-level-badge level-${levelTone(levelConfirmed ? level : "")}`}>
+                      {levelConfirmed ? level : `期望上线：${formatExpectedLaunchMonth(snapshot?.expectedLaunchMonth)}`}
                     </span>
                     {!demand ? <small><AlertTriangle size={12} aria-hidden="true" />来源需求已删除</small> : null}
                   </div>

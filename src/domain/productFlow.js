@@ -1,4 +1,5 @@
 import { DEFAULT_PERMISSIONS, normalizePermissions } from "./permissions.js";
+import { normalizeExpectedLaunchMonth } from "./expectedLaunch.js";
 import { normalizeMonthlyGmvTarget } from "./productGmv.js";
 
 export const PRODUCT_LEVELS = ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"];
@@ -83,7 +84,7 @@ export const DEMAND_POOL_STANDARDS = [
   },
   {
     title: "3. 形成结论",
-    summary: "明确是否继续推进和建议产品定级。",
+    summary: "明确是否继续推进和期望上线月份。",
     check: "结论明确后才允许立项。"
   },
   {
@@ -150,8 +151,8 @@ export const PRODUCT_LEVEL_FLOW_RULES = {
 };
 
 const DEFAULT_PRODUCTS = [
-  { id: "p1", name: "鹦鹉谷物棒", level: "P1 增长级", referenceLevel: "P1 增长级", levelConfirmed: true, monthlyGmvTarget: 150000, grading: { answers: { strategy: 4, salesScale: 3, commercialValue: 3, resourceDemand: 4, risks: {} } }, requester: "周荣庆", productManager: "赵雨涵", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。", image: "https://images.unsplash.com/photo-1552728089-57bdde30beb3?auto=format&fit=crop&w=240&q=80" },
-  { id: "p2", name: "仓鼠冻干零食", level: "P0 战略级", referenceLevel: "P0 战略级", levelConfirmed: true, monthlyGmvTarget: 400000, grading: { answers: { strategy: 5, salesScale: 4, commercialValue: 4, resourceDemand: 5, risks: {} } }, requester: "陈菲", productManager: "叶津成", owner: "叶津成", source: "运营", status: "维持观察", stage: 5, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。", image: "https://images.unsplash.com/photo-1425082661705-1834bfd09dca?auto=format&fit=crop&w=240&q=80" }
+  { id: "p1", name: "鹦鹉谷物棒", level: "P1 增长级", levelConfirmed: true, expectedLaunchMonth: "2026-09", monthlyGmvTarget: 150000, grading: { answers: { strategy: 4, salesScale: 3, commercialValue: 3, resourceDemand: 4, risks: {} } }, requester: "周荣庆", productManager: "赵雨涵", owner: "赵雨涵", source: "产品部", status: "开发中", stage: 2, desc: "围绕鹦鹉零食做内容化卖点，当前正在打样和包装确认。", image: "https://images.unsplash.com/photo-1552728089-57bdde30beb3?auto=format&fit=crop&w=240&q=80" },
+  { id: "p2", name: "仓鼠冻干零食", level: "P0 战略级", levelConfirmed: true, expectedLaunchMonth: "2026-06", monthlyGmvTarget: 400000, grading: { answers: { strategy: 5, salesScale: 4, commercialValue: 4, resourceDemand: 5, risks: {} } }, requester: "陈菲", productManager: "叶津成", owner: "叶津成", source: "运营", status: "维持观察", stage: 5, desc: "已上市，首月数据较好，等待季度复盘决定是否加大推广。", image: "https://images.unsplash.com/photo-1425082661705-1834bfd09dca?auto=format&fit=crop&w=240&q=80" }
 ];
 
 export const REVIEW_MEETINGS = [
@@ -162,9 +163,9 @@ export const REVIEW_MEETINGS = [
 ];
 
 const DEFAULT_DEMANDS = [
-  { id: "d1", name: "鹦鹉站杆升级版", level: "P1 增长级", requester: "叶津成", owner: "叶津成", source: "客服", status: "待讨论", productId: "", createdAt: "2026-07-02T16:00:00.000Z", desc: "用户反馈站杆稳定性和清洁便利性有优化空间，需要判断是否做结构升级。", discussion: "待讨论：补充用户痛点、现有差评、供应链可行性和预估成本。" },
-  { id: "d2", name: "仓鼠夏季降温窝", level: "P3 常规级", requester: "赵雨涵", owner: "赵雨涵", source: "运营", status: "讨论中", productId: "", createdAt: "2026-07-02T16:00:00.000Z", desc: "夏季搜索和内容热度上升，运营希望提前评估应季窗口。", discussion: "讨论中：需要确认开发周期、上市窗口、首批铺货和过季库存预案。" },
-  { id: "d3", name: "兔用草架旧款包装微调", level: "P2 验证级", requester: "赵雨涵", owner: "赵雨涵", source: "品牌", status: "暂缓", productId: "", createdAt: "2026-06-29T16:00:00.000Z", desc: "品牌提出包装视觉老旧，但当前清仓优先级更高。", discussion: "暂缓：等库存处理后再判断是否升级包装。" }
+  { id: "d1", name: "鹦鹉站杆升级版", expectedLaunchMonth: "2026-10", requester: "叶津成", owner: "叶津成", source: "客服", status: "待讨论", productId: "", createdAt: "2026-07-02T16:00:00.000Z", desc: "用户反馈站杆稳定性和清洁便利性有优化空间，需要判断是否做结构升级。", discussion: "待讨论：补充用户痛点、现有差评、供应链可行性和预估成本。" },
+  { id: "d2", name: "仓鼠夏季降温窝", expectedLaunchMonth: "2026-08", requester: "赵雨涵", owner: "赵雨涵", source: "运营", status: "讨论中", productId: "", createdAt: "2026-07-02T16:00:00.000Z", desc: "夏季搜索和内容热度上升，运营希望提前评估应季窗口。", discussion: "讨论中：需要确认开发周期、上市窗口、首批铺货和过季库存预案。" },
+  { id: "d3", name: "兔用草架旧款包装微调", expectedLaunchMonth: "2026-09", requester: "赵雨涵", owner: "赵雨涵", source: "品牌", status: "暂缓", productId: "", createdAt: "2026-06-29T16:00:00.000Z", desc: "品牌提出包装视觉老旧，但当前清仓优先级更高。", discussion: "暂缓：等库存处理后再判断是否升级包装。" }
 ];
 
 export function normalizeProductLevel(level = "") {
@@ -418,8 +419,30 @@ export function taskTemplatesForProductStage(state, product, stageIndex) {
   return templates.filter(template => template.level === level && Number(template.stage) === Number(stageIndex));
 }
 
+export function productStagePolicy(state, product, stageIndex) {
+  const policy = stagePolicy(product, stageIndex);
+  if (!policy.applies) return { ...policy, reason: "level-rule" };
+
+  const hasDefaults = taskTemplatesForProductStage(state, product, stageIndex).length > 0;
+  if (hasDefaults) return { ...policy, reason: "default-tasks" };
+
+  const hasManualTasks = (state?.tasks || []).some(task => (
+    task.productId === product?.id
+    && Number(task.stage) === Number(stageIndex)
+    && !task.systemDefault
+  ));
+  if (hasManualTasks) return { ...policy, reason: "manual-tasks" };
+
+  return {
+    mode: "跳过",
+    applies: false,
+    usage: "该阶段未配置默认任务，可直接跳过。",
+    reason: "no-default-tasks"
+  };
+}
+
 function defaultStageTasks(state, product, stageIndex) {
-  return taskTemplatesForProductStage(state, product, stageIndex).map(template => ({
+  return taskTemplatesForProductStage(state, product, stageIndex).map((template, sortOrder) => ({
     id: `${product.id}-template-${template.id}`,
     templateId: template.id,
     productId: product.id,
@@ -432,7 +455,8 @@ function defaultStageTasks(state, product, stageIndex) {
     required: Boolean(template.required),
     deliverableTemplates: normalizeDeliverableTemplates(template.deliverableTemplates),
     due: "",
-    done: false
+    done: false,
+    sortOrder
   }));
 }
 
@@ -540,7 +564,7 @@ export function applyProductGrading(state, productId, grading, options = {}) {
     const returnedDemand = {
       id: matchedDemand?.id || `d-reserve-${Date.now()}`,
       name: product.name,
-      level: RESERVE_LEVEL,
+      expectedLaunchMonth: normalizeExpectedLaunchMonth(matchedDemand?.expectedLaunchMonth || product.expectedLaunchMonth),
       requester: matchedDemand?.requester || product.requester || "",
       owner: matchedDemand?.requester || product.requester || "",
       source: matchedDemand?.source || product.source || "",
@@ -583,7 +607,7 @@ export function applyProductGrading(state, productId, grading, options = {}) {
   const updatedState = {
     ...state,
     products: state.products.map(item => item.id === productId ? updatedProduct : item),
-    demands: state.demands.map(item => item.productId === productId ? { ...item, level: grading.level, grading: gradingRecord } : item),
+    demands: state.demands.map(item => item.productId === productId ? { ...item, grading: gradingRecord } : item),
     decisions: [{
       id: `decision-${productId}-grading`,
       productId,
@@ -596,7 +620,41 @@ export function applyProductGrading(state, productId, grading, options = {}) {
 }
 
 export function tasksForProductStage(state, product, stageIndex) {
-  return (state.tasks || []).filter(task => task.productId === product?.id && task.stage === stageIndex);
+  return (state.tasks || [])
+    .map((task, index) => ({ task, index }))
+    .filter(({ task }) => task.productId === product?.id && Number(task.stage) === Number(stageIndex))
+    .sort((left, right) => {
+      const leftOrder = Number.isFinite(Number(left.task.sortOrder)) ? Number(left.task.sortOrder) : left.index;
+      const rightOrder = Number.isFinite(Number(right.task.sortOrder)) ? Number(right.task.sortOrder) : right.index;
+      return leftOrder - rightOrder || left.index - right.index;
+    })
+    .map(({ task }) => task);
+}
+
+export function nextTaskSortOrder(state, productId, stageIndex) {
+  const tasks = tasksForProductStage(state, { id: productId }, stageIndex);
+  if (!tasks.length) return 0;
+  return Math.max(...tasks.map((task, index) => (
+    Number.isFinite(Number(task.sortOrder)) ? Number(task.sortOrder) : index
+  ))) + 1;
+}
+
+export function reorderProductStageTasks(state, productId, stageIndex, orderedTaskIds) {
+  const stageTasks = tasksForProductStage(state, { id: productId }, stageIndex);
+  const validIds = new Set(stageTasks.map(task => task.id));
+  const normalizedIds = [...new Set(orderedTaskIds || [])].filter(id => validIds.has(id));
+  stageTasks.forEach(task => {
+    if (!normalizedIds.includes(task.id)) normalizedIds.push(task.id);
+  });
+  const orderById = new Map(normalizedIds.map((id, sortOrder) => [id, sortOrder]));
+  return {
+    ...state,
+    tasks: (state.tasks || []).map(task => (
+      task.productId === productId && Number(task.stage) === Number(stageIndex)
+        ? { ...task, sortOrder: orderById.get(task.id) }
+        : task
+    ))
+  };
 }
 
 export function deliverablesForTask(state, taskId) {
@@ -655,8 +713,8 @@ export function convertDemandToProject(state, demandId, options = {}) {
   const product = {
     id: productId,
     name: demand.name,
-    level: normalizeProductLevel(demand.level),
-    referenceLevel: normalizeProductLevel(demand.level),
+    level: "P1 增长级",
+    expectedLaunchMonth: normalizeExpectedLaunchMonth(demand.expectedLaunchMonth),
     requester: demand.requester || demand.owner || "",
     productManager: "",
     owner: "",

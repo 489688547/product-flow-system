@@ -1,15 +1,16 @@
-import { CalendarCheck2, CalendarPlus, Flag, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
+import { CalendarCheck2, CalendarPlus, Flag, GripVertical, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
   deliverablesForTask,
   hasFormalProductGrading,
+  productStagePolicy,
   STAGES,
-  stagePolicy,
   taskCategoryActions,
   tasksForProductStage
 } from "../../domain/productFlow.js";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button, IconAction } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { DatePickerField } from "../../ui/DatePickerField.jsx";
 import { DeliverablePreviewModal } from "../../ui/DeliverablePreviewModal.jsx";
@@ -18,6 +19,7 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { ProductPicker } from "../../ui/ProductPicker.jsx";
 import { buildTaskMeetingPayload, buildTaskTodoPayload } from "../../domain/dingTalk.js";
 import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
+import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { buildProductGmvProgress, normalizeMonthlyGmvTarget } from "../../domain/productGmv.js";
 import { buildTaskTodoSnapshot, normalizeTaskDueDate, todoSyncStatus } from "../../domain/taskTodo.js";
 import { MeetingScheduleModal } from "./MeetingScheduleModal.jsx";
@@ -32,7 +34,7 @@ import { TaskTemplateModal } from "./TaskTemplateModal.jsx";
 import { TodoSyncModal } from "./TodoSyncModal.jsx";
 
 function stagePolicyTone(mode) {
-  if (mode === "不涉及") return "skipped";
+  if (mode === "不涉及" || mode === "跳过") return "skipped";
   if (mode === "必走" || mode === "核心测试" || mode === "关键节点") return "required";
   if (mode.includes("复盘") || mode.includes("月") || mode.includes("天")) return "review";
   return "suggested";
@@ -54,7 +56,7 @@ function validProgressStage(stage) {
 }
 
 export function ProductProgressPage({ focusStage, onNavigate }) {
-  const { state, currentUser, orgCache, setCurrentProduct, setProductStage, updateProduct, gradeProduct, addTask, updateTask, deleteTask, addDeliverable, syncTaskTodo, scheduleTaskMeeting, returnProductToDemand } = useProductFlow();
+  const { state, currentUser, orgCache, setCurrentProduct, setProductStage, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, addDeliverable, syncTaskTodo, scheduleTaskMeeting, returnProductToDemand } = useProductFlow();
   const selectedProduct = state.products.find(item => item.id === state.currentId) || state.products[0];
   const [selectedStage, setSelectedStage] = useState(validProgressStage(selectedProduct?.stage));
   const [meetingTask, setMeetingTask] = useState(null);
@@ -64,6 +66,8 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const [previewDeliverable, setPreviewDeliverable] = useState(null);
   const [gradingOpen, setGradingOpen] = useState(false);
   const [monthlyGmvDraft, setMonthlyGmvDraft] = useState("");
+  const [draggedTaskId, setDraggedTaskId] = useState("");
+  const [taskToDelete, setTaskToDelete] = useState(null);
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -89,7 +93,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     launchDate: productSchedule.launchDate
   }), [selectedProduct, productSales.rows, productSchedule.launchDate]);
   if (!selectedProduct) return <section className="page"><div className="empty-state">暂无产品</div></section>;
-  const selectedPolicy = stagePolicy(selectedProduct, selectedStage);
+  const selectedPolicy = productStagePolicy(state, selectedProduct, selectedStage);
   const hasFormalGrading = hasFormalProductGrading(selectedProduct);
   const monthlyGmvTarget = normalizeMonthlyGmvTarget(selectedProduct.monthlyGmvTarget);
   const saveMonthlyGmvTarget = () => {
@@ -119,9 +123,6 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
       : `确认将第 ${selectedStage} 阶段设为当前阶段？`;
     if (window.confirm(message)) setProductStage(selectedProduct.id, selectedStage);
   };
-  const confirmDeleteTask = task => {
-    if (window.confirm("确认删除这个任务？删除后不可恢复。")) deleteTask(task.id);
-  };
   const openDeliverable = file => {
     if (file.type === "richtext") {
       setPreviewDeliverable(file);
@@ -129,7 +130,46 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     }
     if (file.url) window.open(file.url, "_blank", "noopener,noreferrer");
   };
+  const handleTaskDrop = (event, targetTaskId) => {
+    event.preventDefault();
+    if (!draggedTaskId || draggedTaskId === targetTaskId) {
+      setDraggedTaskId("");
+      return;
+    }
+    const orderedIds = tasks.map(task => task.id).filter(id => id !== draggedTaskId);
+    let targetIndex = orderedIds.indexOf(targetTaskId);
+    if (targetIndex < 0) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (event.clientY > bounds.top + bounds.height / 2) targetIndex += 1;
+    orderedIds.splice(targetIndex, 0, draggedTaskId);
+    reorderTasks(selectedProduct.id, selectedStage, orderedIds);
+    setDraggedTaskId("");
+  };
+  const getTaskRowProps = task => ({
+    className: draggedTaskId === task.id ? "task-row-dragging" : "",
+    onDragOver: event => {
+      if (!draggedTaskId || draggedTaskId === task.id) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+    },
+    onDrop: event => handleTaskDrop(event, task.id)
+  });
   const columns = [
+    { key: "order", header: "", label: "排序", render: task => (
+      <button
+        type="button"
+        className="task-drag-handle"
+        draggable
+        aria-label={`拖动调整任务顺序：${task.title}`}
+        title="拖动调整任务顺序"
+        onDragStart={event => {
+          setDraggedTaskId(task.id);
+          event.dataTransfer.effectAllowed = "move";
+          event.dataTransfer.setData("text/plain", task.id);
+        }}
+        onDragEnd={() => setDraggedTaskId("")}
+      ><GripVertical size={17} /></button>
+    ) },
     { key: "category", header: "类别", render: task => <TaskCategorySelect value={task.category} onChange={category => updateTask(task.id, { category })} label={`${task.title}任务类别`} /> },
     { key: "title", header: "任务内容", render: task => <input name={`task-title-${task.id}`} autoComplete="off" aria-label={`${task.title}任务内容`} value={task.title} onChange={event => updateTask(task.id, { title: event.target.value })} /> },
     { key: "ownerDept", header: "责任部门", render: task => <OrgSelect type="department" value={task.ownerDept} onChange={ownerDept => updateTask(task.id, { ownerDept })} orgCache={state.orgCache} placeholder="选择责任部门" searchInMenu multiple /> },
@@ -167,7 +207,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             {hasMeeting ? <CalendarCheck2 size={16} /> : <CalendarPlus size={16} />}{hasMeeting ? "已预约" : "预约会议"}
           </Button>
         ) : null}
-        <IconAction label="删除" className="danger" onClick={() => confirmDeleteTask(task)}><Trash2 size={16} /></IconAction>
+        <IconAction label="删除" className="danger" onClick={() => setTaskToDelete(task)}><Trash2 size={16} /></IconAction>
       </TableActions>;
     }}
   ];
@@ -188,7 +228,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
       />
       <div className="stage-grid">
         {progressStages.map(stage => {
-          const policy = stagePolicy(selectedProduct, stage.index);
+          const policy = productStagePolicy(state, selectedProduct, stage.index);
           const stageTasks = tasksForProductStage(state, selectedProduct, stage.index);
           const done = stageTasks.filter(task => task.done).length;
           return (
@@ -196,21 +236,21 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
               <span className="stage-num">{stage.index}</span>
               <strong>{stage.short}</strong>
               <em className={`policy-${stagePolicyTone(policy.mode)}`}>{stagePolicyLabel(policy.mode)}</em>
-              <p>{policy.applies ? stage.goal : "该等级不涉及"}</p>
-              <small>{policy.applies ? `${done}/${stageTasks.length} 任务完成` : "该等级不涉及"}</small>
+              <p>{policy.applies ? stage.goal : policy.reason === "no-default-tasks" ? "未配置默认任务" : "该等级不涉及"}</p>
+              <small>{policy.applies ? `${done}/${stageTasks.length} 任务完成` : policy.reason === "no-default-tasks" ? "可直接跳过" : "该等级不涉及"}</small>
             </button>
           );
         })}
       </div>
       <div className="section-panel">
         <div className="section-head">
-          <div><h2>{selectedStage}. {STAGES[selectedStage].title}</h2><p>{selectedPolicy.applies ? selectedPolicy.usage : "该等级不走这个阶段。"}</p></div>
+          <div><h2>{selectedStage}. {STAGES[selectedStage].title}</h2><p>{selectedPolicy.usage}</p></div>
           <div className="toolbar-actions">
             <Button data-testid="add-stage-task" onClick={handleAddTask}><Plus size={16} />加任务</Button>
             <Button
               data-testid="set-current-stage"
               disabled={selectedStage === selectedProduct.stage || !selectedPolicy.applies || (selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading))}
-              disabledReason={!selectedPolicy.applies ? "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading) ? "请先确认产品负责人、平均月 GMV 和产品定级" : selectedStage === selectedProduct.stage ? "这已经是当前阶段" : ""}
+              disabledReason={!selectedPolicy.applies ? selectedPolicy.reason === "no-default-tasks" ? "该阶段没有默认任务，可直接选择后续阶段" : "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading) ? "请先确认产品负责人、平均月 GMV 和产品定级" : selectedStage === selectedProduct.stage ? "这已经是当前阶段" : ""}
               onClick={handleSetCurrentStage}
             ><Flag size={16} />{selectedStage === selectedProduct.stage ? "当前阶段" : "设为当前阶段"}</Button>
           </div>
@@ -255,13 +295,13 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
                     <strong className={`level-badge level-${productLevelTone(hasFormalGrading ? selectedProduct.level : "")}`}>
                       {hasFormalGrading ? selectedProduct.level : "待定级"}
                     </strong>
-                    <small>参考定级：{selectedProduct.referenceLevel || selectedProduct.level}</small>
+                    <small>期望上线：{formatExpectedLaunchMonth(selectedProduct.expectedLaunchMonth)}</small>
                   </div>
                   <Button className="compact" disabled={!selectedProduct.productManager || (!monthlyGmvTarget && !hasFormalGrading)} disabledReason={!selectedProduct.productManager ? "请先选择产品负责人" : !monthlyGmvTarget && !hasFormalGrading ? "请先填写平均月 GMV" : ""} onClick={() => setGradingOpen(true)}>{hasFormalGrading ? "查看定级打分" : "定级"}</Button>
             </div>
           </div>
         ) : null}
-        {selectedPolicy.applies ? <DataTable className="task-table" minWidth={880} columns={columns} rows={tasks} empty={<div className="empty-state">暂无任务</div>} /> : <div className="empty-state">该等级不涉及这个阶段，不需要维护任务。</div>}
+        {selectedPolicy.applies ? <DataTable className="task-table" minWidth={880} columns={columns} rows={tasks} getRowProps={getTaskRowProps} empty={<div className="empty-state">暂无任务</div>} /> : <div className="empty-state">{selectedPolicy.reason === "no-default-tasks" ? "设置中未配置该阶段的默认任务，流程可直接跳过；需要临时执行时可添加任务。" : "该等级不涉及这个阶段，不需要维护任务。"}</div>}
       </div>
       <MeetingScheduleModal
         open={Boolean(meetingTask)}
@@ -298,6 +338,17 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
         }}
       />
       <DeliverablePreviewModal file={previewDeliverable} onClose={() => setPreviewDeliverable(null)} />
+      <ConfirmDialog
+        open={Boolean(taskToDelete)}
+        title="删除任务"
+        message={taskToDelete ? `确定删除“${taskToDelete.title}”？` : ""}
+        description="相关交付物会从任务解绑，删除后无法恢复。"
+        onClose={() => setTaskToDelete(null)}
+        onConfirm={() => {
+          deleteTask(taskToDelete.id);
+          setTaskToDelete(null);
+        }}
+      />
       <TodoSyncModal
         open={Boolean(todoTask)}
         task={todoTask}

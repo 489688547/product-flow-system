@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, hasFormalProductGrading, moveProductToStage, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
+import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, hasFormalProductGrading, moveProductToStage, nextTaskSortOrder, productStagePolicy, reorderProductStageTasks, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
 import { deliverableKind, isBrokenDeliverable } from "../src/domain/deliverables.js";
 import { normalizeClientState } from "../src/state/stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../src/domain/sessionUser.js";
@@ -206,7 +206,7 @@ test("legacy product level labels migrate to the formal grading vocabulary", () 
   });
 
   assert.equal(normalized.products[0].level, "P1 增长级");
-  assert.equal(normalized.products[0].referenceLevel, "P1 增长级");
+  assert.equal("referenceLevel" in normalized.products[0], false);
   assert.equal(normalized.products[0].levelConfirmed, false);
 });
 
@@ -225,7 +225,7 @@ test("only products with complete grading answers count as formally graded", () 
   });
 
   assert.equal(normalized.products[0].levelConfirmed, true);
-  assert.equal(normalized.products[0].referenceLevel, "P2 验证级");
+  assert.equal("referenceLevel" in normalized.products[0], false);
 });
 
 test("formal grading remains separate from the average monthly GMV target", () => {
@@ -333,6 +333,36 @@ test("workflow task templates are isolated by product level and stage", () => {
   assert.ok(p0Development.every(template => template.level === "P0 战略级" && template.stage === 2));
   const departmentNames = new Set(state.orgCache.departments.map(department => department.name));
   assert.ok(DEFAULT_TASK_TEMPLATES.every(template => departmentNames.has(template.ownerDept)));
+});
+
+test("product stages without configured defaults are skippable unless they contain manual work", () => {
+  const state = createDefaultState();
+  const product = state.products.find(item => item.level === "P1 增长级");
+  const withoutDevelopmentDefaults = updateWorkflowTaskTemplates(
+    state,
+    state.settings.taskTemplates.filter(template => !(template.level === product.level && template.stage === 2))
+  );
+
+  assert.deepEqual(productStagePolicy(withoutDevelopmentDefaults, product, 2), {
+    mode: "跳过",
+    applies: false,
+    usage: "该阶段未配置默认任务，可直接跳过。",
+    reason: "no-default-tasks"
+  });
+
+  const withManualTask = {
+    ...withoutDevelopmentDefaults,
+    tasks: [...withoutDevelopmentDefaults.tasks, {
+      id: "manual-development-task",
+      productId: product.id,
+      stage: 2,
+      title: "临时研发任务",
+      systemDefault: false
+    }]
+  };
+
+  assert.equal(productStagePolicy(withManualTask, product, 2).applies, true);
+  assert.equal(productStagePolicy(withManualTask, product, 2).reason, "manual-tasks");
 });
 
 test("updating workflow templates preserves product execution state and manual tasks", () => {
@@ -498,7 +528,8 @@ test("converting a discussed demand into project writes a shared decision record
   assert.equal(product.stage, 1);
   assert.equal(product.requester, demand.requester);
   assert.equal(product.productManager, "");
-  assert.equal(product.referenceLevel, demand.level);
+  assert.equal(product.expectedLaunchMonth, demand.expectedLaunchMonth);
+  assert.equal("referenceLevel" in product, false);
   assert.equal(product.levelConfirmed, false);
   assert.equal(product.grading, undefined);
   assert.match(decision.title, /进入立项/);
@@ -651,13 +682,14 @@ test("O-level grading returns the opportunity and clears all product progress", 
   assert.equal(graded.dingMeetings.some(item => item.productId === product.id), false);
   assert.equal(returned.productId, "");
   assert.equal(returned.status, "暂缓");
-  assert.equal(returned.level, "O级储备");
+  assert.equal("level" in returned, false);
+  assert.equal(returned.expectedLaunchMonth, linkedDemand.expectedLaunchMonth);
   assert.equal(returned.createdAt, linkedDemand.createdAt);
   assert.equal(returned.grading.gradedBy, "赵雨涵");
   assert.match(returned.discussion, /O级储备/);
 });
 
-test("formal P-level grading stays in initiation and syncs the demand level", () => {
+test("formal P-level grading stays in initiation without writing a reference demand level", () => {
   const state = createDefaultState();
   const product = state.products[0];
   const linkedDemand = { ...state.demands[0], id: "linked-demand", productId: product.id, status: "已转开发" };
@@ -669,7 +701,7 @@ test("formal P-level grading stays in initiation and syncs the demand level", ()
   assert.equal(updatedProduct.level, "P1 增长级");
   assert.equal(updatedProduct.levelConfirmed, true);
   assert.equal(updatedProduct.grading.gradedBy, "赵雨涵");
-  assert.equal(updatedDemand.level, "P1 增长级");
+  assert.equal("level" in updatedDemand, false);
   assert.equal(updatedDemand.productId, product.id);
   assert.match(graded.decisions[0].summary, /P1 增长级 \+ 中风险 \+ 标准推进/);
 });
@@ -781,6 +813,26 @@ test("changing a product level regenerates system default tasks but keeps manual
   assert.equal(tasksForProductStage(updated, changedProduct, 2).filter(task => task.systemDefault).length, 0);
   assert.ok(updated.tasks.find(task => task.id === "manual-keep"));
   assert.ok(tasksForProductStage(updated, changedProduct, 1).some(task => /一页纸/.test(task.title)));
+});
+
+test("product stage tasks can be reordered without changing another stage", () => {
+  const state = createDefaultState();
+  const product = state.products.find(item => item.id === "p1");
+  const stageOne = tasksForProductStage(state, product, 1);
+  const stageTwo = tasksForProductStage(state, product, 2);
+  assert.ok(stageOne.length > 1);
+  assert.ok(stageTwo.length > 0);
+
+  const reversedIds = stageOne.map(task => task.id).reverse();
+  const reordered = reorderProductStageTasks(state, product.id, 1, reversedIds);
+
+  assert.deepEqual(tasksForProductStage(reordered, product, 1).map(task => task.id), reversedIds);
+  assert.deepEqual(tasksForProductStage(reordered, product, 2).map(task => task.id), stageTwo.map(task => task.id));
+  assert.equal(nextTaskSortOrder(reordered, product.id, 1), reversedIds.length);
+
+  const reloaded = normalizeClientState(reordered);
+  const reloadedProduct = reloaded.products.find(item => item.id === product.id);
+  assert.deepEqual(tasksForProductStage(reloaded, reloadedProduct, 1).map(task => task.id), reversedIds);
 });
 
 test("moving a product backward clears future task completion and review minutes", () => {

@@ -19,6 +19,11 @@ const SOURCE_META = {
   decision: { label: "管理决策", route: "projects" },
   risk: { label: "风险整改", route: "projects" },
   review: { label: "经营复盘", route: "reviews" },
+  commitment: { label: "部门承诺审批", route: "strategy" },
+  commitment_milestone: { label: "部门承诺里程碑", route: "strategy" },
+  incentive_project: { label: "激励项目", route: "incentives" },
+  monthly_report: { label: "部门月报", route: "reviews" },
+  reward_payout: { label: "奖金发放", route: "incentives" },
   product_task: { label: "产品任务", route: "progress" }
 };
 

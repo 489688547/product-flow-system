@@ -1,4 +1,10 @@
 export const NAV_PERMISSION_ITEMS = [
+  { key: "home", label: "公司首页" },
+  { key: "strategy", label: "战略中心" },
+  { key: "projects", label: "重点项目" },
+  { key: "incentives", label: "部门激励" },
+  { key: "reviews", label: "经营检查" },
+  { key: "apps", label: "业务 Apps" },
   { key: "dashboard", label: "总览" },
   { key: "demands", label: "需求池" },
   { key: "planning", label: "产品规划" },
@@ -15,6 +21,12 @@ export const FEATURE_PERMISSION_ITEMS = [
 
 export const DEFAULT_PERMISSIONS = {
   navigation: {
+    home: { departments: ["*"] },
+    strategy: { departments: ["*"] },
+    projects: { departments: ["*"] },
+    incentives: { departments: ["*"] },
+    reviews: { departments: ["*"] },
+    apps: { departments: ["*"] },
     dashboard: { departments: ["*"] },
     demands: { departments: ["*"] },
     planning: { departments: ["*"] },

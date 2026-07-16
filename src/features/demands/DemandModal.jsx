@@ -1,12 +1,13 @@
 import { ImagePlus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { generateProductCover, PRODUCT_LEVELS, RESERVE_LEVEL } from "../../domain/productFlow.js";
+import { generateProductCover } from "../../domain/productFlow.js";
 import { Button } from "../../ui/Button.jsx";
+import { ExpectedLaunchMonthSelect } from "../../ui/ExpectedLaunchMonthSelect.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { RichTextEditor } from "../../ui/RichTextEditor.jsx";
 
-const EMPTY = { name: "", level: "P1 增长级", requester: "", source: "", desc: "", discussion: "", image: "" };
+const EMPTY = { name: "", expectedLaunchMonth: "", requester: "", source: "", desc: "", discussion: "", image: "" };
 
 export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
@@ -14,7 +15,7 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
     setForm(demand ? { ...EMPTY, ...demand, requester: demand.requester || demand.owner || "" } : { ...EMPTY, requester: currentUser?.name || "" });
   }, [currentUser?.name, demand, open]);
 
-  const missing = !form.name.trim() || !form.requester.trim() || !form.source.trim() || !form.desc.replace(/<[^>]+>/g, "").trim();
+  const missing = !form.name.trim() || !form.expectedLaunchMonth || !form.requester.trim() || !form.source.trim() || !form.desc.replace(/<[^>]+>/g, "").trim();
   const set = patch => setForm(current => ({ ...current, ...patch }));
   const previewImage = form.image || generateProductCover(form.name);
   const readImage = file => {
@@ -31,7 +32,7 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
       onClose={onClose}
       footer={<>
         <Button onClick={onClose}>取消</Button>
-        <Button variant="primary" disabled={missing} disabledReason="请填写名称、提需人、来源部门和机会描述" onClick={() => onSave(form)}>保存</Button>
+        <Button variant="primary" disabled={missing} disabledReason="请填写名称、期望上线、提需人、来源部门和机会描述" onClick={() => onSave(form)}>保存</Button>
       </>}
     >
       <section className="demand-cover-field" aria-label="产品图片">
@@ -50,7 +51,7 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
       </section>
       <div className="form-grid">
         <label>产品/机会名称<input name="demand-name" autoComplete="off" value={form.name} onChange={event => set({ name: event.target.value })} placeholder="例如：鹦鹉谷物棒升级版…" /></label>
-        <label>参考等级<select name="demand-level" value={form.level} onChange={event => set({ level: event.target.value })}>{(form.level === RESERVE_LEVEL ? [RESERVE_LEVEL, ...PRODUCT_LEVELS] : PRODUCT_LEVELS).map(level => <option key={level}>{level}</option>)}</select></label>
+        <label>期望上线<ExpectedLaunchMonthSelect value={form.expectedLaunchMonth} onChange={expectedLaunchMonth => set({ expectedLaunchMonth })} /></label>
         <label>提需人<OrgSelect type="user" value={form.requester} onChange={requester => set({ requester })} orgCache={orgCache} placeholder="选择提需人…" searchInMenu /></label>
         <label>来源部门<OrgSelect type="department" value={form.source} onChange={source => set({ source })} orgCache={orgCache} placeholder="选择来源部门…" searchInMenu /></label>
       </div>

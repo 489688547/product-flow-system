@@ -1,5 +1,6 @@
 import { AlertTriangle, Check } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import {
   calculateProductGrade,
   hasFormalProductGrading,
@@ -35,7 +36,7 @@ export function ProductGradingModal({ open, product, canEdit = false, onClose, o
       onClose={onClose}
       footer={canEdit ? <><Button onClick={onClose}>取消</Button><Button variant={isReserve ? "danger" : "primary"} disabled={!result.complete} disabledReason="请完成四项基础评分" onClick={() => onSave(answers)}>{isReserve ? "退回需求池" : "确认定级"}</Button></> : null}
     >
-      <div className="grading-intro"><strong>{product?.name}</strong><em>需求池参考等级：{product?.referenceLevel || product?.level || "未填写"}</em><span>价值与资源决定正式产品等级；C2 单独判断风险，并调整管理强度和推进方式。</span></div>
+      <div className="grading-intro"><strong>{product?.name}</strong><em>期望上线：{formatExpectedLaunchMonth(product?.expectedLaunchMonth)}</em><span>价值与资源决定正式产品等级；C2 单独判断风险，并调整管理强度和推进方式。</span></div>
       <div className="grading-layout">
         <div className="grading-form">
           {PRODUCT_GRADING_DIMENSIONS.map(dimension => (

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { generateProductCover, PRODUCT_LEVELS, STAGES } from "../../domain/productFlow.js";
 import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
 import { buildProductGmvProgress } from "../../domain/productGmv.js";
+import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { normalizeSkuCodes } from "../../domain/salesData.js";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
@@ -34,7 +35,7 @@ export function ProductArchivePage({ onNavigate }) {
   ], [state.products]);
   const products = useMemo(() => state.products
     .filter(product => statusFilter === "all" || product.status === statusFilter)
-    .filter(product => levelFilter === "all" || product.level === levelFilter)
+    .filter(product => levelFilter === "all" || (product.levelConfirmed && product.level === levelFilter))
     .filter(product => stageFilter === "all" || String(product.stage) === stageFilter), [state.products, statusFilter, levelFilter, stageFilter]);
   function jump(product, screen) {
     setCurrentProduct(product.id);
@@ -58,7 +59,7 @@ export function ProductArchivePage({ onNavigate }) {
                 <div className="product-card-title"><h2>{product.name}</h2><span className="badge">{product.status || "开发中"}</span></div>
                 <p>{product.desc}</p>
                 <ProductGmvSummary compact summary={gmvSummaries.get(product.id)} loading={productSales.loading} error={productSales.error} />
-                <span>{product.level} · 第 {product.stage} 阶段 {STAGES[product.stage]?.short || "-"} · 提需人 {product.requester || "未记录"} · 产品经理 {product.productManager || "待确定"} · {product.source}</span>
+                <span>{product.levelConfirmed ? product.level : `期望上线：${formatExpectedLaunchMonth(product.expectedLaunchMonth)}`} · 第 {product.stage} 阶段 {STAGES[product.stage]?.short || "-"} · 提需人 {product.requester || "未记录"} · 产品经理 {product.productManager || "待确定"} · {product.source}</span>
               </div>
               <div className="card-actions">
                 <Button

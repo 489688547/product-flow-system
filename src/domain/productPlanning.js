@@ -1,4 +1,5 @@
 import { visibleDemandPool } from "./productFlow.js";
+import { normalizeExpectedLaunchMonth } from "./expectedLaunch.js";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -29,8 +30,10 @@ function updatedTime(plan) {
 function planningLevel(demand, product) {
   const confirmed = Boolean(product?.levelConfirmed);
   return {
-    planningLevel: confirmed ? product.level : (demand?.level || product?.referenceLevel || product?.level || "未定级"),
-    planningLevelIsReference: !confirmed
+    planningLevel: confirmed ? product.level : "未定级",
+    planningLevelConfirmed: confirmed,
+    planningLevelIsReference: false,
+    expectedLaunchMonth: normalizeExpectedLaunchMonth(product?.expectedLaunchMonth || demand?.expectedLaunchMonth)
   };
 }
 
@@ -72,7 +75,9 @@ export function normalizeProductPlans(value) {
         name: cleanText(plan?.demandSnapshot?.name || plan?.demandName) || "未命名产品",
         image: cleanText(plan?.demandSnapshot?.image || plan?.demandImage),
         level: cleanText(plan?.demandSnapshot?.level || plan?.level),
-        levelIsReference: plan?.demandSnapshot?.levelIsReference !== false,
+        levelConfirmed: Boolean(plan?.demandSnapshot?.levelConfirmed || (plan?.demandSnapshot?.level && plan?.demandSnapshot?.levelIsReference === false)),
+        levelIsReference: false,
+        expectedLaunchMonth: normalizeExpectedLaunchMonth(plan?.demandSnapshot?.expectedLaunchMonth || plan?.expectedLaunchMonth),
         productId: cleanText(plan?.demandSnapshot?.productId || plan?.productId)
       },
       developmentStart: cleanDate(plan?.developmentStart),

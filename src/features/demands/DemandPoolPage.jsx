@@ -15,6 +15,7 @@ import { FloatingMenu } from "../../ui/FloatingMenu.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DemandModal } from "./DemandModal.jsx";
 import { formatDemandCreatedAt } from "../../domain/demandDate.js";
+import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 
 function StatusStrip({ demands, value, onChange }) {
   const items = ["all", ...DEMAND_POOL_STATUSES];
@@ -117,7 +118,7 @@ export function DemandPoolPage({ onProjectCreated }) {
   const columns = [
     { key: "name", header: "机会名称", render: demand => <div className="demand-product-cell"><img src={demand.image || generateProductCover(demand.name)} alt="" width="40" height="40" loading="lazy" /><div><strong>{demand.name}</strong><p>{stripHtml(demand.desc) || "暂无机会描述"}</p></div></div> },
     { key: "status", header: "状态", render: demand => <DemandStatusSelect value={demand.status} onChange={status => updateDemand(demand.id, { status })} /> },
-    { key: "level", header: "参考等级", render: demand => demand.level },
+    { key: "expectedLaunchMonth", header: "期望上线", render: demand => formatExpectedLaunchMonth(demand.expectedLaunchMonth) },
     { key: "discussion", header: "讨论摘要", render: demand => <span>{stripHtml(demand.discussion) || "-"}</span> },
     { key: "source", header: "来源", render: demand => demand.source },
     { key: "requester", header: "提需人", render: demand => demand.requester || demand.owner || "-" },

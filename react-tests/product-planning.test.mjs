@@ -11,9 +11,9 @@ import {
 test("planning candidates combine demand opportunities with active products and exclude review-stage products", () => {
   const candidates = buildPlanningCandidates(
     [
-      { id: "d-pool", name: "需求池新品", status: "待讨论", level: "P2 验证级" },
-      { id: "d-active", name: "来源机会", status: "已转开发", productId: "p-active", level: "P1 增长级" },
-      { id: "d-review", name: "复盘来源", status: "已转开发", productId: "p-review", level: "P0 战略级" }
+      { id: "d-pool", name: "需求池新品", status: "待讨论", expectedLaunchMonth: "2026-10" },
+      { id: "d-active", name: "来源机会", status: "已转开发", productId: "p-active", expectedLaunchMonth: "2026-11" },
+      { id: "d-review", name: "复盘来源", status: "已转开发", productId: "p-review", expectedLaunchMonth: "2026-12" }
     ],
     [
       { id: "p-active", name: "流程中产品", stage: 3, level: "P1 增长级", levelConfirmed: true, image: "active.jpg" },
@@ -22,8 +22,9 @@ test("planning candidates combine demand opportunities with active products and 
   );
 
   assert.deepEqual(candidates.map(item => item.id), ["d-pool", "d-active"]);
-  assert.equal(candidates[0].planningLevel, "P2 验证级");
-  assert.equal(candidates[0].planningLevelIsReference, true);
+  assert.equal(candidates[0].planningLevel, "未定级");
+  assert.equal(candidates[0].planningLevelIsReference, false);
+  assert.equal(candidates[0].expectedLaunchMonth, "2026-10");
   assert.equal(candidates[1].name, "流程中产品");
   assert.equal(candidates[1].planningLevel, "P1 增长级");
   assert.equal(candidates[1].planningLevelIsReference, false);

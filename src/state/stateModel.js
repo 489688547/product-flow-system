@@ -4,6 +4,7 @@ import { normalizeTaskDueDate } from "../domain/taskTodo.js";
 import { normalizePermissions } from "../domain/permissions.js";
 import { normalizeSkuCodes } from "../domain/salesData.js";
 import { normalizeDemandCreatedAt } from "../domain/demandDate.js";
+import { normalizeExpectedLaunchMonth } from "../domain/expectedLaunch.js";
 import { normalizeProductPlans } from "../domain/productPlanning.js";
 
 function normalizeOrganizationLabels(value) {
@@ -74,8 +75,8 @@ export function normalizeClientState(input) {
   const state = { ...defaults, ...normalizeOrganizationLabels(input || {}) };
   state.demands = (Array.isArray(state.demands) ? state.demands : defaults.demands).map(demand => {
     const requester = demand.requester || demand.owner || "";
-    const { created: _legacyCreated, ...record } = demand;
-    return { ...record, image: demand.image || generateProductCover(demand.name), createdAt: normalizeDemandCreatedAt(demand), requester, owner: requester };
+    const { created: _legacyCreated, level: _legacyLevel, ...record } = demand;
+    return { ...record, expectedLaunchMonth: normalizeExpectedLaunchMonth(demand.expectedLaunchMonth), image: demand.image || generateProductCover(demand.name), createdAt: normalizeDemandCreatedAt(demand), requester, owner: requester };
   });
   state.products = (Array.isArray(state.products) ? state.products : defaults.products).map(product => {
     const matchedDemand = state.demands.find(demand => demand.productId === product.id);
@@ -83,15 +84,15 @@ export function normalizeClientState(input) {
     const requester = product.requester || matchedDemand?.requester || defaultProduct?.requester || "";
     const productManager = product.productManager || product.owner || "";
     const stage = normalizeWorkflowStage(product.stage);
-    const referenceLevel = normalizeProductLevel(product.referenceLevel || matchedDemand?.level || product.level);
     const gradingResult = calculateProductGrade(product.grading?.answers || {});
     const levelConfirmed = Boolean(product.levelConfirmed && gradingResult.complete);
-    const level = levelConfirmed ? gradingResult.level : normalizeProductLevel(product.level || referenceLevel);
-    return { ...product, image: product.image || generateProductCover(product.name), level, referenceLevel, stage, levelConfirmed, requester, productManager, owner: productManager, skuCodes: normalizeSkuCodes(product.skuCodes), monthlyGmvTarget: normalizeMonthlyGmvTarget(product.monthlyGmvTarget) };
+    const level = levelConfirmed ? gradingResult.level : normalizeProductLevel(product.level);
+    const { referenceLevel: _legacyReferenceLevel, ...record } = product;
+    return { ...record, expectedLaunchMonth: normalizeExpectedLaunchMonth(product.expectedLaunchMonth || matchedDemand?.expectedLaunchMonth), image: product.image || generateProductCover(product.name), level, stage, levelConfirmed, requester, productManager, owner: productManager, skuCodes: normalizeSkuCodes(product.skuCodes), monthlyGmvTarget: normalizeMonthlyGmvTarget(product.monthlyGmvTarget) };
   });
   state.tasks = (Array.isArray(state.tasks) ? state.tasks : defaults.tasks)
     .filter(task => Number(task.stage) > 0)
-    .map(task => ({ ...task, category: normalizeTaskCategory(task.category), ownerDept: normalizeDepartmentSelection(task.ownerDept, state.orgCache) || "产品部", required: Boolean(task.required), stage: normalizeWorkflowStage(task.stage), due: normalizeTaskDueDate(task.due), systemDefault: task.systemDefault ?? isLegacyGeneratedTask(task) }));
+    .map((task, sortOrder) => ({ ...task, category: normalizeTaskCategory(task.category), ownerDept: normalizeDepartmentSelection(task.ownerDept, state.orgCache) || "产品部", required: Boolean(task.required), stage: normalizeWorkflowStage(task.stage), due: normalizeTaskDueDate(task.due), sortOrder: Number.isFinite(Number(task.sortOrder)) ? Number(task.sortOrder) : sortOrder, systemDefault: task.systemDefault ?? isLegacyGeneratedTask(task) }));
   state.deliverables = Array.isArray(state.deliverables) ? state.deliverables : [];
   state.reviews = (Array.isArray(state.reviews) ? state.reviews : []).map(review => ({ ...review, stage: normalizeWorkflowStage(review.stage) }));
   state.decisions = Array.isArray(state.decisions) ? state.decisions : [];

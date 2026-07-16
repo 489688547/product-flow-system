@@ -6,6 +6,8 @@ import {
   createDefaultState,
   convertDemandToProject,
   moveProductToStage,
+  nextTaskSortOrder,
+  reorderProductStageTasks,
   syncDefaultTasksForProduct,
   updateDemandRecord,
   updateProductRecord,
@@ -189,7 +191,7 @@ export function ProductFlowProvider({ children }) {
       const returnedDemand = {
         id: matchedDemand?.id || `d-return-${Date.now()}`,
         name: product.name,
-        level: product.level,
+        expectedLaunchMonth: matchedDemand?.expectedLaunchMonth || product.expectedLaunchMonth || "",
         requester: matchedDemand?.requester || product.requester || "",
         owner: matchedDemand?.requester || product.requester || "",
         source: product.source,
@@ -223,24 +225,29 @@ export function ProductFlowProvider({ children }) {
   }, []);
 
   const addTask = useCallback(task => {
-    commitState(current => ({
-      ...current,
-      tasks: [
-        {
-          id: `task-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-          category: "会前准备",
-          title: "新任务",
-          ownerDept: "产品部",
-          deliverable: "待补充",
-          required: false,
-          due: "",
-          done: false,
-          systemDefault: false,
-          ...task
-        },
-        ...(current.tasks || [])
-      ]
-    }));
+    commitState(current => {
+      const taskWithOrder = {
+        id: `task-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        category: "会前准备",
+        title: "新任务",
+        ownerDept: "产品部",
+        deliverable: "待补充",
+        required: false,
+        due: "",
+        done: false,
+        systemDefault: false,
+        ...task,
+        sortOrder: nextTaskSortOrder(current, task.productId, task.stage)
+      };
+      return {
+        ...current,
+        tasks: [...(current.tasks || []), taskWithOrder]
+      };
+    });
+  }, []);
+
+  const reorderTasks = useCallback((productId, stage, orderedTaskIds) => {
+    commitState(current => reorderProductStageTasks(current, productId, stage, orderedTaskIds));
   }, []);
 
   const updateTask = useCallback((id, patch) => {
@@ -451,6 +458,7 @@ export function ProductFlowProvider({ children }) {
     updateProduct,
     gradeProduct,
     addTask,
+    reorderTasks,
     updateTask,
     deleteTask,
     syncTaskTodo,
@@ -468,7 +476,7 @@ export function ProductFlowProvider({ children }) {
     addFeedbackIssue,
     updateSettings,
     updateTaskTemplates
-  }), [state, currentUser, orgCache, loading, sharedError, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, updateDeliverable, deleteDeliverable, addProductPlan, updateProductPlan, deleteProductPlan, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
+  }), [state, currentUser, orgCache, loading, sharedError, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, updateDeliverable, deleteDeliverable, addProductPlan, updateProductPlan, deleteProductPlan, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
 
   return <ProductFlowContext.Provider value={value}>{children}</ProductFlowContext.Provider>;
 }

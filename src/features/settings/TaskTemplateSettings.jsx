@@ -2,6 +2,7 @@ import { FileText, Plus, Save, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PRODUCT_LEVELS, STAGES } from "../../domain/productFlow.js";
 import { Button, IconAction } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { TaskCategorySelect } from "../progress/TaskCategorySelect.jsx";
@@ -19,6 +20,7 @@ export function TaskTemplateSettings({ templates, orgCache, onSave, canEdit = fa
   const [stage, setStage] = useState(1);
   const [documentTaskId, setDocumentTaskId] = useState("");
   const [savedNotice, setSavedNotice] = useState(false);
+  const [templateToDelete, setTemplateToDelete] = useState(null);
 
   useEffect(() => setDraft(cloneTemplates(templates)), [templates]);
 
@@ -34,10 +36,10 @@ export function TaskTemplateSettings({ templates, orgCache, onSave, canEdit = fa
     const id = `task-template-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     updateDraft(current => [...current, { id, level, stage, category: "会前准备", title: "新任务", ownerDept: "产品部", deliverable: "待补充", required: false, deliverableTemplates: [] }]);
   };
-  const deleteTemplate = id => {
-    if (!window.confirm("确认删除这个默认任务模板？对应产品里的系统任务也会移除。")) return;
-    updateDraft(current => current.filter(template => template.id !== id));
-    if (documentTaskId === id) setDocumentTaskId("");
+  const deleteTemplate = template => {
+    updateDraft(current => current.filter(item => item.id !== template.id));
+    if (documentTaskId === template.id) setDocumentTaskId("");
+    setTemplateToDelete(null);
   };
   const handleSave = () => {
     onSave(cloneTemplates(draft));
@@ -51,7 +53,7 @@ export function TaskTemplateSettings({ templates, orgCache, onSave, canEdit = fa
     { key: "deliverable", header: "交付物", render: template => <input disabled={!canEdit} aria-label={`${template.title}默认交付物`} value={template.deliverable} onChange={event => updateTemplate(template.id, { deliverable: event.target.value })} /> },
     { key: "required", header: "是否必需", render: template => <label className="template-required-check"><input disabled={!canEdit} type="checkbox" aria-label={`${template.title}是否必需`} checked={Boolean(template.required)} onChange={event => updateTemplate(template.id, { required: event.target.checked })} /><span>{template.required ? "必需" : "可选"}</span></label> },
     { key: "documents", header: "交付物模板", render: template => <Button disabled={!canEdit} disabledReason="当前账号没有编辑任务模板的权限" className="compact" onClick={() => setDocumentTaskId(template.id)}><FileText size={15} />模板 {template.deliverableTemplates?.length || 0}</Button> },
-    { key: "actions", header: "操作", render: template => canEdit ? <TableActions><IconAction label="删除默认任务" className="danger" onClick={() => deleteTemplate(template.id)}><Trash2 size={16} /></IconAction></TableActions> : <span className="muted">—</span> }
+    { key: "actions", header: "操作", render: template => canEdit ? <TableActions><IconAction label="删除默认任务" className="danger" onClick={() => setTemplateToDelete(template)}><Trash2 size={16} /></IconAction></TableActions> : <span className="muted">—</span> }
   ];
 
   return (
@@ -81,6 +83,14 @@ export function TaskTemplateSettings({ templates, orgCache, onSave, canEdit = fa
           updateTemplate(documentTask.id, { deliverableTemplates });
           setDocumentTaskId("");
         }}
+      />
+      <ConfirmDialog
+        open={Boolean(templateToDelete)}
+        title="删除默认任务"
+        message={templateToDelete ? `确定删除“${templateToDelete.title}”？` : ""}
+        description="保存任务配置后，对应产品中的系统任务也会被移除。"
+        onClose={() => setTemplateToDelete(null)}
+        onConfirm={() => deleteTemplate(templateToDelete)}
       />
     </section>
   );

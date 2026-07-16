@@ -222,6 +222,10 @@ test("demand pool supports rich text, status filtering, and clear project conver
   assert.match(modal, /提需人/);
   assert.match(modal, /currentUser\?\.name/);
   assert.match(modal, /产品图片/);
+  assert.match(modal, /ExpectedLaunchMonthSelect/);
+  assert.match(modal, /expectedLaunchMonth/);
+  assert.doesNotMatch(modal, /PRODUCT_LEVELS|RESERVE_LEVEL|参考等级/);
+  assert.match(page, /key: "expectedLaunchMonth", header: "期望上线"/);
   assert.match(modal, /type="file"/);
   assert.match(modal, /accept="image\/\*"/);
   assert.match(modal, /generateProductCover\(form\.name\)/);
@@ -286,7 +290,8 @@ test("product progress derives stages and tasks from the selected product level"
   const meetingModal = read("src/features/progress/MeetingScheduleModal.jsx");
   const datePicker = read("src/ui/DatePickerField.jsx");
   const pkg = JSON.parse(read("package.json"));
-  assert.match(page, /stagePolicy\(selectedProduct, stage\.index\)/);
+  assert.match(page, /productStagePolicy\(state, selectedProduct, stage\.index\)/);
+  assert.match(page, /productStagePolicy\(state, selectedProduct, selectedStage\)/);
   assert.match(page, /tasksForProductStage\(state, selectedProduct, selectedStage\)/);
   assert.doesNotMatch(page, /advanceProductStage/);
   assert.doesNotMatch(page, /完成当前阶段并进入下一阶段/);
@@ -316,7 +321,7 @@ test("product progress derives stages and tasks from the selected product level"
   assert.doesNotMatch(page, /disabled=\{!isMeetingTask \|\| hasMeeting\}/);
   assert.match(page, /addTask/);
   assert.match(page, /deleteTask/);
-  assert.match(page, /window\.confirm\("确认删除这个任务/);
+  assert.match(page, /<ConfirmDialog/);
   assert.match(page, /returnProductToDemand/);
   assert.match(page, /className="compact quiet-danger"/);
   assert.match(page, /progress-overview-toolbar/);
@@ -445,7 +450,7 @@ test("initiation grading is calculated in a modal and cannot be changed by a pla
   assert.match(progress, /产品负责人/);
   assert.match(progress, /searchInMenu/);
   assert.match(progress, /查看定级打分/);
-  assert.match(progress, /referenceLevel/);
+  assert.match(progress, /期望上线/);
   assert.match(progress, /level-badge/);
   assert.match(orgSelect, /searchInMenu/);
   assert.match(orgSelect, /org-select-trigger/);
@@ -458,7 +463,7 @@ test("initiation grading is calculated in a modal and cannot be changed by a pla
   assert.match(modal, /RESERVE_LEVEL/);
   assert.match(modal, /自动退回需求池/);
   assert.match(modal, /产品等级/);
-  assert.match(modal, /product\?\.referenceLevel/);
+  assert.match(modal, /product\?\.expectedLaunchMonth/);
   assert.match(modal, /风险等级/);
   assert.match(modal, /推进方式/);
   assert.match(productFlow, /30-100万/);
@@ -551,7 +556,7 @@ test("the static shell shows a loading state before React mounts in DingTalk", (
 
   assert.match(html, /<script defer src="https:\/\/g\.alicdn\.com\/dingding\/dingtalk-jsapi\/3\.0\.40\/dingtalk\.open\.js"><\/script>/);
   assert.match(html, /id="app-boot"/);
-  assert.match(html, /正在打开产品协同系统/);
+  assert.match(html, /正在打开经营执行平台/);
 });
 
 test("table action CSS keeps row height stable across pages", () => {
@@ -586,7 +591,7 @@ test("product archive is a reusable product record surface with edit and linked 
   assert.match(archive, /ProductPackageModal/);
   assert.match(modal, /产品名称/);
   assert.match(modal, /产品等级/);
-  assert.match(modal, /参考等级/);
+  assert.match(modal, /期望上线/);
   assert.match(modal, /提需人/);
   assert.match(modal, /产品经理/);
   assert.match(modal, /departmentFilter="产品"/);
@@ -689,7 +694,7 @@ test("settings configures level-specific stage task and DingTalk deliverable tem
   assert.match(editor, /是否必需/);
   assert.match(editor, /required/);
   assert.match(editor, /<DeliverableTemplateEditorModal/);
-  assert.match(editor, /window\.confirm\("确认删除这个默认任务模板/);
+  assert.match(editor, /<ConfirmDialog/);
   assert.match(editor, /有未保存修改/);
   assert.match(editor, /已保存并同步到对应产品/);
   assert.match(editor, /disabled=\{!hasChanges\}/);
@@ -757,7 +762,8 @@ test("product identity selector is reused instead of native product selects", ()
   assert.match(picker, /export function ProductPicker/);
   assert.match(picker, /<FloatingMenu/);
   assert.match(picker, /product\.image/);
-  assert.match(picker, /product\.level/);
+  assert.match(picker, /levelConfirmed/);
+  assert.match(picker, /formatExpectedLaunchMonth/);
   assert.match(progress, /<ProductPicker/);
   assert.match(packages, /<ProductPicker/);
   assert.doesNotMatch(packages, /<select value=\{selectedProduct/);
@@ -777,6 +783,40 @@ test("shared page and table primitives support consistent hierarchy and responsi
   assert.match(styles, /font-size: 14px/);
   assert.match(styles, /:focus-visible/);
   assert.match(styles, /prefers-reduced-motion/);
+});
+
+test("product progress appends tasks and supports persistent drag ordering", () => {
+  const progress = read("src/features/progress/ProductProgressPage.jsx");
+  const provider = read("src/state/ProductFlowProvider.jsx");
+  const table = read("src/ui/DataTable.jsx");
+  const styles = read("src/styles.css");
+
+  assert.match(progress, /GripVertical/);
+  assert.match(progress, /draggable/);
+  assert.match(progress, /reorderTasks/);
+  assert.match(progress, /getRowProps/);
+  assert.match(progress, /拖动调整任务顺序/);
+  assert.match(provider, /nextTaskSortOrder/);
+  assert.match(provider, /tasks:\s*\[\.\.\.\(current\.tasks \|\| \[\]\), taskWithOrder\]/);
+  assert.match(provider, /reorderProductStageTasks/);
+  assert.match(table, /getRowProps/);
+  assert.match(styles, /\.task-drag-handle\s*\{/);
+});
+
+test("task deletion uses one designed confirmation dialog and a compact drag column", () => {
+  const progress = read("src/features/progress/ProductProgressPage.jsx");
+  const settings = read("src/features/settings/TaskTemplateSettings.jsx");
+  const dialog = read("src/ui/ConfirmDialog.jsx");
+  const styles = read("src/styles.css");
+
+  assert.match(progress, /<ConfirmDialog/);
+  assert.match(settings, /<ConfirmDialog/);
+  assert.doesNotMatch(progress, /window\.confirm\("确认删除这个任务/);
+  assert.doesNotMatch(settings, /window\.confirm\("确认删除这个默认任务模板/);
+  assert.match(dialog, /export function ConfirmDialog/);
+  assert.match(dialog, /variant="danger"/);
+  assert.match(styles, /\.task-table th:nth-child\(1\), \.task-table td:nth-child\(1\)\s*\{[^}]*width: 32px;[^}]*min-width: 32px;/s);
+  assert.match(styles, /\.task-drag-handle\s*\{[^}]*width: 24px;/s);
 });
 
 test("modal supplies keyboard escape, scroll locking, and labelled close control", () => {
