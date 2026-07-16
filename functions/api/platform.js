@@ -2,6 +2,13 @@ import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
 
 const COLLECTIONS = [
   "strategies",
+  "requiredResults",
+  "departmentCommitments",
+  "commitmentMilestones",
+  "incentiveProjects",
+  "departmentRewardBudgets",
+  "monthlyReports",
+  "reportCorrections",
   "objectives",
   "metrics",
   "projects",

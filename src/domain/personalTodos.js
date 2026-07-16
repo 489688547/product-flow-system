@@ -5,6 +5,11 @@ const SOURCE_CONFIG = {
   decision: { appId: "platform", priority: 10 },
   risk: { appId: "platform", priority: 10 },
   review: { appId: "platform", priority: 20 },
+  commitment: { appId: "platform", priority: 10 },
+  commitment_milestone: { appId: "platform", priority: 20 },
+  incentive_project: { appId: "platform", priority: 20 },
+  monthly_report: { appId: "platform", priority: 10 },
+  reward_payout: { appId: "platform", priority: 10 },
   product_task: { appId: "product-flow", priority: 20 }
 };
 
@@ -50,6 +55,11 @@ function sourceStatus(type, record) {
   if (type === "milestone") return record.status === "completed" ? "done" : "pending";
   if (type === "decision") return record.status && record.status !== "pending" ? "done" : "pending";
   if (type === "risk") return record.status === "closed" ? "done" : "pending";
+  if (type === "commitment") return ["active", "completed", "cancelled"].includes(record.status) ? "done" : "pending";
+  if (type === "commitment_milestone") return record.status === "completed" ? "done" : "pending";
+  if (type === "incentive_project") return ["closed", "cancelled"].includes(record.status) ? "done" : "pending";
+  if (type === "monthly_report") return record.status === "frozen" ? "done" : "pending";
+  if (type === "reward_payout") return ["paid", "not_applicable"].includes(record.payoutStatus) ? "done" : "pending";
   if (type === "product_task") return record.done ? "done" : "pending";
   return record.done ? "done" : "pending";
 }
@@ -120,7 +130,57 @@ function reviewCandidates(platformState, users, now) {
 
 function platformCandidates(platformState, users) {
   const projects = new Map((platformState.projects || []).map(project => [project.id, project]));
+  const commitments = new Map((platformState.departmentCommitments || []).map(commitment => [commitment.id, commitment]));
+  const commitmentTodos = (platformState.departmentCommitments || []).flatMap(commitment => {
+    const assignment = commitment.status === "office_review"
+      ? { name: commitment.reviewerName, dueDate: commitment.reviewDueDate || commitment.dueDate, title: `审核部门承诺：${commitment.title}` }
+      : commitment.status === "executive_review"
+        ? { name: commitment.executiveOwner || commitment.reviewerName, dueDate: commitment.confirmDueDate || commitment.dueDate, title: `确认部门承诺：${commitment.title}` }
+        : commitment.status === "returned"
+          ? { name: commitment.owner, dueDate: commitment.dueDate, title: `修改部门承诺：${commitment.title}` }
+          : null;
+    return assignment ? [sourceCandidate("commitment", commitment, findUserByName(users, assignment.name), assignment)] : [];
+  });
+  const milestoneTodos = (platformState.commitmentMilestones || [])
+    .filter(item => !item.archived && item.status !== "completed")
+    .map(item => sourceCandidate("commitment_milestone", item, findUserByName(users, item.owner), {
+      dueDate: item.dueDate,
+      title: item.title,
+      project: { id: item.commitmentId, name: commitments.get(item.commitmentId)?.title || "部门承诺", strategyId: commitments.get(item.commitmentId)?.strategyId || "" }
+    }));
+  const incentiveTodos = (platformState.incentiveProjects || []).flatMap(project => {
+    const todos = [];
+    if (!["closed", "cancelled"].includes(project.status)) {
+      todos.push(sourceCandidate("incentive_project", project, findUserByName(users, project.owner), {
+        dueDate: project.endDate,
+        title: project.status === "closing" ? `结项激励项目：${project.name}` : `推进激励项目：${project.name}`,
+        project: { id: project.id, name: project.name, strategyId: project.strategyId || "" }
+      }));
+    }
+    if (project.payoutStatus === "pending") {
+      todos.push(sourceCandidate("reward_payout", project, findUserByName(users, project.payoutOwner), {
+        dueDate: project.payoutDueDate,
+        title: `发放激励奖金：${project.name}`,
+        project: { id: project.id, name: project.name, strategyId: project.strategyId || "" }
+      }));
+    }
+    return todos;
+  });
+  const reportTodos = (platformState.monthlyReports || []).flatMap(report => {
+    const assignment = ["draft", "returned"].includes(report.status)
+      ? { name: report.owner, title: `${report.status === "returned" ? "修改" : "提交"}${report.month}月度汇报` }
+      : report.status === "submitted"
+        ? { name: report.reviewerName, title: `审核${report.department}${report.month}月度汇报` }
+        : report.status === "approved"
+          ? { name: report.freezerName, title: `冻结${report.department}${report.month}月度汇报` }
+          : null;
+    return assignment ? [sourceCandidate("monthly_report", report, findUserByName(users, assignment.name), { dueDate: report.dueDate, title: assignment.title })] : [];
+  });
   return [
+    ...commitmentTodos,
+    ...milestoneTodos,
+    ...incentiveTodos,
+    ...reportTodos,
     ...(platformState.milestones || []).filter(item => !item.archived).map(item => sourceCandidate(
       "milestone",
       item,

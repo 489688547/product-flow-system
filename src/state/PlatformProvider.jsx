@@ -100,7 +100,59 @@ export function PlatformProvider({ children }) {
       });
       return reducePlatformState(current, { type: "replace_personal_todos", todos: personalTodos });
     });
-  }, [orgCache, productState.products, productState.tasks, state.decisionRequests, state.milestones, state.risks, state.statusUpdates]);
+  }, [
+    orgCache,
+    productState.products,
+    productState.tasks,
+    state.commitmentMilestones,
+    state.decisionRequests,
+    state.departmentCommitments,
+    state.incentiveProjects,
+    state.milestones,
+    state.monthlyReports,
+    state.risks,
+    state.statusUpdates
+  ]);
+
+  const saveRequiredResult = useCallback((record, reason = "维护战略达成标准") => {
+    dispatch({ type: "upsert_required_result", record, reason });
+  }, [dispatch]);
+
+  const saveDepartmentCommitment = useCallback((record, reason = "维护部门承诺") => {
+    dispatch({ type: "upsert_department_commitment", record, reason });
+  }, [dispatch]);
+
+  const transitionCommitment = useCallback((id, transition, reason = "") => {
+    dispatch({ type: "transition_department_commitment", id, transition, reason });
+  }, [dispatch]);
+
+  const saveCommitmentMilestone = useCallback((record, reason = "维护月度里程碑") => {
+    dispatch({ type: "upsert_commitment_milestone", record, reason });
+  }, [dispatch]);
+
+  const saveIncentiveProject = useCallback((record, reason = "维护激励项目") => {
+    dispatch({ type: "upsert_incentive_project", record, reason });
+  }, [dispatch]);
+
+  const settleIncentive = useCallback((id, award) => {
+    dispatch({ type: "settle_incentive_project", id, award });
+  }, [dispatch]);
+
+  const saveMonthlyReport = useCallback((record, reason = "填写月度汇报") => {
+    dispatch({ type: "upsert_monthly_report", record, reason });
+  }, [dispatch]);
+
+  const transitionReport = useCallback((id, transition, options = {}) => {
+    dispatch({ type: "transition_monthly_report", id, transition, ...options });
+  }, [dispatch]);
+
+  const appendReportCorrection = useCallback((id, text) => {
+    dispatch({ type: "transition_monthly_report", id, transition: "append_correction", text });
+  }, [dispatch]);
+
+  const ensureReports = useCallback((month, departments) => {
+    dispatch({ type: "ensure_monthly_reports", month, departments });
+  }, [dispatch]);
 
   const syncDecisionTodo = useCallback(async (decisionId, { creator, executor, detailUrl }) => {
     const decision = state.decisionRequests.find(item => item.id === decisionId);
@@ -256,8 +308,37 @@ export function PlatformProvider({ children }) {
     syncDecisionTodo,
     syncPersonalTodo,
     refreshPersonalTodoStatuses,
-    setPersonalTodoDone
-  }), [state, loading, error, dispatch, syncDecisionTodo, syncPersonalTodo, refreshPersonalTodoStatuses, setPersonalTodoDone]);
+    setPersonalTodoDone,
+    saveRequiredResult,
+    saveDepartmentCommitment,
+    transitionCommitment,
+    saveCommitmentMilestone,
+    saveIncentiveProject,
+    settleIncentive,
+    saveMonthlyReport,
+    transitionReport,
+    appendReportCorrection,
+    ensureReports
+  }), [
+    appendReportCorrection,
+    dispatch,
+    ensureReports,
+    error,
+    loading,
+    refreshPersonalTodoStatuses,
+    saveCommitmentMilestone,
+    saveDepartmentCommitment,
+    saveIncentiveProject,
+    saveMonthlyReport,
+    saveRequiredResult,
+    setPersonalTodoDone,
+    settleIncentive,
+    state,
+    syncDecisionTodo,
+    syncPersonalTodo,
+    transitionCommitment,
+    transitionReport
+  ]);
   return <PlatformContext.Provider value={value}>{children}</PlatformContext.Provider>;
 }
 

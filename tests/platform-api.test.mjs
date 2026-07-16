@@ -65,6 +65,13 @@ test("platform API stores strategy entities as separate D1 records", async () =>
     version: "strategy-platform-v1",
     updatedAt: "2026-07-16T00:00:00.000Z",
     strategies: [{ id: "s1", name: "增长战略" }],
+    requiredResults: [{ id: "rr1", strategyId: "s1", title: "必达结果" }],
+    departmentCommitments: [{ id: "dc1", requiredResultId: "rr1", title: "部门承诺" }],
+    commitmentMilestones: [],
+    incentiveProjects: [{ id: "ip1", name: "投流优化" }],
+    departmentRewardBudgets: [],
+    monthlyReports: [{ id: "mr1", month: "2026-06", department: "运营部" }],
+    reportCorrections: [],
     objectives: [{ id: "o1", strategyId: "s1", title: "季度目标" }],
     metrics: [],
     projects: [{ id: "p1", objectiveId: "o1", name: "重点项目" }],
@@ -94,6 +101,10 @@ test("platform API stores strategy entities as separate D1 records", async () =>
   const payload = await get.json();
   assert.equal(get.status, 200);
   assert.equal(payload.state.strategies[0].name, "增长战略");
+  assert.equal(payload.state.requiredResults[0].title, "必达结果");
+  assert.equal(payload.state.departmentCommitments[0].title, "部门承诺");
+  assert.equal(payload.state.incentiveProjects[0].name, "投流优化");
+  assert.equal(payload.state.monthlyReports[0].department, "运营部");
   assert.equal(payload.state.projects[0].name, "重点项目");
   assert.equal(payload.state.personalTodos[0].title, "完成首发");
   assert.equal(payload.state.appRegistry[0].id, "product-flow");

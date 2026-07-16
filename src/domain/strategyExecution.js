@@ -1,3 +1,10 @@
+import {
+  ensureMonthlyReports,
+  settleIncentiveProject,
+  transitionDepartmentCommitment,
+  transitionMonthlyReport
+} from "./executionGovernance.js";
+
 const DAY_MS = 86400000;
 
 export const PLATFORM_COLLECTIONS = [
@@ -374,6 +381,12 @@ export function strategyHealth(state, strategy, today = new Date()) {
 
 const ACTION_COLLECTION = {
   upsert_strategy: ["strategies", "strategy", "strategy"],
+  upsert_required_result: ["requiredResults", "required_result", "required-result"],
+  upsert_department_commitment: ["departmentCommitments", "department_commitment", "department-commitment"],
+  upsert_commitment_milestone: ["commitmentMilestones", "commitment_milestone", "commitment-milestone"],
+  upsert_incentive_project: ["incentiveProjects", "incentive_project", "incentive-project"],
+  upsert_department_reward_budget: ["departmentRewardBudgets", "department_reward_budget", "department-reward-budget"],
+  upsert_monthly_report: ["monthlyReports", "monthly_report", "monthly-report"],
   upsert_objective: ["objectives", "objective", "objective"],
   upsert_metric: ["metrics", "metric", "metric"],
   upsert_project: ["projects", "project", "project"],
@@ -437,6 +450,81 @@ export function reducePlatformState(input, action = {}) {
       entityType: "personal_todo",
       entityId: action.id,
       reason: action.reason || action.remoteSnapshotKey,
+      timestamp
+    });
+  }
+
+  if (action.type === "transition_department_commitment") {
+    const current = state.departmentCommitments.find(item => item.id === action.id);
+    if (!current) return state;
+    const changed = transitionDepartmentCommitment(current, {
+      type: action.transition,
+      reason: action.reason,
+      actor: action.actor,
+      timestamp
+    });
+    const departmentCommitments = state.departmentCommitments.map(item => item.id === action.id ? changed : item);
+    return audit({ ...state, updatedAt: timestamp, departmentCommitments }, {
+      actor: action.actor,
+      action: action.transition,
+      entityType: "department_commitment",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "transition_monthly_report") {
+    const current = state.monthlyReports.find(item => item.id === action.id);
+    if (!current) return state;
+    const changed = transitionMonthlyReport(current, {
+      type: action.transition,
+      reason: action.reason,
+      actor: action.actor,
+      timestamp,
+      meetingConclusion: action.meetingConclusion,
+      text: action.text,
+      patch: action.patch
+    });
+    const monthlyReports = state.monthlyReports.map(item => item.id === action.id ? changed : item);
+    const latestCorrection = action.transition === "append_correction" ? changed.corrections?.at(-1) : null;
+    const reportCorrections = latestCorrection
+      ? upsert(state.reportCorrections, { ...latestCorrection, reportId: action.id })
+      : state.reportCorrections;
+    return audit({ ...state, updatedAt: timestamp, monthlyReports, reportCorrections }, {
+      actor: action.actor,
+      action: action.transition,
+      entityType: "monthly_report",
+      entityId: action.id,
+      reason: action.reason || action.text,
+      timestamp
+    });
+  }
+
+  if (action.type === "settle_incentive_project") {
+    const current = state.incentiveProjects.find(item => item.id === action.id);
+    if (!current) return state;
+    const changed = settleIncentiveProject(current, { ...(action.award || {}), decidedAt: action.award?.decidedAt || timestamp });
+    const incentiveProjects = state.incentiveProjects.map(item => item.id === action.id ? changed : item);
+    return audit({ ...state, updatedAt: timestamp, incentiveProjects }, {
+      actor: action.actor,
+      action: "settle",
+      entityType: "incentive_project",
+      entityId: action.id,
+      reason: changed.rewardReason,
+      timestamp
+    });
+  }
+
+  if (action.type === "ensure_monthly_reports") {
+    const monthlyReports = ensureMonthlyReports(state, action.month, action.departments);
+    if (monthlyReports.length === state.monthlyReports.length) return state;
+    return audit({ ...state, updatedAt: timestamp, monthlyReports }, {
+      actor: action.actor,
+      action: "generate",
+      entityType: "monthly_report_batch",
+      entityId: action.month,
+      reason: `${monthlyReports.length - state.monthlyReports.length} 个部门`,
       timestamp
     });
   }

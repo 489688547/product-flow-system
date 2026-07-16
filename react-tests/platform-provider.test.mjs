@@ -32,6 +32,26 @@ test("platform provider reconciles personal todos and safely writes back allowed
   assert.match(provider, /updateTask/);
 });
 
+test("platform provider exposes governed execution commands", () => {
+  const provider = read("src/state/PlatformProvider.jsx");
+  [
+    "saveRequiredResult",
+    "saveDepartmentCommitment",
+    "transitionCommitment",
+    "saveCommitmentMilestone",
+    "saveIncentiveProject",
+    "settleIncentive",
+    "saveMonthlyReport",
+    "transitionReport",
+    "appendReportCorrection",
+    "ensureReports"
+  ].forEach(command => assert.match(provider, new RegExp(command)));
+  assert.match(provider, /state\.departmentCommitments/);
+  assert.match(provider, /state\.commitmentMilestones/);
+  assert.match(provider, /state\.incentiveProjects/);
+  assert.match(provider, /state\.monthlyReports/);
+});
+
 test("product task assignment survives a DingTalk sync failure", () => {
   const provider = read("src/state/ProductFlowProvider.jsx");
   assert.match(provider, /executorUnionIds: payload\.executorUnionIds/);

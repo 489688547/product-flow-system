@@ -47,6 +47,25 @@ test("department-only product tasks never become personal todos", () => {
   assert.equal(todos.some(todo => todo.sourceId === "t1"), false);
 });
 
+test("governed execution work projects only explicit personal responsibilities", () => {
+  const todos = reconcilePersonalTodos({
+    platformState: normalizePlatformState({
+      departmentCommitments: [
+        { id: "c-review", title: "运营年度承诺", status: "office_review", reviewerName: "周总", reviewDueDate: "2026-07-18" },
+        { id: "c-returned", title: "产品年度承诺", status: "returned", owner: "叶经理", dueDate: "2026-07-20" }
+      ],
+      commitmentMilestones: [{ id: "cm1", commitmentId: "c-returned", title: "完成产品地图", owner: "叶经理", dueDate: "2026-07-31", status: "at_risk" }],
+      incentiveProjects: [{ id: "ip1", name: "优化抖音投流", owner: "叶经理", endDate: "2026-08-31", status: "active" }],
+      monthlyReports: [{ id: "mr1", month: "2026-06", department: "产品部", owner: "叶经理", dueDate: "2026-07-05", status: "returned" }]
+    }),
+    orgCache: { users: USERS },
+    now: "2026-07-16T08:00:00.000Z"
+  });
+  assert.deepEqual(new Set(todos.map(todo => todo.sourceType)), new Set(["commitment", "commitment_milestone", "incentive_project", "monthly_report", "review"]));
+  assert.equal(todos.find(todo => todo.sourceId === "c-review").assigneeName, "周总");
+  assert.equal(todos.find(todo => todo.sourceId === "mr1").assigneeName, "叶经理");
+});
+
 test("reconciliation preserves sync metadata and cancels removed assignments", () => {
   const existingTodos = [
     {

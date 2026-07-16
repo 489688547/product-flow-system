@@ -8,7 +8,7 @@ import {
   transitionDepartmentCommitment,
   transitionMonthlyReport
 } from "../src/domain/executionGovernance.js";
-import { createDefaultPlatformState, normalizePlatformState } from "../src/domain/strategyExecution.js";
+import { createDefaultPlatformState, normalizePlatformState, reducePlatformState } from "../src/domain/strategyExecution.js";
 
 test("strategy attainment requires two to six results and every result verified", () => {
   const state = normalizePlatformState({
@@ -81,4 +81,30 @@ test("monthly report generation creates one manual draft per active department",
 test("default state contains the three confirmed company strategies", () => {
   const names = createDefaultPlatformState().strategies.map(item => item.name);
   assert.deepEqual(names, ["组织建设", "鸟类销量突破", "仓鼠品牌升级"]);
+});
+
+test("department commitment approval is reduced and audited", () => {
+  const state = normalizePlatformState({ departmentCommitments: [{ id: "c1", status: "office_review" }] });
+  const next = reducePlatformState(state, {
+    type: "transition_department_commitment",
+    id: "c1",
+    transition: "office_approve",
+    actor: "总经办",
+    timestamp: "2026-07-16T09:00:00.000Z"
+  });
+  assert.equal(next.departmentCommitments[0].status, "executive_review");
+  assert.equal(next.auditLogs[0].entityType, "department_commitment");
+  assert.equal(next.auditLogs[0].action, "office_approve");
+});
+
+test("monthly report transitions and incentive settlement are audited", () => {
+  const state = normalizePlatformState({
+    monthlyReports: [{ id: "mr1", status: "submitted" }],
+    incentiveProjects: [{ id: "ip1", status: "closing", rewardCap: 5000 }]
+  });
+  const approved = reducePlatformState(state, { type: "transition_monthly_report", id: "mr1", transition: "approve", actor: "总经办" });
+  assert.equal(approved.monthlyReports[0].status, "approved");
+  const settled = reducePlatformState(approved, { type: "settle_incentive_project", id: "ip1", award: { amount: 3000, reason: "投流效率提升", decidedBy: "运营负责人" }, actor: "运营负责人" });
+  assert.equal(settled.incentiveProjects[0].finalReward, 3000);
+  assert.equal(settled.auditLogs[0].action, "settle");
 });
