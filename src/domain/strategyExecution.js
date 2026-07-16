@@ -340,10 +340,63 @@ const ACTION_COLLECTION = {
 };
 
 export function reducePlatformState(input, action = {}) {
+  if (action.type === "apply_personal_todo_status" && action.remoteSnapshotKey) {
+    const current = Array.isArray(input?.personalTodos) ? input.personalTodos.find(item => item.id === action.id) : null;
+    if (current?.dingTodo?.remoteSnapshotKey === action.remoteSnapshotKey) return input;
+  }
   const state = normalizePlatformState(input);
   const timestamp = action.timestamp || nowIso();
 
   if (action.type === "update_monthly_snapshot") throw new Error("月度经营快照不可修改。");
+
+  if (action.type === "replace_personal_todos") {
+    const personalTodos = Array.isArray(action.todos) ? action.todos.map(item => ({ ...item, dingTodo: { ...(item.dingTodo || {}) } })) : [];
+    if (JSON.stringify(personalTodos) === JSON.stringify(state.personalTodos)) return state;
+    return { ...state, updatedAt: timestamp, personalTodos };
+  }
+
+  if (action.type === "update_personal_todo_notification") {
+    let changed = false;
+    const personalTodos = state.personalTodos.map(item => {
+      if (item.id !== action.id) return item;
+      changed = true;
+      return {
+        ...item,
+        dingTodo: { ...(item.dingTodo || {}), ...(action.dingTodo || {}) },
+        updatedAt: timestamp
+      };
+    });
+    return changed ? { ...state, updatedAt: timestamp, personalTodos } : state;
+  }
+
+  if (action.type === "apply_personal_todo_status") {
+    const current = state.personalTodos.find(item => item.id === action.id);
+    if (!current) return state;
+    const status = action.status === "done" ? "done" : "pending";
+    const personalTodos = state.personalTodos.map(item => item.id === action.id ? {
+      ...item,
+      status,
+      completedAt: status === "done" ? (action.completedAt || timestamp) : "",
+      completedFrom: status === "done" ? (action.completedFrom || "platform") : "",
+      dingTodo: {
+        ...(item.dingTodo || {}),
+        ...(action.dingTodo || {}),
+        ...(action.remoteSnapshotKey ? { remoteSnapshotKey: action.remoteSnapshotKey } : {})
+      },
+      updatedAt: timestamp
+    } : item);
+    const auditAction = action.auditAction || (status === "done"
+      ? action.completedFrom === "dingtalk" ? "complete_from_dingtalk" : "complete"
+      : action.completedFrom === "dingtalk" ? "reopen_from_dingtalk" : "reopen");
+    return audit({ ...state, updatedAt: timestamp, personalTodos }, {
+      actor: action.actor,
+      action: auditAction,
+      entityType: "personal_todo",
+      entityId: action.id,
+      reason: action.reason || action.remoteSnapshotKey,
+      timestamp
+    });
+  }
 
   if (ACTION_COLLECTION[action.type]) {
     const [collection, entityType, prefix] = ACTION_COLLECTION[action.type];

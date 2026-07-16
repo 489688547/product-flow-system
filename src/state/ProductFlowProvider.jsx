@@ -293,6 +293,8 @@ export function ProductFlowProvider({ children }) {
           ...item,
           dingTodo: {
             ...(item.dingTodo || {}),
+            executorUnionIds: payload.executorUnionIds,
+            executorNames: executors.map(user => user.name).filter(Boolean),
             lastError: error.message || "钉钉待办同步失败。",
             failedAt: new Date().toISOString()
           }
