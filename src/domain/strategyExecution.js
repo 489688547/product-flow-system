@@ -153,11 +153,111 @@ export function createDefaultPlatformState() {
       { id: "result-hamster-rank", strategyId: "strategy-hamster-brand-2026", title: "仓鼠品类品牌排名稳定提升", acceptanceStandard: "目标平台品牌排名达到公司确认的目标位次并保持一个月。", owner: "运营部", dueDate: "2026-12-31", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
       { id: "result-hamster-visual", strategyId: "strategy-hamster-brand-2026", title: "完成仓鼠品牌视觉与内容标准升级", acceptanceStandard: "VI 手册定稿并应用到核心平台和重点产品。", owner: "品牌部", dueDate: "2026-09-30", status: "active", createdAt: "2026-07-16T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" }
     ],
-    departmentCommitments: [],
-    commitmentMilestones: [],
-    incentiveProjects: [],
-    departmentRewardBudgets: [],
-    monthlyReports: [],
+    departmentCommitments: [
+      {
+        id: "commitment-ops-bird-q3",
+        strategyId: "strategy-bird-gmv-2026",
+        title: "形成鸟类投流与内容放量模型",
+        department: "运营部",
+        owner: "陈铭懿",
+        reviewerName: "周荣庆",
+        executiveOwner: "周荣庆",
+        period: "2026-Q3",
+        successStandard: "9 月鸟类月 GMV 达到 50 万元，投流 ROI 稳定在部门确认的安全线以上。",
+        dueDate: "2026-09-30",
+        status: "active",
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-16T00:00:00.000Z"
+      },
+      {
+        id: "commitment-brand-hamster-q3",
+        strategyId: "strategy-hamster-brand-2026",
+        title: "完成仓鼠品牌核心视觉统一",
+        department: "品牌部",
+        owner: "叶津成",
+        reviewerName: "周荣庆",
+        executiveOwner: "周荣庆",
+        reviewDueDate: "2026-07-20",
+        period: "2026-Q3",
+        successStandard: "VI 手册通过评审并覆盖抖音、天猫及三款核心产品。",
+        dueDate: "2026-09-30",
+        status: "office_review",
+        createdAt: "2026-07-14T00:00:00.000Z",
+        updatedAt: "2026-07-16T00:00:00.000Z"
+      }
+    ],
+    commitmentMilestones: [
+      { id: "commitment-ms-bird-jul", commitmentId: "commitment-ops-bird-q3", title: "完成三套投流模型对照测试", month: "2026-07", dueDate: "2026-07-31", owner: "陈铭懿", status: "pending", createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "commitment-ms-bird-aug", commitmentId: "commitment-ops-bird-q3", title: "鸟类月 GMV 达到 35 万元", month: "2026-08", dueDate: "2026-08-31", owner: "陈铭懿", status: "pending", createdAt: "2026-07-01T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "commitment-ms-brand-aug", commitmentId: "commitment-brand-hamster-q3", title: "完成 VI 手册终稿评审", month: "2026-08", dueDate: "2026-08-20", owner: "叶津成", status: "pending", createdAt: "2026-07-14T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" }
+    ],
+    incentiveProjects: [
+      {
+        id: "incentive-douyin-roi",
+        name: "优化抖音投流效率",
+        goal: "用两周对照实验找出可稳定复制的素材与人群组合，降低无效消耗。",
+        department: "运营部",
+        owner: "陈铭懿",
+        partnerDepartments: [],
+        strategyId: "strategy-bird-gmv-2026",
+        year: 2026,
+        startDate: "2026-07-15",
+        endDate: "2026-08-15",
+        rewardCap: 5000,
+        evaluationStandard: "实验结论可复用，目标计划 ROI 提升不少于 15%，由运营负责人复核数据。",
+        payoutOwner: "周荣庆",
+        payoutDueDate: "2026-08-20",
+        status: "active",
+        createdAt: "2026-07-15T00:00:00.000Z",
+        updatedAt: "2026-07-16T00:00:00.000Z"
+      }
+    ],
+    departmentRewardBudgets: [
+      { id: "reward-budget-ops-2026", department: "运营部", year: 2026, amount: 30000, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" },
+      { id: "reward-budget-brand-2026", department: "品牌部", year: 2026, amount: 20000, createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-07-16T00:00:00.000Z" }
+    ],
+    monthlyReports: [
+      {
+        id: "report-2026-06-运营部",
+        month: "2026-06",
+        department: "运营部",
+        owner: "陈铭懿",
+        ownerUnionId: "",
+        reviewerName: "周荣庆",
+        freezerName: "周荣庆",
+        dueDate: "2026-07-05",
+        status: "submitted",
+        keyResults: "完成鸟类内容与投流第一轮组合测试，确认两个可继续放量的素材方向。",
+        incompleteItems: "鸟类直播间人货场方案仍需补充一轮验证。",
+        nextMonthPriorities: "完成三套投流模型对照测试；推进鸟类月 GMV 至 25 万元。",
+        risks: "优质素材产能不足。",
+        coordinationNeeds: "需要品牌部优先支持鸟类核心卖点视觉。",
+        decisionNeeds: "建议批准外部剪辑资源短期预算。",
+        corrections: [],
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-04T00:00:00.000Z"
+      },
+      {
+        id: "report-2026-06-品牌部",
+        month: "2026-06",
+        department: "品牌部",
+        owner: "叶津成",
+        ownerUnionId: "",
+        reviewerName: "周荣庆",
+        freezerName: "周荣庆",
+        dueDate: "2026-07-05",
+        status: "draft",
+        keyResults: "",
+        incompleteItems: "",
+        nextMonthPriorities: "",
+        risks: "",
+        coordinationNeeds: "",
+        decisionNeeds: "",
+        corrections: [],
+        createdAt: "2026-07-01T00:00:00.000Z",
+        updatedAt: "2026-07-01T00:00:00.000Z"
+      }
+    ],
     reportCorrections: [],
     objectives: [
       {

@@ -1,6 +1,5 @@
 import { CalendarCheck, CheckCircle2, Clock3, FileText, History, LockKeyhole, Plus } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
-import { buildExecutiveSummary } from "../../domain/strategyExecution.js";
 import { canManagePermissions } from "../../domain/permissions.js";
 import { usePlatform } from "../../state/PlatformProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
@@ -158,7 +157,6 @@ export function OperatingReviewPage() {
   const { currentUser, orgCache } = useProductFlow();
   const [view, setView] = useState("reports");
   const executive = canManagePermissions(currentUser);
-  useMemo(() => buildExecutiveSummary(state, { currentUser, today: new Date() }), [currentUser, state]);
   return (
     <section className="page operating-review-page">
       <PageHeader title="经营检查" description={view === "reports" ? "每月初由部门负责人手工汇报上月重点，总经办审核，月度会议后冻结。" : "持续确认经营事实，并保留不可覆盖的历史记录。"} />
