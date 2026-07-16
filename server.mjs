@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isLoopbackAddress, readDwsTodoPreview } from "./server/dwsTodoPreview.mjs";
 import {
   buildConfigResponse,
   createDingCalendarEvent,
@@ -378,6 +379,23 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   if (url.pathname === "/api/dingtalk/config") {
     json(res, 200, buildConfigResponse(process.env, url.origin));
+    return;
+  }
+  if (url.pathname === "/api/dev/dws/todos") {
+    if (req.method !== "GET") {
+      json(res, 405, { readonly: true, message: "Method not allowed" });
+      return;
+    }
+    if (!isLoopbackAddress(req.socket.remoteAddress)) {
+      json(res, 403, { readonly: true, message: "仅允许本机回环地址访问真实待办预览。" });
+      return;
+    }
+    try {
+      const result = await readDwsTodoPreview({ status: url.searchParams.get("status") === "true" });
+      json(res, 200, result);
+    } catch (error) {
+      json(res, 502, { readonly: true, message: error.message || "DWS 待办查询失败。" });
+    }
     return;
   }
   if (url.pathname === "/api/state") {
