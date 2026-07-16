@@ -38,3 +38,10 @@ test("product task assignment survives a DingTalk sync failure", () => {
   assert.match(catchBlock, /executorUnionIds/);
   assert.match(catchBlock, /executorNames/);
 });
+
+test("local executive preview has a stable demo union id", () => {
+  const auth = read("src/state/AuthProvider.jsx");
+  assert.match(auth, /userId: "u-zhou"/);
+  assert.match(auth, /unionId: "union-zhou"/);
+  assert.match(auth, /name: "周荣庆"/);
+});

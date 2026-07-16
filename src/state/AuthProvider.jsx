@@ -6,8 +6,8 @@ const AuthContext = createContext(null);
 const LOCAL_USER = {
   corpId: "local-preview",
   userId: "u-zhou",
-  unionId: "",
-  name: "本地测试账号",
+  unionId: "union-zhou",
+  name: "周荣庆",
   role: "executive",
   department: "总经办",
   title: "总经理",
