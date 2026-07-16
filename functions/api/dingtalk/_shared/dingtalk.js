@@ -549,6 +549,33 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
     : createDingTodoTask(accessToken, input, fetchImpl);
 }
 
+export async function listDingTodoTasks(accessToken, unionId, { isDone = false, fetchImpl = fetch } = {}) {
+  const userUnionId = String(unionId || "").trim();
+  if (!userUnionId) {
+    const err = new Error("当前登录账号缺少 unionId，无法查询钉钉待办。");
+    err.status = 400;
+    throw err;
+  }
+  const cards = [];
+  let nextToken = "";
+  let page = 0;
+  do {
+    const query = new URLSearchParams({ isDone: String(Boolean(isDone)) });
+    if (nextToken) query.set("nextToken", nextToken);
+    const result = await requestDingOpenApi(
+      accessToken,
+      "GET",
+      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/tasks?${query.toString()}`,
+      null,
+      fetchImpl
+    );
+    cards.push(...(Array.isArray(result.todoCards) ? result.todoCards : []));
+    nextToken = String(result.nextToken || "");
+    page += 1;
+  } while (nextToken && page < 100);
+  return cards;
+}
+
 export function buildDingCalendarEventPayload({
   summary,
   description = "",
