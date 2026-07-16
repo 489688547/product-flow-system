@@ -114,6 +114,7 @@ test("annual product planning uses one development-to-launch period and overwrit
   assert.match(button, /disabled-action-tip/);
   assert.match(button, /data-disabled-reason/);
   assert.match(button, /tabIndex="0"/);
+  assert.doesNotMatch(button, /title=\{disabledReason\}/);
   assert.match(button, /export function IconAction\(\{ label, children, className = "", disabled = false, disabledReason = ""/);
   assert.match(tray, /application\/x-product-demand-id/);
   assert.match(tray, /draggable=\{canEdit\}/);
@@ -394,6 +395,8 @@ test("product progress reuses the shared development-to-launch schedule", () => 
   assert.match(summary, /未设置排期/);
   assert.match(summary, /前往产品规划/);
   assert.match(summary, /schedule-progress-ring/);
+  assert.match(summary, /实际任务进度/);
+  assert.doesNotMatch(summary, /时间进度/);
   assert.match(styles, /\.product-schedule-summary\s*\{/);
   assert.match(styles, /\.schedule-progress-ring\.overdue\s*\{/);
 });
@@ -460,6 +463,37 @@ test("initiation grading is calculated in a modal and cannot be changed by a pla
   assert.match(modal, /推进方式/);
   assert.match(productFlow, /30-100万/);
   assert.doesNotMatch(archiveModal, /name="product-level"/);
+});
+
+test("initiation places average monthly GMV between manager and formal grading", () => {
+  const progress = read("src/features/progress/ProductProgressPage.jsx");
+  const modal = read("src/features/progress/ProductGradingModal.jsx");
+  const styles = read("src/styles.css");
+
+  assert.match(progress, /产品负责人[\s\S]*平均月 GMV[\s\S]*产品定级/);
+  assert.match(progress, /monthlyGmvTarget/);
+  assert.doesNotMatch(progress, /suggestAnnualGmvScore/);
+  assert.doesNotMatch(progress, /用于经营目标和 GMV 达成率/);
+  assert.doesNotMatch(modal, /monthlyGmvTarget/);
+  assert.doesNotMatch(modal, /平均月 GMV/);
+  assert.match(styles, /\.project-gmv-target\s*\{/);
+  assert.doesNotMatch(styles, /\.grading-gmv-target\s*\{/);
+});
+
+test("progress and archive reuse one ERP-backed GMV achievement component", () => {
+  const progress = read("src/features/progress/ProductProgressPage.jsx");
+  const archive = read("src/features/archive/ProductArchivePage.jsx");
+  const summary = read("src/features/sales/ProductGmvSummary.jsx");
+  const hook = read("src/features/sales/useProductSalesRows.js");
+  const styles = read("src/styles.css");
+
+  assert.match(progress, /<ProductGmvSummary/);
+  assert.match(archive, /<ProductGmvSummary/);
+  assert.match(summary, /本月 GMV/);
+  assert.match(summary, /累计 GMV/);
+  assert.match(summary, /待绑定销售商品/);
+  assert.match(hook, /fetchSalesForCodes/);
+  assert.match(styles, /\.product-gmv-summary\s*\{/);
 });
 
 test("demand conversion opens the new product at initiation", () => {
@@ -545,6 +579,8 @@ test("product archive is a reusable product record surface with edit and linked 
   assert.match(archive, /data-testid="open-product-package"/);
   assert.match(archive, /data-testid="open-product-sales"/);
   assert.match(archive, /未填写69码/);
+  assert.match(archive, /disabledReason=\{hasSkuCodes \? "" : "未填写69码，编辑产品后即可查看销售数据"\}/);
+  assert.doesNotMatch(archive, /className=\{hasSkuCodes \? undefined : "disabled-action-tip"\}/);
   assert.doesNotMatch(archive, /open-product-review/);
   assert.doesNotMatch(archive, /产品复盘/);
   assert.match(archive, /ProductPackageModal/);

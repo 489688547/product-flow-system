@@ -1,4 +1,5 @@
 import { calculateProductGrade, createDefaultState, generateProductCover, normalizeDepartmentSelection, normalizeProductLevel, normalizeTaskCategory, reviewRowsForProduct, STAGES, syncDefaultTasksForProduct } from "../domain/productFlow.js";
+import { normalizeMonthlyGmvTarget } from "../domain/productGmv.js";
 import { normalizeTaskDueDate } from "../domain/taskTodo.js";
 import { normalizePermissions } from "../domain/permissions.js";
 import { normalizeSkuCodes } from "../domain/salesData.js";
@@ -86,7 +87,7 @@ export function normalizeClientState(input) {
     const gradingResult = calculateProductGrade(product.grading?.answers || {});
     const levelConfirmed = Boolean(product.levelConfirmed && gradingResult.complete);
     const level = levelConfirmed ? gradingResult.level : normalizeProductLevel(product.level || referenceLevel);
-    return { ...product, image: product.image || generateProductCover(product.name), level, referenceLevel, stage, levelConfirmed, requester, productManager, owner: productManager, skuCodes: normalizeSkuCodes(product.skuCodes) };
+    return { ...product, image: product.image || generateProductCover(product.name), level, referenceLevel, stage, levelConfirmed, requester, productManager, owner: productManager, skuCodes: normalizeSkuCodes(product.skuCodes), monthlyGmvTarget: normalizeMonthlyGmvTarget(product.monthlyGmvTarget) };
   });
   state.tasks = (Array.isArray(state.tasks) ? state.tasks : defaults.tasks)
     .filter(task => Number(task.stage) > 0)

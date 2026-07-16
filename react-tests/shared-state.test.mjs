@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, moveProductToStage, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
+import { applyProductGrading, advanceProductToNextStage, calculateProductGrade, createDefaultState, convertDemandToProject, DEFAULT_TASK_TEMPLATES, deliverablesForTask, generateProductCover, hasFormalProductGrading, moveProductToStage, STAGES, syncDefaultTasksForProduct, taskTemplatesForProductStage, tasksForProductStage, updateDemandRecord, updateProductRecord, updateWorkflowTaskTemplates } from "../src/domain/productFlow.js";
 import { deliverableKind, isBrokenDeliverable } from "../src/domain/deliverables.js";
 import { normalizeClientState } from "../src/state/stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../src/domain/sessionUser.js";
@@ -218,6 +218,7 @@ test("only products with complete grading answers count as formally graded", () 
       name: "正式定级产品",
       level: "P2 验证级",
       levelConfirmed: true,
+      monthlyGmvTarget: 100000,
       stage: 2,
       grading: { answers: { strategy: 3, salesScale: 3, commercialValue: 3, resourceDemand: 3, risks: {} } }
     }]
@@ -225,6 +226,13 @@ test("only products with complete grading answers count as formally graded", () 
 
   assert.equal(normalized.products[0].levelConfirmed, true);
   assert.equal(normalized.products[0].referenceLevel, "P2 验证级");
+});
+
+test("formal grading remains separate from the average monthly GMV target", () => {
+  const state = createDefaultState();
+  const product = { ...state.products[0], monthlyGmvTarget: null };
+  assert.equal(product.levelConfirmed, true);
+  assert.equal(hasFormalProductGrading(product), true);
 });
 
 test("legacy task deadlines migrate to full ISO dates from production state", () => {
@@ -664,6 +672,37 @@ test("formal P-level grading stays in initiation and syncs the demand level", ()
   assert.equal(updatedDemand.level, "P1 增长级");
   assert.equal(updatedDemand.productId, product.id);
   assert.match(graded.decisions[0].summary, /P1 增长级 \+ 中风险 \+ 标准推进/);
+});
+
+test("formal grading stores one normalized average monthly GMV target", () => {
+  const state = createDefaultState();
+  const product = state.products[0];
+  const grading = calculateProductGrade({ strategy: 4, salesScale: 3, commercialValue: 3, resourceDemand: 4, risks: {} });
+  const graded = applyProductGrading(state, product.id, grading, {
+    gradedBy: "赵雨涵",
+    monthlyGmvTarget: "100,000.126"
+  });
+
+  assert.equal(graded.products.find(item => item.id === product.id).monthlyGmvTarget, 100000.13);
+});
+
+test("regrading without a GMV value preserves the existing average monthly target", () => {
+  const state = createDefaultState();
+  const product = { ...state.products[0], monthlyGmvTarget: 180000 };
+  const grading = calculateProductGrade({ strategy: 4, salesScale: 3, commercialValue: 3, resourceDemand: 4, risks: {} });
+  const graded = applyProductGrading({ ...state, products: [product, ...state.products.slice(1)] }, product.id, grading, {
+    gradedBy: "赵雨涵"
+  });
+
+  assert.equal(graded.products.find(item => item.id === product.id).monthlyGmvTarget, 180000);
+});
+
+test("client state normalization preserves a positive monthly GMV target", () => {
+  const normalized = normalizeClientState({
+    products: [{ id: "p-gmv", name: "GMV 产品", monthlyGmvTarget: "250000", stage: 1 }]
+  });
+
+  assert.equal(normalized.products[0].monthlyGmvTarget, 250000);
 });
 
 test("a new project cannot leave initiation before manager and formal grading are confirmed", () => {

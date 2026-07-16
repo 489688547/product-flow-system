@@ -1,6 +1,8 @@
 import { BarChart3, Edit3, FolderOpen, GitBranch } from "lucide-react";
 import { useMemo, useState } from "react";
 import { generateProductCover, PRODUCT_LEVELS, STAGES } from "../../domain/productFlow.js";
+import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
+import { buildProductGmvProgress } from "../../domain/productGmv.js";
 import { normalizeSkuCodes } from "../../domain/salesData.js";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
@@ -9,6 +11,8 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { ProductModal } from "./ProductModal.jsx";
 import { ProductPackageModal } from "./ProductPackageModal.jsx";
 import { ProductSalesModal } from "./ProductSalesModal.jsx";
+import { ProductGmvSummary } from "../sales/ProductGmvSummary.jsx";
+import { useProductSalesRows } from "../sales/useProductSalesRows.js";
 
 export function ProductArchivePage({ onNavigate }) {
   const { state, orgCache, setCurrentProduct, updateProduct } = useProductFlow();
@@ -18,6 +22,11 @@ export function ProductArchivePage({ onNavigate }) {
   const [statusFilter, setStatusFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
+  const productSales = useProductSalesRows(state.products);
+  const gmvSummaries = useMemo(() => new Map(state.products.map(product => {
+    const schedule = buildProductScheduleSummary(product, state.productPlans, state.demands).schedule;
+    return [product.id, buildProductGmvProgress({ product, dailyRows: productSales.rows, launchDate: schedule.launchDate })];
+  })), [state.products, state.productPlans, state.demands, productSales.rows]);
   const statusOptions = useMemo(() => [
     { value: "all", label: "全部状态" },
     ...Array.from(new Set(state.products.map(product => product.status).filter(Boolean)))
@@ -48,16 +57,16 @@ export function ProductArchivePage({ onNavigate }) {
               <div className="product-card-copy">
                 <div className="product-card-title"><h2>{product.name}</h2><span className="badge">{product.status || "开发中"}</span></div>
                 <p>{product.desc}</p>
+                <ProductGmvSummary compact summary={gmvSummaries.get(product.id)} loading={productSales.loading} error={productSales.error} />
                 <span>{product.level} · 第 {product.stage} 阶段 {STAGES[product.stage]?.short || "-"} · 提需人 {product.requester || "未记录"} · 产品经理 {product.productManager || "待确定"} · {product.source}</span>
               </div>
               <div className="card-actions">
-                <span className={hasSkuCodes ? undefined : "disabled-action-tip"} title={hasSkuCodes ? undefined : "未填写69码，编辑产品后即可查看销售数据"}>
-                  <Button
-                    data-testid="open-product-sales"
-                    disabled={!hasSkuCodes}
-                    onClick={() => hasSkuCodes && setSalesProduct(product)}
-                  ><BarChart3 size={16} />数据</Button>
-                </span>
+                <Button
+                  data-testid="open-product-sales"
+                  disabled={!hasSkuCodes}
+                  disabledReason={hasSkuCodes ? "" : "未填写69码，编辑产品后即可查看销售数据"}
+                  onClick={() => hasSkuCodes && setSalesProduct(product)}
+                ><BarChart3 size={16} />数据</Button>
                 <Button data-testid="open-product-progress" onClick={() => jump(product, "progress")}><GitBranch size={16} />进度</Button>
                 <Button data-testid="open-product-package" onClick={() => setPackageProduct(product)}><FolderOpen size={16} />资料</Button>
                 <Button data-testid="product-edit" onClick={() => setEditing(product)}><Edit3 size={16} />编辑</Button>

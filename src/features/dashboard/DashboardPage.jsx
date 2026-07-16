@@ -27,9 +27,7 @@ function levelTone(level) {
 
 function ScheduleRing({ schedule }) {
   const progress = schedule.percent ?? 0;
-  const accessibleLabel = schedule.percent == null
-    ? schedule.label
-    : `${schedule.label}，排期进度 ${schedule.percent}%`;
+  const accessibleLabel = `${schedule.label}，实际进度 ${progress}%`;
   return (
     <span
       className={`schedule-ring ${schedule.state}`}
@@ -37,7 +35,7 @@ function ScheduleRing({ schedule }) {
       role="img"
       aria-label={accessibleLabel}
     >
-      <span>{schedule.percent == null ? "—" : `${schedule.percent}%`}</span>
+      <span>{progress}%</span>
     </span>
   );
 }
@@ -55,8 +53,8 @@ export function DashboardPage({ onNavigate, onOpenProgress }) {
       .map(name => ({ value: name, label: name }))
   ], [orgCache?.departments]);
   const productSummaries = useMemo(
-    () => buildDashboardProductSummaries(state.products, state.productPlans, state.demands),
-    [state.products, state.productPlans, state.demands]
+    () => buildDashboardProductSummaries(state.products, state.productPlans, state.demands, new Date(), state.tasks),
+    [state.products, state.productPlans, state.demands, state.tasks]
   );
   const productById = new Map(state.products.map(product => [product.id, product]));
   const departmentTasks = (isExecutive

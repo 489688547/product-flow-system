@@ -18,10 +18,13 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { ProductPicker } from "../../ui/ProductPicker.jsx";
 import { buildTaskMeetingPayload, buildTaskTodoPayload } from "../../domain/dingTalk.js";
 import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
+import { buildProductGmvProgress, normalizeMonthlyGmvTarget } from "../../domain/productGmv.js";
 import { buildTaskTodoSnapshot, normalizeTaskDueDate, todoSyncStatus } from "../../domain/taskTodo.js";
 import { MeetingScheduleModal } from "./MeetingScheduleModal.jsx";
 import { ProductGradingModal } from "./ProductGradingModal.jsx";
 import { ProductScheduleSummary } from "./ProductScheduleSummary.jsx";
+import { ProductGmvSummary } from "../sales/ProductGmvSummary.jsx";
+import { useProductSalesRows } from "../sales/useProductSalesRows.js";
 import { TaskCategorySelect } from "./TaskCategorySelect.jsx";
 import { TaskDeliverableModal } from "./TaskDeliverableModal.jsx";
 import { TaskDeliverables } from "./TaskDeliverables.jsx";
@@ -60,6 +63,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const [templateTask, setTemplateTask] = useState(null);
   const [previewDeliverable, setPreviewDeliverable] = useState(null);
   const [gradingOpen, setGradingOpen] = useState(false);
+  const [monthlyGmvDraft, setMonthlyGmvDraft] = useState("");
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -70,12 +74,29 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     setSelectedStage(validProgressStage(selectedProduct.stage));
   }, [focusStage, selectedProduct?.id, selectedProduct?.stage]);
 
-  const tasks = useMemo(() => tasksForProductStage(state, selectedProduct, selectedStage), [state, selectedProduct, selectedStage]);
-  if (!selectedProduct) return <section className="page"><div className="empty-state">暂无产品</div></section>;
+  useEffect(() => {
+    setMonthlyGmvDraft(selectedProduct?.monthlyGmvTarget ? String(selectedProduct.monthlyGmvTarget) : "");
+  }, [selectedProduct?.id, selectedProduct?.monthlyGmvTarget]);
 
-  const productSchedule = buildProductScheduleSummary(selectedProduct, state.productPlans, state.demands).schedule;
+  const tasks = useMemo(() => tasksForProductStage(state, selectedProduct, selectedStage), [state, selectedProduct, selectedStage]);
+  const productSchedule = selectedProduct
+    ? buildProductScheduleSummary(selectedProduct, state.productPlans, state.demands, new Date(), state.tasks).schedule
+    : { state: "unplanned", percent: null, launchDate: "" };
+  const productSales = useProductSalesRows([selectedProduct]);
+  const productGmvSummary = useMemo(() => buildProductGmvProgress({
+    product: selectedProduct,
+    dailyRows: productSales.rows,
+    launchDate: productSchedule.launchDate
+  }), [selectedProduct, productSales.rows, productSchedule.launchDate]);
+  if (!selectedProduct) return <section className="page"><div className="empty-state">暂无产品</div></section>;
   const selectedPolicy = stagePolicy(selectedProduct, selectedStage);
   const hasFormalGrading = hasFormalProductGrading(selectedProduct);
+  const monthlyGmvTarget = normalizeMonthlyGmvTarget(selectedProduct.monthlyGmvTarget);
+  const saveMonthlyGmvTarget = () => {
+    const nextTarget = normalizeMonthlyGmvTarget(monthlyGmvDraft);
+    setMonthlyGmvDraft(nextTarget ? String(nextTarget) : "");
+    if (nextTarget !== monthlyGmvTarget) updateProduct(selectedProduct.id, { monthlyGmvTarget: nextTarget });
+  };
   const handleAddTask = () => {
     addTask({
       productId: selectedProduct.id,
@@ -160,6 +181,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           <div className="progress-overview-toolbar">
             <ProductPicker products={state.products} value={selectedProduct.id} onChange={setCurrentProduct} />
             <ProductScheduleSummary schedule={productSchedule} onOpenPlanning={() => onNavigate?.("planning")} />
+            <ProductGmvSummary summary={productGmvSummary} loading={productSales.loading} error={productSales.error} />
             <Button className="compact quiet-danger" data-testid="return-product-demand" onClick={handleReturnProduct}><RotateCcw size={16} />退回需求池</Button>
           </div>
         )}
@@ -187,8 +209,8 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             <Button data-testid="add-stage-task" onClick={handleAddTask}><Plus size={16} />加任务</Button>
             <Button
               data-testid="set-current-stage"
-              disabled={selectedStage === selectedProduct.stage || !selectedPolicy.applies || (selectedStage > 1 && (!selectedProduct.productManager || !hasFormalGrading))}
-              disabledReason={!selectedPolicy.applies ? "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !hasFormalGrading) ? "请先确认产品负责人和产品定级" : selectedStage === selectedProduct.stage ? "这已经是当前阶段" : ""}
+              disabled={selectedStage === selectedProduct.stage || !selectedPolicy.applies || (selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading))}
+              disabledReason={!selectedPolicy.applies ? "该产品等级不涉及这个阶段" : selectedStage > 1 && (!selectedProduct.productManager || !monthlyGmvTarget || !hasFormalGrading) ? "请先确认产品负责人、平均月 GMV 和产品定级" : selectedStage === selectedProduct.stage ? "这已经是当前阶段" : ""}
               onClick={handleSetCurrentStage}
             ><Flag size={16} />{selectedStage === selectedProduct.stage ? "当前阶段" : "设为当前阶段"}</Button>
           </div>
@@ -208,6 +230,25 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
                 searchInMenu
               />
             </div>
+            <div className="project-assignment-item project-gmv-target">
+              <span className="project-assignment-label">平均月 GMV</span>
+              <div className="project-gmv-control">
+                <div className="project-gmv-input">
+                  <span>¥</span>
+                  <input
+                    aria-label="平均月 GMV"
+                    inputMode="decimal"
+                    value={monthlyGmvDraft}
+                    placeholder="填写月度目标"
+                    onChange={event => setMonthlyGmvDraft(event.target.value.replace(/[^\d.]/g, ""))}
+                    onBlur={saveMonthlyGmvTarget}
+                    onKeyDown={event => {
+                      if (event.key === "Enter") event.currentTarget.blur();
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
             <div className="project-assignment-item project-grade-action">
               <div className="project-grade-value">
                 <span className="project-assignment-label">产品定级</span>
@@ -216,7 +257,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
                     </strong>
                     <small>参考定级：{selectedProduct.referenceLevel || selectedProduct.level}</small>
                   </div>
-                  <Button className="compact" disabled={!selectedProduct.productManager} disabledReason={!selectedProduct.productManager ? "请先选择产品负责人" : ""} onClick={() => setGradingOpen(true)}>{hasFormalGrading ? "查看定级打分" : "定级"}</Button>
+                  <Button className="compact" disabled={!selectedProduct.productManager || (!monthlyGmvTarget && !hasFormalGrading)} disabledReason={!selectedProduct.productManager ? "请先选择产品负责人" : !monthlyGmvTarget && !hasFormalGrading ? "请先填写平均月 GMV" : ""} onClick={() => setGradingOpen(true)}>{hasFormalGrading ? "查看定级打分" : "定级"}</Button>
             </div>
           </div>
         ) : null}
