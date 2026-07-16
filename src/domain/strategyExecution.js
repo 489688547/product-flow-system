@@ -108,7 +108,7 @@ function audit(state, { actor = "", action, entityType, entityId, reason = "", t
 
 export function createDefaultPlatformState() {
   const state = {
-    version: "strategy-platform-v1",
+    version: "strategy-platform-v2",
     updatedAt: "2026-07-16T00:00:00.000Z",
     strategies: [
       {

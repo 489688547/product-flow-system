@@ -8,11 +8,27 @@ import { buildDecisionTodoPayload, buildPersonalTodoPayload } from "../domain/pl
 
 const PlatformContext = createContext(null);
 const STORAGE_KEY = "platformExecutionState";
+const GOVERNED_DEMO_COLLECTIONS = ["departmentCommitments", "commitmentMilestones", "incentiveProjects", "departmentRewardBudgets", "monthlyReports"];
+
+function isLocalHost() {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
+function normalizeWithLocalDemo(input) {
+  const normalized = normalizePlatformState(input);
+  if (!isLocalHost() || normalized.version === "strategy-platform-v2") return normalized;
+  const demo = createDefaultPlatformState();
+  return {
+    ...normalized,
+    version: "strategy-platform-v2",
+    ...Object.fromEntries(GOVERNED_DEMO_COLLECTIONS.map(key => [key, normalized[key]?.length ? normalized[key] : demo[key]]))
+  };
+}
 
 function loadLocalState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? normalizePlatformState(JSON.parse(raw)) : createDefaultPlatformState();
+    return raw ? normalizeWithLocalDemo(JSON.parse(raw)) : createDefaultPlatformState();
   } catch {
     return createDefaultPlatformState();
   }
@@ -40,13 +56,13 @@ export function PlatformProvider({ children }) {
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.synced === false || !payload.state) return;
         if (alive) {
-          const normalized = normalizePlatformState(payload.state);
+          const normalized = normalizeWithLocalDemo(payload.state);
           setState(normalized);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
           setError("");
         }
       } catch (loadError) {
-        if (alive && !["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)) {
+        if (alive && !isLocalHost()) {
           setError(errorMessage(loadError, "战略执行数据加载失败，当前显示本地缓存。"));
         }
       } finally {
@@ -74,7 +90,7 @@ export function PlatformProvider({ children }) {
         if (!response.ok || payload.synced === false) throw new Error(payload.message || "战略执行数据保存失败。");
         setError("");
       } catch (saveError) {
-        if (!["localhost", "127.0.0.1", "::1"].includes(window.location.hostname)) {
+        if (!isLocalHost()) {
           setError(errorMessage(saveError, "战略执行数据同步失败，修改已保存在本机。"));
         }
       }
