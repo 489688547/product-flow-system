@@ -4,6 +4,7 @@ import {
 } from "./dingtalk/_shared/dingtalk.js";
 
 const STATE_ID = "company";
+const MAX_PART_BYTES = 1_000_000;
 
 function stateDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
@@ -17,6 +18,56 @@ async function ensureStateTable(db) {
     updated_at TEXT NOT NULL,
     updated_by TEXT
   )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS product_flow_state_parts (
+    state_id TEXT NOT NULL,
+    part_key TEXT NOT NULL,
+    part_index INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT,
+    PRIMARY KEY (state_id, part_key, part_index)
+  )`).run();
+}
+
+function splitUtf8(value, maxBytes = MAX_PART_BYTES) {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(value);
+  if (bytes.byteLength <= maxBytes) return [value];
+  const decoder = new TextDecoder("utf-8", { fatal: true });
+  const chunks = [];
+  let offset = 0;
+  while (offset < bytes.byteLength) {
+    let end = Math.min(offset + maxBytes, bytes.byteLength);
+    let chunk = "";
+    while (!chunk && end > offset) {
+      try {
+        chunk = decoder.decode(bytes.subarray(offset, end));
+      } catch {
+        end -= 1;
+      }
+    }
+    chunks.push(chunk);
+    offset = end;
+  }
+  return chunks;
+}
+
+function serializeStateParts(state) {
+  return Object.entries(state).flatMap(([key, value]) => {
+    const serialized = JSON.stringify(value);
+    if (serialized === undefined) return [];
+    return splitUtf8(serialized).map((payload, index) => ({ key, index, payload }));
+  });
+}
+
+function deserializeStateParts(rows) {
+  const grouped = new Map();
+  rows.forEach(row => {
+    const chunks = grouped.get(row.part_key) || [];
+    chunks[Number(row.part_index)] = row.payload;
+    grouped.set(row.part_key, chunks);
+  });
+  return Object.fromEntries([...grouped].map(([key, chunks]) => [key, JSON.parse(chunks.join(""))]));
 }
 
 function validateStatePayload(state) {
@@ -36,6 +87,20 @@ function validateStatePayload(state) {
 
 async function readCompanyState(db) {
   await ensureStateTable(db);
+  const partResult = await db.prepare(`SELECT part_key, part_index, payload, updated_at, updated_by
+    FROM product_flow_state_parts WHERE state_id = ? ORDER BY part_key, part_index`)
+    .bind(STATE_ID)
+    .all();
+  const parts = partResult?.results || [];
+  if (parts.length) {
+    const state = deserializeStateParts(parts);
+    return {
+      state,
+      version: String(state.version || "unknown"),
+      updatedAt: parts[0].updated_at,
+      updatedBy: parts[0].updated_by || ""
+    };
+  }
   const row = await db.prepare("SELECT payload, version, updated_at, updated_by FROM product_flow_state WHERE id = ?")
     .bind(STATE_ID)
     .first();
@@ -53,16 +118,17 @@ async function writeCompanyState(db, state, updatedBy = "") {
   await ensureStateTable(db);
   const updatedAt = new Date().toISOString();
   const version = String(state.version || "unknown");
-  const payload = JSON.stringify(state);
-  await db.prepare(`INSERT INTO product_flow_state (id, version, payload, updated_at, updated_by)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      version = excluded.version,
-      payload = excluded.payload,
-      updated_at = excluded.updated_at,
-      updated_by = excluded.updated_by`)
-    .bind(STATE_ID, version, payload, updatedAt, String(updatedBy || "").slice(0, 80))
-    .run();
+  const actor = String(updatedBy || "").slice(0, 80);
+  const parts = serializeStateParts(state);
+  const statements = [
+    db.prepare("DELETE FROM product_flow_state_parts WHERE state_id = ?").bind(STATE_ID),
+    ...parts.map(part => db.prepare(`INSERT INTO product_flow_state_parts
+      (state_id, part_key, part_index, payload, updated_at, updated_by)
+      VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(STATE_ID, part.key, part.index, part.payload, updatedAt, actor)),
+    db.prepare("DELETE FROM product_flow_state WHERE id = ?").bind(STATE_ID)
+  ];
+  await db.batch(statements);
   return { version, updatedAt };
 }
 
