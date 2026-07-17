@@ -4,7 +4,7 @@
 
 ## 集成注册表与开发路由
 
-`docs/platform/integration-registry.json` 是平台名称、生命周期、能力、问题、关键词、代码路径、环境变量名、外部域名、官方文档和关系的唯一公开事实源。开发前使用 `.agents/skills/integration-router/SKILL.md` 路由任务；PR 必须用 `Integration-Impact` 和 `Integration-Impact-Reason` 声明路径命中的平台，CI 通过 `npm run check:integrations` 验证。
+`docs/platform/integration-registry.json` 是平台名称、生命周期、能力、问题、关键词、代码路径、环境变量名、外部域名、API 路由、官方文档和关系的唯一公开事实源。开发前使用 `.agents/skills/integration-router/SKILL.md` 路由任务；PR 必须用 `Integration-Impact` 和 `Integration-Impact-Reason` 声明路径或新增代码证据命中的平台，CI 通过 `npm run check:integrations` 验证。
 
 生命周期规则：
 

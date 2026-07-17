@@ -77,6 +77,25 @@ test("router treats changed code paths as mandatory evidence", () => {
   assert.ok(dingtalk.evidence.some(item => item.type === "path"));
 });
 
+test("router treats provider domains, env vars, and API routes in changed code as mandatory evidence", () => {
+  const registry = loadIntegrationRegistry(rootDir);
+  const result = matchIntegrationPlatforms(registry, {
+    content: `
+      const endpoint = "https://api.dingtalk.com/v1.0/todo/users";
+      const key = env.KUAIMAI_APP_KEY;
+      fetch("/api/kuaimai/pull");
+    `
+  });
+
+  const dingtalk = result.direct.find(match => match.id === "dingtalk");
+  const kuaimai = result.direct.find(match => match.id === "kuaimai");
+  assert.equal(dingtalk.required, true);
+  assert.ok(dingtalk.evidence.some(item => item.type === "domain"));
+  assert.equal(kuaimai.required, true);
+  assert.ok(kuaimai.evidence.some(item => item.type === "env"));
+  assert.ok(kuaimai.evidence.some(item => item.type === "api-route"));
+});
+
 test("router keeps ambiguous candidates instead of silently choosing one", () => {
   const registry = loadIntegrationRegistry(rootDir);
   const result = matchIntegrationPlatforms(registry, {
@@ -112,6 +131,16 @@ test("impact check accepts complete declarations and rejects missing path covera
   const rejected = checkIntegrationImpact(registry, {
     paths,
     body: "Integration-Impact: cloudflare-pages, cloudflare-d1\nIntegration-Impact-Reason: 调整登录回调"
+  });
+  assert.ok(rejected.errors.some(error => error.includes("dingtalk")));
+});
+
+test("impact check also requires platforms detected from changed code content", () => {
+  const registry = loadIntegrationRegistry(rootDir);
+  const rejected = checkIntegrationImpact(registry, {
+    paths: ["src/state/providerClient.js"],
+    content: "fetch('https://api.dingtalk.com/v1.0/contact/users/me')",
+    body: "Integration-Impact: none\nIntegration-Impact-Reason: 新增服务端调用"
   });
   assert.ok(rejected.errors.some(error => error.includes("dingtalk")));
 });

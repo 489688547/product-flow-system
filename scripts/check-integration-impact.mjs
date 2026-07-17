@@ -25,6 +25,15 @@ function changedPaths(baseSha, headSha) {
   }).split(/\r?\n/).map(value => value.trim()).filter(Boolean);
 }
 
+function changedCode(baseSha, headSha, paths) {
+  const codePaths = paths.filter(path => !path.startsWith("docs/") && /\.(?:[cm]?[jt]sx?|json|ya?ml)$/.test(path));
+  if (!codePaths.length) return "";
+  return execFileSync("git", ["diff", "--unified=0", "--no-color", `${baseSha}...${headSha}`, "--", ...codePaths], {
+    cwd: rootDir,
+    encoding: "utf8"
+  });
+}
+
 function printRouting(result) {
   const payload = {
     ambiguous: result.ambiguous,
@@ -49,7 +58,7 @@ if (registryErrors.length) {
   process.exitCode = 1;
 } else if (process.argv.includes("--route")) {
   const paths = argumentValue("--paths").split(",").map(value => value.trim()).filter(Boolean);
-  printRouting(matchIntegrationPlatforms(registry, { text: argumentValue("--text"), paths }));
+  printRouting(matchIntegrationPlatforms(registry, { text: argumentValue("--text"), paths, content: argumentValue("--content") }));
 } else {
   const eventPath = process.env.GITHUB_EVENT_PATH;
   const event = eventPath && existsSync(eventPath) ? JSON.parse(readFileSync(eventPath, "utf8")) : null;
@@ -57,8 +66,9 @@ if (registryErrors.length) {
     console.log("集成注册表校验通过；当前不是 pull_request 事件，跳过 PR 影响声明检查。");
   } else {
     const paths = changedPaths(event.pull_request.base?.sha, event.pull_request.head?.sha);
+    const content = changedCode(event.pull_request.base?.sha, event.pull_request.head?.sha, paths);
     const body = event.pull_request.body || "";
-    const result = checkIntegrationImpact(registry, { paths, body });
+    const result = checkIntegrationImpact(registry, { paths, content, body });
     const advisory = matchIntegrationPlatforms(registry, {
       text: `${event.pull_request.title || ""}\n${body}`,
       paths: [],

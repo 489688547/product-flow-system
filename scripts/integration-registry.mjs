@@ -16,6 +16,7 @@ const PLATFORM_FIELDS = new Set([
   "codePaths",
   "envVars",
   "domains",
+  "apiRoutes",
   "publicDocs",
   "evidence",
   "relations"
@@ -77,7 +78,7 @@ export function validateIntegrationRegistry(registry) {
     if (!INTEGRATION_STATUSES.includes(platform?.status)) errors.push(`${context}.status 无效`);
     if (!platform?.summary?.trim()) errors.push(`${context}.summary 不能为空`);
 
-    for (const field of ["capabilities", "businessQuestions", "keywords", "codePaths", "envVars", "domains", "evidence"]) {
+    for (const field of ["capabilities", "businessQuestions", "keywords", "codePaths", "envVars", "domains", "apiRoutes", "evidence"]) {
       if (!nonEmptyStrings(platform?.[field]) && !(Array.isArray(platform?.[field]) && platform[field].length === 0)) {
         errors.push(`${context}.${field} 必须是字符串数组`);
       }
@@ -120,13 +121,14 @@ function addEvidence(matches, platform, evidence) {
   if (!current.evidence.some(item => item.type === evidence.type && item.value === evidence.value)) {
     current.evidence.push(evidence);
   }
-  if (evidence.type === "path") current.required = true;
+  if (["path", "domain", "env", "api-route"].includes(evidence.type)) current.required = true;
   matches.set(platform.id, current);
 }
 
-export function matchIntegrationPlatforms(registry, { text = "", paths = [], expandRelated = true } = {}) {
+export function matchIntegrationPlatforms(registry, { text = "", paths = [], content = "", expandRelated = true } = {}) {
   const matches = new Map();
   const normalizedText = String(text).toLocaleLowerCase("zh-CN");
+  const normalizedContent = String(content).toLocaleLowerCase("zh-CN");
 
   for (const platform of registry.platforms) {
     for (const keyword of platform.keywords) {
@@ -137,6 +139,21 @@ export function matchIntegrationPlatforms(registry, { text = "", paths = [], exp
     for (const path of paths) {
       for (const pattern of platform.codePaths) {
         if (matchesPath(pattern, path)) addEvidence(matches, platform, { type: "path", value: path, pattern });
+      }
+    }
+    for (const domain of platform.domains) {
+      if (normalizedContent.includes(domain.toLocaleLowerCase("zh-CN"))) {
+        addEvidence(matches, platform, { type: "domain", value: domain });
+      }
+    }
+    for (const envVar of platform.envVars) {
+      if (normalizedContent.includes(envVar.toLocaleLowerCase("zh-CN"))) {
+        addEvidence(matches, platform, { type: "env", value: envVar });
+      }
+    }
+    for (const apiRoute of platform.apiRoutes) {
+      if (normalizedContent.includes(apiRoute.toLocaleLowerCase("zh-CN"))) {
+        addEvidence(matches, platform, { type: "api-route", value: apiRoute });
       }
     }
   }
@@ -170,8 +187,8 @@ export function parseIntegrationImpact(body = "") {
   return { declaredIds, reason: reasonMatch?.[1]?.trim() || "" };
 }
 
-export function checkIntegrationImpact(registry, { paths = [], body = "" } = {}) {
-  const routing = matchIntegrationPlatforms(registry, { paths, expandRelated: false });
+export function checkIntegrationImpact(registry, { paths = [], content = "", body = "" } = {}) {
+  const routing = matchIntegrationPlatforms(registry, { paths, content, expandRelated: false });
   const requiredIds = routing.direct.filter(match => match.required).map(match => match.id);
   const { declaredIds, reason } = parseIntegrationImpact(body);
   const knownIds = new Set(registry.platforms.map(platform => platform.id));
