@@ -76,6 +76,8 @@ test("strategy center governs company results and department commitments", () =>
   assert.match(page, /archiveRequiredResult/);
   assert.match(page, /archiveDepartmentCommitment/);
   assert.match(page, /ConfirmDialog/);
+  assert.doesNotMatch(page, /attainment-rule/);
+  assert.doesNotMatch(page, /达成规则：全部必达结果核验通过/);
   assert.match(strategyModal, /战略意图/);
 });
 

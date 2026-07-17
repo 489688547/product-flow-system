@@ -20,7 +20,7 @@ test("strategy center separates company attainment from department commitments",
   assert.match(strategy, /strategyAttainment/);
   assert.match(strategy, /saveRequiredResult/);
   assert.match(strategy, /transitionCommitment/);
-  assert.match(strategy, /全部必达结果核验通过/);
+  assert.doesNotMatch(strategy, /attainment-rule/);
 });
 
 test("incentive workspace enforces budget visibility and recorded settlement", () => {

@@ -1,4 +1,4 @@
-import { AlertTriangle, Building2, CheckCircle2, CircleDashed, ClipboardCheck, Pencil, Plus, ShieldCheck, Target, Trash2 } from "lucide-react";
+import { AlertTriangle, Building2, CheckCircle2, CircleDashed, ClipboardCheck, Pencil, Plus, Target, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { strategyAttainment } from "../../domain/executionGovernance.js";
 import { canManagePermissions } from "../../domain/permissions.js";
@@ -59,7 +59,6 @@ function CompanyStrategyView({ state, canManage, onEditStrategy, onDeleteStrateg
               <StatusPill meta={attainment.attained ? ["战略达成", "success"] : ["尚未达成", "warning"]} />
               {canManage ? <span className="strategy-record-actions"><IconAction label="编辑公司战略" onClick={() => onEditStrategy(strategy)}><Pencil size={16} /></IconAction><IconAction label="归档公司战略" className="danger" onClick={() => onDeleteStrategy(strategy)}><Trash2 size={16} /></IconAction></span> : null}
             </header>
-            <div className="attainment-rule"><ShieldCheck size={16} /><span><strong>达成规则：全部必达结果核验通过</strong><small>{strategy.successStandard}</small></span></div>
             <div className="required-result-list">
               {attainment.results.map(result => (
                 <article className="required-result-row" key={result.id}>
