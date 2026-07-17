@@ -7,11 +7,50 @@ import {
   buildMonthlyTrend,
   createDefaultPlatformState,
   metricHealth,
+  migratePlatformState,
   normalizePlatformState,
   objectiveHealth,
   projectHealth,
   reducePlatformState
 } from "../src/domain/strategyExecution.js";
+
+test("v2 strategy data migrates the DingTalk annual plan into v3 without losing user records", () => {
+  const migrated = migratePlatformState({
+    version: "strategy-platform-v2",
+    strategies: [
+      { id: "strategy-organization-2026", name: "旧组织目标", status: "at_risk", createdAt: "2026-01-02" },
+      { id: "strategy-user-created", name: "用户自建战略", status: "active" }
+    ],
+    requiredResults: [{ id: "result-user-created", strategyId: "strategy-user-created", title: "用户结果" }],
+    departmentCommitments: [],
+    commitmentMilestones: []
+  });
+
+  assert.equal(migrated.version, "strategy-platform-v3");
+  assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").name, "组织建设全面加强");
+  assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").status, "at_risk");
+  assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").createdAt, "2026-01-02");
+  assert.equal(migrated.strategies.some(item => item.id === "strategy-user-created"), true);
+  assert.equal(migrated.requiredResults.some(item => item.id === "result-org-review-cadence"), true);
+  assert.equal(migrated.requiredResults.some(item => item.id === "result-hamster-brand-decisions"), true);
+  assert.equal(migrated.requiredResults.some(item => item.id === "result-user-created"), true);
+  assert.equal(migrated.departmentCommitments.some(item => item.id === "commitment-brand-ip-2026"), true);
+  assert.equal(migrated.departmentCommitments.some(item => item.id === "commitment-ops-channel-2026"), true);
+  assert.equal(migrated.commitmentMilestones.some(item => item.commitmentId === "commitment-ops-channel-2026"), true);
+});
+
+test("v3 strategy migration is idempotent and preserves later edits", () => {
+  const current = {
+    version: "strategy-platform-v3",
+    strategies: [{ id: "strategy-organization-2026", name: "我修改后的战略名称" }],
+    requiredResults: [],
+    departmentCommitments: [],
+    commitmentMilestones: []
+  };
+  const migrated = migratePlatformState(current);
+  assert.equal(migrated, current);
+  assert.equal(migrated.strategies[0].name, "我修改后的战略名称");
+});
 
 test("severe child health cannot be averaged away", () => {
   assert.equal(aggregateHealth(["normal", "off_track", "completed"]), "off_track");

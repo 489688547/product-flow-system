@@ -79,8 +79,11 @@ test("monthly report generation creates one manual draft per active department",
 });
 
 test("default state contains the three confirmed company strategies", () => {
-  const names = createDefaultPlatformState().strategies.map(item => item.name);
-  assert.deepEqual(names, ["组织建设", "鸟类销量突破", "仓鼠品牌升级"]);
+  const state = createDefaultPlatformState();
+  const names = state.strategies.map(item => item.name);
+  assert.equal(state.version, "strategy-platform-v3");
+  assert.deepEqual(names, ["组织建设全面加强", "鸟类销量明显突破", "仓鼠品牌表达与竞争力提升"]);
+  assert.equal(state.requiredResults.some(item => item.id === "result-org-review-cadence"), true);
 });
 
 test("department commitment approval is reduced and audited", () => {

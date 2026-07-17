@@ -49,6 +49,107 @@ const DEFAULT_APP_REGISTRY = [
   }
 ];
 
+const DOCUMENT_SOURCE = "《提野星2026年重点工作》";
+const DOCUMENT_UPDATED_AT = "2026-07-17T00:00:00.000Z";
+const DOCUMENT_V3_SEED = {
+  strategies: [
+    {
+      id: "strategy-organization-2026",
+      name: "组织建设全面加强",
+      intent: "明晰权责边界，建立跨部门协作、周期复盘与钉钉数据资产机制。",
+      successStandard: "四项组织建设必达结果全部完成，并由总经办依据制度、会议记录和数据资产清单核验。",
+      owner: "周荣庆",
+      year: 2026,
+      status: "active",
+      sourceReference: DOCUMENT_SOURCE
+    },
+    {
+      id: "strategy-bird-gmv-2026",
+      name: "鸟类销量明显突破",
+      intent: "围绕鸟类产品、内容投放和渠道运营形成可持续增长能力。",
+      successStandard: "2026 年 12 月鸟类单月实付 GMV 达到 100 万元，且重点运营方法形成可复用记录。",
+      owner: "周荣庆",
+      year: 2026,
+      status: "active",
+      sourceReference: DOCUMENT_SOURCE
+    },
+    {
+      id: "strategy-hamster-brand-2026",
+      name: "仓鼠品牌表达与竞争力提升",
+      intent: "统一品牌视觉和核心概念，提升或守住重点平台市场排名。",
+      successStandard: "品牌表达和经营决策两项必达结果均在 2026 年 9 月前核验通过。",
+      owner: "周荣庆",
+      year: 2026,
+      status: "active",
+      sourceReference: DOCUMENT_SOURCE
+    }
+  ],
+  requiredResults: [
+    { id: "result-org-roles", strategyId: "strategy-organization-2026", title: "完成岗位职责、权责边界与审批流程", acceptanceStandard: "各部门职责说明书明确职责、目标、权限、协作对象和考核指标；人事行政部与财务部完成审批流整合并经总经办验收。", owner: "人事行政部", dueDate: "2026-08-31", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "result-org-collaboration", strategyId: "strategy-organization-2026", title: "跨部门协作与专项会议机制顺畅运行", acceptanceStandard: "提需、沟通和资源协调边界清晰；跨部门专项会议形成纪要并由总助持续追踪，连续一个月无长期悬置事项。", owner: "总经办", dueDate: "2026-08-31", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "result-org-review-cadence", strategyId: "strategy-organization-2026", title: "周度经理办公会与月度复盘稳定运行", acceptanceStandard: "每周一经理办公会持续召开；每月 5 日前完成月度例会，各部门围绕年度目标和关键工作提交汇报，连续运行两个月。", owner: "总经办", dueDate: "2026-09-05", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "result-org-data", strategyId: "strategy-organization-2026", title: "形成钉钉数据资产沉淀机制", acceptanceStandard: "各部门形成数据资产清单，重点指标通过 AI 表格稳定更新，并建立可检索的知识库沉淀。", owner: "总经办", dueDate: "2026-07-31", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "result-bird-gmv", strategyId: "strategy-bird-gmv-2026", title: "12 月鸟类单月 GMV 达到 100 万元", acceptanceStandard: "财务确认的 2026 年 12 月鸟类实付 GMV 不低于 100 万元。", owner: "运营部", dueDate: "2026-12-31", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "result-bird-playbook", strategyId: "strategy-bird-gmv-2026", title: "形成鸟类重点运营与内容投放方法", acceptanceStandard: "鸟类重点产品、内容选题、素材迭代和投放复盘形成书面方法，至少完成两轮可复用验证。", owner: "运营部", dueDate: "2026-11-30", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "result-hamster-rank", strategyId: "strategy-hamster-brand-2026", title: "平台排名和品牌内容表达达标", acceptanceStandard: "重点平台市场排名提升或至少不下降；最迟 9 月核心页面和内容视觉统一并清楚传达品牌核心概念。", owner: "品牌部", dueDate: "2026-09-30", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "result-hamster-brand-decisions", strategyId: "strategy-hamster-brand-2026", title: "品牌理念进入日常经营决策", acceptanceStandard: "各部门会议纪要和关键决策记录中能够说明是否符合品牌核心概念，连续一个月由品牌部抽查通过。", owner: "品牌部", dueDate: "2026-09-30", status: "active", sourceReference: DOCUMENT_SOURCE }
+  ],
+  departmentCommitments: [
+    { id: "commitment-brand-organization-2026", strategyId: "strategy-organization-2026", title: "明确品牌部素材与内容协作流程", department: "品牌部", owner: "品牌部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q3", successStandard: "素材管理、调度、制作、审核和复盘流程形成文档并稳定执行一个月。", dueDate: "2026-09-30", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-brand-concept-2026", strategyId: "strategy-hamster-brand-2026", title: "确定并落地品牌核心概念", department: "品牌部", owner: "品牌部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q3", successStandard: "品牌核心概念完成公司级同步，并覆盖核心平台内容和三款重点产品。", dueDate: "2026-09-30", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-brand-ip-2026", strategyId: "strategy-bird-gmv-2026", title: "鸟类与仓鼠 IP 进入常态化运营", department: "品牌部", owner: "品牌部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q3", successStandard: "两个品类 IP 账号形成稳定内容产出与复盘节奏，鸟类账号持续跟踪涨粉和爆款选题。", dueDate: "2026-09-30", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-brand-performance-2026", strategyId: "strategy-bird-gmv-2026", title: "建立信息流爆款素材迭代机制", department: "品牌部", owner: "品牌部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q3", successStandard: "品牌与运营每周完成素材复盘和迭代，连续四周产出达到投放标准的候选素材。", dueDate: "2026-09-30", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-brand-offline-2026", strategyId: "strategy-hamster-brand-2026", title: "提升线下店品牌形象和私域经营", department: "品牌部", owner: "品牌部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q4", successStandard: "形成日常探店与产品讲解内容，并建立仓鼠、鸟类活体私域售卖记录。", dueDate: "2026-12-31", status: "draft", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ops-data-2026", strategyId: "strategy-organization-2026", title: "建立运营关键数据日常记录", department: "运营部", owner: "运营部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q3", successStandard: "核心运营数据按日记录，能够支持年度运营计划和目标复盘，连续稳定更新一个月。", dueDate: "2026-08-31", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ops-bird-q3", strategyId: "strategy-bird-gmv-2026", title: "鸟类产品重点运营并快速放量", department: "运营部", owner: "运营部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q3", successStandard: "形成鸟类重点产品运营节奏，月度 GMV 按里程碑增长并沉淀投放复盘。", dueDate: "2026-09-30", status: "active", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ops-channel-2026", strategyId: "strategy-hamster-brand-2026", title: "形成渠道打品方法并守住平台排名", department: "运营部", owner: "运营部负责人", reviewerName: "周荣庆", executiveOwner: "周荣庆", period: "2026-Q4", successStandard: "天猫仓鼠类稳定前 3、抖音仓鼠类稳定前 2、拼多多进入前 10，并形成渠道打品方法文档。", dueDate: "2026-12-31", status: "active", sourceReference: DOCUMENT_SOURCE }
+  ],
+  commitmentMilestones: [
+    { id: "commitment-ms-brand-process-aug", commitmentId: "commitment-brand-organization-2026", title: "发布品牌部素材与审核流程", month: "2026-08", dueDate: "2026-08-31", owner: "品牌部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ms-brand-concept-sep", commitmentId: "commitment-brand-concept-2026", title: "完成品牌核心概念全公司同步", month: "2026-09", dueDate: "2026-09-15", owner: "品牌部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ms-brand-ip-aug", commitmentId: "commitment-brand-ip-2026", title: "建立双品类 IP 周度选题与复盘表", month: "2026-08", dueDate: "2026-08-31", owner: "品牌部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ms-brand-material-sep", commitmentId: "commitment-brand-performance-2026", title: "连续四周完成素材投放复盘", month: "2026-09", dueDate: "2026-09-30", owner: "品牌部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ms-brand-offline-oct", commitmentId: "commitment-brand-offline-2026", title: "完成线下店内容和私域方案", month: "2026-10", dueDate: "2026-10-31", owner: "品牌部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ms-ops-data-aug", commitmentId: "commitment-ops-data-2026", title: "运营核心数据连续记录一个月", month: "2026-08", dueDate: "2026-08-31", owner: "运营部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ms-bird-sep", commitmentId: "commitment-ops-bird-q3", title: "完成鸟类重点运营第三轮月度复盘", month: "2026-09", dueDate: "2026-09-30", owner: "运营部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE },
+    { id: "commitment-ms-channel-dec", commitmentId: "commitment-ops-channel-2026", title: "核验三大平台排名与打品方法", month: "2026-12", dueDate: "2026-12-31", owner: "运营部负责人", status: "pending", sourceReference: DOCUMENT_SOURCE }
+  ]
+};
+
+const MIGRATION_PRESERVED_FIELDS = [
+  "status", "statusReason", "createdAt", "updatedAt", "archived", "archivedAt", "archivedBy", "dingTodo"
+];
+
+function mergeDocumentSeed(records = [], seeds = []) {
+  const existing = new Map(records.map(record => [record.id, { ...record }]));
+  seeds.forEach(seed => {
+    const current = existing.get(seed.id);
+    if (!current) {
+      existing.set(seed.id, { ...seed, createdAt: DOCUMENT_UPDATED_AT, updatedAt: DOCUMENT_UPDATED_AT, archived: false });
+      return;
+    }
+    const merged = { ...current, ...seed };
+    MIGRATION_PRESERVED_FIELDS.forEach(field => {
+      if (current[field] !== undefined) merged[field] = current[field];
+    });
+    existing.set(seed.id, merged);
+  });
+  return [...existing.values()];
+}
+
+export function migratePlatformState(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  if (input.version !== "strategy-platform-v2") return input;
+  return {
+    ...input,
+    version: "strategy-platform-v3",
+    strategies: mergeDocumentSeed(input.strategies, DOCUMENT_V3_SEED.strategies),
+    requiredResults: mergeDocumentSeed(input.requiredResults, DOCUMENT_V3_SEED.requiredResults),
+    departmentCommitments: mergeDocumentSeed(input.departmentCommitments, DOCUMENT_V3_SEED.departmentCommitments),
+    commitmentMilestones: mergeDocumentSeed(input.commitmentMilestones, DOCUMENT_V3_SEED.commitmentMilestones)
+  };
+}
+
 function nowIso(value) {
   const date = value ? new Date(value) : new Date();
   return Number.isNaN(date.getTime()) ? new Date().toISOString() : date.toISOString();
@@ -371,14 +472,15 @@ export function createDefaultPlatformState() {
 
 export function normalizePlatformState(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return createDefaultPlatformState();
+  const migrated = migratePlatformState(input);
   const state = {
-    version: String(input.version || "strategy-platform-v1"),
-    updatedAt: input.updatedAt || "",
-    ...input
+    version: String(migrated.version || "strategy-platform-v1"),
+    updatedAt: migrated.updatedAt || "",
+    ...migrated
   };
   PLATFORM_COLLECTIONS.forEach(key => {
     const fallback = key === "appRegistry" ? DEFAULT_APP_REGISTRY : [];
-    state[key] = Array.isArray(input[key]) ? input[key].map(item => ({ ...item })) : fallback.map(item => ({ ...item }));
+    state[key] = Array.isArray(migrated[key]) ? migrated[key].map(item => ({ ...item })) : fallback.map(item => ({ ...item }));
   });
   return state;
 }
