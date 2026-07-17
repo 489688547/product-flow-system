@@ -13,6 +13,9 @@ export function manualChunks(moduleId) {
   if (MARKDOWN_RUNTIME_PACKAGES.some(packageName => includesPackage(normalizedId, packageName))) {
     return "markdown-vendor";
   }
+  if (includesPackage(normalizedId, "lucide-react")) {
+    return "icons-vendor";
+  }
   return undefined;
 }
 

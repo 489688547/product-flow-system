@@ -12,6 +12,7 @@ test("build chunk policy separates heavy shared runtimes", () => {
   assert.equal(manualChunks("/repo/node_modules/react/index.js"), "react-vendor");
   assert.equal(manualChunks("/repo/node_modules/react-markdown/index.js"), "markdown-vendor");
   assert.equal(manualChunks("/repo/node_modules/remark-gfm/index.js"), "markdown-vendor");
+  assert.equal(manualChunks("/repo/node_modules/lucide-react/dist/esm/icons/check.js"), "icons-vendor");
   assert.equal(manualChunks("/repo/src/App.jsx"), undefined);
 });
 
