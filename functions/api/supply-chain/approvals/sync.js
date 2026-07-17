@@ -18,6 +18,14 @@ function upsertByProcess(records, record) {
     : [record, ...records];
 }
 
+function belongsToSupplyChain(record, settings) {
+  const category = String(record?.businessCategory || "").trim();
+  const prefixes = Array.isArray(settings.purchaseCategoryPrefixes)
+    ? settings.purchaseCategoryPrefixes.map(value => String(value || "").trim()).filter(Boolean)
+    : [];
+  return !category || !prefixes.length || prefixes.some(prefix => category.startsWith(prefix));
+}
+
 async function listAllInstanceIds(accessToken, input, fetchImpl) {
   const ids = [];
   const seenCursors = new Set();
@@ -44,7 +52,10 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
     { kind: "payment", processCode: settings.paymentProcessCode, collection: "paymentApprovals" }
   ];
   const next = normalizeSupplyChainState(state);
-  const synced = { purchase: 0, payment: 0, unmapped: 0 };
+  next.purchaseApprovals = next.purchaseApprovals.filter(record => belongsToSupplyChain(record, settings));
+  const allowedPurchaseIds = new Set(next.purchaseApprovals.map(record => record.processInstanceId));
+  next.paymentApprovals = next.paymentApprovals.filter(record => !record.purchaseProcessInstanceId || allowedPurchaseIds.has(record.purchaseProcessInstanceId));
+  const synced = { purchase: 0, payment: 0, unmapped: 0, skipped: 0 };
 
   for (const config of configs) {
     const ids = await listAllInstanceIds(accessToken, { processCode: config.processCode, startTime, endTime }, fetchImpl);
@@ -54,8 +65,17 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
         ...(settings.fieldMappings?.[config.kind] || {}),
         kind: config.kind
       });
+      if (!belongsToSupplyChain(normalized.record, settings)) {
+        synced.skipped += 1;
+        continue;
+      }
+      if (config.kind === "payment" && normalized.record.purchaseProcessInstanceId && !allowedPurchaseIds.has(normalized.record.purchaseProcessInstanceId)) {
+        synced.skipped += 1;
+        continue;
+      }
       next[config.collection] = upsertByProcess(next[config.collection], normalized.record);
       if (config.kind === "purchase") {
+        allowedPurchaseIds.add(normalized.record.processInstanceId);
         for (const line of normalized.lines) {
           const lineRecord = { ...line, purchaseProcessInstanceId: normalized.record.processInstanceId };
           const found = next.purchaseLines.some(item => item.id === lineRecord.id);

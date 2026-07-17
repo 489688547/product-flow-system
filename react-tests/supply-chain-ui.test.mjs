@@ -37,6 +37,8 @@ test("inventory and quality imports preview before saving", () => {
   assert.match(inventory, /streamSpreadsheetRows/);
   assert.match(inventory, /确认导入/);
   assert.match(inventory, /ERP库存/);
+  assert.match(inventory, /ERP 快照/);
+  assert.match(inventory, /盘点核对/);
   assert.match(quality, /streamSpreadsheetRows/);
   assert.match(quality, /确认导入/);
   assert.match(quality, /公关处理/);
@@ -51,6 +53,8 @@ test("approval workspace keeps purchase requests separate from linked payments",
   assert.match(approval, /处理映射/);
   assert.match(approval, /supplierValueMap/);
   assert.match(approval, /productValueMap/);
+  assert.match(approval, /审批实付/);
+  assert.match(approval, /付款超申请/);
 });
 
 test("supplier product and quality workspaces dispatch auditable domain changes", () => {
@@ -58,6 +62,8 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
   const product = read("src/features/supply-chain/ProductSupplyWorkspace.jsx");
   const quality = read("src/features/supply-chain/QualityWorkspace.jsx");
   assert.match(supplier, /collection: "suppliers"/);
+  assert.match(supplier, /供货范围/);
+  assert.match(supplier, /来自钉钉供应链文件夹/);
   assert.match(product, /collection: "productSupplierLinks"/);
   assert.match(quality, /collection: "qualityIssues"/);
   assert.match(quality, /关闭问题/);
@@ -69,4 +75,15 @@ test("supply chain workbench has stable responsive structure", () => {
   assert.match(css, /\.supply-metric-strip/);
   assert.match(css, /\.supply-import-preview/);
   assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-metric-strip\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(170px, 1fr\)\)/);
+});
+
+test("overview and sync records expose cash inventory and source truth separately", () => {
+  const overview = read("src/features/supply-chain/SupplyChainOverview.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  for (const label of ["审批实付", "ERP库存价值", "实盘库存价值", "ERP库存", "实盘库存"]) {
+    assert.match(overview, new RegExp(label));
+  }
+  for (const label of ["供应商档案", "钉钉审批", "快麦销售成本", "ERP库存快照", "盘点导入", "质量导入", "文件快照"]) {
+    assert.match(page, new RegExp(label));
+  }
 });

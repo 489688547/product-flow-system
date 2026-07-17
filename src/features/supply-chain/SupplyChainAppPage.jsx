@@ -20,15 +20,31 @@ function departmentOf(user) {
   return String(user?.department || "").trim();
 }
 
-function SyncRecordsWorkspace() {
+function latestDate(rows, keys) {
+  const timestamps = rows.flatMap(row => keys.map(key => Date.parse(row?.[key] || 0))).filter(Number.isFinite);
+  return timestamps.length ? new Date(Math.max(...timestamps)).toLocaleString("zh-CN", { hour12: false }) : "尚未同步";
+}
+
+function SyncRecordsWorkspace({ salesRows }) {
   const { state } = useSupplyChain();
+  const successfulApprovals = state.syncRuns.filter(row => row.type === "dingtalk-approvals" && row.status === "success");
+  const erpSnapshots = state.inventorySnapshots.filter(row => row.sourceType === "kuaimai-import");
+  const stocktakes = state.inventorySnapshots.filter(row => row.sourceType !== "kuaimai-import" && row.countedQuantity !== null && row.countedQuantity !== undefined);
+  const sources = [
+    { name: "供应商档案", role: "钉钉供应链文件夹的名称、类别与供货范围", status: state.suppliers.length ? "文件快照" : "待导入", count: `${state.suppliers.length} 家供应商`, updatedAt: latestDate(state.suppliers, ["importedAt", "updatedAt"]) },
+    { name: "钉钉审批", role: "采购申请、付款审批与关联关系", status: successfulApprovals.length ? "已连接" : "待首次同步", count: `${state.purchaseApprovals.length} 张采购 · ${state.paymentApprovals.length} 张付款`, updatedAt: latestDate(successfulApprovals, ["completedAt"]) },
+    { name: "快麦销售成本", role: "SKU 销量与库存消耗", status: salesRows.length ? "已读取" : "待导入 / 同步", count: `${salesRows.length} 条成本记录`, updatedAt: salesRows.length ? "随销售数据刷新" : "尚无数据" },
+    { name: "ERP库存快照", role: "SKU × 仓库当前库存", status: erpSnapshots.length ? "文件快照" : "待导入", count: `${erpSnapshots.length} 条库存记录`, updatedAt: latestDate(erpSnapshots, ["stocktakeDate", "importedAt"]) },
+    { name: "盘点导入", role: "ERP 与实盘数量及金额校准", status: stocktakes.length ? "已校准" : "待盘点", count: `${stocktakes.length} 条盘点记录`, updatedAt: latestDate(stocktakes, ["stocktakeDate", "importedAt"]) },
+    { name: "质量导入", role: "差评、抽检、整改与验证", status: state.qualityImportBatches.length ? "文件快照" : "待导入", count: `${state.qualityIssues.length} 个质量事件`, updatedAt: latestDate(state.qualityImportBatches, ["importedAt"]) }
+  ];
   const columns = [
     { key: "time", header: "执行时间", render: row => row.completedAt ? new Date(row.completedAt).toLocaleString("zh-CN", { hour12: false }) : "—" },
     { key: "type", header: "类型", render: () => "钉钉采购/付款审批" },
     { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : "danger"}`}>{row.status === "success" ? "成功" : "失败"}</span> },
-    { key: "counts", header: "结果", render: row => row.status === "success" ? `采购 ${row.counts?.purchase || 0} · 付款 ${row.counts?.payment || 0} · 待映射 ${row.counts?.unmapped || 0}` : row.message || "同步失败" }
+    { key: "counts", header: "结果", render: row => row.status === "success" ? `采购 ${row.counts?.purchase || 0} · 付款 ${row.counts?.payment || 0} · 待映射 ${row.counts?.unmapped || 0} · 过滤 ${row.counts?.skipped || 0}` : row.message || "同步失败" }
   ];
-  return <section className="section-panel"><div className="section-head"><div><h2>同步记录</h2><p>保留每次钉钉读取结果，失败不覆盖上次成功数据。</p></div></div><DataTable minWidth={680} columns={columns} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有执行过审批同步。</div>} /></section>;
+  return <div className="supply-work-grid"><section className="section-panel"><div className="section-head"><div><h2>数据源中心</h2><p>每个数字都标明来源和新鲜度；快麦库存接口验证前只显示文件快照，不伪装自动同步。</p></div></div><div className="supply-source-grid">{sources.map(source => <article key={source.name}><div><strong>{source.name}</strong><span className="status-badge neutral">{source.status}</span></div><p>{source.role}</p><b>{source.count}</b><small>最近更新：{source.updatedAt}</small></article>)}</div></section><section className="section-panel"><div className="section-head"><div><h2>钉钉同步记录</h2><p>保留每次采购与付款审批读取结果，失败不覆盖上次成功数据。</p></div></div><DataTable minWidth={680} columns={columns} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有执行过审批同步。</div>} /></section></div>;
 }
 
 function SupplySettingsWorkspace({ canEdit }) {
@@ -36,7 +52,7 @@ function SupplySettingsWorkspace({ canEdit }) {
   const [draft, setDraft] = useState(state.settings);
   useEffect(() => setDraft(state.settings), [state.settings]);
   const updateMapping = (kind, key, value) => setDraft(current => ({ ...current, fieldMappings: { ...current.fieldMappings, [kind]: { ...(current.fieldMappings?.[kind] || {}), [key]: value } } }));
-  return <section className="section-panel"><div className="section-head"><div><h2>钉钉审批流程映射</h2><p>分别配置采购申请和付款申请流程；付款关系只读取钉钉“关联审批”组件。</p></div>{canEdit ? <Button variant="primary" onClick={() => dispatch({ type: "settings", settings: draft })}>保存设置</Button> : null}</div><div className="supply-settings-matrix"><fieldset disabled={!canEdit}><legend>采购申请</legend><label>processCode<input value={draft.purchaseProcessCode || ""} onChange={event => setDraft(current => ({ ...current, purchaseProcessCode: event.target.value }))} /></label><label>供应商字段 ID<input value={draft.fieldMappings?.purchase?.supplierFieldId || ""} onChange={event => updateMapping("purchase", "supplierFieldId", event.target.value)} /></label><label>产品字段 ID<input value={draft.fieldMappings?.purchase?.productFieldId || ""} onChange={event => updateMapping("purchase", "productFieldId", event.target.value)} /></label><label>金额字段 ID<input value={draft.fieldMappings?.purchase?.amountFieldId || ""} onChange={event => updateMapping("purchase", "amountFieldId", event.target.value)} /></label></fieldset><fieldset disabled={!canEdit}><legend>付款申请</legend><label>processCode<input value={draft.paymentProcessCode || ""} onChange={event => setDraft(current => ({ ...current, paymentProcessCode: event.target.value }))} /></label><label>实付金额字段 ID<input value={draft.fieldMappings?.payment?.amountFieldId || ""} onChange={event => updateMapping("payment", "amountFieldId", event.target.value)} /></label><label>关联采购审批字段 ID<input value={draft.fieldMappings?.payment?.relatedPurchaseFieldId || ""} onChange={event => updateMapping("payment", "relatedPurchaseFieldId", event.target.value)} /></label></fieldset></div></section>;
+  return <section className="section-panel"><div className="section-head"><div><h2>钉钉审批流程映射</h2><p>已预置当前企业真实流程。付款审批通过后，从“采购申请单”关联控件读取原实例 ID 和真实金额。</p></div>{canEdit ? <Button variant="primary" onClick={() => dispatch({ type: "settings", settings: draft })}>保存设置</Button> : null}</div><div className="supply-settings-matrix"><fieldset disabled={!canEdit}><legend>采购申请单</legend><label>processCode<input value={draft.purchaseProcessCode || ""} onChange={event => setDraft(current => ({ ...current, purchaseProcessCode: event.target.value }))} /></label><label>金额字段<input value={draft.fieldMappings?.purchase?.amountFieldId || ""} onChange={event => updateMapping("purchase", "amountFieldId", event.target.value)} /></label><label>事由字段<input value={draft.fieldMappings?.purchase?.purposeFieldId || ""} onChange={event => updateMapping("purchase", "purposeFieldId", event.target.value)} /></label><label>业务分类字段<input value={draft.fieldMappings?.purchase?.businessCategoryFieldId || ""} onChange={event => updateMapping("purchase", "businessCategoryFieldId", event.target.value)} /></label><label>供应商字段（可选）<input value={draft.fieldMappings?.purchase?.supplierFieldId || ""} onChange={event => updateMapping("purchase", "supplierFieldId", event.target.value)} /></label><label>产品字段（可选）<input value={draft.fieldMappings?.purchase?.productFieldId || ""} onChange={event => updateMapping("purchase", "productFieldId", event.target.value)} /></label></fieldset><fieldset disabled={!canEdit}><legend>付款审批</legend><label>processCode<input value={draft.paymentProcessCode || ""} onChange={event => setDraft(current => ({ ...current, paymentProcessCode: event.target.value }))} /></label><label>付款金额字段（无则读取关联采购）<input value={draft.fieldMappings?.payment?.amountFieldId || ""} onChange={event => updateMapping("payment", "amountFieldId", event.target.value)} /></label><label>关联采购审批字段<input value={draft.fieldMappings?.payment?.relatedPurchaseFieldId || ""} onChange={event => updateMapping("payment", "relatedPurchaseFieldId", event.target.value)} /></label><p className="supply-settings-note">安全规则：不保存收款账号、身份证、详细地址或完整审批原文；只保留金额、事由、分类、状态和关联实例 ID。</p></fieldset></div></section>;
 }
 
 export function SupplyChainAppPage({ onNavigate, section = "overview" }) {
@@ -60,7 +76,7 @@ export function SupplyChainAppPage({ onNavigate, section = "overview" }) {
     products: <ProductSupplyWorkspace products={products} canEdit={supplyEditor} />,
     inventory: <InventoryWorkspace products={products} summary={summary} canEdit={supplyEditor} />,
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,
-    records: <SyncRecordsWorkspace />,
+    records: <SyncRecordsWorkspace salesRows={salesRows} />,
     settings: <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
   };
   return (

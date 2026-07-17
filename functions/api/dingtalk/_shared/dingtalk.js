@@ -216,15 +216,32 @@ export async function getDingApprovalInstance(accessToken, processInstanceId, fe
   return {
     ...instance,
     processInstanceId: instance.processInstanceId || instance.process_instance_id || id,
-    formComponentValues: instance.formComponentValues || instance.form_component_values || []
+    formComponentValues: instance.formComponentValues || instance.form_component_values || instance.formValueVOS || instance.form_value_vos || []
   };
 }
 
-function approvalField(instance, fieldId) {
+function approvalFields(instance) {
+  return instance.formComponentValues
+    || instance.form_component_values
+    || instance.formValueVOS
+    || instance.form_value_vos
+    || [];
+}
+
+function approvalFieldRecord(instance, fieldId) {
   const target = String(fieldId || "").trim();
-  if (!target) return "";
-  const fields = instance.formComponentValues || instance.form_component_values || [];
-  const field = fields.find(item => [item.id, item.name, item.label, item.componentName].some(value => String(value || "").trim() === target));
+  if (!target) return null;
+  return approvalFields(instance).find(item => [
+    item.id,
+    item.name,
+    item.label,
+    item.componentName,
+    item.component_name
+  ].some(value => String(value || "").trim() === target)) || null;
+}
+
+function approvalField(instance, fieldId) {
+  const field = approvalFieldRecord(instance, fieldId);
   return field?.value ?? field?.text ?? "";
 }
 
@@ -250,6 +267,38 @@ function parseRelatedProcessInstanceId(value) {
   return "";
 }
 
+function parseJsonValue(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function relatedApproval(field) {
+  const extension = parseJsonValue(field?.extValue ?? field?.ext_value);
+  const relation = extension?.list?.[0] || null;
+  const instanceId = String(
+    relation?.instanceId
+    || relation?.processInstanceId
+    || relation?.process_instance_id
+    || parseRelatedProcessInstanceId(field?.value)
+    || ""
+  ).trim();
+  const rowValues = Array.isArray(relation?.rowValue) ? relation.rowValue : [];
+  return {
+    instanceId,
+    formCode: String(relation?.formCode || "").trim(),
+    value(name) {
+      const names = Array.isArray(name) ? name : [name];
+      const row = rowValues.find(item => names.includes(String(item?.label || item?.name || "").trim()));
+      return row?.value ?? row?.text ?? "";
+    }
+  };
+}
+
 function approvalStatus(instance) {
   const result = String(instance.result || "").toLowerCase();
   const status = String(instance.status || "").toUpperCase();
@@ -267,34 +316,54 @@ function numberValue(value) {
 export function normalizeDingSupplyApproval(instance = {}, mapping = {}) {
   const kind = mapping.kind === "payment" ? "payment" : "purchase";
   const processInstanceId = String(instance.processInstanceId || instance.process_instance_id || "").trim();
-  const amount = numberValue(approvalField(instance, mapping.amountFieldId));
   const common = {
     id: processInstanceId,
     processInstanceId,
-    title: instance.title || instance.processInstanceName || instance.process_instance_name || "",
+    title: instance.title || instance.processInstanceTitle || instance.processInstanceName || instance.process_instance_name || "",
     status: approvalStatus(instance),
+    processCode: instance.processCode || instance.process_code || "",
+    businessId: instance.businessId || instance.business_id || "",
     originatorUserId: instance.originatorUserId || instance.originator_userid || "",
     originatorName: instance.originatorUserName || instance.originator_user_name || "",
     createTime: instance.createTime || instance.create_time || "",
-    finishTime: instance.finishTime || instance.finish_time || "",
-    rawPayload: instance
+    finishTime: instance.finishTime || instance.finish_time || ""
   };
   if (kind === "payment") {
-    const relatedValue = approvalField(instance, mapping.relatedPurchaseFieldId);
-    const purchaseProcessInstanceId = parseRelatedProcessInstanceId(relatedValue);
+    const relatedField = approvalFieldRecord(instance, mapping.relatedPurchaseFieldId);
+    const relation = relatedApproval(relatedField);
+    const explicitAmountValue = approvalField(instance, mapping.amountFieldId);
+    const relatedAmountValue = relation.value(["金额（元）", "付款金额", "付款金额（元）", "总付款金额"]);
+    const hasExplicitAmount = String(explicitAmountValue ?? "").trim() !== "";
+    const amount = numberValue(hasExplicitAmount ? explicitAmountValue : relatedAmountValue);
+    const purchaseProcessInstanceId = relation.instanceId;
+    const reason = String(
+      approvalField(instance, mapping.purposeFieldId)
+      || relation.value(["事由", "申请事由", "付款事由"])
+      || ""
+    ).trim();
+    const businessCategory = String(
+      approvalField(instance, mapping.businessCategoryFieldId)
+      || relation.value(["业务分类", "支出分类", "费用类型"])
+      || ""
+    ).trim();
     return {
       kind,
       record: {
         ...common,
         amount,
+        amountSource: hasExplicitAmount ? "payment-form" : relatedAmountValue ? "related-purchase" : "missing",
+        reason,
+        businessCategory,
+        relatedProcessCode: relation.formCode,
         purchaseProcessInstanceId,
         mappingStatus: purchaseProcessInstanceId ? "mapped" : "unmapped",
-        unmappedValues: purchaseProcessInstanceId ? {} : { relatedPurchase: String(relatedValue || "") }
+        unmappedValues: purchaseProcessInstanceId ? {} : { relatedPurchase: String(relatedField?.value || "") }
       },
       lines: []
     };
   }
 
+  const amount = numberValue(approvalField(instance, mapping.amountFieldId));
   const supplierValue = String(approvalField(instance, mapping.supplierFieldId) || "").trim();
   const productValue = String(approvalField(instance, mapping.productFieldId) || "").trim();
   const supplierId = mapping.supplierValueMap?.[supplierValue] || "";
@@ -312,7 +381,12 @@ export function normalizeDingSupplyApproval(instance = {}, mapping = {}) {
       productIds: mappedProducts,
       requestedAmount: amount,
       approvedAmount: common.status === "COMPLETED" ? amount : 0,
-      mappingStatus: Object.keys(unmappedValues).length ? "unmapped" : "mapped",
+      reason: String(approvalField(instance, mapping.purposeFieldId) || "").trim(),
+      businessCategory: String(approvalField(instance, mapping.businessCategoryFieldId) || "").trim(),
+      requestedPaymentDate: String(approvalField(instance, mapping.paymentDateFieldId) || "").trim(),
+      departmentName: String(approvalField(instance, mapping.departmentFieldId) || "").trim(),
+      projectName: String(approvalField(instance, mapping.projectFieldId) || "").trim(),
+      mappingStatus: supplierId && mappedProducts.length ? "mapped" : "unmapped",
       unmappedValues
     },
     lines: []

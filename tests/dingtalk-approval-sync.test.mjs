@@ -51,7 +51,58 @@ test("payment normalization keeps DingTalk related purchase instance id", () => 
   assert.equal(normalized.record.purchaseProcessInstanceId, "purchase-1");
   assert.equal(normalized.record.amount, 30000);
   assert.equal(normalized.record.status, "COMPLETED");
-  assert.equal(normalized.record.rawPayload.processInstanceId, "pay-1");
+  assert.equal("rawPayload" in normalized.record, false);
+});
+
+test("payment normalization reads related purchase id and amount from FormRelateField extValue", () => {
+  const normalized = normalizeDingSupplyApproval({
+    processInstanceId: "pay-real-1",
+    result: "agree",
+    formValueVOS: [{
+      id: "FormRelateField_I1ZZKN4HAW00",
+      name: "采购申请单",
+      componentType: "FormRelateField",
+      value: "[\"采购申请单\"]",
+      extValue: JSON.stringify({
+        quote: 1,
+        list: [{
+          instanceId: "purchase-real-1",
+          formCode: "PROC-PURCHASE",
+          rowValue: [
+            { label: "事由", value: "原料采购" },
+            { label: "金额（元）", value: "30,000" },
+            { label: "业务分类", value: "支出/产品费用/产品成本费用/原料费" },
+            { label: "收款人信息", value: "供应商 6222 0000 0000" }
+          ]
+        }]
+      })
+    }]
+  }, { kind: "payment", relatedPurchaseFieldId: "采购申请单" });
+
+  assert.equal(normalized.record.purchaseProcessInstanceId, "purchase-real-1");
+  assert.equal(normalized.record.amount, 30000);
+  assert.equal(normalized.record.amountSource, "related-purchase");
+  assert.equal(normalized.record.reason, "原料采购");
+  assert.equal(normalized.record.businessCategory, "支出/产品费用/产品成本费用/原料费");
+  assert.equal(JSON.stringify(normalized.record).includes("6222"), false);
+});
+
+test("purchase normalization stores only allow-listed business fields", () => {
+  const normalized = normalizeDingSupplyApproval({
+    processInstanceId: "purchase-safe-1",
+    result: "agree",
+    form_component_values: [
+      { name: "事由", value: "包装盒采购" },
+      { name: "金额（元）", value: "1200" },
+      { name: "业务分类", value: "支出/产品费用/产品成本费用/包材费" },
+      { name: "收款人信息", value: "某公司 6214 0000 0000" }
+    ]
+  }, { kind: "purchase", amountFieldId: "金额（元）", purposeFieldId: "事由", businessCategoryFieldId: "业务分类" });
+
+  assert.equal(normalized.record.reason, "包装盒采购");
+  assert.equal(normalized.record.businessCategory, "支出/产品费用/产品成本费用/包材费");
+  assert.equal(JSON.stringify(normalized.record).includes("6214"), false);
+  assert.equal("rawPayload" in normalized.record, false);
 });
 
 test("purchase normalization marks unresolved supplier and product values for mapping", () => {
@@ -109,4 +160,39 @@ test("approval sync upserts purchase and payment instances idempotently", async 
   assert.equal(second.state.paymentApprovals[0].purchaseProcessInstanceId, "purchase-1");
   assert.equal(second.synced.purchase, 1);
   assert.equal(second.synced.payment, 1);
+});
+
+test("approval sync excludes categorized non-supply purchases and their linked payments", async () => {
+  const state = normalizeSupplyChainState({
+    settings: {
+      purchaseProcessCode: "PROC-PURCHASE",
+      paymentProcessCode: "PROC-PAYMENT",
+      fieldMappings: {
+        purchase: { amountFieldId: "金额（元）", businessCategoryFieldId: "业务分类" },
+        payment: { relatedPurchaseFieldId: "采购申请单" }
+      }
+    }
+  });
+  const relation = (instanceId, category, amount) => JSON.stringify({
+    list: [{ instanceId, rowValue: [{ label: "金额（元）", value: String(amount) }, { label: "业务分类", value: category }] }]
+  });
+  const instances = {
+    "purchase-supply": { process_instance_id: "purchase-supply", result: "agree", form_component_values: [{ name: "金额（元）", value: "800" }, { name: "业务分类", value: "支出/产品费用/产品成本费用/原料费" }] },
+    "purchase-marketing": { process_instance_id: "purchase-marketing", result: "agree", form_component_values: [{ name: "金额（元）", value: "30000" }, { name: "业务分类", value: "支出/产品费用/运营营销费用/投流推广费" }] },
+    "pay-supply": { process_instance_id: "pay-supply", result: "agree", form_component_values: [{ name: "采购申请单", value: "[\"采购\"]", ext_value: relation("purchase-supply", "支出/产品费用/产品成本费用/原料费", 800) }] },
+    "pay-marketing": { process_instance_id: "pay-marketing", result: "agree", form_component_values: [{ name: "采购申请单", value: "[\"采购\"]", ext_value: relation("purchase-marketing", "支出/产品费用/运营营销费用/投流推广费", 30000) }] }
+  };
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.process_code === "PROC-PURCHASE") return Response.json({ errcode: 0, result: { list: ["purchase-supply", "purchase-marketing"] } });
+    if (body.process_code === "PROC-PAYMENT") return Response.json({ errcode: 0, result: { list: ["pay-supply", "pay-marketing"] } });
+    return Response.json({ errcode: 0, process_instance: instances[body.process_instance_id] });
+  };
+
+  const result = await syncSupplyApprovals({ state, accessToken: "token", startTime: 1, endTime: 2, fetchImpl });
+  assert.deepEqual(result.state.purchaseApprovals.map(item => item.processInstanceId), ["purchase-supply"]);
+  assert.deepEqual(result.state.paymentApprovals.map(item => item.processInstanceId), ["pay-supply"]);
+  assert.equal(result.synced.purchase, 1);
+  assert.equal(result.synced.payment, 1);
+  assert.equal(result.synced.skipped, 2);
 });
