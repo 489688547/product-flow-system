@@ -748,6 +748,13 @@ export function reducePlatformState(input, action = {}) {
 
   if (ACTION_COLLECTION[action.type]) {
     const [collection, entityType, prefix] = ACTION_COLLECTION[action.type];
+    const existing = state[collection].find(item => item.id === action.record?.id);
+    if (action.type === "upsert_incentive_project" && existing?.status === "closed") {
+      throw new Error("已结项激励项目不可修改。");
+    }
+    if (action.type === "upsert_monthly_report" && existing?.status === "frozen") {
+      throw new Error("已冻结月报不可覆盖，只能追加更正记录。");
+    }
     const record = recordWithDefaults(action.record || {}, prefix, timestamp);
     const next = { ...state, updatedAt: timestamp, [collection]: upsert(state[collection], record) };
     return audit(next, {
@@ -769,8 +776,9 @@ export function reducePlatformState(input, action = {}) {
       && !["completed", "cancelled"].includes(item.status)
     ));
     if (activeCommitments.length) throw new Error("请先完成或取消关联的部门承诺。");
+    const linkedObjectiveIds = new Set(state.objectives.filter(item => item.strategyId === action.id && !item.archived).map(item => item.id));
     const activeProjects = state.projects.filter(item => (
-      item.strategyId === action.id
+      (item.strategyId === action.id || linkedObjectiveIds.has(item.objectiveId))
       && !item.archived
       && !["completed", "cancelled"].includes(item.status)
     ));

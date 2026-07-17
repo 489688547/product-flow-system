@@ -142,7 +142,8 @@ export function StrategyCenterPage() {
   };
   const requestStrategyArchive = strategy => {
     const commitmentCount = state.departmentCommitments.filter(item => item.strategyId === strategy.id && !item.archived && !["completed", "cancelled"].includes(item.status)).length;
-    const projectCount = state.projects.filter(item => item.strategyId === strategy.id && !item.archived && !["completed", "cancelled"].includes(item.status)).length;
+    const objectiveIds = new Set(state.objectives.filter(item => item.strategyId === strategy.id && !item.archived).map(item => item.id));
+    const projectCount = state.projects.filter(item => (item.strategyId === strategy.id || objectiveIds.has(item.objectiveId)) && !item.archived && !["completed", "cancelled"].includes(item.status)).length;
     setDeleting({ kind: "strategy", record: strategy, blocked: commitmentCount || projectCount ? `当前仍有关联的 ${commitmentCount} 个部门承诺和 ${projectCount} 个重点项目，请先完成或取消后再归档。` : "关联的必达结果会一并归档，历史审计记录会保留。" });
   };
   const confirmArchive = () => {

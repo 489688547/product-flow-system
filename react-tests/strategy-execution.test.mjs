@@ -61,6 +61,14 @@ test("strategy archive blocks active dependencies and cascades required results"
   });
   assert.throws(() => reducePlatformState(blocked, { type: "archive_strategy", id: "s1", actor: "周总" }), /部门承诺/);
 
+  const objectiveLinked = normalizePlatformState({
+    ...blocked,
+    departmentCommitments: [],
+    objectives: [{ id: "o1", strategyId: "s1" }],
+    projects: [{ id: "p1", objectiveId: "o1", status: "active" }]
+  });
+  assert.throws(() => reducePlatformState(objectiveLinked, { type: "archive_strategy", id: "s1", actor: "周总" }), /重点项目/);
+
   const archived = reducePlatformState({ ...blocked, departmentCommitments: [] }, {
     type: "archive_strategy",
     id: "s1",
@@ -93,6 +101,16 @@ test("governed records only archive in safe workflow states", () => {
   const report = reducePlatformState(base, { type: "archive_monthly_report", id: "draft-report", actor: "周总" });
   assert.equal(report.monthlyReports.find(item => item.id === "draft-report").archived, true);
   assert.throws(() => reducePlatformState(base, { type: "archive_monthly_report", id: "submitted-report" }), /草稿月报/);
+});
+
+test("closed incentives and frozen monthly reports are immutable", () => {
+  const base = normalizePlatformState({
+    version: "strategy-platform-v3",
+    incentiveProjects: [{ id: "closed-incentive", name: "已结项", status: "closed" }],
+    monthlyReports: [{ id: "frozen-report", month: "2026-06", status: "frozen", keyResults: "原始成果" }]
+  });
+  assert.throws(() => reducePlatformState(base, { type: "upsert_incentive_project", record: { id: "closed-incentive", name: "被修改" } }), /已结项/);
+  assert.throws(() => reducePlatformState(base, { type: "upsert_monthly_report", record: { id: "frozen-report", keyResults: "被覆盖" } }), /已冻结/);
 });
 
 test("project archive cascades children while project child and weekly updates archive independently", () => {
