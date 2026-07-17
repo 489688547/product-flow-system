@@ -142,6 +142,10 @@ export function PlatformProvider({ children, enabled = true }) {
     dispatch({ type: "upsert_required_result", record, reason });
   }, [dispatch]);
 
+  const saveStrategy = useCallback((record, reason = "维护公司战略") => {
+    dispatch({ type: "upsert_strategy", record, reason });
+  }, [dispatch]);
+
   const saveDepartmentCommitment = useCallback((record, reason = "维护部门承诺") => {
     dispatch({ type: "upsert_department_commitment", record, reason });
   }, [dispatch]);
@@ -188,6 +192,10 @@ export function PlatformProvider({ children, enabled = true }) {
 
   const archiveDepartmentCommitment = useCallback((id, reason = "归档部门承诺") => {
     dispatch({ type: "archive_department_commitment", id, reason });
+  }, [dispatch]);
+
+  const archiveCommitmentMilestone = useCallback((id, reason = "归档部门承诺里程碑") => {
+    dispatch({ type: "archive_commitment_milestone", id, reason });
   }, [dispatch]);
 
   const archiveProject = useCallback((id, reason = "归档重点项目") => {
@@ -365,6 +373,7 @@ export function PlatformProvider({ children, enabled = true }) {
     syncPersonalTodo,
     refreshPersonalTodoStatuses,
     setPersonalTodoDone,
+    saveStrategy,
     saveRequiredResult,
     saveDepartmentCommitment,
     transitionCommitment,
@@ -378,6 +387,7 @@ export function PlatformProvider({ children, enabled = true }) {
     archiveStrategy,
     archiveRequiredResult,
     archiveDepartmentCommitment,
+    archiveCommitmentMilestone,
     archiveProject,
     archiveProjectChild,
     archiveIncentiveProject,
@@ -385,6 +395,7 @@ export function PlatformProvider({ children, enabled = true }) {
     archiveStatusUpdate
   }), [
     archiveDepartmentCommitment,
+    archiveCommitmentMilestone,
     archiveIncentiveProject,
     archiveMonthlyReport,
     archiveProject,
@@ -403,6 +414,7 @@ export function PlatformProvider({ children, enabled = true }) {
     saveIncentiveProject,
     saveMonthlyReport,
     saveRequiredResult,
+    saveStrategy,
     setPersonalTodoDone,
     settleIncentive,
     state,

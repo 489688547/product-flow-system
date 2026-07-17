@@ -59,6 +59,7 @@ test("local real-data panel is explicitly read-only and development-only", () =>
 
 test("strategy center governs company results and department commitments", () => {
   const page = read("src/features/strategy/StrategyCenterPage.jsx");
+  const strategyModal = read("src/features/strategy/StrategyEditorModal.jsx");
   const resultModal = read("src/features/strategy/RequiredResultModal.jsx");
   const commitmentModal = read("src/features/strategy/DepartmentCommitmentModal.jsx");
   assert.match(page, /公司战略/);
@@ -68,6 +69,14 @@ test("strategy center governs company results and department commitments", () =>
   assert.match(commitmentModal, /月度里程碑/);
   assert.match(page, /总经办审核/);
   assert.match(page, /老板确认/);
+  assert.match(page, /新建公司战略/);
+  assert.match(page, /StrategyEditorModal/);
+  assert.match(page, /saveStrategy/);
+  assert.match(page, /archiveStrategy/);
+  assert.match(page, /archiveRequiredResult/);
+  assert.match(page, /archiveDepartmentCommitment/);
+  assert.match(page, /ConfirmDialog/);
+  assert.match(strategyModal, /战略意图/);
 });
 
 test("key project workspace manages milestones risks and decisions", () => {

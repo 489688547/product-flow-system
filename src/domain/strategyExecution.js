@@ -826,6 +826,22 @@ export function reducePlatformState(input, action = {}) {
     });
   }
 
+  if (action.type === "archive_commitment_milestone") {
+    if (!state.commitmentMilestones.some(item => item.id === action.id && !item.archived)) return state;
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      commitmentMilestones: archiveMatching(state.commitmentMilestones, item => item.id === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "commitment_milestone",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
   if (action.type === "archive_project") {
     if (!state.projects.some(item => item.id === action.id && !item.archived)) return state;
     return audit({
