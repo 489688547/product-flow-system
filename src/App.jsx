@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChevronDown, ClipboardList, GitBranch, Home, LayoutDashboard, LogOut, PanelsTopLeft, Settings, Target } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChevronDown, ClipboardList, GitBranch, Home, LayoutDashboard, LogOut, PanelsTopLeft, Settings, Target, Truck } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductArchivePage } from "./features/archive/ProductArchivePage.jsx";
 import { DashboardPage } from "./features/dashboard/DashboardPage.jsx";
@@ -19,6 +19,7 @@ import { KeyProjectsPage } from "./features/projects/KeyProjectsPage.jsx";
 import { OperatingReviewPage } from "./features/reviews/OperatingReviewPage.jsx";
 import { AppCenterPage } from "./features/platform/AppCenterPage.jsx";
 import { IncentiveProjectsPage } from "./features/incentives/IncentiveProjectsPage.jsx";
+import { SupplyChainAppPage } from "./features/supply-chain/SupplyChainAppPage.jsx";
 
 const COMPANY_NAV = [
   ["home", "公司首页", LayoutDashboard, "公司经营"],
@@ -27,6 +28,7 @@ const COMPANY_NAV = [
   ["incentives", "部门激励", BadgeDollarSign, "公司经营"],
   ["reviews", "经营检查", CalendarCheck, "公司经营"],
   ["apps", "业务 Apps", AppWindow, "公司经营"],
+  ["supply-chain", "供应链管理", Truck, "业务 Apps"],
   ["dashboard", "产品总览", PanelsTopLeft, "产品全周期"],
   ["demands", "需求池", ClipboardList, "产品全周期"],
   ["planning", "产品规划", CalendarRange, "产品全周期"],
@@ -41,6 +43,7 @@ const PRODUCT_NAV = [
   ["planning", "产品规划", CalendarRange],
   ["progress", "产品进度", GitBranch],
   ["archive", "产品档案", Archive],
+  ["supply-chain", "供应链管理", Truck],
   ["issues", "问题反馈", Bug],
   ["settings", "设置", Settings]
 ];
@@ -112,6 +115,7 @@ export default function App() {
     incentives: <IncentiveProjectsPage />,
     reviews: <OperatingReviewPage />,
     apps: <AppCenterPage onNavigate={navigate} />,
+    "supply-chain": <SupplyChainAppPage onNavigate={navigate} />,
     dashboard: <DashboardPage onNavigate={navigate} onOpenProgress={openProgress} />,
     demands: <DemandPoolPage onProjectCreated={productId => openProgress(productId, 1)} />,
     planning: <ProductPlanningPage onOpenProgress={openProgress} />,
