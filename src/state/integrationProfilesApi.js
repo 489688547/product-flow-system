@@ -13,18 +13,28 @@ async function readPayload(response) {
 }
 
 export async function loadIntegrationProfiles({ hostname = "", fetchImpl = fetch } = {}) {
-  const response = await fetchImpl(integrationProfilesApiUrl(hostname), { credentials: "include" });
-  const payload = await readPayload(response);
-  return Array.isArray(payload.profiles) ? payload.profiles : [];
+  try {
+    const response = await fetchImpl(integrationProfilesApiUrl(hostname), { credentials: "include" });
+    const payload = await readPayload(response);
+    return Array.isArray(payload.profiles) ? payload.profiles : [];
+  } catch (error) {
+    if (error?.message && !/failed to fetch|networkerror/i.test(error.message)) throw error;
+    throw new Error("无法连接内部平台资料服务。");
+  }
 }
 
 export async function saveIntegrationProfile(profile, { hostname = "", fetchImpl = fetch } = {}) {
-  const response = await fetchImpl(integrationProfilesApiUrl(hostname), {
-    method: "PUT",
-    credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(profile)
-  });
-  const payload = await readPayload(response);
-  return payload.profile;
+  try {
+    const response = await fetchImpl(integrationProfilesApiUrl(hostname), {
+      method: "PUT",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(profile)
+    });
+    const payload = await readPayload(response);
+    return payload.profile;
+  } catch (error) {
+    if (error?.message && !/failed to fetch|networkerror/i.test(error.message)) throw error;
+    throw new Error("无法连接内部平台资料服务。");
+  }
 }

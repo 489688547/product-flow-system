@@ -133,7 +133,7 @@ export default function App() {
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
-    handbook: <HandbookPage selectedSlug={routeDetail} onSelectDocument={slug => showScreen("handbook", slug)} />,
+    handbook: <HandbookPage selectedSlug={routeDetail} sessionUser={sessionUser} onSelectDocument={slug => showScreen("handbook", slug)} />,
     issues: <IssuePage />,
     settings: <SettingsPage />
   };
