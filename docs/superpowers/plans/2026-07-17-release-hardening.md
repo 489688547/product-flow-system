@@ -68,6 +68,7 @@ git commit -m "fix: enforce dependency security gate"
 - Create: `scripts/build-chunks.mjs`
 - Create: `scripts/check-build-chunks.mjs`
 - Create: `react-tests/build-chunks.test.mjs`
+- Modify: `react-tests/react-app.test.mjs`
 - Modify: `vite.config.js`
 - Modify: `package.json`
 - Modify: `src/App.jsx`
@@ -107,7 +108,7 @@ Expected: build succeeds, Vite emits no 500KB warning, and `check-build-chunks.m
 - [ ] **Step 6: Commit**
 
 ```bash
-git add scripts/build-chunks.mjs scripts/check-build-chunks.mjs react-tests/build-chunks.test.mjs vite.config.js package.json src/App.jsx
+git add scripts/build-chunks.mjs scripts/check-build-chunks.mjs react-tests/build-chunks.test.mjs react-tests/react-app.test.mjs vite.config.js package.json src/App.jsx
 git commit -m "perf: enforce production chunk budget"
 ```
 
