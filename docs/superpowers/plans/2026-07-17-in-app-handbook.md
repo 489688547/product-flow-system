@@ -35,7 +35,7 @@
 - Produces: `HANDBOOK_CATEGORIES`, `createHandbookDocument(entry)`, `filterHandbookDocuments(documents, options)`, `resolveHandbookDocument(documents, slug)`, and `extractMarkdownHeadings(markdown)`.
 - Produces: `handbookDocuments` containing `{ slug, category, kind, title, summary, updatedAt, content }` and `DEFAULT_HANDBOOK_SLUG`.
 
-- [ ] **Step 1: Write failing pure domain tests**
+- [x] **Step 1: Write failing pure domain tests**
 
 Create tests for:
 
@@ -89,21 +89,21 @@ test("markdown table of contents uses stable unique H2 and H3 ids", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify missing-module failure**
+- [x] **Step 2: Run the focused test and verify missing-module failure**
 
 Run: `node --test react-tests/handbook.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `src/domain/handbook.js`.
 
-- [ ] **Step 3: Install safe Markdown dependencies**
+- [x] **Step 3: Install safe Markdown dependencies**
 
 Run: `npm install react-markdown@^10.0.0 remark-gfm@^4.0.0 rehype-slug@^6.0.0 github-slugger@^2.0.0`
 
-- [ ] **Step 4: Implement the pure handbook domain**
+- [x] **Step 4: Implement the pure handbook domain**
 
 Use `GithubSlugger` for heading IDs. Strip the first H1 from the summary search, choose the first non-heading non-list paragraph as summary, normalize whitespace, and compare search text with `toLocaleLowerCase("zh-CN")`. `resolveHandbookDocument` returns the matching slug, then the default slug, then the first document, or `null`.
 
-- [ ] **Step 5: Build the allowlisted Markdown catalog**
+- [x] **Step 5: Build the allowlisted Markdown catalog**
 
 `handbookCatalog.js` explicitly imports `PRODUCT.md` and `DESIGN.md` with `?raw`, then uses `import.meta.glob` with eager raw imports only for:
 
@@ -119,13 +119,13 @@ Use `GithubSlugger` for heading IDs. Strip the first H1 from the summary search,
 
 Map the paths to stable categories and slugs. Derive `updatedAt` from a leading `YYYY-MM-DD` filename when present, otherwise use `2026-07-17`. Sort by category order, kind order, then title. Export `DEFAULT_HANDBOOK_SLUG = "handbook/getting-started"`.
 
-- [ ] **Step 6: Run focused tests and production build**
+- [x] **Step 6: Run focused tests and production build**
 
 Run: `node --test react-tests/handbook.test.mjs && npm run build`
 
 Expected: domain tests pass and Vite resolves every allowlisted raw Markdown import.
 
-- [ ] **Step 7: Commit the domain and catalog**
+- [x] **Step 7: Commit the domain and catalog**
 
 ```bash
 git add src/domain/handbook.js src/features/handbook/handbookCatalog.js react-tests/handbook.test.mjs package.json package-lock.json
@@ -144,21 +144,21 @@ git commit -m "feat(handbook): build documentation catalog"
 - Consumes: `handbookDocuments`, `DEFAULT_HANDBOOK_SLUG`, filtering/resolution/heading helpers.
 - Produces: default export `HandbookPage({ selectedSlug, onSelectDocument })`.
 
-- [ ] **Step 1: Add failing source-contract tests**
+- [x] **Step 1: Add failing source-contract tests**
 
 Assert that the page contains search label `搜索说明书`, category labels `员工使用手册`, `产品与设计`, `平台能力`, empty copy `没有找到匹配的说明`, and renders `MarkdownDocument`. Assert the renderer imports `react-markdown`, `remark-gfm`, and `rehype-slug`, does not import `rehype-raw`, gives external links `target="_blank"`, and renders table wrappers.
 
-- [ ] **Step 2: Run the focused test and verify missing component files**
+- [x] **Step 2: Run the focused test and verify missing component files**
 
 Run: `node --test react-tests/handbook.test.mjs`
 
 Expected: FAIL because `HandbookPage.jsx` and `MarkdownDocument.jsx` do not exist.
 
-- [ ] **Step 3: Implement `MarkdownDocument`**
+- [x] **Step 3: Implement `MarkdownDocument`**
 
 Render Markdown with GFM and heading IDs. Override links so internal `#heading` links stay in the page and HTTP links receive `target="_blank" rel="noreferrer"`. Wrap tables in `.handbook-table-wrap`, keep code blocks horizontally scrollable, and do not enable raw HTML.
 
-- [ ] **Step 4: Implement the three-column handbook page**
+- [x] **Step 4: Implement the three-column handbook page**
 
 State contains `query` and `category`, while selected document remains controlled by the route. The page must:
 
@@ -170,17 +170,17 @@ State contains `query` and `category`, while selected document remains controlle
 - Render title, summary, kind label, updated date, Markdown body, and H2/H3 table of contents.
 - Render an instructional empty state when no result matches.
 
-- [ ] **Step 5: Add restrained responsive CSS**
+- [x] **Step 5: Add restrained responsive CSS**
 
 Use `grid-template-columns: minmax(210px, 250px) minmax(0, 1fr) minmax(150px, 190px)`, existing tokens, full dividers rather than nested cards, 65-75ch article text, stable tables, visible focus, and sticky directory/TOC only when height permits. At 1180px hide the right TOC; at 820px use one column and make the document list horizontally scrollable. Respect `prefers-reduced-motion`.
 
-- [ ] **Step 6: Run focused test and lint**
+- [x] **Step 6: Run focused test and lint**
 
 Run: `node --test react-tests/handbook.test.mjs && npm run lint`
 
 Expected: focused tests pass and ESLint exits 0.
 
-- [ ] **Step 7: Commit the handbook workspace**
+- [x] **Step 7: Commit the handbook workspace**
 
 ```bash
 git add src/features/handbook react-tests/handbook.test.mjs
@@ -199,21 +199,21 @@ git commit -m "feat(handbook): add searchable document workspace"
 - Produces: `parseAppHash(hash) -> { screen, detail }` and `formatAppHash(screen, detail) -> string`.
 - Consumes: lazy default export from `HandbookPage.jsx`.
 
-- [ ] **Step 1: Add failing route and navigation tests**
+- [x] **Step 1: Add failing route and navigation tests**
 
 Test round trips for `#handbook/platform/api-catalog`, percent-encoded Chinese segments, and empty hashes. Source assertions require `BookOpenText`, a `handbook` item in both `COMPANY_NAV` and `PRODUCT_NAV`, `lazy(() => import("./features/handbook/HandbookPage.jsx"))`, a Suspense fallback, and `if (key === "handbook") return Boolean(user);` in permissions.
 
-- [ ] **Step 2: Run the focused test and verify missing route helper**
+- [x] **Step 2: Run the focused test and verify missing route helper**
 
 Run: `node --test react-tests/handbook.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `src/domain/appNavigation.js`.
 
-- [ ] **Step 3: Implement pure hash parsing and formatting**
+- [x] **Step 3: Implement pure hash parsing and formatting**
 
 Split the hash into encoded path segments, decode each safely, and never throw on malformed encoding. `formatAppHash` encodes each detail segment separately so slash-delimited handbook slugs remain readable and stable.
 
-- [ ] **Step 4: Integrate lazy handbook navigation into App**
+- [x] **Step 4: Integrate lazy handbook navigation into App**
 
 - Add `handbook` to company “平台” group and product navigation before issue feedback.
 - Keep screen validation against existing navigation and hidden screens.
@@ -222,17 +222,17 @@ Split the hash into encoded path segments, decode each safely, and never throw o
 - Render a lightweight page skeleton inside Suspense.
 - Preserve existing `navigate`, product progress focus, and default screen behavior.
 
-- [ ] **Step 5: Make handbook navigation unconditionally visible after login**
+- [x] **Step 5: Make handbook navigation unconditionally visible after login**
 
 Return `Boolean(user)` for `key === "handbook"` before configurable navigation rules. Do not add handbook to the permission-settings matrix because employees must not accidentally lose access to company instructions.
 
-- [ ] **Step 6: Run handbook, app, and access tests**
+- [x] **Step 6: Run handbook, app, and access tests**
 
 Run: `node --test react-tests/handbook.test.mjs react-tests/react-app.test.mjs react-tests/company-access-gate.test.mjs`
 
 Expected: all selected tests pass, 0 fail.
 
-- [ ] **Step 7: Commit navigation integration**
+- [x] **Step 7: Commit navigation integration**
 
 ```bash
 git add src/domain/appNavigation.js src/App.jsx src/domain/permissions.js react-tests/handbook.test.mjs
@@ -248,17 +248,17 @@ git commit -m "feat(handbook): add sidebar entry and deep links"
 - Consumes: Complete handbook feature.
 - Produces: Test, build, responsive, accessibility, and lazy-chunk evidence.
 
-- [ ] **Step 1: Run every repository gate**
+- [x] **Step 1: Run every repository gate**
 
 Run: `npm run lint && npm run check:governance && npm test && npm run build`
 
 Expected: all commands exit 0.
 
-- [ ] **Step 2: Verify code splitting from build output**
+- [x] **Step 2: Verify code splitting from build output**
 
 Inspect `dist/assets` and confirm a separate handbook JavaScript chunk contains Markdown renderer code while the primary entry remains separate.
 
-- [ ] **Step 3: Start local preview and inspect real UI**
+- [x] **Step 3: Start local preview and inspect real UI**
 
 Run: `npm run dev`
 
@@ -270,11 +270,11 @@ Open `http://127.0.0.1:8132/#handbook/handbook/getting-started` and verify:
 - Empty search explains how to recover.
 - Invalid slug safely shows the getting-started document.
 
-- [ ] **Step 4: Audit laptop and narrow widths**
+- [x] **Step 4: Audit laptop and narrow widths**
 
 Check approximately 1440px, 1180px, 820px, and 390px widths. Confirm no clipped sidebar, heading, table, search control, or document navigation; right TOC hides at 1180px and the document directory becomes compact at 820px.
 
-- [ ] **Step 5: Inspect final diff and commits**
+- [x] **Step 5: Inspect final diff and commits**
 
 Run: `git status --short && git diff --check && git log -10 --oneline`
 
