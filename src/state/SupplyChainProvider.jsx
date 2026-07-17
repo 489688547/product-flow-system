@@ -20,12 +20,16 @@ function messageFor(error, fallback) {
   return /load failed|failed to fetch/i.test(message) ? fallback : message || fallback;
 }
 
+function isLocalPreview() {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
 export function SupplyChainProvider({ children, enabled = true }) {
   const { user } = useAuth();
   const [state, setState] = useState(loadLocalState);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
-  const firstSave = useRef(true);
+  const dirty = useRef(false);
   const apiUrl = supplyChainApiUrl(window.location.hostname);
 
   useEffect(() => {
@@ -46,7 +50,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
           setError("");
         }
       } catch (loadError) {
-        if (active) setError(messageFor(loadError, "供应链数据加载失败，当前显示本地缓存。"));
+        if (active && !isLocalPreview()) setError(messageFor(loadError, "供应链数据加载失败，当前显示本地缓存。"));
       } finally {
         if (active) setLoading(false);
       }
@@ -58,10 +62,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     if (!enabled) return undefined;
-    if (firstSave.current) {
-      firstSave.current = false;
-      return undefined;
-    }
+    if (!dirty.current) return undefined;
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(apiUrl, {
@@ -71,15 +72,17 @@ export function SupplyChainProvider({ children, enabled = true }) {
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.synced === false) throw new Error(payload.message || "供应链数据保存失败。");
+        dirty.current = false;
         setError("");
       } catch (saveError) {
-        setError(messageFor(saveError, "供应链数据同步失败，修改已保存在本机。"));
+        if (!isLocalPreview()) setError(messageFor(saveError, "供应链数据同步失败，修改已保存在本机。"));
       }
     }, 600);
     return () => clearTimeout(timer);
   }, [apiUrl, enabled, state]);
 
   const dispatch = useCallback(action => {
+    dirty.current = true;
     setState(current => reduceSupplyChainState(current, {
       ...action,
       actor: action.actor || user?.name || "系统"

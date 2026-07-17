@@ -136,6 +136,7 @@ function purchaseProductWeights(purchase, lines) {
 
 function emptyDimensionRow({ product, supplierId = "" }) {
   return {
+    id: product?.id || (supplierId ? `supplier-${supplierId}` : "unmapped-dimension"),
     productId: product?.id || "",
     productName: product?.name || product?.productName || "未命名产品",
     supplierId,

@@ -68,7 +68,7 @@ export function SupplyChainAppPage({ onNavigate }) {
   const content = {
     overview: <SupplyChainOverview summary={summary} />,
     suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} />,
-    approvals: <ApprovalWorkspace canSync={financeEditor} />,
+    approvals: <ApprovalWorkspace canSync={financeEditor} canEditMapping={supplyEditor} products={products} />,
     products: <ProductSupplyWorkspace products={products} canEdit={supplyEditor} />,
     inventory: <InventoryWorkspace products={products} summary={summary} canEdit={supplyEditor} />,
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,

@@ -28,6 +28,9 @@ test("approval workspace keeps purchase requests separate from linked payments",
   assert.match(approval, /付款申请/);
   assert.match(approval, /purchaseProcessInstanceId/);
   assert.match(approval, /同步钉钉审批/);
+  assert.match(approval, /处理映射/);
+  assert.match(approval, /supplierValueMap/);
+  assert.match(approval, /productValueMap/);
 });
 
 test("supplier product and quality workspaces dispatch auditable domain changes", () => {
@@ -38,4 +41,14 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
   assert.match(product, /collection: "productSupplierLinks"/);
   assert.match(quality, /collection: "qualityIssues"/);
   assert.match(quality, /关闭问题/);
+});
+
+test("supply chain workbench has stable responsive structure", () => {
+  const css = read("src/styles.css");
+  assert.match(css, /\.supply-chain-app/);
+  assert.match(css, /\.supply-chain-nav/);
+  assert.match(css, /\.supply-metric-strip/);
+  assert.match(css, /\.supply-import-preview/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-chain-app/);
+  assert.match(css, /\.supply-chain-nav button:focus-visible/);
 });

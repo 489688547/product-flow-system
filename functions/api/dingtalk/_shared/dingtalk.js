@@ -140,7 +140,7 @@ async function postDingTopApi(accessToken, path, body, fetchImpl = fetch) {
     err.detail = data;
     throw err;
   }
-  return data.result ?? data;
+  return data.result || {};
 }
 
 function dingClientToken(value = "") {
@@ -199,9 +199,19 @@ export async function getDingApprovalInstance(accessToken, processInstanceId, fe
     error.status = 400;
     throw error;
   }
-  const result = await postDingTopApi(accessToken, "/topapi/processinstance/get", {
-    process_instance_id: id
-  }, fetchImpl);
+  const res = await fetchImpl(`https://oapi.dingtalk.com/topapi/processinstance/get?access_token=${encodeURIComponent(accessToken)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ process_instance_id: id })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.errcode !== 0) {
+    const error = new Error(data.errmsg || "钉钉审批实例读取失败");
+    error.status = 502;
+    error.detail = data;
+    throw error;
+  }
+  const result = data.result ?? data;
   const instance = result.process_instance || result.processInstance || result;
   return {
     ...instance,

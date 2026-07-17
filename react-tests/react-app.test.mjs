@@ -105,6 +105,7 @@ test("supply chain feature has department defaults and an isolated persistence p
   assert.match(provider, /localStorage\.getItem\(STORAGE_KEY\)/);
   assert.match(provider, /method: "POST"/);
   assert.match(provider, /syncApprovals/);
+  assert.match(provider, /if \(!dirty\.current\) return undefined/);
 });
 
 test("annual product planning uses one development-to-launch period and overwrites duplicate demand plans", () => {
