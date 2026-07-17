@@ -822,6 +822,8 @@ export function reducePlatformState(input, action = {}) {
 
   if (action.type === "archive_required_result") {
     if (!state.requiredResults.some(item => item.id === action.id && !item.archived)) return state;
+    const linkedCommitments = state.departmentCommitments.filter(item => item.requiredResultId === action.id && !item.archived);
+    if (linkedCommitments.length) throw new Error("该必达结果仍有关联部门任务，请先迁移或归档部门任务。");
     return audit({
       ...state,
       updatedAt: timestamp,

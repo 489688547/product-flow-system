@@ -1231,14 +1231,18 @@ main { min-width: 0; overflow-x: hidden; }
 .execution-summary-strip small { color: var(--text-secondary); font-weight: 650; }
 .execution-summary-strip .danger strong { color: var(--danger); }
 .commitment-table, .incentive-list, .monthly-report-list { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.commitment-table-head, .commitment-table-row { min-width: 1120px; display: grid; grid-template-columns: minmax(280px, 1.45fr) minmax(180px, .8fr) 130px minmax(210px, .9fr) 110px minmax(230px, auto); align-items: center; gap: var(--space-3); padding: 0 var(--space-3); }
+.commitment-table-head, .commitment-table-row { min-width: 1320px; display: grid; grid-template-columns: minmax(270px, 1.35fr) minmax(210px, 1fr) 120px 130px minmax(190px, .9fr) 100px minmax(230px, auto); align-items: center; gap: var(--space-3); padding: 0 var(--space-3); }
 .commitment-table-head, .incentive-list-head, .monthly-report-head { min-height: 38px; background: var(--surface-subtle); color: var(--text-tertiary); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .commitment-table-row { position: relative; min-height: 72px; border-top: 1px solid var(--border); color: var(--text-secondary); }
 .commitment-table-row > span { min-width: 0; }
 .commitment-table-row > span:first-child { display: flex; align-items: center; gap: 9px; color: var(--text-primary); }
-.commitment-table-row > span:first-child > span, .commitment-table-row > span:nth-child(3), .commitment-table-row > span:nth-child(4) { min-width: 0; display: grid; gap: 2px; }
+.commitment-table-row > span:first-child > span, .commitment-table-row > span:nth-child(2), .commitment-table-row > span:nth-child(3), .commitment-table-row > span:nth-child(5) { min-width: 0; display: grid; gap: 2px; }
 .commitment-table-row strong, .commitment-table-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .commitment-table-row small { color: var(--text-tertiary); }
+.unlinked-result strong { color: var(--warning); }
+.table-progress { min-width: 0; display: grid; gap: 6px; }
+.table-progress > span:first-child { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.table-progress .execution-progress { width: 100%; }
 .commitment-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
 .commitment-reason { grid-column: 1 / -1; margin: -4px 0 8px; padding: 6px 8px; border-radius: 6px; background: var(--danger-soft); color: var(--danger); display: flex; align-items: center; gap: 6px; font-size: 11px; }
 .modal-guidance { margin: 0 0 var(--space-3); color: var(--text-secondary); line-height: 1.55; }

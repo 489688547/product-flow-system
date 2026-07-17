@@ -100,6 +100,21 @@ test("strategy archive blocks active dependencies and cascades required results"
   assert.equal(archived.auditLogs[0].reason, "年度调整");
 });
 
+test("required result archive blocks linked unarchived department tasks", () => {
+  const linked = normalizePlatformState({
+    requiredResults: [{ id: "r1", strategyId: "s1", title: "必达结果" }],
+    departmentCommitments: [{ id: "c1", strategyId: "s1", requiredResultId: "r1", status: "draft" }]
+  });
+  assert.throws(() => reducePlatformState(linked, { type: "archive_required_result", id: "r1" }), /部门任务/);
+
+  const archivedTask = normalizePlatformState({
+    ...linked,
+    departmentCommitments: [{ ...linked.departmentCommitments[0], archived: true }]
+  });
+  const archivedResult = reducePlatformState(archivedTask, { type: "archive_required_result", id: "r1", actor: "周总" });
+  assert.equal(archivedResult.requiredResults[0].archived, true);
+});
+
 test("governed records only archive in safe workflow states", () => {
   const base = normalizePlatformState({
     version: "strategy-platform-v3",

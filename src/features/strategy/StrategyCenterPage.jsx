@@ -136,15 +136,17 @@ function DepartmentCommitmentView({ state, canManage, onEdit, onDelete, onTransi
   return <>
     <div className="execution-summary-strip"><span><strong>{state.departmentCommitments.length}</strong><small>部门承诺</small></span><span><strong>{active}</strong><small>执行与流转中</small></span><span><strong>{waiting}</strong><small>待审核确认</small></span><span className={abnormal ? "danger" : ""}><strong>{abnormal}</strong><small>风险与退回</small></span></div>
     <section className="commitment-table" aria-label="部门承诺列表">
-      <div className="commitment-table-head"><span>部门承诺</span><span>关联战略</span><span>负责人</span><span>下一里程碑</span><span>状态</span><span>操作</span></div>
+      <div className="commitment-table-head"><span>部门承诺</span><span>关联必达结果</span><span>负责人</span><span>任务进度</span><span>下一里程碑</span><span>状态</span><span>操作</span></div>
       {state.departmentCommitments.filter(item => !item.archived).map(commitment => {
         const strategy = state.strategies.find(item => item.id === commitment.strategyId);
-        const milestones = state.commitmentMilestones.filter(item => item.commitmentId === commitment.id && !item.archived);
-        const next = milestones.filter(item => item.status !== "completed").sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0];
+        const requiredResult = state.requiredResults.find(item => item.id === commitment.requiredResultId && !item.archived);
+        const progress = commitmentProgress(state, commitment.id);
+        const next = progress.milestones.filter(item => item.status !== "completed").sort((a, b) => String(a.dueDate).localeCompare(String(b.dueDate)))[0];
         return <article className="commitment-table-row" key={commitment.id}>
           <span><Building2 size={17} /><span><strong>{commitment.title}</strong><small>{commitment.period} · {commitment.successStandard}</small></span></span>
-          <span>{strategy?.name || "未关联"}</span>
+          <span className={requiredResult ? "" : "unlinked-result"}><strong>{requiredResult?.title || "待关联必达结果"}</strong><small>{strategy?.name || "未关联公司战略"}</small></span>
           <span>{commitment.owner}<small>{commitment.department}</small></span>
+          <span className="table-progress"><span><strong>{progress.percent}%</strong><small>{progress.label}</small></span><span className="execution-progress" role="progressbar" aria-label={`${commitment.title}任务进度`} aria-valuemin="0" aria-valuemax="100" aria-valuenow={progress.percent}><i style={{ width: `${progress.percent}%` }} /></span></span>
           <span>{next?.title || "里程碑已完成"}<small>{next?.dueDate || commitment.dueDate || "待排期"}</small></span>
           <StatusPill meta={COMMITMENT_STATUS[commitment.status]} />
           <CommitmentActions commitment={commitment} canManage={canManage} onEdit={() => onEdit(commitment)} onDelete={() => onDelete(commitment)} onTransition={transition => onTransition(commitment.id, transition)} onReturn={() => onReturn(commitment)} />
@@ -181,6 +183,10 @@ export function StrategyCenterPage() {
     const projectCount = state.projects.filter(item => (item.strategyId === strategy.id || objectiveIds.has(item.objectiveId)) && !item.archived && !["completed", "cancelled"].includes(item.status)).length;
     setDeleting({ kind: "strategy", record: strategy, blocked: commitmentCount || projectCount ? `当前仍有关联的 ${commitmentCount} 个部门承诺和 ${projectCount} 个重点项目，请先完成或取消后再归档。` : "关联的必达结果会一并归档，历史审计记录会保留。" });
   };
+  const requestResultArchive = result => {
+    const commitmentCount = state.departmentCommitments.filter(item => item.requiredResultId === result.id && !item.archived).length;
+    setDeleting({ kind: "result", record: result, blocked: commitmentCount ? `当前仍有 ${commitmentCount} 个部门任务承接该结果，请先迁移或归档部门任务。` : "该必达结果会从战略达成计算中移除，历史审计记录会保留。" });
+  };
   const confirmArchive = () => {
     if (deleting.blocked?.startsWith("当前仍有")) return setDeleting(null);
     if (deleting.kind === "strategy") archiveStrategy(deleting.record.id);
@@ -197,7 +203,7 @@ export function StrategyCenterPage() {
         <button type="button" role="tab" aria-selected={view === "strategy"} className={view === "strategy" ? "active" : ""} onClick={() => setView("strategy")}><Target size={15} />公司战略<span>{state.strategies.length}</span></button>
         <button type="button" role="tab" aria-selected={view === "commitments"} className={view === "commitments" ? "active" : ""} onClick={() => setView("commitments")}><ClipboardCheck size={15} />部门承诺<span>{state.departmentCommitments.length}</span></button>
       </div>
-      {view === "strategy" ? <CompanyStrategyView state={state} canManage={canManage} canCreateCommitment={canCreateCommitment} currentUser={currentUser} onEditStrategy={record => setStrategyEditor({ record })} onDeleteStrategy={requestStrategyArchive} onEditResult={(record, strategyId) => setResultEditor({ record, strategyId })} onDeleteResult={record => setDeleting({ kind: "result", record, blocked: "该必达结果会从战略达成计算中移除，历史审计记录会保留。" })} onAddCommitment={(strategyId, requiredResultId) => setCommitmentEditor({ record: null, defaults: { strategyId, requiredResultId } })} onToggleMilestone={(milestone, status) => saveCommitmentMilestone({ ...milestone, status }, status === "completed" ? "完成月度里程碑" : "重新打开月度里程碑")} /> : <DepartmentCommitmentView state={state} canManage={canManage} onEdit={record => setCommitmentEditor({ record })} onDelete={record => setDeleting({ kind: "commitment", record, blocked: "该承诺及其月度里程碑会一并归档，历史审计记录会保留。" })} onTransition={transitionCommitment} onReturn={setReturning} />}
+      {view === "strategy" ? <CompanyStrategyView state={state} canManage={canManage} canCreateCommitment={canCreateCommitment} currentUser={currentUser} onEditStrategy={record => setStrategyEditor({ record })} onDeleteStrategy={requestStrategyArchive} onEditResult={(record, strategyId) => setResultEditor({ record, strategyId })} onDeleteResult={requestResultArchive} onAddCommitment={(strategyId, requiredResultId) => setCommitmentEditor({ record: null, defaults: { strategyId, requiredResultId } })} onToggleMilestone={(milestone, status) => saveCommitmentMilestone({ ...milestone, status }, status === "completed" ? "完成月度里程碑" : "重新打开月度里程碑")} /> : <DepartmentCommitmentView state={state} canManage={canManage} onEdit={record => setCommitmentEditor({ record })} onDelete={record => setDeleting({ kind: "commitment", record, blocked: "该承诺及其月度里程碑会一并归档，历史审计记录会保留。" })} onTransition={transitionCommitment} onReturn={setReturning} />}
       <StrategyEditorModal open={Boolean(strategyEditor)} kind="strategy" record={strategyEditor?.record} orgCache={orgCache} onClose={() => setStrategyEditor(null)} onSave={form => { saveStrategy({ ...form, id: form.id || `strategy-${Date.now()}` }); setStrategyEditor(null); }} />
       <RequiredResultModal open={Boolean(resultEditor)} record={resultEditor?.record} strategyId={resultEditor?.strategyId} orgCache={orgCache} onClose={() => setResultEditor(null)} onSave={form => { saveRequiredResult({ ...form, id: form.id || `required-result-${Date.now()}` }); setResultEditor(null); }} />
       <DepartmentCommitmentModal open={Boolean(commitmentEditor)} record={commitmentEditor?.record} defaults={commitmentEditor?.defaults} milestones={editorMilestones} strategies={state.strategies.filter(item => !item.archived)} requiredResults={state.requiredResults.filter(item => !item.archived)} currentUser={currentUser} orgCache={orgCache} onClose={() => setCommitmentEditor(null)} onSave={saveCommitment} />
