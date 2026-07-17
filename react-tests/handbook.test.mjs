@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 
 import {
   createHandbookDocument,
@@ -54,4 +55,34 @@ test("markdown table of contents uses stable unique H2 and H3 ids", () => {
     { level: 3, title: "权限", id: "权限" },
     { level: 2, title: "登录", id: "登录-1" }
   ]);
+});
+
+test("handbook workspace exposes search, categories, and an empty state", async () => {
+  const [pageSource, domainSource] = await Promise.all([
+    readFile(new URL("../src/features/handbook/HandbookPage.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/domain/handbook.js", import.meta.url), "utf8")
+  ]);
+  const source = `${pageSource}\n${domainSource}`;
+
+  assert.match(source, /搜索说明书/);
+  assert.match(source, /员工使用手册/);
+  assert.match(source, /产品与设计/);
+  assert.match(source, /平台能力/);
+  assert.match(source, /没有找到匹配的说明/);
+  assert.match(source, /<MarkdownDocument/);
+});
+
+test("markdown renderer keeps repository documents safe and usable", async () => {
+  const source = await readFile(
+    new URL("../src/features/handbook/MarkdownDocument.jsx", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /from "react-markdown"/);
+  assert.match(source, /from "remark-gfm"/);
+  assert.match(source, /from "rehype-slug"/);
+  assert.doesNotMatch(source, /rehype-raw/);
+  assert.match(source, /target="_blank"/);
+  assert.match(source, /rel="noreferrer"/);
+  assert.match(source, /handbook-table-wrap/);
 });
