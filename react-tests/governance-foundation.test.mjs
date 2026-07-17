@@ -75,3 +75,16 @@ test("package exposes the repository lint gate", () => {
   assert.match(read("eslint.config.js"), /\.worktrees/);
   assert.match(read("eslint.config.js"), /no-unreachable/);
 });
+
+test("pull requests run required repository quality gates", () => {
+  const workflow = read(".github/workflows/quality.yml");
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run lint/);
+  assert.match(workflow, /npm run check:governance/);
+  assert.match(workflow, /npm test/);
+  assert.match(workflow, /npm run build/);
+  assert.match(read(".github/pull_request_template.md"), /PRD/);
+  assert.match(read(".github/CODEOWNERS"), /AGENTS\.md/);
+  assert.match(read(".github/BRANCH_PROTECTION.md"), /Require branches to be up to date/);
+});

@@ -1,0 +1,13 @@
+# Repository governance and platform contracts
+AGENTS.md @489688547
+.github/ @489688547
+docs/platform/ @489688547
+docs/templates/ @489688547
+docs/decisions/ @489688547
+
+# Authentication, middleware, and persisted data boundaries
+functions/api/_middleware.js @489688547
+functions/api/auth/ @489688547
+functions/migrations/ @489688547
+migrations/ @489688547
+
