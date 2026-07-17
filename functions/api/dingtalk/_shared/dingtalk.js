@@ -347,19 +347,24 @@ function assertEnterpriseEmployee(identity = {}, detail = {}) {
   return identity;
 }
 
-export async function getDingBrowserIdentity(code, env = {}, fetchImpl = fetch) {
+export async function getDingBrowserLogin(code, env = {}, fetchImpl = fetch) {
   const userToken = await getDingUserAccessToken(env, { code }, fetchImpl);
   const current = await getDingCurrentUser(userToken.accessToken, fetchImpl);
   const appToken = await getDingAccessToken(env, fetchImpl);
   const enterprise = await getDingUserByUnionId(appToken, current.unionId || current.unionid, fetchImpl);
   const detail = await getDingUserDetail(appToken, enterprise.userid, fetchImpl);
   const department = await resolveDingDepartmentName(appToken, detail, fetchImpl);
-  return assertEnterpriseEmployee(normalizedSessionIdentity({
+  const identity = assertEnterpriseEmployee(normalizedSessionIdentity({
     corpId: env.DINGTALK_CORP_ID || env.DINGTALK_CORPID || "",
     basic: { ...current, userid: enterprise.userid, unionid: current.unionId || current.unionid },
     detail,
     department
   }), detail);
+  return { identity, userToken };
+}
+
+export async function getDingBrowserIdentity(code, env = {}, fetchImpl = fetch) {
+  return (await getDingBrowserLogin(code, env, fetchImpl)).identity;
 }
 
 export async function getDingEmbeddedIdentity(authCode, corpId, env = {}, fetchImpl = fetch) {
