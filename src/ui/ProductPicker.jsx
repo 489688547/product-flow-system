@@ -1,16 +1,23 @@
 import { Check, ChevronDown } from "lucide-react";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { formatExpectedLaunchMonth } from "../domain/expectedLaunch.js";
 import { generateProductCover } from "../domain/productFlow.js";
+import { isProductOwnedBy, prioritizeOwnedProducts } from "../domain/productOwnership.js";
 import { FloatingMenu } from "./FloatingMenu.jsx";
+import { ProductOwnershipBadge } from "./ProductOwnershipBadge.jsx";
 
-export function ProductPicker({ products, value, onChange, label = "切换产品", className = "" }) {
+export function ProductPicker({ products, value, onChange, currentUser, label = "切换产品", className = "" }) {
   const [open, setOpen] = useState(false);
   const anchorRef = useRef(null);
   const product = products.find(item => item.id === value) || products[0];
+  const orderedProducts = useMemo(
+    () => prioritizeOwnedProducts(products, currentUser),
+    [currentUser, products]
+  );
 
   if (!product) return null;
   const productMeta = item => item.levelConfirmed ? item.level : `期望上线：${formatExpectedLaunchMonth(item.expectedLaunchMonth)}`;
+  const owned = item => isProductOwnedBy(item, currentUser);
 
   return (
     <div className={`product-picker ${className}`.trim()}>
@@ -25,7 +32,10 @@ export function ProductPicker({ products, value, onChange, label = "切换产品
       >
         <img className="product-identity-thumb" src={product.image || generateProductCover(product.name)} alt="" width="40" height="40" />
         <span className="product-identity-copy">
-          <strong>{product.name}</strong>
+          <span className="product-name-line">
+            <strong>{product.name}</strong>
+            <ProductOwnershipBadge owned={owned(product)} />
+          </span>
           <em>{productMeta(product)}</em>
         </span>
         <ChevronDown className="product-switch-icon" size={16} aria-hidden="true" />
@@ -40,7 +50,7 @@ export function ProductPicker({ products, value, onChange, label = "切换产品
         role="listbox"
         ariaLabel="选择产品"
       >
-        {products.map(item => (
+        {orderedProducts.map(item => (
           <button
             key={item.id}
             type="button"
@@ -53,8 +63,11 @@ export function ProductPicker({ products, value, onChange, label = "切换产品
             }}
           >
             <img src={item.image || generateProductCover(item.name)} alt="" width="38" height="38" loading="lazy" />
-            <span>
-              <strong>{item.name}</strong>
+            <span className="product-switch-copy">
+              <span className="product-name-line">
+                <strong>{item.name}</strong>
+                <ProductOwnershipBadge owned={owned(item)} />
+              </span>
               <em>{productMeta(item)}</em>
             </span>
             {item.id === product.id ? <Check size={15} aria-hidden="true" /> : null}

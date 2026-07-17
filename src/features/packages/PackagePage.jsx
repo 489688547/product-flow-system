@@ -118,13 +118,13 @@ export function PackageFileManager({ product }) {
 }
 
 export function PackagePage() {
-  const { state, setCurrentProduct } = useProductFlow();
+  const { state, currentUser, setCurrentProduct } = useProductFlow();
   const [selectedProductId, setSelectedProductId] = useState(state.currentId || state.products[0]?.id);
   const selectedProduct = state.products.find(product => product.id === selectedProductId) || state.products[0];
 
   return (
     <section className="page">
-      <PageHeader title="资料包" description="管理当前产品自然产生的文档、图片、视频和会议纪要。" identity={<ProductPicker products={state.products} value={selectedProduct?.id} onChange={productId => { setSelectedProductId(productId); setCurrentProduct(productId); }} />} />
+      <PageHeader title="资料包" description="管理当前产品自然产生的文档、图片、视频和会议纪要。" identity={<ProductPicker products={state.products} value={selectedProduct?.id} currentUser={currentUser} onChange={productId => { setSelectedProductId(productId); setCurrentProduct(productId); }} />} />
       <PackageFileManager product={selectedProduct} />
     </section>
   );

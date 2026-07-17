@@ -770,6 +770,23 @@ test("product identity selector is reused instead of native product selects", ()
   assert.doesNotMatch(packages, /<select value=\{selectedProduct/);
 });
 
+test("organization ownership is saved and shown through one shared product badge", () => {
+  const progress = read("src/features/progress/ProductProgressPage.jsx");
+  const modal = read("src/features/archive/ProductModal.jsx");
+  const picker = read("src/ui/ProductPicker.jsx");
+  const badge = read("src/ui/ProductOwnershipBadge.jsx");
+  const packages = read("src/features/packages/PackagePage.jsx");
+  const styles = read("src/styles.css");
+  assert.match(progress, /productManagerAssignment\(productManager, orgCache\)/);
+  assert.match(modal, /productManagerAssignment\(productManager, orgCache\)/);
+  assert.match(picker, /prioritizeOwnedProducts\(products, currentUser\)/);
+  assert.match(picker, /<ProductOwnershipBadge owned=/);
+  assert.match(packages, /currentUser/);
+  assert.match(packages, /<ProductPicker[\s\S]*currentUser=\{currentUser\}/);
+  assert.match(badge, />我负责</);
+  assert.match(styles, /\.product-ownership-badge\s*\{/);
+});
+
 test("shared page and table primitives support consistent hierarchy and responsive density", () => {
   const pageHeader = read("src/ui/PageHeader.jsx");
   const table = read("src/ui/DataTable.jsx");

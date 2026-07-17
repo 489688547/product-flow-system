@@ -21,6 +21,7 @@ import { buildTaskMeetingPayload, buildTaskTodoPayload } from "../../domain/ding
 import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { buildProductGmvProgress, normalizeMonthlyGmvTarget } from "../../domain/productGmv.js";
+import { productManagerAssignment } from "../../domain/productOwnership.js";
 import { buildTaskTodoSnapshot, normalizeTaskDueDate, todoSyncStatus } from "../../domain/taskTodo.js";
 import { MeetingScheduleModal } from "./MeetingScheduleModal.jsx";
 import { ProductGradingModal } from "./ProductGradingModal.jsx";
@@ -219,7 +220,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
         description="按产品定级查看适用阶段和任务。"
         identity={(
           <div className="progress-overview-toolbar">
-            <ProductPicker products={state.products} value={selectedProduct.id} onChange={setCurrentProduct} />
+            <ProductPicker products={state.products} value={selectedProduct.id} onChange={setCurrentProduct} currentUser={currentUser} />
             <ProductScheduleSummary schedule={productSchedule} onOpenPlanning={() => onNavigate?.("planning")} />
             <ProductGmvSummary summary={productGmvSummary} loading={productSales.loading} error={productSales.error} />
             <Button className="compact quiet-danger" data-testid="return-product-demand" onClick={handleReturnProduct}><RotateCcw size={16} />退回需求池</Button>
@@ -262,7 +263,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
               <OrgSelect
                 type="user"
                 value={selectedProduct.productManager || ""}
-                onChange={productManager => updateProduct(selectedProduct.id, { productManager })}
+                onChange={productManager => updateProduct(selectedProduct.id, productManagerAssignment(productManager, orgCache))}
                 orgCache={orgCache}
                 departmentFilter="产品"
                 placeholder="选择产品负责人"
