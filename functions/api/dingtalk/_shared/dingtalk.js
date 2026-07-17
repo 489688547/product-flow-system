@@ -140,7 +140,7 @@ async function postDingTopApi(accessToken, path, body, fetchImpl = fetch) {
     err.detail = data;
     throw err;
   }
-  return data.result || {};
+  return data.result ?? data;
 }
 
 function dingClientToken(value = "") {
@@ -169,6 +169,144 @@ async function requestDingOpenApi(accessToken, method, path, body, fetchImpl = f
     throw err;
   }
   return data;
+}
+
+export async function listDingApprovalInstanceIds(accessToken, input = {}, fetchImpl = fetch) {
+  const processCode = String(input.processCode || "").trim();
+  if (!processCode) {
+    const error = new Error("缺少钉钉审批流程 processCode");
+    error.status = 400;
+    throw error;
+  }
+  const result = await postDingTopApi(accessToken, "/topapi/processinstance/listids", {
+    process_code: processCode,
+    start_time: Number(input.startTime),
+    end_time: Number(input.endTime) || undefined,
+    size: Math.min(20, Math.max(1, Number(input.size) || 20)),
+    cursor: Math.max(0, Number(input.cursor) || 0)
+  }, fetchImpl);
+  const processInstanceIds = result.list || result.process_instance_id_list || result.processInstanceIds || [];
+  return {
+    processInstanceIds: Array.isArray(processInstanceIds) ? processInstanceIds.map(String).filter(Boolean) : [],
+    nextCursor: result.next_cursor ?? result.nextCursor ?? null
+  };
+}
+
+export async function getDingApprovalInstance(accessToken, processInstanceId, fetchImpl = fetch) {
+  const id = String(processInstanceId || "").trim();
+  if (!id) {
+    const error = new Error("缺少钉钉审批实例 ID");
+    error.status = 400;
+    throw error;
+  }
+  const result = await postDingTopApi(accessToken, "/topapi/processinstance/get", {
+    process_instance_id: id
+  }, fetchImpl);
+  const instance = result.process_instance || result.processInstance || result;
+  return {
+    ...instance,
+    processInstanceId: instance.processInstanceId || instance.process_instance_id || id,
+    formComponentValues: instance.formComponentValues || instance.form_component_values || []
+  };
+}
+
+function approvalField(instance, fieldId) {
+  const target = String(fieldId || "").trim();
+  if (!target) return "";
+  const fields = instance.formComponentValues || instance.form_component_values || [];
+  const field = fields.find(item => [item.id, item.name, item.label, item.componentName].some(value => String(value || "").trim() === target));
+  return field?.value ?? field?.text ?? "";
+}
+
+function parseRelatedProcessInstanceId(value) {
+  if (!value) return "";
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      const match = value.match(/[A-Za-z0-9_-]{8,}/);
+      return match?.[0] || "";
+    }
+  }
+  const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== "object") continue;
+    const id = item.processInstanceId || item.process_instance_id || item.instanceId;
+    if (id) return String(id);
+    queue.push(...Object.values(item).filter(value => value && typeof value === "object"));
+  }
+  return "";
+}
+
+function approvalStatus(instance) {
+  const result = String(instance.result || "").toLowerCase();
+  const status = String(instance.status || "").toUpperCase();
+  if (["agree", "approved"].includes(result)) return "COMPLETED";
+  if (["refuse", "rejected", "disagree"].includes(result)) return "REJECTED";
+  if (["TERMINATED", "CANCELED", "CANCELLED"].includes(status)) return status;
+  return status || "RUNNING";
+}
+
+function numberValue(value) {
+  const number = Number(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(number) ? number : 0;
+}
+
+export function normalizeDingSupplyApproval(instance = {}, mapping = {}) {
+  const kind = mapping.kind === "payment" ? "payment" : "purchase";
+  const processInstanceId = String(instance.processInstanceId || instance.process_instance_id || "").trim();
+  const amount = numberValue(approvalField(instance, mapping.amountFieldId));
+  const common = {
+    id: processInstanceId,
+    processInstanceId,
+    title: instance.title || instance.processInstanceName || instance.process_instance_name || "",
+    status: approvalStatus(instance),
+    originatorUserId: instance.originatorUserId || instance.originator_userid || "",
+    originatorName: instance.originatorUserName || instance.originator_user_name || "",
+    createTime: instance.createTime || instance.create_time || "",
+    finishTime: instance.finishTime || instance.finish_time || "",
+    rawPayload: instance
+  };
+  if (kind === "payment") {
+    const relatedValue = approvalField(instance, mapping.relatedPurchaseFieldId);
+    const purchaseProcessInstanceId = parseRelatedProcessInstanceId(relatedValue);
+    return {
+      kind,
+      record: {
+        ...common,
+        amount,
+        purchaseProcessInstanceId,
+        mappingStatus: purchaseProcessInstanceId ? "mapped" : "unmapped",
+        unmappedValues: purchaseProcessInstanceId ? {} : { relatedPurchase: String(relatedValue || "") }
+      },
+      lines: []
+    };
+  }
+
+  const supplierValue = String(approvalField(instance, mapping.supplierFieldId) || "").trim();
+  const productValue = String(approvalField(instance, mapping.productFieldId) || "").trim();
+  const supplierId = mapping.supplierValueMap?.[supplierValue] || "";
+  const mappedProducts = Array.isArray(mapping.productValueMap?.[productValue])
+    ? mapping.productValueMap[productValue]
+    : [mapping.productValueMap?.[productValue]].filter(Boolean);
+  const unmappedValues = {};
+  if (supplierValue && !supplierId) unmappedValues.supplier = supplierValue;
+  if (productValue && !mappedProducts.length) unmappedValues.product = productValue;
+  return {
+    kind,
+    record: {
+      ...common,
+      supplierId,
+      productIds: mappedProducts,
+      requestedAmount: amount,
+      approvedAmount: common.status === "COMPLETED" ? amount : 0,
+      mappingStatus: Object.keys(unmappedValues).length ? "unmapped" : "mapped",
+      unmappedValues
+    },
+    lines: []
+  };
 }
 
 export async function getDingDepartments(accessToken, fetchImpl = fetch, rootDeptId = 1) {
