@@ -52,6 +52,71 @@ test("v3 strategy migration is idempotent and preserves later edits", () => {
   assert.equal(migrated.strategies[0].name, "我修改后的战略名称");
 });
 
+test("strategy archive blocks active dependencies and cascades required results", () => {
+  const blocked = normalizePlatformState({
+    version: "strategy-platform-v3",
+    strategies: [{ id: "s1", name: "增长" }],
+    requiredResults: [{ id: "r1", strategyId: "s1", title: "结果" }],
+    departmentCommitments: [{ id: "c1", strategyId: "s1", status: "active" }]
+  });
+  assert.throws(() => reducePlatformState(blocked, { type: "archive_strategy", id: "s1", actor: "周总" }), /部门承诺/);
+
+  const archived = reducePlatformState({ ...blocked, departmentCommitments: [] }, {
+    type: "archive_strategy",
+    id: "s1",
+    actor: "周总",
+    reason: "年度调整",
+    timestamp: "2026-07-17T08:00:00.000Z"
+  });
+  assert.equal(archived.strategies[0].archived, true);
+  assert.equal(archived.requiredResults[0].archived, true);
+  assert.equal(archived.strategies[0].archivedBy, "周总");
+  assert.equal(archived.auditLogs[0].action, "archive");
+  assert.equal(archived.auditLogs[0].reason, "年度调整");
+});
+
+test("governed records only archive in safe workflow states", () => {
+  const base = normalizePlatformState({
+    version: "strategy-platform-v3",
+    departmentCommitments: [{ id: "draft-commitment", status: "draft" }, { id: "active-commitment", status: "active" }],
+    incentiveProjects: [{ id: "draft-incentive", status: "draft" }, { id: "active-incentive", status: "active" }],
+    monthlyReports: [{ id: "draft-report", status: "draft" }, { id: "submitted-report", status: "submitted" }]
+  });
+  const commitment = reducePlatformState(base, { type: "archive_department_commitment", id: "draft-commitment", actor: "周总" });
+  assert.equal(commitment.departmentCommitments.find(item => item.id === "draft-commitment").archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_department_commitment", id: "active-commitment" }), /草稿或退回/);
+  const incentive = reducePlatformState(base, { type: "archive_incentive_project", id: "draft-incentive", actor: "周总" });
+  assert.equal(incentive.incentiveProjects.find(item => item.id === "draft-incentive").archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_incentive_project", id: "active-incentive" }), /草稿或已取消/);
+  const report = reducePlatformState(base, { type: "archive_monthly_report", id: "draft-report", actor: "周总" });
+  assert.equal(report.monthlyReports.find(item => item.id === "draft-report").archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_monthly_report", id: "submitted-report" }), /草稿月报/);
+});
+
+test("project archive cascades children while project child and weekly updates archive independently", () => {
+  const base = normalizePlatformState({
+    version: "strategy-platform-v3",
+    projects: [{ id: "p1", name: "重点项目" }],
+    milestones: [{ id: "m1", projectId: "p1" }],
+    risks: [{ id: "risk1", projectId: "p1" }],
+    decisionRequests: [{ id: "d1", projectId: "p1", dingTodo: { id: "ding-1" } }],
+    statusUpdates: [{ id: "u1", projectId: "p1", owner: "项目负责人" }]
+  });
+  const child = reducePlatformState(base, { type: "archive_project_child", collection: "risks", id: "risk1", actor: "周总" });
+  assert.equal(child.risks[0].archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_project_child", collection: "strategies", id: "p1" }), /不支持/);
+
+  const archived = reducePlatformState(base, { type: "archive_project", id: "p1", actor: "周总" });
+  assert.equal(archived.projects[0].archived, true);
+  assert.equal(archived.milestones[0].archived, true);
+  assert.equal(archived.risks[0].archived, true);
+  assert.equal(archived.decisionRequests[0].archived, true);
+  assert.equal(archived.decisionRequests[0].dingTodo.id, "ding-1");
+
+  const weekly = reducePlatformState(base, { type: "archive_status_update", id: "u1", actor: "项目负责人" });
+  assert.equal(weekly.statusUpdates[0].archived, true);
+});
+
 test("severe child health cannot be averaged away", () => {
   assert.equal(aggregateHealth(["normal", "off_track", "completed"]), "off_track");
   assert.equal(aggregateHealth(["normal", "at_risk", "completed"]), "at_risk");

@@ -194,6 +194,20 @@ function upsert(records, record) {
     : [record, ...records];
 }
 
+function archivedRecord(record, action, timestamp) {
+  return {
+    ...record,
+    archived: true,
+    archivedAt: timestamp,
+    archivedBy: action.actor || "系统",
+    updatedAt: timestamp
+  };
+}
+
+function archiveMatching(records, predicate, action, timestamp) {
+  return records.map(record => predicate(record) ? archivedRecord(record, action, timestamp) : record);
+}
+
 function audit(state, { actor = "", action, entityType, entityId, reason = "", timestamp }) {
   const entry = {
     id: uniqueId("audit"),
@@ -745,10 +759,169 @@ export function reducePlatformState(input, action = {}) {
     });
   }
 
+  if (action.type === "archive_strategy") {
+    const strategy = state.strategies.find(item => item.id === action.id && !item.archived);
+    if (!strategy) return state;
+    const activeCommitments = state.departmentCommitments.filter(item => (
+      item.strategyId === action.id
+      && !item.archived
+      && !["completed", "cancelled"].includes(item.status)
+    ));
+    if (activeCommitments.length) throw new Error("请先完成或取消关联的部门承诺。");
+    const activeProjects = state.projects.filter(item => (
+      item.strategyId === action.id
+      && !item.archived
+      && !["completed", "cancelled"].includes(item.status)
+    ));
+    if (activeProjects.length) throw new Error("请先完成或取消关联的重点项目。");
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      strategies: archiveMatching(state.strategies, item => item.id === action.id, action, timestamp),
+      requiredResults: archiveMatching(state.requiredResults, item => item.strategyId === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "strategy",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "archive_required_result") {
+    if (!state.requiredResults.some(item => item.id === action.id && !item.archived)) return state;
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      requiredResults: archiveMatching(state.requiredResults, item => item.id === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "required_result",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "archive_department_commitment") {
+    const commitment = state.departmentCommitments.find(item => item.id === action.id && !item.archived);
+    if (!commitment) return state;
+    if (!["draft", "returned"].includes(commitment.status)) {
+      throw new Error("只有草稿或退回状态的部门承诺可以归档；执行中的承诺请先取消。");
+    }
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      departmentCommitments: archiveMatching(state.departmentCommitments, item => item.id === action.id, action, timestamp),
+      commitmentMilestones: archiveMatching(state.commitmentMilestones, item => item.commitmentId === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "department_commitment",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "archive_project") {
+    if (!state.projects.some(item => item.id === action.id && !item.archived)) return state;
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      projects: archiveMatching(state.projects, item => item.id === action.id, action, timestamp),
+      milestones: archiveMatching(state.milestones, item => item.projectId === action.id, action, timestamp),
+      risks: archiveMatching(state.risks, item => item.projectId === action.id, action, timestamp),
+      decisionRequests: archiveMatching(state.decisionRequests, item => item.projectId === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "project",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "archive_project_child") {
+    const collection = String(action.collection || "");
+    const allowed = { milestones: "milestone", risks: "risk", decisionRequests: "decision" };
+    if (!allowed[collection]) throw new Error("不支持归档该项目记录。");
+    if (!state[collection].some(item => item.id === action.id && !item.archived)) return state;
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      [collection]: archiveMatching(state[collection], item => item.id === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: allowed[collection],
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "archive_incentive_project") {
+    const project = state.incentiveProjects.find(item => item.id === action.id && !item.archived);
+    if (!project) return state;
+    if (!["draft", "cancelled"].includes(project.status)) {
+      throw new Error("只有草稿或已取消的激励项目可以归档；执行中的项目请先取消。");
+    }
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      incentiveProjects: archiveMatching(state.incentiveProjects, item => item.id === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "incentive_project",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "archive_monthly_report") {
+    const report = state.monthlyReports.find(item => item.id === action.id && !item.archived);
+    if (!report) return state;
+    if (report.status !== "draft") throw new Error("只有草稿月报可以归档，已提交月报保留为管理记录。");
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      monthlyReports: archiveMatching(state.monthlyReports, item => item.id === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "monthly_report",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
+  if (action.type === "archive_status_update") {
+    if (!state.statusUpdates.some(item => item.id === action.id && !item.archived)) return state;
+    return audit({
+      ...state,
+      updatedAt: timestamp,
+      statusUpdates: archiveMatching(state.statusUpdates, item => item.id === action.id, action, timestamp)
+    }, {
+      actor: action.actor,
+      action: "archive",
+      entityType: "status_update",
+      entityId: action.id,
+      reason: action.reason,
+      timestamp
+    });
+  }
+
   if (action.type === "archive_entity") {
     const collection = String(action.collection || "");
     if (!PLATFORM_COLLECTIONS.includes(collection)) return state;
-    const records = state[collection].map(item => item.id === action.id ? { ...item, archived: true, updatedAt: timestamp } : item);
+    const records = archiveMatching(state[collection], item => item.id === action.id, action, timestamp);
     return audit({ ...state, updatedAt: timestamp, [collection]: records }, {
       actor: action.actor,
       action: "archive",

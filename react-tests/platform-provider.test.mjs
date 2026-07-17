@@ -44,7 +44,15 @@ test("platform provider exposes governed execution commands", () => {
     "saveMonthlyReport",
     "transitionReport",
     "appendReportCorrection",
-    "ensureReports"
+    "ensureReports",
+    "archiveStrategy",
+    "archiveRequiredResult",
+    "archiveDepartmentCommitment",
+    "archiveProject",
+    "archiveProjectChild",
+    "archiveIncentiveProject",
+    "archiveMonthlyReport",
+    "archiveStatusUpdate"
   ].forEach(command => assert.match(provider, new RegExp(command)));
   assert.match(provider, /state\.departmentCommitments/);
   assert.match(provider, /state\.commitmentMilestones/);
