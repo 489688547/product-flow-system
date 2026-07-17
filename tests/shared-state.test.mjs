@@ -12,10 +12,11 @@ async function loadStateRequest() {
   }
 }
 
-function createD1Mock() {
+function createD1Mock({ maxTextBytes = Infinity } = {}) {
   const store = new Map();
+  const parts = new Map();
   const calls = [];
-  return {
+  const db = {
     calls,
     prepare(sql) {
       const statement = {
@@ -27,20 +28,52 @@ function createD1Mock() {
         },
         async run() {
           calls.push({ type: "run", sql, values: statement.values });
-          if (/insert into product_flow_state/i.test(sql)) {
+          const oversized = statement.values.find(value => typeof value === "string" && Buffer.byteLength(value) > maxTextBytes);
+          if (oversized) throw new Error("D1_ERROR: string or blob too big: SQLITE_TOOBIG");
+          if (/insert into product_flow_state\s*\(/i.test(sql)) {
             const [id, version, payload, updatedAt, updatedBy] = statement.values;
             store.set(id, { id, version, payload, updated_at: updatedAt, updated_by: updatedBy });
           }
+          if (/delete from product_flow_state_parts/i.test(sql)) {
+            const [stateId] = statement.values;
+            [...parts.keys()].filter(key => key.startsWith(`${stateId}:`)).forEach(key => parts.delete(key));
+          }
+          if (/insert into product_flow_state_parts/i.test(sql)) {
+            const [stateId, partKey, partIndex, payload, updatedAt, updatedBy] = statement.values;
+            parts.set(`${stateId}:${partKey}:${partIndex}`, {
+              state_id: stateId,
+              part_key: partKey,
+              part_index: partIndex,
+              payload,
+              updated_at: updatedAt,
+              updated_by: updatedBy
+            });
+          }
+          if (/delete from product_flow_state where/i.test(sql)) store.delete(statement.values[0]);
           return { success: true };
         },
         async first() {
           calls.push({ type: "first", sql, values: statement.values });
           return store.get(statement.values[0] || "company") || null;
+        },
+        async all() {
+          calls.push({ type: "all", sql, values: statement.values });
+          const prefix = `${statement.values[0] || "company"}:`;
+          return {
+            results: [...parts.entries()]
+              .filter(([key]) => key.startsWith(prefix))
+              .map(([, value]) => value)
+              .sort((a, b) => a.part_key.localeCompare(b.part_key) || a.part_index - b.part_index)
+          };
         }
       };
       return statement;
+    },
+    async batch(statements) {
+      return Promise.all(statements.map(statement => statement.run()));
     }
   };
+  return db;
 }
 
 test("state API requires a D1 database binding", async () => {
@@ -96,6 +129,45 @@ test("state API persists company data including demand pool and issue submission
   assert.equal(body.state.feedbackIssues[0].desc, "按钮点不动");
   assert.equal(body.state.productPlans[0].id, "plan1");
   assert.equal(body.updatedBy, "周总");
+});
+
+test("state API shards payloads that exceed the D1 row limit and reconstructs them", async () => {
+  const stateRequest = await loadStateRequest();
+  const db = createD1Mock({ maxTextBytes: 2_000_000 });
+  const image = `data:image/png;base64,${"a".repeat(2_100_000)}`;
+  const payload = {
+    version: "oversized-test",
+    currentId: "p1",
+    demands: [],
+    products: [{ id: "p1", name: "超大图片产品" }],
+    tasks: [],
+    deliverables: [{ id: "file1", productId: "p1", name: "原图", url: image }],
+    reviews: [],
+    decisions: [],
+    feedbackIssues: [],
+    productPlans: [],
+    config: { stages: [] }
+  };
+
+  const post = await stateRequest({
+    request: new Request("https://flow.example.com/api/state", {
+      method: "POST",
+      body: JSON.stringify({ state: payload, updatedBy: "周总" })
+    }),
+    env: { PRODUCT_FLOW_DB: db }
+  });
+  const posted = await post.json();
+
+  assert.equal(post.status, 200, posted.message);
+  const get = await stateRequest({
+    request: new Request("https://flow.example.com/api/state"),
+    env: { PRODUCT_FLOW_DB: db }
+  });
+  const body = await get.json();
+  assert.equal(body.state.deliverables[0].url, image);
+  const partWrites = db.calls.filter(call => call.type === "run" && /insert into product_flow_state_parts/i.test(call.sql));
+  assert.ok(partWrites.length > 1);
+  assert.ok(partWrites.every(call => Buffer.byteLength(call.values[3]) <= 1_000_000));
 });
 
 test("frontend loads and saves product flow state through the shared state API", () => {

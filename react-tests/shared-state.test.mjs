@@ -17,8 +17,9 @@ async function loadStateRequest() {
 
 function createD1Mock() {
   const store = new Map();
+  const parts = new Map();
   const calls = [];
-  return {
+  const db = {
     calls,
     prepare(sql) {
       const statement = {
@@ -30,23 +31,53 @@ function createD1Mock() {
         },
         async run() {
           calls.push({ type: "run", sql, values: statement.values });
-          if (/insert into product_flow_state/i.test(sql)) {
+          if (/insert into product_flow_state\s*\(/i.test(sql)) {
             const [id, version, payload, updatedAt, updatedBy] = statement.values;
             store.set(id, { id, version, payload, updated_at: updatedAt, updated_by: updatedBy });
           }
+          if (/delete from product_flow_state_parts/i.test(sql)) {
+            const prefix = `${statement.values[0]}:`;
+            [...parts.keys()].filter(key => key.startsWith(prefix)).forEach(key => parts.delete(key));
+          }
+          if (/insert into product_flow_state_parts/i.test(sql)) {
+            const [stateId, partKey, partIndex, payload, updatedAt, updatedBy] = statement.values;
+            parts.set(`${stateId}:${partKey}:${partIndex}`, {
+              state_id: stateId,
+              part_key: partKey,
+              part_index: partIndex,
+              payload,
+              updated_at: updatedAt,
+              updated_by: updatedBy
+            });
+          }
+          if (/delete from product_flow_state where/i.test(sql)) store.delete(statement.values[0]);
           return { success: true };
         },
         async first() {
           calls.push({ type: "first", sql, values: statement.values });
           return store.get(statement.values[0] || "company") || null;
+        },
+        async all() {
+          calls.push({ type: "all", sql, values: statement.values });
+          const prefix = `${statement.values[0] || "company"}:`;
+          return {
+            results: [...parts.entries()]
+              .filter(([key]) => key.startsWith(prefix))
+              .map(([, value]) => value)
+              .sort((a, b) => a.part_key.localeCompare(b.part_key) || a.part_index - b.part_index)
+          };
         }
       };
       return statement;
+    },
+    async batch(statements) {
+      return Promise.all(statements.map(statement => statement.run()));
     }
   };
+  return db;
 }
 
-test("React app ships a Cloudflare Pages state API backed by one company D1 row", async () => {
+test("React app ships a Cloudflare Pages state API backed by sharded company D1 rows", async () => {
   const stateRequest = await loadStateRequest();
   assert.ok(stateRequest, "functions/api/state.js should export onRequest");
 
