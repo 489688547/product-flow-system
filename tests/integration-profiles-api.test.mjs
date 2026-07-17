@@ -53,12 +53,17 @@ function request(method = "GET", body) {
 test("integration profiles API defensively requires a session", async () => {
   const response = await onRequest({ request: request(), env: { PRODUCT_FLOW_DB: createD1Mock() }, data: {} });
   assert.equal(response.status, 401);
+  const payload = await response.json();
+  assert.equal(payload.error.code, "AUTH_SESSION_REQUIRED");
+  assert.ok(payload.error.requestId);
 });
 
 test("integration profiles API requires D1 but allows every employee to read", async () => {
   const missing = await onRequest({ request: request(), env: {}, data: { session: employee } });
   assert.equal(missing.status, 501);
-  assert.match((await missing.json()).message, /PRODUCT_FLOW_DB/);
+  const missingPayload = await missing.json();
+  assert.match(missingPayload.message, /PRODUCT_FLOW_DB/);
+  assert.equal(missingPayload.error.code, "INTEGRATION_STORAGE_UNAVAILABLE");
 
   const available = await onRequest({ request: request(), env: { PRODUCT_FLOW_DB: createD1Mock() }, data: { session: employee } });
   assert.equal(available.status, 200);
@@ -72,6 +77,7 @@ test("integration profiles API rejects writes outside the platform admin scope",
     data: { session: employee }
   });
   assert.equal(response.status, 403);
+  assert.equal((await response.json()).error.code, "PERMISSION_WRITE_DENIED");
 });
 
 test("platform admin can upsert a normalized profile and employees can read it", async () => {
@@ -108,7 +114,9 @@ test("API rejects unknown sensitive fields and invalid profile values", async ()
     data: { session: admin }
   });
   assert.equal(sensitive.status, 400);
-  assert.match((await sensitive.json()).message, /accessToken/);
+  const sensitivePayload = await sensitive.json();
+  assert.match(sensitivePayload.message, /accessToken/);
+  assert.equal(sensitivePayload.error.code, "INTEGRATION_PROFILE_INVALID");
 
   const invalid = await onRequest({
     request: request("PUT", { platformId: "dingtalk", consoleUrl: "javascript:alert(1)", verifiedAt: "17/07/2026" }),

@@ -21,6 +21,15 @@ function integrationDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
 }
 
+function integrationErrorResponse(message, status, code, retryable = false) {
+  const requestId = globalThis.crypto?.randomUUID?.() || `req_${Date.now().toString(36)}`;
+  return jsonResponse({
+    synced: false,
+    message,
+    error: { code, message, requestId, retryable }
+  }, status);
+}
+
 function inputError(message) {
   const error = new Error(message);
   error.status = 400;
@@ -174,18 +183,21 @@ async function writeProfile(db, profile, updatedBy) {
 
 export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
-  if (!["GET", "PUT"].includes(request.method)) return jsonResponse({ synced: false, message: "Method not allowed" }, 405);
-  if (!data.session) return jsonResponse({ synced: false, message: "请先使用钉钉登录。" }, 401);
+  if (!["GET", "PUT"].includes(request.method)) {
+    return integrationErrorResponse("Method not allowed", 405, "VALIDATION_METHOD_NOT_ALLOWED");
+  }
+  if (!data.session) return integrationErrorResponse("请先使用钉钉登录。", 401, "AUTH_SESSION_REQUIRED");
   if (request.method === "PUT" && (!canManagePermissions(data.session) || data.session.role === "readonly")) {
-    return jsonResponse({ synced: false, message: "仅总经办平台管理员可维护内部平台资料。" }, 403);
+    return integrationErrorResponse("仅总经办平台管理员可维护内部平台资料。", 403, "PERMISSION_WRITE_DENIED");
   }
 
   const db = integrationDatabase(env);
   if (!db) {
-    return jsonResponse({
-      synced: false,
-      message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，内部平台资料暂不可用。"
-    }, 501);
+    return integrationErrorResponse(
+      "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，内部平台资料暂不可用。",
+      501,
+      "INTEGRATION_STORAGE_UNAVAILABLE"
+    );
   }
 
   try {
@@ -199,6 +211,12 @@ export async function onRequest({ request, env, data = {} }) {
     const saved = await writeProfile(db, profile, updatedBy);
     return jsonResponse({ synced: true, profile: saved });
   } catch (error) {
-    return jsonResponse({ synced: false, message: error.message || "内部平台资料同步失败。" }, error.status || 500);
+    const status = error.status || 500;
+    return integrationErrorResponse(
+      error.message || "内部平台资料同步失败。",
+      status,
+      status === 400 ? "INTEGRATION_PROFILE_INVALID" : "INTERNAL_UNEXPECTED",
+      status >= 500
+    );
   }
 }
