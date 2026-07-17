@@ -67,9 +67,13 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
 test("supply chain workbench has stable responsive structure", () => {
   const css = read("src/styles.css");
   assert.match(css, /\.supply-chain-app/);
-  assert.match(css, /\.supply-chain-nav/);
+  assert.match(css, /\.supply-chain-layout\s*\{[^}]*grid-template-columns:\s*176px minmax\(0, 1fr\)/);
+  assert.match(css, /\.supply-chain-section-nav\s*\{/);
+  assert.match(css, /\.supply-chain-section-nav button\.active::before/);
+  assert.match(css, /\.supply-chain-content\s*\{[^}]*min-width:\s*0/);
   assert.match(css, /\.supply-metric-strip/);
   assert.match(css, /\.supply-import-preview/);
-  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-chain-app/);
-  assert.match(css, /\.supply-chain-nav button:focus-visible/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-chain-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-chain-nav-label\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.supply-chain-section-nav button:focus-visible/);
 });
