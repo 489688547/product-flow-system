@@ -1328,17 +1328,6 @@ main { min-width: 0; overflow-x: hidden; }
 
 /* Supply chain App: dense, exception-first operational workbench */
 .supply-chain-app { gap: var(--space-3); }
-.supply-chain-layout { min-width: 0; display: grid; grid-template-columns: 176px minmax(0, 1fr); align-items: start; gap: var(--space-4); }
-.supply-chain-section-nav { min-width: 0; padding: var(--space-2); display: grid; gap: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.supply-chain-nav-group { min-width: 0; display: grid; gap: 2px; }
-.supply-chain-nav-label { min-height: 26px; padding: 7px 9px 3px; color: var(--text-tertiary); font-size: 10px; font-weight: 750; }
-.supply-chain-section-nav button { position: relative; width: 100%; min-height: 36px; padding: 0 9px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; text-align: left; white-space: nowrap; transition: color var(--transition-fast), background-color var(--transition-fast); }
-.supply-chain-section-nav button::before { content: ""; position: absolute; left: 0; width: 3px; height: 16px; border-radius: 3px; background: transparent; }
-.supply-chain-section-nav button:hover { background: var(--surface-hover); color: var(--text-primary); }
-.supply-chain-section-nav button.active { background: var(--primary-soft); color: var(--primary); font-weight: 650; }
-.supply-chain-section-nav button.active::before { background: var(--primary); }
-.supply-chain-section-nav button:focus-visible { outline: 2px solid color-mix(in oklch, var(--primary), white 28%); outline-offset: 1px; }
-.supply-chain-content { min-width: 0; }
 .supply-work-grid { min-width: 0; display: grid; gap: var(--space-3); }
 .supply-metric-strip { min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(170px, 1fr)); overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
 .supply-metric-strip > div { min-width: 170px; min-height: 72px; padding: 10px var(--space-3); display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; border-right: 1px solid var(--border); }
@@ -1393,12 +1382,6 @@ main { min-width: 0; overflow-x: hidden; }
 
 @media (max-width: 900px) {
   .supply-chain-app { padding-left: var(--space-4); padding-right: var(--space-4); }
-  .supply-chain-layout { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); }
-  .supply-chain-section-nav { margin-left: calc(var(--space-4) * -1); margin-right: calc(var(--space-4) * -1); padding: var(--space-1) var(--space-4); display: flex; gap: var(--space-1); overflow-x: auto; border-left: 0; border-right: 0; border-radius: 0; }
-  .supply-chain-nav-group { display: contents; }
-  .supply-chain-nav-label { display: none; }
-  .supply-chain-section-nav button { width: auto; min-width: max-content; }
-  .supply-chain-section-nav button::before { left: 50%; bottom: 0; width: 16px; height: 3px; transform: translateX(-50%); }
   .supply-metric-strip { grid-template-columns: repeat(2, minmax(170px, 1fr)); }
   .supply-metric-strip > div:nth-child(2) { border-right: 0; }
   .supply-metric-strip > div:nth-child(-n + 2) { border-bottom: 1px solid var(--border); }
@@ -1422,6 +1405,5 @@ main { min-width: 0; overflow-x: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .supply-chain-section-nav button { transition: none; }
   .supply-loading span { animation: none; }
 }

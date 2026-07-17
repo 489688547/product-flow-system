@@ -15,7 +15,6 @@ import { ProductSupplyWorkspace } from "./ProductSupplyWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
 import { SupplyChainOverview } from "./SupplyChainOverview.jsx";
-import { SupplyChainSectionNav } from "./SupplyChainSectionNav.jsx";
 
 function departmentOf(user) {
   return String(user?.department || "").trim();
@@ -40,8 +39,7 @@ function SupplySettingsWorkspace({ canEdit }) {
   return <section className="section-panel"><div className="section-head"><div><h2>钉钉审批流程映射</h2><p>分别配置采购申请和付款申请流程；付款关系只读取钉钉“关联审批”组件。</p></div>{canEdit ? <Button variant="primary" onClick={() => dispatch({ type: "settings", settings: draft })}>保存设置</Button> : null}</div><div className="supply-settings-matrix"><fieldset disabled={!canEdit}><legend>采购申请</legend><label>processCode<input value={draft.purchaseProcessCode || ""} onChange={event => setDraft(current => ({ ...current, purchaseProcessCode: event.target.value }))} /></label><label>供应商字段 ID<input value={draft.fieldMappings?.purchase?.supplierFieldId || ""} onChange={event => updateMapping("purchase", "supplierFieldId", event.target.value)} /></label><label>产品字段 ID<input value={draft.fieldMappings?.purchase?.productFieldId || ""} onChange={event => updateMapping("purchase", "productFieldId", event.target.value)} /></label><label>金额字段 ID<input value={draft.fieldMappings?.purchase?.amountFieldId || ""} onChange={event => updateMapping("purchase", "amountFieldId", event.target.value)} /></label></fieldset><fieldset disabled={!canEdit}><legend>付款申请</legend><label>processCode<input value={draft.paymentProcessCode || ""} onChange={event => setDraft(current => ({ ...current, paymentProcessCode: event.target.value }))} /></label><label>实付金额字段 ID<input value={draft.fieldMappings?.payment?.amountFieldId || ""} onChange={event => updateMapping("payment", "amountFieldId", event.target.value)} /></label><label>关联采购审批字段 ID<input value={draft.fieldMappings?.payment?.relatedPurchaseFieldId || ""} onChange={event => updateMapping("payment", "relatedPurchaseFieldId", event.target.value)} /></label></fieldset></div></section>;
 }
 
-export function SupplyChainAppPage({ onNavigate }) {
-  const [section, setSection] = useState("overview");
+export function SupplyChainAppPage({ onNavigate, section = "overview" }) {
   const [salesRows, setSalesRows] = useState([]);
   const { user } = useAuth();
   const { state: productState } = useProductFlow();
@@ -68,13 +66,8 @@ export function SupplyChainAppPage({ onNavigate }) {
   return (
     <section className="page supply-chain-app">
       <PageHeader title="供应链管理" description="供应商、采购付款、库存资金与质量问题的统一工作台。"><Button onClick={() => onNavigate?.("apps")}><ArrowLeft size={16} />返回业务 Apps</Button></PageHeader>
-      <div className="supply-chain-layout">
-        <SupplyChainSectionNav section={section} onChange={setSection} />
-        <div className="supply-chain-content">
-          {error ? <p className="supply-message error" role="alert">{error}</p> : null}
-          {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[section]}
-        </div>
-      </div>
+      {error ? <p className="supply-message error" role="alert">{error}</p> : null}
+      {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[section]}
     </section>
   );
 }

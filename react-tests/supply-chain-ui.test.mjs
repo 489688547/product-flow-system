@@ -1,35 +1,34 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("supply chain App exposes all confirmed workspaces", () => {
-  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
-  const navigation = read("src/features/supply-chain/SupplyChainSectionNav.jsx");
+test("primary sidebar exposes every supply chain workspace in its own group", () => {
+  const app = read("src/App.jsx");
   for (const label of ["供应链总览", "供应商管理", "采购与付款", "产品供应链", "库存盘点", "质量管理", "同步记录", "设置"]) {
-    assert.match(`${page}\n${navigation}`, new RegExp(label));
+    assert.match(app, new RegExp(label));
   }
+  for (const key of ["supply-overview", "supply-suppliers", "supply-approvals", "supply-products", "supply-inventory", "supply-quality", "supply-records", "supply-settings"]) {
+    assert.match(app, new RegExp(`"${key}"`));
+  }
+  assert.match(app, /"供应链管理"/);
+  assert.doesNotMatch(app, /\["supply-chain", "供应链管理", Truck, "业务 Apps"\]/);
+  assert.match(app, /navigationPermissionKey/);
+  assert.match(app, /return SUPPLY_CHAIN_SCREEN_TO_SECTION\.has\(screen\) \? "supply-chain" : screen/);
+  assert.match(app, /screen === "supply-chain" \? "supply-overview" : screen/);
 });
 
-test("supply chain App uses a page-internal secondary navigation", () => {
+test("supply chain page is controlled by the primary route and has no internal navigation", () => {
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
-  assert.match(page, /SupplyChainSectionNav/);
-  assert.match(page, /className="supply-chain-layout"/);
-  assert.match(page, /className="supply-chain-content"/);
-  assert.doesNotMatch(page, /<nav className="supply-chain-nav"/);
-});
-
-test("supply chain secondary navigation groups daily work and configuration", () => {
-  const navPath = new URL("../src/features/supply-chain/SupplyChainSectionNav.jsx", import.meta.url);
-  assert.equal(existsSync(navPath), true);
-  const nav = read("src/features/supply-chain/SupplyChainSectionNav.jsx");
-  assert.match(nav, /日常业务/);
-  assert.match(nav, /数据与配置/);
-  assert.match(nav, /aria-current=\{section === key \? "page" : undefined\}/);
-  for (const key of ["overview", "suppliers", "approvals", "products", "inventory", "quality", "records", "settings"]) {
-    assert.match(nav, new RegExp(`"${key}"`));
-  }
+  const css = read("src/styles.css");
+  assert.match(page, /SupplyChainAppPage\(\{ onNavigate, section = "overview" \}\)/);
+  assert.doesNotMatch(page, /SupplyChainSectionNav/);
+  assert.doesNotMatch(page, /useState\("overview"\)/);
+  assert.doesNotMatch(page, /supply-chain-layout/);
+  assert.doesNotMatch(page, /supply-chain-content/);
+  assert.doesNotMatch(css, /\.supply-chain-section-nav/);
+  assert.doesNotMatch(css, /\.supply-chain-layout/);
 });
 
 test("inventory and quality imports preview before saving", () => {
@@ -67,13 +66,7 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
 test("supply chain workbench has stable responsive structure", () => {
   const css = read("src/styles.css");
   assert.match(css, /\.supply-chain-app/);
-  assert.match(css, /\.supply-chain-layout\s*\{[^}]*grid-template-columns:\s*176px minmax\(0, 1fr\)/);
-  assert.match(css, /\.supply-chain-section-nav\s*\{/);
-  assert.match(css, /\.supply-chain-section-nav button\.active::before/);
-  assert.match(css, /\.supply-chain-content\s*\{[^}]*min-width:\s*0/);
   assert.match(css, /\.supply-metric-strip/);
   assert.match(css, /\.supply-import-preview/);
-  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-chain-layout\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)/);
-  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-chain-nav-label\s*\{[^}]*display:\s*none/);
-  assert.match(css, /\.supply-chain-section-nav button:focus-visible/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-metric-strip\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(170px, 1fr\)\)/);
 });
