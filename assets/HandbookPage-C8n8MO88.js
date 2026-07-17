@@ -1,6 +1,6 @@
-import{j as t,r as l}from"./react-vendor-Cdl46aim.js";import{B as A,M as R,r as D,a as C}from"./markdown-vendor-CTibGXZM.js";import{P as E}from"./PageHeader-DZv__LwJ.js";import{Q as _,X as M,g as b}from"./icons-vendor-mXgWO-PT.js";const j=[{id:"all",label:"全部"},{id:"handbook",label:"员工使用手册"},{id:"product",label:"产品与设计"},{id:"platform",label:"平台能力"}],p=e=>String(e??"").replace(/\s+/g," ").trim(),m=e=>/^#{1,6}\s|^(```|~~~|>|[-*+]\s|\d+[.)]\s|\|)/.test(e),y=e=>p(e.replace(/!\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/[`*_~]/g,"")),U=e=>{const n=String(e??"").match(/^#\s+(.+?)\s*#*\s*$/m);return n?y(n[1]):"未命名说明"},O=e=>{const n=String(e??"").split(/\r?\n/);for(let s=0;s<n.length;s+=1){const a=n[s].trim();if(!a||m(a))continue;const r=[a];for(;n[s+1]?.trim()&&!m(n[s+1].trim());)r.push(n[s+1].trim()),s+=1;return y(r.join(" "))}return"暂无摘要"};function g(e){const n=String(e.content??"");return{...e,content:n,title:p(e.title)||U(n),summary:p(e.summary)||O(n)}}function q(e,{query:n="",category:s="all"}={}){const a=p(n).toLocaleLowerCase("zh-CN");return e.filter(r=>s&&s!=="all"&&r.category!==s?!1:a?[r.title,r.summary,r.content].join(`
-`).toLocaleLowerCase("zh-CN").includes(a):!0)}function F(e,n,s){return e.length?e.find(a=>a.slug===n)??e.find(a=>a.slug===s)??e[0]:null}function L(e){const n=new A,s=[],a=/^(#{2,3})\s+(.+?)\s*#*\s*$/gm;let r;for(;(r=a.exec(String(e??"")))!==null;){const c=y(r[2]);s.push({level:r[1].length,title:c,id:n.slug(c)})}return s}function N(e){const n=String(e??""),s=n.split(/\r?\n/);let a=0;for(;a<s.length&&!s[a].trim();)a+=1;if(!/^#\s+/.test(s[a]?.trim()??""))return n;for(a+=1;a<s.length&&!s[a].trim();)a+=1;if(s[a]?.trim()&&!m(s[a].trim())){for(;a<s.length&&s[a].trim();)a+=1;for(;a<s.length&&!s[a].trim();)a+=1}return s.slice(a).join(`
-`).trim()}const G=e=>/^https?:\/\//i.test(e??"");function z({content:e}){return t.jsx("div",{className:"handbook-markdown",children:t.jsx(R,{remarkPlugins:[C],rehypePlugins:[D],components:{h1:()=>null,a:({href:n,children:s,...a})=>G(n)?t.jsx("a",{...a,href:n,target:"_blank",rel:"noreferrer",children:s}):t.jsx("a",{...a,href:n,children:s}),table:({children:n,...s})=>t.jsx("div",{className:"handbook-table-wrap",children:t.jsx("table",{...s,children:n})})},children:e})})}const B=`# 公司经营功能使用说明
+import{j as t,r as l}from"./react-vendor-Cdl46aim.js";import{B as A,M as R,r as D,a as E}from"./markdown-vendor-CTibGXZM.js";import{P as C}from"./PageHeader-DZv__LwJ.js";import{Q as _,X as M,g as b}from"./icons-vendor-mXgWO-PT.js";const j=[{id:"all",label:"全部"},{id:"handbook",label:"员工使用手册"},{id:"product",label:"产品与设计"},{id:"platform",label:"平台能力"}],u=e=>String(e??"").replace(/\s+/g," ").trim(),m=e=>/^#{1,6}\s|^(```|~~~|>|[-*+]\s|\d+[.)]\s|\|)/.test(e),y=e=>u(e.replace(/!\[([^\]]*)\]\([^)]*\)/g,"$1").replace(/\[([^\]]+)\]\([^)]*\)/g,"$1").replace(/[`*_~]/g,"")),U=e=>{const n=String(e??"").match(/^#\s+(.+?)\s*#*\s*$/m);return n?y(n[1]):"未命名说明"},O=e=>{const n=String(e??"").split(/\r?\n/);for(let s=0;s<n.length;s+=1){const a=n[s].trim();if(!a||m(a))continue;const r=[a];for(;n[s+1]?.trim()&&!m(n[s+1].trim());)r.push(n[s+1].trim()),s+=1;return y(r.join(" "))}return"暂无摘要"};function g(e){const n=String(e.content??"");return{...e,content:n,title:u(e.title)||U(n),summary:u(e.summary)||O(n)}}function G(e,{query:n="",category:s="all"}={}){const a=u(n).toLocaleLowerCase("zh-CN");return e.filter(r=>s&&s!=="all"&&r.category!==s?!1:a?[r.title,r.summary,r.content].join(`
+`).toLocaleLowerCase("zh-CN").includes(a):!0)}function q(e,n,s){return e.length?e.find(a=>a.slug===n)??e.find(a=>a.slug===s)??e[0]:null}function F(e){const n=new A,s=[],a=/^(#{2,3})\s+(.+?)\s*#*\s*$/gm;let r;for(;(r=a.exec(String(e??"")))!==null;){const c=y(r[2]);s.push({level:r[1].length,title:c,id:n.slug(c)})}return s}function L(e){const n=String(e??""),s=n.split(/\r?\n/);let a=0;for(;a<s.length&&!s[a].trim();)a+=1;if(!/^#\s+/.test(s[a]?.trim()??""))return n;for(a+=1;a<s.length&&!s[a].trim();)a+=1;if(s[a]?.trim()&&!m(s[a].trim())){for(;a<s.length&&s[a].trim();)a+=1;for(;a<s.length&&!s[a].trim();)a+=1}return s.slice(a).join(`
+`).trim()}const N=e=>/^https?:\/\//i.test(e??"");function z({content:e}){return t.jsx("div",{className:"handbook-markdown",children:t.jsx(R,{remarkPlugins:[E],rehypePlugins:[D],components:{h1:()=>null,a:({href:n,children:s,...a})=>N(n)?t.jsx("a",{...a,href:n,target:"_blank",rel:"noreferrer",children:s}):t.jsx("a",{...a,href:n,children:s}),table:({children:n,...s})=>t.jsx("div",{className:"handbook-table-wrap",children:t.jsx("table",{...s,children:n})})},children:e})})}const V=`# 公司经营功能使用说明
 
 公司经营功能帮助总经办和责任部门把战略目标拆成可检查的项目、部门承诺和经营复盘。页面权限来自组织架构，编辑动作会记录责任人和业务状态。
 
@@ -28,7 +28,7 @@ import{j as t,r as l}from"./react-vendor-Cdl46aim.js";import{B as A,M as R,r as 
 
 业务 Apps 是公司不同业务系统的入口。产品全周期是当前首个已连接应用，后续系统通过稳定的平台契约接入，而不是复制公司组织和权限逻辑。
 
-`,K=`# 常见问题
+`,B=`# 常见问题
 
 本页汇总登录、权限、保存和外部系统同步中最常见的情况。
 
@@ -60,7 +60,7 @@ import{j as t,r as l}from"./react-vendor-Cdl46aim.js";import{B as A,M as R,r as 
 
 写明页面、账号部门、产品或项目、操作步骤、发生时间、预期结果和实际结果。可以附截图，但不要上传密钥、Cookie、个人手机号或完整外部接口响应。
 
-`,V=`# 开始使用经营执行平台
+`,K=`# 开始使用经营执行平台
 
 经营执行平台把公司战略、重点项目、部门承诺、产品全周期任务和经营复盘放到同一个协作入口。你看到的页面和操作范围来自钉钉组织身份，不需要另建一套账号。
 
@@ -1324,7 +1324,7 @@ Confirm the summary is between the page header and stage cards, aligns to the co
 - [x] **Step 3: Inspect the local page at 1024x768**
 
 Confirm dates and action remain readable without overlap or horizontal page overflow.
-`,pe=`# Executive Personal Todo and DingTalk Sync Implementation Plan
+`,ue=`# Executive Personal Todo and DingTalk Sync Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
 
@@ -1930,7 +1930,7 @@ Inspect the local bridge command log/test and confirm it only invoked \`dws todo
 - [ ] **Step 6: Record the prelaunch live-sync gate**
 
 Before deployment, use newly created \`strategy-platform:\` test todos to validate create/update/complete/reopen and safe decision/risk behavior through the official API. Existing personal todos remain out of scope and untouched.
-`,ue=`# Product GMV Progress Implementation Plan
+`,pe=`# Product GMV Progress Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
@@ -4507,7 +4507,224 @@ Start the local preview, then confirm:
 git add react-tests/react-app.test.mjs src/App.jsx src/features/planning/ProductPlanningPage.jsx src/features/planning/PlanningDemandTray.jsx src/styles.css
 git commit -m "feat(planning): open product progress from cards"
 \`\`\`
-`,we=`# Product Ownership Visibility Implementation Plan
+`,we=`# Product Grading GMV Boundaries Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
+
+**Goal:** Make the annual GMV grading reference use explicit business intervals so exactly 600万元 remains in the 300–600万元 band and only values above 600万元 receive score 5.
+
+**Architecture:** Keep monthly GMV normalization and the existing product grading model unchanged. Add one focused annual-GMV scoring function backed by explicit inclusive/exclusive interval metadata, then make the existing monthly suggestion function delegate to it. Lock the exact 30/100/300/600万元 boundaries with unit tests before rebuilding and deploying the existing Cloudflare Pages release.
+
+**Tech Stack:** JavaScript ES modules, Node.js built-in test runner, React/Vite build, Cloudflare Pages/Wrangler.
+
+## Global Constraints
+
+- Product level, risk level, and delivery route remain separate outputs.
+- C2 risk does not contribute to the C1 resource investment score.
+- High risk increases management intensity and does not lower product level.
+- The exact annual-GMV intervals are \`<30万\`, \`30万 ≤ GMV < 100万\`, \`100万 ≤ GMV < 300万\`, \`300万 ≤ GMV ≤ 600万\`, and \`GMV > 600万\`.
+- No historical product-state migration and no grading-modal layout changes.
+- Do not change product-level thresholds, risk weights, risk bands, route mappings, or O-level rules.
+
+---
+
+## File Structure
+
+- Modify \`src/domain/productGmv.js\`: own explicit annual-GMV band metadata, boundary matching, and monthly-to-annual suggestion conversion.
+- Modify \`react-tests/product-gmv.test.mjs\`: lock annual-GMV boundaries and preserve monthly suggestion behavior.
+- Modify generated Pages release assets only through \`npm run release:pages\`; do not hand-edit production bundles.
+
+### Task 1: Explicit annual-GMV interval scoring
+
+**Files:**
+- Modify: \`src/domain/productGmv.js:3-49\`
+- Test: \`react-tests/product-gmv.test.mjs:1-24\`
+
+**Interfaces:**
+- Consumes: \`normalizeMonthlyGmvTarget(value) -> number | null\` and the existing two-decimal \`round2(value)\` behavior.
+- Produces: \`scoreAnnualGmv(value) -> { annualGmv: number, score: number, label: string } | null\`.
+- Preserves: \`suggestAnnualGmvScore(monthlyGmvTarget) -> { annualGmv: number, score: number, label: string } | null\`.
+
+- [ ] **Step 1: Write the failing boundary tests**
+
+Update the import and add a dedicated test in \`react-tests/product-gmv.test.mjs\`:
+
+\`\`\`js
+import {
+  buildProductGmvProgress,
+  normalizeMonthlyGmvTarget,
+  scoreAnnualGmv,
+  suggestAnnualGmvScore
+} from "../src/domain/productGmv.js";
+
+test("annual GMV grading uses the confirmed inclusive and exclusive boundaries", () => {
+  assert.deepEqual(scoreAnnualGmv(299_999.99), { annualGmv: 299_999.99, score: 1, label: "＜30万" });
+  assert.deepEqual(scoreAnnualGmv(300_000), { annualGmv: 300_000, score: 2, label: "30-100万" });
+  assert.deepEqual(scoreAnnualGmv(1_000_000), { annualGmv: 1_000_000, score: 3, label: "100-300万" });
+  assert.deepEqual(scoreAnnualGmv(3_000_000), { annualGmv: 3_000_000, score: 4, label: "300-600万" });
+  assert.deepEqual(scoreAnnualGmv(5_999_999.99), { annualGmv: 5_999_999.99, score: 4, label: "300-600万" });
+  assert.deepEqual(scoreAnnualGmv(6_000_000), { annualGmv: 6_000_000, score: 4, label: "300-600万" });
+  assert.deepEqual(scoreAnnualGmv(6_000_000.01), { annualGmv: 6_000_000.01, score: 5, label: "＞600万" });
+  assert.equal(scoreAnnualGmv(0), null);
+  assert.equal(scoreAnnualGmv(-1), null);
+  assert.equal(scoreAnnualGmv("not-a-number"), null);
+});
+\`\`\`
+
+- [ ] **Step 2: Run the targeted test and verify RED**
+
+Run:
+
+\`\`\`bash
+node --test react-tests/product-gmv.test.mjs
+\`\`\`
+
+Expected: FAIL because \`scoreAnnualGmv\` is not exported.
+
+- [ ] **Step 3: Implement explicit interval matching**
+
+Replace the current max-only band table and update the suggestion function in \`src/domain/productGmv.js\`:
+
+\`\`\`js
+const GMV_SCORE_BANDS = [
+  { min: 0, minInclusive: false, max: 300_000, maxInclusive: false, score: 1, label: "＜30万" },
+  { min: 300_000, minInclusive: true, max: 1_000_000, maxInclusive: false, score: 2, label: "30-100万" },
+  { min: 1_000_000, minInclusive: true, max: 3_000_000, maxInclusive: false, score: 3, label: "100-300万" },
+  { min: 3_000_000, minInclusive: true, max: 6_000_000, maxInclusive: true, score: 4, label: "300-600万" },
+  { min: 6_000_000, minInclusive: false, max: Infinity, maxInclusive: false, score: 5, label: "＞600万" }
+];
+
+function matchesGmvBand(annualGmv, band) {
+  const aboveMinimum = band.minInclusive ? annualGmv >= band.min : annualGmv > band.min;
+  const belowMaximum = band.max === Infinity
+    ? true
+    : band.maxInclusive
+      ? annualGmv <= band.max
+      : annualGmv < band.max;
+  return aboveMinimum && belowMaximum;
+}
+
+export function scoreAnnualGmv(value) {
+  const annualGmv = round2(Number(value));
+  if (!Number.isFinite(annualGmv) || annualGmv <= 0) return null;
+  const band = GMV_SCORE_BANDS.find(item => matchesGmvBand(annualGmv, item));
+  return band ? { annualGmv, score: band.score, label: band.label } : null;
+}
+
+export function suggestAnnualGmvScore(monthlyGmvTarget) {
+  const monthly = normalizeMonthlyGmvTarget(monthlyGmvTarget);
+  return monthly ? scoreAnnualGmv(monthly * 12) : null;
+}
+\`\`\`
+
+- [ ] **Step 4: Run the targeted test and verify GREEN**
+
+Run:
+
+\`\`\`bash
+node --test react-tests/product-gmv.test.mjs
+\`\`\`
+
+Expected: all tests in \`react-tests/product-gmv.test.mjs\` PASS.
+
+- [ ] **Step 5: Run grading-focused regressions**
+
+Run:
+
+\`\`\`bash
+node --test react-tests/product-gmv.test.mjs react-tests/shared-state.test.mjs react-tests/react-app.test.mjs
+\`\`\`
+
+Expected: all selected tests PASS, including the existing risk separation and three-output assertions.
+
+- [ ] **Step 6: Commit the implementation**
+
+\`\`\`bash
+git add src/domain/productGmv.js react-tests/product-gmv.test.mjs
+git commit -m "fix(grading): correct annual GMV boundaries"
+\`\`\`
+
+### Task 2: Release verification and production deployment
+
+**Files:**
+- Modify: generated release files produced by \`npm run release:pages\`
+- Verify: \`package.json\`, \`CLOUDFLARE_PAGES.md\`
+
+**Interfaces:**
+- Consumes: the passing implementation commit from Task 1.
+- Produces: a pushed branch and \`main\` commit, a successful Cloudflare Pages production deployment, and verified public application availability.
+
+- [ ] **Step 1: Run the full verification suite**
+
+Run each command separately:
+
+\`\`\`bash
+npm test
+npm run lint
+npm run check:governance
+npm run audit:dependencies
+\`\`\`
+
+Expected: all tests PASS, ESLint exits 0, governance exits 0, and npm reports no vulnerability at or above the configured threshold.
+
+- [ ] **Step 2: Build the production Pages release**
+
+Run:
+
+\`\`\`bash
+npm run release:pages
+\`\`\`
+
+Expected: Vite build and chunk validation PASS; generated Pages assets contain the updated GMV interval logic.
+
+- [ ] **Step 3: Commit generated release assets if changed**
+
+Inspect \`git status --short\`. If release files changed, stage only generated release files and commit:
+
+\`\`\`bash
+git add cloudflare-entry.html assets
+git commit -m "build: publish grading boundary fix"
+\`\`\`
+
+If those paths are unchanged, do not create an empty commit.
+
+- [ ] **Step 4: Push the tested branch and update main**
+
+\`\`\`bash
+git push -u origin codex/product-grading-boundaries
+git push origin HEAD:main
+\`\`\`
+
+Expected: both pushes succeed without force.
+
+- [ ] **Step 5: Deploy the production branch to Cloudflare Pages**
+
+\`\`\`bash
+npx wrangler pages deploy . --project-name product-flow-system --branch main
+\`\`\`
+
+Expected: Wrangler reports a successful deployment for \`product-flow-system\`.
+
+- [ ] **Step 6: Verify the deployed version**
+
+Run:
+
+\`\`\`bash
+npx wrangler pages deployment list --project-name product-flow-system
+\`\`\`
+
+Expected: the newest production deployment is successful and references the release commit produced above. Open \`https://product-flow-system.pages.dev\`, confirm the application loads, and verify the production asset contains \`300-600万\` with the inclusive 600万元 scoring behavior.
+
+- [ ] **Step 7: Confirm the worktree is clean**
+
+Run:
+
+\`\`\`bash
+git status --short
+\`\`\`
+
+Expected: no output.
+`,xe=`# Product Ownership Visibility Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
 
@@ -5026,7 +5243,7 @@ Expected: no overlap, clipping, horizontal overflow, inconsistent badge styling,
 Run: \`git diff --check && git status --short && git diff --stat HEAD~4..HEAD\`
 
 Expected: \`git diff --check\` has no output; only the planned product ownership files and pre-existing untracked workspace items appear.
-`,xe=`# Release Hardening Implementation Plan
+`,Se=`# Release Hardening Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
 
@@ -5187,7 +5404,7 @@ Confirm the saved rule targets \`main\` and every required switch/check is activ
 - [ ] **Step 3: Clean temporary local state**
 
 After the merge, remove only \`.worktrees/release-hardening\`, delete the merged local branch, and leave all other user branches/worktrees untouched.
-`,Se=`# Repository Governance Foundation Implementation Plan
+`,je=`# Repository Governance Foundation Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (\`- [ ]\`) syntax for tracking.
 
@@ -5714,7 +5931,7 @@ Expected: no whitespace errors; unrelated existing modifications remain unstaged
 - [x] **Step 5: Record the external GitHub setting still required**
 
 If \`gh auth status\` is not authenticated, do not change repository settings. Report that source-level governance is complete but GitHub branch protection must be enabled after authentication and explicit confirmation.
-`,je=`# 权限与功能设置设计
+`,Pe=`# 权限与功能设置设计
 
 ## 目标
 
@@ -5743,7 +5960,7 @@ If \`gh auth status\` is not authenticated, do not change repository settings. R
 ## 验证
 
 自动化测试覆盖默认权限、导航隐藏、功能查看/编辑、旧数据迁移和大状态请求；浏览器验证设置保存与不同角色页面呈现；钉钉验证不再出现 \`Load failed\`。
-`,Pe=`# 任务类别与责任部门交互设计
+`,Ie=`# 任务类别与责任部门交互设计
 
 ## 目标
 
@@ -5823,7 +6040,7 @@ If \`gh auth status\` is not authenticated, do not change repository settings. R
 - 单元测试覆盖等级隔离、配置同步、执行状态保留、模板删除与老数据迁移。
 - 组件测试覆盖设置页编辑入口、产品进度模板按钮和弹窗。
 - 浏览器验证设置修改后对应等级产品立即变化，其他等级不受影响。
-`,Ie=`# 首页部门待办设计
+`,Ae=`# 首页部门待办设计
 
 ## 目标
 
@@ -5845,7 +6062,7 @@ If \`gh auth status\` is not authenticated, do not change repository settings. R
 - 点击顶部待办卡准确进入首条待办的产品与阶段。
 - 两个下方区块宽度一致，移动端无横向挤压。
 
-`,Ae=`# 需求池创建时间修复设计
+`,Re=`# 需求池创建时间修复设计
 
 ## 目标
 
@@ -5868,7 +6085,7 @@ If \`gh auth status\` is not authenticated, do not change repository settings. R
 ## 范围
 
 只修复需求池创建时间。资料包、反馈问题等其他模块的日期字段不在本次修改范围内。
-`,Re=`# 钉钉网页登录与统一会话设计
+`,De=`# 钉钉网页登录与统一会话设计
 
 ## 目标
 
@@ -6080,7 +6297,7 @@ D1 新增 \`product_flow_org_members\`，保存登录校验所需的最小目录
 ## 发布策略
 
 认证改造先在本地使用模拟钉钉响应完成自动测试；随后发布到 Cloudflare Preview 验证真实扫码回调。Preview 验收通过后再合并到生产 \`main\`。发布前不修改现有 D1 公司业务状态，只新增认证和组织成员表。
-`,De=`# 平台销售表排序设计
+`,Ee=`# 平台销售表排序设计
 
 ## 目标
 
@@ -6262,7 +6479,7 @@ D1 新增 \`product_flow_org_members\`，保存登录校验所需的最小目录
 - 生产构建成功。
 - 本地浏览器验证 1440px 和笔记本宽度布局。
 - 构建产物同步到实际发布仓库后，验证线上 \`/api/state\` 能保存并重新读取 \`productPlans\`。
-`,Ee=`# 产品进度排期摘要设计
+`,_e=`# 产品进度排期摘要设计
 
 ## 目标
 
@@ -6306,7 +6523,7 @@ D1 新增 \`product_flow_org_members\`，保存登录校验所需的最小目录
 - 确认首页与产品进度页对同一产品返回相同百分比和状态。
 - 运行 React 全量测试及生产构建。
 - 在 1440px 和 1024px 视口检查层级、对齐、换行和溢出。
-`,_e=`# 公司战略执行平台设计
+`,Me=`# 公司战略执行平台设计
 
 ## 1. 产品定位
 
@@ -6583,7 +6800,7 @@ D1 新增 \`product_flow_org_members\`，保存登录校验所需的最小目录
 8. 钉钉与独立浏览器使用相同身份、数据和权限。
 9. 单个 App 或数据源故障不会导致整个驾驶舱不可用。
 10. 权限、汇总规则、风险升级、幂等接入和历史快照具有自动化测试。
-`,Me=`# 总经办个人待办与钉钉双向同步设计
+`,Ue=`# 总经办个人待办与钉钉双向同步设计
 
 ## 背景
 
@@ -6858,7 +7075,7 @@ D1 新增 \`product_flow_org_members\`，保存登录校验所需的最小目录
 - 权限测试：本人可见、他人不可见、管理操作服务端校验。
 - UI 测试：双视图默认状态、未完成数量、分组、筛选、空状态、失败状态和重试入口。
 - 回归测试：公司驾驶舱、重点项目、经营检查和产品全周期现有功能保持可用。
-`,Ue=`# 公司战略、部门承诺、激励项目与月度汇报设计
+`,Oe=`# 公司战略、部门承诺、激励项目与月度汇报设计
 
 ## 1. 背景与目标
 
@@ -7039,7 +7256,7 @@ D1 新增 \`product_flow_org_members\`，保存登录校验所需的最小目录
 8. 所有状态变化都有操作者、时间和原因记录。
 9. 桌面和移动端均无横向溢出，核心流程支持键盘操作和明确的错误提示。
 
-`,Oe=`# 钉钉群聊执行人选择设计
+`,Ge=`# 钉钉群聊执行人选择设计
 
 ## 背景
 
@@ -7391,7 +7608,100 @@ Skill 是标准流程助手，不是治理真相。任何 Skill 与仓库 \`AGEN
 ### 阶段三：真实复用
 
 当第二个公司系统出现真实调用需求时，根据已稳定的契约抽取 workspace package 或独立服务，并通过 ADR 记录边界、迁移和兼容策略。
-`,Le=`# 产品负责人识别与“我负责”标识设计
+`,Le=`# 产品分级规则与 GMV 边界设计
+
+## 背景
+
+产品定级已经从单一等级输出调整为三个独立结论：产品等级、风险等级和推进方式。风险用于提高管理强度，不再直接降低产品等级；资源投入只由 C1 开发周期与资源评分决定，C2 风险核查不再计入资源投入分。
+
+本次调整的主要工作是把年 GMV 贡献参考范围明确为可执行的数值区间，并修正 600 万边界。当前实现使用单一 \`max\` 和严格小于比较，导致年 GMV 正好为 600 万时错误进入“＞600万”。
+
+## 已确认业务规则
+
+### 三项独立输出
+
+定级结果继续分别展示：
+
+1. 产品等级：\`P0 战略级\`、\`P1 增长级\`、\`P2 验证级\`、\`P3 常规级\`或\`O级储备\`。
+2. 风险等级：低风险、中风险或高风险。
+3. 推进方式：根据产品等级、资源投入和风险强度得出，例如\`分阶段推进\`或\`缩小验证\`。
+
+高风险不降低产品等级。高风险产品提高管理强度、增加风险预案和阶段闸门，必要时缩小验证或上提评审。
+
+### 资源与风险分离
+
+- C1 开发周期与资源单独决定资源投入分和高、中、低投入档位。
+- C2 风险核查单独决定风险分和风险等级。
+- C2 不参与资源投入分计算。
+- 产品价值分仍由 A 战略价值、B1 年 GMV 贡献和 B2 商业综合价值组成。
+
+### 年 GMV 贡献区间
+
+年 GMV 由平均月 GMV 乘以 12 得出，按以下区间映射：
+
+| 年 GMV | 分值 | 展示文案 |
+|---|---:|---|
+| \`0 < GMV < 30万\` | 1 | \`＜30万\` |
+| \`30万 ≤ GMV < 100万\` | 2 | \`30-100万\` |
+| \`100万 ≤ GMV < 300万\` | 3 | \`100-300万\` |
+| \`300万 ≤ GMV ≤ 600万\` | 4 | \`300-600万\` |
+| \`GMV > 600万\` | 5 | \`＞600万\` |
+
+平均月 GMV 缺失、非数字或不大于零时仍返回无建议分值，不进入任何档位。
+
+## 设计方案
+
+### 显式区间模型
+
+GMV 档位不再只依赖一个严格小于的 \`max\`。每个档位显式表达上下界及边界包含关系，由一个区间匹配函数选择档位。这样业务文案与计算条件能够直接对应，尤其能准确表达第四档包含 600 万、第五档严格大于 600 万。
+
+区间匹配只负责返回分值和标签，不改变平均月 GMV 标准化、年化计算或其他定级逻辑。
+
+### 现有分级逻辑保持不变
+
+以下已经正确的行为不在本次修改范围内：
+
+- 高风险不降低产品等级。
+- C1 资源投入和 C2 风险核查分开计算。
+- 产品等级、风险等级、推进方式三项独立展示。
+- 高风险 P0/P1 使用分阶段推进，高风险 P2/P3 使用缩小验证。
+- O级储备及一票规则。
+
+### 数据兼容
+
+无需迁移历史产品数据。系统保存的是平均月 GMV 和定级答案，建议分值在读取或编辑时实时计算。修改区间后，历史记录会按新边界自然得到正确结果。
+
+## 界面影响
+
+定级弹窗继续使用现有五档文案，不增加新控件。只有正好落在边界上的建议分值会改变，其中 600 万从第五档修正为第四档。三项结果卡片与风险管理说明保持现状。
+
+## 测试与验收
+
+新增或扩充分级 GMV 测试，至少覆盖：
+
+- 30 万以下、正好 30 万和略高于 30 万。
+- 正好 100 万及相邻值。
+- 正好 300 万及相邻值。
+- 略低于 600 万、正好 600 万和略高于 600 万。
+- 缺失、非数字、零和负数输入。
+
+同时保留现有风险分离和三项输出测试，确保 GMV 边界修改不会重新把 C2 风险计入资源投入，也不会改变产品等级降级规则。
+
+验收标准：
+
+1. 正好 600 万返回分值 4 和\`300-600万\`。
+2. 只有大于 600 万才返回分值 5 和\`＞600万\`。
+3. 其他四个档位的上下边界符合已确认区间。
+4. 全部分级、共享状态和界面回归测试通过。
+
+## 不在本次范围
+
+- 不调整产品等级价值分阈值。
+- 不调整风险项权重或风险等级阈值。
+- 不调整不同等级的推进方式映射。
+- 不修改历史定级记录结构。
+- 不改变产品定级弹窗的视觉布局。
+`,Ne=`# 产品负责人识别与“我负责”标识设计
 
 ## 目标
 
@@ -7435,7 +7745,7 @@ Skill 是标准流程助手，不是治理真相。任何 Skill 与仓库 \`AGEN
 - 页面测试确认产品下拉、产品档案、待规划区和年度规划时间轴均使用统一“我负责”标识。
 - 运行 React 全量测试和生产构建。
 - 在 1440px、1024px 和窄屏宽度检查标签与产品名称、状态、等级之间的对齐、换行和溢出。
-`,Ne=`# Product
+`,ze=`# Product
 
 ## Register
 
@@ -7468,7 +7778,7 @@ product
 ## Accessibility & Inclusion
 
 以 WCAG AA 为目标，交互不依赖颜色单独表达，保留焦点和禁用状态。
-`,Ge=`# Design
+`,Ve=`# Design
 
 ## Style Direction
 
@@ -7494,4 +7804,4 @@ product
 ## Embedded DingTalk Webview
 
 避免大请求使用 \`keepalive\`；错误提示使用明确中文。布局使用动态视口高度并适配安全区。
-`,h="handbook/getting-started",ze=Object.assign({"../../../docs/handbook/company-platform.md":B,"../../../docs/handbook/faq.md":K,"../../../docs/handbook/getting-started.md":V,"../../../docs/handbook/product-lifecycle.md":H,"../../../docs/platform/api-catalog.md":W,"../../../docs/platform/architecture.md":Y,"../../../docs/platform/components.md":Q,"../../../docs/platform/error-codes.md":J,"../../../docs/platform/integrations.md":X,"../../../docs/platform/middleware.md":$,"../../../docs/product/core-workflows.md":Z,"../../../docs/product/data-definitions.md":ee,"../../../docs/product/roles-and-permissions.md":ne,"../../../docs/superpowers/plans/2026-07-11-permission-settings.md":te,"../../../docs/superpowers/plans/2026-07-11-task-category-actions.md":se,"../../../docs/superpowers/plans/2026-07-11-workflow-task-templates.md":ae,"../../../docs/superpowers/plans/2026-07-13-dashboard-department-todos.md":oe,"../../../docs/superpowers/plans/2026-07-13-demand-created-at.md":re,"../../../docs/superpowers/plans/2026-07-13-dingtalk-web-login.md":ie,"../../../docs/superpowers/plans/2026-07-13-platform-sales-sorting.md":de,"../../../docs/superpowers/plans/2026-07-15-product-planning.md":ce,"../../../docs/superpowers/plans/2026-07-15-product-progress-schedule-plan.md":le,"../../../docs/superpowers/plans/2026-07-16-executive-personal-todo-dingtalk-sync.md":pe,"../../../docs/superpowers/plans/2026-07-16-product-gmv-progress.md":ue,"../../../docs/superpowers/plans/2026-07-16-strategy-commitments-incentives-reports.md":me,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-1.md":ge,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-2.md":he,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-3.md":fe,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-4.md":ye,"../../../docs/superpowers/plans/2026-07-17-dingtalk-group-executor-selection.md":ke,"../../../docs/superpowers/plans/2026-07-17-in-app-handbook.md":be,"../../../docs/superpowers/plans/2026-07-17-planning-card-progress-navigation.md":ve,"../../../docs/superpowers/plans/2026-07-17-product-ownership-visibility.md":we,"../../../docs/superpowers/plans/2026-07-17-release-hardening.md":xe,"../../../docs/superpowers/plans/2026-07-17-repository-governance-foundation.md":Se,"../../../docs/superpowers/specs/2026-07-11-permission-settings-design.md":je,"../../../docs/superpowers/specs/2026-07-11-task-category-actions-design.md":Pe,"../../../docs/superpowers/specs/2026-07-11-workflow-task-templates-design.md":Te,"../../../docs/superpowers/specs/2026-07-13-dashboard-department-todos-design.md":Ie,"../../../docs/superpowers/specs/2026-07-13-demand-created-at-design.md":Ae,"../../../docs/superpowers/specs/2026-07-13-dingtalk-web-login-design.md":Re,"../../../docs/superpowers/specs/2026-07-13-platform-sales-sorting-design.md":De,"../../../docs/superpowers/specs/2026-07-15-product-planning-design.md":Ce,"../../../docs/superpowers/specs/2026-07-15-product-progress-schedule-design.md":Ee,"../../../docs/superpowers/specs/2026-07-16-company-strategy-execution-platform-design.md":_e,"../../../docs/superpowers/specs/2026-07-16-executive-personal-todo-dingtalk-sync-design.md":Me,"../../../docs/superpowers/specs/2026-07-16-strategy-department-incentive-monthly-report-design.md":Ue,"../../../docs/superpowers/specs/2026-07-17-dingtalk-group-executor-selection-design.md":Oe,"../../../docs/superpowers/specs/2026-07-17-planning-card-progress-navigation-design.md":qe,"../../../docs/superpowers/specs/2026-07-17-platform-handbook-design.md":Fe,"../../../docs/superpowers/specs/2026-07-17-product-ownership-visibility-design.md":Le}),v={handbook:0,product:1,platform:2},w={guide:0,product:0,design:1,specification:2,plan:3,platform:0},f="2026-07-17",P=e=>e.split("/").pop().replace(/\.md$/,""),Be=e=>e.match(/^(\d{4}-\d{2}-\d{2})-/)?.[1]??f,Ke=e=>{const n=P(e);return e.includes("/docs/handbook/")?{slug:`handbook/${n}`,category:"handbook",kind:"guide"}:e.includes("/docs/product/")?{slug:`product/${n}`,category:"product",kind:"product"}:e.includes("/docs/platform/")?{slug:`platform/${n}`,category:"platform",kind:"platform"}:e.includes("/docs/superpowers/specs/")?{slug:`product/specs/${n}`,category:"product",kind:"specification"}:{slug:`product/plans/${n}`,category:"product",kind:"plan"}},Ve=Object.entries(ze).map(([e,n])=>{const s=Ke(e);return g({...s,updatedAt:Be(P(e)),content:n})}),He=[g({slug:"product/product",category:"product",kind:"product",updatedAt:f,content:Ne}),g({slug:"product/design",category:"product",kind:"design",updatedAt:f,content:Ge})],x=[...Ve,...He].sort((e,n)=>(e.slug===h?-1:n.slug===h?1:0)||v[e.category]-v[n.category]||w[e.kind]-w[n.kind]||e.title.localeCompare(n.title,"zh-CN")),We=Object.fromEntries(j.filter(e=>e.id!=="all").map(e=>[e.id,e.label])),S={guide:"使用说明",product:"产品说明",design:"设计书",specification:"设计规格",plan:"实施计划",platform:"平台能力"},Ye=e=>Object.entries(We).map(([n,s])=>({category:n,label:s,documents:e.filter(a=>a.category===n)})).filter(n=>n.documents.length);function Ze({selectedSlug:e,onSelectDocument:n}){const[s,a]=l.useState(""),[r,c]=l.useState("all"),i=F(x,e,h),u=l.useMemo(()=>q(x,{query:s,category:r}),[r,s]),T=l.useMemo(()=>Ye(u),[u]),k=l.useMemo(()=>L(i?.content),[i]),I=(o,d)=>{o.preventDefault(),document.getElementById(d)?.scrollIntoView({behavior:"smooth",block:"start"})};return t.jsxs("section",{className:"page handbook-page",children:[t.jsx(E,{title:"说明书",description:"公司的工作方法、产品定义、设计决策与共享平台能力，以仓库文档为准。"}),t.jsxs("div",{className:"handbook-tools",role:"search",children:[t.jsxs("label",{className:"handbook-search",children:[t.jsx(_,{size:16,"aria-hidden":"true"}),t.jsx("span",{className:"sr-only",children:"搜索说明书"}),t.jsx("input",{type:"search",value:s,onChange:o=>a(o.target.value),placeholder:"搜索说明书"}),s?t.jsx("button",{type:"button","aria-label":"清除搜索",onClick:()=>a(""),children:t.jsx(M,{size:15,"aria-hidden":"true"})}):null]}),t.jsx("div",{className:"handbook-filters","aria-label":"说明书分类",children:j.map(o=>t.jsx("button",{type:"button",className:r===o.id?"active":"","aria-pressed":r===o.id,onClick:()=>c(o.id),children:o.label},o.id))})]}),u.length&&i?t.jsxs("div",{className:"handbook-workspace",children:[t.jsx("nav",{className:"handbook-catalog","aria-label":"说明书目录",children:T.map(o=>t.jsxs("section",{className:"handbook-catalog-group",children:[t.jsx("h2",{children:o.label}),t.jsx("div",{className:"handbook-document-list",children:o.documents.map(d=>t.jsxs("button",{type:"button",className:i.slug===d.slug?"active":"","aria-current":i.slug===d.slug?"page":void 0,onClick:()=>n?.(d.slug),children:[t.jsx("strong",{children:d.title}),t.jsx("small",{children:S[d.kind]??d.kind})]},d.slug))})]},o.category))}),t.jsxs("article",{className:"handbook-article",children:[t.jsxs("header",{className:"handbook-document-header",children:[t.jsxs("div",{className:"handbook-document-kind",children:[t.jsx(b,{size:15,"aria-hidden":"true"}),S[i.kind]??i.kind]}),t.jsx("h1",{children:i.title}),t.jsx("p",{children:i.summary}),t.jsxs("time",{dateTime:i.updatedAt,children:["更新于 ",i.updatedAt]})]}),t.jsx(z,{content:N(i.content)})]}),t.jsxs("aside",{className:"handbook-toc","aria-label":"本页目录",children:[t.jsx("strong",{children:"本页目录"}),k.length?t.jsx("ol",{children:k.map(o=>t.jsx("li",{className:`level-${o.level}`,children:t.jsx("a",{href:`#${o.id}`,onClick:d=>I(d,o.id),children:o.title})},`${o.id}-${o.level}`))}):t.jsx("small",{children:"本页没有分节标题"})]})]}):t.jsxs("div",{className:"handbook-empty",children:[t.jsx(b,{size:24,"aria-hidden":"true"}),t.jsx("strong",{children:"没有找到匹配的说明"}),t.jsx("span",{children:"换一个关键词，或选择“全部”查看现有文档。"}),t.jsx("button",{type:"button",className:"btn",onClick:()=>{a(""),c("all")},children:"查看全部说明"})]})]})}export{Ze as default};
+`,h="handbook/getting-started",Be=Object.assign({"../../../docs/handbook/company-platform.md":V,"../../../docs/handbook/faq.md":B,"../../../docs/handbook/getting-started.md":K,"../../../docs/handbook/product-lifecycle.md":H,"../../../docs/platform/api-catalog.md":W,"../../../docs/platform/architecture.md":Y,"../../../docs/platform/components.md":Q,"../../../docs/platform/error-codes.md":J,"../../../docs/platform/integrations.md":X,"../../../docs/platform/middleware.md":$,"../../../docs/product/core-workflows.md":Z,"../../../docs/product/data-definitions.md":ee,"../../../docs/product/roles-and-permissions.md":ne,"../../../docs/superpowers/plans/2026-07-11-permission-settings.md":te,"../../../docs/superpowers/plans/2026-07-11-task-category-actions.md":se,"../../../docs/superpowers/plans/2026-07-11-workflow-task-templates.md":ae,"../../../docs/superpowers/plans/2026-07-13-dashboard-department-todos.md":oe,"../../../docs/superpowers/plans/2026-07-13-demand-created-at.md":re,"../../../docs/superpowers/plans/2026-07-13-dingtalk-web-login.md":ie,"../../../docs/superpowers/plans/2026-07-13-platform-sales-sorting.md":de,"../../../docs/superpowers/plans/2026-07-15-product-planning.md":ce,"../../../docs/superpowers/plans/2026-07-15-product-progress-schedule-plan.md":le,"../../../docs/superpowers/plans/2026-07-16-executive-personal-todo-dingtalk-sync.md":ue,"../../../docs/superpowers/plans/2026-07-16-product-gmv-progress.md":pe,"../../../docs/superpowers/plans/2026-07-16-strategy-commitments-incentives-reports.md":me,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-1.md":ge,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-2.md":he,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-3.md":fe,"../../../docs/superpowers/plans/2026-07-16-strategy-platform-phase-4.md":ye,"../../../docs/superpowers/plans/2026-07-17-dingtalk-group-executor-selection.md":ke,"../../../docs/superpowers/plans/2026-07-17-in-app-handbook.md":be,"../../../docs/superpowers/plans/2026-07-17-planning-card-progress-navigation.md":ve,"../../../docs/superpowers/plans/2026-07-17-product-grading-boundaries.md":we,"../../../docs/superpowers/plans/2026-07-17-product-ownership-visibility.md":xe,"../../../docs/superpowers/plans/2026-07-17-release-hardening.md":Se,"../../../docs/superpowers/plans/2026-07-17-repository-governance-foundation.md":je,"../../../docs/superpowers/specs/2026-07-11-permission-settings-design.md":Pe,"../../../docs/superpowers/specs/2026-07-11-task-category-actions-design.md":Ie,"../../../docs/superpowers/specs/2026-07-11-workflow-task-templates-design.md":Te,"../../../docs/superpowers/specs/2026-07-13-dashboard-department-todos-design.md":Ae,"../../../docs/superpowers/specs/2026-07-13-demand-created-at-design.md":Re,"../../../docs/superpowers/specs/2026-07-13-dingtalk-web-login-design.md":De,"../../../docs/superpowers/specs/2026-07-13-platform-sales-sorting-design.md":Ee,"../../../docs/superpowers/specs/2026-07-15-product-planning-design.md":Ce,"../../../docs/superpowers/specs/2026-07-15-product-progress-schedule-design.md":_e,"../../../docs/superpowers/specs/2026-07-16-company-strategy-execution-platform-design.md":Me,"../../../docs/superpowers/specs/2026-07-16-executive-personal-todo-dingtalk-sync-design.md":Ue,"../../../docs/superpowers/specs/2026-07-16-strategy-department-incentive-monthly-report-design.md":Oe,"../../../docs/superpowers/specs/2026-07-17-dingtalk-group-executor-selection-design.md":Ge,"../../../docs/superpowers/specs/2026-07-17-planning-card-progress-navigation-design.md":qe,"../../../docs/superpowers/specs/2026-07-17-platform-handbook-design.md":Fe,"../../../docs/superpowers/specs/2026-07-17-product-grading-boundaries-design.md":Le,"../../../docs/superpowers/specs/2026-07-17-product-ownership-visibility-design.md":Ne}),v={handbook:0,product:1,platform:2},w={guide:0,product:0,design:1,specification:2,plan:3,platform:0},f="2026-07-17",P=e=>e.split("/").pop().replace(/\.md$/,""),Ke=e=>e.match(/^(\d{4}-\d{2}-\d{2})-/)?.[1]??f,He=e=>{const n=P(e);return e.includes("/docs/handbook/")?{slug:`handbook/${n}`,category:"handbook",kind:"guide"}:e.includes("/docs/product/")?{slug:`product/${n}`,category:"product",kind:"product"}:e.includes("/docs/platform/")?{slug:`platform/${n}`,category:"platform",kind:"platform"}:e.includes("/docs/superpowers/specs/")?{slug:`product/specs/${n}`,category:"product",kind:"specification"}:{slug:`product/plans/${n}`,category:"product",kind:"plan"}},We=Object.entries(Be).map(([e,n])=>{const s=He(e);return g({...s,updatedAt:Ke(P(e)),content:n})}),Ye=[g({slug:"product/product",category:"product",kind:"product",updatedAt:f,content:ze}),g({slug:"product/design",category:"product",kind:"design",updatedAt:f,content:Ve})],x=[...We,...Ye].sort((e,n)=>(e.slug===h?-1:n.slug===h?1:0)||v[e.category]-v[n.category]||w[e.kind]-w[n.kind]||e.title.localeCompare(n.title,"zh-CN")),Qe=Object.fromEntries(j.filter(e=>e.id!=="all").map(e=>[e.id,e.label])),S={guide:"使用说明",product:"产品说明",design:"设计书",specification:"设计规格",plan:"实施计划",platform:"平台能力"},Je=e=>Object.entries(Qe).map(([n,s])=>({category:n,label:s,documents:e.filter(a=>a.category===n)})).filter(n=>n.documents.length);function nn({selectedSlug:e,onSelectDocument:n}){const[s,a]=l.useState(""),[r,c]=l.useState("all"),i=q(x,e,h),p=l.useMemo(()=>G(x,{query:s,category:r}),[r,s]),I=l.useMemo(()=>Je(p),[p]),k=l.useMemo(()=>F(i?.content),[i]),T=(o,d)=>{o.preventDefault(),document.getElementById(d)?.scrollIntoView({behavior:"smooth",block:"start"})};return t.jsxs("section",{className:"page handbook-page",children:[t.jsx(C,{title:"说明书",description:"公司的工作方法、产品定义、设计决策与共享平台能力，以仓库文档为准。"}),t.jsxs("div",{className:"handbook-tools",role:"search",children:[t.jsxs("label",{className:"handbook-search",children:[t.jsx(_,{size:16,"aria-hidden":"true"}),t.jsx("span",{className:"sr-only",children:"搜索说明书"}),t.jsx("input",{type:"search",value:s,onChange:o=>a(o.target.value),placeholder:"搜索说明书"}),s?t.jsx("button",{type:"button","aria-label":"清除搜索",onClick:()=>a(""),children:t.jsx(M,{size:15,"aria-hidden":"true"})}):null]}),t.jsx("div",{className:"handbook-filters","aria-label":"说明书分类",children:j.map(o=>t.jsx("button",{type:"button",className:r===o.id?"active":"","aria-pressed":r===o.id,onClick:()=>c(o.id),children:o.label},o.id))})]}),p.length&&i?t.jsxs("div",{className:"handbook-workspace",children:[t.jsx("nav",{className:"handbook-catalog","aria-label":"说明书目录",children:I.map(o=>t.jsxs("section",{className:"handbook-catalog-group",children:[t.jsx("h2",{children:o.label}),t.jsx("div",{className:"handbook-document-list",children:o.documents.map(d=>t.jsxs("button",{type:"button",className:i.slug===d.slug?"active":"","aria-current":i.slug===d.slug?"page":void 0,onClick:()=>n?.(d.slug),children:[t.jsx("strong",{children:d.title}),t.jsx("small",{children:S[d.kind]??d.kind})]},d.slug))})]},o.category))}),t.jsxs("article",{className:"handbook-article",children:[t.jsxs("header",{className:"handbook-document-header",children:[t.jsxs("div",{className:"handbook-document-kind",children:[t.jsx(b,{size:15,"aria-hidden":"true"}),S[i.kind]??i.kind]}),t.jsx("h1",{children:i.title}),t.jsx("p",{children:i.summary}),t.jsxs("time",{dateTime:i.updatedAt,children:["更新于 ",i.updatedAt]})]}),t.jsx(z,{content:L(i.content)})]}),t.jsxs("aside",{className:"handbook-toc","aria-label":"本页目录",children:[t.jsx("strong",{children:"本页目录"}),k.length?t.jsx("ol",{children:k.map(o=>t.jsx("li",{className:`level-${o.level}`,children:t.jsx("a",{href:`#${o.id}`,onClick:d=>T(d,o.id),children:o.title})},`${o.id}-${o.level}`))}):t.jsx("small",{children:"本页没有分节标题"})]})]}):t.jsxs("div",{className:"handbook-empty",children:[t.jsx(b,{size:24,"aria-hidden":"true"}),t.jsx("strong",{children:"没有找到匹配的说明"}),t.jsx("span",{children:"换一个关键词，或选择“全部”查看现有文档。"}),t.jsx("button",{type:"button",className:"btn",onClick:()=>{a(""),c("all")},children:"查看全部说明"})]})]})}export{nn as default};
