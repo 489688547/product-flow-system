@@ -21,6 +21,17 @@ test("group search normalizes DingTalk MCP results", () => {
   assert.deepEqual(result, { groups: [{ id: "g1", name: "产品群", memberCount: 8 }], nextCursor: "", hasMore: false });
 });
 
+test("group search unwraps text content from a JSON-RPC tool result", () => {
+  const result = normalizeGroupSearch({ result: { content: [{
+    type: "text",
+    text: JSON.stringify({ success: true, result: {
+      groups: [{ openConversationId: "g2", title: "运营群", memberCount: 16 }],
+      hasMore: false
+    } })
+  }] } });
+  assert.deepEqual(result, { groups: [{ id: "g2", name: "运营群", memberCount: 16 }], nextCursor: "", hasMore: false });
+});
+
 test("group members normalize identity fields without guessing union ids", () => {
   const result = normalizeGroupMembers({ result: { structuredContent: {
     result: { list: [{ memberNick: "张真", openDingtalkId: "open-1" }], hasMore: false },

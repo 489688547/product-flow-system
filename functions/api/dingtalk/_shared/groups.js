@@ -3,15 +3,16 @@ const GROUP_MEMBERS_ENDPOINT = "https://mcp-gw.dingtalk.com/server/0a16094373856
 const CONTACT_SEARCH_ENDPOINT = "https://mcp-gw.dingtalk.com/server/db4b26cb38ea6a8739ad55d1997fa1da608cd36b33a6cf0f77884f70c49382fe";
 
 function unwrap(payload = {}) {
-  let value = payload?.result?.structuredContent ?? payload?.structuredContent ?? payload;
-  if (value?.result?.structuredContent) value = value.result.structuredContent;
-  if (Array.isArray(value?.content)) {
-    const text = value.content.find(block => block?.text)?.text;
+  const root = payload.result || payload;
+  if (root.structuredContent && typeof root.structuredContent === "object") return root.structuredContent;
+  if (root.content && !Array.isArray(root.content) && typeof root.content === "object") return root.content;
+  if (Array.isArray(root.content)) {
+    const text = root.content.find(block => block?.text)?.text;
     if (text) {
-      try { value = JSON.parse(text); } catch {}
+      try { return JSON.parse(text); } catch {}
     }
   }
-  return value || {};
+  return root || {};
 }
 
 async function callMcp(endpoint, accessToken, toolName, args, fetchImpl = fetch) {
