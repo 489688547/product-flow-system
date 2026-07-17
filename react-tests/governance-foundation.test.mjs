@@ -24,3 +24,25 @@ test("repository provides complete feature and platform templates", () => {
   assert.match(read("docs/templates/design.md"), /## 页面状态/);
   assert.match(read("docs/templates/api-contract.md"), /## 兼容与废弃/);
 });
+
+test("handbook, product, and platform source documents are present", () => {
+  const required = [
+    "docs/handbook/getting-started.md",
+    "docs/handbook/company-platform.md",
+    "docs/handbook/product-lifecycle.md",
+    "docs/handbook/faq.md",
+    "docs/product/core-workflows.md",
+    "docs/product/roles-and-permissions.md",
+    "docs/product/data-definitions.md",
+    "docs/platform/architecture.md",
+    "docs/platform/components.md",
+    "docs/platform/middleware.md",
+    "docs/platform/api-catalog.md",
+    "docs/platform/integrations.md",
+    "docs/platform/error-codes.md"
+  ];
+  for (const file of required) assert.equal(existsSync(resolve(root, file)), true, `${file} should exist`);
+  assert.match(read("docs/platform/architecture.md"), /src\/domain/);
+  assert.match(read("docs/platform/api-catalog.md"), /\/api\/state/);
+  assert.match(read("docs/handbook/getting-started.md"), /登录/);
+});
