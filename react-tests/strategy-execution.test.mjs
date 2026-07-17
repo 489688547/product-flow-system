@@ -14,7 +14,7 @@ import {
   reducePlatformState
 } from "../src/domain/strategyExecution.js";
 
-test("v2 strategy data migrates the DingTalk annual plan into v3 without losing user records", () => {
+test("v2 strategy data migrates the DingTalk annual plan into v4 without losing user records", () => {
   const migrated = migratePlatformState({
     version: "strategy-platform-v2",
     strategies: [
@@ -26,7 +26,7 @@ test("v2 strategy data migrates the DingTalk annual plan into v3 without losing 
     commitmentMilestones: []
   });
 
-  assert.equal(migrated.version, "strategy-platform-v3");
+  assert.equal(migrated.version, "strategy-platform-v4");
   assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").name, "组织建设全面加强");
   assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").status, "at_risk");
   assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").createdAt, "2026-01-02");
@@ -37,19 +37,36 @@ test("v2 strategy data migrates the DingTalk annual plan into v3 without losing 
   assert.equal(migrated.departmentCommitments.some(item => item.id === "commitment-brand-ip-2026"), true);
   assert.equal(migrated.departmentCommitments.some(item => item.id === "commitment-ops-channel-2026"), true);
   assert.equal(migrated.commitmentMilestones.some(item => item.commitmentId === "commitment-ops-channel-2026"), true);
+  assert.equal(migrated.departmentCommitments.find(item => item.id === "commitment-ops-data-2026").requiredResultId, "result-org-data");
 });
 
-test("v3 strategy migration is idempotent and preserves later edits", () => {
+test("v3 commitments migrate to v4 required-result links without guessing custom records", () => {
   const current = {
     version: "strategy-platform-v3",
     strategies: [{ id: "strategy-organization-2026", name: "我修改后的战略名称" }],
     requiredResults: [],
-    departmentCommitments: [],
+    departmentCommitments: [
+      { id: "commitment-ops-data-2026", strategyId: "strategy-organization-2026" },
+      { id: "custom", strategyId: "strategy-organization-2026" }
+    ],
     commitmentMilestones: []
   };
   const migrated = migratePlatformState(current);
-  assert.equal(migrated, current);
+  assert.equal(migrated.version, "strategy-platform-v4");
   assert.equal(migrated.strategies[0].name, "我修改后的战略名称");
+  assert.equal(migrated.departmentCommitments[0].requiredResultId, "result-org-data");
+  assert.equal(migrated.departmentCommitments[1].requiredResultId, undefined);
+});
+
+test("v4 strategy migration is idempotent and preserves later edits", () => {
+  const current = {
+    version: "strategy-platform-v4",
+    strategies: [{ id: "strategy-organization-2026", name: "我修改后的战略名称" }],
+    requiredResults: [],
+    departmentCommitments: [{ id: "commitment-ops-data-2026", requiredResultId: "my-result" }],
+    commitmentMilestones: []
+  };
+  assert.equal(migratePlatformState(current), current);
 });
 
 test("strategy archive blocks active dependencies and cascades required results", () => {

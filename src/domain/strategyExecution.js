@@ -116,6 +116,17 @@ const DOCUMENT_V3_SEED = {
   ]
 };
 
+const REQUIRED_RESULT_BY_COMMITMENT_ID = {
+  "commitment-brand-organization-2026": "result-org-collaboration",
+  "commitment-brand-concept-2026": "result-hamster-rank",
+  "commitment-brand-ip-2026": "result-bird-playbook",
+  "commitment-brand-performance-2026": "result-bird-playbook",
+  "commitment-brand-offline-2026": "result-hamster-rank",
+  "commitment-ops-data-2026": "result-org-data",
+  "commitment-ops-bird-q3": "result-bird-gmv",
+  "commitment-ops-channel-2026": "result-hamster-rank"
+};
+
 const MIGRATION_PRESERVED_FIELDS = [
   "status", "statusReason", "createdAt", "updatedAt", "archived", "archivedAt", "archivedBy", "dingTodo"
 ];
@@ -139,14 +150,25 @@ function mergeDocumentSeed(records = [], seeds = []) {
 
 export function migratePlatformState(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return input;
-  if (input.version !== "strategy-platform-v2") return input;
+  if (input.version === "strategy-platform-v4") return input;
+  const v3 = input.version === "strategy-platform-v2"
+    ? {
+        ...input,
+        version: "strategy-platform-v3",
+        strategies: mergeDocumentSeed(input.strategies, DOCUMENT_V3_SEED.strategies),
+        requiredResults: mergeDocumentSeed(input.requiredResults, DOCUMENT_V3_SEED.requiredResults),
+        departmentCommitments: mergeDocumentSeed(input.departmentCommitments, DOCUMENT_V3_SEED.departmentCommitments),
+        commitmentMilestones: mergeDocumentSeed(input.commitmentMilestones, DOCUMENT_V3_SEED.commitmentMilestones)
+      }
+    : input;
+  if (v3.version !== "strategy-platform-v3") return v3;
   return {
-    ...input,
-    version: "strategy-platform-v3",
-    strategies: mergeDocumentSeed(input.strategies, DOCUMENT_V3_SEED.strategies),
-    requiredResults: mergeDocumentSeed(input.requiredResults, DOCUMENT_V3_SEED.requiredResults),
-    departmentCommitments: mergeDocumentSeed(input.departmentCommitments, DOCUMENT_V3_SEED.departmentCommitments),
-    commitmentMilestones: mergeDocumentSeed(input.commitmentMilestones, DOCUMENT_V3_SEED.commitmentMilestones)
+    ...v3,
+    version: "strategy-platform-v4",
+    departmentCommitments: (v3.departmentCommitments || []).map(commitment => {
+      if (commitment.requiredResultId || !REQUIRED_RESULT_BY_COMMITMENT_ID[commitment.id]) return commitment;
+      return { ...commitment, requiredResultId: REQUIRED_RESULT_BY_COMMITMENT_ID[commitment.id] };
+    })
   };
 }
 

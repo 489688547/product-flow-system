@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   ensureMonthlyReports,
+  commitmentProgress,
   incentiveBudgetCheck,
   settleIncentiveProject,
   strategyAttainment,
@@ -38,6 +39,28 @@ test("department commitment follows office and executive approval", () => {
   const confirmed = transitionDepartmentCommitment(officeApproved, { type: "executive_confirm", actor: "老板" });
   assert.equal(confirmed.status, "active");
   assert.throws(() => transitionDepartmentCommitment(draft, { type: "office_approve" }), /当前状态/);
+});
+
+test("commitment progress ignores archived milestones and rounds percent", () => {
+  const state = normalizePlatformState({
+    commitmentMilestones: [
+      { id: "m1", commitmentId: "c1", status: "completed" },
+      { id: "m2", commitmentId: "c1", status: "pending" },
+      { id: "m3", commitmentId: "c1", status: "completed", archived: true }
+    ]
+  });
+  const progress = commitmentProgress(state, "c1");
+  assert.deepEqual(
+    { completed: progress.completed, total: progress.total, percent: progress.percent, label: progress.label },
+    { completed: 1, total: 2, percent: 50, label: "1/2" }
+  );
+  assert.deepEqual(commitmentProgress(normalizePlatformState({}), "missing"), {
+    completed: 0,
+    total: 0,
+    percent: 0,
+    label: "未设置里程碑",
+    milestones: []
+  });
 });
 
 test("incentive budget escalates over-budget and cross-department projects", () => {
@@ -81,7 +104,7 @@ test("monthly report generation creates one manual draft per active department",
 test("default state contains the three confirmed company strategies", () => {
   const state = createDefaultPlatformState();
   const names = state.strategies.map(item => item.name);
-  assert.equal(state.version, "strategy-platform-v3");
+  assert.equal(state.version, "strategy-platform-v4");
   assert.deepEqual(names, ["组织建设全面加强", "鸟类销量明显突破", "仓鼠品牌表达与竞争力提升"]);
   assert.equal(state.requiredResults.some(item => item.id === "result-org-review-cadence"), true);
 });

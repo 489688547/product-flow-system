@@ -16,11 +16,11 @@ function isLocalHost() {
 
 function normalizeWithLocalDemo(input) {
   const normalized = normalizePlatformState(input);
-  if (!isLocalHost() || normalized.version === "strategy-platform-v3") return normalized;
+  if (!isLocalHost() || normalized.version === "strategy-platform-v4") return normalized;
   const demo = createDefaultPlatformState();
   return {
     ...normalized,
-    version: "strategy-platform-v3",
+    version: "strategy-platform-v4",
     ...Object.fromEntries(GOVERNED_DEMO_COLLECTIONS.map(key => [key, normalized[key]?.length ? normalized[key] : demo[key]]))
   };
 }
