@@ -82,9 +82,12 @@ test("package exposes the repository lint gate", () => {
 });
 
 test("pull requests run required repository quality gates", () => {
+  const pkg = JSON.parse(read("package.json"));
   const workflow = read(".github/workflows/quality.yml");
+  assert.equal(pkg.scripts["audit:dependencies"], "npm audit --audit-level=low");
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /npm ci/);
+  assert.match(workflow, /npm run audit:dependencies/);
   assert.match(workflow, /npm run lint/);
   assert.match(workflow, /npm run check:governance/);
   assert.match(workflow, /npm test/);

@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 8132",
-    "build": "vite build",
+    "audit:dependencies": "npm audit --audit-level=low",
+    "build": "vite build && node scripts/check-build-chunks.mjs",
     "lint": "eslint src functions server scripts tests react-tests",
     "release:pages": "npm run build && node scripts/prepare-pages-release.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 8133",
@@ -20,7 +21,7 @@
     "@vitejs/plugin-react": "^5.0.0",
     "github-slugger": "^2.0.0",
     "lucide-react": "^0.468.0",
-    "quill": "^2.0.3",
+    "quill": "2.0.2",
     "react": "^19.0.0",
     "react-day-picker": "^9.14.0",
     "react-dom": "^19.0.0",
