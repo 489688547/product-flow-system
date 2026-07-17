@@ -36,7 +36,7 @@ function enrichPlanningDemand(demand, products) {
   };
 }
 
-export function ProductPlanningPage() {
+export function ProductPlanningPage({ onOpenProgress }) {
   const { state, currentUser, orgCache, addDemand, addProductPlan, updateProductPlan, deleteProductPlan } = useProductFlow();
   const [year, setYear] = useState(new Date().getFullYear());
   const [demandModalOpen, setDemandModalOpen] = useState(false);
@@ -107,7 +107,7 @@ export function ProductPlanningPage() {
         </div>
         <Button variant="primary" disabled={!canEdit} disabledReason="只有产品部和总经办可以添加需求机会" onClick={() => setDemandModalOpen(true)}><Plus size={16} aria-hidden="true" />添加需求机会</Button>
       </PageHeader>
-      <PlanningDemandTray demands={candidates} currentUser={currentUser} canEdit={canEdit} onArrange={openNewPlan} />
+      <PlanningDemandTray demands={candidates} currentUser={currentUser} canEdit={canEdit} onArrange={openNewPlan} onOpenProgress={onOpenProgress} />
       <AnnualPlanningTimeline year={year} plans={state.productPlans || []} demands={planningRecords} currentUser={currentUser} canEdit={canEdit} onDropDemand={openDroppedDemand} onEditPlan={openExistingPlan} />
       <DemandModal open={demandModalOpen} currentUser={currentUser} orgCache={orgCache} onClose={() => setDemandModalOpen(false)} onSave={saveDemand} />
       <ProductPlanModal

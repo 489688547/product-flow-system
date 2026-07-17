@@ -812,6 +812,20 @@ test("archive and both planning product surfaces show the shared ownership badge
   assert.match(timeline, /<ProductOwnershipBadge owned=\{isProductOwnedBy\(snapshot, currentUser\)\}/);
 });
 
+test("initiated planning cards open product progress without hijacking the arrange action", () => {
+  const app = read("src/App.jsx");
+  const page = read("src/features/planning/ProductPlanningPage.jsx");
+  const tray = read("src/features/planning/PlanningDemandTray.jsx");
+  const styles = read("src/styles.css");
+
+  assert.match(app, /<ProductPlanningPage onOpenProgress=\{openProgress\}/);
+  assert.match(page, /onOpenProgress=\{onOpenProgress\}/);
+  assert.match(tray, /onOpenProgress\?\.\(demand\.productId\)/);
+  assert.match(tray, /event\.key === "Enter" \|\| event\.key === " "/);
+  assert.match(tray, /event\.stopPropagation\(\)/);
+  assert.match(styles, /\.planning-demand-chip\.is-progress-link/);
+});
+
 test("shared page and table primitives support consistent hierarchy and responsive density", () => {
   const pageHeader = read("src/ui/PageHeader.jsx");
   const table = read("src/ui/DataTable.jsx");

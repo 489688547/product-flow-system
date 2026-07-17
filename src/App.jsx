@@ -114,7 +114,7 @@ export default function App() {
     apps: <AppCenterPage onNavigate={navigate} />,
     dashboard: <DashboardPage onNavigate={navigate} onOpenProgress={openProgress} />,
     demands: <DemandPoolPage onProjectCreated={productId => openProgress(productId, 1)} />,
-    planning: <ProductPlanningPage />,
+    planning: <ProductPlanningPage onOpenProgress={openProgress} />,
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
