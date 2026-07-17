@@ -419,6 +419,25 @@ test("task deliverable modal supports DingTalk documents and rich text", () => {
   assert.match(list, /task-deliverable-add/);
 });
 
+test("product progress completes deliverable edit and delete actions", () => {
+  const page = read("src/features/progress/ProductProgressPage.jsx");
+  const modal = read("src/features/progress/TaskDeliverableModal.jsx");
+  const preview = read("src/ui/DeliverablePreviewModal.jsx");
+
+  assert.match(page, /updateDeliverable/);
+  assert.match(page, /deleteDeliverable/);
+  assert.match(page, /editingDeliverable/);
+  assert.match(page, /deliverableToDelete/);
+  assert.match(page, /title="删除交付物"/);
+  assert.match(modal, /file\?\.id/);
+  assert.match(modal, /编辑交付物/);
+  assert.match(modal, /保存/);
+  assert.match(preview, /onEdit/);
+  assert.match(preview, /onDelete/);
+  assert.match(preview, /编辑交付物/);
+  assert.match(preview, /删除交付物/);
+});
+
 test("product tasks expose configured DingTalk document templates beside deliverables", () => {
   const page = read("src/features/progress/ProductProgressPage.jsx");
   const list = read("src/features/progress/TaskDeliverables.jsx");
