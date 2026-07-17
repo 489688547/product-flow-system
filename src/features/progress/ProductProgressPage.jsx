@@ -4,6 +4,7 @@ import {
   deliverablesForTask,
   hasFormalProductGrading,
   productStagePolicy,
+  orgUsers,
   STAGES,
   taskCategoryActions,
   tasksForProductStage
@@ -412,7 +413,8 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           detailUrl.searchParams.set("productId", selectedProduct.id);
           detailUrl.searchParams.set("taskId", todoTask.id);
           detailUrl.hash = "progress";
-          const payload = buildTaskTodoPayload({ product: selectedProduct, task: todoTask, creator: currentUser, executors, detailUrl: detailUrl.toString() });
+          const recoveryUsers = orgUsers(orgCache).filter(user => user.name === selectedProduct.productManager);
+          const payload = buildTaskTodoPayload({ product: selectedProduct, task: todoTask, creator: currentUser, executors, recoveryUsers, detailUrl: detailUrl.toString() });
           const snapshot = buildTaskTodoSnapshot(todoTask, payload.executorUnionIds);
           return syncTaskTodo({ taskId: todoTask.id, payload, executors, snapshot });
         }}
