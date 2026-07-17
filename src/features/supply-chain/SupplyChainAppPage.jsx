@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Boxes, Building2, ClipboardCheck, FileClock, LayoutDashboard, PackageSearch, Settings, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { buildSupplyChainSummary } from "../../domain/supplyChain.js";
 import { canAccessCompanyPlatform } from "../../domain/permissions.js";
 import { fetchSalesForCodes } from "../../state/salesStore.js";
@@ -15,17 +15,7 @@ import { ProductSupplyWorkspace } from "./ProductSupplyWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
 import { SupplyChainOverview } from "./SupplyChainOverview.jsx";
-
-const SECTIONS = [
-  ["overview", "供应链总览", LayoutDashboard],
-  ["suppliers", "供应商管理", Building2],
-  ["approvals", "采购与付款", ClipboardCheck],
-  ["products", "产品供应链", PackageSearch],
-  ["inventory", "库存盘点", Boxes],
-  ["quality", "质量管理", ShieldCheck],
-  ["records", "同步记录", FileClock],
-  ["settings", "设置", Settings]
-];
+import { SupplyChainSectionNav } from "./SupplyChainSectionNav.jsx";
 
 function departmentOf(user) {
   return String(user?.department || "").trim();
@@ -78,9 +68,13 @@ export function SupplyChainAppPage({ onNavigate }) {
   return (
     <section className="page supply-chain-app">
       <PageHeader title="供应链管理" description="供应商、采购付款、库存资金与质量问题的统一工作台。"><Button onClick={() => onNavigate?.("apps")}><ArrowLeft size={16} />返回业务 Apps</Button></PageHeader>
-      <nav className="supply-chain-nav" aria-label="供应链管理导航">{SECTIONS.map(([key, label, Icon]) => <button key={key} type="button" className={section === key ? "active" : ""} aria-current={section === key ? "page" : undefined} onClick={() => setSection(key)}><Icon size={16} /><span>{label}</span></button>)}</nav>
-      {error ? <p className="supply-message error" role="alert">{error}</p> : null}
-      {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[section]}
+      <div className="supply-chain-layout">
+        <SupplyChainSectionNav section={section} onChange={setSection} />
+        <div className="supply-chain-content">
+          {error ? <p className="supply-message error" role="alert">{error}</p> : null}
+          {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[section]}
+        </div>
+      </div>
     </section>
   );
 }
