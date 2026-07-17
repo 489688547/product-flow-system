@@ -67,3 +67,11 @@ test("governance checker accepts the repository and rejects incomplete feature d
     rmSync(fixture, { recursive: true, force: true });
   }
 });
+
+test("package exposes the repository lint gate", () => {
+  const pkg = JSON.parse(read("package.json"));
+  assert.equal(pkg.scripts.lint, "eslint src functions server scripts tests react-tests");
+  assert.ok(pkg.devDependencies.eslint);
+  assert.match(read("eslint.config.js"), /\.worktrees/);
+  assert.match(read("eslint.config.js"), /no-unreachable/);
+});
