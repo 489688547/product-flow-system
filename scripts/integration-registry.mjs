@@ -160,3 +160,37 @@ export function matchIntegrationPlatforms(registry, { text = "", paths = [], exp
 
   return { direct, related, ambiguous: direct.length > 1 };
 }
+
+export function parseIntegrationImpact(body = "") {
+  const impactMatch = String(body).match(/^Integration-Impact:\s*(.+?)\s*$/im);
+  const reasonMatch = String(body).match(/^Integration-Impact-Reason:\s*(.+?)\s*$/im);
+  const declaredIds = impactMatch
+    ? [...new Set(impactMatch[1].split(",").map(value => value.trim().toLowerCase()).filter(Boolean))]
+    : [];
+  return { declaredIds, reason: reasonMatch?.[1]?.trim() || "" };
+}
+
+export function checkIntegrationImpact(registry, { paths = [], body = "" } = {}) {
+  const routing = matchIntegrationPlatforms(registry, { paths, expandRelated: false });
+  const requiredIds = routing.direct.filter(match => match.required).map(match => match.id);
+  const { declaredIds, reason } = parseIntegrationImpact(body);
+  const knownIds = new Set(registry.platforms.map(platform => platform.id));
+  const errors = [];
+
+  if (!declaredIds.length && requiredIds.length) {
+    errors.push(`缺少 Integration-Impact 声明；变更路径命中：${requiredIds.join(", ")}`);
+  }
+  if (declaredIds.length && !reason) errors.push("缺少 Integration-Impact-Reason 或原因为空");
+
+  const unknownIds = declaredIds.filter(id => id !== "none" && !knownIds.has(id));
+  if (unknownIds.length) errors.push(`Integration-Impact 包含未知平台：${unknownIds.join(", ")}`);
+
+  if (declaredIds.includes("none") && declaredIds.length > 1) {
+    errors.push("Integration-Impact 的 none 不能与平台 ID 同时声明");
+  }
+
+  const missingIds = requiredIds.filter(id => !declaredIds.includes(id));
+  if (missingIds.length) errors.push(`Integration-Impact 漏报路径命中的平台：${missingIds.join(", ")}`);
+
+  return { errors, requiredIds, declaredIds, reason, routing };
+}
