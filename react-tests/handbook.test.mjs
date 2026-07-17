@@ -8,6 +8,7 @@ import {
   filterHandbookDocuments,
   resolveHandbookDocument
 } from "../src/domain/handbook.js";
+import { formatAppHash, parseAppHash } from "../src/domain/appNavigation.js";
 
 const docs = [
   createHandbookDocument({
@@ -85,4 +86,31 @@ test("markdown renderer keeps repository documents safe and usable", async () =>
   assert.match(source, /target="_blank"/);
   assert.match(source, /rel="noreferrer"/);
   assert.match(source, /handbook-table-wrap/);
+});
+
+test("application hash routes preserve handbook document slugs", () => {
+  assert.deepEqual(parseAppHash("#handbook/platform/api-catalog"), {
+    screen: "handbook",
+    detail: "platform/api-catalog"
+  });
+  assert.equal(
+    formatAppHash("handbook", "产品与设计/接口 目录"),
+    "#handbook/%E4%BA%A7%E5%93%81%E4%B8%8E%E8%AE%BE%E8%AE%A1/%E6%8E%A5%E5%8F%A3%20%E7%9B%AE%E5%BD%95"
+  );
+  assert.deepEqual(parseAppHash(""), { screen: "", detail: "" });
+  assert.doesNotThrow(() => parseAppHash("#handbook/%E0%A4%A"));
+});
+
+test("both application shells expose a lazy authenticated handbook route", async () => {
+  const [appSource, permissionSource] = await Promise.all([
+    readFile(new URL("../src/App.jsx", import.meta.url), "utf8"),
+    readFile(new URL("../src/domain/permissions.js", import.meta.url), "utf8")
+  ]);
+
+  assert.match(appSource, /BookOpenText/);
+  assert.equal((appSource.match(/\["handbook", "说明书", BookOpenText/g) ?? []).length, 2);
+  assert.match(appSource, /lazy\(\(\) => import\("\.\/features\/handbook\/HandbookPage\.jsx"\)\)/);
+  assert.match(appSource, /<Suspense fallback=/);
+  assert.match(appSource, /selectedSlug=/);
+  assert.match(permissionSource, /if \(key === "handbook"\) return Boolean\(user\);/);
 });
