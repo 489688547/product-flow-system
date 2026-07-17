@@ -23,7 +23,7 @@
 - Modify: `package.json`
 - Modify: `package-lock.json`
 - Modify: `.github/workflows/quality.yml`
-- Modify: `react-tests/governance.test.mjs`
+- Modify: `react-tests/governance-foundation.test.mjs`
 
 **Interfaces:**
 - Consumes: npm advisory metadata for `quill@2.0.3`.
@@ -35,7 +35,7 @@ Assert that `package.json` exposes `audit:dependencies` as `npm audit --audit-le
 
 - [ ] **Step 2: Run the focused test and verify RED**
 
-Run: `node --test react-tests/governance.test.mjs`
+Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: FAIL because the script and CI step are absent.
 
@@ -47,7 +47,7 @@ Add `"audit:dependencies": "npm audit --audit-level=low"` to `package.json`, and
 
 - [ ] **Step 4: Verify GREEN and the external advisory result**
 
-Run: `node --test react-tests/governance.test.mjs`
+Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: PASS.
 
@@ -58,7 +58,7 @@ Expected: `found 0 vulnerabilities`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add package.json package-lock.json .github/workflows/quality.yml react-tests/governance.test.mjs
+git add package.json package-lock.json .github/workflows/quality.yml react-tests/governance-foundation.test.mjs
 git commit -m "fix: enforce dependency security gate"
 ```
 
