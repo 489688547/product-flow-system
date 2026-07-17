@@ -608,7 +608,8 @@ const ACTION_COLLECTION = {
   upsert_project: ["projects", "project", "project"],
   upsert_milestone: ["milestones", "milestone", "milestone"],
   upsert_risk: ["risks", "risk", "risk"],
-  upsert_decision: ["decisionRequests", "decision", "decision"]
+  upsert_decision: ["decisionRequests", "decision", "decision"],
+  upsert_status_update: ["statusUpdates", "status_update", "status-update"]
 };
 
 export function reducePlatformState(input, action = {}) {

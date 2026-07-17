@@ -2,13 +2,13 @@ import { useEffect, useState } from "react";
 import { Button } from "../../ui/Button.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 
-export function StatusUpdateModal({ open, projects, currentUser, onClose, onSave }) {
+export function StatusUpdateModal({ open, record, projects, currentUser, onClose, onSave }) {
   const [form, setForm] = useState({});
   const [error, setError] = useState("");
   useEffect(() => {
-    setForm({ projectId: projects[0]?.id || "", owner: currentUser?.name || "", needsCoordination: false, needsDecision: false });
+    setForm(record ? { ...record } : { projectId: projects[0]?.id || "", owner: currentUser?.name || "", needsCoordination: false, needsDecision: false });
     setError("");
-  }, [currentUser?.name, open, projects]);
+  }, [currentUser?.name, open, projects, record]);
   const set = patch => setForm(current => ({ ...current, ...patch }));
   const save = () => {
     if (!form.projectId) return setError("请选择需要确认的重点项目。");
@@ -17,7 +17,7 @@ export function StatusUpdateModal({ open, projects, currentUser, onClose, onSave
     onSave(form);
   };
   return (
-    <Modal open={open} title="确认本周项目状态" onClose={onClose} footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={save}>提交确认</Button></>}>
+    <Modal open={open} title={record ? "编辑本周项目状态" : "确认本周项目状态"} onClose={onClose} footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={save}>{record ? "保存修改" : "提交确认"}</Button></>}>
       {error ? <div className="inline-alert" role="alert">{error}</div> : null}
       <div className="form-grid">
         <label>重点项目<select value={form.projectId || ""} onChange={event => set({ projectId: event.target.value })}>{projects.map(project => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label>

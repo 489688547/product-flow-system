@@ -79,11 +79,13 @@ test("governed records only archive in safe workflow states", () => {
   const base = normalizePlatformState({
     version: "strategy-platform-v3",
     departmentCommitments: [{ id: "draft-commitment", status: "draft" }, { id: "active-commitment", status: "active" }],
+    commitmentMilestones: [{ id: "commitment-milestone-1", commitmentId: "draft-commitment" }],
     incentiveProjects: [{ id: "draft-incentive", status: "draft" }, { id: "active-incentive", status: "active" }],
     monthlyReports: [{ id: "draft-report", status: "draft" }, { id: "submitted-report", status: "submitted" }]
   });
   const commitment = reducePlatformState(base, { type: "archive_department_commitment", id: "draft-commitment", actor: "周总" });
   assert.equal(commitment.departmentCommitments.find(item => item.id === "draft-commitment").archived, true);
+  assert.equal(commitment.commitmentMilestones[0].archived, true);
   assert.throws(() => reducePlatformState(base, { type: "archive_department_commitment", id: "active-commitment" }), /草稿或退回/);
   const incentive = reducePlatformState(base, { type: "archive_incentive_project", id: "draft-incentive", actor: "周总" });
   assert.equal(incentive.incentiveProjects.find(item => item.id === "draft-incentive").archived, true);
@@ -115,6 +117,9 @@ test("project archive cascades children while project child and weekly updates a
 
   const weekly = reducePlatformState(base, { type: "archive_status_update", id: "u1", actor: "项目负责人" });
   assert.equal(weekly.statusUpdates[0].archived, true);
+  const edited = reducePlatformState(base, { type: "upsert_status_update", record: { ...base.statusUpdates[0], change: "已完成投放复盘" }, actor: "项目负责人" });
+  assert.equal(edited.statusUpdates[0].change, "已完成投放复盘");
+  assert.equal(edited.auditLogs[0].action, "update");
 });
 
 test("severe child health cannot be averaged away", () => {

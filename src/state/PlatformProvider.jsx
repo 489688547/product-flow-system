@@ -170,6 +170,10 @@ export function PlatformProvider({ children, enabled = true }) {
     dispatch({ type: "upsert_monthly_report", record, reason });
   }, [dispatch]);
 
+  const saveStatusUpdate = useCallback((record, reason = "维护周度状态确认") => {
+    dispatch({ type: "upsert_status_update", record, reason });
+  }, [dispatch]);
+
   const transitionReport = useCallback((id, transition, options = {}) => {
     dispatch({ type: "transition_monthly_report", id, transition, ...options });
   }, [dispatch]);
@@ -381,6 +385,7 @@ export function PlatformProvider({ children, enabled = true }) {
     saveIncentiveProject,
     settleIncentive,
     saveMonthlyReport,
+    saveStatusUpdate,
     transitionReport,
     appendReportCorrection,
     ensureReports,
@@ -415,6 +420,7 @@ export function PlatformProvider({ children, enabled = true }) {
     saveMonthlyReport,
     saveRequiredResult,
     saveStrategy,
+    saveStatusUpdate,
     setPersonalTodoDone,
     settleIncentive,
     state,

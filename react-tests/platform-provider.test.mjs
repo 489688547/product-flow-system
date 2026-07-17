@@ -43,6 +43,7 @@ test("platform provider exposes governed execution commands", () => {
     "saveIncentiveProject",
     "settleIncentive",
     "saveMonthlyReport",
+    "saveStatusUpdate",
     "transitionReport",
     "appendReportCorrection",
     "ensureReports",

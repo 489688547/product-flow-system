@@ -29,6 +29,9 @@ test("incentive workspace enforces budget visibility and recorded settlement", (
   assert.match(incentives, /奖金上限/);
   assert.match(incentives, /结项定奖/);
   assert.match(incentives, /settleIncentive/);
+  assert.match(incentives, /archiveIncentiveProject/);
+  assert.match(incentives, /取消项目/);
+  assert.match(incentives, /ConfirmDialog/);
 });
 
 test("operating review collects manual department reports with freeze workflow", () => {

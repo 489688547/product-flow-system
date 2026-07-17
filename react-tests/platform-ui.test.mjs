@@ -86,6 +86,10 @@ test("key project workspace manages milestones risks and decisions", () => {
   assert.match(detail, /关键里程碑/);
   assert.match(detail, /风险与阻塞/);
   assert.match(detail, /待决策/);
+  assert.match(page, /archiveProject/);
+  assert.match(detail, /archiveProjectChild/);
+  assert.match(detail, /编辑里程碑/);
+  assert.match(detail, /归档风险/);
 });
 
 test("operating reviews retain weekly updates and monthly snapshots", () => {
@@ -96,6 +100,10 @@ test("operating reviews retain weekly updates and monthly snapshots", () => {
   assert.match(modal, /本周关键变化/);
   assert.match(modal, /当前最大风险/);
   assert.match(modal, /需要协调或决策/);
+  assert.match(page, /archiveMonthlyReport/);
+  assert.match(page, /archiveStatusUpdate/);
+  assert.match(page, /saveStatusUpdate/);
+  assert.match(page, /ConfirmDialog/);
 });
 
 test("business App center keeps Product Lifecycle as the first connected App", () => {
