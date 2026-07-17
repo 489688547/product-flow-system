@@ -1,4 +1,4 @@
-# Strategy Platform Phase 2 Implementation Plan
+# 公司战略平台第二阶段实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 
 import {
   createHandbookDocument,
@@ -74,11 +74,46 @@ test("handbook workspace exposes search, categories, and an empty state", async 
   const source = `${pageSource}\n${domainSource}`;
 
   assert.match(source, /搜索说明书/);
-  assert.match(source, /员工使用手册/);
+  assert.match(source, /使用手册/);
   assert.match(source, /产品与设计/);
   assert.match(source, /平台能力/);
+  assert.doesNotMatch(source, /员工使用手册/);
+  assert.doesNotMatch(source, /label: "全部"/);
+  assert.match(pageSource, /activeDocument\?\.category \?\? "handbook"/);
   assert.match(source, /没有找到匹配的说明/);
   assert.match(source, /<MarkdownDocument/);
+});
+
+test("product and design navigation uses readable Chinese headings", async () => {
+  const root = new URL("../", import.meta.url);
+  const planDirectory = new URL("../docs/superpowers/plans/", import.meta.url);
+  const planFiles = (await readdir(planDirectory)).filter(file => file.endsWith(".md"));
+  const contents = await Promise.all([
+    readFile(new URL("PRODUCT.md", root), "utf8"),
+    readFile(new URL("DESIGN.md", root), "utf8"),
+    ...planFiles.map(file => readFile(new URL(file, planDirectory), "utf8"))
+  ]);
+
+  for (const content of contents) {
+    const title = content.match(/^#\s+(.+)$/m)?.[1] ?? "";
+    const readableTitle = title.replace(/\b(?:API|D1|GMV)\b/g, "");
+    assert.doesNotMatch(readableTitle, /[A-Za-z]{2,}/, `英文标题未中文化：${title}`);
+  }
+
+  for (const content of contents.slice(0, 2)) {
+    const headings = [...content.matchAll(/^#{1,3}\s+(.+)$/gm)].map(match => match[1]);
+    assert.equal(headings.some(heading => /[A-Za-z]{2,}/.test(heading)), false);
+  }
+});
+
+test("product and design catalog excludes agent-only implementation plans", async () => {
+  const source = await readFile(
+    new URL("../src/features/handbook/handbookCatalog.js", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /docs\/superpowers\/specs\/\*\.md/);
+  assert.doesNotMatch(source, /docs\/superpowers\/plans\/\*\.md/);
 });
 
 test("markdown renderer keeps repository documents safe and usable", async () => {
@@ -123,7 +158,7 @@ test("both application shells expose a lazy authenticated handbook route", async
   assert.match(permissionSource, /if \(key === "handbook"\) return Boolean\(user\);/);
 });
 
-test("compact handbook layout scrolls documents by category instead of stacking every plan", async () => {
+test("compact handbook layout scrolls documents by category", async () => {
   const source = await readFile(
     new URL("../src/features/handbook/handbook.css", import.meta.url),
     "utf8"

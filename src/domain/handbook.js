@@ -1,8 +1,7 @@
 import GithubSlugger from "github-slugger";
 
 export const HANDBOOK_CATEGORIES = [
-  { id: "all", label: "全部" },
-  { id: "handbook", label: "员工使用手册" },
+  { id: "handbook", label: "使用手册" },
   { id: "product", label: "产品与设计" },
   { id: "platform", label: "平台能力" }
 ];
