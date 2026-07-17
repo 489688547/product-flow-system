@@ -13,6 +13,7 @@
       "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "server.mjs"],
       "envVars": ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET", "DINGTALK_CORP_ID", "DINGTALK_TOKEN_ENCRYPTION_KEY"],
       "domains": ["open.dingtalk.com", "api.dingtalk.com", "oapi.dingtalk.com"],
+      "apiRoutes": ["/api/dingtalk/", "/api/auth/dingtalk/"],
       "publicDocs": [
         { "label": "钉钉开放平台能力中心", "url": "https://open.dingtalk.com/" }
       ],
@@ -33,6 +34,7 @@
       "codePaths": ["functions/api/kuaimai/**", "functions/api/sales.js", "src/features/settings/KuaimaiSyncSettings.jsx", "src/state/salesStore.js", "server.mjs"],
       "envVars": ["KUAIMAI_APP_KEY", "KUAIMAI_APP_SECRET", "KUAIMAI_ACCESS_TOKEN", "KUAIMAI_REFRESH_TOKEN"],
       "domains": ["open.kuaimai.com", "api.kuaimai.com", "scm.superboss.cc"],
+      "apiRoutes": ["/api/kuaimai/", "/api/sales"],
       "publicDocs": [
         { "label": "快麦开放平台 API 文档", "url": "https://open.kuaimai.com/docs/" }
       ],
@@ -53,6 +55,7 @@
       "codePaths": ["functions/**", "scripts/prepare-pages-release.mjs", "cloudflare-entry.html", "_redirects", ".github/workflows/**"],
       "envVars": [],
       "domains": ["pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
+      "apiRoutes": [],
       "publicDocs": [
         { "label": "Cloudflare Pages 文档", "url": "https://developers.cloudflare.com/pages/" },
         { "label": "Pages Functions 文档", "url": "https://developers.cloudflare.com/pages/functions/" }
@@ -73,6 +76,7 @@
       "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/auth/**", "functions/api/dingtalk/org/**"],
       "envVars": ["PRODUCT_FLOW_DB"],
       "domains": ["api.cloudflare.com", "dash.cloudflare.com"],
+      "apiRoutes": ["/api/state", "/api/platform", "/api/sales"],
       "publicDocs": [
         { "label": "Cloudflare D1 入门", "url": "https://developers.cloudflare.com/d1/get-started/" },
         { "label": "Pages D1 绑定", "url": "https://developers.cloudflare.com/pages/functions/bindings/" }
@@ -95,6 +99,7 @@
       "codePaths": ["docs/platform/integrations.md", "docs/decisions/**"],
       "envVars": [],
       "domains": ["aliyun.com", "aliyuncs.com", "help.aliyun.com"],
+      "apiRoutes": [],
       "publicDocs": [
         { "label": "阿里云帮助中心", "url": "https://help.aliyun.com/" },
         { "label": "阿里云 OpenAPI", "url": "https://help.aliyun.com/zh/openapi/api-overview/" }
@@ -115,6 +120,7 @@
       "codePaths": ["src/features/settings/SalesDataSettings.jsx", "src/domain/salesData.js", "src/state/salesStore.js", "functions/api/sales.js"],
       "envVars": [],
       "domains": [],
+      "apiRoutes": ["/api/sales"],
       "publicDocs": [],
       "evidence": ["src/features/settings/SalesDataSettings.jsx", "src/domain/salesData.js"],
       "relations": [
@@ -133,6 +139,7 @@
       "codePaths": [],
       "envVars": [],
       "domains": ["open.taobao.com"],
+      "apiRoutes": [],
       "publicDocs": [
         { "label": "淘宝开放平台", "url": "https://open.taobao.com/" }
       ],
@@ -152,6 +159,7 @@
       "codePaths": [],
       "envVars": [],
       "domains": ["open.pinduoduo.com"],
+      "apiRoutes": [],
       "publicDocs": [
         { "label": "拼多多开放平台", "url": "https://open.pinduoduo.com/" }
       ],
@@ -171,6 +179,7 @@
       "codePaths": [],
       "envVars": [],
       "domains": ["xiaohongshu.com", "xiaohongshu.apifox.cn"],
+      "apiRoutes": [],
       "publicDocs": [
         { "label": "小红书开放平台应用开发", "url": "https://xiaohongshu.apifox.cn/doc-2810909" },
         { "label": "小红书分享开放平台", "url": "https://agora.xiaohongshu.com/" }
@@ -191,6 +200,7 @@
       "codePaths": [],
       "envVars": [],
       "domains": ["open.oceanengine.com", "qianchuan.jinritemai.com"],
+      "apiRoutes": [],
       "publicDocs": [
         { "label": "巨量引擎商业开放平台", "url": "https://open.oceanengine.com/labels" }
       ],
