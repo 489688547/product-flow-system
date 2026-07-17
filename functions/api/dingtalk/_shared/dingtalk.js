@@ -579,13 +579,35 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
       ...(input.executorUnionIds || []),
       ...(input.recoveryUnionIds || [])
     ].map(value => String(value || "").trim()).filter(Boolean))].slice(0, 10);
-    let existing = null;
-    for (const unionId of recoveryUnionIds) {
-      existing = await findDingTodoBySourceId(accessToken, unionId, input.sourceId, fetchImpl);
-      if (existing) break;
+    const findAcrossRecoveryUsers = async sourceId => {
+      for (const unionId of recoveryUnionIds) {
+        const found = await findDingTodoBySourceId(accessToken, unionId, sourceId, fetchImpl);
+        if (found) return found;
+      }
+      return null;
+    };
+    let existing = await findAcrossRecoveryUsers(input.sourceId);
+    let todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
+    if (!todoId) {
+      const replacementSourceId = `${String(input.sourceId || "")}:r1`;
+      try {
+        const replacement = await createDingTodoTask(accessToken, {
+          ...input,
+          sourceId: replacementSourceId
+        }, fetchImpl);
+        return {
+          ...replacement,
+          sourceId: replacementSourceId,
+          recovered: true,
+          replacedOrphanedSource: true
+        };
+      } catch (replacementError) {
+        if (!isDuplicateTodoSourceError(replacementError)) throw replacementError;
+        existing = await findAcrossRecoveryUsers(replacementSourceId);
+        todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
+        if (!todoId) throw replacementError;
+      }
     }
-    const todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
-    if (!todoId) throw error;
     const resourceUnionId = String(existing.creatorId || existing.resourceUnionId || input.creatorUnionId || "");
     const updated = await updateDingTodoTask(accessToken, {
       ...input,
