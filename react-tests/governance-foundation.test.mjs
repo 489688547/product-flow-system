@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const read = path => readFileSync(resolve(root, path), "utf8");
@@ -45,4 +45,25 @@ test("handbook, product, and platform source documents are present", () => {
   assert.match(read("docs/platform/architecture.md"), /src\/domain/);
   assert.match(read("docs/platform/api-catalog.md"), /\/api\/state/);
   assert.match(read("docs/handbook/getting-started.md"), /登录/);
+});
+
+test("governance checker accepts the repository and rejects incomplete feature docs", async () => {
+  const { checkProjectGovernance, REQUIRED_REPOSITORY_FILES } = await import("../scripts/check-project-governance.mjs");
+  assert.deepEqual(checkProjectGovernance(root).errors, []);
+
+  const fixture = resolve(root, ".tmp-governance-fixture");
+  try {
+    for (const file of REQUIRED_REPOSITORY_FILES) {
+      mkdirSync(dirname(resolve(fixture, file)), { recursive: true });
+      writeFileSync(resolve(fixture, file), "# Fixture\n");
+    }
+    mkdirSync(resolve(fixture, "docs/features/sample"), { recursive: true });
+    writeFileSync(resolve(fixture, "docs/features/sample/prd.md"), "# Sample\n");
+    const result = checkProjectGovernance(fixture);
+    assert.ok(result.errors.some(error => error.includes("docs/features/sample/design.md")));
+    assert.ok(result.errors.some(error => error.includes("docs/features/sample/plan.md")));
+    assert.ok(result.errors.some(error => error.includes("docs/features/sample/tasks.md")));
+  } finally {
+    rmSync(fixture, { recursive: true, force: true });
+  }
 });
