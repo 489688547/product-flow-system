@@ -1,4 +1,4 @@
-# Executive Personal Todo and DingTalk Sync Implementation Plan
+# 总经办个人待办与钉钉同步实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

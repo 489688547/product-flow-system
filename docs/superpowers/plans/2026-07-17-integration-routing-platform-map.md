@@ -1,4 +1,4 @@
-# Integration Routing And Platform Map Implementation Plan
+# 外部平台路由与平台地图实施计划
 
 > **For Codex:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Use superpowers:test-driven-development for every behavior change and superpowers:verification-before-completion before claiming completion.
 
