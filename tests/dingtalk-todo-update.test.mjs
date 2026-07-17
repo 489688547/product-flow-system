@@ -162,10 +162,9 @@ test("syncDingTodoTask does not query todos for unrelated DingTalk errors", asyn
   assert.deepEqual(calls.map(call => call.options.method), ["POST"]);
 });
 
-test("syncDingTodoTask preserves the duplicate error when the source task cannot be found", async () => {
+test("syncDingTodoTask creates one deterministic replacement when the original source is orphaned", async () => {
   const calls = [];
-  await assert.rejects(
-    () => syncDingTodoTask("token-1", {
+  const result = await syncDingTodoTask("token-1", {
       creatorUnionId: "creator-union",
       executorUnionIds: ["executor-union"],
       sourceId: "task:p1:missing",
@@ -175,11 +174,18 @@ test("syncDingTodoTask preserves the duplicate error when the source task cannot
     }, async (url, options) => {
       calls.push({ url, options });
       if (options.method === "POST" && !url.endsWith("/org/tasks/query")) {
-        return errorJson(400, { message: "task existed sourceId is task:p1:missing" });
+        const body = JSON.parse(options.body);
+        if (body.sourceId === "task:p1:missing") {
+          return errorJson(400, { message: "task existed sourceId is task:p1:missing" });
+        }
+        return okJson({ id: "todo-replacement" });
       }
       return okJson({ todoCards: [] });
-    }),
-    /task existed sourceId/
-  );
-  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "POST", "POST"]);
+    });
+
+  assert.equal(result.id, "todo-replacement");
+  assert.equal(result.recovered, true);
+  assert.equal(result.replacedOrphanedSource, true);
+  assert.equal(JSON.parse(calls.at(-1).options.body).sourceId, "task:p1:missing:r1");
+  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "POST", "POST", "POST"]);
 });
