@@ -21,6 +21,11 @@ test("strategy center separates company attainment from department commitments",
   assert.match(strategy, /saveRequiredResult/);
   assert.match(strategy, /transitionCommitment/);
   assert.doesNotMatch(strategy, /attainment-rule/);
+  assert.match(strategy, /aria-expanded=\{expandedResultId === result\.id\}/);
+  assert.match(strategy, /role="progressbar"/);
+  assert.match(strategy, /commitmentProgress/);
+  assert.match(strategy, /saveCommitmentMilestone/);
+  assert.match(strategy, /添加部门任务/);
 });
 
 test("incentive workspace enforces budget visibility and recorded settlement", () => {
