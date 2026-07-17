@@ -2,6 +2,8 @@ import { CalendarPlus } from "lucide-react";
 import { Button } from "../../ui/Button.jsx";
 import { generateProductCover } from "../../domain/productFlow.js";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
+import { isProductOwnedBy } from "../../domain/productOwnership.js";
+import { ProductOwnershipBadge } from "../../ui/ProductOwnershipBadge.jsx";
 
 export const PRODUCT_DEMAND_DRAG_TYPE = "application/x-product-demand-id";
 
@@ -10,7 +12,7 @@ function levelTone(level) {
   return ["p0", "p1", "p2", "p3"].includes(prefix) ? prefix : "pending";
 }
 
-export function PlanningDemandTray({ demands, canEdit, onArrange }) {
+export function PlanningDemandTray({ demands, currentUser, canEdit, onArrange }) {
   return (
     <section className="planning-demand-tray" aria-label="待规划产品">
       <div className="planning-demand-list">
@@ -27,7 +29,10 @@ export function PlanningDemandTray({ demands, canEdit, onArrange }) {
           >
             <img src={demand.image || generateProductCover(demand.name)} alt="" width="40" height="40" />
             <div className="planning-demand-copy">
-              <strong title={demand.name}>{demand.name}</strong>
+              <span className="product-name-line">
+                <strong title={demand.name}>{demand.name}</strong>
+                <ProductOwnershipBadge owned={isProductOwnedBy(demand, currentUser)} />
+              </span>
               <span className={`level-badge planning-level-badge level-${levelTone(demand.planningLevelConfirmed ? demand.planningLevel : "")}`}>
                 {demand.planningLevelConfirmed ? demand.planningLevel : `期望上线：${formatExpectedLaunchMonth(demand.expectedLaunchMonth)}`}
               </span>

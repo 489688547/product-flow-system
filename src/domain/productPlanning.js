@@ -22,6 +22,14 @@ function firstCleanDate(...values) {
   return "";
 }
 
+function productManagerIdentity(product = {}) {
+  return {
+    productManager: cleanText(product?.productManager),
+    productManagerUserId: cleanText(product?.productManagerUserId),
+    productManagerUnionId: cleanText(product?.productManagerUnionId)
+  };
+}
+
 function updatedTime(plan) {
   const time = Date.parse(plan.updatedAt || plan.createdAt || "");
   return Number.isNaN(time) ? 0 : time;
@@ -33,7 +41,8 @@ function planningLevel(demand, product) {
     planningLevel: confirmed ? product.level : "未定级",
     planningLevelConfirmed: confirmed,
     planningLevelIsReference: false,
-    expectedLaunchMonth: normalizeExpectedLaunchMonth(product?.expectedLaunchMonth || demand?.expectedLaunchMonth)
+    expectedLaunchMonth: normalizeExpectedLaunchMonth(product?.expectedLaunchMonth || demand?.expectedLaunchMonth),
+    ...productManagerIdentity(product)
   };
 }
 
@@ -78,7 +87,10 @@ export function normalizeProductPlans(value) {
         levelConfirmed: Boolean(plan?.demandSnapshot?.levelConfirmed || (plan?.demandSnapshot?.level && plan?.demandSnapshot?.levelIsReference === false)),
         levelIsReference: false,
         expectedLaunchMonth: normalizeExpectedLaunchMonth(plan?.demandSnapshot?.expectedLaunchMonth || plan?.expectedLaunchMonth),
-        productId: cleanText(plan?.demandSnapshot?.productId || plan?.productId)
+        productId: cleanText(plan?.demandSnapshot?.productId || plan?.productId),
+        productManager: cleanText(plan?.demandSnapshot?.productManager || plan?.productManager),
+        productManagerUserId: cleanText(plan?.demandSnapshot?.productManagerUserId || plan?.productManagerUserId),
+        productManagerUnionId: cleanText(plan?.demandSnapshot?.productManagerUnionId || plan?.productManagerUnionId)
       },
       developmentStart: cleanDate(plan?.developmentStart),
       launchDate: firstCleanDate(plan?.launchDate, plan?.launchEnd, plan?.launchStart, plan?.developmentEnd),

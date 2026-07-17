@@ -16,7 +16,7 @@ test("planning candidates combine demand opportunities with active products and 
       { id: "d-review", name: "复盘来源", status: "已转开发", productId: "p-review", expectedLaunchMonth: "2026-12" }
     ],
     [
-      { id: "p-active", name: "流程中产品", stage: 3, level: "P1 增长级", levelConfirmed: true, image: "active.jpg" },
+      { id: "p-active", name: "流程中产品", stage: 3, level: "P1 增长级", levelConfirmed: true, image: "active.jpg", productManager: "赵雨涵", productManagerUserId: "u-zhao", productManagerUnionId: "union-zhao" },
       { id: "p-review", name: "已复盘产品", stage: 5, level: "P0 战略级", levelConfirmed: true }
     ]
   );
@@ -29,13 +29,16 @@ test("planning candidates combine demand opportunities with active products and 
   assert.equal(candidates[1].planningLevel, "P1 增长级");
   assert.equal(candidates[1].planningLevelIsReference, false);
   assert.equal(candidates[1].planningSource, "progress");
+  assert.equal(candidates[1].productManager, "赵雨涵");
+  assert.equal(candidates[1].productManagerUserId, "u-zhao");
+  assert.equal(candidates[1].productManagerUnionId, "union-zhao");
 });
 
 test("planning records normalize and intersect every displayed year they touch", () => {
   const [plan] = normalizeProductPlans([{
     id: "plan-1",
     demandId: "d1",
-    demandSnapshot: { name: "跨年新品", image: "cover.jpg" },
+    demandSnapshot: { name: "跨年新品", image: "cover.jpg", productManager: "赵雨涵", productManagerUserId: "u-zhao", productManagerUnionId: "union-zhao" },
     developmentStart: "2026-12-15",
     developmentEnd: "2027-01-20",
     launchStart: "2027-02-01",
@@ -43,6 +46,9 @@ test("planning records normalize and intersect every displayed year they touch",
   }]);
 
   assert.equal(plan.demandSnapshot.name, "跨年新品");
+  assert.equal(plan.demandSnapshot.productManager, "赵雨涵");
+  assert.equal(plan.demandSnapshot.productManagerUserId, "u-zhao");
+  assert.equal(plan.demandSnapshot.productManagerUnionId, "union-zhao");
   assert.equal(plan.developmentStart, "2026-12-15");
   assert.equal(plan.launchDate, "2027-02-10");
   assert.equal("developmentEnd" in plan, false);

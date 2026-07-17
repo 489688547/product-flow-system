@@ -29,7 +29,10 @@ function enrichPlanningDemand(demand, products) {
     planningLevel: levelConfirmed ? product.level : "未定级",
     planningLevelConfirmed: levelConfirmed,
     planningLevelIsReference: false,
-    expectedLaunchMonth: normalizeExpectedLaunchMonth(product?.expectedLaunchMonth || demand.expectedLaunchMonth)
+    expectedLaunchMonth: normalizeExpectedLaunchMonth(product?.expectedLaunchMonth || demand.expectedLaunchMonth),
+    productManager: product?.productManager || "",
+    productManagerUserId: product?.productManagerUserId || "",
+    productManagerUnionId: product?.productManagerUnionId || ""
   };
 }
 
@@ -80,7 +83,10 @@ export function ProductPlanningPage() {
       levelConfirmed: Boolean(planModal.demand?.planningLevelConfirmed ?? planModal.plan?.demandSnapshot?.levelConfirmed),
       levelIsReference: false,
       expectedLaunchMonth: normalizeExpectedLaunchMonth(planModal.demand?.expectedLaunchMonth || planModal.plan?.demandSnapshot?.expectedLaunchMonth),
-      productId: planModal.demand?.productId || planModal.plan?.demandSnapshot?.productId
+      productId: planModal.demand?.productId || planModal.plan?.demandSnapshot?.productId,
+      productManager: planModal.demand?.productManager || planModal.plan?.demandSnapshot?.productManager || "",
+      productManagerUserId: planModal.demand?.productManagerUserId || planModal.plan?.demandSnapshot?.productManagerUserId || "",
+      productManagerUnionId: planModal.demand?.productManagerUnionId || planModal.plan?.demandSnapshot?.productManagerUnionId || ""
     };
     if (planModal.plan) updateProductPlan(planModal.plan.id, { ...form, demandSnapshot });
     else addProductPlan({ ...form, demandId: planModal.demand.id, demandSnapshot });
@@ -101,8 +107,8 @@ export function ProductPlanningPage() {
         </div>
         <Button variant="primary" disabled={!canEdit} disabledReason="只有产品部和总经办可以添加需求机会" onClick={() => setDemandModalOpen(true)}><Plus size={16} aria-hidden="true" />添加需求机会</Button>
       </PageHeader>
-      <PlanningDemandTray demands={candidates} canEdit={canEdit} onArrange={openNewPlan} />
-      <AnnualPlanningTimeline year={year} plans={state.productPlans || []} demands={planningRecords} canEdit={canEdit} onDropDemand={openDroppedDemand} onEditPlan={openExistingPlan} />
+      <PlanningDemandTray demands={candidates} currentUser={currentUser} canEdit={canEdit} onArrange={openNewPlan} />
+      <AnnualPlanningTimeline year={year} plans={state.productPlans || []} demands={planningRecords} currentUser={currentUser} canEdit={canEdit} onDropDemand={openDroppedDemand} onEditPlan={openExistingPlan} />
       <DemandModal open={demandModalOpen} currentUser={currentUser} orgCache={orgCache} onClose={() => setDemandModalOpen(false)} onSave={saveDemand} />
       <ProductPlanModal
         open={Boolean(planModal)}

@@ -801,6 +801,17 @@ test("product progress defaults locally but preserves explicit product navigatio
   assert.match(progress, /setSelectedProductId\(productId\)/);
 });
 
+test("archive and both planning product surfaces show the shared ownership badge", () => {
+  const archive = read("src/features/archive/ProductArchivePage.jsx");
+  const page = read("src/features/planning/ProductPlanningPage.jsx");
+  const tray = read("src/features/planning/PlanningDemandTray.jsx");
+  const timeline = read("src/features/planning/AnnualPlanningTimeline.jsx");
+  assert.match(archive, /<ProductOwnershipBadge owned=\{isProductOwnedBy\(product, currentUser\)\}/);
+  assert.match(page, /currentUser=\{currentUser\}/g);
+  assert.match(tray, /<ProductOwnershipBadge owned=\{isProductOwnedBy\(demand, currentUser\)\}/);
+  assert.match(timeline, /<ProductOwnershipBadge owned=\{isProductOwnedBy\(snapshot, currentUser\)\}/);
+});
+
 test("shared page and table primitives support consistent hierarchy and responsive density", () => {
   const pageHeader = read("src/ui/PageHeader.jsx");
   const table = read("src/ui/DataTable.jsx");

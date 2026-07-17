@@ -2,6 +2,8 @@ import { AlertTriangle } from "lucide-react";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { generateProductCover } from "../../domain/productFlow.js";
 import { planIntersectsYear, timelineSegment } from "../../domain/productPlanning.js";
+import { isProductOwnedBy } from "../../domain/productOwnership.js";
+import { ProductOwnershipBadge } from "../../ui/ProductOwnershipBadge.jsx";
 import { PRODUCT_DEMAND_DRAG_TYPE } from "./PlanningDemandTray.jsx";
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => `${index + 1}月`);
@@ -52,7 +54,7 @@ function levelTone(level) {
   return ["p0", "p1", "p2", "p3"].includes(prefix) ? prefix : "pending";
 }
 
-export function AnnualPlanningTimeline({ year, plans, demands, canEdit, onDropDemand, onEditPlan }) {
+export function AnnualPlanningTimeline({ year, plans, demands, currentUser, canEdit, onDropDemand, onEditPlan }) {
   const demandMap = new Map(demands.map(demand => [demand.id, demand]));
   const visiblePlans = plans.filter(plan => planIntersectsYear(plan, year));
 
@@ -81,7 +83,10 @@ export function AnnualPlanningTimeline({ year, plans, demands, canEdit, onDropDe
                 <div className="planning-product-column planning-product-info">
                   <img src={snapshot?.image || generateProductCover(snapshot?.name)} alt="" width="36" height="36" />
                   <div>
-                    <strong>{snapshot?.name || "未命名产品"}</strong>
+                    <span className="product-name-line">
+                      <strong>{snapshot?.name || "未命名产品"}</strong>
+                      <ProductOwnershipBadge owned={isProductOwnedBy(snapshot, currentUser)} />
+                    </span>
                     <span className={`level-badge planning-level-badge level-${levelTone(levelConfirmed ? level : "")}`}>
                       {levelConfirmed ? level : `期望上线：${formatExpectedLaunchMonth(snapshot?.expectedLaunchMonth)}`}
                     </span>

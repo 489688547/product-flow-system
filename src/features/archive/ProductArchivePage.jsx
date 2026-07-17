@@ -5,10 +5,12 @@ import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
 import { buildProductGmvProgress } from "../../domain/productGmv.js";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { normalizeSkuCodes } from "../../domain/salesData.js";
+import { isProductOwnedBy } from "../../domain/productOwnership.js";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { HeaderFilter } from "../../ui/HeaderFilter.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
+import { ProductOwnershipBadge } from "../../ui/ProductOwnershipBadge.jsx";
 import { ProductModal } from "./ProductModal.jsx";
 import { ProductPackageModal } from "./ProductPackageModal.jsx";
 import { ProductSalesModal } from "./ProductSalesModal.jsx";
@@ -16,7 +18,7 @@ import { ProductGmvSummary } from "../sales/ProductGmvSummary.jsx";
 import { useProductSalesRows } from "../sales/useProductSalesRows.js";
 
 export function ProductArchivePage({ onNavigate, onOpenProgress }) {
-  const { state, orgCache, setCurrentProduct, updateProduct } = useProductFlow();
+  const { state, currentUser, orgCache, setCurrentProduct, updateProduct } = useProductFlow();
   const [editing, setEditing] = useState(null);
   const [salesProduct, setSalesProduct] = useState(null);
   const [packageProduct, setPackageProduct] = useState(null);
@@ -60,7 +62,10 @@ export function ProductArchivePage({ onNavigate, onOpenProgress }) {
             <article className="product-card no-review" key={product.id}>
               <img src={product.image || generateProductCover(product.name)} alt={`${product.name}封面`} width="68" height="68" loading="lazy" />
               <div className="product-card-copy">
-                <div className="product-card-title"><h2>{product.name}</h2><span className="badge">{product.status || "开发中"}</span></div>
+                <div className="product-card-title">
+                  <span className="product-name-line"><h2>{product.name}</h2><ProductOwnershipBadge owned={isProductOwnedBy(product, currentUser)} /></span>
+                  <span className="badge">{product.status || "开发中"}</span>
+                </div>
                 <p>{product.desc}</p>
                 <ProductGmvSummary compact summary={gmvSummaries.get(product.id)} loading={productSales.loading} error={productSales.error} />
                 <span>{product.levelConfirmed ? product.level : `期望上线：${formatExpectedLaunchMonth(product.expectedLaunchMonth)}`} · 第 {product.stage} 阶段 {STAGES[product.stage]?.short || "-"} · 提需人 {product.requester || "未记录"} · 产品经理 {product.productManager || "待确定"} · {product.source}</span>
