@@ -6,6 +6,7 @@ import {
   createHandbookDocument,
   extractMarkdownHeadings,
   filterHandbookDocuments,
+  removeMarkdownLead,
   resolveHandbookDocument
 } from "../src/domain/handbook.js";
 import { formatAppHash, parseAppHash } from "../src/domain/appNavigation.js";
@@ -56,6 +57,13 @@ test("markdown table of contents uses stable unique H2 and H3 ids", () => {
     { level: 3, title: "权限", id: "权限" },
     { level: 2, title: "登录", id: "登录-1" }
   ]);
+});
+
+test("rendered handbook bodies omit the title and already displayed summary", () => {
+  assert.equal(
+    removeMarkdownLead("# 开始使用\n\n这是摘要第一行，\n这是摘要第二行。\n\n## 登录\n\n使用钉钉登录。"),
+    "## 登录\n\n使用钉钉登录。"
+  );
 });
 
 test("handbook workspace exposes search, categories, and an empty state", async () => {
@@ -113,4 +121,14 @@ test("both application shells expose a lazy authenticated handbook route", async
   assert.match(appSource, /<Suspense fallback=/);
   assert.match(appSource, /selectedSlug=/);
   assert.match(permissionSource, /if \(key === "handbook"\) return Boolean\(user\);/);
+});
+
+test("compact handbook layout scrolls documents by category instead of stacking every plan", async () => {
+  const source = await readFile(
+    new URL("../src/features/handbook/handbook.css", import.meta.url),
+    "utf8"
+  );
+
+  assert.match(source, /@media \(max-width: 820px\)[\s\S]*\.handbook-document-list\s*\{[\s\S]*display: flex;/);
+  assert.match(source, /@media \(max-width: 820px\)[\s\S]*\.handbook-document-list button\s*\{[\s\S]*flex: 0 0 190px;/);
 });

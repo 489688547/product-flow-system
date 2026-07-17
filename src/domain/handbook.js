@@ -8,6 +8,7 @@ export const HANDBOOK_CATEGORIES = [
 ];
 
 const normalizeWhitespace = value => String(value ?? "").replace(/\s+/g, " ").trim();
+const isMarkdownStructure = value => /^#{1,6}\s|^(```|~~~|>|[-*+]\s|\d+[.)]\s|\|)/.test(value);
 
 const cleanInlineMarkdown = value => normalizeWhitespace(
   value
@@ -24,17 +25,16 @@ const deriveTitle = content => {
 const deriveSummary = content => {
   const lines = String(content ?? "").split(/\r?\n/);
 
-  for (const line of lines) {
-    const value = line.trim();
-    if (
-      !value ||
-      /^#{1,6}\s/.test(value) ||
-      /^(```|~~~|>|[-*+]\s|\d+[.)]\s|\|)/.test(value)
-    ) {
-      continue;
-    }
+  for (let index = 0; index < lines.length; index += 1) {
+    const value = lines[index].trim();
+    if (!value || isMarkdownStructure(value)) continue;
 
-    return cleanInlineMarkdown(value);
+    const paragraph = [value];
+    while (lines[index + 1]?.trim() && !isMarkdownStructure(lines[index + 1].trim())) {
+      paragraph.push(lines[index + 1].trim());
+      index += 1;
+    }
+    return cleanInlineMarkdown(paragraph.join(" "));
   }
 
   return "暂无摘要";
@@ -90,4 +90,23 @@ export function extractMarkdownHeadings(markdown) {
   }
 
   return headings;
+}
+
+export function removeMarkdownLead(markdown) {
+  const original = String(markdown ?? "");
+  const lines = original.split(/\r?\n/);
+  let index = 0;
+
+  while (index < lines.length && !lines[index].trim()) index += 1;
+  if (!/^#\s+/.test(lines[index]?.trim() ?? "")) return original;
+
+  index += 1;
+  while (index < lines.length && !lines[index].trim()) index += 1;
+
+  if (lines[index]?.trim() && !isMarkdownStructure(lines[index].trim())) {
+    while (index < lines.length && lines[index].trim()) index += 1;
+    while (index < lines.length && !lines[index].trim()) index += 1;
+  }
+
+  return lines.slice(index).join("\n").trim();
 }

@@ -4,6 +4,7 @@ import {
   HANDBOOK_CATEGORIES,
   extractMarkdownHeadings,
   filterHandbookDocuments,
+  removeMarkdownLead,
   resolveHandbookDocument
 } from "../../domain/handbook.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
@@ -128,7 +129,7 @@ export default function HandbookPage({ selectedSlug, onSelectDocument }) {
               <p>{activeDocument.summary}</p>
               <time dateTime={activeDocument.updatedAt}>更新于 {activeDocument.updatedAt}</time>
             </header>
-            <MarkdownDocument content={activeDocument.content} />
+            <MarkdownDocument content={removeMarkdownLead(activeDocument.content)} />
           </article>
 
           <aside className="handbook-toc" aria-label="本页目录">

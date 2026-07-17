@@ -79,6 +79,8 @@ const rootDocuments = [
 ];
 
 export const handbookDocuments = [...repositoryDocuments, ...rootDocuments].sort((left, right) => (
+  (left.slug === DEFAULT_HANDBOOK_SLUG ? -1 : right.slug === DEFAULT_HANDBOOK_SLUG ? 1 : 0)
+  ||
   CATEGORY_ORDER[left.category] - CATEGORY_ORDER[right.category]
   || KIND_ORDER[left.kind] - KIND_ORDER[right.kind]
   || left.title.localeCompare(right.title, "zh-CN")
