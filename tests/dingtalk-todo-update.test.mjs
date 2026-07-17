@@ -113,6 +113,36 @@ test("syncDingTodoTask also recovers a completed task with the same sourceId", a
   assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "PUT"]);
 });
 
+test("syncDingTodoTask recovers a task owned by an additional recovery user", async () => {
+  const calls = [];
+  const result = await syncDingTodoTask("token-1", {
+    creatorUnionId: "current-union",
+    executorUnionIds: ["current-union"],
+    recoveryUnionIds: ["owner-union"],
+    sourceId: "task:p1:owner",
+    subject: "立项PRD同步",
+    detailUrl: "https://flow.example.com/#progress",
+    dueTime: 1784301600000,
+    done: false
+  }, async (url, options) => {
+    calls.push({ url, options });
+    if (!url.endsWith("/org/tasks/query") && options.method === "POST") {
+      return errorJson(400, { message: "task existed sourceId is task:p1:owner" });
+    }
+    if (url.includes("/users/owner-union/org/tasks/query") && JSON.parse(options.body).isDone === false) {
+      return okJson({ todoCards: [{ taskId: "todo-owner", sourceId: "task:p1:owner" }] });
+    }
+    if (url.endsWith("/tasks/todo-owner?operatorId=owner-union")) return okJson({ result: true });
+    return okJson({ todoCards: [] });
+  });
+
+  assert.equal(result.id, "todo-owner");
+  assert.equal(result.recovered, true);
+  assert.equal(calls.some(call => call.url.includes("/users/owner-union/org/tasks/query")), true);
+  assert.equal(calls.at(-1).options.method, "PUT");
+  assert.match(calls.at(-1).url, /\/users\/owner-union\/tasks\/todo-owner\?operatorId=owner-union$/);
+});
+
 test("syncDingTodoTask does not query todos for unrelated DingTalk errors", async () => {
   const calls = [];
   await assert.rejects(
@@ -151,5 +181,5 @@ test("syncDingTodoTask preserves the duplicate error when the source task cannot
     }),
     /task existed sourceId/
   );
-  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST"]);
+  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "POST", "POST"]);
 });
