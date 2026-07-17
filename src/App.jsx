@@ -1,5 +1,5 @@
-import { AppWindow, Archive, BadgeDollarSign, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChevronDown, ClipboardList, GitBranch, Home, LayoutDashboard, LogOut, PanelsTopLeft, Settings, Target } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { AppWindow, Archive, BadgeDollarSign, BookOpenText, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChevronDown, ClipboardList, GitBranch, Home, LayoutDashboard, LogOut, PanelsTopLeft, Settings, Target } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ProductArchivePage } from "./features/archive/ProductArchivePage.jsx";
 import { DashboardPage } from "./features/dashboard/DashboardPage.jsx";
 import { DemandPoolPage } from "./features/demands/DemandPoolPage.jsx";
@@ -19,6 +19,9 @@ import { KeyProjectsPage } from "./features/projects/KeyProjectsPage.jsx";
 import { OperatingReviewPage } from "./features/reviews/OperatingReviewPage.jsx";
 import { AppCenterPage } from "./features/platform/AppCenterPage.jsx";
 import { IncentiveProjectsPage } from "./features/incentives/IncentiveProjectsPage.jsx";
+import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
+
+const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
 
 const COMPANY_NAV = [
   ["home", "公司首页", LayoutDashboard, "公司经营"],
@@ -32,6 +35,7 @@ const COMPANY_NAV = [
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
+  ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
 ];
@@ -41,19 +45,24 @@ const PRODUCT_NAV = [
   ["planning", "产品规划", CalendarRange],
   ["progress", "产品进度", GitBranch],
   ["archive", "产品档案", Archive],
+  ["handbook", "说明书", BookOpenText],
   ["issues", "问题反馈", Bug],
   ["settings", "设置", Settings]
 ];
 const HIDDEN_SCREENS = new Set(["packages"]);
 const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NAV.map(([key]) => key), ...HIDDEN_SCREENS]);
 
-function screenFromHash() {
-  const screen = window.location.hash.replace(/^#/, "");
-  return VALID_SCREENS.has(screen) ? screen : "home";
+function routeFromHash() {
+  const route = parseAppHash(window.location.hash);
+  return {
+    screen: VALID_SCREENS.has(route.screen) ? route.screen : "home",
+    detail: route.detail
+  };
 }
 
 export default function App() {
-  const [screen, setScreen] = useState(screenFromHash);
+  const [route, setRoute] = useState(routeFromHash);
+  const { screen, detail: routeDetail } = route;
   const [progressFocus, setProgressFocus] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
@@ -82,7 +91,7 @@ export default function App() {
     };
   }, [accountMenuOpen]);
   useEffect(() => {
-    const onHashChange = () => setScreen(screenFromHash());
+    const onHashChange = () => setRoute(routeFromHash());
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -90,11 +99,12 @@ export default function App() {
     if (loading || (hasCompanyAccess && platformLoading)) return;
     if (!screenAllowed) navigate(defaultScreen);
   }, [defaultScreen, hasCompanyAccess, loading, platformLoading, screenAllowed]);
-  function showScreen(nextScreen) {
+  function showScreen(nextScreen, detail = "") {
     if (!VALID_SCREENS.has(nextScreen)) return;
     if (!visibleScreenKeys.has(nextScreen) && !(nextScreen === "packages" && visibleScreenKeys.has("archive"))) return;
-    setScreen(nextScreen);
-    if (window.location.hash !== `#${nextScreen}`) window.location.hash = nextScreen;
+    setRoute({ screen: nextScreen, detail });
+    const nextHash = formatAppHash(nextScreen, detail);
+    if (window.location.hash !== nextHash) window.location.hash = nextHash;
   }
   function navigate(nextScreen) {
     if (nextScreen === "progress") setProgressFocus(null);
@@ -118,6 +128,14 @@ export default function App() {
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
+    handbook: (
+      <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载说明书…</div></section>}>
+        <HandbookPage
+          selectedSlug={routeDetail}
+          onSelectDocument={slug => showScreen("handbook", slug)}
+        />
+      </Suspense>
+    ),
     issues: <IssuePage />,
     settings: <SettingsPage />
   };
