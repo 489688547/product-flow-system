@@ -67,6 +67,10 @@ test("strategy center governs company results and department commitments", () =>
   assert.match(page, /部门承诺/);
   assert.match(resultModal, /验收标准/);
   assert.match(commitmentModal, /月度里程碑/);
+  assert.match(commitmentModal, /requiredResultId/);
+  assert.match(commitmentModal, /关联必达结果/);
+  assert.match(commitmentModal, /item\.strategyId === form\.strategyId/);
+  assert.match(page, /requiredResults=\{state\.requiredResults/);
   assert.match(page, /总经办审核/);
   assert.match(page, /老板确认/);
   assert.match(page, /新建公司战略/);
