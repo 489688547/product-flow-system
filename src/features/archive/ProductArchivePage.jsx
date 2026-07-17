@@ -15,7 +15,7 @@ import { ProductSalesModal } from "./ProductSalesModal.jsx";
 import { ProductGmvSummary } from "../sales/ProductGmvSummary.jsx";
 import { useProductSalesRows } from "../sales/useProductSalesRows.js";
 
-export function ProductArchivePage({ onNavigate }) {
+export function ProductArchivePage({ onNavigate, onOpenProgress }) {
   const { state, orgCache, setCurrentProduct, updateProduct } = useProductFlow();
   const [editing, setEditing] = useState(null);
   const [salesProduct, setSalesProduct] = useState(null);
@@ -38,6 +38,10 @@ export function ProductArchivePage({ onNavigate }) {
     .filter(product => levelFilter === "all" || (product.levelConfirmed && product.level === levelFilter))
     .filter(product => stageFilter === "all" || String(product.stage) === stageFilter), [state.products, statusFilter, levelFilter, stageFilter]);
   function jump(product, screen) {
+    if (screen === "progress") {
+      onOpenProgress?.(product.id);
+      return;
+    }
     setCurrentProduct(product.id);
     onNavigate?.(screen);
   }

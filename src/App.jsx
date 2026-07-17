@@ -90,16 +90,20 @@ export default function App() {
     if (loading || (hasCompanyAccess && platformLoading)) return;
     if (!screenAllowed) navigate(defaultScreen);
   }, [defaultScreen, hasCompanyAccess, loading, platformLoading, screenAllowed]);
-  function navigate(nextScreen) {
+  function showScreen(nextScreen) {
     if (!VALID_SCREENS.has(nextScreen)) return;
     if (!visibleScreenKeys.has(nextScreen) && !(nextScreen === "packages" && visibleScreenKeys.has("archive"))) return;
     setScreen(nextScreen);
     if (window.location.hash !== `#${nextScreen}`) window.location.hash = nextScreen;
   }
+  function navigate(nextScreen) {
+    if (nextScreen === "progress") setProgressFocus(null);
+    showScreen(nextScreen);
+  }
   function openProgress(productId, stage) {
     if (productId) setCurrentProduct(productId);
     setProgressFocus({ productId, stage, tick: Date.now() });
-    navigate("progress");
+    showScreen("progress");
   }
   const pages = {
     home: <CompanyHomePage onNavigate={navigate} />,
@@ -112,7 +116,7 @@ export default function App() {
     demands: <DemandPoolPage onProjectCreated={productId => openProgress(productId, 1)} />,
     planning: <ProductPlanningPage />,
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
-    archive: <ProductArchivePage onNavigate={navigate} />,
+    archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
     issues: <IssuePage />,
     settings: <SettingsPage />

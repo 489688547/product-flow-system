@@ -1,5 +1,5 @@
 import { CalendarCheck2, CalendarPlus, Flag, GripVertical, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   deliverablesForTask,
   hasFormalProductGrading,
@@ -21,7 +21,7 @@ import { buildTaskMeetingPayload, buildTaskTodoPayload } from "../../domain/ding
 import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { buildProductGmvProgress, normalizeMonthlyGmvTarget } from "../../domain/productGmv.js";
-import { productManagerAssignment } from "../../domain/productOwnership.js";
+import { preferredProgressProductId, productManagerAssignment } from "../../domain/productOwnership.js";
 import { buildTaskTodoSnapshot, normalizeTaskDueDate, todoSyncStatus } from "../../domain/taskTodo.js";
 import { MeetingScheduleModal } from "./MeetingScheduleModal.jsx";
 import { ProductGradingModal } from "./ProductGradingModal.jsx";
@@ -57,8 +57,11 @@ function validProgressStage(stage) {
 }
 
 export function ProductProgressPage({ focusStage, onNavigate }) {
-  const { state, currentUser, orgCache, setCurrentProduct, setProductStage, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, addDeliverable, syncTaskTodo, scheduleTaskMeeting, returnProductToDemand } = useProductFlow();
-  const selectedProduct = state.products.find(item => item.id === state.currentId) || state.products[0];
+  const { state, loading, currentUser, orgCache, setCurrentProduct, setProductStage, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, addDeliverable, syncTaskTodo, scheduleTaskMeeting, returnProductToDemand } = useProductFlow();
+  const selectionInitialized = useRef(false);
+  const lastFocusTick = useRef(0);
+  const [selectedProductId, setSelectedProductId] = useState("");
+  const selectedProduct = state.products.find(item => item.id === selectedProductId) || state.products[0];
   const [selectedStage, setSelectedStage] = useState(validProgressStage(selectedProduct?.stage));
   const [meetingTask, setMeetingTask] = useState(null);
   const [todoTask, setTodoTask] = useState(null);
@@ -69,6 +72,19 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const [monthlyGmvDraft, setMonthlyGmvDraft] = useState("");
   const [draggedTaskId, setDraggedTaskId] = useState("");
   const [taskToDelete, setTaskToDelete] = useState(null);
+
+  useEffect(() => {
+    if (loading) return;
+    const hasExplicitFocus = Boolean(focusStage?.productId && lastFocusTick.current !== focusStage.tick);
+    const selectionMissing = !state.products.some(product => product.id === selectedProductId);
+    if (!selectionInitialized.current || hasExplicitFocus || selectionMissing) {
+      const explicitProductId = hasExplicitFocus ? focusStage.productId : "";
+      const preferredId = preferredProgressProductId(state.products, currentUser, explicitProductId);
+      setSelectedProductId(preferredId);
+      selectionInitialized.current = true;
+      if (hasExplicitFocus) lastFocusTick.current = focusStage.tick;
+    }
+  }, [currentUser, focusStage?.productId, focusStage?.tick, loading, selectedProductId, state.products]);
 
   useEffect(() => {
     if (!selectedProduct) return;
@@ -220,7 +236,15 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
         description="按产品定级查看适用阶段和任务。"
         identity={(
           <div className="progress-overview-toolbar">
-            <ProductPicker products={state.products} value={selectedProduct.id} onChange={setCurrentProduct} currentUser={currentUser} />
+            <ProductPicker
+              products={state.products}
+              value={selectedProduct.id}
+              currentUser={currentUser}
+              onChange={productId => {
+                setSelectedProductId(productId);
+                setCurrentProduct(productId);
+              }}
+            />
             <ProductScheduleSummary schedule={productSchedule} onOpenPlanning={() => onNavigate?.("planning")} />
             <ProductGmvSummary summary={productGmvSummary} loading={productSales.loading} error={productSales.error} />
             <Button className="compact quiet-danger" data-testid="return-product-demand" onClick={handleReturnProduct}><RotateCcw size={16} />退回需求池</Button>

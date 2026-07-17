@@ -787,6 +787,20 @@ test("organization ownership is saved and shown through one shared product badge
   assert.match(styles, /\.product-ownership-badge\s*\{/);
 });
 
+test("product progress defaults locally but preserves explicit product navigation", () => {
+  const app = read("src/App.jsx");
+  const progress = read("src/features/progress/ProductProgressPage.jsx");
+  const archive = read("src/features/archive/ProductArchivePage.jsx");
+  assert.match(app, /setProgressFocus\(null\)/);
+  assert.match(app, /onOpenProgress=\{openProgress\}/);
+  assert.match(archive, /onOpenProgress\?\.\(product\.id\)/);
+  assert.match(progress, /preferredProgressProductId\(state\.products, currentUser, explicitProductId\)/);
+  assert.match(progress, /const selectionInitialized = useRef\(false\)/);
+  assert.match(progress, /const lastFocusTick = useRef\(0\)/);
+  assert.match(progress, /if \(loading\) return/);
+  assert.match(progress, /setSelectedProductId\(productId\)/);
+});
+
 test("shared page and table primitives support consistent hierarchy and responsive density", () => {
   const pageHeader = read("src/ui/PageHeader.jsx");
   const table = read("src/ui/DataTable.jsx");
