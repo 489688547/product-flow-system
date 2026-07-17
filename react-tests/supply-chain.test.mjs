@@ -67,6 +67,22 @@ test("inventory funds subtract sales cost and include confirmed adjustment", () 
   assert.equal(summary.adjustedInventoryFunds, 55);
 });
 
+test("supplier inventory funds use product material consumption per sale", () => {
+  const summary = buildSupplyChainSummary({
+    supplyState: normalizeSupplyChainState({
+      suppliers: [{ id: "s1", name: "包材供应商" }],
+      purchaseApprovals: [{ processInstanceId: "purchase-1", productIds: ["p1"], supplierId: "s1" }],
+      paymentApprovals: [{ processInstanceId: "pay-1", purchaseProcessInstanceId: "purchase-1", status: "COMPLETED", amount: 100 }],
+      productSupplierLinks: [{ id: "link-1", productId: "p1", supplierId: "s1", unitCost: 2, consumptionPerSale: 3, status: "active" }]
+    }),
+    products: [{ id: "p1", skuCodes: [{ code: "6977173969783" }] }],
+    salesRows: [{ code: "6977173969783", cost: 40, qty: 4 }]
+  });
+  assert.equal(summary.byProduct[0].consumedSalesCost, 40);
+  assert.equal(summary.bySupplier[0].consumedSalesCost, 24);
+  assert.equal(summary.bySupplier[0].adjustedInventoryFunds, 76);
+});
+
 test("inventory import validates product mapping and computes ERP variance", () => {
   const result = parseInventoryImportRows([
     { 商品编码: "6977173969783", 盘点数量: "12", ERP库存: "10", 库存金额: "240", 供应商编码: "SUP-1" },

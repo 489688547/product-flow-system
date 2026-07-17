@@ -155,6 +155,7 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
   const productRows = new Map(products.map(product => [product.id, emptyDimensionRow({ product })]));
   const supplierRows = new Map();
   const paidByProductSupplier = new Map();
+  const soldQuantityByProduct = new Map();
 
   for (const payment of state.paymentApprovals) {
     if (!APPROVED_STATUSES.has(cleanText(payment.status).toUpperCase())) continue;
@@ -191,6 +192,28 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     const productRow = productRows.get(product.id) || emptyDimensionRow({ product });
     productRow.consumedSalesCost += finiteNumber(salesRow.cost ?? salesRow.salesCost);
     productRows.set(product.id, productRow);
+    soldQuantityByProduct.set(product.id, (soldQuantityByProduct.get(product.id) || 0) + finiteNumber(salesRow.qty ?? salesRow.quantity));
+  }
+
+  const linkedCostProducts = new Set();
+  for (const link of state.productSupplierLinks) {
+    if (!link.productId || !link.supplierId || cleanText(link.status).toLowerCase() === "inactive") continue;
+    const unitCost = finiteNumber(link.unitCost);
+    const consumptionPerSale = finiteNumber(link.consumptionPerSale);
+    if (unitCost <= 0 || consumptionPerSale <= 0) continue;
+    const supplier = state.suppliers.find(item => item.id === link.supplierId);
+    const supplierRow = supplierRows.get(link.supplierId) || {
+      supplierId: link.supplierId,
+      supplierName: supplier?.name || "待映射供应商",
+      actualPaid: 0,
+      consumedSalesCost: 0,
+      rawInventoryFunds: 0,
+      adjustmentAmount: 0,
+      adjustedInventoryFunds: 0
+    };
+    supplierRow.consumedSalesCost += (soldQuantityByProduct.get(link.productId) || 0) * consumptionPerSale * unitCost;
+    supplierRows.set(link.supplierId, supplierRow);
+    linkedCostProducts.add(link.productId);
   }
 
   for (const adjustment of state.inventoryAdjustments) {
@@ -217,11 +240,13 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
 
   for (const productRow of productRows.values()) {
     const allocations = [...paidByProductSupplier.entries()].filter(([key]) => key.startsWith(`${productRow.productId}::`));
-    const paidTotal = allocations.reduce((sum, [, amount]) => sum + amount, 0);
-    for (const [key, amount] of allocations) {
-      const supplierId = key.split("::")[1];
-      const supplierRow = supplierRows.get(supplierId);
-      if (supplierRow) supplierRow.consumedSalesCost += paidTotal > 0 ? productRow.consumedSalesCost * amount / paidTotal : 0;
+    if (!linkedCostProducts.has(productRow.productId)) {
+      const paidTotal = allocations.reduce((sum, [, amount]) => sum + amount, 0);
+      for (const [key, amount] of allocations) {
+        const supplierId = key.split("::")[1];
+        const supplierRow = supplierRows.get(supplierId);
+        if (supplierRow) supplierRow.consumedSalesCost += paidTotal > 0 ? productRow.consumedSalesCost * amount / paidTotal : 0;
+      }
     }
     productRow.rawInventoryFunds = productRow.actualPaid - productRow.consumedSalesCost;
     productRow.adjustedInventoryFunds = productRow.rawInventoryFunds + productRow.adjustmentAmount;
@@ -278,6 +303,7 @@ export function parseInventoryImportRows(rows = [], { products = [], suppliers =
 
     const supplierValue = cleanText(firstValue(row, ["供应商编码", "供应商", "supplierCode"]));
     const supplier = supplierByCode.get(supplierValue);
+    const inventoryAmountValue = firstValue(row, ["库存金额", "盘点金额", "inventoryAmount"]);
     validRows.push({
       id: uniqueId("inventory"),
       productId: product.id,
@@ -286,7 +312,7 @@ export function parseInventoryImportRows(rows = [], { products = [], suppliers =
       countedQuantity,
       erpQuantity,
       quantityVariance: roundMoney(countedQuantity - erpQuantity),
-      inventoryAmount: roundMoney(firstValue(row, ["库存金额", "盘点金额", "inventoryAmount"])),
+      inventoryAmount: cleanText(inventoryAmountValue) ? roundMoney(inventoryAmountValue) : null,
       sourceRow: rowNumber
     });
   });
