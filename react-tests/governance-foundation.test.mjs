@@ -49,6 +49,11 @@ test("handbook, product, and platform source documents are present", () => {
 
 test("governance checker accepts the repository and rejects incomplete feature docs", async () => {
   const { checkProjectGovernance, REQUIRED_REPOSITORY_FILES } = await import("../scripts/check-project-governance.mjs");
+  for (const skill of ["feature-workflow", "verification", "platform-capability-review"]) {
+    const path = `.agents/skills/${skill}/SKILL.md`;
+    assert.equal(REQUIRED_REPOSITORY_FILES.includes(path), true, `${path} should be governed`);
+    assert.match(read(path), /AGENTS\.md/);
+  }
   assert.deepEqual(checkProjectGovernance(root).errors, []);
 
   const fixture = resolve(root, ".tmp-governance-fixture");
