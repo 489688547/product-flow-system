@@ -9,6 +9,7 @@ export const REQUIRED_REPOSITORY_FILES = [
   ".agents/skills/feature-workflow/SKILL.md",
   ".agents/skills/verification/SKILL.md",
   ".agents/skills/platform-capability-review/SKILL.md",
+  ".agents/skills/integration-router/SKILL.md",
   "docs/templates/prd.md",
   "docs/templates/design.md",
   "docs/templates/plan.md",
@@ -20,7 +21,8 @@ export const REQUIRED_REPOSITORY_FILES = [
   "docs/platform/middleware.md",
   "docs/platform/api-catalog.md",
   "docs/platform/integrations.md",
-  "docs/platform/error-codes.md"
+  "docs/platform/error-codes.md",
+  "docs/platform/integration-registry.json"
 ];
 
 const REQUIRED_FEATURE_FILES = ["prd.md", "design.md", "plan.md", "tasks.md"];

@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  checkIntegrationImpact,
   loadIntegrationRegistry,
   matchIntegrationPlatforms,
+  parseIntegrationImpact,
   validateIntegrationRegistry
 } from "../scripts/integration-registry.mjs";
 
@@ -84,4 +86,63 @@ test("router keeps ambiguous candidates instead of silently choosing one", () =>
 
   assert.ok(result.direct.length > 1);
   assert.equal(result.ambiguous, true);
+});
+
+test("PR impact parser reads machine-readable fields", () => {
+  assert.deepEqual(parseIntegrationImpact(`
+## 变更
+
+Integration-Impact: dingtalk, cloudflare-pages
+Integration-Impact-Reason: 登录回调由 Pages Functions 承载
+  `), {
+    declaredIds: ["dingtalk", "cloudflare-pages"],
+    reason: "登录回调由 Pages Functions 承载"
+  });
+});
+
+test("impact check accepts complete declarations and rejects missing path coverage", () => {
+  const registry = loadIntegrationRegistry(rootDir);
+  const paths = ["functions/api/auth/dingtalk/callback.js"];
+  const accepted = checkIntegrationImpact(registry, {
+    paths,
+    body: "Integration-Impact: dingtalk, cloudflare-pages, cloudflare-d1\nIntegration-Impact-Reason: 调整登录回调"
+  });
+  assert.deepEqual(accepted.errors, []);
+
+  const rejected = checkIntegrationImpact(registry, {
+    paths,
+    body: "Integration-Impact: cloudflare-pages, cloudflare-d1\nIntegration-Impact-Reason: 调整登录回调"
+  });
+  assert.ok(rejected.errors.some(error => error.includes("dingtalk")));
+});
+
+test("impact check rejects missing declarations, unknown ids, and empty reasons", () => {
+  const registry = loadIntegrationRegistry(rootDir);
+  const paths = ["functions/api/kuaimai/pull.js"];
+
+  assert.ok(checkIntegrationImpact(registry, { paths, body: "" }).errors.some(error => error.includes("Integration-Impact")));
+  assert.ok(checkIntegrationImpact(registry, {
+    paths,
+    body: "Integration-Impact: mystery\nIntegration-Impact-Reason: 新平台"
+  }).errors.some(error => error.includes("mystery")));
+  assert.ok(checkIntegrationImpact(registry, {
+    paths,
+    body: "Integration-Impact: kuaimai, cloudflare-pages"
+  }).errors.some(error => error.includes("Reason")));
+});
+
+test("none is allowed only with a reason and no mandatory path matches", () => {
+  const registry = loadIntegrationRegistry(rootDir);
+  assert.deepEqual(checkIntegrationImpact(registry, {
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: "Integration-Impact: none\nIntegration-Impact-Reason: 仅调整本地说明书布局"
+  }).errors, []);
+  assert.ok(checkIntegrationImpact(registry, {
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: "Integration-Impact: none"
+  }).errors.some(error => error.includes("Reason")));
+  assert.ok(checkIntegrationImpact(registry, {
+    paths: ["functions/api/kuaimai/pull.js"],
+    body: "Integration-Impact: none\nIntegration-Impact-Reason: 没有外部影响"
+  }).errors.some(error => error.includes("kuaimai")));
 });
