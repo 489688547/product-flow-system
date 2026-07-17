@@ -596,13 +596,13 @@ export async function listDingTodoTasks(accessToken, unionId, { isDone = false, 
   let nextToken = "";
   let page = 0;
   do {
-    const query = new URLSearchParams({ isDone: String(Boolean(isDone)) });
-    if (nextToken) query.set("nextToken", nextToken);
+    const body = { isDone: Boolean(isDone) };
+    if (nextToken) body.nextToken = nextToken;
     const result = await requestDingOpenApi(
       accessToken,
-      "GET",
-      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/tasks?${query.toString()}`,
-      null,
+      "POST",
+      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/org/tasks/query`,
+      body,
       fetchImpl
     );
     cards.push(...(Array.isArray(result.todoCards) ? result.todoCards : []));
