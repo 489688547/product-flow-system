@@ -543,15 +543,46 @@ export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fe
   return { ...result, id: todoId, updated: true };
 }
 
+export function isDuplicateTodoSourceError(error) {
+  const text = [error?.message, error?.detail?.message, error?.detail?.errmsg]
+    .filter(Boolean)
+    .join(" ");
+  return /task existed sourceId/i.test(text);
+}
+
+export async function findDingTodoBySourceId(accessToken, unionId, sourceId, fetchImpl = fetch) {
+  const wantedSourceId = String(sourceId || "");
+  if (!wantedSourceId) return null;
+  for (const isDone of [false, true]) {
+    const cards = await listDingTodoTasks(accessToken, unionId, { isDone, fetchImpl });
+    const found = cards.find(card => String(card?.sourceId || "") === wantedSourceId);
+    if (found) return found;
+  }
+  return null;
+}
+
 export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
   if (!Number(input.dueTime)) {
     const err = new Error("请先设置任务截止日期，再同步到钉钉待办。");
     err.status = 400;
     throw err;
   }
-  return input.todoId
-    ? updateDingTodoTask(accessToken, input, fetchImpl)
-    : createDingTodoTask(accessToken, input, fetchImpl);
+  if (input.todoId) return updateDingTodoTask(accessToken, input, fetchImpl);
+  try {
+    return await createDingTodoTask(accessToken, input, fetchImpl);
+  } catch (error) {
+    if (!isDuplicateTodoSourceError(error)) throw error;
+    const existing = await findDingTodoBySourceId(
+      accessToken,
+      input.creatorUnionId,
+      input.sourceId,
+      fetchImpl
+    );
+    const todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
+    if (!todoId) throw error;
+    const updated = await updateDingTodoTask(accessToken, { ...input, todoId }, fetchImpl);
+    return { ...updated, recovered: true };
+  }
 }
 
 export async function listDingTodoTasks(accessToken, unionId, { isDone = false, fetchImpl = fetch } = {}) {
