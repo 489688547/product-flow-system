@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   checkRuleWriteback,
   checkIntegrationImpact,
+  isIntegrationCodePath,
   loadIntegrationRegistry,
   matchIntegrationPlatforms,
   parseIntegrationImpact,
@@ -106,6 +107,15 @@ test("router keeps ambiguous candidates instead of silently choosing one", () =>
 
   assert.ok(result.direct.length > 1);
   assert.equal(result.ambiguous, true);
+});
+
+test("integration content routing ignores generated Pages assets but keeps source code", () => {
+  assert.equal(isIntegrationCodePath("assets/HandbookPage-QWj1s2m5.js"), false);
+  assert.equal(isIntegrationCodePath("assets/index-DJmNTJZv.js"), false);
+  assert.equal(isIntegrationCodePath("react-tests/integration-routing.test.mjs"), false);
+  assert.equal(isIntegrationCodePath("tests/deployed-readiness.test.mjs"), false);
+  assert.equal(isIntegrationCodePath("src/features/handbook/HandbookPage.jsx"), true);
+  assert.equal(isIntegrationCodePath("functions/api/platform/v1/example.js"), true);
 });
 
 test("PR impact parser reads machine-readable fields", () => {

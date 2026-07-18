@@ -187,10 +187,20 @@ export function parseIntegrationImpact(body = "") {
   return { declaredIds, reason: reasonMatch?.[1]?.trim() || "" };
 }
 
+export function isIntegrationCodePath(path = "") {
+  const normalized = String(path).trim();
+  return !normalized.startsWith("docs/")
+    && !normalized.startsWith("assets/")
+    && !normalized.startsWith("tests/")
+    && !normalized.startsWith("react-tests/")
+    && /\.(?:[cm]?[jt]sx?|json|ya?ml)$/.test(normalized);
+}
+
 const SHARED_BOUNDARY_PATHS = [
   /^functions\/api\/platform\//,
   /^server\/productionData/,
   /^scripts\/check-deployed-readiness\.mjs$/,
+  /^scripts\/(?:integration-registry|check-integration-impact)\.mjs$/,
   /(?:^|\/)migrations?\//,
   /(?:^|\/)schema\.sql$/,
   /^docs\/platform\/(?:environment-capabilities|integration-registry)\.json$/,

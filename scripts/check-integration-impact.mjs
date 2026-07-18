@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import {
   checkRuleWriteback,
   checkIntegrationImpact,
+  isIntegrationCodePath,
   loadIntegrationRegistry,
   matchIntegrationPlatforms,
   validateIntegrationRegistry
@@ -27,7 +28,7 @@ function changedPaths(baseSha, headSha) {
 }
 
 function changedCode(baseSha, headSha, paths) {
-  const codePaths = paths.filter(path => !path.startsWith("docs/") && /\.(?:[cm]?[jt]sx?|json|ya?ml)$/.test(path));
+  const codePaths = paths.filter(isIntegrationCodePath);
   if (!codePaths.length) return "";
   return execFileSync("git", ["diff", "--unified=0", "--no-color", `${baseSha}...${headSha}`, "--", ...codePaths], {
     cwd: rootDir,
