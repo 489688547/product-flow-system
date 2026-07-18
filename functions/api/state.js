@@ -29,7 +29,7 @@ async function ensureStateTable(db) {
   )`).run();
 }
 
-function splitUtf8(value, maxBytes = MAX_PART_BYTES) {
+export function splitUtf8(value, maxBytes = MAX_PART_BYTES) {
   const encoder = new TextEncoder();
   const bytes = encoder.encode(value);
   if (bytes.byteLength <= maxBytes) return [value];
@@ -85,7 +85,7 @@ function validateStatePayload(state) {
   }
 }
 
-async function readCompanyState(db) {
+export async function readCompanyState(db) {
   await ensureStateTable(db);
   const partResult = await db.prepare(`SELECT part_key, part_index, payload, updated_at, updated_by
     FROM product_flow_state_parts WHERE state_id = ? ORDER BY part_key, part_index`)
@@ -113,7 +113,7 @@ async function readCompanyState(db) {
   };
 }
 
-async function writeCompanyState(db, state, updatedBy = "") {
+export async function writeCompanyState(db, state, updatedBy = "") {
   validateStatePayload(state);
   await ensureStateTable(db);
   const updatedAt = new Date().toISOString();

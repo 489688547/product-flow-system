@@ -374,6 +374,41 @@ test("API middleware keeps login bootstrap routes public", async () => {
   assert.equal(await response.text(), "public");
 });
 
+test("API middleware attaches an employee session on alternate token-auth routes", async () => {
+  const db = createAuthD1Mock();
+  const created = await createSession(identity, "browser", { PRODUCT_FLOW_DB: db });
+  const context = {
+    request: new Request("https://flow.example.com/api/platform/v1/environment-readiness", {
+      headers: { cookie: created.cookie }
+    }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: {},
+    next: async () => Response.json({ ok: true })
+  };
+
+  const response = await apiMiddleware(context);
+  assert.equal(response.status, 200);
+  assert.equal(context.data.session.name, "周荣庆");
+});
+
+test("API middleware allows bearer-token routes to authorize inside their handler", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/platform/v1/environment-readiness", {
+      headers: { authorization: "Bearer personal-token" }
+    }),
+    env: { PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(continued, true);
+});
+
 test("readonly sessions cannot write shared company state", async () => {
   const response = await stateRequest({
     request: new Request("https://flow.example.com/api/state", {

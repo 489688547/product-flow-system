@@ -20,10 +20,10 @@ test("DingTalk todo list uses the requested union id and paginates", async () =>
   });
 
   assert.deepEqual(todos.map(item => item.taskId), ["d1", "d2"]);
-  assert.match(calls[0].url, /\/v1\.0\/todo\/users\/union-zhou\/tasks/);
-  assert.match(calls[0].url, /isDone=true/);
-  assert.match(calls[1].url, /nextToken=next-1/);
-  assert.equal(calls.every(call => call.options.method === "GET"), true);
+  assert.match(calls[0].url, /\/v1\.0\/todo\/users\/union-zhou\/org\/tasks\/query$/);
+  assert.deepEqual(JSON.parse(calls[0].options.body), { isDone: true });
+  assert.deepEqual(JSON.parse(calls[1].options.body), { isDone: true, nextToken: "next-1" });
+  assert.equal(calls.every(call => call.options.method === "POST"), true);
 });
 
 test("DingTalk todo list rejects missing identity", async () => {
@@ -36,7 +36,7 @@ test("todo list endpoint ignores client identity and queries the signed-in user"
   globalThis.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
     if (String(url).includes("/gettoken")) return okJson({ errcode: 0, access_token: "access-token" });
-    const done = String(url).includes("isDone=true");
+    const done = JSON.parse(options.body || "{}").isDone === true;
     return okJson({ todoCards: [{ taskId: done ? "done-1" : "pending-1", isDone: done }], nextToken: "" });
   };
   try {
@@ -51,7 +51,8 @@ test("todo list endpoint ignores client identity and queries the signed-in user"
     assert.deepEqual(body.todos.map(item => item.taskId).sort(), ["done-1", "pending-1"]);
     const todoCalls = calls.filter(call => call.url.includes("/v1.0/todo/"));
     assert.equal(todoCalls.length, 2);
-    assert.equal(todoCalls.every(call => call.url.includes("/users/union-session/tasks")), true);
+    assert.equal(todoCalls.every(call => call.url.includes("/users/union-session/org/tasks/query")), true);
+    assert.equal(todoCalls.every(call => call.options.method === "POST"), true);
     assert.equal(todoCalls.some(call => call.url.includes("union-attacker")), false);
   } finally {
     globalThis.fetch = originalFetch;

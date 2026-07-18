@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isLoopbackAddress, readDwsTodoPreview } from "./server/dwsTodoPreview.mjs";
+import { createProductionDataClient } from "./server/productionDataClient.mjs";
 import {
   buildConfigResponse,
   createDingCalendarEvent,
@@ -32,8 +33,13 @@ const PORT = Number(process.env.DINGTALK_PORT || 8127);
 const LOCAL_DATA_DIR = path.join(__dirname, ".local-data");
 const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 let orgCache = null;
+let productionDataClient;
 
 loadDotEnv();
+productionDataClient = createProductionDataClient({
+  apiUrl: process.env.PRODUCTION_DATA_API_URL || "https://product-flow-system.pages.dev",
+  accessToken: process.env.PRODUCTION_DATA_ACCESS_TOKEN || ""
+});
 
 function loadDotEnv() {
   const envPath = path.join(__dirname, ".env");
@@ -51,7 +57,7 @@ function json(res, status, body) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
     "access-control-allow-headers": "content-type"
   });
   res.end(JSON.stringify(body));
@@ -141,6 +147,24 @@ async function handleKuaimaiPull(res, url) {
 
 async function handleState(req, res) {
   try {
+    if (productionDataClient.configured) {
+      if (req.method === "GET") {
+        json(res, 200, await productionDataClient.readState());
+        return;
+      }
+      if (req.method !== "POST") {
+        json(res, 405, { message: "Method not allowed" });
+        return;
+      }
+      const body = await readBody(req);
+      const message = validateCompanyState(body.state);
+      if (message) {
+        json(res, 400, { synced: false, message });
+        return;
+      }
+      json(res, 200, await productionDataClient.writeState(body));
+      return;
+    }
     if (req.method === "GET") {
       const stored = await readLocalCompanyState();
       json(res, 200, stored ? { synced: true, ...stored } : { synced: false, state: null });
@@ -167,8 +191,86 @@ async function handleState(req, res) {
     await writeFile(LOCAL_STATE_PATH, JSON.stringify(payload, null, 2));
     json(res, 200, { synced: true, version: payload.version, updatedAt });
   } catch (error) {
-    json(res, 500, { synced: false, message: error.message || "公司共享数据同步失败。" });
+    json(res, error.status || 500, { synced: false, message: error.message || "公司共享数据同步失败。", error: { code: error.code || "STATE_SYNC_FAILED" } });
   }
+}
+
+async function handleProductionWriteSession(req, res) {
+  try {
+    if (!productionDataClient.configured) {
+      json(res, 200, productionDataClient.status());
+      return;
+    }
+    if (req.method === "GET") {
+      json(res, 200, productionDataClient.status());
+      return;
+    }
+    if (req.method === "DELETE") {
+      json(res, 200, await productionDataClient.lock());
+      return;
+    }
+    if (req.method === "POST") {
+      json(res, 200, await productionDataClient.unlock(await readBody(req)));
+      return;
+    }
+    json(res, 405, { message: "Method not allowed" });
+  } catch (error) {
+    json(res, error.status || 500, { allowed: false, unlocked: false, message: error.message || "生产写入授权失败。", error: { code: error.code || "PRODUCTION_ACCESS_FAILED" } });
+  }
+}
+
+async function handleEnvironmentReadiness(res) {
+  if (!productionDataClient.configured) {
+    json(res, 200, {
+      environment: "development",
+      ready: false,
+      checkedAt: new Date().toISOString(),
+      capabilities: [{
+        id: "local-production-data",
+        name: "本地生产数据连接",
+        description: "本地服务通过个人令牌连接生产数据网关。",
+        level: "blocking",
+        status: "blocked",
+        missing: ["PRODUCTION_DATA_ACCESS_TOKEN"]
+      }],
+      dataAccess: productionDataClient.status(),
+      audit: []
+    });
+    return;
+  }
+  try {
+    const [production, state] = await Promise.all([productionDataClient.readiness(), productionDataClient.readState()]);
+    json(res, 200, {
+      ...production,
+      environment: "development",
+      productionEnvironment: production.environment,
+      dataAccess: productionDataClient.status(),
+      audit: state.audit || []
+    });
+  } catch (error) {
+    json(res, error.status || 500, { ready: false, message: error.message || "生产环境状态读取失败。", error: { code: error.code || "ENVIRONMENT_READINESS_FAILED" } });
+  }
+}
+
+async function handleProductionRollback(req, res) {
+  try {
+    if (req.method !== "POST") {
+      json(res, 405, { message: "Method not allowed" });
+      return;
+    }
+    const body = await readBody(req);
+    json(res, 200, await productionDataClient.rollback(body.auditId, body.confirmation));
+  } catch (error) {
+    json(res, error.status || 500, { synced: false, message: error.message || "生产数据回滚失败。", error: { code: error.code || "PRODUCTION_ROLLBACK_FAILED" } });
+  }
+}
+
+function blockExternalAction(res) {
+  json(res, 409, {
+    synced: false,
+    message: "测试环境只允许修改数据库，不能执行真实外部平台操作。",
+    error: { code: "EXTERNAL_ACTION_DISABLED_IN_TEST" }
+  });
 }
 
 async function handleDingLogin(req, res) {
@@ -402,6 +504,18 @@ const server = http.createServer(async (req, res) => {
     await handleState(req, res);
     return;
   }
+  if (url.pathname === "/api/platform/v1/production-write-session") {
+    await handleProductionWriteSession(req, res);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/environment-readiness" && req.method === "GET") {
+    await handleEnvironmentReadiness(res);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/production-data/rollback") {
+    await handleProductionRollback(req, res);
+    return;
+  }
   if (url.pathname === "/api/sales") {
     json(res, 501, { synced: false, message: "本地测试模式没有 D1 数据库，销售数据将保存在浏览器本地。" });
     return;
@@ -411,7 +525,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/kuaimai/refresh" && req.method === "POST") {
-    await handleKuaimaiRefresh(res);
+    blockExternalAction(res);
     return;
   }
   if (url.pathname === "/api/kuaimai/pull" && req.method === "GET") {
@@ -435,15 +549,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/create" && req.method === "POST") {
-    await handleDingTodoCreate(req, res);
+    blockExternalAction(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/sync" && req.method === "POST") {
-    await handleDingTodoSync(req, res);
+    blockExternalAction(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/create" && req.method === "POST") {
-    await handleDingCalendarCreate(req, res);
+    blockExternalAction(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/events" && req.method === "POST") {

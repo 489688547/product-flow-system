@@ -43,6 +43,8 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 - Existing APIs remain internal until their contract is documented. New multi-system APIs use `/api/platform/v1/...`.
 - API changes document authentication, authorization, request, response, errors, compatibility, deprecation, observability, and contract tests.
 - Database or persisted-state changes require migration, backwards compatibility, capacity impact, and rollback notes.
+- Environment or provider configuration changes must update `docs/platform/environment-capabilities.json`, regenerate platform modules, and pass `npm run check:environment-capabilities` in the same pull request.
+- A reusable component, middleware, skill, API, integration or environment rule discovered during feature work must be written back to `AGENTS.md`, `docs/platform/`, the integration registry or an ADR before merge; feature-only notes are not a durable rule.
 
 ## Security and external systems
 
@@ -53,6 +55,7 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 - Company documents remain behind the existing authenticated application boundary even when all employees may view them.
 - Validate authorization on the server; hidden UI is not an authorization boundary.
 - Keep local preview, Cloudflare deployment, DingTalk embedded WebView, and external-provider verification separate.
+- Local tests may read production data only through the server-side production data gateway. Cross-environment writes require a hashed personal token, active executive identity, 15-minute unlock, version check, snapshot and audit. Database write access never implies external-provider action access.
 - Do not publish, deploy, send DingTalk actions, or change remote repository settings without the required authorization.
 
 ## Definition of done
@@ -63,6 +66,7 @@ Run all of the following from the repository root:
 npm run lint
 npm run check:governance
 npm run check:integrations
+npm run check:environment-capabilities
 npm test
 npm run build
 ```

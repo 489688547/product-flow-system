@@ -25,5 +25,6 @@ jobs:
       - run: npm run lint
       - run: npm run check:governance
       - run: npm run check:integrations
+      - run: npm run check:environment-capabilities
       - run: npm test
       - run: npm run build

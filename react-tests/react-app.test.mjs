@@ -9,7 +9,7 @@ const read = path => readFileSync(resolve(root, path), "utf8");
 test("project uses React Vite and Tailwind v4 as the new frontend foundation", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(pkg.scripts.dev, "vite --host 127.0.0.1 --port 8132");
-  assert.equal(pkg.scripts.build, "vite build && node scripts/check-build-chunks.mjs");
+  assert.equal(pkg.scripts.build, "npm run check:environment-capabilities && vite build && node scripts/check-build-chunks.mjs");
   assert.equal(pkg.scripts["test:react"], "node --test react-tests/*.test.mjs");
   assert.match(pkg.scripts.test, /test:react/);
   assert.match(pkg.scripts.test, /test:api/);
@@ -43,11 +43,11 @@ test("domain model keeps product-flow rules independent from React components", 
   assert.match(domain, /export function stagePolicy/);
 });
 
-test("shared state layer uses the production company state API during local preview", async () => {
+test("shared state layer uses the same-origin production data proxy during local preview", async () => {
   const store = read("src/state/ProductFlowProvider.jsx");
   const api = await import("../src/state/stateApi.js");
-  assert.equal(api.sharedStateApiUrl("127.0.0.1"), "https://product-flow-system.pages.dev/api/state");
-  assert.equal(api.sharedStateApiUrl("localhost"), "https://product-flow-system.pages.dev/api/state");
+  assert.equal(api.sharedStateApiUrl("127.0.0.1"), "/api/state");
+  assert.equal(api.sharedStateApiUrl("localhost"), "/api/state");
   assert.equal(api.sharedStateApiUrl("product-flow-system.pages.dev"), "/api/state");
   assert.match(store, /sharedStateApiUrl\(window\.location\.hostname\)/);
   assert.doesNotMatch(store, /fetch\("\/api\/state"\)/);

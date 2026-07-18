@@ -514,8 +514,10 @@ export async function createDingTodoTask(accessToken, input = {}, fetchImpl = fe
 
 export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
   const creatorUnionId = String(input.creatorUnionId || "");
+  const resourceUnionId = String(input.resourceUnionId || creatorUnionId);
+  const operatorUnionId = String(input.operatorUnionId || creatorUnionId);
   const todoId = String(input.todoId || "");
-  if (!creatorUnionId || !todoId) {
+  if (!resourceUnionId || !operatorUnionId || !todoId) {
     const err = new Error("缺少钉钉创建人 unionId 或待办 ID，无法更新待办。");
     err.status = 400;
     throw err;
@@ -536,7 +538,7 @@ export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fe
   const result = await requestDingOpenApi(
     accessToken,
     "PUT",
-    `/v1.0/todo/users/${encodeURIComponent(creatorUnionId)}/tasks/${encodeURIComponent(todoId)}?operatorId=${encodeURIComponent(creatorUnionId)}`,
+    `/v1.0/todo/users/${encodeURIComponent(resourceUnionId)}/tasks/${encodeURIComponent(todoId)}?operatorId=${encodeURIComponent(operatorUnionId)}`,
     body,
     fetchImpl
   );
@@ -556,7 +558,7 @@ export async function findDingTodoBySourceId(accessToken, unionId, sourceId, fet
   for (const isDone of [false, true]) {
     const cards = await listDingTodoTasks(accessToken, unionId, { isDone, fetchImpl });
     const found = cards.find(card => String(card?.sourceId || "") === wantedSourceId);
-    if (found) return found;
+    if (found) return { ...found, resourceUnionId: unionId };
   }
   return null;
 }
@@ -572,15 +574,47 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
     return await createDingTodoTask(accessToken, input, fetchImpl);
   } catch (error) {
     if (!isDuplicateTodoSourceError(error)) throw error;
-    const existing = await findDingTodoBySourceId(
-      accessToken,
+    const recoveryUnionIds = [...new Set([
       input.creatorUnionId,
-      input.sourceId,
-      fetchImpl
-    );
-    const todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
-    if (!todoId) throw error;
-    const updated = await updateDingTodoTask(accessToken, { ...input, todoId }, fetchImpl);
+      ...(input.executorUnionIds || []),
+      ...(input.recoveryUnionIds || [])
+    ].map(value => String(value || "").trim()).filter(Boolean))].slice(0, 10);
+    const findAcrossRecoveryUsers = async sourceId => {
+      for (const unionId of recoveryUnionIds) {
+        const found = await findDingTodoBySourceId(accessToken, unionId, sourceId, fetchImpl);
+        if (found) return found;
+      }
+      return null;
+    };
+    let existing = await findAcrossRecoveryUsers(input.sourceId);
+    let todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
+    if (!todoId) {
+      const replacementSourceId = `${String(input.sourceId || "")}:r1`;
+      try {
+        const replacement = await createDingTodoTask(accessToken, {
+          ...input,
+          sourceId: replacementSourceId
+        }, fetchImpl);
+        return {
+          ...replacement,
+          sourceId: replacementSourceId,
+          recovered: true,
+          replacedOrphanedSource: true
+        };
+      } catch (replacementError) {
+        if (!isDuplicateTodoSourceError(replacementError)) throw replacementError;
+        existing = await findAcrossRecoveryUsers(replacementSourceId);
+        todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
+        if (!todoId) throw replacementError;
+      }
+    }
+    const resourceUnionId = String(existing.creatorId || existing.resourceUnionId || input.creatorUnionId || "");
+    const updated = await updateDingTodoTask(accessToken, {
+      ...input,
+      todoId,
+      resourceUnionId,
+      operatorUnionId: resourceUnionId
+    }, fetchImpl);
     return { ...updated, recovered: true };
   }
 }
@@ -596,13 +630,13 @@ export async function listDingTodoTasks(accessToken, unionId, { isDone = false, 
   let nextToken = "";
   let page = 0;
   do {
-    const query = new URLSearchParams({ isDone: String(Boolean(isDone)) });
-    if (nextToken) query.set("nextToken", nextToken);
+    const body = { isDone: Boolean(isDone) };
+    if (nextToken) body.nextToken = nextToken;
     const result = await requestDingOpenApi(
       accessToken,
-      "GET",
-      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/tasks?${query.toString()}`,
-      null,
+      "POST",
+      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/org/tasks/query`,
+      body,
       fetchImpl
     );
     cards.push(...(Array.isArray(result.todoCards) ? result.todoCards : []));
