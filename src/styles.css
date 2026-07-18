@@ -1329,6 +1329,19 @@ main { min-width: 0; overflow-x: hidden; }
 /* Supply chain App: dense, exception-first operational workbench */
 .supply-chain-app { gap: var(--space-3); }
 .supply-work-grid { min-width: 0; display: grid; gap: var(--space-3); }
+.supply-flat-workspace { min-width: 0; display: grid; gap: var(--space-2); }
+.supply-workspace-toolbar { min-height: var(--control-height); display: flex; align-items: center; justify-content: flex-end; }
+.supplier-category { white-space: nowrap; word-break: keep-all; }
+.supplier-table .data-table th:nth-child(1), .supplier-table .data-table td:nth-child(1) { min-width: 150px; }
+.supplier-table .data-table th:nth-child(2), .supplier-table .data-table td:nth-child(2) { width: 72px; min-width: 72px; white-space: nowrap; word-break: keep-all; }
+.supplier-table .data-table th:nth-child(3), .supplier-table .data-table td:nth-child(3) { min-width: 360px; line-height: 1.6; }
+.supplier-table .data-table th:nth-child(4), .supplier-table .data-table td:nth-child(4) { min-width: 150px; }
+.supplier-table .data-table th:nth-child(5), .supplier-table .data-table td:nth-child(5) { min-width: 100px; }
+.supplier-table .data-table th:nth-child(6), .supplier-table .data-table td:nth-child(6),
+.supplier-table .data-table th:nth-child(7), .supplier-table .data-table td:nth-child(7) { min-width: 112px; white-space: nowrap; }
+.supplier-table .data-table th:nth-child(8), .supplier-table .data-table td:nth-child(8) { min-width: 178px; }
+.supplier-table .data-table th:nth-child(9), .supplier-table .data-table td:nth-child(9) { min-width: 90px; }
+.supplier-table .data-table tbody td { vertical-align: top; }
 .supply-metric-strip { min-width: 0; display: grid; grid-template-columns: repeat(5, minmax(160px, 1fr)); overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
 .supply-metric-strip > div { min-width: 170px; min-height: 72px; padding: 10px var(--space-3); display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: center; gap: 8px; border-right: 1px solid var(--border); }
 .supply-metric-strip > div:last-child { border-right: 0; }

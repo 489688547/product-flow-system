@@ -26,8 +26,8 @@ export function SupplierWorkspace({ summary, canEdit }) {
   }
   const columns = [
     { key: "name", header: "供应商", render: row => <span><strong>{row.name}</strong><small className="table-secondary">{row.code || "未设置编码"}</small></span> },
-    { key: "category", header: "类别", render: row => row.category || "—" },
-    { key: "scope", header: "供货范围", render: row => <span>{row.supplyScope || "—"}<small className="table-secondary">{row.dataSource === "dingtalk-folder" ? "来自钉钉供应链文件夹" : ""}</small></span> },
+    { key: "category", header: "类别", render: row => <span className="supplier-category">{row.category || "—"}</span> },
+    { key: "scope", header: "供货范围", render: row => row.supplyScope || "—" },
     { key: "contact", header: "联系人", render: row => [row.contactName, row.contactPhone].filter(Boolean).join(" · ") || "—" },
     { key: "payment", header: "账期", render: row => row.paymentTerms || "—" },
     { key: "paid", header: "累计实付", render: row => money(summaryBySupplier.get(row.id)?.actualPaid) },
@@ -40,9 +40,9 @@ export function SupplierWorkspace({ summary, canEdit }) {
     { key: "actions", header: "操作", render: row => canEdit ? <TableActions><IconAction label="编辑供应商" onClick={() => open(row)}><Pencil size={15} /></IconAction></TableActions> : "—" }
   ];
   return (
-    <section className="section-panel">
-      <div className="section-head"><div><h2>供应商档案与表现</h2><p>统一查看供货类别、资金占用、质量整改和合作状态；敏感收款资料不在此页面保存。</p></div>{canEdit ? <Button variant="primary" onClick={() => open()}><Plus size={16} />新增供应商</Button> : null}</div>
-      <DataTable columns={columns} rows={state.suppliers} minWidth={1280} empty={<div className="empty-state compact-empty">还没有供应商，新增后即可关联产品 BOM 和采购审批。</div>} />
+    <section className="supply-flat-workspace supplier-workspace">
+      {canEdit ? <div className="supply-workspace-toolbar"><Button variant="primary" onClick={() => open()}><Plus size={16} />新增供应商</Button></div> : null}
+      <DataTable className="supplier-table" columns={columns} rows={state.suppliers} minWidth={1400} empty={<div className="empty-state compact-empty">还没有供应商，新增后即可关联产品 BOM 和采购审批。</div>} />
       <Modal title={editing ? "编辑供应商" : "新增供应商"} open={modalOpen} onClose={() => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); }} footer={<><Button onClick={() => { setModalOpen(false); setEditing(null); setForm(EMPTY_FORM); }}>取消</Button><Button variant="primary" disabled={!form.name.trim()} onClick={save}>保存</Button></>}>
         <div className="form-grid supply-form-grid">
           <label>供应商名称<input value={form.name} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} /></label>

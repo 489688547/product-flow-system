@@ -63,10 +63,28 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
   const quality = read("src/features/supply-chain/QualityWorkspace.jsx");
   assert.match(supplier, /collection: "suppliers"/);
   assert.match(supplier, /供货范围/);
-  assert.match(supplier, /来自钉钉供应链文件夹/);
+  assert.doesNotMatch(supplier, /来自钉钉供应链文件夹/);
   assert.match(product, /collection: "productSupplierLinks"/);
   assert.match(quality, /collection: "qualityIssues"/);
   assert.match(quality, /关闭问题/);
+});
+
+test("single-purpose supply workspaces render their primary content without a nested title card", () => {
+  const supplier = read("src/features/supply-chain/SupplierWorkspace.jsx");
+  const product = read("src/features/supply-chain/ProductSupplyWorkspace.jsx");
+  const approval = read("src/features/supply-chain/ApprovalWorkspace.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  const css = read("src/styles.css");
+
+  for (const workspace of [supplier, product, approval]) {
+    assert.match(workspace, /supply-flat-workspace/);
+    assert.doesNotMatch(workspace, /className="section-panel"/);
+  }
+  assert.match(page, /supply-flat-workspace/);
+  assert.doesNotMatch(supplier, /供应商档案与表现/);
+  assert.match(supplier, /supplier-category/);
+  assert.match(css, /\.supplier-category[^}]*white-space:\s*nowrap/);
+  assert.match(css, /\.supplier-table \.data-table th:nth-child\(2\)/);
 });
 
 test("supply chain workbench has stable responsive structure", () => {
