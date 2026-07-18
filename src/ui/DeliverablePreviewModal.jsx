@@ -1,14 +1,16 @@
-import { Download, ExternalLink, FileWarning } from "lucide-react";
+import { Download, ExternalLink, FileWarning, Pencil, Trash2 } from "lucide-react";
 import { canDownloadDeliverable, deliverableKind, isBrokenDeliverable } from "../domain/deliverables.js";
 import { Button } from "./Button.jsx";
 import { Modal } from "./Modal.jsx";
 
-export function DeliverablePreviewModal({ file, onClose }) {
+export function DeliverablePreviewModal({ file, onClose, onEdit, onDelete }) {
   const kind = deliverableKind(file);
   const broken = isBrokenDeliverable(file);
   const canDownload = canDownloadDeliverable(file);
   const footer = (
     <>
+      {onEdit ? <Button onClick={onEdit}><Pencil size={16} />编辑交付物</Button> : null}
+      {onDelete ? <Button className="danger" onClick={onDelete}><Trash2 size={16} />删除交付物</Button> : null}
       {!broken && file?.url ? <a className="btn secondary" href={file.url} target="_blank" rel="noreferrer"><ExternalLink size={16} />新窗口打开</a> : null}
       {!broken && canDownload ? <a className="btn primary" href={file.url} download={file.name}><Download size={16} />下载</a> : null}
       <Button onClick={onClose}>关闭</Button>

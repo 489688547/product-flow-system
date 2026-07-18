@@ -1,15 +1,25 @@
 import { normalizeSkuCodes } from "./salesData.js";
 
 const GMV_SCORE_BANDS = [
-  { max: 300_000, score: 1, label: "＜30万" },
-  { max: 1_000_000, score: 2, label: "30-100万" },
-  { max: 3_000_000, score: 3, label: "100-300万" },
-  { max: 6_000_000, score: 4, label: "300-600万" },
-  { max: Infinity, score: 5, label: "＞600万" }
+  { min: 0, minInclusive: false, max: 300_000, maxInclusive: false, score: 1, label: "＜30万" },
+  { min: 300_000, minInclusive: true, max: 1_000_000, maxInclusive: false, score: 2, label: "30-100万" },
+  { min: 1_000_000, minInclusive: true, max: 3_000_000, maxInclusive: false, score: 3, label: "100-300万" },
+  { min: 3_000_000, minInclusive: true, max: 6_000_000, maxInclusive: true, score: 4, label: "300-600万" },
+  { min: 6_000_000, minInclusive: false, max: Infinity, maxInclusive: false, score: 5, label: "＞600万" }
 ];
 
 function round2(value) {
   return Math.round(value * 100) / 100;
+}
+
+function matchesGmvBand(annualGmv, band) {
+  const aboveMinimum = band.minInclusive ? annualGmv >= band.min : annualGmv > band.min;
+  const belowMaximum = band.max === Infinity
+    ? true
+    : band.maxInclusive
+      ? annualGmv <= band.max
+      : annualGmv < band.max;
+  return aboveMinimum && belowMaximum;
 }
 
 function dateString(value) {
@@ -39,12 +49,16 @@ export function normalizeMonthlyGmvTarget(value) {
   return Number.isFinite(amount) && amount > 0 ? round2(amount) : null;
 }
 
+export function scoreAnnualGmv(value) {
+  const annualGmv = round2(Number(value));
+  if (!Number.isFinite(annualGmv) || annualGmv <= 0) return null;
+  const band = GMV_SCORE_BANDS.find(item => matchesGmvBand(annualGmv, item));
+  return band ? { annualGmv, score: band.score, label: band.label } : null;
+}
+
 export function suggestAnnualGmvScore(monthlyGmvTarget) {
   const monthly = normalizeMonthlyGmvTarget(monthlyGmvTarget);
-  if (!monthly) return null;
-  const annualGmv = round2(monthly * 12);
-  const band = GMV_SCORE_BANDS.find(item => annualGmv < item.max) || GMV_SCORE_BANDS.at(-1);
-  return { annualGmv, score: band.score, label: band.label };
+  return monthly ? scoreAnnualGmv(monthly * 12) : null;
 }
 
 export function buildProductGmvProgress({ product = {}, dailyRows = [], launchDate = "", today = new Date() } = {}) {

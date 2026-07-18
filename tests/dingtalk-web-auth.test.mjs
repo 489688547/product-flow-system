@@ -81,6 +81,20 @@ test("browser login start redirects to DingTalk with a protected callback state"
   assert.match(response.headers.get("set-cookie"), /HttpOnly/);
 });
 
+test("group authorization remembers only a safe same-origin return path", async () => {
+  const response = await startBrowserLogin({
+    request: new Request("https://flow.example.com/api/auth/dingtalk/start?returnTo=%2F%3FproductId%3Dp1%23progress"),
+    env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+  });
+  assert.match(response.headers.get("set-cookie"), /pfs_oauth_return=/);
+
+  const unsafe = await startBrowserLogin({
+    request: new Request("https://flow.example.com/api/auth/dingtalk/start?returnTo=https%3A%2F%2Fevil.example"),
+    env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+  });
+  assert.doesNotMatch(unsafe.headers.get("set-cookie"), /pfs_oauth_return=/);
+});
+
 test("browser OAuth callback rejects a mismatched state", async () => {
   const response = await finishBrowserLogin({
     request: new Request("https://flow.example.com/api/auth/dingtalk/callback?code=auth-code&state=wrong", {

@@ -1,7 +1,7 @@
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET,POST,OPTIONS",
+  "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
   "access-control-allow-headers": "content-type"
 };
 
@@ -347,19 +347,24 @@ function assertEnterpriseEmployee(identity = {}, detail = {}) {
   return identity;
 }
 
-export async function getDingBrowserIdentity(code, env = {}, fetchImpl = fetch) {
+export async function getDingBrowserLogin(code, env = {}, fetchImpl = fetch) {
   const userToken = await getDingUserAccessToken(env, { code }, fetchImpl);
   const current = await getDingCurrentUser(userToken.accessToken, fetchImpl);
   const appToken = await getDingAccessToken(env, fetchImpl);
   const enterprise = await getDingUserByUnionId(appToken, current.unionId || current.unionid, fetchImpl);
   const detail = await getDingUserDetail(appToken, enterprise.userid, fetchImpl);
   const department = await resolveDingDepartmentName(appToken, detail, fetchImpl);
-  return assertEnterpriseEmployee(normalizedSessionIdentity({
+  const identity = assertEnterpriseEmployee(normalizedSessionIdentity({
     corpId: env.DINGTALK_CORP_ID || env.DINGTALK_CORPID || "",
     basic: { ...current, userid: enterprise.userid, unionid: current.unionId || current.unionid },
     detail,
     department
   }), detail);
+  return { identity, userToken };
+}
+
+export async function getDingBrowserIdentity(code, env = {}, fetchImpl = fetch) {
+  return (await getDingBrowserLogin(code, env, fetchImpl)).identity;
 }
 
 export async function getDingEmbeddedIdentity(authCode, corpId, env = {}, fetchImpl = fetch) {
@@ -509,8 +514,10 @@ export async function createDingTodoTask(accessToken, input = {}, fetchImpl = fe
 
 export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
   const creatorUnionId = String(input.creatorUnionId || "");
+  const resourceUnionId = String(input.resourceUnionId || creatorUnionId);
+  const operatorUnionId = String(input.operatorUnionId || creatorUnionId);
   const todoId = String(input.todoId || "");
-  if (!creatorUnionId || !todoId) {
+  if (!resourceUnionId || !operatorUnionId || !todoId) {
     const err = new Error("缺少钉钉创建人 unionId 或待办 ID，无法更新待办。");
     err.status = 400;
     throw err;
@@ -531,11 +538,29 @@ export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fe
   const result = await requestDingOpenApi(
     accessToken,
     "PUT",
-    `/v1.0/todo/users/${encodeURIComponent(creatorUnionId)}/tasks/${encodeURIComponent(todoId)}?operatorId=${encodeURIComponent(creatorUnionId)}`,
+    `/v1.0/todo/users/${encodeURIComponent(resourceUnionId)}/tasks/${encodeURIComponent(todoId)}?operatorId=${encodeURIComponent(operatorUnionId)}`,
     body,
     fetchImpl
   );
   return { ...result, id: todoId, updated: true };
+}
+
+export function isDuplicateTodoSourceError(error) {
+  const text = [error?.message, error?.detail?.message, error?.detail?.errmsg]
+    .filter(Boolean)
+    .join(" ");
+  return /task existed sourceId/i.test(text);
+}
+
+export async function findDingTodoBySourceId(accessToken, unionId, sourceId, fetchImpl = fetch) {
+  const wantedSourceId = String(sourceId || "");
+  if (!wantedSourceId) return null;
+  for (const isDone of [false, true]) {
+    const cards = await listDingTodoTasks(accessToken, unionId, { isDone, fetchImpl });
+    const found = cards.find(card => String(card?.sourceId || "") === wantedSourceId);
+    if (found) return { ...found, resourceUnionId: unionId };
+  }
+  return null;
 }
 
 export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
@@ -544,9 +569,54 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
     err.status = 400;
     throw err;
   }
-  return input.todoId
-    ? updateDingTodoTask(accessToken, input, fetchImpl)
-    : createDingTodoTask(accessToken, input, fetchImpl);
+  if (input.todoId) return updateDingTodoTask(accessToken, input, fetchImpl);
+  try {
+    return await createDingTodoTask(accessToken, input, fetchImpl);
+  } catch (error) {
+    if (!isDuplicateTodoSourceError(error)) throw error;
+    const recoveryUnionIds = [...new Set([
+      input.creatorUnionId,
+      ...(input.executorUnionIds || []),
+      ...(input.recoveryUnionIds || [])
+    ].map(value => String(value || "").trim()).filter(Boolean))].slice(0, 10);
+    const findAcrossRecoveryUsers = async sourceId => {
+      for (const unionId of recoveryUnionIds) {
+        const found = await findDingTodoBySourceId(accessToken, unionId, sourceId, fetchImpl);
+        if (found) return found;
+      }
+      return null;
+    };
+    let existing = await findAcrossRecoveryUsers(input.sourceId);
+    let todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
+    if (!todoId) {
+      const replacementSourceId = `${String(input.sourceId || "")}:r1`;
+      try {
+        const replacement = await createDingTodoTask(accessToken, {
+          ...input,
+          sourceId: replacementSourceId
+        }, fetchImpl);
+        return {
+          ...replacement,
+          sourceId: replacementSourceId,
+          recovered: true,
+          replacedOrphanedSource: true
+        };
+      } catch (replacementError) {
+        if (!isDuplicateTodoSourceError(replacementError)) throw replacementError;
+        existing = await findAcrossRecoveryUsers(replacementSourceId);
+        todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
+        if (!todoId) throw replacementError;
+      }
+    }
+    const resourceUnionId = String(existing.creatorId || existing.resourceUnionId || input.creatorUnionId || "");
+    const updated = await updateDingTodoTask(accessToken, {
+      ...input,
+      todoId,
+      resourceUnionId,
+      operatorUnionId: resourceUnionId
+    }, fetchImpl);
+    return { ...updated, recovered: true };
+  }
 }
 
 export async function listDingTodoTasks(accessToken, unionId, { isDone = false, fetchImpl = fetch } = {}) {
@@ -560,13 +630,13 @@ export async function listDingTodoTasks(accessToken, unionId, { isDone = false, 
   let nextToken = "";
   let page = 0;
   do {
-    const query = new URLSearchParams({ isDone: String(Boolean(isDone)) });
-    if (nextToken) query.set("nextToken", nextToken);
+    const body = { isDone: Boolean(isDone) };
+    if (nextToken) body.nextToken = nextToken;
     const result = await requestDingOpenApi(
       accessToken,
-      "GET",
-      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/tasks?${query.toString()}`,
-      null,
+      "POST",
+      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/org/tasks/query`,
+      body,
       fetchImpl
     );
     cards.push(...(Array.isArray(result.todoCards) ? result.todoCards : []));

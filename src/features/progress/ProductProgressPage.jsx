@@ -4,6 +4,7 @@ import {
   deliverablesForTask,
   hasFormalProductGrading,
   productStagePolicy,
+  orgUsers,
   STAGES,
   taskCategoryActions,
   tasksForProductStage
@@ -57,7 +58,7 @@ function validProgressStage(stage) {
 }
 
 export function ProductProgressPage({ focusStage, onNavigate }) {
-  const { state, loading, currentUser, orgCache, setCurrentProduct, setProductStage, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, addDeliverable, syncTaskTodo, scheduleTaskMeeting, returnProductToDemand } = useProductFlow();
+  const { state, loading, currentUser, orgCache, setCurrentProduct, setProductStage, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, addDeliverable, updateDeliverable, deleteDeliverable, syncTaskTodo, scheduleTaskMeeting, returnProductToDemand } = useProductFlow();
   const selectionInitialized = useRef(false);
   const lastFocusTick = useRef(0);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -68,6 +69,8 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const [deliverableTask, setDeliverableTask] = useState(null);
   const [templateTask, setTemplateTask] = useState(null);
   const [previewDeliverable, setPreviewDeliverable] = useState(null);
+  const [editingDeliverable, setEditingDeliverable] = useState(null);
+  const [deliverableToDelete, setDeliverableToDelete] = useState(null);
   const [gradingOpen, setGradingOpen] = useState(false);
   const [monthlyGmvDraft, setMonthlyGmvDraft] = useState("");
   const [draggedTaskId, setDraggedTaskId] = useState("");
@@ -140,13 +143,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
       : `确认将第 ${selectedStage} 阶段设为当前阶段？`;
     if (window.confirm(message)) setProductStage(selectedProduct.id, selectedStage);
   };
-  const openDeliverable = file => {
-    if (file.type === "richtext") {
-      setPreviewDeliverable(file);
-      return;
-    }
-    if (file.url) window.open(file.url, "_blank", "noopener,noreferrer");
-  };
+  const openDeliverable = file => setPreviewDeliverable(file);
   const handleTaskDrop = (event, targetTaskId) => {
     event.preventDefault();
     if (!draggedTaskId || draggedTaskId === targetTaskId) {
@@ -350,6 +347,17 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           setDeliverableTask(null);
         }}
       />
+      <TaskDeliverableModal
+        open={Boolean(editingDeliverable)}
+        task={state.tasks.find(item => item.id === editingDeliverable?.taskId)}
+        product={selectedProduct}
+        file={editingDeliverable}
+        onClose={() => setEditingDeliverable(null)}
+        onSave={patch => {
+          updateDeliverable(editingDeliverable.id, patch);
+          setEditingDeliverable(null);
+        }}
+      />
       <TaskTemplateModal open={Boolean(templateTask)} task={templateTask} onClose={() => setTemplateTask(null)} />
       <ProductGradingModal
         open={gradingOpen}
@@ -362,7 +370,27 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           if (result.level === "O级储备") onNavigate?.("demands");
         }}
       />
-      <DeliverablePreviewModal file={previewDeliverable} onClose={() => setPreviewDeliverable(null)} />
+      <DeliverablePreviewModal
+        file={previewDeliverable}
+        onClose={() => setPreviewDeliverable(null)}
+        onEdit={() => {
+          setEditingDeliverable(previewDeliverable);
+          setPreviewDeliverable(null);
+        }}
+        onDelete={() => setDeliverableToDelete(previewDeliverable)}
+      />
+      <ConfirmDialog
+        open={Boolean(deliverableToDelete)}
+        title="删除交付物"
+        message={deliverableToDelete ? `确定删除“${deliverableToDelete.name}”？` : ""}
+        description="该交付物会同时从产品进度和资料包移除，删除后无法恢复。"
+        onClose={() => setDeliverableToDelete(null)}
+        onConfirm={() => {
+          deleteDeliverable(deliverableToDelete.id);
+          setDeliverableToDelete(null);
+          setPreviewDeliverable(null);
+        }}
+      />
       <ConfirmDialog
         open={Boolean(taskToDelete)}
         title="删除任务"
@@ -385,7 +413,8 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           detailUrl.searchParams.set("productId", selectedProduct.id);
           detailUrl.searchParams.set("taskId", todoTask.id);
           detailUrl.hash = "progress";
-          const payload = buildTaskTodoPayload({ product: selectedProduct, task: todoTask, creator: currentUser, executors, detailUrl: detailUrl.toString() });
+          const recoveryUsers = orgUsers(orgCache).filter(user => user.name === selectedProduct.productManager);
+          const payload = buildTaskTodoPayload({ product: selectedProduct, task: todoTask, creator: currentUser, executors, recoveryUsers, detailUrl: detailUrl.toString() });
           const snapshot = buildTaskTodoSnapshot(todoTask, payload.executorUnionIds);
           return syncTaskTodo({ taskId: todoTask.id, payload, executors, snapshot });
         }}

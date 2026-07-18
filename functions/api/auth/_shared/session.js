@@ -81,6 +81,13 @@ export async function ensureAuthTables(db) {
     synced_at TEXT NOT NULL,
     PRIMARY KEY (corp_id, user_id)
   )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS product_flow_ding_user_tokens (
+    session_id_hash TEXT PRIMARY KEY,
+    access_ciphertext TEXT NOT NULL,
+    iv TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  )`).run();
 }
 
 export async function upsertOrgMembers(db, org = {}, corpId = "") {
@@ -152,6 +159,7 @@ export async function createSession(identity = {}, loginMode = "browser", env = 
 
   return {
     token,
+    sessionIdHash: idHash,
     cookie: sessionCookie(token),
     session: {
       ...identity,
@@ -159,6 +167,12 @@ export async function createSession(identity = {}, loginMode = "browser", env = 
       expiresAt: expiresAt.toISOString()
     }
   };
+}
+
+export async function getSessionIdHash(request, env = {}) {
+  const token = cookieValue(request, SESSION_COOKIE);
+  if (!token || !authDatabase(env)) return "";
+  return hashToken(token);
 }
 
 export async function readSession(request, env = {}) {

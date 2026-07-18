@@ -1,4 +1,4 @@
-# Repository Governance Foundation Implementation Plan
+# 项目治理基础实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -37,7 +37,7 @@
 - Consumes: Approved design at `docs/superpowers/specs/2026-07-17-platform-handbook-design.md`.
 - Produces: Stable repository instructions and six reusable document templates required by later governance checks.
 
-- [ ] **Step 1: Write failing repository-contract tests**
+- [x] **Step 1: Write failing repository-contract tests**
 
 Create `react-tests/governance-foundation.test.mjs` with assertions that:
 
@@ -70,13 +70,13 @@ test("repository provides complete feature and platform templates", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify missing-template failures**
+- [x] **Step 2: Run the test and verify missing-template failures**
 
 Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: FAIL because `docs/templates/prd.md` does not exist and `AGENTS.md` lacks the required sections.
 
-- [ ] **Step 3: Expand `AGENTS.md` into the repository contract**
+- [x] **Step 3: Expand `AGENTS.md` into the repository contract**
 
 Preserve the imported heading and add exact sections covering:
 
@@ -103,7 +103,7 @@ Run `npm run lint`, `npm run check:governance`, `npm test`, and `npm run build`.
 
 Also document: no direct pushes as the intended GitHub policy, no secrets in docs, API contract/version requirements, data migration/rollback requirements, and the rule that existing user changes are never overwritten.
 
-- [ ] **Step 4: Create the six concrete templates**
+- [x] **Step 4: Create the six concrete templates**
 
 Each template must contain actionable Chinese headings and no unfinished-marker words:
 
@@ -114,13 +114,13 @@ Each template must contain actionable Chinese headings and no unfinished-marker 
 - `adr.md`: status, context, decision, alternatives, consequences, compatibility, superseded decisions.
 - `api-contract.md`: owner, consumers, method/path/version, auth/permissions, request, response, error codes, idempotency, pagination, timeout/retry/rate limit, observability, compatibility/deprecation, contract tests.
 
-- [ ] **Step 5: Run the repository-contract test**
+- [x] **Step 5: Run the repository-contract test**
 
 Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: 2 tests pass, 0 fail.
 
-- [ ] **Step 6: Commit repository rules and templates**
+- [x] **Step 6: Commit repository rules and templates**
 
 ```bash
 git add AGENTS.md docs/templates react-tests/governance-foundation.test.mjs
@@ -149,7 +149,7 @@ git commit -m "docs: establish repository governance contract"
 - Consumes: Existing `PRODUCT.md`, `DESIGN.md`, `src/App.jsx`, `src/domain/permissions.js`, `src/ui`, `functions/api`, and the approved design.
 - Produces: Versioned Markdown sources that the later handbook UI imports explicitly.
 
-- [ ] **Step 1: Add failing source-document assertions**
+- [x] **Step 1: Add failing source-document assertions**
 
 Extend the governance test with:
 
@@ -177,13 +177,13 @@ test("handbook, product, and platform source documents are present", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify missing-document failures**
+- [x] **Step 2: Run the focused test and verify missing-document failures**
 
 Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: FAIL in `handbook, product, and platform source documents are present`.
 
-- [ ] **Step 3: Write the four employee handbook documents**
+- [x] **Step 3: Write the four employee handbook documents**
 
 Use clear employee-facing language:
 
@@ -194,13 +194,13 @@ Use clear employee-facing language:
 
 Each file begins with one H1 and a short summary paragraph; avoid internal implementation jargon.
 
-- [ ] **Step 4: Write the three durable product documents**
+- [x] **Step 4: Write the three durable product documents**
 
 - `core-workflows.md`: demand collection -> review/discussion -> planning -> development stages -> launch -> archive/review, including stage gates and deliverables.
 - `roles-and-permissions.md`: 总经办, 产品部, operations/brand/supply chain/customer service/finance responsibilities, navigation visibility, view/edit distinction.
 - `data-definitions.md`: demand, product, product manager, stage, task, deliverable, expected launch month, sales reporting time dimension, and the default exclusion of `其它` from normal channel analysis.
 
-- [ ] **Step 5: Write the six platform documents from current code**
+- [x] **Step 5: Write the six platform documents from current code**
 
 - `architecture.md`: current React/domain/state/Cloudflare Functions/D1/external-provider flow and dependency direction.
 - `components.md`: inventory `Button`, `IconAction`, `Modal`, `ConfirmDialog`, `DataTable`, `HeaderFilter`, `DatePickerField`, `ProductPicker`, `OrgSelect`, and `RichTextEditor`; record states and reuse rules.
@@ -209,13 +209,13 @@ Each file begins with one H1 and a short summary paragraph; avoid internal imple
 - `integrations.md`: DingTalk, Kuaimai, ERP/sales imports, Cloudflare Pages/D1 boundaries and failure ownership.
 - `error-codes.md`: define the common envelope `{ error: { code, message, requestId, retryable } }`, code prefixes `AUTH_`, `PERMISSION_`, `VALIDATION_`, `STATE_`, `DINGTALK_`, `KUAIMAI_`, `INTERNAL_`, and the rule that existing endpoints migrate incrementally.
 
-- [ ] **Step 6: Run the focused governance test**
+- [x] **Step 6: Run the focused governance test**
 
 Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: 3 tests pass, 0 fail.
 
-- [ ] **Step 7: Commit the documentation source foundation**
+- [x] **Step 7: Commit the documentation source foundation**
 
 ```bash
 git add docs/handbook docs/product docs/platform react-tests/governance-foundation.test.mjs
@@ -233,7 +233,7 @@ git commit -m "docs: add handbook and platform sources"
 - Consumes: Required repository contract and document paths from Tasks 1-2.
 - Produces: `checkProjectGovernance(rootDir)` returning `{ errors: string[] }`; CLI exits 1 when errors exist and 0 otherwise; npm command `check:governance`.
 
-- [ ] **Step 1: Add failing checker tests**
+- [x] **Step 1: Add failing checker tests**
 
 Extend the test file:
 
@@ -267,13 +267,13 @@ test("governance checker accepts the repository and rejects incomplete feature d
 
 Add `mkdirSync`, `writeFileSync`, and `rmSync` to the existing `node:fs` import, and add `dirname` to the existing `node:path` import.
 
-- [ ] **Step 2: Run the test and verify the missing-module failure**
+- [x] **Step 2: Run the test and verify the missing-module failure**
 
 Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `scripts/check-project-governance.mjs`.
 
-- [ ] **Step 3: Implement the offline governance checker**
+- [x] **Step 3: Implement the offline governance checker**
 
 Implement:
 
@@ -308,7 +308,7 @@ export function checkProjectGovernance(rootDir) {
 
 The CLI path prints `治理检查通过。` on success. On failure it prints `治理检查失败：` followed by one `- <message>` line per error and sets `process.exitCode = 1`.
 
-- [ ] **Step 4: Add the npm command**
+- [x] **Step 4: Add the npm command**
 
 Add to `package.json` scripts:
 
@@ -316,13 +316,13 @@ Add to `package.json` scripts:
 "check:governance": "node scripts/check-project-governance.mjs"
 ```
 
-- [ ] **Step 5: Run the focused test and CLI**
+- [x] **Step 5: Run the focused test and CLI**
 
 Run: `node --test react-tests/governance-foundation.test.mjs && npm run check:governance`
 
 Expected: all focused tests pass, then output contains `治理检查通过。`.
 
-- [ ] **Step 6: Commit the governance checker**
+- [x] **Step 6: Commit the governance checker**
 
 ```bash
 git add scripts/check-project-governance.mjs package.json react-tests/governance-foundation.test.mjs
@@ -341,7 +341,7 @@ git commit -m "chore: enforce repository governance"
 - Consumes: JavaScript/JSX source tree.
 - Produces: `npm run lint` covering `src`, `functions`, `server`, `scripts`, `tests`, and `react-tests` while ignoring generated assets, build output, and `.worktrees`.
 
-- [ ] **Step 1: Add failing lint-contract assertions**
+- [x] **Step 1: Add failing lint-contract assertions**
 
 ```js
 test("package exposes the repository lint gate", () => {
@@ -353,13 +353,13 @@ test("package exposes the repository lint gate", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify it fails**
+- [x] **Step 2: Run the focused test and verify it fails**
 
 Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: FAIL because `pkg.scripts.lint` is absent.
 
-- [ ] **Step 3: Install ESLint and add a conservative flat config**
+- [x] **Step 3: Install ESLint and add a conservative flat config**
 
 Run: `npm install --save-dev eslint@^9.0.0`
 
@@ -392,13 +392,13 @@ export default [
 
 Add `"lint": "eslint src functions server scripts tests react-tests"` to package scripts. This first gate intentionally targets syntax and high-confidence correctness defects; stricter style and unused-variable rules require a separate baseline cleanup.
 
-- [ ] **Step 4: Run lint and the contract test**
+- [x] **Step 4: Run lint and the contract test**
 
 Run: `npm run lint && node --test react-tests/governance-foundation.test.mjs`
 
 Expected: ESLint exits 0 and all governance tests pass.
 
-- [ ] **Step 5: Commit the lint gate**
+- [x] **Step 5: Commit the lint gate**
 
 ```bash
 git add eslint.config.js package.json package-lock.json react-tests/governance-foundation.test.mjs
@@ -418,7 +418,7 @@ git commit -m "chore: add baseline lint gate"
 - Consumes: npm scripts from Tasks 3-4.
 - Produces: GitHub Actions job `quality`, PR checklist, ownership review rules, and exact branch-protection configuration instructions.
 
-- [ ] **Step 1: Add failing CI-governance assertions**
+- [x] **Step 1: Add failing CI-governance assertions**
 
 ```js
 test("pull requests run required repository quality gates", () => {
@@ -435,13 +435,13 @@ test("pull requests run required repository quality gates", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused test and verify missing-file failures**
+- [x] **Step 2: Run the focused test and verify missing-file failures**
 
 Run: `node --test react-tests/governance-foundation.test.mjs`
 
 Expected: FAIL because `.github/workflows/quality.yml` does not exist.
 
-- [ ] **Step 3: Create the GitHub Actions workflow**
+- [x] **Step 3: Create the GitHub Actions workflow**
 
 Use Node 22 and npm cache:
 
@@ -470,19 +470,19 @@ jobs:
       - run: npm run build
 ```
 
-- [ ] **Step 4: Create PR, ownership, and branch-protection rules**
+- [x] **Step 4: Create PR, ownership, and branch-protection rules**
 
 - PR template requires: purpose, linked PRD/design/ADR or explicit small-change exemption, screenshots for UI changes, test/build results, API/data compatibility, rollback, documentation update.
 - `CODEOWNERS` assigns `AGENTS.md`, `.github/`, `docs/platform/`, `docs/templates/`, `functions/api/_middleware.js`, `functions/api/auth/`, and schema/migration files to `@489688547`, matching the configured origin owner.
 - `BRANCH_PROTECTION.md` specifies: protect `main`, require PR, require `quality`, require branches up to date, dismiss stale approvals, block force pushes and deletions. Note that a repository administrator must enable these settings after authenticating GitHub.
 
-- [ ] **Step 5: Run focused governance tests and all local gates**
+- [x] **Step 5: Run focused governance tests and all local gates**
 
 Run: `node --test react-tests/governance-foundation.test.mjs && npm run lint && npm run check:governance`
 
 Expected: all commands exit 0.
 
-- [ ] **Step 6: Commit CI and PR governance**
+- [x] **Step 6: Commit CI and PR governance**
 
 ```bash
 git add .github react-tests/governance-foundation.test.mjs
@@ -498,30 +498,30 @@ git commit -m "ci: require repository quality gates"
 - Consumes: All phase-one governance deliverables.
 - Produces: Evidence that the current application still passes its complete local acceptance suite.
 
-- [ ] **Step 1: Run the complete test suite**
+- [x] **Step 1: Run the complete test suite**
 
 Run: `npm test`
 
 Expected: all React and API tests pass, 0 fail.
 
-- [ ] **Step 2: Run production build**
+- [x] **Step 2: Run production build**
 
 Run: `npm run build`
 
 Expected: Vite build exits 0 and emits production assets.
 
-- [ ] **Step 3: Re-run the enforced gates exactly as CI will**
+- [x] **Step 3: Re-run the enforced gates exactly as CI will**
 
 Run: `npm run lint && npm run check:governance && npm test && npm run build`
 
 Expected: all commands exit 0.
 
-- [ ] **Step 4: Inspect the scoped diff and dirty worktree**
+- [x] **Step 4: Inspect the scoped diff and dirty worktree**
 
 Run: `git status --short && git diff --check && git log -6 --oneline`
 
 Expected: no whitespace errors; unrelated existing modifications remain unstaged and are not included in the task commits.
 
-- [ ] **Step 5: Record the external GitHub setting still required**
+- [x] **Step 5: Record the external GitHub setting still required**
 
 If `gh auth status` is not authenticated, do not change repository settings. Report that source-level governance is complete but GitHub branch protection must be enabled after authentication and explicit confirmation.

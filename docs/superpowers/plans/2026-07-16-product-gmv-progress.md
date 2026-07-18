@@ -1,4 +1,4 @@
-# Product GMV Progress Implementation Plan
+# 产品 GMV 进度实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 

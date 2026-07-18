@@ -1,4 +1,4 @@
-# Strategy Commitments, Incentives, and Reports Implementation Plan
+# 战略承诺、激励与汇报实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -377,4 +377,3 @@ Verify desktop and 390 px mobile layouts, no horizontal overflow, strategy drill
 git add src/features/company/CompanyHomePage.jsx src/features/company/PersonalTodoWorkbench.jsx src/domain/personalTodos.js src/domain/strategyExecution.js src/styles.css react-tests/platform-ui.test.mjs react-tests/personal-todos.test.mjs react-tests/strategy-execution.test.mjs
 git commit -m "feat(company): integrate governed execution cockpit"
 ```
-

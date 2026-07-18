@@ -47,7 +47,7 @@ export function createTaskMeetingRecord({ event = {}, payload, attendees = [], s
   };
 }
 
-export function buildTaskTodoPayload({ product, task, creator, executors = [], detailUrl, now = new Date() }) {
+export function buildTaskTodoPayload({ product, task, creator, executors = [], recoveryUsers = [], detailUrl, now = new Date() }) {
   const creatorUnionId = String(creator?.unionid || creator?.unionId || "").trim();
   if (!creatorUnionId) throw new Error("当前账号缺少钉钉 unionId，请重新登录后再同步待办。");
   const due = normalizeTaskDueDate(task?.due, now);
@@ -55,6 +55,9 @@ export function buildTaskTodoPayload({ product, task, creator, executors = [], d
   const dueTime = new Date(`${due}T18:00:00+08:00`).getTime();
   if (!Number.isFinite(dueTime)) throw new Error("任务截止日期无效，请重新选择后再同步到钉钉待办。");
   const executorUnionIds = [...new Set(executors
+    .map(user => String(user?.unionid || user?.unionId || "").trim())
+    .filter(Boolean))];
+  const recoveryUnionIds = [...new Set(recoveryUsers
     .map(user => String(user?.unionid || user?.unionId || "").trim())
     .filter(Boolean))];
   if (!executorUnionIds.length) throw new Error("请至少选择一位具有钉钉身份的执行人。");
@@ -71,6 +74,7 @@ export function buildTaskTodoPayload({ product, task, creator, executors = [], d
     ].filter(Boolean).join("\n"),
     creatorUnionId,
     executorUnionIds,
+    recoveryUnionIds,
     participantUnionIds: [],
     detailUrl: String(detailUrl || ""),
     dueTime,
