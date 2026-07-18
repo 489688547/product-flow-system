@@ -20,9 +20,13 @@ test("primary sidebar exposes every supply chain workspace in its own group", ()
 });
 
 test("supply chain page is controlled by the primary route and has no internal navigation", () => {
+  const app = read("src/App.jsx");
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
   const css = read("src/styles.css");
-  assert.match(page, /SupplyChainAppPage\(\{ onNavigate, section = "overview" \}\)/);
+  assert.match(page, /SupplyChainAppPage\(\{ section = "overview" \}\)/);
+  assert.doesNotMatch(page, /返回业务 Apps/);
+  assert.doesNotMatch(page, /ArrowLeft/);
+  assert.doesNotMatch(app, /<SupplyChainAppPage onNavigate=/);
   assert.doesNotMatch(page, /SupplyChainSectionNav/);
   assert.doesNotMatch(page, /useState\("overview"\)/);
   assert.doesNotMatch(page, /supply-chain-layout/);

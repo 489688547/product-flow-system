@@ -172,7 +172,7 @@ export default function App() {
             ) : null}
           </div>
         </header>
-        {supplySection ? <SupplyChainAppPage onNavigate={navigate} section={supplySection} /> : pages[activeScreen]}
+        {supplySection ? <SupplyChainAppPage section={supplySection} /> : pages[activeScreen]}
       </main>
       <FloatingIssueButton />
     </div>
