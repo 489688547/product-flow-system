@@ -9,14 +9,14 @@
 
 ## 任务
 
-- [ ] 领域模型
+- [x] 领域模型
   - 依赖：供应链与治理基线已合并。
   - 文件：`src/domain/dataCenter.js`、`react-tests/data-center.test.mjs`。
   - 输入：现有销售行结构和共享数据定义。
   - 输出：日期、平台过滤、标准化、摘要、质量和 reducer。
   - 失败测试：`node --test react-tests/data-center.test.mjs`，预期模块不存在。
   - 实现步骤：日期规则、平台排除、安全字段、默认状态、摘要、审计。
-  - 验证：领域测试全部通过。
+  - 验证：`node --test react-tests/data-center.test.mjs`，6/6 通过。
   - 提交：`feat(data): add data center domain`。
 
 - [ ] D1 与 API
