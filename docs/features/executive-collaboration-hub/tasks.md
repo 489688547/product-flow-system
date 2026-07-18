@@ -44,7 +44,7 @@
   - 提交：`feat(collaboration): add governed workflow domain`。
   - 实际结果：2026-07-18 协同规范化、状态流转、参与范围、部门视图、老板行动投影和生产安全 feature flag 已实现；`node --test react-tests/collaboration-domain.test.mjs` 8 项通过。
 
-- [ ] 实现细粒度 D1 API
+- [x] 实现细粒度 D1 API
   - 依赖：协同领域。
   - 文件：协同 API shared 模块、集合/单项/活动/流转端点、API 测试和 `package.json`。
   - 输入：公司会话和 `PRODUCT_FLOW_DB`。
@@ -53,6 +53,7 @@
   - 实现步骤：验证、授权、存储、集合、单项、活动和流转。
   - 验证：API 测试覆盖 401/403/404/409/501 和成功路径。
   - 提交：`feat(api): persist scoped collaboration items`。
+  - 实际结果：2026-07-18 已交付独立事项、参与者和活动表，服务端发起身份、部门范围查询、幂等创建、乐观锁、归档、状态动作和稳定错误结构；协同 API 与领域联合测试 14 项通过，相关文件 ESLint 通过。
 
 - [ ] 实现协同客户端和 Provider
   - 依赖：v1 API。
