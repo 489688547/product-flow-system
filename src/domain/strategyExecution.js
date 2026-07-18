@@ -62,6 +62,14 @@ const DEFAULT_APP_REGISTRY = [
     route: "data-center",
     enabled: true,
     status: "connected"
+  },
+  {
+    id: "brand-content",
+    name: "品牌内容协同",
+    description: "协同内容生产、素材资产、发布归因、投放复盘与补充决策。",
+    route: "content-overview",
+    enabled: true,
+    status: "integrating"
   }
 ];
 

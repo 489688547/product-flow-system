@@ -4,6 +4,7 @@ import { ProductFlowProvider } from "./state/ProductFlowProvider.jsx";
 import { AuthProvider, useAuth } from "./state/AuthProvider.jsx";
 import { AuthGate } from "./features/auth/AuthGate.jsx";
 import { PlatformProvider } from "./state/PlatformProvider.jsx";
+import { BrandContentProvider } from "./state/BrandContentProvider.jsx";
 import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatformBridge.jsx";
 import { canAccessCompanyPlatform, canAccessDataCenter, canAccessSupplyChain } from "./domain/permissions.js";
 import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
@@ -20,10 +21,12 @@ function AuthenticatedApp() {
     <ProductFlowProvider>
       <DataCenterProvider enabled={hasDataCenterAccess}>
         <SupplyChainProvider enabled={hasSupplyChainAccess}>
-          <PlatformProvider enabled={hasCompanyAccess}>
-            {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-            <App />
-          </PlatformProvider>
+          <BrandContentProvider>
+            <PlatformProvider enabled={hasCompanyAccess}>
+              {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+              <App />
+            </PlatformProvider>
+          </BrandContentProvider>
         </SupplyChainProvider>
       </DataCenterProvider>
     </ProductFlowProvider>
