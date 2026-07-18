@@ -34,8 +34,8 @@ test("integration filters and counts use lifecycle status", () => {
   const planned = filterIntegrations(platforms, { status: "planned" });
   const counts = countIntegrationStatuses(platforms);
 
-  assert.equal(planned.length, 4);
-  assert.deepEqual(counts, { all: 10, connected: 4, integrating: 2, planned: 4, retired: 0 });
+  assert.equal(planned.length, 5);
+  assert.deepEqual(counts, { all: 11, connected: 4, integrating: 2, planned: 5, retired: 0 });
 });
 
 test("relations resolve to public platform records", () => {
