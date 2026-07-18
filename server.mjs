@@ -219,6 +219,52 @@ async function handleProductionWriteSession(req, res) {
   }
 }
 
+async function handleEnvironmentReadiness(res) {
+  if (!productionDataClient.configured) {
+    json(res, 200, {
+      environment: "development",
+      ready: false,
+      checkedAt: new Date().toISOString(),
+      capabilities: [{
+        id: "local-production-data",
+        name: "本地生产数据连接",
+        description: "本地服务通过个人令牌连接生产数据网关。",
+        level: "blocking",
+        status: "blocked",
+        missing: ["PRODUCTION_DATA_ACCESS_TOKEN"]
+      }],
+      dataAccess: productionDataClient.status(),
+      audit: []
+    });
+    return;
+  }
+  try {
+    const [production, state] = await Promise.all([productionDataClient.readiness(), productionDataClient.readState()]);
+    json(res, 200, {
+      ...production,
+      environment: "development",
+      productionEnvironment: production.environment,
+      dataAccess: productionDataClient.status(),
+      audit: state.audit || []
+    });
+  } catch (error) {
+    json(res, error.status || 500, { ready: false, message: error.message || "生产环境状态读取失败。", error: { code: error.code || "ENVIRONMENT_READINESS_FAILED" } });
+  }
+}
+
+async function handleProductionRollback(req, res) {
+  try {
+    if (req.method !== "POST") {
+      json(res, 405, { message: "Method not allowed" });
+      return;
+    }
+    const body = await readBody(req);
+    json(res, 200, await productionDataClient.rollback(body.auditId, body.confirmation));
+  } catch (error) {
+    json(res, error.status || 500, { synced: false, message: error.message || "生产数据回滚失败。", error: { code: error.code || "PRODUCTION_ROLLBACK_FAILED" } });
+  }
+}
+
 function blockExternalAction(res) {
   json(res, 409, {
     synced: false,
@@ -460,6 +506,14 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/platform/v1/production-write-session") {
     await handleProductionWriteSession(req, res);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/environment-readiness" && req.method === "GET") {
+    await handleEnvironmentReadiness(res);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/production-data/rollback") {
+    await handleProductionRollback(req, res);
     return;
   }
   if (url.pathname === "/api/sales") {

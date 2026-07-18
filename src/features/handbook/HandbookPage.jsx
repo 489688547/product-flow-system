@@ -11,6 +11,7 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { MarkdownDocument } from "./MarkdownDocument.jsx";
 import { DEFAULT_HANDBOOK_SLUG, handbookDocuments } from "./handbookCatalog.js";
 import { IntegrationPlatformMap } from "./IntegrationPlatformMap.jsx";
+import { EnvironmentReadinessPanel } from "./EnvironmentReadinessPanel.jsx";
 import "./handbook.css";
 
 const CATEGORY_LABELS = Object.fromEntries(
@@ -47,6 +48,8 @@ export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUs
   );
   const groups = useMemo(() => groupedDocuments(filteredDocuments), [filteredDocuments]);
   const isIntegrationMap = activeDocument?.slug === "platform/external-platform-map";
+  const isEnvironmentReadiness = activeDocument?.slug === "platform/environment-readiness";
+  const isPlatformWorkspace = isIntegrationMap || isEnvironmentReadiness;
   const headings = useMemo(
     () => extractMarkdownHeadings(activeDocument?.content),
     [activeDocument]
@@ -111,7 +114,7 @@ export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUs
       </div>
 
       {filteredDocuments.length && activeDocument ? (
-        <div className={`handbook-workspace${isIntegrationMap ? " platform-map-open" : ""}`}>
+        <div className={`handbook-workspace${isIntegrationMap ? " platform-map-open" : ""}${isEnvironmentReadiness ? " environment-readiness-open" : ""}`}>
           <nav className="handbook-catalog" aria-label="说明书目录">
             {groups.map(group => (
               <section key={group.category} className="handbook-catalog-group" data-category={group.category}>
@@ -134,7 +137,7 @@ export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUs
             ))}
           </nav>
 
-          <article className={`handbook-article${isIntegrationMap ? " handbook-article-platform-map" : ""}`}>
+          <article className={`handbook-article${isIntegrationMap ? " handbook-article-platform-map" : ""}${isEnvironmentReadiness ? " handbook-article-environment-readiness" : ""}`}>
             <header className="handbook-document-header">
               <div className="handbook-document-kind">
                 <BookOpenText size={15} aria-hidden="true" />
@@ -146,10 +149,12 @@ export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUs
             </header>
             {isIntegrationMap
               ? <IntegrationPlatformMap sessionUser={sessionUser} />
-              : <MarkdownDocument content={removeMarkdownLead(activeDocument.content)} />}
+              : isEnvironmentReadiness
+                ? <EnvironmentReadinessPanel sessionUser={sessionUser} />
+                : <MarkdownDocument content={removeMarkdownLead(activeDocument.content)} />}
           </article>
 
-          {!isIntegrationMap ? <aside className="handbook-toc" aria-label="本页目录">
+          {!isPlatformWorkspace ? <aside className="handbook-toc" aria-label="本页目录">
             <strong>本页目录</strong>
             {headings.length ? (
               <ol>

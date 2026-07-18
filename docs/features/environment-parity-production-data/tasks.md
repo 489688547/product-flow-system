@@ -49,14 +49,14 @@
   - 验证：本地代理与生产网关聚焦测试 11/11 通过；ESLint 静默通过。
   - 提交：`feat: connect local tests to production data`。
 
-- [ ] 说明书环境状态界面
+- [x] 说明书环境状态界面
   - 依赖：就绪 API、本地代理。
   - 文件：`docs/platform/environment-readiness.md`、`src/state/environmentReadinessApi.js`、`src/features/handbook/EnvironmentReadinessPanel.jsx`、`src/features/handbook/environment-readiness.css`、`src/features/handbook/HandbookPage.jsx`、`react-tests/environment-readiness-ui.test.mjs`。
   - 输入：标准就绪、解锁和审计响应。
   - 输出：中文状态卡、红色解锁提示、回滚入口和完整页面状态。
   - 失败测试：专用文档路由、加载/错误/阻断/解锁/无权限文案和响应式规则先失败。
   - 实现步骤：先 API 客户端和纯展示，再解锁/回滚交互，最后响应式与无障碍。
-  - 验证：`node --test react-tests/environment-readiness-ui.test.mjs`，并完成 1440、1024、390 宽度检查。
+  - 验证：UI/API/本地代理聚焦测试 14/14 通过；ESLint 与生产构建通过；视觉宽度检查在发布任务执行。
   - 提交：`feat: show environment readiness in handbook`。
 
 - [ ] 治理、发布与生产验收

@@ -86,3 +86,46 @@ test("environment readiness rejects unsupported methods", async () => {
   });
   assert.equal(response.status, 405);
 });
+
+test("a server-only production data token can read readiness without an employee cookie", async () => {
+  const { onRequest } = await loadRoute();
+  const rawToken = "local-production-readiness-token";
+  const bytes = new TextEncoder().encode(rawToken);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const tokenHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
+  const tables = [
+    "production_data_access_tokens",
+    "production_write_unlocks",
+    "production_data_snapshots",
+    "production_data_snapshot_parts",
+    "production_data_audit"
+  ];
+  const db = {
+    prepare(sql) {
+      const statement = {
+        values: [],
+        bind(...values) { statement.values = values; return statement; },
+        async run() { return { success: true }; },
+        async first() {
+          if (/from production_data_access_tokens/i.test(sql) && statement.values[0] === tokenHash) {
+            return { token_hash: tokenHash, user_id: "u1", union_id: "union1", name: "最高权限账号", capabilities: "[\"read\"]", expires_at: "2099-01-01T00:00:00.000Z", revoked_at: null };
+          }
+          if (/from product_flow_org_members/i.test(sql)) return { user_id: "u1", union_id: "union1", name: "最高权限账号", role: "executive", active: 1 };
+          return null;
+        },
+        async all() {
+          if (/sqlite_master/i.test(sql)) return { results: tables.map(name => ({ name })) };
+          return { results: [] };
+        }
+      };
+      return statement;
+    }
+  };
+  const response = await onRequest({
+    request: new Request(request().url, { headers: { authorization: `Bearer ${rawToken}` } }),
+    env: { RUNTIME_ENV: "production", PRODUCT_FLOW_DB: db, DINGTALK_APP_KEY: "configured", DINGTALK_APP_SECRET: "configured" },
+    data: {}
+  });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).ready, true);
+});
