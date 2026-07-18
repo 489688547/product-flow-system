@@ -8,7 +8,9 @@ const PUBLIC_PATHS = new Set([
   "/api/auth/dingtalk/callback",
   "/api/auth/dingtalk/embedded",
   "/api/dingtalk/config",
-  "/api/dingtalk/login"
+  "/api/dingtalk/login",
+  "/api/platform/v1/production-write-session",
+  "/api/platform/v1/production-data/state"
 ]);
 
 export async function onRequest(context) {

@@ -29,14 +29,14 @@
   - 验证：环境清单与就绪 API 聚焦测试 6/6 通过；ESLint 静默通过。
   - 提交：`feat: expose environment readiness`。
 
-- [ ] 生产数据受控网关
+- [x] 生产数据受控网关
   - 依赖：就绪 API。
   - 文件：`functions/api/platform/_shared/productionDataAccess.js`、`functions/api/platform/v1/production-write-session.js`、`functions/api/platform/v1/production-data/state.js`、`functions/api/state.js`、`functions/api/_middleware.js`、`tests/production-data-access.test.mjs`。
   - 输入：个人访问令牌、最高权限身份、写入原因、确认短语和基线版本。
   - 输出：实时读取、15 分钟解锁、冲突保护、快照、审计和回滚。
   - 失败测试：原始令牌不落库、错误账号/无解锁/过期/冲突被拒绝，有效写入和回滚成功。
   - 实现步骤：先建表和鉴权，再实现解锁，最后接入状态快照、审计和回滚。
-  - 验证：`node --test tests/production-data-access.test.mjs`。
+  - 验证：受控网关与共享状态聚焦测试 10/10 通过；完整 API 测试 115/115 通过；ESLint 静默通过。
   - 提交：`feat: guard production data writes`。
 
 - [ ] 本地生产数据代理与外部动作隔离
