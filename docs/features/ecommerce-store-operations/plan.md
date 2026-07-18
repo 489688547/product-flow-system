@@ -20,6 +20,7 @@
 - `src/domain/ecommerceOperations.js`：默认状态、实体归一化、完整度、权限、流转、摘要和版本冲突规则。
 - `src/state/ecommerceOperationsApi.js`：经营、动作和 AI 点评请求。
 - `src/state/EcommerceOperationsProvider.jsx`：按角色/月份加载、数据中心适配、草稿和刷新编排。
+- `src/domain/ecommercePerformanceEvidence.js`：把已验收任务、结果和复盘转换为只读绩效证据引用。
 - `functions/api/ecommerce-operations.js`：经营实体读取和动作入口。
 - `functions/api/ecommerce-operations/_shared/storage.js`：D1 表、记录级存取、审计和版本。
 - `functions/api/ecommerce-operations/ai-review.js`：服务端 AI 点评、输入白名单、超时和错误映射。
@@ -40,6 +41,7 @@
 ### API
 
 - `GET /api/ecommerce-operations?month=YYYY-MM`：返回当前用户可见实体、版本、权限和审计摘要。
+- `GET /api/ecommerce-operations/evidence?employeeId=&month=`：返回当前会话有权读取的任务、结果和复盘证据，不返回绩效评分字段。
 - `POST /api/ecommerce-operations/actions`：接收 `{ type, entityType, entityId, expectedVersion, payload }`，服务端执行白名单、权限、状态机和幂等校验。
 - `POST /api/ecommerce-operations/ai-review`：接收 `{ cycleId, planId, planVersion }`，服务端重新读取已授权方案与数据质量，返回并持久化结构化点评。
 - AI 返回维度为 `evidence`、`goal`、`issue`、`countermeasure`、`monitor`、`risk`、`dataLimitations` 和 `recommendations`；不返回批准动作。
@@ -87,3 +89,4 @@ npm run build
 6. 驾驶舱与重点产品经营工作台。
 7. 跨部门协同、团队管理和经营方法库。
 8. 本地服务一致性、响应式、无障碍和 Definition of Done。
+9. 绩效证据只读契约和独立绩效 App 联调。

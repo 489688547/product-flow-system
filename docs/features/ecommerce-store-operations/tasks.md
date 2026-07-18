@@ -98,3 +98,13 @@
   - 实现步骤：桌面；900/640/390px；键盘；减少动效；本地路由；文档更新。
   - 验证：Definition of Done 与浏览器验收全部通过。
   - 提交：`style(ops): finish ecommerce operations UI`。
+
+- [ ] 绩效证据出口
+  - 依赖：经营工作台与动作 API。
+  - 文件：`src/domain/ecommercePerformanceEvidence.js`、`functions/api/ecommerce-operations/evidence.js`、证据契约测试、绩效管理适配测试。
+  - 输入：已授权经营周期、任务、执行更新和复盘。
+  - 输出：只读 `PerformanceEvidenceRef` 列表。
+  - 失败测试：未验收任务、越权人员、绩效评分字段或过期版本进入证据响应。
+  - 实现步骤：标准化引用；按员工和月份过滤；权限校验；响应版本与取得时间；联调。
+  - 验证：证据契约与电商运营/绩效 API 回归通过。
+  - 提交：`feat(ops): expose performance evidence`。
