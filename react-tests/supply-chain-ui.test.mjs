@@ -15,8 +15,8 @@ test("primary sidebar exposes every supply chain workspace in its own group", ()
   assert.match(app, /"供应链管理"/);
   assert.doesNotMatch(app, /\["supply-chain", "供应链管理", Truck, "业务 Apps"\]/);
   assert.match(app, /navigationPermissionKey/);
-  assert.match(app, /return SUPPLY_CHAIN_SCREEN_TO_SECTION\.has\(screen\) \? "supply-chain" : screen/);
-  assert.match(app, /screen === "supply-chain" \? "supply-overview" : screen/);
+  assert.match(app, /if \(SUPPLY_CHAIN_SCREEN_TO_SECTION\.has\(screen\)\) return "supply-chain"/);
+  assert.match(app, /if \(screen === "supply-chain"\) return "supply-overview"/);
 });
 
 test("supply chain page is controlled by the primary route and has no internal navigation", () => {

@@ -6,26 +6,34 @@ import { AuthGate } from "./features/auth/AuthGate.jsx";
 import { PlatformProvider } from "./state/PlatformProvider.jsx";
 import { BrandContentProvider } from "./state/BrandContentProvider.jsx";
 import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatformBridge.jsx";
-import { canAccessCompanyPlatform, canAccessSupplyChain } from "./domain/permissions.js";
+import { canAccessCompanyPlatform, canAccessDataCenter, canAccessSupplyChain } from "./domain/permissions.js";
 import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
+import { DataCenterProvider } from "./state/DataCenterProvider.jsx";
+import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
+import "./features/collaboration/collaboration.css";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
   const hasCompanyAccess = canAccessCompanyPlatform(user);
   const hasSupplyChainAccess = canAccessSupplyChain(user);
+  const hasDataCenterAccess = canAccessDataCenter(user);
   return (
     <ProductFlowProvider>
-      <BrandContentProvider>
+      <DataCenterProvider enabled={hasDataCenterAccess}>
         <SupplyChainProvider enabled={hasSupplyChainAccess}>
-          <PlatformProvider enabled={hasCompanyAccess}>
-            {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-            <App />
-          </PlatformProvider>
+          <BrandContentProvider>
+            <CollaborationProvider>
+              <PlatformProvider enabled={hasCompanyAccess}>
+                {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+                <App />
+              </PlatformProvider>
+            </CollaborationProvider>
+          </BrandContentProvider>
         </SupplyChainProvider>
-      </BrandContentProvider>
+      </DataCenterProvider>
     </ProductFlowProvider>
   );
 }

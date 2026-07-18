@@ -34,6 +34,8 @@ import { TaskDeliverableModal } from "./TaskDeliverableModal.jsx";
 import { TaskDeliverables } from "./TaskDeliverables.jsx";
 import { TaskTemplateModal } from "./TaskTemplateModal.jsx";
 import { TodoSyncModal } from "./TodoSyncModal.jsx";
+import { collaborationDraftFromProductTask } from "../../domain/collaborationAdapters.js";
+import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 
 function stagePolicyTone(mode) {
   if (mode === "不涉及" || mode === "跳过") return "skipped";
@@ -221,6 +223,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             {hasMeeting ? <CalendarCheck2 size={16} /> : <CalendarPlus size={16} />}{hasMeeting ? "已预约" : "预约会议"}
           </Button>
         ) : null}
+        <AppCollaborationButton draft={collaborationDraftFromProductTask(selectedProduct, task)} />
         <IconAction label="删除" className="danger" onClick={() => setTaskToDelete(task)}><Trash2 size={16} /></IconAction>
       </TableActions>;
     }}

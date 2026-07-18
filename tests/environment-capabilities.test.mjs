@@ -22,6 +22,20 @@ test("environment capability manifest validates platform references and generate
   assert.equal(registryModule, renderGeneratedModule("integrationRegistry", registry));
 });
 
+test("collaboration execution declares its production D1 schema", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const capability = manifest.capabilities.find(entry => entry.id === "collaboration-execution");
+  assert.ok(capability, "collaboration execution capability must be declared");
+  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "dingtalk"]);
+  assert.equal(capability.bindings.includes("PRODUCT_FLOW_DB"), true);
+  assert.deepEqual(capability.tables, [
+    "collaboration_items",
+    "collaboration_participants",
+    "collaboration_activities"
+  ]);
+  assert.equal(existsSync(resolve(root, "migrations/0002_collaboration_execution.sql")), true);
+});
+
 test("environment capability validation rejects secret values and unknown platforms", async () => {
   assert.equal(existsSync(generatorPath), true, "platform manifest generator must exist");
   const { validateEnvironmentCapabilities } = await import(generatorPath);

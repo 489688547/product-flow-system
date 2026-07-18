@@ -1,10 +1,11 @@
-import { AlertTriangle, BadgeDollarSign, CheckCircle2, Coins, Plus, Sparkles } from "lucide-react";
+import { AlertTriangle, BadgeDollarSign, CheckCircle2, Coins, Plus, Sparkles, Trash2, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { incentiveBudgetCheck } from "../../domain/executionGovernance.js";
 import { canManagePermissions } from "../../domain/permissions.js";
 import { usePlatform } from "../../state/PlatformProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
@@ -110,17 +111,18 @@ function SettlementModal({ open, project, currentUser, onClose, onSettle }) {
 }
 
 export function IncentiveProjectsPage() {
-  const { state, saveIncentiveProject, settleIncentive } = usePlatform();
+  const { state, saveIncentiveProject, settleIncentive, archiveIncentiveProject } = usePlatform();
   const { currentUser, orgCache } = useProductFlow();
   const [editor, setEditor] = useState(null);
   const [settling, setSettling] = useState(null);
   const [filter, setFilter] = useState("active");
+  const [confirming, setConfirming] = useState(null);
   const canManage = canManagePermissions(currentUser);
   const canCreate = canManage || /负责人|经理|总监/.test(currentUser?.title || "");
-  const visible = useMemo(() => state.incentiveProjects.filter(project => filter === "all" || (filter === "active" ? !["closed", "cancelled"].includes(project.status) : project.status === filter)), [filter, state.incentiveProjects]);
+  const visible = useMemo(() => state.incentiveProjects.filter(project => !project.archived && (filter === "all" || (filter === "active" ? !["closed", "cancelled"].includes(project.status) : project.status === filter))), [filter, state.incentiveProjects]);
   const budgets = state.departmentRewardBudgets.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-  const committed = state.incentiveProjects.filter(item => !["closed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.rewardCap || 0), 0);
-  const paid = state.incentiveProjects.reduce((sum, item) => sum + Number(item.finalReward || 0), 0);
+  const committed = state.incentiveProjects.filter(item => !item.archived && !["closed", "cancelled"].includes(item.status)).reduce((sum, item) => sum + Number(item.rewardCap || 0), 0);
+  const paid = state.incentiveProjects.filter(item => !item.archived).reduce((sum, item) => sum + Number(item.finalReward || 0), 0);
   return (
     <section className="page incentive-projects-page">
       <PageHeader title="部门激励" description="用短周期、有奖金的改善项目解决额外重要事项；预算内部门直接立项，结项后由部门负责人定奖并留痕。">
@@ -140,6 +142,8 @@ export function IncentiveProjectsPage() {
             <div className="commitment-actions">
               {project.status === "pending_approval" && canManage ? <Button className="compact" variant="primary" onClick={() => saveIncentiveProject({ ...project, status: "active" }, "批准跨部门或超预算激励项目")}>批准立项</Button> : null}
               {!['closed', 'cancelled'].includes(project.status) ? <><Button className="compact" onClick={() => setEditor({ record: project })}>编辑</Button><Button className="compact" variant="primary" onClick={() => setSettling(project)}>结项定奖</Button></> : null}
+              {!['closed', 'cancelled', 'draft'].includes(project.status) ? <Button className="compact" onClick={() => setConfirming({ type: "cancel", project })}><XCircle size={14} />取消项目</Button> : null}
+              {['draft', 'cancelled'].includes(project.status) ? <Button className="compact" variant="danger" onClick={() => setConfirming({ type: "archive", project })}><Trash2 size={14} />归档</Button> : null}
               {project.status === "closed" ? <span className="settled-note">{project.rewardReason}</span> : null}
             </div>
           </article>;
@@ -148,6 +152,7 @@ export function IncentiveProjectsPage() {
       </section>
       <IncentiveEditor open={Boolean(editor)} record={editor?.record} state={state} currentUser={currentUser} orgCache={orgCache} onClose={() => setEditor(null)} onSave={form => { saveIncentiveProject({ ...form, id: form.id || `incentive-${Date.now()}` }); setEditor(null); }} />
       <SettlementModal open={Boolean(settling)} project={settling} currentUser={currentUser} onClose={() => setSettling(null)} onSettle={award => { settleIncentive(settling.id, award); setSettling(null); }} />
+      <ConfirmDialog open={Boolean(confirming)} title={confirming?.type === "cancel" ? "取消激励项目" : "归档激励项目"} message={confirming?.project?.name || "该激励项目"} description={confirming?.type === "cancel" ? "取消后项目停止执行，奖金承诺释放；之后仍可归档。" : "归档后不再出现在项目列表中，历史审计记录会保留。"} confirmLabel={confirming?.type === "cancel" ? "确认取消" : "确认归档"} onClose={() => setConfirming(null)} onConfirm={() => { if (confirming.type === "cancel") saveIncentiveProject({ ...confirming.project, status: "cancelled" }, "取消激励项目"); else archiveIncentiveProject(confirming.project.id); setConfirming(null); }} />
     </section>
   );
 }

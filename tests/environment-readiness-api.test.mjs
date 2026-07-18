@@ -4,6 +4,16 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const routePath = resolve("functions/api/platform/v1/environment-readiness.js");
+const REQUIRED_PRODUCTION_TABLES = [
+  "production_data_access_tokens",
+  "production_write_unlocks",
+  "production_data_snapshots",
+  "production_data_snapshot_parts",
+  "production_data_audit",
+  "collaboration_items",
+  "collaboration_participants",
+  "collaboration_activities"
+];
 
 async function loadRoute() {
   assert.equal(existsSync(routePath), true, "environment readiness route must exist");
@@ -53,13 +63,7 @@ test("environment readiness reports missing production bindings and variables wi
 
 test("warning capabilities do not block an otherwise ready production environment", async () => {
   const { onRequest } = await loadRoute();
-  const tables = [
-    "production_data_access_tokens",
-    "production_write_unlocks",
-    "production_data_snapshots",
-    "production_data_snapshot_parts",
-    "production_data_audit"
-  ];
+  const tables = REQUIRED_PRODUCTION_TABLES;
   const response = await onRequest({
     request: request(),
     env: {
@@ -93,13 +97,7 @@ test("a server-only production data token can read readiness without an employee
   const bytes = new TextEncoder().encode(rawToken);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const tokenHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
-  const tables = [
-    "production_data_access_tokens",
-    "production_write_unlocks",
-    "production_data_snapshots",
-    "production_data_snapshot_parts",
-    "production_data_audit"
-  ];
+  const tables = REQUIRED_PRODUCTION_TABLES;
   const db = {
     prepare(sql) {
       const statement = {

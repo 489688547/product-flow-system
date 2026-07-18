@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Settings, ShieldCheck, SlidersHorizontal, Smartphone, Target, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Target, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -6,6 +6,7 @@ import { canAccessCompanyPlatform, canViewNavigation } from "./domain/permission
 import { useAuth } from "./state/AuthProvider.jsx";
 import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
+import { featureFlagEnabled } from "./domain/featureFlags.js";
 
 const lazyNamed = (loader, exportName) => lazy(async () => {
   const module = await loader();
@@ -28,6 +29,7 @@ const AppCenterPage = lazyNamed(() => import("./features/platform/AppCenterPage.
 const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/IncentiveProjectsPage.jsx"), "IncentiveProjectsPage");
 const SupplyChainAppPage = lazyNamed(() => import("./features/supply-chain/SupplyChainAppPage.jsx"), "SupplyChainAppPage");
 const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
+const DataCenterAppPage = lazyNamed(() => import("./features/data-center/DataCenterAppPage.jsx"), "DataCenterAppPage");
 const BrandContentOverviewPage = lazyNamed(() => import("./features/brand-content/BrandContentOverviewPage.jsx"), "BrandContentOverviewPage");
 const BrandContentWorkbenchPage = lazyNamed(() => import("./features/brand-content/BrandContentWorkbenchPage.jsx"), "BrandContentWorkbenchPage");
 const BrandAssetLibraryPage = lazyNamed(() => import("./features/brand-content/BrandAssetLibraryPage.jsx"), "BrandAssetLibraryPage");
@@ -37,18 +39,7 @@ const BrandDecisionPage = lazyNamed(() => import("./features/brand-content/Brand
 const BrandTeamPage = lazyNamed(() => import("./features/brand-content/BrandTeamPage.jsx"), "BrandTeamPage");
 const BrandDataIssuesPage = lazyNamed(() => import("./features/brand-content/BrandDataIssuesPage.jsx"), "BrandDataIssuesPage");
 const BrandContentSettingsPage = lazyNamed(() => import("./features/brand-content/BrandContentSettingsPage.jsx"), "BrandContentSettingsPage");
-
-const BRAND_NAV = [
-  ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
-  ["content-workbench", "内容作战台", Workflow, "品牌内容协同"],
-  ["content-assets", "素材资产", FileVideo2, "品牌内容协同"],
-  ["content-review", "投放复盘", ChartNoAxesCombined, "品牌内容协同"],
-  ["brand-accounts", "品牌账号", Smartphone, "品牌内容协同"],
-  ["content-decisions", "补充决策", ListChecks, "品牌内容协同"],
-  ["content-team", "团队效能", UsersRound, "品牌内容协同"],
-  ["content-issues", "数据问题", DatabaseZap, "品牌内容协同"],
-  ["content-settings", "设置", SlidersHorizontal, "品牌内容协同"]
-];
+const CollaborationPage = lazyNamed(() => import("./features/collaboration/CollaborationPage.jsx"), "CollaborationPage");
 
 const SUPPLY_CHAIN_NAV = [
   ["supply-overview", "供应链总览", LayoutDashboard, "供应链管理", "overview"],
@@ -62,12 +53,36 @@ const SUPPLY_CHAIN_NAV = [
 ];
 const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , , , section]) => [screen, section]));
 
+const DATA_CENTER_NAV = [
+  ["data-overview", "数据总览", Database, "数据中心", "overview"],
+  ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
+  ["data-sources", "数据接入", Plug, "数据中心", "sources"],
+  ["data-metrics", "指标管理", Ruler, "数据中心", "metrics"],
+  ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],
+  ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
+  ["data-services", "数据服务", Share2, "数据中心", "services"],
+  ["data-settings", "设置", Settings, "数据中心", "settings"]
+];
+const DATA_CENTER_SCREEN_TO_SECTION = new Map(DATA_CENTER_NAV.map(([screen, , , , section]) => [screen, section]));
+
+const BRAND_NAV = [
+  ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
+  ["content-workbench", "内容作战台", Workflow, "品牌内容协同"],
+  ["content-assets", "素材资产", FileVideo2, "品牌内容协同"],
+  ["content-review", "投放复盘", ChartNoAxesCombined, "品牌内容协同"],
+  ["brand-accounts", "品牌账号", Smartphone, "品牌内容协同"],
+  ["content-decisions", "补充决策", ListChecks, "品牌内容协同"],
+  ["content-team", "团队效能", UsersRound, "品牌内容协同"],
+  ["content-issues", "数据问题", DatabaseZap, "品牌内容协同"],
+  ["content-settings", "设置", SlidersHorizontal, "品牌内容协同"]
+];
 const COMPANY_NAV = [
   ["home", "公司首页", LayoutDashboard, "公司经营"],
   ["strategy", "战略中心", Target, "公司经营"],
   ["projects", "重点项目", BriefcaseBusiness, "公司经营"],
   ["incentives", "部门激励", BadgeDollarSign, "公司经营"],
   ["reviews", "经营检查", CalendarCheck, "公司经营"],
+  ["collaboration", "部门协同", Workflow, "公司经营"],
   ["apps", "业务 Apps", AppWindow, "公司经营"],
   ...SUPPLY_CHAIN_NAV,
   ["dashboard", "产品总览", PanelsTopLeft, "产品全周期"],
@@ -75,6 +90,7 @@ const COMPANY_NAV = [
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
+  ...DATA_CENTER_NAV,
   ...BRAND_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
@@ -86,7 +102,9 @@ const PRODUCT_NAV = [
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
+  ["collaboration", "部门协同", Workflow, "协同执行"],
   ...SUPPLY_CHAIN_NAV,
+  ...DATA_CENTER_NAV,
   ...BRAND_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
@@ -96,11 +114,8 @@ const HIDDEN_SCREENS = new Set(["packages"]);
 const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NAV.map(([key]) => key), ...HIDDEN_SCREENS]);
 
 function resolveScreen(screen) {
-  return screen === "supply-chain" ? "supply-overview" : screen;
-}
-
-function navigationPermissionKey(screen) {
-  return SUPPLY_CHAIN_SCREEN_TO_SECTION.has(screen) ? "supply-chain" : screen;
+  if (screen === "supply-chain") return "supply-overview";
+  return screen === "data-center" ? "data-overview" : screen;
 }
 
 function routeFromHash() {
@@ -110,6 +125,11 @@ function routeFromHash() {
     screen: VALID_SCREENS.has(screen) ? screen : "home",
     detail: route.detail
   };
+}
+
+function navigationPermissionKey(screen) {
+  if (SUPPLY_CHAIN_SCREEN_TO_SECTION.has(screen)) return "supply-chain";
+  return DATA_CENTER_SCREEN_TO_SECTION.has(screen) ? "data-center" : screen;
 }
 
 export default function App() {
@@ -122,7 +142,11 @@ export default function App() {
   const { loading: platformLoading, error: platformError } = usePlatform();
   const { state, loading, sharedError, currentUser, setCurrentProduct } = useProductFlow();
   const hasCompanyAccess = canAccessCompanyPlatform(sessionUser);
-  const navigation = hasCompanyAccess ? COMPANY_NAV : PRODUCT_NAV;
+  const collaborationEnabled = hasCompanyAccess || featureFlagEnabled("executiveCollaborationHub");
+  const navigation = useMemo(() => {
+    const base = hasCompanyAccess ? COMPANY_NAV : PRODUCT_NAV;
+    return collaborationEnabled ? base : base.filter(([key]) => key !== "collaboration");
+  }, [collaborationEnabled, hasCompanyAccess]);
   const visibleNavigation = useMemo(() => navigation.filter(([key]) => canViewNavigation(state.settings?.permissions, currentUser, navigationPermissionKey(key))), [currentUser, navigation, state.settings?.permissions]);
   const visibleScreenKeys = useMemo(() => new Set(visibleNavigation.map(([key]) => key)), [visibleNavigation]);
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
@@ -156,6 +180,8 @@ export default function App() {
     if (!VALID_SCREENS.has(resolvedScreen)) return;
     if (!visibleScreenKeys.has(resolvedScreen) && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
     setRoute({ screen: resolvedScreen, detail });
+    window.scrollTo({ top: 0, behavior: "auto" });
+    document.body.scrollTo({ top: 0, behavior: "auto" });
     const nextHash = formatAppHash(resolvedScreen, detail);
     if (window.location.hash !== nextHash) window.location.hash = nextHash;
   }
@@ -174,6 +200,7 @@ export default function App() {
     projects: <KeyProjectsPage />,
     incentives: <IncentiveProjectsPage />,
     reviews: <OperatingReviewPage />,
+    collaboration: <CollaborationPage />,
     apps: <AppCenterPage onNavigate={navigate} />,
     dashboard: <DashboardPage onNavigate={navigate} onOpenProgress={openProgress} />,
     demands: <DemandPoolPage onProjectCreated={productId => openProgress(productId, 1)} />,
@@ -195,6 +222,7 @@ export default function App() {
     settings: <SettingsPage />
   };
   const supplySection = SUPPLY_CHAIN_SCREEN_TO_SECTION.get(activeScreen);
+  const dataSection = DATA_CENTER_SCREEN_TO_SECTION.get(activeScreen);
 
   return (
     <div className="app-shell">
@@ -220,7 +248,7 @@ export default function App() {
           </div>
         </header>
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
-          {supplySection ? <SupplyChainAppPage section={supplySection} /> : pages[activeScreen]}
+          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
       <FloatingIssueButton />

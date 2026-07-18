@@ -136,6 +136,10 @@ test("application hash routes preserve handbook document slugs", () => {
     screen: "handbook",
     detail: "platform/api-catalog"
   });
+  assert.deepEqual(parseAppHash("#/collaboration/demo-item"), {
+    screen: "collaboration",
+    detail: "demo-item"
+  });
   assert.equal(
     formatAppHash("handbook", "产品与设计/接口 目录"),
     "#handbook/%E4%BA%A7%E5%93%81%E4%B8%8E%E8%AE%BE%E8%AE%A1/%E6%8E%A5%E5%8F%A3%20%E7%9B%AE%E5%BD%95"
