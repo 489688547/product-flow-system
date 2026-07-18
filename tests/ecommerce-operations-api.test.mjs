@@ -133,3 +133,13 @@ test("performance evidence contains accepted execution but no scores", async () 
   assert.equal(payload.evidence.length, 1);
   assert.equal(payload.evidence[0].score, undefined);
 });
+
+test("executive office can read the global operations loop but cannot write it", async () => {
+  const db = createD1Mock();
+  await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_cycle", record: { id: "cycle-global", ownerId: "o-1", product: "主粮", month: "2026-07" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  const executive = { userId: "exec-1", name: "总经理", department: "总经办", title: "总经理" };
+  const view = await onOperationsRequest({ request: new Request("https://example.com/api/ecommerce-operations"), env: { PRODUCT_FLOW_DB: db }, data: { session: executive } });
+  assert.equal((await view.json()).state.cycles.length, 1);
+  const write = await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_cycle", record: { ownerId: "o-1", product: "砂", month: "2026-07" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: executive } });
+  assert.equal(write.status, 403);
+});

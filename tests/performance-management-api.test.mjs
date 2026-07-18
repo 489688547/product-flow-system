@@ -49,6 +49,10 @@ test("employee can only self-review own assessment and HR freezes it", async () 
   assert.equal(self.status, 200);
   const managerReview = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "manager_score", id: "a-1", finalScore: 90, reason: "证据已核验" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
   assert.equal(managerReview.status, 200);
+  const prematureFreeze = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "freeze_assessment", id: "a-1" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: hr } });
+  assert.equal(prematureFreeze.status, 400);
+  const confirmation = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "confirm_result", id: "a-1" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: employee } });
+  assert.equal(confirmation.status, 200);
   const deniedFreeze = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "freeze_assessment", id: "a-1" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
   assert.equal(deniedFreeze.status, 403);
   const freeze = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "freeze_assessment", id: "a-1" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: hr } });
@@ -94,4 +98,14 @@ test("manager assessment creation is limited to authorized employees", async () 
   assert.equal(allowed.status, 200);
   assert.equal(payload.state.assessments[0].suggestedScore, null);
   assert.equal(payload.state.assessments[0].items[0].actual, null);
+});
+
+test("executive office has read-only global performance visibility", async () => {
+  const db = createD1Mock();
+  await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_assessment", record: { id: "visible-global", employeeId: "e-1", month: "2026-07", items: [{ weight: 100, target: 10, formula: "completion" }] } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  const executive = { userId: "exec-1", name: "总经理", department: "总经办", title: "总经理" };
+  const view = await onPerformanceRequest({ request: new Request("https://example.com/api/performance-management"), env: { PRODUCT_FLOW_DB: db }, data: { session: executive } });
+  assert.equal((await view.json()).state.assessments.length, 1);
+  const write = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "manager_score", id: "visible-global", finalScore: 100 } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: executive } });
+  assert.equal(write.status, 403);
 });

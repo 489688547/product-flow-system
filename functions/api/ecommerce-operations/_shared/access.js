@@ -29,6 +29,7 @@ export function actor(session = {}) {
 }
 
 export function filterOperationsStateForSession(state, session = {}) {
+  if (department(session) === "总经办") return state;
   if (isOperationsManager(session)) return state;
   const user = actor(session); const dept = department(session);
   if (dept === "运营部") {

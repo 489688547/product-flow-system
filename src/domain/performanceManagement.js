@@ -75,12 +75,17 @@ export function reducePerformanceState(input, action = {}) {
     if (finalScore === null || finalScore < 0 || finalScore > 100) throw new Error("主管评分必须在 0–100 之间。");
     const differs = [assessment.selfScore, assessment.suggestedScore].filter(value => value !== null && value !== undefined).some(value => Math.abs(finalScore - value) >= 10);
     if (differs && !clean(action.reason)) throw new Error("评分差异达到 10 分，请说明原因。");
-    const changed = { ...assessment, finalScore, managerReason: clean(action.reason), status: "pending_freeze", updatedAt: timestamp };
+    const changed = { ...assessment, finalScore, managerReason: clean(action.reason), status: "employee_confirmation", updatedAt: timestamp };
+    return audit({ ...state, assessments: upsert(state.assessments, changed) }, action, assessment.id);
+  }
+  if (action.type === "confirm_result") {
+    if (assessment.status !== "employee_confirmation") throw new Error("当前状态不能确认考核结果。");
+    const changed = { ...assessment, employeeConfirmedAt: timestamp, status: "pending_freeze", updatedAt: timestamp };
     return audit({ ...state, assessments: upsert(state.assessments, changed) }, action, assessment.id);
   }
   if (action.type === "request_review") {
     if (assessment.reviewRequestedAt) throw new Error("每次考核仅可申请一次复核。");
-    if (assessment.status !== "pending_freeze") throw new Error("仅待归档考核可以申请复核。");
+    if (assessment.status !== "employee_confirmation") throw new Error("仅待员工确认的考核可以申请复核。");
     if (!clean(action.reason)) throw new Error("请填写复核原因。");
     const request = { id: idFor("review"), assessmentId: assessment.id, employeeId: assessment.employeeId, reason: clean(action.reason), status: "pending", createdAt: timestamp };
     const changed = { ...assessment, reviewRequestedAt: timestamp, status: "review_requested", updatedAt: timestamp };
@@ -116,6 +121,8 @@ export function reducePerformanceState(input, action = {}) {
     return audit({ ...state, assessments: upsert(state.assessments, changed) }, action, assessment.id);
   }
   if (action.type === "append_correction") {
+    if (assessment.status !== "frozen") throw new Error("仅冻结后的考核可以追加更正记录。");
+    if (!clean(action.reason)) throw new Error("追加更正必须填写原因。");
     const corrections = [...(assessment.corrections || []), { id: idFor("correction"), reason: clean(action.reason), value: action.value, createdAt: timestamp }];
     return audit({ ...state, assessments: upsert(state.assessments, { ...assessment, corrections }) }, action, assessment.id);
   }

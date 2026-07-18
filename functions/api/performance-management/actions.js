@@ -7,7 +7,7 @@ import { performanceDatabase, readPerformanceState, writePerformanceState } from
 
 const HR_ACTIONS = new Set(["upsert_template", "upsert_manager_assignment", "freeze_assessment", "append_correction"]);
 const MANAGER_ACTIONS = new Set(["create_assessment", "manager_score", "resolve_review"]);
-const EMPLOYEE_ACTIONS = new Set(["submit_self_review", "request_review"]);
+const EMPLOYEE_ACTIONS = new Set(["submit_self_review", "confirm_result", "request_review"]);
 const ACTIONS = new Set([...HR_ACTIONS, ...MANAGER_ACTIONS, ...EMPLOYEE_ACTIONS]);
 
 export async function onRequest({ request, env, data = {} }) {
@@ -24,7 +24,7 @@ export async function onRequest({ request, env, data = {} }) {
   try {
     const state = await readPerformanceState(db);
     const assessment = state.assessments.find(item => item.id === action.id);
-    if (["submit_self_review", "request_review"].includes(action.type) && assessment?.employeeId !== currentUserId(data.session)) return jsonResponse({ message: "只能操作自己的绩效。" }, 403);
+    if (["submit_self_review", "confirm_result", "request_review"].includes(action.type) && assessment?.employeeId !== currentUserId(data.session)) return jsonResponse({ message: "只能操作自己的绩效。" }, 403);
     if (body.expectedRevision !== undefined && Number(body.expectedRevision) !== state.revision) return jsonResponse({ message: "数据已更新，请刷新后重试。", code: "REVISION_CONFLICT" }, 409);
     const user = actor(data.session);
     if (action.type === "create_assessment") {

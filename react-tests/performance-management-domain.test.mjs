@@ -22,11 +22,12 @@ test("employee self score, manager final score and HR freeze form an audited wor
   state = reducePerformanceState(state, { type: "create_assessment", actor: { userId: "hr", name: "人事" }, record: { id: "a-1", employeeId: "e-1", month: "2026-07", items: [{ id: "i-1", weight: 100, target: 10, actual: 9, formula: "completion" }] } });
   state = reducePerformanceState(state, { type: "submit_self_review", actor: { userId: "e-1", name: "员工" }, id: "a-1", selfScore: 88, selfComment: "完成重点产品测试" });
   state = reducePerformanceState(state, { type: "manager_score", actor: { userId: "m-1", name: "主管" }, id: "a-1", finalScore: 75, reason: "证据不足" });
+  state = reducePerformanceState(state, { type: "confirm_result", actor: { userId: "e-1", name: "员工" }, id: "a-1" });
   state = reducePerformanceState(state, { type: "freeze_assessment", actor: { userId: "hr", name: "人事" }, id: "a-1" });
   assert.equal(state.assessments[0].status, "frozen");
   assert.equal(state.assessments[0].selfScore, 88);
   assert.equal(state.assessments[0].finalScore, 75);
-  assert.equal(state.auditLogs.length, 4);
+  assert.equal(state.auditLogs.length, 5);
   assert.throws(() => reducePerformanceState(state, { type: "manager_score", id: "a-1", finalScore: 90 }), /已冻结/);
 });
 
@@ -51,4 +52,13 @@ test("review must be resolved before HR freezes an immutable snapshot", () => {
   state = reducePerformanceState(state, { type: "freeze_assessment", id: "a-review" });
   assert.equal(state.assessments[0].status, "frozen");
   assert.equal(state.assessments[0].frozenSnapshot.finalScore, 90);
+});
+
+test("corrections are append-only after freeze and require an audit reason", () => {
+  let state = reducePerformanceState(createDefaultPerformanceState(), { type: "create_assessment", record: { id: "a-correction", employeeId: "e-1", month: "2026-07", items: [{ weight: 100, target: 1, actual: 1, formula: "completion" }] } });
+  assert.throws(() => reducePerformanceState(state, { type: "append_correction", id: "a-correction", reason: "提前改" }), /冻结后/);
+  state.assessments[0].status = "frozen";
+  assert.throws(() => reducePerformanceState(state, { type: "append_correction", id: "a-correction" }), /填写原因/);
+  state = reducePerformanceState(state, { type: "append_correction", id: "a-correction", reason: "财务数据更正", value: 88 });
+  assert.equal(state.assessments[0].corrections[0].reason, "财务数据更正");
 });

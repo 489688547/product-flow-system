@@ -13,7 +13,7 @@ export function canManageEmployee(state, session, employeeId) {
 }
 
 export function filterPerformanceState(state, session) {
-  if (isHr(session)) return state;
+  if (isHr(session) || dept(session) === "总经办") return state;
   const employeeId = uid(session);
   if (isManager(session)) {
     const ids = new Set(state.assessments.filter(item => item.managerId === employeeId).map(item => item.id));
