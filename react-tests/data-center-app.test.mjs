@@ -60,3 +60,26 @@ test("overview and analysis expose the operating time basis and drilldowns", () 
   assert.match(analysis, /商品筛选/);
   assert.match(analysis, /DataTable/);
 });
+
+test("governance workspaces cover safe sources metrics quality sync services and settings", () => {
+  const page = read("src/features/data-center/DataCenterAppPage.jsx");
+  const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
+  assert.match(page, /DataSourcesWorkspace/);
+  assert.match(page, /MetricDefinitionsWorkspace/);
+  assert.match(page, /DataQualityWorkspace/);
+  assert.match(page, /SyncRunsWorkspace/);
+  assert.match(page, /DataServicesWorkspace/);
+  assert.match(page, /DataCenterSettingsWorkspace/);
+  assert.match(workspaces, /不保存账号密码、Cookie、验证码或 Token/);
+  assert.doesNotMatch(workspaces, /type="password"/);
+  assert.match(workspaces, /抖音店铺/);
+  assert.match(workspaces, /快手店铺/);
+  assert.match(workspaces, /天猫店铺/);
+  assert.match(workspaces, /快麦 ERP/);
+  assert.match(workspaces, /巨量引擎/);
+  assert.match(workspaces, /待验证/);
+  assert.match(workspaces, /订单创建时间/);
+  assert.match(workspaces, /Asia\/Shanghai/);
+  assert.match(workspaces, /应用订阅/);
+  assert.match(workspaces, /原始数据保留天数/);
+});
