@@ -28,11 +28,13 @@
 - `loadMyDingTalkGroups(fetchImpl?) -> Promise<{groups}>`
 - `createTodoComposerDraft({task, product}) -> {subject, descriptionHtml, priority, dueDate, dueClock}`
 - `buildTaskTodoPayload(..., draft) -> DingTalkTodoInput`
+- `reconcileTaskTodosFromDingTalk(tasks, cards) -> tasks`：按 todoId/sourceId 匹配，以钉钉卡片覆盖同步快照；无匹配或查询失败保持原状态。
 - `GET /api/dingtalk/groups -> {groups:[{id,name,memberCount,myRole}], nextCursor, hasMore}`
 - `POST /api/dingtalk/todo/sync`：必须具备有效企业会话且不是只读账号；服务端从会话覆盖创建人，从 D1 共享状态校验 `sourceId` 对应的产品任务，并只接受与任务记录一致的 `todoId`。客户端传入的创建人、操作人、资源人和恢复人员不作为授权依据。
 - 待办同步请求成功返回 `{synced:true,todo}`；无会话由全局中间件返回 401，只读返回 403，任务不存在返回 404，D1 未绑定或状态未初始化返回 501/409，钉钉失败保留供应商错误摘要并使用对应 HTTP 状态。
 - 兼容旧任务：没有 `dingTodo.id` 时按稳定 `sourceId` 创建或执行有界恢复；有 ID 时仅使用服务端任务记录中的 ID 更新。日志和供应商响应不得写入令牌、手机号或原始敏感数据。
 - `TodoSyncModal.onSync({executors,draft})`
+- `ProductFlowProvider` 在登录完成、窗口聚焦和 60 秒周期读取 `/api/dingtalk/todo/list`，只在远端快照变化时持久化产品任务。
 
 ## 数据迁移
 

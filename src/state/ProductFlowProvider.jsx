@@ -15,12 +15,13 @@ import {
 } from "../domain/productFlow.js";
 import { normalizeClientState } from "./stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../domain/sessionUser.js";
-import { createTaskMeetingRecord } from "../domain/dingTalk.js";
+import { createTaskMeetingRecord, reconcileTaskTodosFromDingTalk } from "../domain/dingTalk.js";
 import { applyTaskTodoSyncFailure, applyTaskTodoSyncSuccess } from "../domain/taskTodo.js";
 import { sharedStateApiUrl } from "./stateApi.js";
 import { createDemandRecord } from "../domain/demandDate.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { normalizeProductPlans, validateProductPlan } from "../domain/productPlanning.js";
+import { createDingTalkTodoRefreshController } from "./dingTalkTodoRefresh.js";
 
 const ProductFlowContext = createContext(null);
 const STORAGE_KEY = "productFlowState";
@@ -74,6 +75,13 @@ export function ProductFlowProvider({ children }) {
       return nextState;
     });
   }, []);
+  const todoRefreshController = useMemo(() => createDingTalkTodoRefreshController({
+    fetchImpl: (...args) => fetch(...args),
+    onTodos: todos => commitState(current => {
+      const tasks = reconcileTaskTodosFromDingTalk(current.tasks || [], todos);
+      return tasks === current.tasks ? current : { ...current, tasks };
+    })
+  }), [commitState]);
 
   useEffect(() => {
     let alive = true;
@@ -133,6 +141,31 @@ export function ProductFlowProvider({ children }) {
     refreshOrganization();
     return () => { alive = false; };
   }, [loading]);
+
+  const refreshTaskTodoStatuses = useCallback(
+    () => todoRefreshController.refresh(),
+    [todoRefreshController]
+  );
+
+  useEffect(() => {
+    if (loading || !authUser?.unionId) return undefined;
+    let active = true;
+    const refresh = () => {
+      if (!active) return;
+      refreshTaskTodoStatuses().catch(() => {
+        // A temporary read failure must not overwrite the last successful local snapshot.
+      });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      active = false;
+      todoRefreshController.invalidate();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [authUser?.unionId, loading, refreshTaskTodoStatuses, todoRefreshController]);
 
   useEffect(() => {
     const serializedState = JSON.stringify(state);
@@ -278,6 +311,7 @@ export function ProductFlowProvider({ children }) {
         throw new Error([result.message || "钉钉待办同步失败。", detail].filter(Boolean).join(" "));
       }
       const syncedAt = new Date().toISOString();
+      todoRefreshController.invalidate();
       commitState(current => ({
         ...current,
         tasks: (current.tasks || []).map(item => item.id === taskId

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { createDingTalkTodoRefreshController } from "../src/state/dingTalkTodoRefresh.js";
 
 const modal = fs.readFileSync(new URL("../src/features/progress/TodoSyncModal.jsx", import.meta.url), "utf8");
 const page = fs.readFileSync(new URL("../src/features/progress/ProductProgressPage.jsx", import.meta.url), "utf8");
@@ -21,6 +22,57 @@ test("progress page allows opening the composer before a deadline exists", () =>
   assert.doesNotMatch(page, /updateTask\(todoTask\.id, \{ due: draft\.dueDate \}\)/);
   assert.match(provider, /applyTaskTodoSyncSuccess/);
   assert.match(provider, /applyTaskTodoSyncFailure/);
+});
+
+test("product flow automatically refreshes remote DingTalk task changes", () => {
+  assert.match(provider, /reconcileTaskTodosFromDingTalk/);
+  assert.match(provider, /createDingTalkTodoRefreshController/);
+  assert.match(provider, /window\.addEventListener\("focus"/);
+  assert.match(provider, /todoRefreshController\.invalidate\(\)/);
+});
+
+function deferred() {
+  let resolve;
+  const promise = new Promise(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+function todoListResponse(todos) {
+  return { ok: true, json: async () => ({ synced: true, todos }) };
+}
+
+test("todo refresh accepts only the latest overlapping response", async () => {
+  const first = deferred();
+  const second = deferred();
+  const responses = [first.promise, second.promise];
+  const applied = [];
+  const controller = createDingTalkTodoRefreshController({
+    fetchImpl: async () => responses.shift(),
+    onTodos: todos => applied.push(todos)
+  });
+
+  const firstRefresh = controller.refresh();
+  const secondRefresh = controller.refresh();
+  second.resolve(todoListResponse([{ taskId: "new" }]));
+  assert.equal(await secondRefresh, true);
+  first.resolve(todoListResponse([{ taskId: "old" }]));
+  assert.equal(await firstRefresh, false);
+  assert.deepEqual(applied, [[{ taskId: "new" }]]);
+});
+
+test("successful local sync can invalidate an in-flight todo refresh", async () => {
+  const pending = deferred();
+  const applied = [];
+  const controller = createDingTalkTodoRefreshController({
+    fetchImpl: async () => pending.promise,
+    onTodos: todos => applied.push(todos)
+  });
+
+  const refresh = controller.refresh();
+  controller.invalidate();
+  pending.resolve(todoListResponse([{ taskId: "stale" }]));
+  assert.equal(await refresh, false);
+  assert.deepEqual(applied, []);
 });
 
 test("shared rich text editor supports compact text-only disabled mode", () => {

@@ -1,4 +1,4 @@
-import { normalizeTaskDueDate } from "./taskTodo.js";
+import { buildTaskTodoSnapshot, normalizeTaskDueDate } from "./taskTodo.js";
 
 const TODO_PRIORITIES = new Set([10, 20, 30, 40]);
 
@@ -199,4 +199,116 @@ export function buildTaskTodoPayload({ product, task, creator, executors = [], r
     draft: { ...composer, dueDate: due },
     done: Boolean(task.done)
   };
+}
+
+function dingTodoCardId(card = {}) {
+  return String(card.taskId || card.id || card.todoTaskId || "").trim();
+}
+
+function dingTodoExecutors(card = {}) {
+  const values = card.executorIds || card.executorUnionIds;
+  if (!Array.isArray(values)) return null;
+  return [...new Set(values.map(value => String(value?.id || value || "").trim()).filter(Boolean))];
+}
+
+function shanghaiDateAndClock(value) {
+  const date = new Date(Number(value));
+  if (!Number.isFinite(date.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+  const part = type => parts.find(item => item.type === type)?.value || "";
+  return {
+    dueDate: `${part("year")}-${part("month")}-${part("day")}`,
+    dueClock: `${part("hour")}:${part("minute")}`
+  };
+}
+
+function plainTextToTodoHtml(value = "") {
+  const lines = String(value).replace(/\r\n?/g, "\n").split("\n");
+  return lines.map(line => `<p>${escapeHtml(line) || "<br>"}</p>`).join("") || "<p><br></p>";
+}
+
+function remoteModifiedAt(card = {}) {
+  const value = card.modifiedTime || card.updatedAt || card.updateTime;
+  if (!value) return "";
+  const numeric = Number(value);
+  const date = new Date(Number.isFinite(numeric) && String(value).trim() !== "" ? numeric : String(value));
+  return Number.isFinite(date.getTime()) ? date.toISOString() : "";
+}
+
+function todoSnapshotTime(value) {
+  const time = Date.parse(String(value || ""));
+  return Number.isFinite(time) ? time : 0;
+}
+
+export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
+  const remoteById = new Map();
+  const remoteBySource = new Map();
+  (Array.isArray(cards) ? cards : []).forEach(card => {
+    const id = dingTodoCardId(card);
+    const sourceId = String(card?.sourceId || "").trim();
+    if (id) remoteById.set(id, card);
+    if (sourceId) remoteBySource.set(sourceId, card);
+  });
+
+  let changed = false;
+  const nextTasks = (Array.isArray(tasks) ? tasks : []).map(task => {
+    const todoId = String(task?.dingTodo?.id || "").trim();
+    const sourceId = `task:${task?.productId || ""}:${task?.id || ""}`;
+    const card = remoteById.get(todoId) || remoteBySource.get(sourceId);
+    if (!card) return task;
+
+    const remoteUpdatedAt = remoteModifiedAt(card);
+    const localUpdatedAt = Math.max(
+      todoSnapshotTime(task.dingTodo?.remoteUpdatedAt),
+      todoSnapshotTime(task.dingTodo?.syncedAt)
+    );
+    if (localUpdatedAt && (!remoteUpdatedAt || todoSnapshotTime(remoteUpdatedAt) <= localUpdatedAt)) return task;
+
+    const remoteId = dingTodoCardId(card) || todoId;
+    const remoteDue = Number(card.dueTime) > 0 ? shanghaiDateAndClock(card.dueTime) : null;
+    const previousDraft = task.dingTodo?.draft || createTodoComposerDraft({ task });
+    const remotePriority = TODO_PRIORITIES.has(Number(card.priority)) ? Number(card.priority) : previousDraft.priority;
+    const draft = {
+      ...previousDraft,
+      subject: Object.hasOwn(card, "subject") ? String(card.subject || "") : previousDraft.subject,
+      descriptionHtml: Object.hasOwn(card, "description")
+        ? plainTextToTodoHtml(card.description)
+        : previousDraft.descriptionHtml,
+      priority: remotePriority,
+      dueDate: remoteDue?.dueDate || previousDraft.dueDate || task.due || "",
+      dueClock: remoteDue?.dueClock || previousDraft.dueClock || "18:00"
+    };
+    const executorUnionIds = dingTodoExecutors(card) || task.dingTodo?.executorUnionIds || [];
+    const sameExecutors = JSON.stringify(executorUnionIds) === JSON.stringify(task.dingTodo?.executorUnionIds || []);
+    const done = Object.hasOwn(card, "isDone") ? Boolean(card.isDone) : Boolean(task.done);
+    const effectiveTask = {
+      ...task,
+      due: draft.dueDate || task.due || "",
+      done
+    };
+    const dingTodo = {
+      ...(task.dingTodo || {}),
+      id: remoteId,
+      executorUnionIds,
+      executorNames: sameExecutors ? (task.dingTodo?.executorNames || []) : [],
+      draft,
+      remoteUpdatedAt,
+      lastError: "",
+      failedAt: ""
+    };
+    dingTodo.snapshot = buildTaskTodoSnapshot(effectiveTask, executorUnionIds, draft);
+    const nextTask = { ...effectiveTask, dingTodo };
+    if (JSON.stringify(nextTask) === JSON.stringify(task)) return task;
+    changed = true;
+    return nextTask;
+  });
+  return changed ? nextTasks : tasks;
 }
