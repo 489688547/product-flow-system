@@ -4,6 +4,7 @@ import fs from "node:fs";
 import {
   createCollaborationItem,
   listCollaborationItems,
+  syncCollaborationDingTodo,
   transitionCollaborationItem,
   updateCollaborationItem
 } from "../src/state/collaborationApi.js";
@@ -35,6 +36,7 @@ test("collaboration client sends scoped queries and governed writes", async () =
   await listCollaborationItems({ view: "pending_acceptance", status: ["pending_acceptance", "returned"], query: "包装" }, fetchImpl);
   await createCollaborationItem({ title: "确认包装" }, fetchImpl);
   await transitionCollaborationItem("c1", { version: 1, transition: "accept", idempotencyKey: "accept-1" }, fetchImpl);
+  await syncCollaborationDingTodo("c1", { version: 2, detailUrl: "https://flow.example.com/#/collaboration/c1" }, fetchImpl);
 
   assert.match(calls[0].url, /view=pending_acceptance/);
   assert.match(calls[0].url, /status=pending_acceptance/);
@@ -42,6 +44,7 @@ test("collaboration client sends scoped queries and governed writes", async () =
   assert.equal(calls[1].options.method, "POST");
   assert.equal(calls[2].options.method, "POST");
   assert.match(calls[2].url, /\/c1\/transitions$/);
+  assert.match(calls[3].url, /\/c1\/dingtalk$/);
 });
 
 test("collaboration provider is mounted for all authenticated employees outside the executive platform provider", () => {
@@ -50,6 +53,7 @@ test("collaboration provider is mounted for all authenticated employees outside 
   assert.match(provider, /export function CollaborationProvider/);
   assert.match(provider, /COLLABORATION_VERSION_CONFLICT/);
   assert.match(provider, /loadActivities/);
+  assert.match(provider, /syncDingTodo/);
   assert.match(provider, /useCollaboration/);
   assert.match(main, /<CollaborationProvider>/);
   assert.match(main, /<CollaborationProvider>[\s\S]*<PlatformProvider enabled=\{hasCompanyAccess\}>/);

@@ -4,6 +4,7 @@ import {
   getCollaborationItem,
   listCollaborationActivities,
   listCollaborationItems,
+  syncCollaborationDingTodo,
   transitionCollaborationItem,
   updateCollaborationItem
 } from "./collaborationApi.js";
@@ -104,6 +105,11 @@ export function CollaborationProvider({ children, enabled = true }) {
     await loadActivities(id).catch(() => {});
     return payload;
   }), [loadActivities, runWrite]);
+  const syncDingTodo = useCallback((id, input) => runWrite(async () => {
+    const payload = await syncCollaborationDingTodo(id, input);
+    await loadActivities(id).catch(() => {});
+    return payload;
+  }), [loadActivities, runWrite]);
 
   const value = useMemo(() => ({
     items,
@@ -120,9 +126,10 @@ export function CollaborationProvider({ children, enabled = true }) {
     createItem,
     updateItem,
     transitionItem,
+    syncDingTodo,
     clearError: () => setError(null),
     clearConflict: () => setConflict(null)
-  }), [activitiesByItem, conflict, createItem, error, items, loadActivities, loadItem, loadItems, loading, query, saving, scope, transitionItem, updateItem]);
+  }), [activitiesByItem, conflict, createItem, error, items, loadActivities, loadItem, loadItems, loading, query, saving, scope, syncDingTodo, transitionItem, updateItem]);
 
   return <CollaborationContext.Provider value={value}>{children}</CollaborationContext.Provider>;
 }

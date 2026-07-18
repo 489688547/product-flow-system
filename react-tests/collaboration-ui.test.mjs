@@ -31,6 +31,8 @@ test("detail and editor cover responsibility transitions creation editing and ar
   assert.match(detail, /标记阻塞并请求协调/);
   assert.match(detail, /提交发起方验收/);
   assert.match(detail, /活动记录/);
+  assert.match(detail, /同步到钉钉待办/);
+  assert.match(detail, /dingTodo\.lastError/);
   assert.match(editor, /OrgSelect/);
   assert.match(editor, /DatePickerField/);
   assert.match(editor, /businessImpact/);

@@ -73,3 +73,8 @@ export async function listCollaborationActivities(id, fetchImpl = fetch, signal)
   const response = await fetchImpl(`${BASE_URL}/${encodeURIComponent(id)}/activities`, signal ? { signal } : undefined);
   return payloadFor(response, "协同活动记录加载失败。");
 }
+
+export async function syncCollaborationDingTodo(id, input, fetchImpl = fetch, signal) {
+  const response = await fetchImpl(`${BASE_URL}/${encodeURIComponent(id)}/dingtalk`, jsonOptions("POST", input, signal));
+  return payloadFor(response, "钉钉待办同步失败。");
+}

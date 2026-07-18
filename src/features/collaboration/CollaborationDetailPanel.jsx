@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowUpRight, Check, ChevronRight, Pencil, X } from "lucide-react";
+import { ArrowUpRight, Check, ChevronRight, Pencil, RefreshCw, Send, X } from "lucide-react";
 import { collaborationTransitionsFor } from "../../domain/collaboration.js";
 import { orgUsers } from "../../domain/productFlow.js";
 import { useCollaboration } from "../../state/CollaborationProvider.jsx";
@@ -44,7 +44,7 @@ function dateTime(value) {
 }
 
 export function CollaborationDetailPanel({ item, currentUser, orgCache, onClose, onEdit }) {
-  const { activitiesByItem, loadActivities, transitionItem, saving } = useCollaboration();
+  const { activitiesByItem, loadActivities, syncDingTodo, transitionItem, saving } = useCollaboration();
   const [action, setAction] = useState("");
   const [reason, setReason] = useState("");
   const [ownerName, setOwnerName] = useState(item?.ownerUser?.name || "");
@@ -55,6 +55,7 @@ export function CollaborationDetailPanel({ item, currentUser, orgCache, onClose,
   const actor = useMemo(() => actorFor(currentUser), [currentUser]);
   const allowed = useMemo(() => item ? collaborationTransitionsFor(item, actor) : [], [actor, item]);
   const activities = item ? activitiesByItem[item.id] || [] : [];
+  const dingError = item.dingTodo && item.dingTodo.lastError;
 
   useEffect(() => {
     if (!item) return;
@@ -89,6 +90,15 @@ export function CollaborationDetailPanel({ item, currentUser, orgCache, onClose,
     }
   }
 
+  async function syncTodo() {
+    try {
+      await syncDingTodo(item.id, { version: item.version, detailUrl: `${window.location.origin}${window.location.pathname}#/collaboration/${item.id}` });
+      setActionError("");
+    } catch (error) {
+      setActionError(error.message || "钉钉待办同步失败。");
+    }
+  }
+
   return (
     <aside className="collaboration-detail" aria-label={`协同详情：${item.title}`}>
       <header>
@@ -111,6 +121,7 @@ export function CollaborationDetailPanel({ item, currentUser, orgCache, onClose,
       <section className="collaboration-detail-section"><h3>责任关系</h3><dl><div><dt>发起部门</dt><dd>{item.requesterDepartment?.name || "未识别"}</dd></div><div><dt>主责部门</dt><dd>{item.ownerDepartment?.name || "待指定"}</dd></div><div><dt>主负责人</dt><dd>{item.ownerUser?.name || "待接收时指定"}</dd></div><div><dt>截止时间</dt><dd>{dateTime(item.dueAt)}</dd></div><div><dt>协同部门</dt><dd>{item.partnerDepartments?.map(department => department.name).join("、") || "无"}</dd></div></dl></section>
       <section className="collaboration-detail-section"><h3>业务影响与完成结果</h3><p>{item.businessImpact || "未填写业务影响"}</p>{item.completionSummary ? <div className="collaboration-result"><strong>提交结果</strong><p>{item.completionSummary}</p></div> : null}</section>
       <section className="collaboration-detail-section"><h3>来源与关联</h3><div className="collaboration-source-card"><span><strong>{item.source?.sourceLabel || "协同工作台"}</strong><small>{item.source?.appId || "manual"}</small></span>{item.source?.sourceRoute ? <a href={item.source.sourceRoute}>打开来源 <ArrowUpRight size={14} /></a> : <span className="muted">来源不可进入</span>}</div></section>
+      <section className="collaboration-detail-section collaboration-dingtalk-sync"><h3>钉钉待办</h3><div><span><strong>{item.dingTodo?.id ? "已建立待办镜像" : "尚未同步"}</strong><small>{item.dingTodo?.syncedAt ? `最近同步 ${dateTime(item.dingTodo.syncedAt)}` : "接收并确定主负责人后可同步"}</small></span><Button disabled={!item.ownerUser?.unionId || item.status === "pending_acceptance" || saving} disabledReason={!item.ownerUser?.unionId ? "主负责人缺少真实钉钉身份" : item.status === "pending_acceptance" ? "等待主责部门接收后再同步" : "正在同步"} onClick={syncTodo}>{dingError ? <RefreshCw size={15} /> : <Send size={15} />}{dingError ? "重试同步" : item.dingTodo?.id ? "更新钉钉待办" : "同步到钉钉待办"}</Button></div>{dingError ? <p className="collaboration-ding-error" role="alert">{dingError}</p> : null}</section>
       <section className="collaboration-detail-section"><h3>活动记录</h3><ol className="collaboration-timeline">{activities.length ? activities.map(activity => <li key={activity.id}><span /><div><strong>{ACTION_LABELS[activity.action] || (activity.action === "create" ? "创建事项" : activity.action)}</strong><p>{activity.reason || activity.actorUser?.name || "系统记录"}</p><time>{dateTime(activity.createdAt)}</time></div><ChevronRight size={14} aria-hidden="true" /></li>) : <li className="empty"><div><strong>正在等待活动记录</strong><p>状态动作会在这里形成不可删除的审计轨迹。</p></div></li>}</ol></section>
       <section className="collaboration-record-meta"><span>事项 ID {item.id}</span><span>版本 {item.version}</span></section>
     </aside>
