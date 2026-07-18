@@ -29,14 +29,14 @@
   - 验证：`node --test tests/data-center-api.test.mjs tests/supply-chain-api.test.mjs react-tests/sales-data.test.mjs`，21/21 通过。
   - 提交：`feat(data): add data center APIs`。
 
-- [ ] Provider
+- [x] Provider
   - 依赖：D1 与 API。
   - 文件：`src/state/dataCenterApi.js`、`src/state/DataCenterProvider.jsx`、领域测试。
   - 输入：元数据 API、销售 API、现有浏览器销售仓库。
   - 输出：`useDataCenter()`。
   - 失败测试：Provider 源码契约测试预期文件不存在。
   - 实现步骤：并行读取、缓存、debounce 保存、本地销售降级。
-  - 验证：Provider 契约和领域测试通过。
+  - 验证：`node --test react-tests/data-center-provider.test.mjs react-tests/data-center.test.mjs`，10/10 通过。
   - 提交：`feat(data): add data center provider`。
 
 - [ ] 第三 App 装配
