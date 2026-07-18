@@ -9,8 +9,7 @@ const markdownModules = import.meta.glob(
     "../../../docs/handbook/*.md",
     "../../../docs/product/*.md",
     "../../../docs/platform/*.md",
-    "../../../docs/superpowers/specs/*.md",
-    "../../../docs/superpowers/plans/*.md"
+    "../../../docs/superpowers/specs/*.md"
   ],
   { eager: true, query: "?raw", import: "default" }
 );
@@ -21,7 +20,6 @@ const KIND_ORDER = {
   product: 0,
   design: 1,
   specification: 2,
-  plan: 3,
   platform: 0
 };
 const DEFAULT_UPDATED_AT = "2026-07-17";
@@ -45,11 +43,7 @@ const documentLocation = path => {
   if (path.includes("/docs/platform/")) {
     return { slug: `platform/${name}`, category: "platform", kind: "platform" };
   }
-  if (path.includes("/docs/superpowers/specs/")) {
-    return { slug: `product/specs/${name}`, category: "product", kind: "specification" };
-  }
-
-  return { slug: `product/plans/${name}`, category: "product", kind: "plan" };
+  return { slug: `product/specs/${name}`, category: "product", kind: "specification" };
 };
 
 const repositoryDocuments = Object.entries(markdownModules).map(([path, content]) => {

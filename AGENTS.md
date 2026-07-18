@@ -46,6 +46,9 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 
 ## Security and external systems
 
+- Before coding, debugging, reviewing, or documenting work that may touch an external platform, use `.agents/skills/integration-router/SKILL.md` and route the task through `docs/platform/integration-registry.json`.
+- Treat prompt keywords as advisory. A changed path matched by the registry is mandatory and must be declared in the pull request with `Integration-Impact` and `Integration-Impact-Reason`.
+- New branches start from the latest `main`; branches created earlier must update from `main` before merge so they receive the current registry and routing rules.
 - Never commit credentials, access tokens, cookies, personal mobile numbers, or raw provider responses containing sensitive data.
 - Company documents remain behind the existing authenticated application boundary even when all employees may view them.
 - Validate authorization on the server; hidden UI is not an authorization boundary.
@@ -59,6 +62,7 @@ Run all of the following from the repository root:
 ```bash
 npm run lint
 npm run check:governance
+npm run check:integrations
 npm test
 npm run build
 ```
@@ -66,4 +70,3 @@ npm run build
 UI work also requires keyboard, focus, empty/error/disabled states, real laptop width, responsive layout, WCAG AA contrast, and DingTalk WebView review. API work requires authentication, permission, failure, timeout, and compatibility coverage.
 
 Before committing, inspect `git status --short` and stage only files belonging to the current task. Existing user changes and unrelated worktrees must never be overwritten or included.
-

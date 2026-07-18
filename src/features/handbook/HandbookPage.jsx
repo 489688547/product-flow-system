@@ -1,5 +1,5 @@
 import { BookOpenText, Search, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   HANDBOOK_CATEGORIES,
   extractMarkdownHeadings,
@@ -10,11 +10,11 @@ import {
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { MarkdownDocument } from "./MarkdownDocument.jsx";
 import { DEFAULT_HANDBOOK_SLUG, handbookDocuments } from "./handbookCatalog.js";
+import { IntegrationPlatformMap } from "./IntegrationPlatformMap.jsx";
 import "./handbook.css";
 
 const CATEGORY_LABELS = Object.fromEntries(
-  HANDBOOK_CATEGORIES.filter(category => category.id !== "all")
-    .map(category => [category.id, category.label])
+  HANDBOOK_CATEGORIES.map(category => [category.id, category.label])
 );
 
 const KIND_LABELS = {
@@ -22,7 +22,6 @@ const KIND_LABELS = {
   product: "产品说明",
   design: "设计书",
   specification: "设计规格",
-  plan: "实施计划",
   platform: "平台能力"
 };
 
@@ -34,23 +33,39 @@ const groupedDocuments = documents => Object.entries(CATEGORY_LABELS)
   }))
   .filter(group => group.documents.length);
 
-export default function HandbookPage({ selectedSlug, onSelectDocument }) {
+export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUser }) {
   const [query, setQuery] = useState("");
-  const [category, setCategory] = useState("all");
   const activeDocument = resolveHandbookDocument(
     handbookDocuments,
     selectedSlug,
     DEFAULT_HANDBOOK_SLUG
   );
+  const [category, setCategory] = useState(() => activeDocument?.category ?? "handbook");
   const filteredDocuments = useMemo(
     () => filterHandbookDocuments(handbookDocuments, { query, category }),
     [category, query]
   );
   const groups = useMemo(() => groupedDocuments(filteredDocuments), [filteredDocuments]);
+  const isIntegrationMap = activeDocument?.slug === "platform/external-platform-map";
   const headings = useMemo(
     () => extractMarkdownHeadings(activeDocument?.content),
     [activeDocument]
   );
+
+  useEffect(() => {
+    if (selectedSlug && activeDocument?.category) {
+      setCategory(activeDocument.category);
+    }
+  }, [activeDocument?.category, selectedSlug]);
+
+  const selectCategory = nextCategory => {
+    setCategory(nextCategory);
+
+    if (activeDocument?.category !== nextCategory) {
+      const firstDocument = handbookDocuments.find(document => document.category === nextCategory);
+      if (firstDocument) onSelectDocument?.(firstDocument.slug);
+    }
+  };
 
   const jumpToHeading = (event, id) => {
     event.preventDefault();
@@ -87,7 +102,7 @@ export default function HandbookPage({ selectedSlug, onSelectDocument }) {
               type="button"
               className={category === item.id ? "active" : ""}
               aria-pressed={category === item.id}
-              onClick={() => setCategory(item.id)}
+              onClick={() => selectCategory(item.id)}
             >
               {item.label}
             </button>
@@ -96,10 +111,10 @@ export default function HandbookPage({ selectedSlug, onSelectDocument }) {
       </div>
 
       {filteredDocuments.length && activeDocument ? (
-        <div className="handbook-workspace">
+        <div className={`handbook-workspace${isIntegrationMap ? " platform-map-open" : ""}`}>
           <nav className="handbook-catalog" aria-label="说明书目录">
             {groups.map(group => (
-              <section key={group.category} className="handbook-catalog-group">
+              <section key={group.category} className="handbook-catalog-group" data-category={group.category}>
                 <h2>{group.label}</h2>
                 <div className="handbook-document-list">
                   {group.documents.map(document => (
@@ -119,7 +134,7 @@ export default function HandbookPage({ selectedSlug, onSelectDocument }) {
             ))}
           </nav>
 
-          <article className="handbook-article">
+          <article className={`handbook-article${isIntegrationMap ? " handbook-article-platform-map" : ""}`}>
             <header className="handbook-document-header">
               <div className="handbook-document-kind">
                 <BookOpenText size={15} aria-hidden="true" />
@@ -129,10 +144,12 @@ export default function HandbookPage({ selectedSlug, onSelectDocument }) {
               <p>{activeDocument.summary}</p>
               <time dateTime={activeDocument.updatedAt}>更新于 {activeDocument.updatedAt}</time>
             </header>
-            <MarkdownDocument content={removeMarkdownLead(activeDocument.content)} />
+            {isIntegrationMap
+              ? <IntegrationPlatformMap sessionUser={sessionUser} />
+              : <MarkdownDocument content={removeMarkdownLead(activeDocument.content)} />}
           </article>
 
-          <aside className="handbook-toc" aria-label="本页目录">
+          {!isIntegrationMap ? <aside className="handbook-toc" aria-label="本页目录">
             <strong>本页目录</strong>
             {headings.length ? (
               <ol>
@@ -145,15 +162,15 @@ export default function HandbookPage({ selectedSlug, onSelectDocument }) {
                 ))}
               </ol>
             ) : <small>本页没有分节标题</small>}
-          </aside>
+          </aside> : null}
         </div>
       ) : (
         <div className="handbook-empty">
           <BookOpenText size={24} aria-hidden="true" />
           <strong>没有找到匹配的说明</strong>
-          <span>换一个关键词，或选择“全部”查看现有文档。</span>
-          <button type="button" className="btn" onClick={() => { setQuery(""); setCategory("all"); }}>
-            查看全部说明
+          <span>换一个关键词，或返回使用手册查看现有文档。</span>
+          <button type="button" className="btn" onClick={() => { setQuery(""); selectCategory("handbook"); }}>
+            返回使用手册
           </button>
         </div>
       )}

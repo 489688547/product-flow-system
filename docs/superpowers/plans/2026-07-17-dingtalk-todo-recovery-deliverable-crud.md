@@ -1,4 +1,4 @@
-# DingTalk Todo Recovery and Deliverable CRUD Implementation Plan
+# 钉钉待办恢复与交付物管理实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

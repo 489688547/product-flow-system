@@ -11,8 +11,9 @@
     "release:pages": "npm run build && node scripts/prepare-pages-release.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 8133",
     "check:governance": "node scripts/check-project-governance.mjs",
+    "check:integrations": "node scripts/check-integration-impact.mjs",
     "test:react": "node --test react-tests/*.test.mjs",
-    "test:api": "node --test tests/shared-state.test.mjs tests/platform-api.test.mjs tests/dingtalk-api.test.mjs tests/dingtalk-org.test.mjs tests/dingtalk-org-routes.test.mjs tests/dingtalk-sync.test.mjs tests/dingtalk-todo-update.test.mjs tests/dingtalk-todo-list.test.mjs tests/dws-todo-preview.test.mjs tests/dingtalk-web-auth.test.mjs tests/dingtalk-group-auth.test.mjs tests/dingtalk-groups.test.mjs",
+    "test:api": "node --test tests/shared-state.test.mjs tests/platform-api.test.mjs tests/integration-profiles-api.test.mjs tests/dingtalk-api.test.mjs tests/dingtalk-org.test.mjs tests/dingtalk-org-routes.test.mjs tests/dingtalk-sync.test.mjs tests/dingtalk-todo-update.test.mjs tests/dingtalk-todo-list.test.mjs tests/dws-todo-preview.test.mjs tests/dingtalk-web-auth.test.mjs tests/dingtalk-group-auth.test.mjs tests/dingtalk-groups.test.mjs",
     "test": "npm run test:react && npm run test:api",
     "start": "node server.mjs"
   },

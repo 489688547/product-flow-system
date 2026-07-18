@@ -19,10 +19,14 @@
 - 外部系统影响：
 - 回滚条件与步骤：
 
+Integration-Impact: none
+Integration-Impact-Reason: 请说明无影响原因，或把 none 改为逗号分隔的平台 ID
+
 ## 验证
 
 - [ ] `npm run lint`
 - [ ] `npm run check:governance`
+- [ ] `npm run check:integrations`
 - [ ] `npm test`
 - [ ] `npm run build`
 - [ ] UI 变更已检查键盘、空/错/禁用状态、笔记本宽度、响应式和钉钉 WebView
@@ -35,4 +39,3 @@ UI 变更附真实页面截图；数据或 API 变更附测试输出或安全的
 ## 文档更新
 
 列出本次更新的产品说明、设计规范、说明书、平台目录或架构决策。
-
