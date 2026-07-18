@@ -27,12 +27,15 @@ const OperatingReviewPage = lazyNamed(() => import("./features/reviews/Operating
 const AppCenterPage = lazyNamed(() => import("./features/platform/AppCenterPage.jsx"), "AppCenterPage");
 const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/IncentiveProjectsPage.jsx"), "IncentiveProjectsPage");
 const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
-const BrandContentPlaceholderPage = lazyNamed(() => import("./features/brand-content/BrandContentPlaceholderPage.jsx"), "BrandContentPlaceholderPage");
 const BrandContentOverviewPage = lazyNamed(() => import("./features/brand-content/BrandContentOverviewPage.jsx"), "BrandContentOverviewPage");
 const BrandContentWorkbenchPage = lazyNamed(() => import("./features/brand-content/BrandContentWorkbenchPage.jsx"), "BrandContentWorkbenchPage");
 const BrandAssetLibraryPage = lazyNamed(() => import("./features/brand-content/BrandAssetLibraryPage.jsx"), "BrandAssetLibraryPage");
 const BrandAdvertisingReviewPage = lazyNamed(() => import("./features/brand-content/BrandAdvertisingReviewPage.jsx"), "BrandAdvertisingReviewPage");
 const BrandAccountPage = lazyNamed(() => import("./features/brand-content/BrandAccountPage.jsx"), "BrandAccountPage");
+const BrandDecisionPage = lazyNamed(() => import("./features/brand-content/BrandDecisionPage.jsx"), "BrandDecisionPage");
+const BrandTeamPage = lazyNamed(() => import("./features/brand-content/BrandTeamPage.jsx"), "BrandTeamPage");
+const BrandDataIssuesPage = lazyNamed(() => import("./features/brand-content/BrandDataIssuesPage.jsx"), "BrandDataIssuesPage");
+const BrandContentSettingsPage = lazyNamed(() => import("./features/brand-content/BrandContentSettingsPage.jsx"), "BrandContentSettingsPage");
 
 const BRAND_NAV = [
   ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
@@ -158,10 +161,10 @@ export default function App() {
     "content-assets": <BrandAssetLibraryPage />,
     "content-review": <BrandAdvertisingReviewPage />,
     "brand-accounts": <BrandAccountPage />,
-    "content-decisions": <BrandContentPlaceholderPage title="补充决策" description="把证据转成产品、数量、方向、账户、责任人和复盘日期。" />,
-    "content-team": <BrandContentPlaceholderPage title="团队效能" description="按编导、剪辑和运营分别看有效交付，不做混合总榜。" />,
-    "content-issues": <BrandContentPlaceholderPage title="数据问题" description="集中处理重复 ID、缺失映射、来源缺日和 NAS 文件失联。" />,
-    "content-settings": <BrandContentPlaceholderPage title="品牌内容设置" description="维护学习期、测试阈值、内容编号与只读接入状态。" />,
+    "content-decisions": <BrandDecisionPage />,
+    "content-team": <BrandTeamPage />,
+    "content-issues": <BrandDataIssuesPage />,
+    "content-settings": <BrandContentSettingsPage />,
     handbook: <HandbookPage selectedSlug={routeDetail} sessionUser={sessionUser} onSelectDocument={slug => showScreen("handbook", slug)} />,
     issues: <IssuePage />,
     settings: <SettingsPage />
