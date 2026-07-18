@@ -30,6 +30,9 @@ const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
 const BrandContentPlaceholderPage = lazyNamed(() => import("./features/brand-content/BrandContentPlaceholderPage.jsx"), "BrandContentPlaceholderPage");
 const BrandContentOverviewPage = lazyNamed(() => import("./features/brand-content/BrandContentOverviewPage.jsx"), "BrandContentOverviewPage");
 const BrandContentWorkbenchPage = lazyNamed(() => import("./features/brand-content/BrandContentWorkbenchPage.jsx"), "BrandContentWorkbenchPage");
+const BrandAssetLibraryPage = lazyNamed(() => import("./features/brand-content/BrandAssetLibraryPage.jsx"), "BrandAssetLibraryPage");
+const BrandAdvertisingReviewPage = lazyNamed(() => import("./features/brand-content/BrandAdvertisingReviewPage.jsx"), "BrandAdvertisingReviewPage");
+const BrandAccountPage = lazyNamed(() => import("./features/brand-content/BrandAccountPage.jsx"), "BrandAccountPage");
 
 const BRAND_NAV = [
   ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
@@ -152,9 +155,9 @@ export default function App() {
     packages: <PackagePage />,
     "content-overview": <BrandContentOverviewPage onNavigate={showScreen} />,
     "content-workbench": <BrandContentWorkbenchPage />,
-    "content-assets": <BrandContentPlaceholderPage title="素材资产" description="关联 NAS 中的内容版本、审核记录和平台发布关系。" />,
-    "content-review": <BrandContentPlaceholderPage title="投放复盘" description="先核对数据口径，再比较产品链接与素材表现。" />,
-    "brand-accounts": <BrandContentPlaceholderPage title="品牌账号" description="独立查看自然播放、完播、互动、收藏和涨粉。" />,
+    "content-assets": <BrandAssetLibraryPage />,
+    "content-review": <BrandAdvertisingReviewPage />,
+    "brand-accounts": <BrandAccountPage />,
     "content-decisions": <BrandContentPlaceholderPage title="补充决策" description="把证据转成产品、数量、方向、账户、责任人和复盘日期。" />,
     "content-team": <BrandContentPlaceholderPage title="团队效能" description="按编导、剪辑和运营分别看有效交付，不做混合总榜。" />,
     "content-issues": <BrandContentPlaceholderPage title="数据问题" description="集中处理重复 ID、缺失映射、来源缺日和 NAS 文件失联。" />,
