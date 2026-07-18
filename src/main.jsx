@@ -6,7 +6,8 @@ import { AuthGate } from "./features/auth/AuthGate.jsx";
 import { PlatformProvider } from "./state/PlatformProvider.jsx";
 import { BrandContentProvider } from "./state/BrandContentProvider.jsx";
 import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatformBridge.jsx";
-import { canAccessCompanyPlatform } from "./domain/permissions.js";
+import { canAccessCompanyPlatform, canAccessSupplyChain } from "./domain/permissions.js";
+import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
@@ -14,13 +15,16 @@ import "./features/brand-content/brand-content.css";
 function AuthenticatedApp() {
   const { user } = useAuth();
   const hasCompanyAccess = canAccessCompanyPlatform(user);
+  const hasSupplyChainAccess = canAccessSupplyChain(user);
   return (
     <ProductFlowProvider>
       <BrandContentProvider>
-        <PlatformProvider enabled={hasCompanyAccess}>
-          {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-          <App />
-        </PlatformProvider>
+        <SupplyChainProvider enabled={hasSupplyChainAccess}>
+          <PlatformProvider enabled={hasCompanyAccess}>
+            {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+            <App />
+          </PlatformProvider>
+        </SupplyChainProvider>
       </BrandContentProvider>
     </ProductFlowProvider>
   );
