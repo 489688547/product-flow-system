@@ -69,14 +69,14 @@
   - 验证：数据中心 App/Provider 10/10 通过，生产构建通过。
   - 提交：`feat(data): add data governance workspaces`。
 
-- [ ] 本地服务一致性
+- [x] 本地服务一致性
   - 依赖：Provider。
   - 文件：`server.mjs`、`tests/local-data-center-server.test.mjs`、`package.json`。
   - 输入：本机 JSON 与浏览器 IndexedDB 降级边界。
   - 输出：本地元数据路由和明确销售 501。
   - 失败测试：本地路由源码断言失败。
   - 实现步骤：JSON 读写、路由、501 响应。
-  - 验证：数据中心与供应链本地测试通过。
+  - 验证：数据中心 API、本地数据中心与供应链 7/7 通过。
   - 提交：`feat(data): add local data center routes`。
 
 - [ ] 视觉与交付
