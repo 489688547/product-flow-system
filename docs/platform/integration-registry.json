@@ -52,15 +52,15 @@
       "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "回滚"],
       "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失"],
       "keywords": ["Cloudflare", "Pages", "Pages Functions", "部署", "生产环境"],
-      "codePaths": ["functions/**", "scripts/prepare-pages-release.mjs", "cloudflare-entry.html", "_redirects", ".github/workflows/**"],
-      "envVars": [],
+      "codePaths": ["functions/**", "scripts/prepare-pages-release.mjs", "cloudflare-entry.html", "_redirects", "wrangler.toml", ".github/workflows/**"],
+      "envVars": ["LOCAL_LIVE_D1_PREVIEW"],
       "domains": ["pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
       "apiRoutes": [],
       "publicDocs": [
         { "label": "Cloudflare Pages 文档", "url": "https://developers.cloudflare.com/pages/" },
         { "label": "Pages Functions 文档", "url": "https://developers.cloudflare.com/pages/functions/" }
       ],
-      "evidence": ["functions/", "scripts/prepare-pages-release.mjs"],
+      "evidence": ["functions/", "scripts/prepare-pages-release.mjs", "wrangler.toml"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "binds", "description": "Pages Functions 通过 PRODUCT_FLOW_DB 绑定访问 D1。" }
       ]

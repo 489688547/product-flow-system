@@ -374,6 +374,62 @@ test("API middleware keeps login bootstrap routes public", async () => {
   assert.equal(await response.text(), "public");
 });
 
+test("explicit localhost live preview attaches an executive session for read requests", async () => {
+  const context = {
+    request: new Request("http://127.0.0.1:8141/api/state"),
+    env: { LOCAL_LIVE_D1_PREVIEW: "1" },
+    data: {},
+    next: async () => Response.json({ ok: true })
+  };
+
+  const response = await apiMiddleware(context);
+  assert.equal(response.status, 200);
+  assert.equal(context.data.session.department, "总经办");
+  assert.equal(context.data.session.loginMode, "local-live-d1-preview");
+});
+
+test("localhost live preview rejects writes to the remote database", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("http://localhost:8141/api/state", { method: "POST" }),
+    env: { LOCAL_LIVE_D1_PREVIEW: "1" },
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 403);
+  assert.equal(continued, false);
+  assert.match(body.message, /只读/);
+});
+
+test("live preview flag never bypasses authentication on non-local hosts", async () => {
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/state"),
+    env: { LOCAL_LIVE_D1_PREVIEW: "1" },
+    data: {},
+    next: async () => Response.json({ ok: true })
+  });
+
+  assert.equal(response.status, 401);
+});
+
+test("session bootstrap exposes the middleware preview identity", async () => {
+  const response = await getCurrentSession({
+    request: new Request("http://127.0.0.1:8141/api/auth/session"),
+    env: {},
+    data: { session: identity }
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.authenticated, true);
+  assert.equal(body.user.name, "周荣庆");
+});
+
 test("readonly sessions cannot write shared company state", async () => {
   const response = await stateRequest({
     request: new Request("https://flow.example.com/api/state", {

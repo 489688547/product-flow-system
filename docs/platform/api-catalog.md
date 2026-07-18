@@ -34,6 +34,8 @@
 
 兼容策略：数据中心不复制销售事实，继续复用 `product_sales_daily`。本地开发没有 D1 时，元数据写入 `.local-data/data-center-state.json`，销售读取返回 501 并由前端降级到现有浏览器销售仓库；销售行不会写入 `localStorage`。
 
+远程只读预览：`wrangler pages dev` 通过 `wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1` 且显式设置 `LOCAL_LIVE_D1_PREVIEW=1` 时，中间件才注入总经办预览身份；该模式只允许 GET，所有写请求返回 403。非本地主机即使设置同名变量也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
+
 ### 内部平台资料契约
 
 `GET /api/platform/v1/integrations` 返回：
