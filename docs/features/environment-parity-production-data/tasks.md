@@ -39,14 +39,14 @@
   - 验证：受控网关与共享状态聚焦测试 10/10 通过；完整 API 测试 115/115 通过；ESLint 静默通过。
   - 提交：`feat: guard production data writes`。
 
-- [ ] 本地生产数据代理与外部动作隔离
+- [x] 本地生产数据代理与外部动作隔离
   - 依赖：生产数据网关。
   - 文件：`server/productionDataClient.mjs`、`server.mjs`、`src/state/stateApi.js`、`tests/local-production-data-client.test.mjs`。
   - 输入：被忽略 `.env` 中的生产 API URL 和个人访问令牌。
   - 输出：本地同源 `/api/state` 真实读写及本地解锁代理；外部写操作默认阻断。
   - 失败测试：读取转发、解锁令牌不下发浏览器、写入携带解锁、无配置降级、外部动作阻断。
   - 实现步骤：实现 Node 客户端，再接入本地路由，最后移除浏览器直连生产 API。
-  - 验证：`node --test tests/local-production-data-client.test.mjs`。
+  - 验证：本地代理与生产网关聚焦测试 11/11 通过；ESLint 静默通过。
   - 提交：`feat: connect local tests to production data`。
 
 - [ ] 说明书环境状态界面
