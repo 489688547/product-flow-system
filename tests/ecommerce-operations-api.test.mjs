@@ -63,20 +63,24 @@ test("collaboration departments only receive their assigned queue", async () => 
 
 test("operator creates a complete plan and manager approves it", async () => {
   const db = createD1Mock();
+  await onActionsRequest({
+    request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_cycle", record: { id: "cycle-p-1", ownerId: "o-1", ownerName: "运营甲", product: "主粮", month: "2026-07" } } }) }),
+    env: { PRODUCT_FLOW_DB: db }, data: { session: manager }
+  });
   const create = await onActionsRequest({
     request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({
-      action: { type: "upsert_plan", record: { id: "p-1", ownerId: "o-1", platform: "抖音", store: "旗舰店", evidence: ["近7日GMV下降"], goals: ["GMV增长20%"], issues: ["素材衰退"], countermeasures: ["补充素材"], monitors: ["日GMV"] } }
+      action: { type: "upsert_plan", record: { id: "p-1", cycleId: "cycle-p-1", ownerId: "o-1", platform: "抖音", store: "旗舰店", evidence: ["近7日GMV下降"], goals: ["GMV增长20%"], issues: ["素材衰退"], countermeasures: ["补充素材"], monitors: ["日GMV"] } }
     }) }),
     env: { PRODUCT_FLOW_DB: db }, data: { session: operator }
   });
   assert.equal(create.status, 200);
   const submit = await onActionsRequest({
-    request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ expectedRevision: 1, action: { type: "submit_plan", id: "p-1" } }) }),
+    request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ expectedRevision: 2, action: { type: "submit_plan", id: "p-1" } }) }),
     env: { PRODUCT_FLOW_DB: db }, data: { session: operator }
   });
   assert.equal(submit.status, 200);
   const approve = await onActionsRequest({
-    request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ expectedRevision: 2, action: { type: "review_plan", id: "p-1", decision: "approved", reason: "目标与资源匹配" } }) }),
+    request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ expectedRevision: 3, action: { type: "review_plan", id: "p-1", decision: "approved", reason: "目标与资源匹配" } }) }),
     env: { PRODUCT_FLOW_DB: db }, data: { session: manager }
   });
   const payload = await approve.json();
@@ -84,11 +88,28 @@ test("operator creates a complete plan and manager approves it", async () => {
   assert.equal(payload.state.plans[0].status, "approved");
 });
 
+test("operators cannot inject plan approval or accepted execution evidence", async () => {
+  const db = createD1Mock();
+  await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_cycle", record: { id: "cycle-1", ownerId: "o-1", ownerName: "运营甲", product: "主粮", month: "2026-07" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  const injected = await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "upsert_plan", record: { id: "p-injected", cycleId: "cycle-1", ownerId: "someone", platform: "抖音", store: "旗舰店", status: "approved" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: operator } });
+  const payload = await injected.json();
+  assert.equal(payload.state.plans[0].status, "draft");
+  assert.equal(payload.state.plans[0].ownerId, "o-1");
+  const execution = await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "append_execution", record: { planId: "p-injected", status: "accepted" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: operator } });
+  assert.equal(execution.status, 403);
+  const unknown = await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "approve_everything" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: operator } });
+  assert.equal(unknown.status, 400);
+});
+
 test("performance evidence contains accepted execution but no scores", async () => {
   const db = createD1Mock();
   const seed = [
-    { type: "upsert_plan", record: { id: "p-1", ownerId: "o-1", platform: "抖音", store: "旗舰店", status: "approved", version: 2 } },
-    { type: "append_execution", record: { id: "e-1", planId: "p-1", ownerId: "o-1", status: "accepted", acceptance: "完成两轮素材实验", updatedAt: "2026-07-30T00:00:00.000Z" } }
+    { type: "create_cycle", record: { id: "cycle-evidence", ownerId: "o-1", ownerName: "运营甲", product: "主粮", month: "2026-07" } },
+    { type: "upsert_plan", record: { id: "p-1", cycleId: "cycle-evidence", ownerId: "o-1", ownerName: "运营甲", platform: "抖音", store: "旗舰店", evidence: ["近7日GMV下降"], goals: ["GMV增长20%"], issues: ["素材衰退"], countermeasures: ["补充素材"], monitors: ["日GMV"] } },
+    { type: "submit_plan", id: "p-1" },
+    { type: "review_plan", id: "p-1", decision: "approved", reason: "方案可执行" },
+    { type: "append_execution", record: { id: "e-1", planId: "p-1", progress: "完成两轮素材实验", monitorData: "GMV增长20%", nextAction: "继续放量" } },
+    { type: "review_execution", id: "e-1", decision: "accepted", reason: "完成两轮素材实验" }
   ];
   for (const action of seed) {
     await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });

@@ -1,6 +1,6 @@
 import { normalizePerformanceState } from "../../../../src/domain/performanceManagement.js";
 
-const COLLECTIONS = ["templates", "assessments", "reviewRequests", "auditLogs"];
+const COLLECTIONS = ["templates", "managerAssignments", "assessments", "reviewRequests", "auditLogs"];
 export const performanceDatabase = (env = {}) => env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
 
 export async function ensurePerformanceTables(db) {

@@ -20,6 +20,10 @@ export function isOperationsMember(session) {
   return department(session) === "总经办" || department(session) === "运营部";
 }
 
+export function isDepartmentManager(session) {
+  return department(session) === "总经办" || /主管|经理|总监|负责人/.test(String(session?.title || ""));
+}
+
 export function actor(session = {}) {
   return { userId: session.userId || session.userid || session.unionId || session.name, name: session.name || "系统" };
 }

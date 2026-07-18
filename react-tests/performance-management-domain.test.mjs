@@ -35,6 +35,20 @@ test("large scoring difference requires a reason and review is limited to once",
   state = reducePerformanceState(state, { type: "create_assessment", record: { id: "a-1", employeeId: "e-1", month: "2026-07", items: [{ weight: 100, target: 10, actual: 10, formula: "completion" }] } });
   state = reducePerformanceState(state, { type: "submit_self_review", id: "a-1", selfScore: 95, selfComment: "完成" });
   assert.throws(() => reducePerformanceState(state, { type: "manager_score", id: "a-1", finalScore: 70 }), /说明原因/);
+  state = reducePerformanceState(state, { type: "manager_score", id: "a-1", finalScore: 90, reason: "结合验收证据" });
   state = reducePerformanceState(state, { type: "request_review", id: "a-1", reason: "请复核证据" });
-  assert.throws(() => reducePerformanceState(state, { type: "request_review", id: "a-1", reason: "再次复核" }), /仅可申请一次/);
+  assert.throws(() => reducePerformanceState(state, { type: "request_review", id: "a-1", reason: "再次复核" }), /仅可申请一次|仅待归档/);
+});
+
+test("review must be resolved before HR freezes an immutable snapshot", () => {
+  let state = createDefaultPerformanceState();
+  state = reducePerformanceState(state, { type: "create_assessment", record: { id: "a-review", employeeId: "e-1", month: "2026-07", items: [{ weight: 100, target: 10, actual: 10, formula: "completion" }] } });
+  state = reducePerformanceState(state, { type: "submit_self_review", id: "a-review", selfScore: 90, selfComment: "完成" });
+  state = reducePerformanceState(state, { type: "manager_score", id: "a-review", finalScore: 90, reason: "结合验收证据" });
+  state = reducePerformanceState(state, { type: "request_review", id: "a-review", reason: "复核证据" });
+  assert.throws(() => reducePerformanceState(state, { type: "freeze_assessment", id: "a-review" }), /不能冻结/);
+  state = reducePerformanceState(state, { type: "resolve_review", id: "a-review", decision: "upheld", reason: "证据无误" });
+  state = reducePerformanceState(state, { type: "freeze_assessment", id: "a-review" });
+  assert.equal(state.assessments[0].status, "frozen");
+  assert.equal(state.assessments[0].frozenSnapshot.finalScore, 90);
 });
