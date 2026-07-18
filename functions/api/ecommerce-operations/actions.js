@@ -1,9 +1,10 @@
 import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
 import { reduceEcommerceOperationsState } from "../../../src/domain/ecommerceOperations.js";
-import { actor, canViewOperations, isOperationsManager } from "./_shared/access.js";
+import { actor, canViewOperations, department, isOperationsManager, isOperationsMember } from "./_shared/access.js";
 import { operationsDatabase, readOperationsState, writeOperationsState } from "./_shared/storage.js";
 
-const MANAGER_ACTIONS = new Set(["create_cycle", "review_plan", "review_execution", "upsert_responsibility", "upsert_playbook", "respond_collaboration"]);
+const MANAGER_ACTIONS = new Set(["create_cycle", "review_plan", "review_execution", "upsert_responsibility", "upsert_playbook"]);
+const OPERATIONS_ACTIONS = new Set(["upsert_plan", "submit_plan", "record_ai_review", "append_execution", "upsert_collaboration"]);
 
 export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
@@ -14,10 +15,15 @@ export async function onRequest({ request, env, data = {} }) {
   const action = body.action;
   if (!action?.type) return jsonResponse({ message: "缺少经营动作。" }, 400);
   if (MANAGER_ACTIONS.has(action.type) && !isOperationsManager(data.session)) return jsonResponse({ message: "该动作需要运营主管权限。" }, 403);
+  if (OPERATIONS_ACTIONS.has(action.type) && !isOperationsMember(data.session)) return jsonResponse({ message: "该动作仅限运营团队。" }, 403);
   const db = operationsDatabase(env);
   if (!db) return jsonResponse({ message: "缺少 D1 数据库绑定。" }, 501);
   try {
     const current = await readOperationsState(db);
+    if (action.type === "respond_collaboration") {
+      const collaboration = current.collaborations.find(item => item.id === (action.id || action.record?.id));
+      if (!collaboration || (!isOperationsManager(data.session) && collaboration.targetDepartment !== department(data.session))) return jsonResponse({ message: "只能处理分配给本部门的协同事项。" }, 403);
+    }
     if (body.expectedRevision !== undefined && Number(body.expectedRevision) !== current.revision) return jsonResponse({ message: "数据已更新，请刷新后重试。", code: "REVISION_CONFLICT" }, 409);
     const user = actor(data.session);
     if (action.type === "upsert_plan" && !isOperationsManager(data.session)) action.record = { ...action.record, ownerId: user.userId, ownerName: user.name };

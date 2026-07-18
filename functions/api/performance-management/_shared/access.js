@@ -6,8 +6,12 @@ export const actor = session => ({ userId: uid(session), name: session?.name || 
 export const currentUserId = uid;
 
 export function filterPerformanceState(state, session) {
-  if (isHr(session) || isManager(session)) return state;
+  if (isHr(session)) return state;
   const employeeId = uid(session);
+  if (isManager(session)) {
+    const ids = new Set(state.assessments.filter(item => item.managerId === employeeId).map(item => item.id));
+    return { ...state, templates: state.templates, assessments: state.assessments.filter(item => ids.has(item.id)), reviewRequests: state.reviewRequests.filter(item => ids.has(item.assessmentId)), auditLogs: [] };
+  }
   const ids = new Set(state.assessments.filter(item => item.employeeId === employeeId).map(item => item.id));
   return { ...state, templates: [], assessments: state.assessments.filter(item => ids.has(item.id)), reviewRequests: state.reviewRequests.filter(item => ids.has(item.assessmentId)), auditLogs: [] };
 }

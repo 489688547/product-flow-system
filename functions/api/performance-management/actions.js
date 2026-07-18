@@ -21,7 +21,10 @@ export async function onRequest({ request, env, data = {} }) {
     const assessment = state.assessments.find(item => item.id === action.id);
     if (["submit_self_review", "request_review"].includes(action.type) && assessment?.employeeId !== currentUserId(data.session)) return jsonResponse({ message: "只能操作自己的绩效。" }, 403);
     if (body.expectedRevision !== undefined && Number(body.expectedRevision) !== state.revision) return jsonResponse({ message: "数据已更新，请刷新后重试。", code: "REVISION_CONFLICT" }, 409);
-    const user = actor(data.session); const next = reducePerformanceState(state, { ...action, actor: user });
+    const user = actor(data.session);
+    if (action.type === "create_assessment") action.record = { ...action.record, managerId: user.userId, managerName: user.name };
+    if (action.type === "manager_score" && !isHr(data.session) && assessment?.managerId !== user.userId) return jsonResponse({ message: "只能评估自己负责的员工。" }, 403);
+    const next = reducePerformanceState(state, { ...action, actor: user });
     return jsonResponse({ state: await writePerformanceState(db, next, user.name), synced: true });
   } catch (error) { return jsonResponse({ message: error.message || "绩效动作保存失败。" }, error.status || 400); }
 }

@@ -50,6 +50,17 @@ test("operations API enforces session and department access", async () => {
   assert.equal(forbidden.status, 403);
 });
 
+test("collaboration departments only receive their assigned queue", async () => {
+  const db = createD1Mock();
+  await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "upsert_collaboration", record: { id: "c-supply", title: "确认库存", targetDepartment: "供应链部" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "upsert_plan", record: { id: "private-plan", platform: "抖音", store: "旗舰店" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: operator } });
+  const response = await onOperationsRequest({ request: new Request("https://example.com/api/ecommerce-operations"), env: { PRODUCT_FLOW_DB: db }, data: { session: { userId: "s-1", department: "供应链部" } } });
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(payload.state.collaborations.map(item => item.id), ["c-supply"]);
+  assert.equal(payload.state.plans.length, 0);
+});
+
 test("operator creates a complete plan and manager approves it", async () => {
   const db = createD1Mock();
   const create = await onActionsRequest({

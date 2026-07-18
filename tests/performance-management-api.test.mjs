@@ -52,3 +52,13 @@ test("employee can only self-review own assessment and HR freezes it", async () 
   const freeze = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "freeze_assessment", id: "a-1" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: hr } });
   assert.equal(freeze.status, 200);
 });
+
+test("a manager cannot read or score another manager's assessments", async () => {
+  const db = createD1Mock();
+  await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_assessment", record: { id: "a-1", employeeId: "e-1", month: "2026-07", items: [{ weight: 100, target: 10, actual: 9, formula: "completion" }] } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  const otherManager = { userId: "m-2", name: "其他主管", department: "运营部", title: "运营主管" };
+  const get = await onPerformanceRequest({ request: new Request("https://example.com/api/performance-management"), env: { PRODUCT_FLOW_DB: db }, data: { session: otherManager } });
+  assert.equal((await get.json()).state.assessments.length, 0);
+  const score = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "manager_score", id: "a-1", finalScore: 90, reason: "越权" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: otherManager } });
+  assert.equal(score.status, 403);
+});

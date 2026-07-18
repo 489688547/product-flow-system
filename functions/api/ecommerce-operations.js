@@ -1,5 +1,5 @@
 import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
-import { canViewOperations } from "./ecommerce-operations/_shared/access.js";
+import { canViewOperations, filterOperationsStateForSession } from "./ecommerce-operations/_shared/access.js";
 import { operationsDatabase, readOperationsState } from "./ecommerce-operations/_shared/storage.js";
 
 export async function onRequest({ request, env, data = {} }) {
@@ -9,6 +9,6 @@ export async function onRequest({ request, env, data = {} }) {
   if (!canViewOperations(data.session)) return jsonResponse({ message: "当前部门无权访问电商店铺运营。" }, 403);
   const db = operationsDatabase(env);
   if (!db) return jsonResponse({ message: "缺少 D1 数据库绑定。" }, 501);
-  try { return jsonResponse({ state: await readOperationsState(db), synced: true }); }
+  try { return jsonResponse({ state: filterOperationsStateForSession(await readOperationsState(db), data.session), synced: true }); }
   catch (error) { return jsonResponse({ message: error.message || "经营数据读取失败。" }, 500); }
 }
