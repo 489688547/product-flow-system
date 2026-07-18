@@ -154,7 +154,17 @@ export async function saveProductionSnapshot(db, stored, { now = new Date() } = 
     await db.prepare(`INSERT INTO production_data_snapshot_parts (snapshot_id, part_index, payload)
       VALUES (?, ?, ?)`).bind(id, index, payload).run();
   }
+  await pruneProductionSnapshots(db);
   return id;
+}
+
+export async function pruneProductionSnapshots(db, limit = SNAPSHOT_LIMIT) {
+  const result = await db.prepare(`SELECT id FROM production_data_snapshots
+    ORDER BY created_at DESC LIMIT -1 OFFSET ?`).bind(Math.max(1, limit)).all();
+  for (const row of result?.results || []) {
+    await db.prepare("DELETE FROM production_data_snapshot_parts WHERE snapshot_id = ?").bind(row.id).run();
+    await db.prepare("DELETE FROM production_data_snapshots WHERE id = ?").bind(row.id).run();
+  }
 }
 
 export async function readProductionSnapshot(db, snapshotId) {

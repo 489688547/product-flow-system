@@ -68,6 +68,10 @@ function createProductionDb() {
           } else if (normalized.startsWith("insert into production_data_snapshot_parts")) {
             const [snapshotId, partIndex, payload] = values;
             data.snapshotParts.set(`${snapshotId}:${partIndex}`, { snapshot_id: snapshotId, part_index: partIndex, payload });
+          } else if (normalized.startsWith("delete from production_data_snapshot_parts")) {
+            for (const [key, row] of data.snapshotParts) if (row.snapshot_id === values[0]) data.snapshotParts.delete(key);
+          } else if (normalized.startsWith("delete from production_data_snapshots")) {
+            data.snapshots.delete(values[0]);
           } else if (normalized.startsWith("insert into production_data_audit")) {
             const [id, action, sourceEnvironment, userId, unionId, name, reason, snapshotId, beforeVersion, beforeUpdatedAt, status, requestId, createdAt] = values;
             data.audits.set(id, { id, action, source_environment: sourceEnvironment, user_id: userId, union_id: unionId, name, reason, snapshot_id: snapshotId, before_version: beforeVersion, before_updated_at: beforeUpdatedAt, after_version: null, after_updated_at: null, status, request_id: requestId, created_at: createdAt });
@@ -99,6 +103,9 @@ function createProductionDb() {
           }
           if (normalized.includes("from production_data_snapshot_parts")) {
             return { results: [...data.snapshotParts.values()].filter(row => row.snapshot_id === values[0]).sort((a, b) => a.part_index - b.part_index) };
+          }
+          if (normalized.includes("from production_data_snapshots") && normalized.includes("offset")) {
+            return { results: [...data.snapshots.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(Number(values[0] || 30)) };
           }
           if (normalized.includes("from production_data_audit")) {
             return { results: [...data.audits.values()].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, Number(values[0] || 30)) };
@@ -247,6 +254,22 @@ test("a successful production write can roll back to its write-before snapshot",
   const read = await (await state.onRequest({ request: gatewayRequest("/api/platform/v1/production-data/state"), env: { PRODUCT_FLOW_DB: db } })).json();
   assert.equal(read.state.marker, "before");
   assert.equal([...db.data.audits.values()].some(row => row.action === "rollback"), true);
+});
+
+test("production snapshots keep only the newest 30 entries", async () => {
+  const { access } = await loadRoutes();
+  const db = createProductionDb();
+  for (let index = 0; index < 30; index += 1) {
+    const id = `old-${index}`;
+    db.data.snapshots.set(id, { id, version: "v1", created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString() });
+    db.data.snapshotParts.set(`${id}:0`, { snapshot_id: id, part_index: 0, payload: "{}" });
+  }
+
+  await access.saveProductionSnapshot(db, db.data.state, { now: new Date("2026-07-18T10:00:00.000Z") });
+
+  assert.equal(db.data.snapshots.size, 30);
+  assert.equal(db.data.snapshots.has("old-0"), false);
+  assert.equal([...db.data.snapshotParts.values()].some(row => row.snapshot_id === "old-0"), false);
 });
 
 test("production data access requires the active DingTalk identity to remain executive", async () => {
