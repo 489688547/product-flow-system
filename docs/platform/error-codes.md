@@ -31,6 +31,7 @@
 | `DINGTALK_` | 钉钉授权和接口调用 | `DINGTALK_PERMISSION_MISSING` |
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
+| `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -40,6 +41,18 @@
 - `INTEGRATION_PROFILE_INVALID`：字段、URL、日期、平台 ID 或敏感内容校验失败。
 - `INTEGRATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定，公开资料仍可降级展示。
 - `VALIDATION_METHOD_NOT_ALLOWED`：请求方法不受支持。
+
+部门协同 API 使用：
+
+- `PERMISSION_READ_DENIED`：当前身份不能读取请求范围。
+- `PERMISSION_WRITE_DENIED`：当前身份不能执行写操作或状态动作。
+- `COLLABORATION_ITEM_INVALID`：字段、身份、来源、时间或证据不符合契约。
+- `COLLABORATION_TRANSITION_INVALID`：当前状态或角色不能执行请求动作。
+- `COLLABORATION_ITEM_NOT_FOUND`：事项不存在或对当前用户不可见。
+- `COLLABORATION_VERSION_CONFLICT`：读取版本已经过期，写入未执行。
+- `COLLABORATION_IDEMPOTENCY_CONFLICT`：同一幂等键与现有业务来源不一致。
+- `COLLABORATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定或协同表写入不可用。
+- `DINGTALK_TODO_SYNC_FAILED`：协同状态已保存，但钉钉待办同步失败。
 
 ## HTTP 状态
 
