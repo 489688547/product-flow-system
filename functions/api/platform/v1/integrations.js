@@ -1,4 +1,4 @@
-import integrationRegistry from "../../../../docs/platform/integration-registry.json" with { type: "json" };
+import integrationRegistry from "../_generated/integrationRegistry.js";
 import { canManagePermissions } from "../../../../src/domain/permissions.js";
 import { jsonResponse, optionsResponse } from "../../dingtalk/_shared/dingtalk.js";
 

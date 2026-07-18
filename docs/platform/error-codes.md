@@ -31,6 +31,9 @@
 | `DINGTALK_` | 钉钉授权和接口调用 | `DINGTALK_PERMISSION_MISSING` |
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
+| `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
+| `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
+| `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -41,6 +44,17 @@
 - `INTEGRATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定，公开资料仍可降级展示。
 - `VALIDATION_METHOD_NOT_ALLOWED`：请求方法不受支持。
 
+生产数据与环境 API 使用：
+
+- `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。
+- `PRODUCTION_ROLE_REQUIRED`：令牌对应的钉钉稳定身份不再是 active executive。
+- `PRODUCTION_CAPABILITY_REQUIRED`：个人令牌没有所需的 read 或 write 能力。
+- `PRODUCTION_WRITE_LOCKED`：写入未解锁、解锁已过期或已撤销，HTTP 423。
+- `PRODUCTION_DATA_VERSION_CONFLICT`：基线版本落后于线上数据，HTTP 409。
+- `PRODUCTION_SNAPSHOT_NOT_FOUND` / `PRODUCTION_ROLLBACK_NOT_AVAILABLE`：写前快照不存在或不可回滚。
+- `ENVIRONMENT_READINESS_FAILED`：环境能力检查失败。
+- `EXTERNAL_ACTION_DISABLED_IN_TEST`：本地测试试图执行真实外部平台写操作。
+
 ## HTTP 状态
 
 - 400：请求或业务状态不合法。
@@ -48,6 +62,7 @@
 - 403：已登录但没有操作权限。
 - 404：资源不存在或对当前用户不可见。
 - 409：版本、重复操作或状态冲突。
+- 423：资源已锁定，生产写入需要重新解锁。
 - 429：达到接口限流。
 - 500：未预期服务端错误。
 - 501：当前部署缺少必需的平台能力或数据库绑定。

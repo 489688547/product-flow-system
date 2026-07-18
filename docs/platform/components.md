@@ -17,6 +17,10 @@
 | `DeliverablePreviewModal` | 交付物预览 | 根据类型安全预览，下载能力由来源决定 |
 | `FloatingMenu` | 脱离裁切容器的菜单 | 统一浮层定位、关闭、键盘和层级行为 |
 
+## 平台组合组件
+
+`EnvironmentReadinessPanel` 位于 `src/features/handbook/`，消费稳定的环境就绪 API，统一展示 Cloudflare、D1、钉钉和其他平台的环境状态。它是说明书中的平台组合能力，不是基础控件；其他页面需要状态展示时应复用其状态契约和文案，不复制密钥检查逻辑到组件。
+
 ## 组件状态
 
 交互组件按适用范围覆盖 default、hover、focus、active、disabled、loading、error、empty 和 selected。加载优先使用保持布局的骨架；空状态说明下一步；错误说明原因和恢复方式。
@@ -28,4 +32,3 @@
 ## 兼容与废弃
 
 修改共享组件属性前搜索全部调用方并补测试。废弃属性先提供迁移说明和兼容周期，不在无关功能 PR 中顺手重写所有调用方。
-

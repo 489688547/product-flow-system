@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-17",
+  "updatedAt": "2026-07-18",
   "platforms": [
     {
       "id": "dingtalk",
@@ -49,13 +49,13 @@
       "name": "Cloudflare Pages",
       "status": "connected",
       "summary": "托管 React 应用与 Pages Functions，并提供生产和预览运行边界。",
-      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "回滚"],
-      "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失"],
+      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "回滚", "环境就绪检查", "生产数据网关"],
+      "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失", "测试环境与生产配置漂移", "本地如何受控读取生产数据"],
       "keywords": ["Cloudflare", "Pages", "Pages Functions", "部署", "生产环境"],
-      "codePaths": ["functions/**", "scripts/prepare-pages-release.mjs", "cloudflare-entry.html", "_redirects", ".github/workflows/**"],
+      "codePaths": ["functions/**", "scripts/prepare-pages-release.mjs", "scripts/check-deployed-readiness.mjs", "cloudflare-entry.html", "_redirects", ".github/workflows/**"],
       "envVars": [],
       "domains": ["pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": [],
+      "apiRoutes": ["/api/platform/v1/environment-readiness", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/"],
       "publicDocs": [
         { "label": "Cloudflare Pages 文档", "url": "https://developers.cloudflare.com/pages/" },
         { "label": "Pages Functions 文档", "url": "https://developers.cloudflare.com/pages/functions/" }
@@ -70,18 +70,18 @@
       "name": "Cloudflare D1",
       "status": "connected",
       "summary": "保存共享业务状态、平台数据、登录会话、组织数据和销售聚合。",
-      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置"],
-      "businessQuestions": ["数据只在本地可见", "跨设备状态不同步", "数据库绑定缺失", "表结构或容量问题"],
+      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "生产写入审计", "写前快照"],
+      "businessQuestions": ["数据只在本地可见", "跨设备状态不同步", "数据库绑定缺失", "表结构或容量问题", "测试账号如何受控写生产数据", "生产写入如何回滚"],
       "keywords": ["D1", "数据库", "落库", "PRODUCT_FLOW_DB", "持久化"],
-      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/auth/**", "functions/api/dingtalk/org/**"],
+      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/auth/**", "functions/api/dingtalk/org/**", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/v1/production-data/**", "migrations/**"],
       "envVars": ["PRODUCT_FLOW_DB"],
       "domains": ["api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": ["/api/state", "/api/platform", "/api/sales"],
+      "apiRoutes": ["/api/state", "/api/platform", "/api/sales", "/api/platform/v1/environment-readiness", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/"],
       "publicDocs": [
         { "label": "Cloudflare D1 入门", "url": "https://developers.cloudflare.com/d1/get-started/" },
         { "label": "Pages D1 绑定", "url": "https://developers.cloudflare.com/pages/functions/bindings/" }
       ],
-      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js"],
+      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/platform/_shared/productionDataAccess.js", "migrations/0001_production_data_access.sql"],
       "relations": [
         { "platformId": "cloudflare-pages", "type": "bound-to", "description": "D1 通过 Pages Functions 的环境绑定提供服务。" },
         { "platformId": "dingtalk", "type": "stores-data-for", "description": "保存钉钉会话、组织和用户令牌相关数据。" },
