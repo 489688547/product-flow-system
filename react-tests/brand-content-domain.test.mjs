@@ -4,6 +4,7 @@ import {
   BRAND_PRODUCTION_STATUSES,
   buildBrandTeamMetrics,
   createDefaultBrandContentState,
+  createEmptyBrandContentState,
   deriveContentDataStatus,
   findBrandContentIssues,
   normalizeBrandContentState,
@@ -23,6 +24,15 @@ test("default brand state keeps content, assets, publications, snapshots and dec
   assert.ok(state.decisions.length >= 2);
   assert.equal(state.settings.learningDays.douyin, 3);
   assert.equal(state.settings.effectiveSpend.douyin, 50);
+});
+
+test("empty brand state is production-safe and contains no demo business records", () => {
+  const state = createEmptyBrandContentState();
+  assert.equal(state.contents.length, 0);
+  assert.equal(state.publications.length, 0);
+  assert.equal(state.performanceSnapshots.length, 0);
+  assert.equal(state.dataQuality.sourceMode, "waiting");
+  assert.equal(state.settings.learningDays.douyin, 3);
 });
 
 test("published content stays in learning for three complete days", () => {

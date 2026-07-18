@@ -157,6 +157,29 @@ export function createDefaultBrandContentState() {
   };
 }
 
+export function createEmptyBrandContentState() {
+  return {
+    version: 0,
+    contents: [],
+    assetVersions: [],
+    publications: [],
+    performanceSnapshots: [],
+    decisions: [],
+    accounts: [],
+    dataQuality: {
+      asOfDate: "",
+      reconciliationStatus: "waiting",
+      coverageRate: 0,
+      difference: null,
+      metricVersion: "",
+      sourceUpdatedAt: "",
+      sourceMode: "waiting"
+    },
+    settings: clone(DEFAULT_SETTINGS),
+    auditLogs: []
+  };
+}
+
 export function normalizeBrandContentState(input = {}) {
   const defaults = createDefaultBrandContentState();
   const source = input && typeof input === "object" && !Array.isArray(input) ? input : {};
