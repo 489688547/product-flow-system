@@ -33,9 +33,15 @@ test("detail and editor cover responsibility transitions creation editing and ar
   assert.match(detail, /活动记录/);
   assert.match(detail, /同步到钉钉待办/);
   assert.match(detail, /dingTodo\.lastError/);
+  assert.match(detail, /user\?\.userId \|\| user\?\.userid/);
+  assert.match(detail, /user\?\.unionId \|\| user\?\.unionid/);
   assert.match(editor, /OrgSelect/);
+  assert.match(editor, /user\?\.userId \|\| user\?\.userid/);
+  assert.match(editor, /user\?\.unionId \|\| user\?\.unionid/);
   assert.match(editor, /DatePickerField/);
   assert.match(editor, /businessImpact/);
+  assert.match(editor, /form\.kind !== "decision" \|\| form\.ownerUser/);
+  assert.match(editor, /决策人（必填）/);
   assert.match(editor, /updateItem/);
   assert.match(editor, /archived: true/);
 });
@@ -43,8 +49,11 @@ test("detail and editor cover responsibility transitions creation editing and ar
 test("all authenticated employees get a feature-flagged collaboration route", () => {
   const app = read("src/App.jsx");
   const permissions = read("src/domain/permissions.js");
+  const companyNavigation = app.match(/const COMPANY_NAV = \[([\s\S]*?)\n\];/)?.[1] || "";
+  const productNavigation = app.match(/const PRODUCT_NAV = \[([\s\S]*?)\n\];/)?.[1] || "";
   assert.match(app, /CollaborationPage/);
-  assert.match(app, /\["collaboration", "部门协同"/);
+  assert.equal((companyNavigation.match(/\["collaboration", "部门协同"/g) || []).length, 1);
+  assert.equal((productNavigation.match(/\["collaboration", "部门协同"/g) || []).length, 1);
   assert.match(app, /featureFlagEnabled\("executiveCollaborationHub"\)/);
   assert.match(app, /collaboration: <CollaborationPage/);
   assert.match(permissions, /collaboration: \{ departments: \["\*"\] \}/);

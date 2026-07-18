@@ -14,21 +14,22 @@ test("company shell exposes strategy execution as first-class workspaces", () =>
   assert.match(app, /产品全周期/);
 });
 
-test("executive cockpit prioritizes decisions and deviations", () => {
+test("executive action desk prioritizes decisions coordination and changes", () => {
   const page = read("src/features/company/CompanyHomePage.jsx");
-  assert.match(page, /待决策事项/);
-  assert.match(page, /重大异常与风险/);
+  const desk = read("src/features/company/ExecutiveActionDesk.jsx");
+  assert.match(desk, /待拍板/);
+  assert.match(desk, /需要协调/);
+  assert.match(desk, /重要变化/);
   assert.match(page, /战略执行地图/);
   assert.match(page, /重点项目组合/);
-  assert.match(page, /三分钟/);
+  assert.match(page, /处理今天需要拍板、协调和升级的经营事项/);
 });
 
-test("executive home defaults to the personal todo workbench", () => {
+test("executive home retains the personal todo workbench below the action desk", () => {
   const home = read("src/features/company/CompanyHomePage.jsx");
   const workbench = read("src/features/company/PersonalTodoWorkbench.jsx");
-  assert.match(home, /useState\("todos"\)/);
+  assert.match(home, /ExecutiveActionDesk/);
   assert.match(home, /我的待办/);
-  assert.match(home, /公司驾驶舱/);
   assert.match(home, /PersonalTodoWorkbench/);
   assert.match(workbench, /已逾期/);
   assert.match(workbench, /今日截止/);
@@ -114,10 +115,11 @@ test("operating reviews retain weekly updates and monthly snapshots", () => {
   assert.match(page, /ConfirmDialog/);
 });
 
-test("business App center keeps Product Lifecycle as the first connected App", () => {
+test("business App center exposes App freshness and collaboration health", () => {
   const page = read("src/features/platform/AppCenterPage.jsx");
-  assert.match(page, /产品全周期/);
   assert.match(page, /数据新鲜度/);
+  assert.match(page, /AppCollaborationHealth/);
+  assert.match(page, /未关闭协同/);
   assert.match(page, /打开 App/);
 });
 

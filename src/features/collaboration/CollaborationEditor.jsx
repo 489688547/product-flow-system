@@ -38,7 +38,7 @@ function formFor(item) {
 
 function identityFor(name, orgCache) {
   const user = orgUsers(orgCache).find(candidate => candidate.name === name);
-  return name ? { userId: user?.userId || "", unionId: user?.unionId || "", name } : null;
+  return name ? { userId: user?.userId || user?.userid || "", unionId: user?.unionId || user?.unionid || "", name } : null;
 }
 
 function payloadFor(form, orgCache) {
@@ -71,12 +71,12 @@ export function CollaborationEditor({ open, onClose, item = null, draft = null, 
     }
   }, [draft, item, open]);
   const title = item ? "编辑协同事项" : "发起部门协同";
-  const valid = useMemo(() => form.title.trim() && form.requestedAction.trim() && form.businessImpact.trim() && form.ownerDepartment && form.dueDate, [form]);
+  const valid = useMemo(() => form.title.trim() && form.requestedAction.trim() && form.businessImpact.trim() && form.ownerDepartment && form.dueDate && (form.kind !== "decision" || form.ownerUser), [form]);
   const update = (key, value) => setForm(current => ({ ...current, [key]: value }));
 
   async function save() {
     if (!valid) {
-      setFormError("请完整填写事项、下一步、业务影响、主责部门和截止日期。");
+      setFormError("请完整填写事项、下一步、业务影响、主责部门和截止日期；待决策事项还需指定决策人。");
       return;
     }
     try {
@@ -132,7 +132,7 @@ export function CollaborationEditor({ open, onClose, item = null, draft = null, 
         <label><span>影响等级</span><select value={form.impactLevel} onChange={event => update("impactLevel", event.target.value)}><option value="high">高影响</option><option value="medium">中影响</option><option value="low">低影响</option></select></label>
         <label><span>截止日期</span><DatePickerField value={form.dueDate} onChange={value => update("dueDate", value)} ariaLabel="选择协同截止日期" /></label>
         <OrgSelect type="department" label="主责部门" value={form.ownerDepartment} onChange={value => update("ownerDepartment", value)} orgCache={orgCache} searchInMenu />
-        <OrgSelect label="主负责人（可接收时指定）" value={form.ownerUser} onChange={value => update("ownerUser", value)} orgCache={orgCache} departmentFilter={form.ownerDepartment} searchInMenu />
+        <OrgSelect label={form.kind === "decision" ? "决策人（必填）" : "主负责人（可接收时指定）"} value={form.ownerUser} onChange={value => update("ownerUser", value)} orgCache={orgCache} departmentFilter={form.ownerDepartment} searchInMenu />
         <div className="span-2"><OrgSelect type="department" label="协同部门" value={form.partnerDepartments} onChange={value => update("partnerDepartments", value)} orgCache={orgCache} multiple searchInMenu /></div>
         {item ? <section className="collaboration-archive-box span-2"><div><strong>归档事项</strong><p>归档后从默认列表隐藏，但不会删除责任和活动历史。</p></div><textarea value={archiveReason} onChange={event => setArchiveReason(event.target.value)} placeholder="填写归档原因" /><Button variant="quiet-danger" disabled={saving} onClick={archive}><Archive size={15} />归档</Button></section> : null}
       </div>

@@ -110,7 +110,7 @@
   - 提交：`feat(collaboration): sync governed DingTalk todos`。
   - 实际结果：2026-07-18 平台端点使用稳定 `collaboration:<id>` 来源键，保存安全的待办 ID/同步状态并更新同一待办；失败仅记录可重试摘要，不回滚协同状态或保存 Token。协同钉钉及既有待办回归 17 项、相关 ESLint 和生产构建通过，未触发真实钉钉调用。
 
-- [ ] 完整验证、视觉审计和本地测试页交付
+- [x] 完整验证、视觉审计和本地测试页交付
   - 依赖：全部实现完成。
   - 文件：本任务缺陷修正和本任务清单。
   - 输入：完整功能分支。
@@ -119,3 +119,4 @@
   - 实现步骤：完整质量门、浏览器检查、视觉修正、任务记录。
   - 验证：lint、governance、integrations、test、build 和浏览器验收全部通过。
   - 提交：`test(collaboration): verify executive coordination hub`。
+  - 实际结果：2026-07-18 完整质量门通过（React 369 项、API 142 项，生产 JavaScript chunk 全部小于 500KB）；8137 本地页完成 1440×900 与 390×844 浏览器验收，覆盖老板行动台、六类部门视图、详情、编辑、归档、状态流转和来源链接。浏览器控制台无 warning/error；本地 API 完成创建、读取、编辑、接收、活动记录和归档闭环，钉钉真实发送保持禁用。

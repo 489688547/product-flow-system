@@ -24,8 +24,8 @@ const REASON_ACTIONS = new Set(["return", "block", "resume", "reopen", "cancel",
 
 function actorFor(user) {
   return {
-    userId: user?.userId,
-    unionId: user?.unionId,
+    userId: user?.userId || user?.userid,
+    unionId: user?.unionId || user?.unionid,
     name: user?.name,
     departmentIds: [user?.departmentId, ...(user?.departmentIds || [])].filter(Boolean),
     departmentNames: [user?.department, ...(user?.departments || []), ...(user?.departmentNames || [])].filter(Boolean),
@@ -36,7 +36,7 @@ function actorFor(user) {
 
 function identityFor(name, orgCache) {
   const user = orgUsers(orgCache).find(candidate => candidate.name === name);
-  return name ? { userId: user?.userId || "", unionId: user?.unionId || "", name } : null;
+  return name ? { userId: user?.userId || user?.userid || "", unionId: user?.unionId || user?.unionid || "", name } : null;
 }
 
 function dateTime(value) {

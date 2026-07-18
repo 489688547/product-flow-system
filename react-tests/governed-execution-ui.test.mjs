@@ -57,11 +57,11 @@ test("personal todos route governed responsibilities to their workspaces", () =>
   assert.match(workbench, /reward_payout/);
 });
 
-test("boss cockpit summarizes governed execution across all three modules", () => {
+test("boss action desk leads governed execution and retains the three operating modules", () => {
   const home = read("src/features/company/CompanyHomePage.jsx");
   assert.match(home, /strategyAttainment/);
   assert.match(home, /三大战略达成/);
-  assert.match(home, /部门承诺异常/);
+  assert.match(home, /ExecutiveActionDesk/);
   assert.match(home, /激励项目/);
-  assert.match(home, /月报待处理/);
+  assert.match(home, /部门月报进度/);
 });
