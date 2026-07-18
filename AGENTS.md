@@ -48,8 +48,10 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 
 ## Security and external systems
 
+- Before changing environment variables, bindings, D1 tables, production-data access, Cloudflare deployment behavior, or provider configuration, use `.agents/skills/environment-parity/SKILL.md`. A request to skip review does not waive automated gates, migration, rollback, or deployed production verification.
 - Before coding, debugging, reviewing, or documenting work that may touch an external platform, use `.agents/skills/integration-router/SKILL.md` and route the task through `docs/platform/integration-registry.json`.
 - Treat prompt keywords as advisory. A changed path matched by the registry is mandatory and must be declared in the pull request with `Integration-Impact` and `Integration-Impact-Reason`.
+- Every pull request must declare `Rule-Writeback` and `Rule-Writeback-Reason`. Shared API, integration, environment, migration, error-contract, production-gateway, or provider-boundary changes must update and name an applicable durable rule file; CI rejects an ungrounded `none`.
 - New branches start from the latest `main`; branches created earlier must update from `main` before merge so they receive the current registry and routing rules.
 - Never commit credentials, access tokens, cookies, personal mobile numbers, or raw provider responses containing sensitive data.
 - Company documents remain behind the existing authenticated application boundary even when all employees may view them.
