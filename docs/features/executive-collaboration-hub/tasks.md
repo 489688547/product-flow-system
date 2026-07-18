@@ -33,7 +33,7 @@
   - 提交：三个说明性 merge commit。
   - 实际结果：战略、供应链、数据中心和品牌内容完整 UI/API 已汇合；React 345 项、API 132 项通过，生产构建通过且全部 JavaScript chunk 小于 500KB。
 
-- [ ] 实现协同领域、权限和老板行动投影
+- [x] 实现协同领域、权限和老板行动投影
   - 依赖：集成基线。
   - 文件：`src/domain/collaboration.js`、权限、feature flag、领域测试。
   - 输入：PRD 状态机和组织身份。
@@ -42,6 +42,7 @@
   - 实现步骤：先类型和规范化，再状态机、权限、视图和排序。
   - 验证：领域测试全部通过。
   - 提交：`feat(collaboration): add governed workflow domain`。
+  - 实际结果：2026-07-18 协同规范化、状态流转、参与范围、部门视图、老板行动投影和生产安全 feature flag 已实现；`node --test react-tests/collaboration-domain.test.mjs` 8 项通过。
 
 - [ ] 实现细粒度 D1 API
   - 依赖：协同领域。
