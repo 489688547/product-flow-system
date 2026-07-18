@@ -66,6 +66,45 @@
       "envVars": ["KUAIMAI_APP_KEY", "KUAIMAI_APP_SECRET"],
       "bindings": ["PRODUCT_FLOW_DB"],
       "tables": ["product_sales_daily"]
+    },
+    {
+      "id": "business-data-apps",
+      "name": "数据中心、店铺运营与绩效管理",
+      "description": "三个业务 App 的标准数据、经营闭环和绩效归档所需的 D1 持久化能力。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "data_sources",
+        "data_runners",
+        "data_sync_runs",
+        "data_source_files",
+        "data_dimension_mappings",
+        "data_metric_definitions",
+        "data_quality_issues",
+        "data_app_subscriptions",
+        "data_audit_logs",
+        "data_center_meta",
+        "ecommerce_operation_records",
+        "ecommerce_operation_meta",
+        "ecommerce_operation_state",
+        "performance_management_records",
+        "performance_management_meta",
+        "performance_management_state"
+      ]
+    },
+    {
+      "id": "operations-ai-review",
+      "name": "经营方案 AI 点评",
+      "description": "可选的 OpenAI Responses API 点评；未配置时使用本地规则检查，不阻断经营流程。",
+      "platforms": ["openai-responses", "cloudflare-pages"],
+      "requiredIn": [],
+      "level": "warning",
+      "envVars": ["OPENAI_API_KEY", "OPENAI_MODEL"],
+      "bindings": [],
+      "tables": []
     }
   ]
 }

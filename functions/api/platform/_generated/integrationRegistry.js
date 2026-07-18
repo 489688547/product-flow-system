@@ -226,7 +226,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心元数据和跨 App 协同记录。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、绩效和跨 App 协同记录。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
@@ -234,6 +234,8 @@ const integrationRegistry = {
         "销售聚合",
         "平台配置",
         "数据中心元数据",
+        "店铺运营记录",
+        "绩效记录",
         "跨 App 协同",
         "生产写入审计",
         "写前快照"
@@ -260,6 +262,10 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/**",
+        "functions/api/ecommerce-operations.js",
+        "functions/api/ecommerce-operations/**",
+        "functions/api/performance-management.js",
+        "functions/api/performance-management/**",
         "functions/api/auth/**",
         "functions/api/dingtalk/org/**",
         "functions/api/platform/_shared/productionDataAccess.js",
@@ -280,6 +286,8 @@ const integrationRegistry = {
         "/api/platform",
         "/api/sales",
         "/api/data-center",
+        "/api/ecommerce-operations",
+        "/api/performance-management",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
@@ -301,9 +309,15 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/",
+        "functions/api/ecommerce-operations.js",
+        "functions/api/ecommerce-operations/",
+        "functions/api/performance-management.js",
+        "functions/api/performance-management/",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
-        "migrations/0001_production_data_access.sql"
+        "migrations/0001_production_data_access.sql",
+        "migrations/0002_business_data_apps.sql",
+        "migrations/0002_collaboration_execution.sql"
       ],
       "relations": [
         {
@@ -671,6 +685,60 @@ const integrationRegistry = {
           "platformId": "xiaohongshu-open-platform",
           "type": "cross-channel-content",
           "description": "跨渠道素材分析需要区分平台内容与投放数据口径。"
+        }
+      ]
+    },
+    {
+      "id": "openai-responses",
+      "name": "OpenAI Responses API",
+      "status": "integrating",
+      "summary": "为电商店铺运营方案提供可选的服务端优化建议；未配置时明确降级为规则检查。",
+      "capabilities": [
+        "方案结构点评",
+        "问题与对策检查",
+        "监测指标建议"
+      ],
+      "businessQuestions": [
+        "AI 点评不可用",
+        "模型响应超时",
+        "建议是否替代主管审批",
+        "输入是否包含敏感字段"
+      ],
+      "keywords": [
+        "OpenAI",
+        "Responses API",
+        "AI 点评",
+        "智能建议",
+        "OPENAI_API_KEY"
+      ],
+      "codePaths": [
+        "functions/api/ecommerce-operations/ai-review.js"
+      ],
+      "envVars": [
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL"
+      ],
+      "domains": [
+        "api.openai.com",
+        "platform.openai.com"
+      ],
+      "apiRoutes": [
+        "/api/ecommerce-operations/ai-review"
+      ],
+      "publicDocs": [
+        {
+          "label": "OpenAI API 开发者快速入门",
+          "url": "https://platform.openai.com/docs/quickstart/make-your-first-api-request"
+        }
+      ],
+      "evidence": [
+        "functions/api/ecommerce-operations/ai-review.js"
+      ],
+      "relations": [
+        {
+          "platformId": "cloudflare-pages",
+          "type": "called-by",
+          "description": "Pages Function 从服务端调用 Responses API，密钥不进入浏览器。"
         }
       ]
     }

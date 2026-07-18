@@ -38,6 +38,25 @@ function createTableDb(tables = []) {
   };
 }
 
+const businessDataTables = [
+  "data_sources",
+  "data_runners",
+  "data_sync_runs",
+  "data_source_files",
+  "data_dimension_mappings",
+  "data_metric_definitions",
+  "data_quality_issues",
+  "data_app_subscriptions",
+  "data_audit_logs",
+  "data_center_meta",
+  "ecommerce_operation_records",
+  "ecommerce_operation_meta",
+  "ecommerce_operation_state",
+  "performance_management_records",
+  "performance_management_meta",
+  "performance_management_state"
+];
+
 test("environment readiness defensively requires an employee session", async () => {
   const { onRequest } = await loadRoute();
   const response = await onRequest({ request: request(), env: {}, data: {} });
@@ -63,7 +82,7 @@ test("environment readiness reports missing production bindings and variables wi
 
 test("warning capabilities do not block an otherwise ready production environment", async () => {
   const { onRequest } = await loadRoute();
-  const tables = REQUIRED_PRODUCTION_TABLES;
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables];
   const response = await onRequest({
     request: request(),
     env: {
@@ -97,7 +116,7 @@ test("a server-only production data token can read readiness without an employee
   const bytes = new TextEncoder().encode(rawToken);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const tokenHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
-  const tables = REQUIRED_PRODUCTION_TABLES;
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables];
   const db = {
     prepare(sql) {
       const statement = {

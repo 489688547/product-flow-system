@@ -65,6 +65,7 @@ Production 和 Preview 环境都建议绑定。没有这个绑定时，页面会
 
 ```bash
 npx wrangler d1 execute product-flow-system --remote --file migrations/0001_production_data_access.sql
+npx wrangler d1 execute product-flow-system --remote --file migrations/0002_business_data_apps.sql
 npx wrangler d1 execute product-flow-system --remote --file migrations/0002_collaboration_execution.sql
 npm run verify:production
 ```

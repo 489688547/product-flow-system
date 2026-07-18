@@ -6,9 +6,11 @@ import { AuthGate } from "./features/auth/AuthGate.jsx";
 import { PlatformProvider } from "./state/PlatformProvider.jsx";
 import { BrandContentProvider } from "./state/BrandContentProvider.jsx";
 import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatformBridge.jsx";
-import { canAccessCompanyPlatform, canAccessDataCenter, canAccessSupplyChain } from "./domain/permissions.js";
+import { canAccessCompanyPlatform, canAccessDataCenter, canAccessEcommerceOperations, canAccessPerformanceManagement, canAccessSupplyChain } from "./domain/permissions.js";
 import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
 import { DataCenterProvider } from "./state/DataCenterProvider.jsx";
+import { EcommerceOperationsProvider } from "./state/EcommerceOperationsProvider.jsx";
+import { PerformanceManagementProvider } from "./state/PerformanceManagementProvider.jsx";
 import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
@@ -20,16 +22,22 @@ function AuthenticatedApp() {
   const hasCompanyAccess = canAccessCompanyPlatform(user);
   const hasSupplyChainAccess = canAccessSupplyChain(user);
   const hasDataCenterAccess = canAccessDataCenter(user);
+  const hasOperationsAccess = canAccessEcommerceOperations(user);
+  const hasPerformanceAccess = canAccessPerformanceManagement(user);
   return (
     <ProductFlowProvider>
       <DataCenterProvider enabled={hasDataCenterAccess}>
         <SupplyChainProvider enabled={hasSupplyChainAccess}>
           <BrandContentProvider>
             <CollaborationProvider>
-              <PlatformProvider enabled={hasCompanyAccess}>
-                {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-                <App />
-              </PlatformProvider>
+              <EcommerceOperationsProvider enabled={hasOperationsAccess}>
+                <PerformanceManagementProvider enabled={hasPerformanceAccess}>
+                  <PlatformProvider enabled={hasCompanyAccess}>
+                    {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+                    <App />
+                  </PlatformProvider>
+                </PerformanceManagementProvider>
+              </EcommerceOperationsProvider>
             </CollaborationProvider>
           </BrandContentProvider>
         </SupplyChainProvider>

@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Target, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -30,6 +30,8 @@ const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/Ince
 const SupplyChainAppPage = lazyNamed(() => import("./features/supply-chain/SupplyChainAppPage.jsx"), "SupplyChainAppPage");
 const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
 const DataCenterAppPage = lazyNamed(() => import("./features/data-center/DataCenterAppPage.jsx"), "DataCenterAppPage");
+const EcommerceOperationsAppPage = lazyNamed(() => import("./features/ecommerce-operations/EcommerceOperationsAppPage.jsx"), "EcommerceOperationsAppPage");
+const PerformanceManagementAppPage = lazyNamed(() => import("./features/performance-management/PerformanceManagementAppPage.jsx"), "PerformanceManagementAppPage");
 const BrandContentOverviewPage = lazyNamed(() => import("./features/brand-content/BrandContentOverviewPage.jsx"), "BrandContentOverviewPage");
 const BrandContentWorkbenchPage = lazyNamed(() => import("./features/brand-content/BrandContentWorkbenchPage.jsx"), "BrandContentWorkbenchPage");
 const BrandAssetLibraryPage = lazyNamed(() => import("./features/brand-content/BrandAssetLibraryPage.jsx"), "BrandAssetLibraryPage");
@@ -52,7 +54,6 @@ const SUPPLY_CHAIN_NAV = [
   ["supply-settings", "设置", Settings, "供应链管理", "settings"]
 ];
 const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , , , section]) => [screen, section]));
-
 const DATA_CENTER_NAV = [
   ["data-overview", "数据总览", Database, "数据中心", "overview"],
   ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
@@ -64,6 +65,23 @@ const DATA_CENTER_NAV = [
   ["data-settings", "设置", Settings, "数据中心", "settings"]
 ];
 const DATA_CENTER_SCREEN_TO_SECTION = new Map(DATA_CENTER_NAV.map(([screen, , , , section]) => [screen, section]));
+const ECOMMERCE_OPERATIONS_NAV = [
+  ["ops-dashboard", "经营驾驶舱", LayoutDashboard, "电商店铺运营", "dashboard"],
+  ["ops-focus", "重点产品经营", Target, "电商店铺运营", "focus"],
+  ["ops-collaboration", "跨部门协同", Workflow, "电商店铺运营", "collaboration"],
+  ["ops-team", "运营团队", Users, "电商店铺运营", "team"],
+  ["ops-playbooks", "经营方法库", Sparkles, "电商店铺运营", "playbooks"]
+];
+const ECOMMERCE_OPERATIONS_SCREEN_TO_SECTION = new Map(ECOMMERCE_OPERATIONS_NAV.map(([screen, , , , section]) => [screen, section]));
+
+const PERFORMANCE_MANAGEMENT_NAV = [
+  ["performance-overview", "绩效总览", BarChart3, "绩效管理", "overview"],
+  ["performance-schemes", "考核方案", ListChecks, "绩效管理", "schemes"],
+  ["performance-mine", "我的绩效", ClipboardCheck, "绩效管理", "mine"],
+  ["performance-manager", "主管评估", Users, "绩效管理", "manager"],
+  ["performance-archive", "复核与归档", RefreshCcw, "绩效管理", "archive"]
+];
+const PERFORMANCE_MANAGEMENT_SCREEN_TO_SECTION = new Map(PERFORMANCE_MANAGEMENT_NAV.map(([screen, , , , section]) => [screen, section]));
 
 const BRAND_NAV = [
   ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
@@ -91,6 +109,8 @@ const COMPANY_NAV = [
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
   ...DATA_CENTER_NAV,
+  ...ECOMMERCE_OPERATIONS_NAV,
+  ...PERFORMANCE_MANAGEMENT_NAV,
   ...BRAND_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
@@ -105,6 +125,8 @@ const PRODUCT_NAV = [
   ["collaboration", "部门协同", Workflow, "协同执行"],
   ...SUPPLY_CHAIN_NAV,
   ...DATA_CENTER_NAV,
+  ...ECOMMERCE_OPERATIONS_NAV,
+  ...PERFORMANCE_MANAGEMENT_NAV,
   ...BRAND_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
@@ -115,7 +137,9 @@ const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NA
 
 function resolveScreen(screen) {
   if (screen === "supply-chain") return "supply-overview";
-  return screen === "data-center" ? "data-overview" : screen;
+  const resolvedDataScreen = screen === "data-center" ? "data-overview" : screen;
+  if (resolvedDataScreen === "ecommerce-operations") return "ops-dashboard";
+  return resolvedDataScreen === "performance-management" ? "performance-overview" : resolvedDataScreen;
 }
 
 function routeFromHash() {
@@ -129,7 +153,10 @@ function routeFromHash() {
 
 function navigationPermissionKey(screen) {
   if (SUPPLY_CHAIN_SCREEN_TO_SECTION.has(screen)) return "supply-chain";
-  return DATA_CENTER_SCREEN_TO_SECTION.has(screen) ? "data-center" : screen;
+  const dataPermission = DATA_CENTER_SCREEN_TO_SECTION.has(screen) ? "data-center" : screen;
+  if (dataPermission !== screen) return dataPermission;
+  if (ECOMMERCE_OPERATIONS_SCREEN_TO_SECTION.has(screen)) return "ecommerce-operations";
+  return PERFORMANCE_MANAGEMENT_SCREEN_TO_SECTION.has(screen) ? "performance-management" : screen;
 }
 
 export default function App() {
@@ -223,6 +250,8 @@ export default function App() {
   };
   const supplySection = SUPPLY_CHAIN_SCREEN_TO_SECTION.get(activeScreen);
   const dataSection = DATA_CENTER_SCREEN_TO_SECTION.get(activeScreen);
+  const operationsSection = ECOMMERCE_OPERATIONS_SCREEN_TO_SECTION.get(activeScreen);
+  const performanceSection = PERFORMANCE_MANAGEMENT_SCREEN_TO_SECTION.get(activeScreen);
 
   return (
     <div className="app-shell">
@@ -248,7 +277,7 @@ export default function App() {
           </div>
         </header>
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
-          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : pages[activeScreen]}
+          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
       <FloatingIssueButton />

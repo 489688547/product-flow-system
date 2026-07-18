@@ -14,6 +14,12 @@
 | `/api/sales` | 查询产品销售聚合 | 需要公司会话；时间和平台口径见产品数据定义 |
 | `/api/data-center` | 读取和保存数据中心安全元数据 | 指定部门可读；仅总经办和运营部可写；拒绝只读身份；D1 分实体表存储 |
 | `/api/data-center/sales` | 按日期读取数据中心销售事实 | 需要公司会话；最长 370 天；订单创建时间；上海时区；排除“其它” |
+| `/api/ecommerce-operations` | 读取可见的店铺经营状态 | 需要公司会话和授权部门；D1 分实体存储 |
+| `/api/ecommerce-operations/actions` | 提交重点产品、方案、执行、协同和复盘动作 | 服务端校验角色、状态与版本；拒绝只读身份 |
+| `/api/ecommerce-operations/ai-review` | 对当前方案给出优化建议 | 服务端字段白名单；AI 不改变审批；无密钥时明确降级为规则检查 |
+| `/api/ecommerce-operations/evidence` | 按员工和月份读取已验收经营证据 | 员工只读本人；主管和人事按职责读取；不返回绩效分 |
+| `/api/performance-management` | 按角色读取绩效状态 | 员工只读本人；主管看管理范围；人事管理归档 |
+| `/api/performance-management/actions` | 自评、终评、复核、冻结和更正 | 角色动作白名单、版本冲突、一次复核、冻结后追加更正 |
 | `/api/platform/v1/integrations` | 读取和维护内部平台资料 | 全员可读；仅总经办非只读身份可写；字段白名单；D1 审计只记录字段名 |
 | `/api/platform/v1/collaboration-items` | 查询和创建跨 App 部门协同事项 | 公司会话；普通员工按本人和部门参与范围；游标分页；业务幂等键 |
 | `/api/platform/v1/collaboration-items/:id` | 读取、修改和归档单个协同事项 | 参与范围；版本乐观锁；无物理 DELETE |
@@ -44,6 +50,14 @@
 ```
 
 兼容策略：数据中心不复制销售事实，继续复用 `product_sales_daily`。本地开发没有 D1 时，元数据写入 `.local-data/data-center-state.json`，销售读取返回 501 并由前端降级到现有浏览器销售仓库；销售行不会写入 `localStorage`。
+
+### 店铺运营与绩效契约
+
+店铺运营状态分别保存在 `ecommerce_operation_records` 和 `ecommerce_operation_meta`；绩效状态分别保存在 `performance_management_records` 和 `performance_management_meta`。两个动作接口都接收 `{ "expectedRevision": 1, "action": { "type": "..." } }`，旧版本写入返回 409。
+
+AI 点评只传输方案中的产品、平台、店铺、现状证据、目标、问题、对策和检测指标，不传账号凭据或绩效数据。生产密钥使用 Cloudflare Secret `OPENAI_API_KEY`；请求设置 `store: false`。未配置或服务异常时响应 `mode: "rule_fallback"`，页面明确显示“智能规则检查”。
+
+绩效考核项可保存只读经营证据引用 `{ sourceAppId, entityType, entityId }`，但经营系统不写绩效分；任务完成也不会自动把考核标记为达标。绩效数据不写浏览器 `localStorage`。
 
 ### 环境就绪契约
 
