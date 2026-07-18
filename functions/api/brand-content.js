@@ -58,7 +58,26 @@ function isBrandLead(session = {}) {
   return /品牌负责人|品牌总监|运营总监/.test(String(session.title || ""));
 }
 
-function canApplyAction(session, action) {
+function contentForAction(state, action) {
+  if (action.type === "transition_content") return state.contents.find(content => content.id === action.id) || null;
+  if (action.type === "upsert_asset") {
+    const contentId = action.record?.contentId || state.assetVersions.find(asset => asset.id === action.record?.id)?.contentId;
+    return state.contents.find(content => content.id === contentId) || null;
+  }
+  if (action.type === "upsert_publication") {
+    const contentId = action.record?.contentId || state.publications.find(publication => publication.id === action.record?.id)?.contentId;
+    return state.contents.find(content => content.id === contentId) || null;
+  }
+  return null;
+}
+
+function isAssigned(session, content, roles) {
+  const userId = String(session.userId || "");
+  const name = String(session.name || "");
+  return roles.some(role => String(content?.[`${role}Id`] || "") === userId || String(content?.[`${role}Name`] || "") === name);
+}
+
+function canApplyAction(session, action, state) {
   if (!isBrandWriter(session)) return { allowed: false, code: "BRAND_CONTENT_WRITE_DENIED", message: "当前账号不在品牌内容协同的可写范围。" };
   if (LEAD_ACTIONS.has(action.type) && !isBrandLead(session)) {
     return { allowed: false, code: "BRAND_CONTENT_ACTION_DENIED", message: "该操作需要品牌内容负责人或总经办权限。" };
@@ -68,6 +87,13 @@ function canApplyAction(session, action) {
   }
   if (action.type === "upsert_publication" && !isBrandLead(session) && !/运营/.test(String(session.title || ""))) {
     return { allowed: false, code: "BRAND_CONTENT_ACTION_DENIED", message: "只有运营或品牌内容负责人可以维护发布记录。" };
+  }
+  if (!isBrandLead(session)) {
+    const content = contentForAction(state, action);
+    const roles = action.type === "upsert_asset" ? ["editor"] : action.type === "upsert_publication" ? ["operator"] : ["director", "editor", "operator"];
+    if (["transition_content", "upsert_asset", "upsert_publication"].includes(action.type) && !isAssigned(session, content, roles)) {
+      return { allowed: false, code: "BRAND_CONTENT_SCOPE_DENIED", message: "只能修改自己负责的品牌内容记录。" };
+    }
   }
   return { allowed: true };
 }
@@ -89,7 +115,7 @@ function parseStoredState(row) {
     const version = Math.max(0, Math.trunc(Number(row.version) || 0));
     return { state: { ...state, version }, version, updatedAt: row.updated_at || "", updatedBy: row.updated_by || "" };
   } catch {
-    const error = new Error("品牌内容数据损坏，已停止写入，请联系平台管理员恢复。 ");
+    const error = new Error("品牌内容数据损坏，已停止写入，请联系平台管理员恢复。");
     error.status = 500;
     error.code = "BRAND_CONTENT_STATE_CORRUPT";
     throw error;
@@ -155,14 +181,14 @@ export async function onRequest({ request, env, data = {} }) {
     if (!body || typeof body !== "object" || Array.isArray(body)) throw inputError("请求体必须是 JSON 对象。");
     const expectedVersion = normalizeVersion(body.version);
     const action = normalizeAction(body.action);
-    const permission = canApplyAction(session, action);
+    const currentState = stored?.state || createEmptyBrandContentState();
+    const permission = canApplyAction(session, action, currentState);
     if (!permission.allowed) return errorResponse(permission.message, 403, permission.code);
 
     const currentVersion = stored?.version || 0;
     if (expectedVersion !== currentVersion) {
       return errorResponse("品牌内容数据已被其他同事更新，请刷新后重试。", 409, "BRAND_CONTENT_VERSION_CONFLICT", { version: currentVersion }, true);
     }
-    const currentState = stored?.state || createEmptyBrandContentState();
     const actor = String(session.name || session.userId || "unknown").slice(0, 120);
     const nextState = reduceBrandContentState(currentState, { ...action, actor, now: new Date().toISOString() });
     const saved = await writeStoredState(db, nextState, currentVersion + 1, actor);

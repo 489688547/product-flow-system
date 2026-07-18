@@ -9,6 +9,7 @@ import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatfo
 import { canAccessCompanyPlatform } from "./domain/permissions.js";
 import App from "./App.jsx";
 import "./styles.css";
+import "./features/brand-content/brand-content.css";
 
 function AuthenticatedApp() {
   const { user } = useAuth();

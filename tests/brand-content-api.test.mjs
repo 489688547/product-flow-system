@@ -4,6 +4,7 @@ import { onRequest } from "../functions/api/brand-content.js";
 
 const executive = { userId: "u-exec", name: "品牌负责人", role: "executive", department: "总经办", title: "总经理" };
 const editor = { userId: "u-editor", name: "张煜雷", role: "employee", department: "品牌部", title: "剪辑师" };
+const unassignedEditor = { userId: "u-editor-2", name: "其他剪辑", role: "employee", department: "品牌部", title: "剪辑师" };
 const outsider = { userId: "u-finance", name: "财务同事", role: "employee", department: "财务部", title: "会计" };
 
 function createD1Mock() {
@@ -129,6 +130,19 @@ test("brand content API enforces action roles and rejects unknown actions", asyn
   const unknown = await call({ db, method: "POST", body: { version: 0, action: { type: "delete_everything" } } });
   assert.equal(unknown.status, 400);
   assert.equal((await unknown.json()).error.code, "BRAND_CONTENT_ACTION_INVALID");
+});
+
+test("brand collaborators may only update content assigned to them", async () => {
+  const db = createD1Mock();
+  const created = await call({ db, method: "POST", body: { version: 0, action: { type: "create_content", record: contentInput } } });
+  assert.equal(created.status, 200);
+
+  const assigned = await call({ db, session: editor, method: "POST", body: { version: 1, action: { type: "transition_content", id: (await created.clone().json()).state.contents[0].id, nextStatus: "scripting" } } });
+  assert.equal(assigned.status, 200);
+
+  const denied = await call({ db, session: unassignedEditor, method: "POST", body: { version: 2, action: { type: "transition_content", id: (await assigned.clone().json()).state.contents[0].id, nextStatus: "editing" } } });
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).error.code, "BRAND_CONTENT_SCOPE_DENIED");
 });
 
 test("OPTIONS advertises GET and POST", async () => {
