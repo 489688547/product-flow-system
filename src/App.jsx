@@ -28,6 +28,8 @@ const AppCenterPage = lazyNamed(() => import("./features/platform/AppCenterPage.
 const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/IncentiveProjectsPage.jsx"), "IncentiveProjectsPage");
 const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
 const BrandContentPlaceholderPage = lazyNamed(() => import("./features/brand-content/BrandContentPlaceholderPage.jsx"), "BrandContentPlaceholderPage");
+const BrandContentOverviewPage = lazyNamed(() => import("./features/brand-content/BrandContentOverviewPage.jsx"), "BrandContentOverviewPage");
+const BrandContentWorkbenchPage = lazyNamed(() => import("./features/brand-content/BrandContentWorkbenchPage.jsx"), "BrandContentWorkbenchPage");
 
 const BRAND_NAV = [
   ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
@@ -148,8 +150,8 @@ export default function App() {
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
-    "content-overview": <BrandContentPlaceholderPage title="内容总览" description="先处理未发布、缺素材 ID、学习期到期、未获测试和数据问题。" />,
-    "content-workbench": <BrandContentPlaceholderPage title="内容作战台" description="按产品、责任人和截止时间推进 Brief、脚本、剪辑、审核与发布。" />,
+    "content-overview": <BrandContentOverviewPage onNavigate={showScreen} />,
+    "content-workbench": <BrandContentWorkbenchPage />,
     "content-assets": <BrandContentPlaceholderPage title="素材资产" description="关联 NAS 中的内容版本、审核记录和平台发布关系。" />,
     "content-review": <BrandContentPlaceholderPage title="投放复盘" description="先核对数据口径，再比较产品链接与素材表现。" />,
     "brand-accounts": <BrandContentPlaceholderPage title="品牌账号" description="独立查看自然播放、完播、互动、收藏和涨粉。" />,
