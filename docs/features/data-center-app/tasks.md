@@ -43,24 +43,24 @@
   - 依赖：Provider。
   - 文件：`src/App.jsx`、`main.jsx`、权限、App 注册和最小页面。
   - 输入：现有 Supply Chain 导航模式。
-  - 输出：产品全周期之后的八个数据中心入口。
+  - 输出：产品全周期之后的七个数据中心入口，不包含独立数据分析页。
   - 失败测试：导航、顺序、权限和注册断言失败。
   - 实现步骤：权限、注册、懒加载、路由映射、Provider 挂载。
   - 验证：数据中心与供应链 21/21 通过，`npm run build` 通过。
   - 提交：`feat(data): register data center app`。
 
-- [x] 总览与分析
+- [x] 数据总览
   - 依赖：第三 App 装配。
-  - 文件：`DataCenterAppPage.jsx`、`DataOverview.jsx`、`DataAnalysis.jsx`。
-  - 输入：Provider 销售响应和产品 SKU 映射。
-  - 输出：老板总览与运营下钻。
-  - 失败测试：指标、口径、筛选和状态文案断言失败。
-  - 实现步骤：摘要、趋势、贡献、异常、筛选、分组表。
+  - 文件：`DataCenterAppPage.jsx`、`DataOverview.jsx`。
+  - 输入：Provider 销售响应。
+  - 输出：老板经营总览；不提供独立数据分析入口或全量明细表。
+  - 失败测试：指标、口径、状态文案和无分析入口断言失败。
+  - 实现步骤：摘要、趋势、贡献、异常。
   - 验证：数据中心 App 与领域测试 11/11 通过，生产构建通过。
   - 提交：`feat(data): add sales overview and analysis`。
 
 - [x] 数据治理工作区
-  - 依赖：总览与分析。
+  - 依赖：数据总览。
   - 文件：六个数据治理 Workspace 和 App 页面映射。
   - 输入：标准元数据状态。
   - 输出：接入、指标、质量、记录、服务和设置页面。

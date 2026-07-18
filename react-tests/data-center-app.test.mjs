@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { createDefaultPlatformState } from "../src/domain/strategyExecution.js";
 import { canAccessDataCenter, DEFAULT_PERMISSIONS, FEATURE_PERMISSION_ITEMS, NAV_PERMISSION_ITEMS } from "../src/domain/permissions.js";
@@ -24,9 +24,10 @@ test("data center has navigation and feature permission defaults", () => {
   assert.equal(canAccessDataCenter({ department: "品牌部" }), false);
 });
 
-test("data center navigation sits after product lifecycle with eight routes", () => {
+test("data center navigation sits after product lifecycle with seven routes and no analysis tab", () => {
   const app = read("src/App.jsx");
-  assert.match(app, /const DATA_CENTER_NAV = \[[\s\S]*data-overview[\s\S]*data-analysis[\s\S]*data-sources[\s\S]*data-metrics[\s\S]*data-quality[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
+  assert.match(app, /const DATA_CENTER_NAV = \[[\s\S]*data-overview[\s\S]*data-sources[\s\S]*data-metrics[\s\S]*data-quality[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
+  assert.doesNotMatch(app, /data-analysis|"数据分析"/);
   assert.match(app, /\["archive", "产品档案"[\s\S]*\.\.\.DATA_CENTER_NAV[\s\S]*\["handbook", "说明书"/);
   assert.match(app, /screen === "data-center" \? "data-overview"/);
   assert.match(app, /DATA_CENTER_SCREEN_TO_SECTION\.has\(screen\) \? "data-center"/);
@@ -42,14 +43,14 @@ test("main mounts data center provider inside product state with access gating",
   assert.match(main, /<ProductFlowProvider>[\s\S]*<DataCenterProvider enabled=\{hasDataCenterAccess\}>[\s\S]*<SupplyChainProvider/);
 });
 
-test("overview and analysis expose the operating time basis and drilldowns", () => {
+test("overview exposes the operating time basis without a separate analysis workspace", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   const overview = read("src/features/data-center/DataOverview.jsx");
-  const analysis = read("src/features/data-center/DataAnalysis.jsx");
   assert.match(page, /summarizeDataCenterSales/);
   assert.match(page, /buildDataQualitySummary/);
   assert.match(page, /overview: <DataOverview/);
-  assert.match(page, /analysis: <DataAnalysis/);
+  assert.doesNotMatch(page, /DataAnalysis|analysis:/);
+  assert.equal(existsSync(resolve(root, "src/features/data-center/DataAnalysis.jsx")), false);
   assert.match(overview, /净销售额/);
   assert.match(overview, /订单创建时间/);
   assert.match(overview, /截止昨天/);
@@ -57,10 +58,6 @@ test("overview and analysis expose the operating time basis and drilldowns", () 
   assert.match(overview, /毛利率/);
   assert.match(overview, /平台贡献/);
   assert.match(overview, /数据健康/);
-  assert.match(analysis, /按日趋势/);
-  assert.match(analysis, /平台筛选/);
-  assert.match(analysis, /商品筛选/);
-  assert.match(analysis, /DataTable/);
 });
 
 test("governance workspaces cover safe sources metrics quality sync services and settings", () => {
@@ -99,4 +96,5 @@ test("data center has restrained responsive layouts and visible focus states", (
   assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.data-overview-grid/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.data-range-controls/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
+  assert.doesNotMatch(styles, /data-analysis/);
 });

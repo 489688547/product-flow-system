@@ -1,9 +1,7 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { useMemo } from "react";
 import { buildDataQualitySummary, summarizeDataCenterSales } from "../../domain/dataCenter.js";
-import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
-import { DataAnalysis } from "./DataAnalysis.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
 import { canAccessCompanyPlatform } from "../../domain/permissions.js";
@@ -11,7 +9,6 @@ import { DataCenterSettingsWorkspace, DataQualityWorkspace, DataServicesWorkspac
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据和数据健康状态。"],
-  analysis: ["数据分析", "按时间、平台和商品下钻经营表现。"],
   sources: ["数据接入", "管理店铺、广告平台和 ERP 数据源。"],
   metrics: ["指标管理", "维护指标口径、负责人和版本。"],
   quality: ["数据质量", "定位缺失、重复、延迟和映射异常。"],
@@ -22,16 +19,13 @@ const SECTION_META = {
 
 export function DataCenterAppPage({ section = "overview" }) {
   const { user } = useAuth();
-  const { state: productState } = useProductFlow();
   const { state, range, setRange, salesRows, salesMeta, loading, error } = useDataCenter();
   const [title, description] = SECTION_META[section] || SECTION_META.overview;
   const summary = useMemo(() => summarizeDataCenterSales(salesRows, range), [range, salesRows]);
   const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
-  const productNames = useMemo(() => new Map((productState.products || []).flatMap(product => (product.skuCodes || []).map(item => [typeof item === "object" ? item.code : item, product.name]))), [productState.products]);
   const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
   const content = {
     overview: <DataOverview summary={summary} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} />,
-    analysis: <DataAnalysis rows={salesRows} range={range} productNames={productNames} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} />,
     metrics: <MetricDefinitionsWorkspace />,
     quality: <DataQualityWorkspace quality={quality} />,

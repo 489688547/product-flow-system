@@ -2,7 +2,7 @@
 
 ## 目标
 
-交付第三个可运行的业务 App，在不复制销售事实的前提下完成 D1 元数据、销售查询、权限、八个工作区和完整页面状态。
+交付第三个可运行的业务 App，在不复制销售事实的前提下完成 D1 元数据、销售查询、权限、七个工作区和完整页面状态。
 
 ## 架构方案
 
@@ -15,7 +15,7 @@
 - `src/domain/dataCenter.js`：日期、平台过滤、标准化、摘要和审计。
 - `src/state/dataCenterApi.js`、`DataCenterProvider.jsx`：API 编排、缓存和本地降级。
 - `functions/api/data-center*`：元数据持久化和只读销售查询。
-- `src/features/data-center/*`：八个工作区。
+- `src/features/data-center/*`：七个工作区。
 - `src/App.jsx`、`main.jsx`、`permissions.js`、`strategyExecution.js`：第三 App 装配。
 - `styles.css`：沿用现有 Token 的数据中心布局和响应式规则。
 - `react-tests/data-center.test.mjs`、`tests/data-center-api.test.mjs`：领域、UI、契约和权限测试。
@@ -65,7 +65,7 @@ npm run build
 2. D1 元数据与销售查询 API。
 3. Provider 和本地降级。
 4. 第三 App 注册、权限和主导航。
-5. 总览与分析。
+5. 数据总览。
 6. 数据治理工作区。
 7. 本地服务一致性。
 8. 视觉、响应式和 Definition of Done。
