@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
+  checkRuleWriteback,
   checkIntegrationImpact,
   loadIntegrationRegistry,
   matchIntegrationPlatforms,
@@ -69,6 +70,7 @@ if (registryErrors.length) {
     const content = changedCode(event.pull_request.base?.sha, event.pull_request.head?.sha, paths);
     const body = event.pull_request.body || "";
     const result = checkIntegrationImpact(registry, { paths, content, body });
+    const writeback = checkRuleWriteback({ paths, body });
     const advisory = matchIntegrationPlatforms(registry, {
       text: `${event.pull_request.title || ""}\n${body}`,
       paths: [],
@@ -78,12 +80,13 @@ if (registryErrors.length) {
     if (advisory.direct.length) {
       console.log(`关键词建议检查平台：${advisory.direct.map(match => match.id).join(", ")}`);
     }
-    if (result.errors.length) {
+    const errors = [...result.errors, ...writeback.errors];
+    if (errors.length) {
       console.error("集成影响检查失败：");
-      result.errors.forEach(error => console.error(`- ${error}`));
+      errors.forEach(error => console.error(`- ${error}`));
       process.exitCode = 1;
     } else {
-      console.log(`集成影响检查通过；路径要求：${result.requiredIds.join(", ") || "none"}。`);
+      console.log(`集成影响检查通过；路径要求：${result.requiredIds.join(", ") || "none"}；规则反写：${writeback.declaredPaths.join(", ")}。`);
     }
   }
 }

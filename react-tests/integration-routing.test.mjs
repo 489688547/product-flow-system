@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  checkRuleWriteback,
   checkIntegrationImpact,
   loadIntegrationRegistry,
   matchIntegrationPlatforms,
@@ -174,4 +175,38 @@ test("none is allowed only with a reason and no mandatory path matches", () => {
     paths: ["functions/api/kuaimai/pull.js"],
     body: "Integration-Impact: none\nIntegration-Impact-Reason: 没有外部影响"
   }).errors.some(error => error.includes("kuaimai")));
+});
+
+test("shared boundary changes require an explicit durable rule write-back", () => {
+  const missing = checkRuleWriteback({
+    paths: ["functions/api/platform/v1/example.js"],
+    body: "Rule-Writeback: none\nRule-Writeback-Reason: 只是一个功能实现，不需要更新长期规则"
+  });
+  assert.ok(missing.errors.some(error => error.includes("长期规则")));
+
+  const accepted = checkRuleWriteback({
+    paths: ["functions/api/platform/v1/example.js", "docs/platform/api-catalog.md"],
+    body: [
+      "Rule-Writeback: docs/platform/api-catalog.md",
+      "Rule-Writeback-Reason: 共享 API 契约已同步到平台目录"
+    ].join("\n")
+  });
+  assert.deepEqual(accepted.errors, []);
+});
+
+test("every pull request declares rule write-back and only names changed durable files", () => {
+  assert.ok(checkRuleWriteback({
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: ""
+  }).errors.some(error => error.includes("Rule-Writeback")));
+
+  assert.ok(checkRuleWriteback({
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: "Rule-Writeback: docs/platform/api-catalog.md\nRule-Writeback-Reason: 已更新目录"
+  }).errors.some(error => error.includes("未在本 PR 变更")));
+
+  assert.deepEqual(checkRuleWriteback({
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: "Rule-Writeback: none\nRule-Writeback-Reason: 仅调整现有手册布局，没有改变共享契约"
+  }).errors, []);
 });
