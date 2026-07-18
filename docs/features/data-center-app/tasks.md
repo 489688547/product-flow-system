@@ -19,14 +19,14 @@
   - 验证：`node --test react-tests/data-center.test.mjs`，6/6 通过。
   - 提交：`feat(data): add data center domain`。
 
-- [ ] D1 与 API
+- [x] D1 与 API
   - 依赖：领域模型。
   - 文件：`functions/api/data-center*`、`functions/api/sales.js`、`tests/data-center-api.test.mjs`、`package.json`。
   - 输入：安全元数据状态和 `product_sales_daily`。
   - 输出：认证后的元数据 GET/POST 与销售 GET。
   - 失败测试：`node --test tests/data-center-api.test.mjs`，预期路由不存在。
   - 实现步骤：表、读写、权限、日期校验、其它过滤、响应元数据。
-  - 验证：新 API、销售和供应链回归测试通过。
+  - 验证：`node --test tests/data-center-api.test.mjs tests/supply-chain-api.test.mjs react-tests/sales-data.test.mjs`，21/21 通过。
   - 提交：`feat(data): add data center APIs`。
 
 - [ ] Provider

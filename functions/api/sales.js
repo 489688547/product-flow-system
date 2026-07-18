@@ -26,11 +26,11 @@ function optionsResponse() {
   });
 }
 
-function salesDatabase(env = {}) {
+export function salesDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
 }
 
-async function ensureSalesTables(db) {
+export async function ensureSalesTables(db) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS product_sales_daily (
     code TEXT NOT NULL,
     date TEXT NOT NULL,
