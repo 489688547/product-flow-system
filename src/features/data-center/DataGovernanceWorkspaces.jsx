@@ -2,7 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, ShieldCheck } from "lucide-react";
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
-import { DataTable } from "../../ui/DataTable.jsx";
+import { DataTable, TableActions } from "../../ui/DataTable.jsx";
+import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapters.js";
+import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 
 const SOURCE_CATALOG = [
   ["douyin-shop", "抖音店铺", "店铺订单与商品经营数据", "文件导出 / 浏览器辅助", "可配置"],
@@ -77,7 +79,8 @@ export function DataQualityWorkspace({ quality }) {
     { key: "title", header: "问题", render: row => row.title || row.message || "未命名问题" },
     { key: "type", header: "类型", render: row => row.type || "数据校验" },
     { key: "owner", header: "负责人", render: row => row.owner || "待认领" },
-    { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "resolved" ? "success" : "warning"}`}>{row.status === "resolved" ? "已解决" : "待处理"}</span> }
+    { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "resolved" ? "success" : "warning"}`}>{row.status === "resolved" ? "已解决" : "待处理"}</span> },
+    { key: "actions", header: "操作", render: row => <TableActions><AppCollaborationButton draft={collaborationDraftFromDataIssue(row)} disabled={row.status === "resolved"} disabledReason="已解决的数据问题无需再发起协同" /></TableActions> }
   ]} rows={state.qualityIssues} empty={<div className="empty-state compact-empty">当前没有待处理的数据质量问题。</div>} /></section></div>;
 }
 
