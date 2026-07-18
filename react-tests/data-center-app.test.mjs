@@ -39,3 +39,24 @@ test("main mounts data center provider inside product state with access gating",
   assert.match(main, /canAccessDataCenter/);
   assert.match(main, /<ProductFlowProvider>[\s\S]*<DataCenterProvider enabled=\{hasDataCenterAccess\}>[\s\S]*<SupplyChainProvider/);
 });
+
+test("overview and analysis expose the operating time basis and drilldowns", () => {
+  const page = read("src/features/data-center/DataCenterAppPage.jsx");
+  const overview = read("src/features/data-center/DataOverview.jsx");
+  const analysis = read("src/features/data-center/DataAnalysis.jsx");
+  assert.match(page, /summarizeDataCenterSales/);
+  assert.match(page, /buildDataQualitySummary/);
+  assert.match(page, /overview: <DataOverview/);
+  assert.match(page, /analysis: <DataAnalysis/);
+  assert.match(overview, /净销售额/);
+  assert.match(overview, /订单创建时间/);
+  assert.match(overview, /截止昨天/);
+  assert.match(overview, /退款率/);
+  assert.match(overview, /毛利率/);
+  assert.match(overview, /平台贡献/);
+  assert.match(overview, /数据健康/);
+  assert.match(analysis, /按日趋势/);
+  assert.match(analysis, /平台筛选/);
+  assert.match(analysis, /商品筛选/);
+  assert.match(analysis, /DataTable/);
+});

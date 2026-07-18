@@ -1,4 +1,10 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
+import { useMemo } from "react";
+import { buildDataQualitySummary, summarizeDataCenterSales } from "../../domain/dataCenter.js";
+import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
+import { PageHeader } from "../../ui/PageHeader.jsx";
+import { DataAnalysis } from "./DataAnalysis.jsx";
+import { DataOverview } from "./DataOverview.jsx";
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据和数据健康状态。"],
@@ -12,15 +18,21 @@ const SECTION_META = {
 };
 
 export function DataCenterAppPage({ section = "overview" }) {
-  const { loading, error } = useDataCenter();
+  const { state: productState } = useProductFlow();
+  const { state, range, setRange, salesRows, salesMeta, loading, error } = useDataCenter();
   const [title, description] = SECTION_META[section] || SECTION_META.overview;
+  const summary = useMemo(() => summarizeDataCenterSales(salesRows, range), [range, salesRows]);
+  const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
+  const productNames = useMemo(() => new Map((productState.products || []).flatMap(product => (product.skuCodes || []).map(item => [typeof item === "object" ? item.code : item, product.name]))), [productState.products]);
+  const content = {
+    overview: <DataOverview summary={summary} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} />,
+    analysis: <DataAnalysis rows={salesRows} range={range} productNames={productNames} />
+  };
   return (
     <section className="page data-center-page">
-      <header className="page-header">
-        <div><span className="eyebrow">数据中心</span><h1>{title}</h1><p>{description}</p></div>
-      </header>
+      <PageHeader title={title} description={description} identity="统一口径 · 可追溯 · 截止昨天" />
       {error ? <div className="section-panel" role="status">{error}</div> : null}
-      <div className="section-panel empty-state">{loading ? "正在加载数据…" : "工作区已接入，详细内容正在装配。"}</div>
+      {loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}
     </section>
   );
 }

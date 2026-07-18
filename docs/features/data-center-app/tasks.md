@@ -49,14 +49,14 @@
   - 验证：数据中心与供应链 21/21 通过，`npm run build` 通过。
   - 提交：`feat(data): register data center app`。
 
-- [ ] 总览与分析
+- [x] 总览与分析
   - 依赖：第三 App 装配。
   - 文件：`DataCenterAppPage.jsx`、`DataOverview.jsx`、`DataAnalysis.jsx`。
   - 输入：Provider 销售响应和产品 SKU 映射。
   - 输出：老板总览与运营下钻。
   - 失败测试：指标、口径、筛选和状态文案断言失败。
   - 实现步骤：摘要、趋势、贡献、异常、筛选、分组表。
-  - 验证：数据中心 UI 和领域测试通过。
+  - 验证：数据中心 App 与领域测试 11/11 通过，生产构建通过。
   - 提交：`feat(data): add sales overview and analysis`。
 
 - [ ] 数据治理工作区
