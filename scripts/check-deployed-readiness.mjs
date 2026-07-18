@@ -5,7 +5,7 @@ function normalizeUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
-export async function checkDeployedReadiness({ baseUrl, accessToken, fetchImpl = fetch } = {}) {
+export async function checkDeployedReadiness({ baseUrl, accessToken, requiredPlatforms = [], fetchImpl = fetch } = {}) {
   const url = normalizeUrl(baseUrl);
   const token = String(accessToken || "").trim();
   if (!url) throw new Error("缺少生产部署 URL。");
@@ -20,6 +20,18 @@ export async function checkDeployedReadiness({ baseUrl, accessToken, fetchImpl =
     const missing = [...new Set(blocking.flatMap(capability => capability.missing || []))];
     throw new Error(`生产环境未就绪：${missing.join("、") || "存在未说明的阻断项"}`);
   }
+  const required = new Set(requiredPlatforms.map(value => String(value || "").trim().toLowerCase()).filter(Boolean));
+  const affectedWarnings = (payload.capabilities || []).filter(capability =>
+    capability.status === "warning"
+    && (capability.platforms || []).some(platform => required.has(String(platform).toLowerCase()))
+  );
+  if (affectedWarnings.length) {
+    const details = affectedWarnings.map(capability => {
+      const missing = [...new Set(capability.missing || [])];
+      return `${capability.id}${missing.length ? `（${missing.join("、")}）` : ""}`;
+    });
+    throw new Error(`受影响平台仍有环境警告：${details.join("；")}`);
+  }
   return payload;
 }
 
@@ -28,10 +40,20 @@ function argument(name) {
   return index >= 0 ? process.argv[index + 1] || "" : "";
 }
 
+function argumentsList(name) {
+  const values = [];
+  for (let index = 0; index < process.argv.length; index += 1) {
+    if (process.argv[index] !== name) continue;
+    values.push(...String(process.argv[index + 1] || "").split(","));
+  }
+  return [...new Set(values.map(value => value.trim().toLowerCase()).filter(Boolean))];
+}
+
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   checkDeployedReadiness({
     baseUrl: argument("--url") || "https://product-flow-system.pages.dev",
-    accessToken: process.env.PRODUCTION_DATA_ACCESS_TOKEN
+    accessToken: process.env.PRODUCTION_DATA_ACCESS_TOKEN,
+    requiredPlatforms: argumentsList("--require-platform")
   }).then(payload => {
     process.stdout.write(`生产环境就绪：${payload.checkedAt || new Date().toISOString()}\n`);
   }).catch(error => {
