@@ -9,14 +9,14 @@
 
 ## 任务
 
-- [ ] 环境能力清单与兼容生成模块
+- [x] 环境能力清单与兼容生成模块
   - 依赖：无。
   - 文件：`docs/platform/environment-capabilities.json`、`scripts/generate-platform-manifests.mjs`、`functions/api/platform/_generated/`、`tests/environment-capabilities.test.mjs`、`package.json`。
   - 输入：集成注册表平台 ID 与已确认环境需求。
   - 输出：`validateEnvironmentCapabilities`、Wrangler 兼容 JS 模块和 `check:environment-capabilities`。
   - 失败测试：`node --test tests/environment-capabilities.test.mjs`，预期缺少模块或校验函数。
   - 实现步骤：先验证 schema 与平台引用，再生成确定性模块，最后把漂移检查加入质量脚本。
-  - 验证：测试通过且重复生成无 diff。
+  - 验证：`node --test tests/environment-capabilities.test.mjs` 2/2 通过；`npm run check:environment-capabilities` 通过且重复生成无 diff。
   - 提交：`feat: define environment capability contract`。
 
 - [ ] 脱敏环境就绪 API
