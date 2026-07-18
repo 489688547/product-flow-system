@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { createDefaultSupplyChainState, normalizeSupplyChainState, reduceSupplyChainState } from "../domain/supplyChain.js";
 import { useAuth } from "./AuthProvider.jsx";
-import { supplyChainApiUrl, supplyChainApprovalSyncUrl } from "./supplyChainApi.js";
+import { supplyChainApiUrl, syncSupplyApprovalPages } from "./supplyChainApi.js";
 
 const SupplyChainContext = createContext(null);
 const STORAGE_KEY = "supplyChainState";
@@ -90,13 +90,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
   }, [user?.name]);
 
   const syncApprovals = useCallback(async input => {
-    const response = await fetch(supplyChainApprovalSyncUrl(), {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(input || {})
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || payload.synced === false) throw new Error(payload.message || "钉钉审批同步失败。");
+    const payload = await syncSupplyApprovalPages({ input });
     const refreshed = await fetch(apiUrl);
     const refreshedPayload = await refreshed.json().catch(() => ({}));
     if (refreshed.ok && refreshedPayload.state) setState(normalizeSupplyChainState(refreshedPayload.state));
