@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BookOpenText, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChevronDown, ClipboardList, GitBranch, Home, LayoutDashboard, LogOut, PanelsTopLeft, Settings, Target } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BookOpenText, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardList, Clapperboard, DatabaseZap, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PanelsTopLeft, Settings, SlidersHorizontal, Smartphone, Target, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -27,6 +27,19 @@ const OperatingReviewPage = lazyNamed(() => import("./features/reviews/Operating
 const AppCenterPage = lazyNamed(() => import("./features/platform/AppCenterPage.jsx"), "AppCenterPage");
 const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/IncentiveProjectsPage.jsx"), "IncentiveProjectsPage");
 const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
+const BrandContentPlaceholderPage = lazyNamed(() => import("./features/brand-content/BrandContentPlaceholderPage.jsx"), "BrandContentPlaceholderPage");
+
+const BRAND_NAV = [
+  ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
+  ["content-workbench", "内容作战台", Workflow, "品牌内容协同"],
+  ["content-assets", "素材资产", FileVideo2, "品牌内容协同"],
+  ["content-review", "投放复盘", ChartNoAxesCombined, "品牌内容协同"],
+  ["brand-accounts", "品牌账号", Smartphone, "品牌内容协同"],
+  ["content-decisions", "补充决策", ListChecks, "品牌内容协同"],
+  ["content-team", "团队效能", UsersRound, "品牌内容协同"],
+  ["content-issues", "数据问题", DatabaseZap, "品牌内容协同"],
+  ["content-settings", "设置", SlidersHorizontal, "品牌内容协同"]
+];
 
 const COMPANY_NAV = [
   ["home", "公司首页", LayoutDashboard, "公司经营"],
@@ -40,19 +53,21 @@ const COMPANY_NAV = [
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
+  ...BRAND_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
 ];
 const PRODUCT_NAV = [
-  ["dashboard", "总览", Home],
-  ["demands", "需求池", ClipboardList],
-  ["planning", "产品规划", CalendarRange],
-  ["progress", "产品进度", GitBranch],
-  ["archive", "产品档案", Archive],
-  ["handbook", "说明书", BookOpenText],
-  ["issues", "问题反馈", Bug],
-  ["settings", "设置", Settings]
+  ["dashboard", "总览", Home, "产品全周期"],
+  ["demands", "需求池", ClipboardList, "产品全周期"],
+  ["planning", "产品规划", CalendarRange, "产品全周期"],
+  ["progress", "产品进度", GitBranch, "产品全周期"],
+  ["archive", "产品档案", Archive, "产品全周期"],
+  ...BRAND_NAV,
+  ["handbook", "说明书", BookOpenText, "平台"],
+  ["issues", "问题反馈", Bug, "平台"],
+  ["settings", "设置", Settings, "平台"]
 ];
 const HIDDEN_SCREENS = new Set(["packages"]);
 const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NAV.map(([key]) => key), ...HIDDEN_SCREENS]);
@@ -133,6 +148,15 @@ export default function App() {
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
+    "content-overview": <BrandContentPlaceholderPage title="内容总览" description="先处理未发布、缺素材 ID、学习期到期、未获测试和数据问题。" />,
+    "content-workbench": <BrandContentPlaceholderPage title="内容作战台" description="按产品、责任人和截止时间推进 Brief、脚本、剪辑、审核与发布。" />,
+    "content-assets": <BrandContentPlaceholderPage title="素材资产" description="关联 NAS 中的内容版本、审核记录和平台发布关系。" />,
+    "content-review": <BrandContentPlaceholderPage title="投放复盘" description="先核对数据口径，再比较产品链接与素材表现。" />,
+    "brand-accounts": <BrandContentPlaceholderPage title="品牌账号" description="独立查看自然播放、完播、互动、收藏和涨粉。" />,
+    "content-decisions": <BrandContentPlaceholderPage title="补充决策" description="把证据转成产品、数量、方向、账户、责任人和复盘日期。" />,
+    "content-team": <BrandContentPlaceholderPage title="团队效能" description="按编导、剪辑和运营分别看有效交付，不做混合总榜。" />,
+    "content-issues": <BrandContentPlaceholderPage title="数据问题" description="集中处理重复 ID、缺失映射、来源缺日和 NAS 文件失联。" />,
+    "content-settings": <BrandContentPlaceholderPage title="品牌内容设置" description="维护学习期、测试阈值、内容编号与只读接入状态。" />,
     handbook: <HandbookPage selectedSlug={routeDetail} sessionUser={sessionUser} onSelectDocument={slug => showScreen("handbook", slug)} />,
     issues: <IssuePage />,
     settings: <SettingsPage />
@@ -143,9 +167,7 @@ export default function App() {
       <a className="skip-link" href="#main-content">跳到主要内容</a>
       <aside className="sidebar">
         <div className="brand"><span>{hasCompanyAccess ? "企" : "P"}</span><div><strong>{hasCompanyAccess ? "经营执行平台" : "产品全周期"}</strong><small>{hasCompanyAccess ? "战略与业务协同" : "流程协同系统"}</small></div></div>
-        <nav aria-label="主导航">{hasCompanyAccess
-          ? visibleNavigation.map(([key, label, Icon, group], index) => <div className="sidebar-nav-item" key={key}>{index === 0 || visibleNavigation[index - 1]?.[3] !== group ? <span className="sidebar-section-label">{group}</span> : null}<button className={activeScreen === key ? "active" : ""} aria-current={activeScreen === key ? "page" : undefined} onClick={() => navigate(key)}><Icon size={18} aria-hidden="true" /><span>{label}</span></button></div>)
-          : visibleNavigation.map(([key, label, Icon]) => <button key={key} className={activeScreen === key ? "active" : ""} aria-current={activeScreen === key ? "page" : undefined} onClick={() => navigate(key)}><Icon size={18} aria-hidden="true" /><span>{label}</span></button>)}</nav>
+        <nav aria-label="主导航">{visibleNavigation.map(([key, label, Icon, group], index) => <div className="sidebar-nav-item" key={key}>{index === 0 || visibleNavigation[index - 1]?.[3] !== group ? <span className="sidebar-section-label">{group}</span> : null}<button className={activeScreen === key ? "active" : ""} aria-current={activeScreen === key ? "page" : undefined} onClick={() => navigate(key)}><Icon size={18} aria-hidden="true" /><span>{label}</span></button></div>)}</nav>
       </aside>
       <main id="main-content">
         <header className="topbar">
