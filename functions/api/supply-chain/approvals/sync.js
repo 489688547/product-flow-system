@@ -32,6 +32,17 @@ function belongsToSupplyChain(record, settings) {
   return !category || !prefixes.length || prefixes.some(prefix => category.startsWith(prefix));
 }
 
+function supplierNameValueMap(suppliers = []) {
+  const names = new Map();
+  for (const supplier of suppliers) {
+    const name = String(supplier?.name || "").trim();
+    const id = String(supplier?.id || "").trim();
+    if (!name || !id) continue;
+    names.set(name, names.has(name) ? "" : id);
+  }
+  return Object.fromEntries([...names].filter(([, id]) => id));
+}
+
 async function listAllInstanceIds(accessToken, input, fetchImpl) {
   const ids = [];
   const seenCursors = new Set();
@@ -83,7 +94,11 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
   const next = normalizeSupplyChainState(state);
   next.purchaseApprovals = next.purchaseApprovals.filter(record => belongsToSupplyChain(record, settings));
   const allowedPurchaseIds = new Set(next.purchaseApprovals.map(record => record.processInstanceId));
-  next.paymentApprovals = next.paymentApprovals.filter(record => !record.purchaseProcessInstanceId || allowedPurchaseIds.has(record.purchaseProcessInstanceId));
+  next.paymentApprovals = next.paymentApprovals.filter(record => record.purchaseProcessInstanceId && allowedPurchaseIds.has(record.purchaseProcessInstanceId));
+  const purchaseSupplierValueMap = {
+    ...supplierNameValueMap(next.suppliers),
+    ...(settings.fieldMappings?.purchase?.supplierValueMap || {})
+  };
   const synced = { purchase: 0, payment: 0, unmapped: 0, skipped: 0 };
 
   for (const config of configs) {
@@ -92,13 +107,14 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
     for (const instance of instances) {
       const normalized = normalizeDingSupplyApproval(instance, {
         ...(settings.fieldMappings?.[config.kind] || {}),
+        ...(config.kind === "purchase" ? { supplierValueMap: purchaseSupplierValueMap } : {}),
         kind: config.kind
       });
       if (!belongsToSupplyChain(normalized.record, settings)) {
         synced.skipped += 1;
         continue;
       }
-      if (config.kind === "payment" && normalized.record.purchaseProcessInstanceId && !allowedPurchaseIds.has(normalized.record.purchaseProcessInstanceId)) {
+      if (config.kind === "payment" && (!normalized.record.purchaseProcessInstanceId || !allowedPurchaseIds.has(normalized.record.purchaseProcessInstanceId))) {
         synced.skipped += 1;
         continue;
       }

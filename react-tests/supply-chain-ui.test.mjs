@@ -63,6 +63,8 @@ test("approval workspace keeps purchase requests separate from linked payments",
   assert.match(approval, /productValueMap/);
   assert.match(approval, /审批实付/);
   assert.match(approval, /付款超申请/);
+  assert.match(approval, /供应商已关联 · 产品待关联/);
+  assert.match(approval, /供应商与产品待关联/);
 });
 
 test("supplier product and quality workspaces dispatch auditable domain changes", () => {
