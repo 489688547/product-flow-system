@@ -19,14 +19,14 @@
   - 验证：`node --test tests/environment-capabilities.test.mjs` 2/2 通过；`npm run check:environment-capabilities` 通过且重复生成无 diff。
   - 提交：`feat: define environment capability contract`。
 
-- [ ] 脱敏环境就绪 API
+- [x] 脱敏环境就绪 API
   - 依赖：环境能力清单。
   - 文件：`functions/api/platform/_shared/environmentReadiness.js`、`functions/api/platform/v1/environment-readiness.js`、`tests/environment-readiness-api.test.mjs`。
   - 输入：生成的能力清单、当前 `env` 与员工会话。
   - 输出：标准 `environment readiness` 响应。
   - 失败测试：未登录、缺失变量、D1 表缺失和完全就绪场景先失败。
   - 实现步骤：实现环境识别、变量/绑定/表检查、脱敏响应和错误码。
-  - 验证：`node --test tests/environment-readiness-api.test.mjs`。
+  - 验证：环境清单与就绪 API 聚焦测试 6/6 通过；ESLint 静默通过。
   - 提交：`feat: expose environment readiness`。
 
 - [ ] 生产数据受控网关
