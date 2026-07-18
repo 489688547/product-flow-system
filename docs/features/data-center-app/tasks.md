@@ -79,12 +79,12 @@
   - 验证：数据中心 API、本地数据中心与供应链 7/7 通过。
   - 提交：`feat(data): add local data center routes`。
 
-- [ ] 视觉与交付
+- [x] 视觉与交付
   - 依赖：全部功能任务。
   - 文件：`src/styles.css`、数据中心测试、耐久文档。
   - 输入：现有设计 Token 和页面 class。
   - 输出：响应式、无障碍、完整验证记录。
   - 失败测试：结构 CSS 断言失败。
   - 实现步骤：桌面、900、640、390px、减少动效、表格和焦点。
-  - 验证：Definition of Done 命令与浏览器验收全部通过。
+  - 验证：Definition of Done 五项命令通过；本地浏览器桌面与 390px 通过，无横向溢出、无新控制台错误，视觉规则扫描 0 命中。Cloudflare 和钉钉 WebView 未部署验收。
   - 提交：`style(data): finish responsive data center UI`。

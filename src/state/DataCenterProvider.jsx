@@ -46,7 +46,7 @@ export function DataCenterProvider({ children, enabled = true }) {
         const normalized = normalizeDataCenterState(metadataResult.value.state);
         setState(normalized);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-      } else if (metadataResult.reason?.status !== 501) {
+      } else if (![404, 405, 501].includes(metadataResult.reason?.status)) {
         throw metadataResult.reason;
       }
       if (salesResult.status === "rejected") throw salesResult.reason;

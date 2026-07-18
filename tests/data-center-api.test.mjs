@@ -7,6 +7,7 @@ import { normalizeDataCenterState } from "../src/domain/dataCenter.js";
 function createD1Mock() {
   const records = new Map();
   const meta = new Map();
+  const batchSizes = [];
   const sales = [
     { code: "690000000001", date: "2026-07-16", platform: "抖音", qty: 2, sales: 120, net_sales: 110, gross_profit: 55, refund: 10, cost: 55, pre_ship_refund: 4, post_ship_refund: 6 },
     { code: "690000000002", date: "2026-07-17", platform: "天猫", qty: 1, sales: 80, net_sales: 75, gross_profit: 30, refund: 5, cost: 45, pre_ship_refund: 0, post_ship_refund: 5 },
@@ -15,6 +16,7 @@ function createD1Mock() {
   return {
     records,
     meta,
+    batchSizes,
     prepare(sql) {
       const statement = {
         values: [],
@@ -67,6 +69,7 @@ function createD1Mock() {
       return statement;
     },
     async batch(statements) {
+      batchSizes.push(statements.length);
       return Promise.all(statements.map(statement => statement.run()));
     }
   };
@@ -120,6 +123,23 @@ test("data center metadata rejects readonly writes", async () => {
   assert.equal(response.status, 403);
 });
 
+test("fresh data center storage keeps default metrics and chunks metadata writes", async () => {
+  const db = createD1Mock();
+  const fresh = await onDataCenterRequest({ request: new Request("https://flow.example.com/api/data-center"), env: { PRODUCT_FLOW_DB: db }, data: { session: executive } });
+  const freshPayload = await fresh.json();
+  assert.equal(fresh.status, 200);
+  assert.ok(freshPayload.state.metricDefinitions.some(metric => metric.metricCode === "sales.net_sales"));
+
+  const sources = Array.from({ length: 120 }, (_, index) => ({ id: `source-${index}`, name: `来源 ${index}` }));
+  const post = await onDataCenterRequest({
+    request: new Request("https://flow.example.com/api/data-center", { method: "POST", body: JSON.stringify({ state: normalizeDataCenterState({ sources }) }) }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: executive }
+  });
+  assert.equal(post.status, 200);
+  assert.ok(Math.max(...db.batchSizes) <= 50);
+});
+
 test("data center sales uses creation-date range and excludes Other", async () => {
   const response = await onSalesRequest({
     request: new Request("https://flow.example.com/api/data-center/sales?from=2026-07-01&to=2026-07-17"),
@@ -143,6 +163,13 @@ test("data center sales validates date range and permissions", async () => {
     data: { session: executive }
   });
   assert.equal(badRange.status, 400);
+
+  const impossibleDate = await onSalesRequest({
+    request: new Request("https://flow.example.com/api/data-center/sales?from=2026-02-30&to=2026-03-05"),
+    env: { PRODUCT_FLOW_DB: createD1Mock() },
+    data: { session: executive }
+  });
+  assert.equal(impossibleDate.status, 400);
 
   const forbidden = await onSalesRequest({
     request: new Request("https://flow.example.com/api/data-center/sales?from=2026-07-01&to=2026-07-17"),

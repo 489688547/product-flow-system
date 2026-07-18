@@ -31,6 +31,8 @@ test("data center navigation sits after product lifecycle with eight routes", ()
   assert.match(app, /screen === "data-center" \? "data-overview"/);
   assert.match(app, /DATA_CENTER_SCREEN_TO_SECTION\.has\(screen\) \? "data-center"/);
   assert.match(app, /<DataCenterAppPage section=\{dataSection\}/);
+  assert.match(app, /window\.scrollTo\(\{ top: 0, behavior: "auto" \}\)/);
+  assert.match(app, /document\.body\.scrollTo\(\{ top: 0, behavior: "auto" \}\)/);
 });
 
 test("main mounts data center provider inside product state with access gating", () => {
@@ -82,4 +84,19 @@ test("governance workspaces cover safe sources metrics quality sync services and
   assert.match(workspaces, /Asia\/Shanghai/);
   assert.match(workspaces, /应用订阅/);
   assert.match(workspaces, /原始数据保留天数/);
+});
+
+test("data center has restrained responsive layouts and visible focus states", () => {
+  const styles = read("src/styles.css");
+  assert.match(styles, /\.data-basis-strip/);
+  assert.match(styles, /\.data-workspace \{[^}]*grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(styles, /\.data-workspace > \* \{ min-width: 0; \}/);
+  assert.match(styles, /\.data-kpi-grid/);
+  assert.match(styles, /\.data-overview-grid/);
+  assert.match(styles, /\.data-source-grid/);
+  assert.match(styles, /\.data-settings-workspace/);
+  assert.match(styles, /\.data-center-page[\s\S]*:focus-visible/);
+  assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.data-overview-grid/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.data-range-controls/);
+  assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
 });

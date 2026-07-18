@@ -15,7 +15,9 @@ function errorResponse(message, status, code, retryable = false) {
 }
 
 function validDate(value) {
-  return DATE_PATTERN.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00+08:00`));
+  if (!DATE_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) === value;
 }
 
 function mapRow(row) {

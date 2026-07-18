@@ -150,6 +150,8 @@ export default function App() {
     if (!VALID_SCREENS.has(resolvedScreen)) return;
     if (!visibleScreenKeys.has(resolvedScreen) && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
     setRoute({ screen: resolvedScreen, detail });
+    window.scrollTo({ top: 0, behavior: "auto" });
+    document.body.scrollTo({ top: 0, behavior: "auto" });
     const nextHash = formatAppHash(resolvedScreen, detail);
     if (window.location.hash !== nextHash) window.location.hash = nextHash;
   }

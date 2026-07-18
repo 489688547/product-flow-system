@@ -58,13 +58,17 @@ test("source records reject credential-like fields", () => {
       password: "secret",
       cookie: "sid=1",
       accessToken: "secret-token",
-      verificationCode: "123456"
+      apiToken: "api-secret",
+      verificationCode: "123456",
+      credentials: { password: "nested-secret", cookie: "nested-cookie" }
     }]
   });
   assert.equal(normalized.sources[0].password, undefined);
   assert.equal(normalized.sources[0].cookie, undefined);
   assert.equal(normalized.sources[0].accessToken, undefined);
+  assert.equal(normalized.sources[0].apiToken, undefined);
   assert.equal(normalized.sources[0].verificationCode, undefined);
+  assert.deepEqual(normalized.sources[0].credentials, {});
   assert.equal(normalized.sources[0].pageUrl, "https://erp.example");
 });
 

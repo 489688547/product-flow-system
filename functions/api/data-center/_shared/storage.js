@@ -11,6 +11,7 @@ const TABLES = {
   subscriptions: "data_app_subscriptions",
   auditLogs: "data_audit_logs"
 };
+const BATCH_SIZE = 50;
 
 export function dataCenterDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
@@ -67,7 +68,9 @@ export async function writeDataCenterState(db, input, actor = "") {
   statements.push(metaStatement(db, "updatedAt", updatedAt));
   statements.push(metaStatement(db, "updatedBy", actor));
   statements.push(metaStatement(db, "settings", JSON.stringify(state.settings)));
-  await db.batch(statements);
+  for (let index = 0; index < statements.length; index += BATCH_SIZE) {
+    await db.batch(statements.slice(index, index + BATCH_SIZE));
+  }
   return { updatedAt, version: state.version };
 }
 
@@ -82,14 +85,15 @@ export async function readDataCenterState(db) {
   for (const collection of DATA_CENTER_COLLECTIONS) {
     const table = TABLES[collection];
     const result = await db.prepare(`SELECT entity_type, id, payload, updated_at, updated_by FROM ${table}`).all();
-    state[collection] = [];
+    const records = [];
     for (const row of result?.results || []) {
       try {
-        state[collection].push(JSON.parse(row.payload));
+        records.push(JSON.parse(row.payload));
       } catch {
         // Isolate malformed legacy records so the remaining data stays available.
       }
     }
+    if (records.length || !state[collection].length) state[collection] = records;
   }
   const settings = await readMeta(db, "settings");
   if (settings) {

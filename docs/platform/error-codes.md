@@ -31,6 +31,7 @@
 | `DINGTALK_` | 钉钉授权和接口调用 | `DINGTALK_PERMISSION_MISSING` |
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
+| `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -40,6 +41,15 @@
 - `INTEGRATION_PROFILE_INVALID`：字段、URL、日期、平台 ID 或敏感内容校验失败。
 - `INTEGRATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定，公开资料仍可降级展示。
 - `VALIDATION_METHOD_NOT_ALLOWED`：请求方法不受支持。
+
+数据中心 API 使用：
+
+- `AUTH_SESSION_REQUIRED`：没有有效公司会话。
+- `PERMISSION_VIEW_DENIED`：当前部门无权查看数据中心。
+- `PERMISSION_WRITE_DENIED`：当前身份不能维护数据中心元数据。
+- `DATA_STATE_INVALID`：提交的元数据状态结构无效。
+- `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
+- `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 
 ## HTTP 状态
 

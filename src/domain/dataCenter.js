@@ -20,18 +20,18 @@ export const DATA_CENTER_STATUS = [
   "disabled"
 ];
 
-const BLOCKED_SOURCE_KEYS = new Set([
-  "password",
-  "passwd",
-  "cookie",
-  "cookies",
-  "token",
-  "accessToken",
-  "refreshToken",
-  "verificationCode",
-  "smsCode",
-  "session"
-]);
+const BLOCKED_SOURCE_KEY = /(?:password|passwd|cookie|token|secret|verificationcode|smscode|session)/i;
+const COLLECTION_LIMITS = {
+  sources: 200,
+  runners: 100,
+  syncRuns: 300,
+  sourceFiles: 300,
+  mappings: 1000,
+  metricDefinitions: 100,
+  qualityIssues: 500,
+  subscriptions: 100,
+  auditLogs: 500
+};
 const EXCLUDED_PLATFORMS = new Set(["", "其它", "其他", "未知", "未知平台"]);
 const SALES_METRICS = ["qty", "sales", "netSales", "grossProfit", "refund", "cost"];
 
@@ -60,12 +60,20 @@ function round(value, digits = 2) {
   return Math.round((number(value) + Number.EPSILON) * scale) / scale;
 }
 
-function safeRecord(record = {}) {
-  return Object.fromEntries(Object.entries(record).filter(([key]) => !BLOCKED_SOURCE_KEYS.has(key)));
+function safeValue(value) {
+  if (Array.isArray(value)) return value.map(safeValue);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !BLOCKED_SOURCE_KEY.test(key))
+    .map(([key, nested]) => [key, safeValue(nested)]));
 }
 
-function normalizeCollection(input, fallback) {
-  return (Array.isArray(input) ? input : fallback).map(safeRecord);
+function safeRecord(record = {}) {
+  return safeValue(record);
+}
+
+function normalizeCollection(input, fallback, key) {
+  return (Array.isArray(input) ? input : fallback).slice(0, COLLECTION_LIMITS[key]).map(safeRecord);
 }
 
 function groupSales(rows, key) {
@@ -162,7 +170,7 @@ export function normalizeDataCenterState(input = {}) {
     settings: { ...base.settings, ...(input.settings || {}) }
   };
   for (const key of DATA_CENTER_COLLECTIONS) {
-    state[key] = normalizeCollection(input[key], base[key]);
+    state[key] = normalizeCollection(input[key], base[key], key);
   }
   state.sources = state.sources.map(source => ({
     captureMethod: "export",
