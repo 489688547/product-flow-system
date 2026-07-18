@@ -488,6 +488,28 @@ main { min-width: 0; overflow-x: hidden; }
 .meeting-attendee-list small { color: var(--text-tertiary); font-size: 11px; }
 .meeting-attendee-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-subtle); color: var(--text-secondary); display: grid; place-items: center; font-weight: 750; }
 .meeting-attendee-check { color: var(--primary); display: grid; place-items: center; }
+.todo-executor-picker { margin-top: var(--space-3); display: grid; gap: 8px; }
+.todo-executor-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.todo-executor-modes button { min-height: 36px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; }
+.todo-executor-modes button[aria-pressed="true"] { background: var(--surface); color: var(--primary); box-shadow: 0 1px 4px color-mix(in oklch, var(--text-primary), transparent 88%); }
+.todo-executor-picker .meeting-attendee-search { margin-top: 0; }
+.todo-group-results { min-height: 96px; max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 4px; display: grid; align-content: start; gap: 2px; }
+.todo-group-results > p { margin: 0; padding: 22px 12px; color: var(--text-tertiary); font-size: 12px; text-align: center; }
+.todo-group-results > button { min-height: 48px; width: 100%; border: 0; border-radius: 7px; background: transparent; color: var(--text-primary); display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 5px 7px; text-align: left; }
+.todo-group-results > button:hover { background: var(--primary-soft); }
+.todo-group-results > button:disabled { opacity: .62; }
+.todo-group-results > button > span:first-child { width: 30px; height: 30px; border-radius: 8px; background: var(--surface-subtle); color: var(--text-secondary); display: grid; place-items: center; }
+.todo-group-results > button > span:nth-child(2) { min-width: 0; display: grid; gap: 1px; }
+.todo-group-results strong, .todo-group-results small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.todo-group-results small, .todo-group-results > button > span:last-child { color: var(--text-tertiary); font-size: 11px; }
+.todo-group-error { padding: 8px 10px; border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
+.todo-group-error a { color: inherit; font-weight: 750; white-space: nowrap; }
+.todo-selected-groups, .todo-selected-people { display: flex; flex-wrap: wrap; gap: 6px; }
+.todo-selected-groups > span, .todo-selected-people > span { min-height: 28px; padding: 3px 5px 3px 8px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
+.todo-selected-people > span { background: var(--surface-subtle); color: var(--text-secondary); }
+.todo-selected-groups button, .todo-selected-people button { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; display: grid; place-items: center; }
+.todo-selected-groups button:hover, .todo-selected-people button:hover { background: color-mix(in oklch, currentColor, transparent 88%); }
+.todo-executor-picker button:focus-visible, .todo-executor-picker input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .form-error { margin-top: var(--space-3); padding: 9px 10px; border: 1px solid color-mix(in oklch, var(--danger), white 72%); border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); font-size: 12px; }
 .meeting-loading-layer { position: fixed; inset: 0; z-index: 110; background: oklch(18% .02 258 / .34); display: grid; place-items: center; }
 .meeting-loading-card { min-width: 220px; padding: 16px 18px; border-radius: 12px; background: var(--surface); color: var(--text-primary); box-shadow: 0 16px 44px oklch(18% .03 258 / .2); display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; }
@@ -725,6 +747,8 @@ main { min-width: 0; overflow-x: hidden; }
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { width: 100%; height: auto; min-width: 0; overflow: hidden; position: sticky; top: 0; z-index: 20; padding: 8px 10px; border-right: 0; border-bottom: 1px solid var(--border); }
   .sidebar nav { display: flex; overflow-x: auto; }
+  .sidebar-nav-item { flex: 0 0 auto; }
+  .sidebar-section-label { display: none; }
   .sidebar nav button { flex: 0 0 auto; }
   .sidebar nav button::before { left: 50%; bottom: 0; width: 16px; height: 3px; transform: translateX(-50%); }
   .brand, .topbar { display: none; }

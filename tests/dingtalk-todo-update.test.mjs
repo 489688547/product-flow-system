@@ -6,6 +6,10 @@ function okJson(body) {
   return { ok: true, json: async () => body };
 }
 
+function errorJson(status, body) {
+  return { ok: false, status, json: async () => body };
+}
+
 test("updateDingTodoTask keeps the DingTalk task id and updates task state", async () => {
   const calls = [];
   const result = await updateDingTodoTask("token-1", {
@@ -51,4 +55,137 @@ test("syncDingTodoTask creates once and updates when a DingTalk id exists", asyn
 
   assert.equal(calls[0].options.method, "POST");
   assert.equal(calls[1].options.method, "PUT");
+});
+
+test("syncDingTodoTask recovers an existing DingTalk task after duplicate sourceId", async () => {
+  const calls = [];
+  const result = await syncDingTodoTask("token-1", {
+    creatorUnionId: "creator-union",
+    executorUnionIds: ["executor-union"],
+    sourceId: "task:p1:t1",
+    subject: "立项PRD同步",
+    detailUrl: "https://flow.example.com/#progress",
+    dueTime: 1784301600000,
+    done: false
+  }, async (url, options) => {
+    calls.push({ url, options });
+    if (options.method === "POST" && !url.endsWith("/org/tasks/query")) {
+      return errorJson(400, {
+        code: "todo.taskCreate.paramError",
+        message: "task existed sourceId is task:p1:t1"
+      });
+    }
+    if (options.method === "POST") {
+      return okJson({ todoCards: [{ id: "todo-existing", sourceId: "task:p1:t1" }] });
+    }
+    return okJson({ result: true });
+  });
+
+  assert.equal(result.id, "todo-existing");
+  assert.equal(result.recovered, true);
+  assert.match(calls[1].url, /\/v1\.0\/todo\/users\/creator-union\/org\/tasks\/query$/);
+  assert.deepEqual(JSON.parse(calls[1].options.body), { isDone: false });
+  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "PUT"]);
+});
+
+test("syncDingTodoTask also recovers a completed task with the same sourceId", async () => {
+  const calls = [];
+  const result = await syncDingTodoTask("token-1", {
+    creatorUnionId: "creator-union",
+    executorUnionIds: ["executor-union"],
+    sourceId: "task:p1:done",
+    subject: "已完成任务",
+    detailUrl: "https://flow.example.com/#progress",
+    dueTime: 1784301600000,
+    done: true
+  }, async (url, options) => {
+    calls.push({ url, options });
+    if (options.method === "POST" && !url.endsWith("/org/tasks/query")) {
+      return errorJson(400, { message: "task existed sourceId is task:p1:done" });
+    }
+    if (options.method === "POST" && JSON.parse(options.body).isDone === false) return okJson({ todoCards: [] });
+    if (options.method === "POST") return okJson({ todoCards: [{ todoTaskId: "todo-done", sourceId: "task:p1:done" }] });
+    return okJson({ result: true });
+  });
+
+  assert.equal(result.id, "todo-done");
+  assert.equal(result.recovered, true);
+  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "PUT"]);
+});
+
+test("syncDingTodoTask recovers a task owned by an additional recovery user", async () => {
+  const calls = [];
+  const result = await syncDingTodoTask("token-1", {
+    creatorUnionId: "current-union",
+    executorUnionIds: ["current-union"],
+    recoveryUnionIds: ["owner-union"],
+    sourceId: "task:p1:owner",
+    subject: "立项PRD同步",
+    detailUrl: "https://flow.example.com/#progress",
+    dueTime: 1784301600000,
+    done: false
+  }, async (url, options) => {
+    calls.push({ url, options });
+    if (!url.endsWith("/org/tasks/query") && options.method === "POST") {
+      return errorJson(400, { message: "task existed sourceId is task:p1:owner" });
+    }
+    if (url.includes("/users/owner-union/org/tasks/query") && JSON.parse(options.body).isDone === false) {
+      return okJson({ todoCards: [{ taskId: "todo-owner", sourceId: "task:p1:owner" }] });
+    }
+    if (url.endsWith("/tasks/todo-owner?operatorId=owner-union")) return okJson({ result: true });
+    return okJson({ todoCards: [] });
+  });
+
+  assert.equal(result.id, "todo-owner");
+  assert.equal(result.recovered, true);
+  assert.equal(calls.some(call => call.url.includes("/users/owner-union/org/tasks/query")), true);
+  assert.equal(calls.at(-1).options.method, "PUT");
+  assert.match(calls.at(-1).url, /\/users\/owner-union\/tasks\/todo-owner\?operatorId=owner-union$/);
+});
+
+test("syncDingTodoTask does not query todos for unrelated DingTalk errors", async () => {
+  const calls = [];
+  await assert.rejects(
+    () => syncDingTodoTask("token-1", {
+      creatorUnionId: "creator-union",
+      executorUnionIds: ["executor-union"],
+      sourceId: "task:p1:t1",
+      subject: "整理 PRD",
+      detailUrl: "https://flow.example.com/#progress",
+      dueTime: 1784301600000
+    }, async (url, options) => {
+      calls.push({ url, options });
+      return errorJson(403, { code: "Forbidden", message: "permission denied" });
+    }),
+    /permission denied/
+  );
+  assert.deepEqual(calls.map(call => call.options.method), ["POST"]);
+});
+
+test("syncDingTodoTask creates one deterministic replacement when the original source is orphaned", async () => {
+  const calls = [];
+  const result = await syncDingTodoTask("token-1", {
+      creatorUnionId: "creator-union",
+      executorUnionIds: ["executor-union"],
+      sourceId: "task:p1:missing",
+      subject: "整理 PRD",
+      detailUrl: "https://flow.example.com/#progress",
+      dueTime: 1784301600000
+    }, async (url, options) => {
+      calls.push({ url, options });
+      if (options.method === "POST" && !url.endsWith("/org/tasks/query")) {
+        const body = JSON.parse(options.body);
+        if (body.sourceId === "task:p1:missing") {
+          return errorJson(400, { message: "task existed sourceId is task:p1:missing" });
+        }
+        return okJson({ id: "todo-replacement" });
+      }
+      return okJson({ todoCards: [] });
+    });
+
+  assert.equal(result.id, "todo-replacement");
+  assert.equal(result.recovered, true);
+  assert.equal(result.replacedOrphanedSource, true);
+  assert.equal(JSON.parse(calls.at(-1).options.body).sourceId, "task:p1:missing:r1");
+  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "POST", "POST", "POST"]);
 });

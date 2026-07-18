@@ -84,11 +84,13 @@ test("task todo payload requires a due date and keeps a stable system source id"
   const task = { id: "t1", title: "整理 PRD", due: "2026-07-12", done: false, deliverable: "PRD", ownerDept: "产品部" };
   const creator = { unionid: "creator-union" };
   const executors = [{ name: "赵雨涵", unionid: "executor-union" }];
-  const payload = buildTaskTodoPayload({ product, task, creator, executors, detailUrl: "https://flow.example.com/#progress" });
+  const recoveryUsers = [{ name: "产品负责人", unionid: "owner-union" }];
+  const payload = buildTaskTodoPayload({ product, task, creator, executors, recoveryUsers, detailUrl: "https://flow.example.com/#progress" });
 
   assert.equal(payload.sourceId, "task:p1:t1");
   assert.equal(payload.creatorUnionId, "creator-union");
   assert.deepEqual(payload.executorUnionIds, ["executor-union"]);
+  assert.deepEqual(payload.recoveryUnionIds, ["owner-union"]);
   assert.equal(payload.dueTime, new Date("2026-07-12T18:00:00+08:00").getTime());
   assert.equal(payload.done, false);
   assert.throws(() => buildTaskTodoPayload({ product, task: { ...task, due: "" }, creator, executors, detailUrl: "https://flow.example.com" }), /截止日期/);

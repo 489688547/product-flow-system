@@ -1,25 +1,33 @@
-import { AppWindow, Archive, BadgeDollarSign, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChevronDown, ClipboardCheck, ClipboardList, FileClock, GitBranch, Home, LayoutDashboard, LogOut, PackageSearch, PanelsTopLeft, Settings, ShieldCheck, Target } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ProductArchivePage } from "./features/archive/ProductArchivePage.jsx";
-import { DashboardPage } from "./features/dashboard/DashboardPage.jsx";
-import { DemandPoolPage } from "./features/demands/DemandPoolPage.jsx";
+import { AppWindow, Archive, BadgeDollarSign, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChevronDown, ClipboardCheck, ClipboardList, FileClock, GitBranch, Home, LayoutDashboard, LogOut, PackageSearch, PanelsTopLeft, Settings, ShieldCheck, Target } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
-import { IssuePage } from "./features/issues/IssuePage.jsx";
-import { PackagePage } from "./features/packages/PackagePage.jsx";
-import { ProductProgressPage } from "./features/progress/ProductProgressPage.jsx";
-import { SettingsPage } from "./features/settings/SettingsPage.jsx";
-import { ProductPlanningPage } from "./features/planning/ProductPlanningPage.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
 import { canAccessCompanyPlatform, canViewNavigation } from "./domain/permissions.js";
 import { useAuth } from "./state/AuthProvider.jsx";
 import { usePlatform } from "./state/PlatformProvider.jsx";
-import { CompanyHomePage } from "./features/company/CompanyHomePage.jsx";
-import { StrategyCenterPage } from "./features/strategy/StrategyCenterPage.jsx";
-import { KeyProjectsPage } from "./features/projects/KeyProjectsPage.jsx";
-import { OperatingReviewPage } from "./features/reviews/OperatingReviewPage.jsx";
-import { AppCenterPage } from "./features/platform/AppCenterPage.jsx";
-import { IncentiveProjectsPage } from "./features/incentives/IncentiveProjectsPage.jsx";
-import { SupplyChainAppPage } from "./features/supply-chain/SupplyChainAppPage.jsx";
+import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
+
+const lazyNamed = (loader, exportName) => lazy(async () => {
+  const module = await loader();
+  return { default: module[exportName] };
+});
+
+const ProductArchivePage = lazyNamed(() => import("./features/archive/ProductArchivePage.jsx"), "ProductArchivePage");
+const DashboardPage = lazyNamed(() => import("./features/dashboard/DashboardPage.jsx"), "DashboardPage");
+const DemandPoolPage = lazyNamed(() => import("./features/demands/DemandPoolPage.jsx"), "DemandPoolPage");
+const IssuePage = lazyNamed(() => import("./features/issues/IssuePage.jsx"), "IssuePage");
+const PackagePage = lazyNamed(() => import("./features/packages/PackagePage.jsx"), "PackagePage");
+const ProductProgressPage = lazyNamed(() => import("./features/progress/ProductProgressPage.jsx"), "ProductProgressPage");
+const SettingsPage = lazyNamed(() => import("./features/settings/SettingsPage.jsx"), "SettingsPage");
+const ProductPlanningPage = lazyNamed(() => import("./features/planning/ProductPlanningPage.jsx"), "ProductPlanningPage");
+const CompanyHomePage = lazyNamed(() => import("./features/company/CompanyHomePage.jsx"), "CompanyHomePage");
+const StrategyCenterPage = lazyNamed(() => import("./features/strategy/StrategyCenterPage.jsx"), "StrategyCenterPage");
+const KeyProjectsPage = lazyNamed(() => import("./features/projects/KeyProjectsPage.jsx"), "KeyProjectsPage");
+const OperatingReviewPage = lazyNamed(() => import("./features/reviews/OperatingReviewPage.jsx"), "OperatingReviewPage");
+const AppCenterPage = lazyNamed(() => import("./features/platform/AppCenterPage.jsx"), "AppCenterPage");
+const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/IncentiveProjectsPage.jsx"), "IncentiveProjectsPage");
+const SupplyChainAppPage = lazyNamed(() => import("./features/supply-chain/SupplyChainAppPage.jsx"), "SupplyChainAppPage");
+const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
 
 const SUPPLY_CHAIN_NAV = [
   ["supply-overview", "供应链总览", LayoutDashboard, "供应链管理", "overview"],
@@ -46,6 +54,7 @@ const COMPANY_NAV = [
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
+  ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
 ];
@@ -56,6 +65,7 @@ const PRODUCT_NAV = [
   ["progress", "产品进度", GitBranch],
   ["archive", "产品档案", Archive],
   ...SUPPLY_CHAIN_NAV,
+  ["handbook", "说明书", BookOpenText],
   ["issues", "问题反馈", Bug],
   ["settings", "设置", Settings]
 ];
@@ -70,13 +80,18 @@ function navigationPermissionKey(screen) {
   return SUPPLY_CHAIN_SCREEN_TO_SECTION.has(screen) ? "supply-chain" : screen;
 }
 
-function screenFromHash() {
-  const screen = resolveScreen(window.location.hash.replace(/^#/, ""));
-  return VALID_SCREENS.has(screen) ? screen : "home";
+function routeFromHash() {
+  const route = parseAppHash(window.location.hash);
+  const screen = resolveScreen(route.screen);
+  return {
+    screen: VALID_SCREENS.has(screen) ? screen : "home",
+    detail: route.detail
+  };
 }
 
 export default function App() {
-  const [screen, setScreen] = useState(screenFromHash);
+  const [route, setRoute] = useState(routeFromHash);
+  const { screen, detail: routeDetail } = route;
   const [progressFocus, setProgressFocus] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
@@ -105,7 +120,7 @@ export default function App() {
     };
   }, [accountMenuOpen]);
   useEffect(() => {
-    const onHashChange = () => setScreen(screenFromHash());
+    const onHashChange = () => setRoute(routeFromHash());
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
@@ -113,12 +128,13 @@ export default function App() {
     if (loading || (hasCompanyAccess && platformLoading)) return;
     if (!screenAllowed) navigate(defaultScreen);
   }, [defaultScreen, hasCompanyAccess, loading, platformLoading, screenAllowed]);
-  function showScreen(nextScreen) {
+  function showScreen(nextScreen, detail = "") {
     const resolvedScreen = resolveScreen(nextScreen);
     if (!VALID_SCREENS.has(resolvedScreen)) return;
     if (!visibleScreenKeys.has(resolvedScreen) && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
-    setScreen(resolvedScreen);
-    if (window.location.hash !== `#${resolvedScreen}`) window.location.hash = resolvedScreen;
+    setRoute({ screen: resolvedScreen, detail });
+    const nextHash = formatAppHash(resolvedScreen, detail);
+    if (window.location.hash !== nextHash) window.location.hash = nextHash;
   }
   function navigate(nextScreen) {
     if (nextScreen === "progress") setProgressFocus(null);
@@ -142,6 +158,7 @@ export default function App() {
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
+    handbook: <HandbookPage selectedSlug={routeDetail} sessionUser={sessionUser} onSelectDocument={slug => showScreen("handbook", slug)} />,
     issues: <IssuePage />,
     settings: <SettingsPage />
   };
@@ -172,7 +189,9 @@ export default function App() {
             ) : null}
           </div>
         </header>
-        {supplySection ? <SupplyChainAppPage section={supplySection} /> : pages[activeScreen]}
+        <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
+          {supplySection ? <SupplyChainAppPage section={supplySection} /> : pages[activeScreen]}
+        </Suspense>
       </main>
       <FloatingIssueButton />
     </div>

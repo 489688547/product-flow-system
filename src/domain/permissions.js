@@ -122,6 +122,7 @@ function matchesScope(user, departments = [], titles = []) {
 }
 
 export function canViewNavigation(permissions, user, key) {
+  if (key === "handbook") return Boolean(user);
   if (canManagePermissions(user)) return true;
   if (key === "settings" && FEATURE_PERMISSION_ITEMS.some(item => canViewFeature(permissions, user, item.key))) return true;
   const normalized = normalizePermissions(permissions);

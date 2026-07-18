@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   buildProductGmvProgress,
   normalizeMonthlyGmvTarget,
+  scoreAnnualGmv,
   suggestAnnualGmvScore
 } from "../src/domain/productGmv.js";
 
@@ -15,6 +16,19 @@ test("average monthly GMV produces the annual grading reference score", () => {
   assert.deepEqual(suggestAnnualGmvScore(400_000), { annualGmv: 4_800_000, score: 4, label: "300-600万" });
   assert.deepEqual(suggestAnnualGmvScore(600_000), { annualGmv: 7_200_000, score: 5, label: "＞600万" });
   assert.equal(suggestAnnualGmvScore(0), null);
+});
+
+test("annual GMV grading uses the confirmed inclusive and exclusive boundaries", () => {
+  assert.deepEqual(scoreAnnualGmv(299_999.99), { annualGmv: 299_999.99, score: 1, label: "＜30万" });
+  assert.deepEqual(scoreAnnualGmv(300_000), { annualGmv: 300_000, score: 2, label: "30-100万" });
+  assert.deepEqual(scoreAnnualGmv(1_000_000), { annualGmv: 1_000_000, score: 3, label: "100-300万" });
+  assert.deepEqual(scoreAnnualGmv(3_000_000), { annualGmv: 3_000_000, score: 4, label: "300-600万" });
+  assert.deepEqual(scoreAnnualGmv(5_999_999.99), { annualGmv: 5_999_999.99, score: 4, label: "300-600万" });
+  assert.deepEqual(scoreAnnualGmv(6_000_000), { annualGmv: 6_000_000, score: 4, label: "300-600万" });
+  assert.deepEqual(scoreAnnualGmv(6_000_000.01), { annualGmv: 6_000_000.01, score: 5, label: "＞600万" });
+  assert.equal(scoreAnnualGmv(0), null);
+  assert.equal(scoreAnnualGmv(-1), null);
+  assert.equal(scoreAnnualGmv("not-a-number"), null);
 });
 
 test("monthly GMV targets normalize to positive currency values", () => {

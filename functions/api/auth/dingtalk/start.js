@@ -11,12 +11,19 @@ function oauthStateCookie(state) {
   return `pfs_oauth_state=${encodeURIComponent(state)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`;
 }
 
+function safeReturnTo(value = "") {
+  const path = String(value || "").trim();
+  return path.startsWith("/") && !path.startsWith("//") ? path : "";
+}
+
 export async function onRequest({ request, env }) {
   if (request.method !== "GET") return jsonResponse({ message: "Method not allowed" }, 405);
   const { appKey, missing } = getDingCredentials(env);
   if (missing.length) return jsonResponse({ message: `缺少钉钉应用配置：${missing.join("、")}` }, 501);
 
-  const origin = new URL(request.url).origin;
+  const requestUrl = new URL(request.url);
+  const origin = requestUrl.origin;
+  const returnTo = safeReturnTo(requestUrl.searchParams.get("returnTo"));
   const state = randomState();
   const authorize = new URL("https://login.dingtalk.com/oauth2/auth");
   authorize.searchParams.set("redirect_uri", `${origin}/api/auth/dingtalk/callback`);
@@ -26,12 +33,14 @@ export async function onRequest({ request, env }) {
   authorize.searchParams.set("state", state);
   authorize.searchParams.set("prompt", "consent");
 
-  return new Response(null, {
+  const response = new Response(null, {
     status: 302,
     headers: {
       location: authorize.toString(),
-      "set-cookie": oauthStateCookie(state),
       "cache-control": "no-store"
     }
   });
+  response.headers.append("set-cookie", oauthStateCookie(state));
+  if (returnTo) response.headers.append("set-cookie", `pfs_oauth_return=${encodeURIComponent(returnTo)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=600`);
+  return response;
 }
