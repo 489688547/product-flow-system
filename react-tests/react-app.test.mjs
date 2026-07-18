@@ -94,6 +94,20 @@ test("new app exposes all core product workflow pages", () => {
   assert.match(app, /hashchange/);
 });
 
+test("supply chain feature has department defaults and an isolated persistence provider", async () => {
+  const permissions = await import("../src/domain/permissions.js");
+  const api = await import("../src/state/supplyChainApi.js");
+  const provider = read("src/state/SupplyChainProvider.jsx");
+  assert.ok(permissions.FEATURE_PERMISSION_ITEMS.some(item => item.key === "supplyChain"));
+  assert.equal(permissions.canAccessSupplyChain({ department: "供应链部" }), true);
+  assert.equal(permissions.canAccessSupplyChain({ department: "品牌部" }), false);
+  assert.equal(api.supplyChainApiUrl("product-flow-system.pages.dev"), "/api/supply-chain");
+  assert.match(provider, /localStorage\.getItem\(STORAGE_KEY\)/);
+  assert.match(provider, /method: "POST"/);
+  assert.match(provider, /syncApprovals/);
+  assert.match(provider, /if \(!dirty\.current\) return undefined/);
+});
+
 test("annual product planning uses one development-to-launch period and overwrites duplicate demand plans", () => {
   const app = read("src/App.jsx");
   const page = read("src/features/planning/ProductPlanningPage.jsx");

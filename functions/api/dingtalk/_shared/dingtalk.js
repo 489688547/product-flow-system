@@ -171,6 +171,228 @@ async function requestDingOpenApi(accessToken, method, path, body, fetchImpl = f
   return data;
 }
 
+export async function listDingApprovalInstanceIds(accessToken, input = {}, fetchImpl = fetch) {
+  const processCode = String(input.processCode || "").trim();
+  if (!processCode) {
+    const error = new Error("缺少钉钉审批流程 processCode");
+    error.status = 400;
+    throw error;
+  }
+  const result = await postDingTopApi(accessToken, "/topapi/processinstance/listids", {
+    process_code: processCode,
+    start_time: Number(input.startTime),
+    end_time: Number(input.endTime) || undefined,
+    size: Math.min(20, Math.max(1, Number(input.size) || 20)),
+    cursor: Math.max(0, Number(input.cursor) || 0)
+  }, fetchImpl);
+  const processInstanceIds = result.list || result.process_instance_id_list || result.processInstanceIds || [];
+  return {
+    processInstanceIds: Array.isArray(processInstanceIds) ? processInstanceIds.map(String).filter(Boolean) : [],
+    nextCursor: result.next_cursor ?? result.nextCursor ?? null
+  };
+}
+
+export async function getDingApprovalInstance(accessToken, processInstanceId, fetchImpl = fetch) {
+  const id = String(processInstanceId || "").trim();
+  if (!id) {
+    const error = new Error("缺少钉钉审批实例 ID");
+    error.status = 400;
+    throw error;
+  }
+  const res = await fetchImpl(`https://oapi.dingtalk.com/topapi/processinstance/get?access_token=${encodeURIComponent(accessToken)}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ process_instance_id: id })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.errcode !== 0) {
+    const error = new Error(data.errmsg || "钉钉审批实例读取失败");
+    error.status = 502;
+    error.detail = data;
+    throw error;
+  }
+  const result = data.result ?? data;
+  const instance = result.process_instance || result.processInstance || result;
+  return {
+    ...instance,
+    processInstanceId: instance.processInstanceId || instance.process_instance_id || id,
+    formComponentValues: instance.formComponentValues || instance.form_component_values || instance.formValueVOS || instance.form_value_vos || []
+  };
+}
+
+function approvalFields(instance) {
+  return instance.formComponentValues
+    || instance.form_component_values
+    || instance.formValueVOS
+    || instance.form_value_vos
+    || [];
+}
+
+function approvalFieldRecord(instance, fieldId) {
+  const target = String(fieldId || "").trim();
+  if (!target) return null;
+  return approvalFields(instance).find(item => [
+    item.id,
+    item.name,
+    item.label,
+    item.componentName,
+    item.component_name
+  ].some(value => String(value || "").trim() === target)) || null;
+}
+
+function approvalField(instance, fieldId) {
+  const field = approvalFieldRecord(instance, fieldId);
+  return field?.value ?? field?.text ?? "";
+}
+
+function parseRelatedProcessInstanceId(value) {
+  if (!value) return "";
+  let parsed = value;
+  if (typeof value === "string") {
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      const match = value.match(/[A-Za-z0-9_-]{8,}/);
+      return match?.[0] || "";
+    }
+  }
+  const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
+  while (queue.length) {
+    const item = queue.shift();
+    if (!item || typeof item !== "object") continue;
+    const id = item.processInstanceId || item.process_instance_id || item.instanceId;
+    if (id) return String(id);
+    queue.push(...Object.values(item).filter(value => value && typeof value === "object"));
+  }
+  return "";
+}
+
+function parseJsonValue(value) {
+  if (!value) return null;
+  if (typeof value === "object") return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function relatedApproval(field) {
+  const extension = parseJsonValue(field?.extValue ?? field?.ext_value);
+  const relation = extension?.list?.[0] || null;
+  const instanceId = String(
+    relation?.instanceId
+    || relation?.processInstanceId
+    || relation?.process_instance_id
+    || parseRelatedProcessInstanceId(field?.value)
+    || ""
+  ).trim();
+  const rowValues = Array.isArray(relation?.rowValue) ? relation.rowValue : [];
+  return {
+    instanceId,
+    formCode: String(relation?.formCode || "").trim(),
+    value(name) {
+      const names = Array.isArray(name) ? name : [name];
+      const row = rowValues.find(item => names.includes(String(item?.label || item?.name || "").trim()));
+      return row?.value ?? row?.text ?? "";
+    }
+  };
+}
+
+function approvalStatus(instance) {
+  const result = String(instance.result || "").toLowerCase();
+  const status = String(instance.status || "").toUpperCase();
+  if (["agree", "approved"].includes(result)) return "COMPLETED";
+  if (["refuse", "rejected", "disagree"].includes(result)) return "REJECTED";
+  if (["TERMINATED", "CANCELED", "CANCELLED"].includes(status)) return status;
+  return status || "RUNNING";
+}
+
+function numberValue(value) {
+  const number = Number(String(value ?? "").replace(/,/g, "").trim());
+  return Number.isFinite(number) ? number : 0;
+}
+
+export function normalizeDingSupplyApproval(instance = {}, mapping = {}) {
+  const kind = mapping.kind === "payment" ? "payment" : "purchase";
+  const processInstanceId = String(instance.processInstanceId || instance.process_instance_id || "").trim();
+  const common = {
+    id: processInstanceId,
+    processInstanceId,
+    title: instance.title || instance.processInstanceTitle || instance.processInstanceName || instance.process_instance_name || "",
+    status: approvalStatus(instance),
+    processCode: instance.processCode || instance.process_code || "",
+    businessId: instance.businessId || instance.business_id || "",
+    originatorUserId: instance.originatorUserId || instance.originator_userid || "",
+    originatorName: instance.originatorUserName || instance.originator_user_name || "",
+    createTime: instance.createTime || instance.create_time || "",
+    finishTime: instance.finishTime || instance.finish_time || ""
+  };
+  if (kind === "payment") {
+    const relatedField = approvalFieldRecord(instance, mapping.relatedPurchaseFieldId);
+    const relation = relatedApproval(relatedField);
+    const explicitAmountValue = approvalField(instance, mapping.amountFieldId);
+    const relatedAmountValue = relation.value(["金额（元）", "付款金额", "付款金额（元）", "总付款金额"]);
+    const hasExplicitAmount = String(explicitAmountValue ?? "").trim() !== "";
+    const amount = numberValue(hasExplicitAmount ? explicitAmountValue : relatedAmountValue);
+    const purchaseProcessInstanceId = relation.instanceId;
+    const reason = String(
+      approvalField(instance, mapping.purposeFieldId)
+      || relation.value(["事由", "申请事由", "付款事由"])
+      || ""
+    ).trim();
+    const businessCategory = String(
+      approvalField(instance, mapping.businessCategoryFieldId)
+      || relation.value(["业务分类", "支出分类", "费用类型"])
+      || ""
+    ).trim();
+    return {
+      kind,
+      record: {
+        ...common,
+        amount,
+        amountSource: hasExplicitAmount ? "payment-form" : relatedAmountValue ? "related-purchase" : "missing",
+        reason,
+        businessCategory,
+        relatedProcessCode: relation.formCode,
+        purchaseProcessInstanceId,
+        mappingStatus: purchaseProcessInstanceId ? "mapped" : "unmapped",
+        unmappedValues: purchaseProcessInstanceId ? {} : { relatedPurchase: String(relatedField?.value || "") }
+      },
+      lines: []
+    };
+  }
+
+  const amount = numberValue(approvalField(instance, mapping.amountFieldId));
+  const supplierValue = String(approvalField(instance, mapping.supplierFieldId) || "").trim();
+  const productValue = String(approvalField(instance, mapping.productFieldId) || "").trim();
+  const supplierId = mapping.supplierValueMap?.[supplierValue] || "";
+  const mappedProducts = Array.isArray(mapping.productValueMap?.[productValue])
+    ? mapping.productValueMap[productValue]
+    : [mapping.productValueMap?.[productValue]].filter(Boolean);
+  const unmappedValues = {};
+  if (supplierValue && !supplierId) unmappedValues.supplier = supplierValue;
+  if (productValue && !mappedProducts.length) unmappedValues.product = productValue;
+  return {
+    kind,
+    record: {
+      ...common,
+      supplierId,
+      productIds: mappedProducts,
+      requestedAmount: amount,
+      approvedAmount: common.status === "COMPLETED" ? amount : 0,
+      reason: String(approvalField(instance, mapping.purposeFieldId) || "").trim(),
+      businessCategory: String(approvalField(instance, mapping.businessCategoryFieldId) || "").trim(),
+      requestedPaymentDate: String(approvalField(instance, mapping.paymentDateFieldId) || "").trim(),
+      departmentName: String(approvalField(instance, mapping.departmentFieldId) || "").trim(),
+      projectName: String(approvalField(instance, mapping.projectFieldId) || "").trim(),
+      mappingStatus: supplierId && mappedProducts.length ? "mapped" : "unmapped",
+      unmappedValues
+    },
+    lines: []
+  };
+}
+
 export async function getDingDepartments(accessToken, fetchImpl = fetch, rootDeptId = 1) {
   const root = Number(rootDeptId) || 1;
   const departmentsById = new Map();
