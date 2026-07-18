@@ -556,6 +556,63 @@ const integrationRegistry = {
       ]
     },
     {
+      "id": "ugreen-nas",
+      "name": "绿联 NAS / UGOS Pro",
+      "status": "planned",
+      "summary": "计划通过公司 Mac 的 SMB/WebDAV 挂载和只读索引器关联品牌内容素材；官方未提供 MCP Server，MCP 仅作为可选文件搜索入口。",
+      "capabilities": [
+        "SMB 文件访问",
+        "WebDAV 文件访问",
+        "Docker 应用",
+        "NAS 用户认证",
+        "素材目录索引"
+      ],
+      "businessQuestions": [
+        "品牌素材目录如何只读索引",
+        "NAS 离线和文件移动如何恢复",
+        "AI 文件搜索是否需要可选 MCP"
+      ],
+      "keywords": [
+        "绿联 NAS",
+        "UGREEN NAS",
+        "UGOS Pro",
+        "NAS",
+        "SMB",
+        "WebDAV",
+        "素材目录",
+        "文件索引"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [
+        "developer.ugnas.com",
+        "ugnas.com"
+      ],
+      "apiRoutes": [],
+      "publicDocs": [
+        {
+          "label": "绿联云开发者平台",
+          "url": "https://developer.ugnas.com/"
+        },
+        {
+          "label": "UGOS Pro Docker 应用开发",
+          "url": "https://developer.ugnas.com/en/doc/backend/quick-start/develop-docker-app.html"
+        },
+        {
+          "label": "绿联 NAS WebDAV 指南",
+          "url": "https://ai.ugreen.com/blogs/how-to/access-ugreen-nas-files-via-webdav"
+        }
+      ],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "oceanengine-qianchuan",
+          "type": "asset-to-performance",
+          "description": "NAS 内容资产通过内容主键和素材 ID 与投放表现关联，不能直接以文件名猜测归因。"
+        }
+      ]
+    },
+    {
       "id": "oceanengine-qianchuan",
       "name": "巨量引擎 / 巨量千川",
       "status": "planned",
