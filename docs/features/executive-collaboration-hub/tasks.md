@@ -22,7 +22,7 @@
   - 提交：`docs(collaboration): define cross-app execution hub`。
   - 实际结果：2026-07-18 `npm run check:governance`、`npm run check:integrations` 和 `git diff --check` 通过。
 
-- [ ] 汇合战略、供应链、数据中心和品牌内容已完成依赖
+- [x] 汇合战略、供应链、数据中心和品牌内容已完成依赖
   - 依赖：文档契约完成。
   - 文件：三个功能分支及冲突文件。
   - 输入：`codex/strategy-crud`、`codex/data-center-app`、`codex/brand-content-collaboration`。
@@ -31,6 +31,7 @@
   - 实现步骤：按战略、数据中心、品牌内容顺序合并并逐次验证。
   - 验证：`npm test`、`npm run build`、冲突标记扫描。
   - 提交：三个说明性 merge commit。
+  - 实际结果：战略、供应链、数据中心和品牌内容完整 UI/API 已汇合；React 345 项、API 132 项通过，生产构建通过且全部 JavaScript chunk 小于 500KB。
 
 - [ ] 实现协同领域、权限和老板行动投影
   - 依赖：集成基线。
