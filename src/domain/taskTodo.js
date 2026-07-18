@@ -103,8 +103,8 @@ export function riskMetaForTask(task, now = new Date()) {
   return { days, tone: "upcoming", label: `${days} 天后截止` };
 }
 
-export function buildTaskTodoSnapshot(task, executorUnionIds = task?.dingTodo?.executorUnionIds || []) {
-  return {
+export function buildTaskTodoSnapshot(task, executorUnionIds = task?.dingTodo?.executorUnionIds || [], draft) {
+  const snapshot = {
     title: String(task?.title || ""),
     due: String(task?.due || ""),
     done: Boolean(task?.done),
@@ -112,6 +112,14 @@ export function buildTaskTodoSnapshot(task, executorUnionIds = task?.dingTodo?.e
     ownerDept: String(task?.ownerDept || ""),
     executorUnionIds: [...new Set(executorUnionIds.filter(Boolean))].sort()
   };
+  if (draft) snapshot.draft = {
+    subject: String(draft.subject || ""),
+    descriptionHtml: String(draft.descriptionHtml || ""),
+    priority: Number(draft.priority) || 20,
+    dueDate: String(draft.dueDate || ""),
+    dueClock: String(draft.dueClock || "18:00")
+  };
+  return snapshot;
 }
 
 function sameSnapshot(left, right) {
@@ -122,7 +130,35 @@ export function todoSyncStatus(task) {
   const todo = task?.dingTodo;
   if (todo?.lastError) return "同步失败";
   if (!todo?.id) return "未同步";
-  const current = buildTaskTodoSnapshot(task, todo.executorUnionIds || []);
+  const current = buildTaskTodoSnapshot(task, todo.executorUnionIds || [], todo.draft);
   if (!sameSnapshot(current, todo.snapshot)) return "待更新";
   return task.done ? "已完成" : "已同步";
+}
+
+export function applyTaskTodoSyncSuccess(task, { payload, executors = [], snapshot, todo = {}, syncedAt }) {
+  const due = String(payload?.draft?.dueDate || task?.due || "");
+  const effectiveTask = { ...task, due };
+  return {
+    ...effectiveTask,
+    dingTodo: {
+      id: todo?.id || todo?.taskId || payload?.todoId || "",
+      syncedAt,
+      executorUnionIds: payload?.executorUnionIds || [],
+      executorNames: executors.map(user => user.name).filter(Boolean),
+      draft: payload?.draft,
+      snapshot: snapshot || buildTaskTodoSnapshot(effectiveTask, payload?.executorUnionIds || [], payload?.draft),
+      lastError: ""
+    }
+  };
+}
+
+export function applyTaskTodoSyncFailure(task, error, failedAt = new Date().toISOString()) {
+  return {
+    ...task,
+    dingTodo: {
+      ...(task?.dingTodo || {}),
+      lastError: error?.message || "钉钉待办同步失败。",
+      failedAt
+    }
+  };
 }

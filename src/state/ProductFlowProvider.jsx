@@ -16,7 +16,7 @@ import {
 import { normalizeClientState } from "./stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../domain/sessionUser.js";
 import { createTaskMeetingRecord } from "../domain/dingTalk.js";
-import { buildTaskTodoSnapshot } from "../domain/taskTodo.js";
+import { applyTaskTodoSyncFailure, applyTaskTodoSyncSuccess } from "../domain/taskTodo.js";
 import { sharedStateApiUrl } from "./stateApi.js";
 import { createDemandRecord } from "../domain/demandDate.js";
 import { useAuth } from "./AuthProvider.jsx";
@@ -280,32 +280,17 @@ export function ProductFlowProvider({ children }) {
       const syncedAt = new Date().toISOString();
       commitState(current => ({
         ...current,
-        tasks: (current.tasks || []).map(item => item.id === taskId ? {
-          ...item,
-          dingTodo: {
-            id: result.todo?.id || result.todo?.taskId || payload.todoId,
-            syncedAt,
-            executorUnionIds: payload.executorUnionIds,
-            executorNames: executors.map(user => user.name).filter(Boolean),
-            snapshot: snapshot || buildTaskTodoSnapshot(item, payload.executorUnionIds),
-            lastError: ""
-          }
-        } : item)
+        tasks: (current.tasks || []).map(item => item.id === taskId
+          ? applyTaskTodoSyncSuccess(item, { payload, executors, snapshot, todo: result.todo, syncedAt })
+          : item)
       }));
       return result.todo;
     } catch (error) {
       commitState(current => ({
         ...current,
-        tasks: (current.tasks || []).map(item => item.id === taskId ? {
-          ...item,
-          dingTodo: {
-            ...(item.dingTodo || {}),
-            executorUnionIds: payload.executorUnionIds,
-            executorNames: executors.map(user => user.name).filter(Boolean),
-            lastError: error.message || "钉钉待办同步失败。",
-            failedAt: new Date().toISOString()
-          }
-        } : item)
+        tasks: (current.tasks || []).map(item => item.id === taskId
+          ? applyTaskTodoSyncFailure(item, error)
+          : item)
       }));
       throw error;
     }

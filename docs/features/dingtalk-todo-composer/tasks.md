@@ -8,9 +8,9 @@
 
 ## 任务
 
-- [ ] 领域草稿和 payload
+- [x] 领域草稿和 payload
   - 依赖：无。
-  - 文件：`src/domain/dingTalkTodoComposer.js`、`src/domain/dingTalk.js`、`src/domain/taskTodo.js`、`react-tests/dingtalk-todo-composer.test.mjs`。
+  - 文件：`src/domain/dingTalk.js`、`src/domain/taskTodo.js`、`react-tests/task-todo.test.mjs`。
   - 输入：产品、任务、草稿、执行人。
   - 输出：可验证草稿、纯文本正文、优先级和截止时间 payload。
   - 失败测试：新测试因模块或字段不存在失败。
@@ -18,7 +18,7 @@
   - 验证：聚焦领域测试通过。
   - 提交：`feat: add DingTalk todo composer domain`。
 
-- [ ] 我的群 API
+- [x] 我的群 API
   - 依赖：无。
   - 文件：`functions/api/dingtalk/_shared/groups.js`、`functions/api/dingtalk/groups/index.js`、`src/domain/dingTalkGroups.js`、`tests/dingtalk-groups.test.mjs`、`react-tests/dingtalk-groups-client.test.mjs`。
   - 输入：当前登录用户授权令牌。
@@ -28,7 +28,7 @@
   - 验证：API 和客户端测试通过。
   - 提交：`feat: list DingTalk groups in todo picker`。
 
-- [ ] 群选择器恢复能力
+- [x] 群选择器恢复能力
   - 依赖：我的群 API。
   - 文件：`src/features/progress/GroupExecutorPicker.jsx`、`src/domain/dingTalkGroupSelection.js`、相关 React 测试。
   - 输入：我的群、搜索群、成员解析结果。
@@ -38,7 +38,7 @@
   - 验证：聚焦群选择测试通过。
   - 提交：`feat: complete DingTalk group executor flow`。
 
-- [ ] 待办编排 UI
+- [x] 待办编排 UI
   - 依赖：领域草稿、群选择器。
   - 文件：`TodoComposerFields.jsx`、`TodoPreview.jsx`、`TodoSyncModal.jsx`、`ProductProgressPage.jsx`、`ProductFlowProvider.jsx`、`RichTextEditor.jsx`、样式与测试。
   - 输入：任务、产品、组织架构、编排草稿。
@@ -48,7 +48,7 @@
   - 验证：组件契约、领域和 Provider 测试通过。
   - 提交：`feat: add DingTalk todo composer`。
 
-- [ ] 共享焦点和最终验收
+- [x] 共享焦点和最终验收
   - 依赖：待办编排 UI。
   - 文件：`src/ui/Modal.jsx`、共享 Modal 测试、`src/styles.css`。
   - 输入：打开/关闭与键盘事件。

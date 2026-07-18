@@ -1,28 +1,54 @@
 import { X } from "lucide-react";
-import { useEffect, useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
 export function Modal({ title, open, onClose, children, footer, size = "default" }) {
   const titleId = useId();
+  const sheetRef = useRef(null);
+  const previousFocusRef = useRef(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
 
   useEffect(() => {
     if (!open) return undefined;
     const previousOverflow = document.body.style.overflow;
+    previousFocusRef.current = document.activeElement;
     const onKeyDown = event => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") onCloseRef.current();
+      if (event.key === "Tab") {
+        const focusable = [...(sheetRef.current?.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || [])]
+          .filter(element => !element.hasAttribute("hidden"));
+        if (!focusable.length) {
+          event.preventDefault();
+          sheetRef.current?.focus();
+        } else if (event.shiftKey && document.activeElement === focusable[0]) {
+          event.preventDefault();
+          focusable.at(-1)?.focus();
+        } else if (!event.shiftKey && document.activeElement === focusable.at(-1)) {
+          event.preventDefault();
+          focusable[0]?.focus();
+        }
+      }
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
+    window.requestAnimationFrame(() => {
+      const target = sheetRef.current?.querySelector("[data-autofocus]")
+        || sheetRef.current?.querySelector("input:not([disabled]), button:not([disabled])");
+      (target || sheetRef.current)?.focus();
+    });
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
+      window.requestAnimationFrame(() => previousFocusRef.current?.focus());
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
   return createPortal(
     <div className="modal-layer" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-      <section className={`modal-sheet ${size}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <section ref={sheetRef} tabIndex={-1} className={`modal-sheet ${size}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header className="modal-header">
           <h2 id={titleId}>{title}</h2>
           <button className="modal-close" type="button" onClick={onClose} aria-label="关闭"><X size={20} /></button>

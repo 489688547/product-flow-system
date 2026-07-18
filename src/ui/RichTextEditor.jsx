@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import "quill/dist/quill.snow.css";
 
-export function RichTextEditor({ value, onChange, placeholder }) {
+export function RichTextEditor({ value, onChange, placeholder, disabled = false, allowImages = true, compact = false }) {
   const hostRef = useRef(null);
   const quillRef = useRef(null);
   const fileRef = useRef(null);
@@ -20,23 +20,32 @@ export function RichTextEditor({ value, onChange, placeholder }) {
         theme: "snow",
         placeholder,
         modules: {
-          toolbar: [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], ["link", "image"], ["clean"]]
+          toolbar: [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], allowImages ? ["link", "image"] : ["link"], ["clean"]]
         }
       });
       const toolbar = editor.getModule("toolbar");
-      toolbar.addHandler("image", () => fileRef.current?.click());
+      if (allowImages) toolbar.addHandler("image", () => fileRef.current?.click());
       editor.root.innerHTML = value || "";
+      editor.enable(!disabled);
+      toolbar.container.querySelectorAll("button, select").forEach(control => { control.disabled = disabled; });
       editor.on("text-change", () => onChangeRef.current(editor.root.innerHTML));
       quillRef.current = editor;
     });
     return () => { cancelled = true; };
-  }, [placeholder]);
+  }, [allowImages, disabled, placeholder, value]);
 
   useEffect(() => {
     const editor = quillRef.current;
     if (!editor) return;
     if ((value || "") !== editor.root.innerHTML) editor.root.innerHTML = value || "";
   }, [value]);
+
+  useEffect(() => {
+    const editor = quillRef.current;
+    if (!editor) return;
+    editor.enable(!disabled);
+    editor.getModule("toolbar").container.querySelectorAll("button, select").forEach(control => { control.disabled = disabled; });
+  }, [disabled]);
 
   function insertImages(files) {
     const editor = quillRef.current;
@@ -52,9 +61,9 @@ export function RichTextEditor({ value, onChange, placeholder }) {
   }
 
   return (
-    <div className="rich-field">
+    <div className={`rich-field ${compact ? "compact" : ""}`}>
       <div ref={hostRef} className="rich-editor" />
-      <input ref={fileRef} className="hidden" type="file" accept="image/*" multiple aria-label="插入图片" onChange={event => insertImages(event.target.files)} />
+      {allowImages ? <input ref={fileRef} className="hidden" type="file" accept="image/*" multiple aria-label="插入图片" onChange={event => insertImages(event.target.files)} /> : null}
     </div>
   );
 }

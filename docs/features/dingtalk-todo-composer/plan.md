@@ -10,7 +10,7 @@
 
 ## 文件职责
 
-- `src/domain/dingTalkTodoComposer.js`：草稿默认值、校验、截止时间、富文本转正文和预览模型。
+- `src/domain/dingTalk.js`：草稿默认值、校验、截止时间、富文本清洗、正文转换和待办 payload。
 - `src/domain/dingTalkGroups.js`：我的群和搜索客户端。
 - `functions/api/dingtalk/_shared/groups.js`：我的群 MCP 适配与标准化。
 - `functions/api/dingtalk/groups/index.js`：登录态保护的我的群路由。
@@ -29,11 +29,14 @@
 - `createTodoComposerDraft({task, product}) -> {subject, descriptionHtml, priority, dueDate, dueClock}`
 - `buildTaskTodoPayload(..., draft) -> DingTalkTodoInput`
 - `GET /api/dingtalk/groups -> {groups:[{id,name,memberCount,myRole}], nextCursor, hasMore}`
+- `POST /api/dingtalk/todo/sync`：必须具备有效企业会话且不是只读账号；服务端从会话覆盖创建人，从 D1 共享状态校验 `sourceId` 对应的产品任务，并只接受与任务记录一致的 `todoId`。客户端传入的创建人、操作人、资源人和恢复人员不作为授权依据。
+- 待办同步请求成功返回 `{synced:true,todo}`；无会话由全局中间件返回 401，只读返回 403，任务不存在返回 404，D1 未绑定或状态未初始化返回 501/409，钉钉失败保留供应商错误摘要并使用对应 HTTP 状态。
+- 兼容旧任务：没有 `dingTodo.id` 时按稳定 `sourceId` 创建或执行有界恢复；有 ID 时仅使用服务端任务记录中的 ID 更新。日志和供应商响应不得写入令牌、手机号或原始敏感数据。
 - `TodoSyncModal.onSync({executors,draft})`
 
 ## 数据迁移
 
-不迁移数据库。`dingTodo.draft` 为可选增量字段；缺失时从产品任务生成。富文本和新优先级只在成功同步后持久化。
+不迁移数据库。`dingTodo.draft` 为可选增量字段；缺失时从产品任务生成。富文本、优先级和弹窗内修改的任务截止日期只在钉钉同步成功后原子持久化；失败仅记录错误和失败时间，保留上一次成功值。
 
 ## 风险与回滚
 
@@ -44,7 +47,7 @@
 
 ## 验证命令
 
-- `node --test react-tests/dingtalk-todo-composer.test.mjs react-tests/dingtalk-group-selection.test.mjs`
+- `node --test react-tests/task-todo.test.mjs react-tests/todo-composer-ui.test.mjs react-tests/dingtalk-group-selection.test.mjs`
 - `node --test tests/dingtalk-groups.test.mjs tests/dingtalk-todo-update.test.mjs`
 - `npm run lint`
 - `npm run check:governance`

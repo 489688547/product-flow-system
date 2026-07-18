@@ -435,6 +435,9 @@ main { min-width: 0; overflow-x: hidden; }
 .rich-field .ql-toolbar.ql-snow { border-color: var(--border-strong); border-radius: var(--radius-control) var(--radius-control) 0 0; background: var(--surface-subtle); }
 .rich-field .ql-container.ql-snow { height: auto; border-color: var(--border-strong); border-radius: 0 0 var(--radius-control) var(--radius-control); min-height: 112px; font: inherit; }
 .rich-field .ql-editor { min-height: 112px; max-height: 240px; overflow: auto; font-size: 14px; line-height: 1.6; }
+.rich-field.compact .ql-container.ql-snow, .rich-field.compact .ql-editor { min-height: 92px; }
+.rich-field.compact .ql-editor { max-height: 180px; }
+.rich-field .ql-container.ql-disabled { background: var(--surface-subtle); }
 .rich-field img { max-width: 180px; border-radius: var(--radius-control); border: 1px solid var(--border); }
 .deliverable-type-tabs { width: fit-content; display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-subtle); }
 .deliverable-type-tabs button { min-height: 32px; padding: 0 11px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
@@ -471,6 +474,20 @@ main { min-width: 0; overflow-x: hidden; }
 .todo-context b.status-同步失败 { color: var(--danger); }
 .todo-context b.status-待更新 { color: var(--warning); }
 .todo-context b.status-已同步, .todo-context b.status-已完成 { color: var(--success); }
+.todo-composer-fields { margin-top: var(--space-4); display: grid; grid-template-columns: minmax(150px, .5fr) minmax(280px, 1fr); gap: var(--space-3); }
+.todo-composer-fields > label, .todo-composer-deadline { min-width: 0; display: grid; align-content: start; gap: 6px; color: var(--text-secondary); font-weight: 650; }
+.todo-composer-fields input, .todo-composer-fields select { width: 100%; height: var(--control-height); border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: 0 10px; background: var(--surface); color: var(--text-primary); }
+.todo-composer-title, .todo-composer-body { grid-column: 1 / -1; }
+.todo-composer-deadline > div { display: grid; grid-template-columns: minmax(180px, 1fr) 112px; gap: 8px; }
+.todo-composer-deadline .date-picker-trigger { width: 100%; }
+.todo-preview { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border); display: grid; gap: 7px; }
+.todo-preview-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.todo-preview-heading span { color: var(--text-secondary); font-weight: 750; }
+.todo-preview-heading small { color: var(--text-tertiary); }
+.todo-preview > strong { color: var(--text-primary); font-size: 15px; }
+.todo-preview > p { max-height: 72px; margin: 0; overflow: auto; white-space: pre-wrap; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+.todo-preview > div:last-child { display: flex; flex-wrap: wrap; gap: 6px 14px; color: var(--text-tertiary); font-size: 11px; }
+.todo-preview > div:last-child > span { display: inline-flex; align-items: center; gap: 4px; }
 .meeting-time-grid { margin-top: var(--space-3); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
 .meeting-time-grid label, .meeting-attendee-search { display: grid; gap: 6px; color: var(--text-secondary); font-weight: 650; }
 .meeting-time-grid input, .meeting-attendee-search input { width: 100%; height: var(--control-height); border: 1px solid var(--border-strong); border-radius: var(--radius-control); padding: 0 10px; background: var(--surface); color: var(--text-primary); }
@@ -490,11 +507,17 @@ main { min-width: 0; overflow-x: hidden; }
 .meeting-attendee-check { color: var(--primary); display: grid; place-items: center; }
 .todo-executor-picker { margin-top: var(--space-3); display: grid; gap: 8px; }
 .todo-executor-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 3px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
-.todo-executor-modes button { min-height: 36px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; }
+.todo-executor-modes button { min-height: 40px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-weight: 700; }
 .todo-executor-modes button[aria-pressed="true"] { background: var(--surface); color: var(--primary); box-shadow: 0 1px 4px color-mix(in oklch, var(--text-primary), transparent 88%); }
 .todo-executor-picker .meeting-attendee-search { margin-top: 0; }
 .todo-group-results { min-height: 96px; max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 4px; display: grid; align-content: start; gap: 2px; }
 .todo-group-results > p { margin: 0; padding: 22px 12px; color: var(--text-tertiary); font-size: 12px; text-align: center; }
+.todo-group-results-heading { padding: 7px 8px 5px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.todo-group-results-heading strong { color: var(--text-secondary); font-size: 12px; }
+.todo-group-results-heading small { color: var(--text-tertiary); font-size: 11px; }
+.todo-group-skeleton { padding: 5px 4px; display: grid; gap: 4px; }
+.todo-group-skeleton > span { height: 44px; border-radius: 7px; background: linear-gradient(90deg, var(--surface-subtle) 20%, color-mix(in oklch, var(--surface-subtle), white 46%) 45%, var(--surface-subtle) 70%); background-size: 240% 100%; animation: todo-skeleton-shimmer 1.3s ease-in-out infinite; }
+@keyframes todo-skeleton-shimmer { to { background-position: -120% 0; } }
 .todo-group-results > button { min-height: 48px; width: 100%; border: 0; border-radius: 7px; background: transparent; color: var(--text-primary); display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 5px 7px; text-align: left; }
 .todo-group-results > button:hover { background: var(--primary-soft); }
 .todo-group-results > button:disabled { opacity: .62; }
@@ -503,12 +526,18 @@ main { min-width: 0; overflow-x: hidden; }
 .todo-group-results strong, .todo-group-results small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .todo-group-results small, .todo-group-results > button > span:last-child { color: var(--text-tertiary); font-size: 11px; }
 .todo-group-error { padding: 8px 10px; border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 12px; }
-.todo-group-error a { color: inherit; font-weight: 750; white-space: nowrap; }
+.todo-group-error a, .todo-group-error button { color: inherit; font-weight: 750; white-space: nowrap; }
+.todo-group-error button { min-height: 32px; border: 0; background: transparent; display: inline-flex; align-items: center; gap: 4px; }
 .todo-selected-groups, .todo-selected-people { display: flex; flex-wrap: wrap; gap: 6px; }
-.todo-selected-groups > span, .todo-selected-people > span { min-height: 28px; padding: 3px 5px 3px 8px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
+.todo-selected-group { display: grid; gap: 3px; }
+.todo-selected-group > span, .todo-selected-people > span { min-height: 32px; padding: 3px 5px 3px 9px; border-radius: 999px; background: var(--primary-soft); color: var(--primary); display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; }
 .todo-selected-people > span { background: var(--surface-subtle); color: var(--text-secondary); }
-.todo-selected-groups button, .todo-selected-people button { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; display: grid; place-items: center; }
+.todo-selected-groups button, .todo-selected-people button { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: inherit; display: grid; place-items: center; }
 .todo-selected-groups button:hover, .todo-selected-people button:hover { background: color-mix(in oklch, currentColor, transparent 88%); }
+.todo-selected-group details { padding-left: 8px; color: var(--text-tertiary); font-size: 11px; }
+.todo-selected-group summary { cursor: pointer; }
+.todo-selected-group ul { margin: 4px 0 0; padding-left: 18px; }
+.todo-picker-empty { margin: 0; padding: 22px 12px; color: var(--text-tertiary); font-size: 12px; text-align: center; }
 .todo-executor-picker button:focus-visible, .todo-executor-picker input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .form-error { margin-top: var(--space-3); padding: 9px 10px; border: 1px solid color-mix(in oklch, var(--danger), white 72%); border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); font-size: 12px; }
 .meeting-loading-layer { position: fixed; inset: 0; z-index: 110; background: oklch(18% .02 258 / .34); display: grid; place-items: center; }
@@ -801,6 +830,15 @@ main { min-width: 0; overflow-x: hidden; }
   .standard-rule:last-child { border-bottom: 0; }
   .modal-layer { padding: 0; align-items: end; }
   .modal-sheet { max-height: 92dvh; border-radius: var(--radius-modal) var(--radius-modal) 0 0; }
+  .modal-footer { padding: 10px 14px max(10px, env(safe-area-inset-bottom)); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .modal-footer > .btn, .modal-footer > .disabled-action-tip, .modal-footer > .disabled-action-tip > .btn { width: 100%; }
+  .modal-footer .disabled-action-tip::after { left: auto; right: 0; max-width: min(260px, calc(100vw - 28px)); transform: translateY(3px); }
+  .modal-footer .disabled-action-tip:hover::after, .modal-footer .disabled-action-tip:focus-visible::after { transform: translateY(0); }
+  .todo-composer-fields { grid-template-columns: 1fr; }
+  .todo-composer-title, .todo-composer-body { grid-column: auto; }
+  .todo-composer-deadline > div { grid-template-columns: minmax(0, 1fr) 106px; }
+  .todo-preview-heading { align-items: flex-start; flex-direction: column; }
+  .todo-group-results-heading { align-items: flex-start; flex-direction: column; }
   .meeting-time-grid { grid-template-columns: 1fr; }
   .product-card { grid-template-columns: 52px minmax(0, 1fr); padding: var(--space-3); }
   .product-card > img { width: 52px; height: 52px; }
