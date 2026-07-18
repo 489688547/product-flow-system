@@ -39,14 +39,14 @@
   - 验证：`node --test react-tests/data-center-provider.test.mjs react-tests/data-center.test.mjs`，10/10 通过。
   - 提交：`feat(data): add data center provider`。
 
-- [ ] 第三 App 装配
+- [x] 第三 App 装配
   - 依赖：Provider。
   - 文件：`src/App.jsx`、`main.jsx`、权限、App 注册和最小页面。
   - 输入：现有 Supply Chain 导航模式。
   - 输出：产品全周期之后的八个数据中心入口。
   - 失败测试：导航、顺序、权限和注册断言失败。
   - 实现步骤：权限、注册、懒加载、路由映射、Provider 挂载。
-  - 验证：数据中心、供应链、平台和公司访问测试通过。
+  - 验证：数据中心与供应链 21/21 通过，`npm run build` 通过。
   - 提交：`feat(data): register data center app`。
 
 - [ ] 总览与分析

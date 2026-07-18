@@ -54,6 +54,14 @@ const DEFAULT_APP_REGISTRY = [
     route: "supply-chain",
     enabled: true,
     status: "connected"
+  },
+  {
+    id: "data-center",
+    name: "数据中心",
+    description: "统一归集经营数据、指标口径、质量状态和应用订阅。",
+    route: "data-center",
+    enabled: true,
+    status: "connected"
   }
 ];
 

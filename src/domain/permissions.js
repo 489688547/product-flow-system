@@ -6,6 +6,7 @@ export const NAV_PERMISSION_ITEMS = [
   { key: "reviews", label: "经营检查" },
   { key: "apps", label: "业务 Apps" },
   { key: "supply-chain", label: "供应链管理" },
+  { key: "data-center", label: "数据中心" },
   { key: "dashboard", label: "总览" },
   { key: "demands", label: "需求池" },
   { key: "planning", label: "产品规划" },
@@ -18,7 +19,8 @@ export const NAV_PERMISSION_ITEMS = [
 export const FEATURE_PERMISSION_ITEMS = [
   { key: "taskTemplates", label: "产品任务模板", description: "维护不同产品等级、阶段的默认任务与交付物模板。" },
   { key: "salesData", label: "销售数据源", description: "导入销售明细 Excel，维护产品档案单品数据页的数据来源。" },
-  { key: "supplyChain", label: "供应链管理", description: "查看或维护供应商、采购付款、库存资金和质量问题。" }
+  { key: "supplyChain", label: "供应链管理", description: "查看或维护供应商、采购付款、库存资金和质量问题。" },
+  { key: "dataCenter", label: "数据中心", description: "查看统一经营指标，维护数据接入、质量规则和应用订阅。" }
 ];
 
 export const DEFAULT_PERMISSIONS = {
@@ -30,6 +32,7 @@ export const DEFAULT_PERMISSIONS = {
     reviews: { departments: ["*"] },
     apps: { departments: ["*"] },
     "supply-chain": { departments: ["总经办", "供应链部", "供应链", "供应链团队", "采购部", "财务部", "质量管理部", "产品部", "运营部"] },
+    "data-center": { departments: ["总经办", "运营部", "财务部", "产品部", "供应链部", "供应链", "供应链团队", "采购部"] },
     dashboard: { departments: ["*"] },
     demands: { departments: ["*"] },
     planning: { departments: ["*"] },
@@ -56,6 +59,12 @@ export const DEFAULT_PERMISSIONS = {
       viewTitles: ["总经理", "供应链负责人", "采购负责人", "财务负责人", "质量负责人", "产品负责人", "运营负责人"],
       editDepartments: ["总经办", "供应链部", "供应链", "供应链团队", "采购部", "财务部", "质量管理部"],
       editTitles: ["总经理", "供应链负责人", "采购负责人", "财务负责人", "质量负责人"]
+    },
+    dataCenter: {
+      viewDepartments: ["总经办", "运营部", "财务部", "产品部", "供应链部", "供应链", "供应链团队", "采购部"],
+      viewTitles: ["总经理", "运营负责人", "财务负责人", "产品负责人", "供应链负责人"],
+      editDepartments: ["总经办", "运营部"],
+      editTitles: ["总经理", "运营负责人"]
     }
   }
 };
@@ -101,6 +110,14 @@ export function canAccessSupplyChain(user) {
     user,
     DEFAULT_PERMISSIONS.features.supplyChain.viewDepartments,
     DEFAULT_PERMISSIONS.features.supplyChain.viewTitles
+  );
+}
+
+export function canAccessDataCenter(user) {
+  return matchesScope(
+    user,
+    DEFAULT_PERMISSIONS.features.dataCenter.viewDepartments,
+    DEFAULT_PERMISSIONS.features.dataCenter.viewTitles
   );
 }
 
