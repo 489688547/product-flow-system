@@ -69,19 +69,19 @@
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合和数据中心元数据。",
-      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "数据中心元数据"],
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营和绩效元数据。",
+      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "数据中心元数据", "店铺运营记录", "绩效记录"],
       "businessQuestions": ["数据只在本地可见", "跨设备状态不同步", "数据库绑定缺失", "表结构或容量问题"],
       "keywords": ["D1", "数据库", "落库", "PRODUCT_FLOW_DB", "持久化"],
-      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/auth/**", "functions/api/dingtalk/org/**"],
+      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/**", "functions/api/performance-management.js", "functions/api/performance-management/**", "functions/api/auth/**", "functions/api/dingtalk/org/**"],
       "envVars": ["PRODUCT_FLOW_DB"],
       "domains": ["api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": ["/api/state", "/api/platform", "/api/sales", "/api/data-center"],
+      "apiRoutes": ["/api/state", "/api/platform", "/api/sales", "/api/data-center", "/api/ecommerce-operations", "/api/performance-management"],
       "publicDocs": [
         { "label": "Cloudflare D1 入门", "url": "https://developers.cloudflare.com/d1/get-started/" },
         { "label": "Pages D1 绑定", "url": "https://developers.cloudflare.com/pages/functions/bindings/" }
       ],
-      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/"],
+      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/", "functions/api/performance-management.js", "functions/api/performance-management/"],
       "relations": [
         { "platformId": "cloudflare-pages", "type": "bound-to", "description": "D1 通过 Pages Functions 的环境绑定提供服务。" },
         { "platformId": "dingtalk", "type": "stores-data-for", "description": "保存钉钉会话、组织和用户令牌相关数据。" },
@@ -207,6 +207,26 @@
       "evidence": [],
       "relations": [
         { "platformId": "xiaohongshu-open-platform", "type": "cross-channel-content", "description": "跨渠道素材分析需要区分平台内容与投放数据口径。" }
+      ]
+    },
+    {
+      "id": "openai-responses",
+      "name": "OpenAI Responses API",
+      "status": "integrating",
+      "summary": "为电商店铺运营方案提供可选的服务端优化建议；未配置时明确降级为规则检查。",
+      "capabilities": ["方案结构点评", "问题与对策检查", "监测指标建议"],
+      "businessQuestions": ["AI 点评不可用", "模型响应超时", "建议是否替代主管审批", "输入是否包含敏感字段"],
+      "keywords": ["OpenAI", "Responses API", "AI 点评", "智能建议", "OPENAI_API_KEY"],
+      "codePaths": ["functions/api/ecommerce-operations/ai-review.js"],
+      "envVars": ["OPENAI_API_KEY", "OPENAI_MODEL"],
+      "domains": ["api.openai.com", "platform.openai.com"],
+      "apiRoutes": ["/api/ecommerce-operations/ai-review"],
+      "publicDocs": [
+        { "label": "OpenAI API 开发者快速入门", "url": "https://platform.openai.com/docs/quickstart/make-your-first-api-request" }
+      ],
+      "evidence": ["functions/api/ecommerce-operations/ai-review.js"],
+      "relations": [
+        { "platformId": "cloudflare-pages", "type": "called-by", "description": "Pages Function 从服务端调用 Responses API，密钥不进入浏览器。" }
       ]
     }
   ]

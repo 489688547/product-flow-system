@@ -19,7 +19,7 @@
   - 验证：`npm run check:governance`。
   - 提交：`docs(perf): design performance management app`。
 
-- [ ] 领域模型
+- [x] 领域模型
   - 依赖：规格。
   - 文件：`src/domain/performanceManagement.js`、领域测试。
   - 输入：周期、方案、证据、自评和主管评分。
@@ -29,7 +29,7 @@
   - 验证：领域测试通过。
   - 提交：`feat(perf): add performance domain`。
 
-- [ ] API 与存储
+- [x] API 与存储
   - 依赖：领域模型。
   - 文件：`functions/api/performance-management*`、API 测试、`package.json`。
   - 输入：钉钉会话、领域动作和 D1。
@@ -39,7 +39,7 @@
   - 验证：绩效 API 与平台回归通过。
   - 提交：`feat(perf): add performance APIs`。
 
-- [ ] App 与核心 UI
+- [x] App 与核心 UI
   - 依赖：API、运营证据出口。
   - 文件：Provider、App 壳、权限、五个工作区、UI 测试。
   - 输入：绩效状态、组织和业务证据。
@@ -49,7 +49,7 @@
   - 验证：角色流程和权限测试通过。
   - 提交：`feat(perf): add performance workflows`。
 
-- [ ] 视觉与发布
+- [x] 视觉与发布
   - 依赖：完整功能。
   - 文件：样式、耐久文档、集成与全部测试。
   - 输入：五个页面和所有状态。

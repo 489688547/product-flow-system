@@ -19,7 +19,7 @@
   - 验证：`npm run check:governance`。
   - 提交：`docs(ops): design ecommerce operations app`。
 
-- [ ] 领域模型
+- [x] 领域模型
   - 依赖：书面规格复核。
   - 文件：`src/domain/ecommerceOperations.js`、`react-tests/ecommerce-operations-domain.test.mjs`。
   - 输入：产品月度周期、平台店铺子方案和组织身份。
@@ -29,7 +29,7 @@
   - 验证：领域测试全部通过。
   - 提交：`feat(ops): add ecommerce operations domain`。
 
-- [ ] D1 与动作 API
+- [x] D1 与动作 API
   - 依赖：领域模型。
   - 文件：`functions/api/ecommerce-operations.js`、`functions/api/ecommerce-operations/actions.js`、`functions/api/ecommerce-operations/_shared/storage.js`、`tests/ecommerce-operations-api.test.mjs`、`package.json`。
   - 输入：领域动作、当前钉钉会话和 `PRODUCT_FLOW_DB`。
@@ -39,7 +39,7 @@
   - 验证：新 API 与现有数据中心、供应链、平台 API 回归通过。
   - 提交：`feat(ops): add ecommerce operations APIs`。
 
-- [ ] 数据中心适配
+- [x] 数据中心适配
   - 依赖：D1 与动作 API。
   - 文件：`src/state/ecommerceOperationsData.js`、领域测试、API 契约测试。
   - 输入：数据中心销售响应、产品和店铺映射。
@@ -49,7 +49,7 @@
   - 验证：数据适配测试和数据中心回归通过。
   - 提交：`feat(ops): connect data center evidence`。
 
-- [ ] AI 点评
+- [x] AI 点评
   - 依赖：领域模型、数据中心适配。
   - 文件：`functions/api/ecommerce-operations/ai-review.js`、AI 适配器、API 测试、平台集成登记。
   - 输入：已授权方案版本、证据快照和数据质量。
@@ -59,7 +59,7 @@
   - 验证：成功、无配置、超时、坏响应和权限测试通过。
   - 提交：`feat(ops): add AI plan review`。
 
-- [ ] App 装配与 Provider
+- [x] App 装配与 Provider
   - 依赖：API 和数据适配。
   - 文件：`src/state/ecommerceOperationsApi.js`、`src/state/EcommerceOperationsProvider.jsx`、`src/App.jsx`、`src/main.jsx`、权限、App 注册、导航测试。
   - 输入：经营 API、数据中心 API 和现有三 App 壳。
@@ -69,7 +69,7 @@
   - 验证：导航、权限、数据中心和供应链回归通过。
   - 提交：`feat(ops): register ecommerce operations app`。
 
-- [ ] 经营驾驶舱与重点产品工作台
+- [x] 经营驾驶舱与重点产品工作台
   - 依赖：App 装配与 Provider。
   - 文件：`src/features/ecommerce-operations/OperationsCockpit.jsx`、`FocusProductWorkspace.jsx`、`ProblemChainEditor.jsx`、`ExecutionTimeline.jsx`、UI 测试。
   - 输入：经营状态、数据证据、AI 点评和角色。
@@ -79,7 +79,7 @@
   - 验证：核心用户流程和页面状态测试通过。
   - 提交：`feat(ops): add focus product workbench`。
 
-- [ ] 协同、团队管理与方法库
+- [x] 协同、团队管理与方法库
   - 依赖：经营工作台。
   - 文件：`CollaborationWorkspace.jsx`、`TeamManagementWorkspace.jsx`、`PlaybookWorkspace.jsx`、权限与 UI 测试。
   - 输入：协同请求、组织责任、经营过程事实和已关闭复盘。
@@ -89,7 +89,7 @@
   - 验证：角色权限和完整协同流程通过。
   - 提交：`feat(ops): add collaboration and team management`。
 
-- [ ] 视觉与交付
+- [x] 视觉与交付
   - 依赖：全部功能任务。
   - 文件：`src/styles.css`、本地服务、耐久文档和全部相关测试。
   - 输入：现有设计 Token、五个页面和完整页面状态。
@@ -99,7 +99,7 @@
   - 验证：Definition of Done 与浏览器验收全部通过。
   - 提交：`style(ops): finish ecommerce operations UI`。
 
-- [ ] 绩效证据出口
+- [x] 绩效证据出口
   - 依赖：经营工作台与动作 API。
   - 文件：`src/domain/ecommercePerformanceEvidence.js`、`functions/api/ecommerce-operations/evidence.js`、证据契约测试、绩效管理适配测试。
   - 输入：已授权经营周期、任务、执行更新和复盘。

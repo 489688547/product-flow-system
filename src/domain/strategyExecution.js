@@ -62,6 +62,22 @@ const DEFAULT_APP_REGISTRY = [
     route: "data-center",
     enabled: true,
     status: "connected"
+  },
+  {
+    id: "ecommerce-operations",
+    name: "电商店铺运营",
+    description: "围绕重点产品连接经营方案、执行、复盘和跨部门协同。",
+    route: "ecommerce-operations",
+    enabled: true,
+    status: "connected"
+  },
+  {
+    id: "performance-management",
+    name: "绩效管理",
+    description: "由人事管理考核方案、自评、主管评估、复核与归档。",
+    route: "performance-management",
+    enabled: true,
+    status: "connected"
   }
 ];
 

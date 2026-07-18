@@ -1575,3 +1575,56 @@ main { min-width: 0; overflow-x: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .data-mini-trend { scroll-behavior: auto; }
 }
+
+/* Ecommerce operations and performance management */
+.operations-page, .performance-page { max-width: 1480px; }
+.operations-page .page-identity, .performance-page .page-identity { width: fit-content; padding: 4px 8px; border-radius: 999px; background: var(--surface-subtle); color: var(--text-tertiary); font-size: 11px; font-weight: 700; }
+.operations-page h2, .performance-page h2 { margin: 0 0 var(--space-3); font-size: 15px; }
+.ops-notice { margin-bottom: var(--space-3); padding: 10px 12px; border: 1px solid color-mix(in oklch, var(--success), transparent 70%); border-radius: var(--radius-control); background: var(--success-soft); color: var(--text-primary); font-size: 12px; }
+.ops-notice.danger { border-color: color-mix(in oklch, var(--danger), transparent 70%); background: var(--danger-soft); }
+.ops-metric-grid { display: grid; grid-template-columns: repeat(4, minmax(160px, 1fr)); overflow: hidden; margin-bottom: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.ops-metric-grid article { min-height: 104px; padding: var(--space-4); display: grid; align-content: center; gap: 4px; border-right: 1px solid var(--border); }
+.ops-metric-grid article:last-child { border-right: 0; }
+.ops-metric-grid span, .ops-metric-grid small { color: var(--text-tertiary); font-size: 11px; }
+.ops-metric-grid strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.ops-two-column, .ops-workspace-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, .85fr); gap: var(--space-4); align-items: start; }
+.ops-focus-definition { margin-bottom: var(--space-4); }
+.ops-loop { margin: 0; padding-left: 20px; display: grid; gap: 10px; color: var(--text-secondary); font-size: 13px; }
+.ops-form, .ops-inline-form { display: grid; gap: var(--space-3); }
+.ops-form label, .ops-inline-form label { min-width: 0; display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.ops-form input, .ops-form select, .ops-form textarea, .ops-inline-form input, .ops-inline-form select, .ops-inline-form textarea { width: 100%; min-width: 0; min-height: var(--control-height); padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); }
+.ops-form textarea, .ops-inline-form textarea { min-height: 78px; resize: vertical; }
+.ops-field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.ops-card-list { min-width: 0; display: grid; gap: var(--space-3); }
+.ops-plan-card { min-width: 0; padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.ops-plan-card p { margin: 8px 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.ops-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); }
+.ops-card-heading > div { min-width: 0; display: grid; gap: 3px; }
+.ops-card-heading strong { overflow-wrap: anywhere; }
+.ops-card-heading small { color: var(--text-tertiary); }
+.ai-review { margin: var(--space-3) 0; padding: var(--space-3); border-left: 3px solid var(--accent); border-radius: 0 var(--radius-control) var(--radius-control) 0; background: var(--accent-soft); }
+.ai-review b { color: var(--accent); font-size: 12px; }
+.ai-review p { margin: 5px 0 0; }
+.ops-execution-form { margin-top: var(--space-3); padding-top: var(--space-3); display: grid; gap: var(--space-2); border-top: 1px solid var(--border); }
+.ops-execution-form h3 { margin: 0; font-size: 13px; }
+.ops-execution-form label { display: grid; gap: 4px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.ops-execution-form input, .ops-execution-form textarea { width: 100%; min-height: var(--control-height); padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); }
+.ops-execution-form textarea { min-height: 64px; resize: vertical; }
+.ops-execution-item { margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); }
+.operations-page button:focus-visible, .operations-page input:focus-visible, .operations-page select:focus-visible, .operations-page textarea:focus-visible, .performance-page button:focus-visible, .performance-page input:focus-visible, .performance-page textarea:focus-visible { outline: 2px solid color-mix(in oklch, var(--accent), white 28%); outline-offset: 2px; }
+
+@media (max-width: 900px) {
+  .operations-page, .performance-page { padding-left: var(--space-4); padding-right: var(--space-4); }
+  .ops-metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ops-metric-grid article:nth-child(2) { border-right: 0; }
+  .ops-metric-grid article:nth-child(-n + 2) { border-bottom: 1px solid var(--border); }
+  .ops-two-column, .ops-workspace-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+  .ops-metric-grid, .ops-field-row { grid-template-columns: 1fr; }
+  .ops-metric-grid article { border-right: 0; border-bottom: 1px solid var(--border); }
+  .ops-metric-grid article:last-child { border-bottom: 0; }
+  .ops-card-heading { align-items: stretch; flex-direction: column; }
+  .ops-form .btn, .ops-inline-form .btn { width: 100%; }
+}
