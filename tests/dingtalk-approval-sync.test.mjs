@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   getDingApprovalInstance,
   listDingApprovalInstanceIds,
@@ -316,6 +317,55 @@ test("approval sync reads detail instances sequentially with QPS pacing", async 
   assert.equal(maxActive, 1);
   assert.equal(delays.length, 40);
   assert.ok(delays.every(milliseconds => milliseconds >= 30));
+});
+
+test("approval sync can process one bounded workflow page for Cloudflare Workers", async () => {
+  const state = normalizeSupplyChainState({
+    settings: {
+      purchaseProcessCode: "PROC-PURCHASE",
+      paymentProcessCode: "PROC-PAYMENT",
+      purchaseCategoryPrefixes: []
+    }
+  });
+  const purchaseIds = Array.from({ length: 41 }, (_, index) => `purchase-${index + 1}`);
+  let requests = 0;
+  let paymentListRequests = 0;
+  const fetchImpl = async (_url, options) => {
+    requests += 1;
+    const body = JSON.parse(options.body);
+    if (body.process_code === "PROC-PAYMENT") {
+      paymentListRequests += 1;
+      return Response.json({ errcode: 0, result: { list: [] } });
+    }
+    if (body.process_code === "PROC-PURCHASE") {
+      const cursor = Number(body.cursor || 0);
+      const page = purchaseIds.slice(cursor, cursor + body.size);
+      const nextCursor = cursor + page.length < purchaseIds.length ? cursor + page.length : null;
+      return Response.json({ errcode: 0, result: { list: page, next_cursor: nextCursor } });
+    }
+    return Response.json({ errcode: 0, process_instance: { process_instance_id: body.process_instance_id, result: "agree" } });
+  };
+
+  const first = await syncSupplyApprovals({
+    state,
+    accessToken: "token",
+    startTime: 1,
+    endTime: 2,
+    fetchImpl,
+    sleepImpl: async () => {},
+    batch: { kind: "purchase", cursor: 0, size: 20 }
+  });
+
+  assert.equal(first.synced.purchase, 20);
+  assert.equal(first.synced.payment, 0);
+  assert.equal(paymentListRequests, 0);
+  assert.equal(requests, 21);
+  assert.deepEqual(first.continuation, { kind: "purchase", nextCursor: 20 });
+});
+
+test("approval endpoint forwards the client batch boundary to the sync service", () => {
+  const endpoint = readFileSync(new URL("../functions/api/supply-chain/approvals/sync.js", import.meta.url), "utf8");
+  assert.match(endpoint, /syncSupplyApprovals\(\{[^}]*batch:\s*body\.batch/s);
 });
 
 test("approval sync retries one throttled detail after DingTalk cooldown", async () => {

@@ -79,7 +79,7 @@ async function getApprovalInstancesWithPacing(accessToken, ids, fetchImpl, sleep
   return instances;
 }
 
-export async function syncSupplyApprovals({ state: inputState, accessToken, startTime, endTime, fetchImpl = fetch, sleepImpl = sleep }) {
+export async function syncSupplyApprovals({ state: inputState, accessToken, startTime, endTime, fetchImpl = fetch, sleepImpl = sleep, batch = null }) {
   const state = normalizeSupplyChainState(inputState);
   const settings = state.settings || {};
   if (!settings.purchaseProcessCode || !settings.paymentProcessCode) {
@@ -91,6 +91,13 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
     { kind: "purchase", processCode: settings.purchaseProcessCode, collection: "purchaseApprovals" },
     { kind: "payment", processCode: settings.paymentProcessCode, collection: "paymentApprovals" }
   ];
+  const batchKind = String(batch?.kind || "").trim();
+  const activeConfigs = batchKind ? configs.filter(config => config.kind === batchKind) : configs;
+  if (batchKind && !activeConfigs.length) {
+    const error = new Error("不支持的审批同步批次类型。");
+    error.status = 400;
+    throw error;
+  }
   const next = normalizeSupplyChainState(state);
   next.purchaseApprovals = next.purchaseApprovals.filter(record => belongsToSupplyChain(record, settings));
   const allowedPurchaseIds = new Set(next.purchaseApprovals.map(record => record.processInstanceId));
@@ -101,8 +108,22 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
   };
   const synced = { purchase: 0, payment: 0, unmapped: 0, skipped: 0 };
 
-  for (const config of configs) {
-    const ids = await listAllInstanceIds(accessToken, { processCode: config.processCode, startTime, endTime }, fetchImpl);
+  let continuation = null;
+  for (const config of activeConfigs) {
+    let ids;
+    if (batchKind) {
+      const page = await listDingApprovalInstanceIds(accessToken, {
+        processCode: config.processCode,
+        startTime,
+        endTime,
+        cursor: Math.max(0, Number(batch?.cursor) || 0),
+        size: Math.min(20, Math.max(1, Number(batch?.size) || 20))
+      }, fetchImpl);
+      ids = [...new Set(page.processInstanceIds)];
+      continuation = { kind: config.kind, nextCursor: page.nextCursor };
+    } else {
+      ids = await listAllInstanceIds(accessToken, { processCode: config.processCode, startTime, endTime }, fetchImpl);
+    }
     const instances = await getApprovalInstancesWithPacing(accessToken, ids, fetchImpl, sleepImpl);
     for (const instance of instances) {
       const normalized = normalizeDingSupplyApproval(instance, {
@@ -143,7 +164,7 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
     counts: synced,
     completedAt
   }, ...next.syncRuns].slice(0, 100);
-  return { state: next, synced };
+  return { state: next, synced, continuation };
 }
 
 function sessionDepartment(session = {}) {
@@ -161,6 +182,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (!db) return jsonResponse({ synced: false, message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB。" }, 501);
 
   const body = await request.json().catch(() => ({}));
+  if (!body.batch?.kind) return jsonResponse({ synced: false, message: "缺少审批同步批次参数。" }, 400);
   const now = Date.now();
   const startTime = Number(body.startTime) || now - 30 * 24 * 60 * 60 * 1000;
   const endTime = Number(body.endTime) || now;
@@ -168,9 +190,9 @@ export async function onRequest({ request, env, data = {} }) {
   try {
     stored = await readSupplyState(db);
     const accessToken = await getDingAccessToken(env);
-    const result = await syncSupplyApprovals({ state: stored.state, accessToken, startTime, endTime });
+    const result = await syncSupplyApprovals({ state: stored.state, accessToken, startTime, endTime, batch: body.batch });
     const saved = await writeSupplyState(db, result.state, String(data.session?.name || "系统同步").slice(0, 80));
-    return jsonResponse({ synced: true, counts: result.synced, ...saved });
+    return jsonResponse({ synced: true, counts: result.synced, continuation: result.continuation, ...saved });
   } catch (error) {
     if (stored?.state) {
       const failedAt = new Date().toISOString();
