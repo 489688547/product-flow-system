@@ -9,6 +9,7 @@ import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatfo
 import { canAccessCompanyPlatform, canAccessDataCenter, canAccessSupplyChain } from "./domain/permissions.js";
 import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
 import { DataCenterProvider } from "./state/DataCenterProvider.jsx";
+import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
@@ -23,10 +24,12 @@ function AuthenticatedApp() {
       <DataCenterProvider enabled={hasDataCenterAccess}>
         <SupplyChainProvider enabled={hasSupplyChainAccess}>
           <BrandContentProvider>
-            <PlatformProvider enabled={hasCompanyAccess}>
-              {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-              <App />
-            </PlatformProvider>
+            <CollaborationProvider>
+              <PlatformProvider enabled={hasCompanyAccess}>
+                {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+                <App />
+              </PlatformProvider>
+            </CollaborationProvider>
           </BrandContentProvider>
         </SupplyChainProvider>
       </DataCenterProvider>

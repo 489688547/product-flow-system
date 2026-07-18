@@ -55,7 +55,7 @@
   - 提交：`feat(api): persist scoped collaboration items`。
   - 实际结果：2026-07-18 已交付独立事项、参与者和活动表，服务端发起身份、部门范围查询、幂等创建、乐观锁、归档、状态动作和稳定错误结构；协同 API 与领域联合测试 14 项通过，相关文件 ESLint 通过。
 
-- [ ] 实现协同客户端和 Provider
+- [x] 实现协同客户端和 Provider
   - 依赖：v1 API。
   - 文件：`src/state/collaborationApi.js`、`CollaborationProvider.jsx`、`src/main.jsx` 和测试。
   - 输入：API 响应和当前会话。
@@ -64,6 +64,7 @@
   - 实现步骤：先客户端错误模型，再 Provider 加载、详情、写入和冲突状态。
   - 验证：Provider 与现有公司访问门测试通过。
   - 提交：`feat(collaboration): add scoped state provider`。
+  - 实际结果：2026-07-18 客户端保留服务端错误码与冲突详情，Provider 提供列表、详情、活动、创建、编辑和状态动作；它面向所有已登录员工挂载，并位于总经办 `PlatformProvider` 外侧。协同及相关 Provider 回归 17 项通过。
 
 - [ ] 交付部门协同工作台
   - 依赖：Provider。
