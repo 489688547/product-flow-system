@@ -66,7 +66,7 @@
   - 提交：`feat(collaboration): add scoped state provider`。
   - 实际结果：2026-07-18 客户端保留服务端错误码与冲突详情，Provider 提供列表、详情、活动、创建、编辑和状态动作；它面向所有已登录员工挂载，并位于总经办 `PlatformProvider` 外侧。协同及相关 Provider 回归 17 项通过。
 
-- [ ] 交付部门协同工作台
+- [x] 交付部门协同工作台
   - 依赖：Provider。
   - 文件：`src/features/collaboration/*`、路由、权限、样式和 UI 测试。
   - 输入：授权事项、活动和允许动作。
@@ -75,6 +75,7 @@
   - 实现步骤：状态视图、筛选、表格、详情、编辑和响应式。
   - 验证：UI、平台外壳和公司访问门测试通过。
   - 提交：`feat(collaboration): add department workbench`。
+  - 实际结果：2026-07-18 已交付六个责任视图、结构化筛选、1120px 高密度表格、响应式详情、活动时间线、新建/编辑/归档和受控状态动作；普通员工导航可见，生产默认由 feature flag 关闭。UI、Provider 与 API 联合回归 13 项及生产构建通过。
 
 - [ ] 接入四个 App 草稿适配器和三个真实 UI 入口
   - 依赖：协同工作台和真实 App 代码。

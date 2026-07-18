@@ -64,7 +64,7 @@ export function validatePatchInput(body, item, actor, now = new Date()) {
   if (!Number.isInteger(body.version) || !body.patch || typeof body.patch !== "object" || Array.isArray(body.patch)) invalid();
   assertKnownFields(body.patch, PATCH_FIELDS);
   const reason = String(body.reason || "").trim().slice(0, 1000);
-  if (["closed", "cancelled"].includes(item.status) || item.archivedAt) invalid("关闭、取消或归档事项不能普通编辑。");
+  if ((["closed", "cancelled"].includes(item.status) && body.patch.archived !== true) || item.archivedAt) invalid("关闭、取消或归档事项不能普通编辑。");
   const sensitive = ["ownerDepartment", "ownerUser", "dueAt"].some(key => key in body.patch);
   if (item.status !== "pending_acceptance" && sensitive && !reason) invalid("事项接收后修改责任或截止时间必须填写原因。");
   if (body.patch.dueAt && !validDate(body.patch.dueAt)) invalid("截止时间必须是带时区的有效时间。");

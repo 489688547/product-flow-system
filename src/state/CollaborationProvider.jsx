@@ -29,7 +29,7 @@ export function CollaborationProvider({ children, enabled = true }) {
   const [items, setItems] = useState([]);
   const [activitiesByItem, setActivitiesByItem] = useState({});
   const [scope, setScope] = useState({ mode: "department", departmentIds: [] });
-  const [query, setQuery] = useState({ view: "my_scope" });
+  const [query, setQuery] = useState({ view: "pending_acceptance" });
   const [loading, setLoading] = useState(enabled);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -62,7 +62,7 @@ export function CollaborationProvider({ children, enabled = true }) {
       setLoading(false);
       return undefined;
     }
-    loadItems({ view: "my_scope" }).catch(() => {});
+    loadItems({ view: "pending_acceptance" }).catch(() => {});
     return () => requestRef.current?.abort();
   }, [enabled]);
 

@@ -13,6 +13,7 @@ import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
+import "./features/collaboration/collaboration.css";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
