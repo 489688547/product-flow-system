@@ -59,12 +59,12 @@
   - 验证：UI/API/本地代理聚焦测试 14/14 通过；ESLint 与生产构建通过；视觉宽度检查在发布任务执行。
   - 提交：`feat: show environment readiness in handbook`。
 
-- [ ] 治理、发布与生产验收
+- [x] 治理、发布与生产验收
   - 依赖：全部功能任务。
   - 文件：`AGENTS.md`、`docs/platform/*.md`、`docs/decisions/2026-07-18-production-data-access.md`、`.github/workflows/quality.yml`、`CLOUDFLARE_PAGES.md`、`scripts/check-deployed-readiness.mjs`。
   - 输入：环境契约、平台能力、生产部署地址和当前指定账号。
   - 输出：跨分支门禁、生产令牌签发、部署与可验证运行状态。
   - 失败测试：治理检查发现共享能力未登记、部署检查发现生产阻断项时失败。
   - 实现步骤：更新 durable docs 和 CI，执行完整门禁，生成并签发令牌，合并 `main`，部署后检查与可回滚写入验收。
-  - 验证：Definition of Done、生产就绪接口、生产页面视觉检查、D1 审计与快照记录。
+  - 验证：Definition of Done 全绿；PR #9 质量门禁与 Cloudflare Pages 部署通过；生产就绪接口 4/4 能力就绪；真实写入与回滚各生成 1 条成功审计且验证标记已移除；1440px 与 390px 页面无横向溢出。
   - 提交：`docs: govern environment parity releases`。
