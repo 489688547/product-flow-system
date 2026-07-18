@@ -184,9 +184,12 @@ const integrationRegistry = {
         "scripts/check-deployed-readiness.mjs",
         "cloudflare-entry.html",
         "_redirects",
+        "wrangler.toml",
         ".github/workflows/**"
       ],
-      "envVars": [],
+      "envVars": [
+        "LOCAL_LIVE_D1_PREVIEW"
+      ],
       "domains": [
         "pages.dev",
         "api.cloudflare.com",
@@ -209,7 +212,8 @@ const integrationRegistry = {
       ],
       "evidence": [
         "functions/",
-        "scripts/prepare-pages-release.mjs"
+        "scripts/prepare-pages-release.mjs",
+        "wrangler.toml"
       ],
       "relations": [
         {
@@ -223,13 +227,14 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据和销售聚合。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合和数据中心元数据。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
         "组织数据",
         "销售聚合",
         "平台配置",
+        "数据中心元数据",
         "生产写入审计",
         "写前快照"
       ],
@@ -252,6 +257,8 @@ const integrationRegistry = {
         "functions/api/state.js",
         "functions/api/platform.js",
         "functions/api/sales.js",
+        "functions/api/data-center.js",
+        "functions/api/data-center/**",
         "functions/api/auth/**",
         "functions/api/dingtalk/org/**",
         "functions/api/platform/_shared/productionDataAccess.js",
@@ -269,6 +276,7 @@ const integrationRegistry = {
         "/api/state",
         "/api/platform",
         "/api/sales",
+        "/api/data-center",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/"
@@ -287,6 +295,8 @@ const integrationRegistry = {
         "functions/api/state.js",
         "functions/api/platform.js",
         "functions/api/sales.js",
+        "functions/api/data-center.js",
+        "functions/api/data-center/",
         "functions/api/platform/_shared/productionDataAccess.js",
         "migrations/0001_production_data_access.sql"
       ],

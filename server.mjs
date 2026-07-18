@@ -27,11 +27,16 @@ import {
   pullKuaimaiDay,
   refreshKuaimaiSession
 } from "./functions/api/kuaimai/_shared/kuaimai.js";
+import { syncSupplyApprovals } from "./functions/api/supply-chain/approvals/sync.js";
+import { normalizeSupplyChainState } from "./src/domain/supplyChain.js";
+import { normalizeDataCenterState } from "./src/domain/dataCenter.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.DINGTALK_PORT || 8127);
 const LOCAL_DATA_DIR = path.join(__dirname, ".local-data");
 const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
+const LOCAL_SUPPLY_STATE_PATH = path.join(LOCAL_DATA_DIR, "supply-chain-state.json");
+const LOCAL_DATA_CENTER_STATE_PATH = path.join(LOCAL_DATA_DIR, "data-center-state.json");
 let orgCache = null;
 let productionDataClient;
 
@@ -87,6 +92,42 @@ async function readLocalCompanyState() {
   } catch {
     return null;
   }
+}
+
+async function readLocalSupplyState() {
+  try {
+    const raw = JSON.parse(await readFile(LOCAL_SUPPLY_STATE_PATH, "utf8"));
+    return normalizeSupplyChainState(raw.state || raw);
+  } catch {
+    return normalizeSupplyChainState();
+  }
+}
+
+async function writeLocalSupplyState(state, updatedBy = "") {
+  const normalized = normalizeSupplyChainState(state);
+  const updatedAt = new Date().toISOString();
+  const payload = { state: normalized, version: normalized.version, updatedAt, updatedBy: String(updatedBy || "").slice(0, 80) };
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_SUPPLY_STATE_PATH, JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+async function readLocalDataCenterState() {
+  try {
+    const raw = JSON.parse(await readFile(LOCAL_DATA_CENTER_STATE_PATH, "utf8"));
+    return normalizeDataCenterState(raw.state || raw);
+  } catch {
+    return normalizeDataCenterState();
+  }
+}
+
+async function writeLocalDataCenterState(state, updatedBy = "") {
+  const normalized = normalizeDataCenterState(state);
+  const updatedAt = new Date().toISOString();
+  const payload = { state: normalized, version: normalized.version, updatedAt, updatedBy: String(updatedBy || "").slice(0, 80) };
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_DATA_CENTER_STATE_PATH, JSON.stringify(payload, null, 2));
+  return payload;
 }
 
 function validateCompanyState(state) {
@@ -271,6 +312,75 @@ function blockExternalAction(res) {
     message: "测试环境只允许修改数据库，不能执行真实外部平台操作。",
     error: { code: "EXTERNAL_ACTION_DISABLED_IN_TEST" }
   });
+}
+
+async function handleSupplyState(req, res) {
+  try {
+    if (req.method === "GET") {
+      const state = await readLocalSupplyState();
+      json(res, 200, { synced: Boolean(state.updatedAt), state, version: state.version, updatedAt: state.updatedAt || "" });
+      return;
+    }
+    if (req.method !== "POST") {
+      json(res, 405, { message: "Method not allowed" });
+      return;
+    }
+    const body = await readBody(req);
+    if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+      json(res, 400, { synced: false, message: "缺少有效的供应链数据。" });
+      return;
+    }
+    const saved = await writeLocalSupplyState(body.state, body.updatedBy || "本地开发");
+    json(res, 200, { synced: true, version: saved.version, updatedAt: saved.updatedAt });
+  } catch (error) {
+    json(res, 500, { synced: false, message: error.message || "本地供应链数据保存失败。" });
+  }
+}
+
+async function handleDataCenterState(req, res) {
+  try {
+    if (req.method === "GET") {
+      const state = await readLocalDataCenterState();
+      json(res, 200, { synced: Boolean(state.updatedAt), state, version: state.version, updatedAt: state.updatedAt || "" });
+      return;
+    }
+    if (req.method !== "POST") {
+      json(res, 405, { message: "Method not allowed" });
+      return;
+    }
+    const body = await readBody(req);
+    if (!body.state || typeof body.state !== "object" || Array.isArray(body.state)) {
+      json(res, 400, { synced: false, message: "缺少有效的数据中心元数据。" });
+      return;
+    }
+    const saved = await writeLocalDataCenterState(body.state, body.updatedBy || "本地开发");
+    json(res, 200, { synced: true, version: saved.version, updatedAt: saved.updatedAt });
+  } catch (error) {
+    json(res, 500, { synced: false, message: error.message || "本地数据中心元数据保存失败。" });
+  }
+}
+
+async function handleSupplyApprovalSync(req, res) {
+  if (req.method !== "POST") {
+    json(res, 405, { synced: false, message: "Method not allowed" });
+    return;
+  }
+  try {
+    const body = await readBody(req);
+    const now = Date.now();
+    const state = await readLocalSupplyState();
+    const accessToken = await getDingAccessToken(process.env);
+    const result = await syncSupplyApprovals({
+      state,
+      accessToken,
+      startTime: Number(body.startTime) || now - 30 * 24 * 60 * 60 * 1000,
+      endTime: Number(body.endTime) || now
+    });
+    const saved = await writeLocalSupplyState(result.state, "本地钉钉同步");
+    json(res, 200, { synced: true, counts: result.synced, updatedAt: saved.updatedAt, version: saved.version });
+  } catch (error) {
+    json(res, error.status || 502, { synced: false, message: error.message || "本地钉钉审批同步失败。" });
+  }
 }
 
 async function handleDingLogin(req, res) {
@@ -514,6 +624,22 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/platform/v1/production-data/rollback") {
     await handleProductionRollback(req, res);
+    return;
+  }
+  if (url.pathname === "/api/supply-chain") {
+    await handleSupplyState(req, res);
+    return;
+  }
+  if (url.pathname === "/api/supply-chain/approvals/sync") {
+    await handleSupplyApprovalSync(req, res);
+    return;
+  }
+  if (url.pathname === "/api/data-center") {
+    await handleDataCenterState(req, res);
+    return;
+  }
+  if (url.pathname === "/api/data-center/sales") {
+    json(res, 501, { synced: false, message: "本地测试模式没有 D1 数据库，数据中心销售读取将降级到浏览器本地仓库。" });
     return;
   }
   if (url.pathname === "/api/sales") {

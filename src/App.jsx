@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BookOpenText, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChevronDown, ClipboardList, GitBranch, Home, LayoutDashboard, LogOut, PanelsTopLeft, Settings, Target } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChevronDown, ClipboardCheck, ClipboardList, Database, FileClock, GitBranch, Home, LayoutDashboard, LogOut, PackageSearch, PanelsTopLeft, Plug, Ruler, Settings, Share2, ShieldCheck, Target } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -27,6 +27,32 @@ const OperatingReviewPage = lazyNamed(() => import("./features/reviews/Operating
 const AppCenterPage = lazyNamed(() => import("./features/platform/AppCenterPage.jsx"), "AppCenterPage");
 const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/IncentiveProjectsPage.jsx"), "IncentiveProjectsPage");
 const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
+const SupplyChainAppPage = lazyNamed(() => import("./features/supply-chain/SupplyChainAppPage.jsx"), "SupplyChainAppPage");
+const DataCenterAppPage = lazyNamed(() => import("./features/data-center/DataCenterAppPage.jsx"), "DataCenterAppPage");
+
+const SUPPLY_CHAIN_NAV = [
+  ["supply-overview", "供应链总览", LayoutDashboard, "供应链管理", "overview"],
+  ["supply-suppliers", "供应商管理", Building2, "供应链管理", "suppliers"],
+  ["supply-approvals", "采购与付款", ClipboardCheck, "供应链管理", "approvals"],
+  ["supply-products", "产品供应链", PackageSearch, "供应链管理", "products"],
+  ["supply-inventory", "库存盘点", Boxes, "供应链管理", "inventory"],
+  ["supply-quality", "质量管理", ShieldCheck, "供应链管理", "quality"],
+  ["supply-records", "同步记录", FileClock, "供应链管理", "records"],
+  ["supply-settings", "设置", Settings, "供应链管理", "settings"]
+];
+const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , , , section]) => [screen, section]));
+
+const DATA_CENTER_NAV = [
+  ["data-overview", "数据总览", Database, "数据中心", "overview"],
+  ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
+  ["data-sources", "数据接入", Plug, "数据中心", "sources"],
+  ["data-metrics", "指标管理", Ruler, "数据中心", "metrics"],
+  ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],
+  ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
+  ["data-services", "数据服务", Share2, "数据中心", "services"],
+  ["data-settings", "设置", Settings, "数据中心", "settings"]
+];
+const DATA_CENTER_SCREEN_TO_SECTION = new Map(DATA_CENTER_NAV.map(([screen, , , , section]) => [screen, section]));
 
 const COMPANY_NAV = [
   ["home", "公司首页", LayoutDashboard, "公司经营"],
@@ -35,11 +61,13 @@ const COMPANY_NAV = [
   ["incentives", "部门激励", BadgeDollarSign, "公司经营"],
   ["reviews", "经营检查", CalendarCheck, "公司经营"],
   ["apps", "业务 Apps", AppWindow, "公司经营"],
+  ...SUPPLY_CHAIN_NAV,
   ["dashboard", "产品总览", PanelsTopLeft, "产品全周期"],
   ["demands", "需求池", ClipboardList, "产品全周期"],
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
+  ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
@@ -50,6 +78,8 @@ const PRODUCT_NAV = [
   ["planning", "产品规划", CalendarRange],
   ["progress", "产品进度", GitBranch],
   ["archive", "产品档案", Archive],
+  ...SUPPLY_CHAIN_NAV,
+  ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText],
   ["issues", "问题反馈", Bug],
   ["settings", "设置", Settings]
@@ -57,12 +87,23 @@ const PRODUCT_NAV = [
 const HIDDEN_SCREENS = new Set(["packages"]);
 const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NAV.map(([key]) => key), ...HIDDEN_SCREENS]);
 
+function resolveScreen(screen) {
+  if (screen === "supply-chain") return "supply-overview";
+  return screen === "data-center" ? "data-overview" : screen;
+}
+
 function routeFromHash() {
   const route = parseAppHash(window.location.hash);
+  const screen = resolveScreen(route.screen);
   return {
-    screen: VALID_SCREENS.has(route.screen) ? route.screen : "home",
+    screen: VALID_SCREENS.has(screen) ? screen : "home",
     detail: route.detail
   };
+}
+
+function navigationPermissionKey(screen) {
+  if (SUPPLY_CHAIN_SCREEN_TO_SECTION.has(screen)) return "supply-chain";
+  return DATA_CENTER_SCREEN_TO_SECTION.has(screen) ? "data-center" : screen;
 }
 
 export default function App() {
@@ -76,7 +117,7 @@ export default function App() {
   const { state, loading, sharedError, currentUser, setCurrentProduct } = useProductFlow();
   const hasCompanyAccess = canAccessCompanyPlatform(sessionUser);
   const navigation = hasCompanyAccess ? COMPANY_NAV : PRODUCT_NAV;
-  const visibleNavigation = useMemo(() => navigation.filter(([key]) => canViewNavigation(state.settings?.permissions, currentUser, key)), [currentUser, navigation, state.settings?.permissions]);
+  const visibleNavigation = useMemo(() => navigation.filter(([key]) => canViewNavigation(state.settings?.permissions, currentUser, navigationPermissionKey(key))), [currentUser, navigation, state.settings?.permissions]);
   const visibleScreenKeys = useMemo(() => new Set(visibleNavigation.map(([key]) => key)), [visibleNavigation]);
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
   const screenAllowed = visibleScreenKeys.has(screen) || (screen === "packages" && visibleScreenKeys.has("archive"));
@@ -105,10 +146,13 @@ export default function App() {
     if (!screenAllowed) navigate(defaultScreen);
   }, [defaultScreen, hasCompanyAccess, loading, platformLoading, screenAllowed]);
   function showScreen(nextScreen, detail = "") {
-    if (!VALID_SCREENS.has(nextScreen)) return;
-    if (!visibleScreenKeys.has(nextScreen) && !(nextScreen === "packages" && visibleScreenKeys.has("archive"))) return;
-    setRoute({ screen: nextScreen, detail });
-    const nextHash = formatAppHash(nextScreen, detail);
+    const resolvedScreen = resolveScreen(nextScreen);
+    if (!VALID_SCREENS.has(resolvedScreen)) return;
+    if (!visibleScreenKeys.has(resolvedScreen) && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
+    setRoute({ screen: resolvedScreen, detail });
+    window.scrollTo({ top: 0, behavior: "auto" });
+    document.body.scrollTo({ top: 0, behavior: "auto" });
+    const nextHash = formatAppHash(resolvedScreen, detail);
     if (window.location.hash !== nextHash) window.location.hash = nextHash;
   }
   function navigate(nextScreen) {
@@ -137,6 +181,8 @@ export default function App() {
     issues: <IssuePage />,
     settings: <SettingsPage />
   };
+  const supplySection = SUPPLY_CHAIN_SCREEN_TO_SECTION.get(activeScreen);
+  const dataSection = DATA_CENTER_SCREEN_TO_SECTION.get(activeScreen);
 
   return (
     <div className="app-shell">
@@ -164,7 +210,7 @@ export default function App() {
           </div>
         </header>
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
-          {pages[activeScreen]}
+          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
       <FloatingIssueButton />

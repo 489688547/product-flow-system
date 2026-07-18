@@ -34,6 +34,7 @@
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
+| `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -54,6 +55,15 @@
 - `PRODUCTION_SNAPSHOT_NOT_FOUND` / `PRODUCTION_ROLLBACK_NOT_AVAILABLE`：写前快照不存在或不可回滚。
 - `ENVIRONMENT_READINESS_FAILED`：环境能力检查失败。
 - `EXTERNAL_ACTION_DISABLED_IN_TEST`：本地测试试图执行真实外部平台写操作。
+
+数据中心 API 使用：
+
+- `AUTH_SESSION_REQUIRED`：没有有效公司会话。
+- `PERMISSION_VIEW_DENIED`：当前部门无权查看数据中心。
+- `PERMISSION_WRITE_DENIED`：当前身份不能维护数据中心元数据。
+- `DATA_STATE_INVALID`：提交的元数据状态结构无效。
+- `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
+- `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 
 ## HTTP 状态
 
