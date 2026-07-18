@@ -16,13 +16,23 @@ const BRAND_ROUTES = [
   "content-issues",
   "content-settings"
 ];
+const BRAND_PAGES = [
+  "BrandContentOverviewPage",
+  "BrandContentWorkbenchPage",
+  "BrandAssetLibraryPage",
+  "BrandAdvertisingReviewPage",
+  "BrandAccountPage",
+  "BrandDecisionPage",
+  "BrandTeamPage",
+  "BrandDataIssuesPage",
+  "BrandContentSettingsPage"
+];
 
 test("brand content uses nine left routes and no top subnavigation", () => {
   const app = read("src/App.jsx");
   assert.match(app, /品牌内容协同/);
   for (const route of BRAND_ROUTES) assert.match(app, new RegExp(route));
-  const page = read("src/features/brand-content/BrandContentPlaceholderPage.jsx");
-  assert.doesNotMatch(page, /role="tablist"|brand-content-tabs|顶部导航/);
+  assert.doesNotMatch(app, /role="tablist"|brand-content-tabs|brand-subnav/);
   assert.match(app, /sidebar-section-label/);
 });
 
@@ -45,6 +55,8 @@ test("brand content is registered as a business App", () => {
 
 test("all brand routes are lazy loaded instead of joining the initial bundle", () => {
   const app = read("src/App.jsx");
-  assert.match(app, /import\("\.\/features\/brand-content\/BrandContentPlaceholderPage\.jsx"\)/);
-  assert.doesNotMatch(app, /^import .*BrandContentPlaceholderPage/m);
+  for (const page of BRAND_PAGES) {
+    assert.match(app, new RegExp(`import\\("\\.\\/features\\/brand-content\\/${page}\\.jsx"\\)`));
+    assert.doesNotMatch(app, new RegExp(`^import .*${page}`, "m"));
+  }
 });

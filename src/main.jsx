@@ -11,6 +11,7 @@ import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
 import { DataCenterProvider } from "./state/DataCenterProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
+import "./features/brand-content/brand-content.css";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
