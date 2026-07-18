@@ -59,6 +59,7 @@ test("local real-data panel is explicitly read-only and development-only", () =>
 
 test("strategy center governs company results and department commitments", () => {
   const page = read("src/features/strategy/StrategyCenterPage.jsx");
+  const strategyModal = read("src/features/strategy/StrategyEditorModal.jsx");
   const resultModal = read("src/features/strategy/RequiredResultModal.jsx");
   const commitmentModal = read("src/features/strategy/DepartmentCommitmentModal.jsx");
   assert.match(page, /公司战略/);
@@ -66,8 +67,24 @@ test("strategy center governs company results and department commitments", () =>
   assert.match(page, /部门承诺/);
   assert.match(resultModal, /验收标准/);
   assert.match(commitmentModal, /月度里程碑/);
+  assert.match(commitmentModal, /requiredResultId/);
+  assert.match(commitmentModal, /关联必达结果/);
+  assert.match(commitmentModal, /item\.strategyId === form\.strategyId/);
+  assert.match(page, /requiredResults=\{state\.requiredResults/);
+  assert.match(page, /待关联必达结果/);
+  assert.match(page, /任务进度/);
   assert.match(page, /总经办审核/);
   assert.match(page, /老板确认/);
+  assert.match(page, /新建公司战略/);
+  assert.match(page, /StrategyEditorModal/);
+  assert.match(page, /saveStrategy/);
+  assert.match(page, /archiveStrategy/);
+  assert.match(page, /archiveRequiredResult/);
+  assert.match(page, /archiveDepartmentCommitment/);
+  assert.match(page, /ConfirmDialog/);
+  assert.doesNotMatch(page, /attainment-rule/);
+  assert.doesNotMatch(page, /达成规则：全部必达结果核验通过/);
+  assert.match(strategyModal, /战略意图/);
 });
 
 test("key project workspace manages milestones risks and decisions", () => {
@@ -77,6 +94,10 @@ test("key project workspace manages milestones risks and decisions", () => {
   assert.match(detail, /关键里程碑/);
   assert.match(detail, /风险与阻塞/);
   assert.match(detail, /待决策/);
+  assert.match(page, /archiveProject/);
+  assert.match(detail, /archiveProjectChild/);
+  assert.match(detail, /编辑里程碑/);
+  assert.match(detail, /归档风险/);
 });
 
 test("operating reviews retain weekly updates and monthly snapshots", () => {
@@ -87,6 +108,10 @@ test("operating reviews retain weekly updates and monthly snapshots", () => {
   assert.match(modal, /本周关键变化/);
   assert.match(modal, /当前最大风险/);
   assert.match(modal, /需要协调或决策/);
+  assert.match(page, /archiveMonthlyReport/);
+  assert.match(page, /archiveStatusUpdate/);
+  assert.match(page, /saveStatusUpdate/);
+  assert.match(page, /ConfirmDialog/);
 });
 
 test("business App center keeps Product Lifecycle as the first connected App", () => {

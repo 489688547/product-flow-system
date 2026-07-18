@@ -1,9 +1,10 @@
-import { CalendarCheck, CheckCircle2, Clock3, FileText, History, LockKeyhole, Plus } from "lucide-react";
+import { CalendarCheck, CheckCircle2, Clock3, FileText, History, LockKeyhole, Pencil, Plus, Trash2 } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { canManagePermissions } from "../../domain/permissions.js";
 import { usePlatform } from "../../state/PlatformProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { HealthBadge } from "../company/HealthBadge.jsx";
@@ -85,10 +86,11 @@ function ReportActionModal({ action, onClose, onConfirm }) {
   );
 }
 
-function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensureReports, saveMonthlyReport, transitionReport, appendReportCorrection }) {
+function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensureReports, saveMonthlyReport, transitionReport, appendReportCorrection, archiveMonthlyReport }) {
   const [month, setMonth] = useState(previousMonth);
   const [editor, setEditor] = useState(null);
   const [action, setAction] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const departments = useMemo(() => [...new Set((orgCache?.departments || [])
     .map(item => typeof item === "string" ? item : item?.name)
     .map(name => String(name || "").replaceAll("产品团队", "产品部").trim())
@@ -96,7 +98,7 @@ function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensur
   useEffect(() => {
     if (executive && departments.length) ensureReports(month, departments);
   }, [departments, ensureReports, executive, month]);
-  const reports = state.monthlyReports.filter(report => report.month === month);
+  const reports = state.monthlyReports.filter(report => report.month === month && !report.archived);
   const visible = executive ? reports : reports.filter(report => report.department === currentUser?.department || report.owner === currentUser?.name);
   const counts = Object.fromEntries(Object.keys(REPORT_STATUS).map(status => [status, reports.filter(item => item.status === status).length]));
   const confirmAction = text => {
@@ -119,7 +121,7 @@ function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensur
         <span>{report.owner || "待指定"}</span>
         {reportStatus(report.status)}
         <div className="commitment-actions">
-          {["draft", "returned"].includes(report.status) ? <><Button className="compact" onClick={() => setEditor(report)}>填写</Button><Button className="compact" variant="primary" disabled={!report.keyResults || !report.nextMonthPriorities} onClick={() => transitionReport(report.id, "submit")}>提交</Button></> : null}
+          {["draft", "returned"].includes(report.status) ? <><Button className="compact" onClick={() => setEditor(report)}>填写</Button><Button className="compact" variant="primary" disabled={!report.keyResults || !report.nextMonthPriorities} onClick={() => transitionReport(report.id, "submit")}>提交</Button>{report.status === "draft" ? <Button className="compact" variant="danger" onClick={() => setDeleting(report)}><Trash2 size={14} />归档</Button> : null}</> : null}
           {report.status === "submitted" && executive ? <><Button className="compact" onClick={() => setAction({ type: "return", report })}>退回</Button><Button className="compact" variant="primary" onClick={() => transitionReport(report.id, "approve")}>审核通过</Button></> : null}
           {report.status === "approved" && executive ? <><Button className="compact" onClick={() => setAction({ type: "return", report })}>退回</Button><Button className="compact" variant="primary" onClick={() => setAction({ type: "freeze", report })}><LockKeyhole size={14} />冻结</Button></> : null}
           {report.status === "frozen" ? <Button className="compact" onClick={() => setAction({ type: "correction", report })}>追加更正</Button> : null}
@@ -131,20 +133,24 @@ function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensur
     </section>
     <MonthlyReportEditor open={Boolean(editor)} report={editor} onClose={() => setEditor(null)} onSave={form => { saveMonthlyReport({ ...form, owner: form.owner || currentUser?.name || "", ownerUnionId: form.ownerUnionId || currentUser?.unionId || currentUser?.unionid || "", reviewerName: form.reviewerName || "周荣庆", freezerName: form.freezerName || "周荣庆", dueDate: form.dueDate || `${month}-05` }); setEditor(null); }} />
     <ReportActionModal action={action} onClose={() => setAction(null)} onConfirm={confirmAction} />
+    <ConfirmDialog open={Boolean(deleting)} title="归档草稿月报" message={`${deleting?.department || "部门"} · ${deleting?.month || ""}`} description="只有草稿月报可以归档；已提交或已冻结的管理记录不会被删除。" confirmLabel="确认归档" onClose={() => setDeleting(null)} onConfirm={() => { archiveMonthlyReport(deleting.id); setDeleting(null); }} />
   </>;
 }
 
-function WeeklyReviewWorkspace({ state, currentUser, executive, dispatch }) {
-  const [updateOpen, setUpdateOpen] = useState(false);
+function WeeklyReviewWorkspace({ state, currentUser, executive, saveStatusUpdate, archiveStatusUpdate }) {
+  const [editor, setEditor] = useState(null);
+  const [deleting, setDeleting] = useState(null);
   const ownedProjects = state.projects.filter(project => executive || [project.owner, project.sponsor].includes(currentUser?.name));
+  const updates = state.statusUpdates.filter(update => !update.archived).slice(0, 20);
   return <>
     <div className="review-cadence-strip"><span><Clock3 size={18} /><strong>每周</strong><small>负责人确认变化、风险与协调请求</small></span><span><CalendarCheck size={18} /><strong>每月</strong><small>部门手工汇报，总经办审核后会议冻结</small></span><span><History size={18} /><strong>长期</strong><small>冻结内容不可覆盖，仅可追加更正</small></span></div>
     <section className="company-work-section">
-      <div className="panel-title"><CheckCircle2 size={18} /><h2>本周确认记录</h2><Button className="compact" variant="primary" onClick={() => setUpdateOpen(true)}><Plus size={15} />提交状态</Button></div>
-      {state.statusUpdates.slice(0, 20).map(update => { const project = state.projects.find(item => item.id === update.projectId); return <div className="review-update-row" key={update.id}><span className="review-update-date">{update.week?.slice(5) || "本周"}</span><span><strong>{project?.name || "未关联项目"}</strong><small>{update.owner} · {update.change}</small><em>{update.largestRisk}</em></span>{update.needsDecision ? <span className="review-request">需决策</span> : update.needsCoordination ? <span className="review-request">需协调</span> : null}</div>; })}
-      {!state.statusUpdates.length ? <div className="empty-state">尚未提交周度状态确认。</div> : null}
+      <div className="panel-title"><CheckCircle2 size={18} /><h2>本周确认记录</h2><Button className="compact" variant="primary" onClick={() => setEditor({ record: null })}><Plus size={15} />提交状态</Button></div>
+      {updates.map(update => { const project = state.projects.find(item => item.id === update.projectId); const canEdit = executive || update.owner === currentUser?.name; return <div className="review-update-row" key={update.id}><span className="review-update-date">{update.week?.slice(5) || "本周"}</span><span><strong>{project?.name || "未关联项目"}</strong><small>{update.owner} · {update.change}</small><em>{update.largestRisk}</em></span>{update.needsDecision ? <span className="review-request">需决策</span> : update.needsCoordination ? <span className="review-request">需协调</span> : null}{canEdit ? <span className="row-actions"><button type="button" aria-label="编辑周度确认" onClick={() => setEditor({ record: update })}><Pencil size={14} /></button><button type="button" aria-label="归档周度确认" onClick={() => setDeleting(update)}><Trash2 size={14} /></button></span> : null}</div>; })}
+      {!updates.length ? <div className="empty-state">尚未提交周度状态确认。</div> : null}
     </section>
-    <StatusUpdateModal open={updateOpen} projects={ownedProjects} currentUser={currentUser} onClose={() => setUpdateOpen(false)} onSave={form => { dispatch({ type: "append_status_update", record: { ...form, id: `status-${Date.now()}`, week: new Date().toISOString().slice(0, 10) } }); setUpdateOpen(false); }} />
+    <StatusUpdateModal open={Boolean(editor)} record={editor?.record} projects={ownedProjects} currentUser={currentUser} onClose={() => setEditor(null)} onSave={form => { saveStatusUpdate({ ...form, id: form.id || `status-${Date.now()}`, week: form.week || new Date().toISOString().slice(0, 10) }); setEditor(null); }} />
+    <ConfirmDialog open={Boolean(deleting)} title="归档周度确认" message={state.projects.find(item => item.id === deleting?.projectId)?.name || "该周度确认"} description="归档后不再显示在经营检查中，历史审计记录会保留。" confirmLabel="确认归档" onClose={() => setDeleting(null)} onConfirm={() => { archiveStatusUpdate(deleting.id); setDeleting(null); }} />
   </>;
 }
 
@@ -156,7 +162,7 @@ function HistoryWorkspace({ state }) {
 }
 
 export function OperatingReviewPage() {
-  const { state, dispatch, ensureReports, saveMonthlyReport, transitionReport, appendReportCorrection } = usePlatform();
+  const { state, ensureReports, saveMonthlyReport, transitionReport, appendReportCorrection, archiveMonthlyReport, saveStatusUpdate, archiveStatusUpdate } = usePlatform();
   const { currentUser, orgCache } = useProductFlow();
   const [view, setView] = useState("reports");
   const executive = canManagePermissions(currentUser);
@@ -168,7 +174,7 @@ export function OperatingReviewPage() {
         <button type="button" role="tab" aria-selected={view === "weekly"} className={view === "weekly" ? "active" : ""} onClick={() => setView("weekly")}><Clock3 size={15} />周度确认</button>
         <button type="button" role="tab" aria-selected={view === "history"} className={view === "history" ? "active" : ""} onClick={() => setView("history")}><History size={15} />历史快照</button>
       </div>
-      {view === "reports" ? <MonthlyReportWorkspace state={state} currentUser={currentUser} orgCache={orgCache} executive={executive} ensureReports={ensureReports} saveMonthlyReport={saveMonthlyReport} transitionReport={transitionReport} appendReportCorrection={appendReportCorrection} /> : view === "weekly" ? <WeeklyReviewWorkspace state={state} currentUser={currentUser} executive={executive} dispatch={dispatch} /> : <HistoryWorkspace state={state} />}
+      {view === "reports" ? <MonthlyReportWorkspace state={state} currentUser={currentUser} orgCache={orgCache} executive={executive} ensureReports={ensureReports} saveMonthlyReport={saveMonthlyReport} transitionReport={transitionReport} appendReportCorrection={appendReportCorrection} archiveMonthlyReport={archiveMonthlyReport} /> : view === "weekly" ? <WeeklyReviewWorkspace state={state} currentUser={currentUser} executive={executive} saveStatusUpdate={saveStatusUpdate} archiveStatusUpdate={archiveStatusUpdate} /> : <HistoryWorkspace state={state} />}
     </section>
   );
 }
