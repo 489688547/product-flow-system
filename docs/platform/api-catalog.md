@@ -9,6 +9,8 @@
 | `/api/state` | 读取和保存产品全周期共享状态 | 需要公司会话；写操作拒绝只读身份；大状态按 D1 行限制分片 |
 | `/api/platform` | 读取和保存公司战略执行实体 | 仅总经办范围；实体分记录存储；写操作需要非只读身份 |
 | `/api/brand-content` | 读取品牌内容状态并应用单个领域动作 | 全员登录后可读；品牌、运营和总经办按动作权限写入；独立 D1 状态表；乐观版本冲突返回 409 |
+| `/api/supply-chain` | 读取和保存供应链独立状态 | 需要公司会话；按部门裁剪金额和成本字段；写入仅允许所属部门集合 |
+| `/api/supply-chain/approvals/sync` | 分批读取钉钉采购和付款审批并写入供应链状态 | 仅总经办、供应链、采购和财务；每次只读取一个流程的一页，客户端先完成采购再完成付款 |
 | `/api/sales` | 查询产品销售聚合 | 需要公司会话；时间和平台口径见产品数据定义 |
 | `/api/platform/v1/integrations` | 读取和维护内部平台资料 | 全员可读；仅总经办非只读身份可写；字段白名单；D1 审计只记录字段名 |
 | `/api/platform/v1/environment-readiness` | 读取当前或生产环境脱敏就绪状态 | 员工会话或 read 个人令牌；只返回配置名称与存在性 |
@@ -79,6 +81,20 @@
 兼容策略：接口当前是品牌功能内部 API，不是数据中心共享契约。每次写入必须携带上次读取的 `version`；版本落后返回 `409 BRAND_CONTENT_VERSION_CONFLICT`，客户端重新读取后由用户重试，服务端不静默覆盖。回滚时可隐藏品牌 App 并停止写入，`brand_content_state` 记录继续保留。
 
 主要错误码：`AUTH_SESSION_REQUIRED`、`BRAND_CONTENT_STORAGE_UNAVAILABLE`、`BRAND_CONTENT_WRITE_DENIED`、`BRAND_CONTENT_ACTION_DENIED`、`BRAND_CONTENT_ACTION_INVALID`、`BRAND_CONTENT_VERSION_INVALID`、`BRAND_CONTENT_VERSION_CONFLICT`、`BRAND_CONTENT_STATE_CORRUPT`。错误响应包含 `requestId` 和 `retryable`，不包含凭据、平台原始响应或 NAS 路径外的本地敏感信息。
+
+### 供应链审批同步契约
+
+`POST /api/supply-chain/approvals/sync` 接收固定的 `startTime`、`endTime` 和批次参数：
+
+```json
+{
+  "startTime": 1784304000000,
+  "endTime": 1786895999000,
+  "batch": { "kind": "purchase", "cursor": 0, "size": 18 }
+}
+```
+
+`kind` 只允许 `purchase` 或 `payment`，`size` 最大为 20。响应通过 `continuation.nextCursor` 指示下一页；前端在同一时间范围内先耗尽采购申请页，再耗尽付款申请页，避免付款在采购尚未写入时被误判为非供应链记录。单个 Worker 调用只读取一个流程的一页，确保钉钉详情请求不超过 Cloudflare 子请求上限。每批成功后立即写入 D1，重复同步按审批实例 ID 幂等更新。
 
 ## 认证
 
