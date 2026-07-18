@@ -5,19 +5,27 @@ import { AuthProvider, useAuth } from "./state/AuthProvider.jsx";
 import { AuthGate } from "./features/auth/AuthGate.jsx";
 import { PlatformProvider } from "./state/PlatformProvider.jsx";
 import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatformBridge.jsx";
-import { canAccessCompanyPlatform } from "./domain/permissions.js";
+import { canAccessCompanyPlatform, canAccessDataCenter, canAccessSupplyChain } from "./domain/permissions.js";
+import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
+import { DataCenterProvider } from "./state/DataCenterProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
   const hasCompanyAccess = canAccessCompanyPlatform(user);
+  const hasSupplyChainAccess = canAccessSupplyChain(user);
+  const hasDataCenterAccess = canAccessDataCenter(user);
   return (
     <ProductFlowProvider>
-      <PlatformProvider enabled={hasCompanyAccess}>
-        {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-        <App />
-      </PlatformProvider>
+      <DataCenterProvider enabled={hasDataCenterAccess}>
+        <SupplyChainProvider enabled={hasSupplyChainAccess}>
+          <PlatformProvider enabled={hasCompanyAccess}>
+            {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+            <App />
+          </PlatformProvider>
+        </SupplyChainProvider>
+      </DataCenterProvider>
     </ProductFlowProvider>
   );
 }

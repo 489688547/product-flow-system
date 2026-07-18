@@ -32,6 +32,7 @@
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
 | `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
+| `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -53,6 +54,15 @@
 - `COLLABORATION_IDEMPOTENCY_CONFLICT`：同一幂等键与现有业务来源不一致。
 - `COLLABORATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定或协同表写入不可用。
 - `DINGTALK_TODO_SYNC_FAILED`：协同状态已保存，但钉钉待办同步失败。
+
+数据中心 API 使用：
+
+- `AUTH_SESSION_REQUIRED`：没有有效公司会话。
+- `PERMISSION_VIEW_DENIED`：当前部门无权查看数据中心。
+- `PERMISSION_WRITE_DENIED`：当前身份不能维护数据中心元数据。
+- `DATA_STATE_INVALID`：提交的元数据状态结构无效。
+- `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
+- `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 
 ## HTTP 状态
 

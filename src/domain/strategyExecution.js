@@ -46,6 +46,22 @@ const DEFAULT_APP_REGISTRY = [
     route: "dashboard",
     enabled: true,
     status: "connected"
+  },
+  {
+    id: "supply-chain",
+    name: "供应链管理",
+    description: "归集供应商、采购付款、库存资金与质量问题。",
+    route: "supply-chain",
+    enabled: true,
+    status: "connected"
+  },
+  {
+    id: "data-center",
+    name: "数据中心",
+    description: "统一归集经营数据、指标口径、质量状态和应用订阅。",
+    route: "data-center",
+    enabled: true,
+    status: "connected"
   }
 ];
 
@@ -516,7 +532,16 @@ export function normalizePlatformState(input) {
   };
   PLATFORM_COLLECTIONS.forEach(key => {
     const fallback = key === "appRegistry" ? DEFAULT_APP_REGISTRY : [];
-    state[key] = Array.isArray(migrated[key]) ? migrated[key].map(item => ({ ...item })) : fallback.map(item => ({ ...item }));
+    if (key === "appRegistry") {
+      const incoming = Array.isArray(migrated[key]) ? migrated[key] : [];
+      const incomingById = new Map(incoming.map(item => [item.id, item]));
+      state[key] = [
+        ...DEFAULT_APP_REGISTRY.map(item => ({ ...item, ...(incomingById.get(item.id) || {}) })),
+        ...incoming.filter(item => !DEFAULT_APP_REGISTRY.some(fallbackItem => fallbackItem.id === item.id)).map(item => ({ ...item }))
+      ];
+    } else {
+      state[key] = Array.isArray(migrated[key]) ? migrated[key].map(item => ({ ...item })) : fallback.map(item => ({ ...item }));
+    }
   });
   return state;
 }

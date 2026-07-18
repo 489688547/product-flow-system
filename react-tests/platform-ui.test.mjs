@@ -121,6 +121,16 @@ test("business App center keeps Product Lifecycle as the first connected App", (
   assert.match(page, /打开 App/);
 });
 
+test("business App center exposes the embedded supply chain App", () => {
+  const strategy = read("src/domain/strategyExecution.js");
+  const app = read("src/App.jsx");
+  const main = read("src/main.jsx");
+  assert.match(strategy, /供应链管理/);
+  assert.match(app, /SupplyChainAppPage/);
+  assert.match(app, /"supply-chain"/);
+  assert.match(main, /SupplyChainProvider/);
+});
+
 test("the static shell and DingTalk login use the company platform brand", () => {
   const html = read("index.html");
   const login = read("src/features/auth/LoginPage.jsx");
