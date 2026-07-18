@@ -109,3 +109,12 @@ test("operations summary separates decision work from execution work", () => {
   });
   assert.deepEqual(summary, { activeCycles: 1, pendingReviews: 1, activePlans: 1, blockedCollaborations: 2 });
 });
+
+test("manager decisions enforce source states and monthly product uniqueness", () => {
+  let state = reduceEcommerceOperationsState(createDefaultEcommerceOperationsState(), { type: "create_cycle", record: { id: "cycle-a", month: "2026-07", product: "主粮", ownerId: "o-1" } });
+  assert.throws(() => reduceEcommerceOperationsState(state, { type: "create_cycle", record: { id: "cycle-b", month: "2026-07", product: "主粮", ownerId: "o-2" } }), /已存在/);
+  state = reduceEcommerceOperationsState(state, { type: "upsert_plan", record: { ...completePlan, id: "draft-plan", cycleId: "cycle-a", status: "draft" } });
+  assert.throws(() => reduceEcommerceOperationsState(state, { type: "review_plan", id: "draft-plan", decision: "approved", reason: "越级批准" }), /待审批/);
+  state = reduceEcommerceOperationsState({ ...state, plans: [{ ...state.plans[0], status: "submitted" }] }, { type: "review_plan", id: "draft-plan", decision: "approved", reason: "正常批准" });
+  assert.throws(() => reduceEcommerceOperationsState(state, { type: "review_plan", id: "draft-plan", decision: "returned", reason: "重复审批" }), /待审批/);
+});

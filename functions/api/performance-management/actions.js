@@ -5,8 +5,8 @@ import { operationsDatabase, readOperationsState } from "../ecommerce-operations
 import { actor, canManageEmployee, currentUserId, filterPerformanceState, isHr, isManager } from "./_shared/access.js";
 import { performanceDatabase, readPerformanceState, writePerformanceState } from "./_shared/storage.js";
 
-const HR_ACTIONS = new Set(["upsert_template", "upsert_manager_assignment", "resolve_review", "freeze_assessment", "append_correction"]);
-const MANAGER_ACTIONS = new Set(["create_assessment", "manager_score"]);
+const HR_ACTIONS = new Set(["upsert_template", "upsert_manager_assignment", "freeze_assessment", "append_correction"]);
+const MANAGER_ACTIONS = new Set(["create_assessment", "manager_score", "resolve_review"]);
 const EMPLOYEE_ACTIONS = new Set(["submit_self_review", "request_review"]);
 const ACTIONS = new Set([...HR_ACTIONS, ...MANAGER_ACTIONS, ...EMPLOYEE_ACTIONS]);
 
@@ -19,7 +19,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (!action?.type) return jsonResponse({ message: "缺少绩效动作。" }, 400);
   if (!ACTIONS.has(action.type)) return jsonResponse({ message: "不支持的绩效动作。" }, 400);
   if (HR_ACTIONS.has(action.type) && !isHr(data.session)) return jsonResponse({ message: "该动作需要人事权限。" }, 403);
-  if (MANAGER_ACTIONS.has(action.type) && !isManager(data.session)) return jsonResponse({ message: "该动作需要主管权限。" }, 403);
+  if (MANAGER_ACTIONS.has(action.type) && (!isManager(data.session) || isHr(data.session))) return jsonResponse({ message: "该动作需要直属主管权限，人事仅负责授权和归档。" }, 403);
   const db = performanceDatabase(env); if (!db) return jsonResponse({ message: "缺少 D1 数据库绑定。" }, 501);
   try {
     const state = await readPerformanceState(db);
@@ -39,13 +39,13 @@ export async function onRequest({ request, env, data = {} }) {
         if ((item.evidenceRefs || []).length && !requested.length) throw new Error("关联的经营任务未验收、人员不匹配或月份不一致。");
         return {
           ...item,
-          actual: requested.length ? Number(item.target) : null,
+          actual: null,
           evidenceRefs: requested.map(record => ({ ...record, retrievedAt }))
         };
       });
       action.record = { ...action.record, items, managerId: user.userId, managerName: user.name };
     }
-    if (action.type === "manager_score" && !isHr(data.session) && assessment?.managerId !== user.userId) return jsonResponse({ message: "只能评估自己负责的员工。" }, 403);
+    if (["manager_score", "resolve_review"].includes(action.type) && assessment?.managerId !== user.userId) return jsonResponse({ message: "只能评估自己负责的员工。" }, 403);
     const next = reducePerformanceState(state, { ...action, actor: user });
     const saved = await writePerformanceState(db, next, user.name);
     return jsonResponse({ state: filterPerformanceState(saved, data.session), synced: true });

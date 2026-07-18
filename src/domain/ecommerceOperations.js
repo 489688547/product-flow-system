@@ -75,6 +75,8 @@ export function reduceEcommerceOperationsState(input, action = {}) {
   const state = normalizeEcommerceOperationsState(input);
   const timestamp = action.timestamp || new Date().toISOString();
   if (action.type === "create_cycle") {
+    const duplicate = state.cycles.find(item => item.id !== action.record?.id && item.status !== "cancelled" && text(item.month) === text(action.record?.month) && text(item.product) === text(action.record?.product));
+    if (duplicate) throw new Error("该产品本月已存在重点经营周期。");
     const record = { status: "draft", ...action.record, id: text(action.record?.id) || idFor("cycle"), createdAt: action.record?.createdAt || timestamp, updatedAt: timestamp };
     return audit({ ...state, cycles: upsert(state.cycles, record) }, action, "cycle", record.id);
   }
@@ -94,6 +96,7 @@ export function reduceEcommerceOperationsState(input, action = {}) {
   if (action.type === "review_plan") {
     const plan = state.plans.find(item => item.id === action.id);
     if (!plan) throw new Error("未找到打品方案。");
+    if (plan.status !== "submitted") throw new Error("仅待审批方案可以批准或退回。");
     if (!text(action.reason)) throw new Error("主管审批必须填写原因。");
     const status = action.decision === "approved" ? "approved" : "returned";
     const changed = { ...plan, status, version: status === "approved" ? Number(plan.version || 1) + 1 : Number(plan.version || 1), reviewedAt: timestamp, reviewReason: text(action.reason), updatedAt: timestamp };
@@ -110,6 +113,7 @@ export function reduceEcommerceOperationsState(input, action = {}) {
   if (action.type === "review_execution") {
     const execution = state.executions.find(item => item.id === action.id);
     if (!execution) throw new Error("未找到执行记录。");
+    if (execution.status !== "submitted") throw new Error("仅待验收执行记录可以接受或退回。");
     if (!text(action.reason)) throw new Error("执行验收必须填写说明。");
     const changed = { ...execution, status: action.decision === "accepted" ? "accepted" : "returned", acceptance: text(action.reason), reviewedAt: timestamp, updatedAt: timestamp };
     return audit({ ...state, executions: upsert(state.executions, changed) }, action, "execution", execution.id, action.reason);
@@ -117,7 +121,8 @@ export function reduceEcommerceOperationsState(input, action = {}) {
   if (action.type === "upsert_collaboration" || action.type === "respond_collaboration") {
     const existing = state.collaborations.find(item => item.id === (action.record?.id || action.id));
     const record = { ...existing, ...action.record, id: text(action.record?.id || action.id) || idFor("collaboration"), updatedAt: timestamp };
-    if (action.type === "respond_collaboration" && !text(record.reason)) throw new Error("接受、退回或改期必须填写说明。");
+    if (action.type === "respond_collaboration" && !["accepted", "returned"].includes(record.status)) throw new Error("协同事项只能接受或退回。");
+    if (action.type === "respond_collaboration" && !text(record.reason)) throw new Error("接受或退回必须填写说明。");
     return audit({ ...state, collaborations: upsert(state.collaborations, record) }, action, "collaboration", record.id, record.reason);
   }
   if (action.type === "upsert_responsibility" || action.type === "upsert_playbook") {

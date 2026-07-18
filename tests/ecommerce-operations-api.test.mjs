@@ -61,6 +61,19 @@ test("collaboration departments only receive their assigned queue", async () => 
   assert.equal(payload.state.plans.length, 0);
 });
 
+test("department manager can decide collaboration without rewriting its ownership", async () => {
+  const db = createD1Mock();
+  await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "upsert_collaboration", record: { id: "c-safe", title: "确认库存", targetDepartment: "供应链部", dueDate: "2026-07-25" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  const supplyManager = { userId: "s-m-1", name: "供应链主管", department: "供应链部", title: "供应链主管" };
+  const response = await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "respond_collaboration", id: "c-safe", record: { id: "c-safe", status: "accepted", reason: "库存已确认", ownerId: "attacker", targetDepartment: "财务部", title: "篡改" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: supplyManager } });
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.state.collaborations[0].title, "确认库存");
+  assert.equal(payload.state.collaborations[0].targetDepartment, "供应链部");
+  assert.equal(payload.state.collaborations[0].ownerId, "m-1");
+  assert.equal(payload.state.collaborations[0].status, "accepted");
+});
+
 test("operator creates a complete plan and manager approves it", async () => {
   const db = createD1Mock();
   await onActionsRequest({

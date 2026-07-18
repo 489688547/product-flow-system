@@ -70,7 +70,9 @@ test("supply-chain API round-trips collections as separate D1 records", async ()
   const state = normalizeSupplyChainState({
     suppliers: [{ id: "s1", name: "杭州鲜宠食品" }],
     purchaseApprovals: [{ id: "purchase-1", processInstanceId: "purchase-1", supplierId: "s1", productIds: ["p1"] }],
-    paymentApprovals: [{ id: "pay-1", processInstanceId: "pay-1", purchaseProcessInstanceId: "purchase-1", amount: 300, status: "COMPLETED" }]
+    paymentApprovals: [{ id: "pay-1", processInstanceId: "pay-1", purchaseProcessInstanceId: "purchase-1", amount: 300, status: "COMPLETED" }],
+    materialInventorySnapshots: [{ id: "material-1", productName: "莓果粮", materialName: "包装袋", inventoryAmount: 200 }],
+    inventoryRisks: [{ id: "risk-1", productName: "木丝绒", status: "active" }]
   });
   const post = await onRequest({
     request: new Request("https://flow.example.com/api/supply-chain", { method: "POST", body: JSON.stringify({ state }) }),
@@ -80,6 +82,8 @@ test("supply-chain API round-trips collections as separate D1 records", async ()
   assert.equal(post.status, 200);
   assert.ok(db.records.has("suppliers:s1"));
   assert.ok(db.records.has("paymentApprovals:pay-1"));
+  assert.ok(db.records.has("materialInventorySnapshots:material-1"));
+  assert.ok(db.records.has("inventoryRisks:risk-1"));
 
   const get = await onRequest({
     request: new Request("https://flow.example.com/api/supply-chain"),
@@ -114,6 +118,27 @@ test("quality department can read quality data without payment details", async (
   assert.equal(payload.state.paymentApprovals.length, 0);
   assert.equal(payload.state.suppliers[0].paymentTerms, undefined);
   assert.equal(payload.state.qualityIssues[0].content, "包装破损");
+});
+
+test("product department can read material quantities without supplier cost fields", async () => {
+  const db = createD1Mock();
+  const state = normalizeSupplyChainState({
+    materialInventorySnapshots: [{ id: "m1", productName: "莓果粮", materialName: "包装袋", quantity: 100, unitCost: 0.5, inventoryAmount: 50 }]
+  });
+  await onRequest({
+    request: new Request("https://flow.example.com/api/supply-chain", { method: "POST", body: JSON.stringify({ state }) }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: executive }
+  });
+  const response = await onRequest({
+    request: new Request("https://flow.example.com/api/supply-chain"),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { name: "产品同事", department: "产品部" } }
+  });
+  const payload = await response.json();
+  assert.equal(payload.state.materialInventorySnapshots[0].quantity, 100);
+  assert.equal(payload.state.materialInventorySnapshots[0].unitCost, undefined);
+  assert.equal(payload.state.materialInventorySnapshots[0].inventoryAmount, undefined);
 });
 
 test("department writes are limited to their owned collections", async () => {

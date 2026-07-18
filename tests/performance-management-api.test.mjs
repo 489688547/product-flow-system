@@ -61,6 +61,16 @@ test("unknown actions and injected approval states are rejected or normalized", 
   assert.equal(unknown.status, 400);
   const create = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_assessment", record: { id: "a-injected", employeeId: "e-1", status: "frozen", items: [{ weight: 100, target: 1, actual: 1, formula: "completion" }] } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
   assert.equal((await create.json()).state.assessments[0].status, "self_review");
+  const overwrite = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_assessment", record: { id: "a-injected", employeeId: "e-1", items: [{ weight: 100, target: 999, formula: "completion" }] } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  assert.equal(overwrite.status, 400);
+});
+
+test("HR cannot replace the direct manager's final score", async () => {
+  const db = createD1Mock();
+  await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_assessment", record: { id: "role-separated", employeeId: "e-1", month: "2026-07", items: [{ weight: 100, target: 10, formula: "completion" }] } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: manager } });
+  await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "submit_self_review", id: "role-separated", selfScore: 90, selfComment: "完成" } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: employee } });
+  const score = await onActionsRequest({ request: new Request("https://example.com/api/performance-management/actions", { method: "POST", body: JSON.stringify({ action: { type: "manager_score", id: "role-separated", finalScore: 90 } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: hr } });
+  assert.equal(score.status, 403);
 });
 
 test("a manager cannot read or score another manager's assessments", async () => {

@@ -54,6 +54,8 @@ export function reducePerformanceState(input, action = {}) {
   }
   if (action.type === "create_assessment") {
     if (validateAssessmentTemplate(action.record).length) throw new Error("考核项权重合计必须为 100%");
+    if (action.record?.id && state.assessments.some(item => item.id === action.record.id)) throw new Error("考核记录已存在，不能覆盖重建。");
+    if (state.assessments.some(item => item.status !== "cancelled" && clean(item.employeeId) === clean(action.record?.employeeId) && clean(item.month) === clean(action.record?.month))) throw new Error("该员工本月已存在有效考核。");
     const record = { ...action.record, status: "self_review", id: clean(action.record?.id) || idFor("assessment"), suggestedScore: calculateSuggestedScore(action.record?.items), createdAt: timestamp, updatedAt: timestamp };
     return audit({ ...state, assessments: upsert(state.assessments, record) }, action, record.id);
   }

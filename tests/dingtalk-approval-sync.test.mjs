@@ -130,6 +130,88 @@ test("purchase normalization marks unresolved supplier and product values for ma
   assert.deepEqual(normalized.record.unmappedValues, { supplier: "新供应商", product: "新品A" });
 });
 
+test("purchase normalization extracts mapping candidates from a standard purchase reason", () => {
+  const normalized = normalizeDingSupplyApproval({
+    processInstanceId: "purchase-reason-1",
+    result: "agree",
+    formComponentValues: [
+      { name: "事由", value: "向贝瑞采购坚果谷物棒" },
+      { name: "金额（元）", value: "18917.28" }
+    ]
+  }, {
+    kind: "purchase",
+    purposeFieldId: "事由",
+    amountFieldId: "金额（元）"
+  });
+
+  assert.equal(normalized.record.reason, "向贝瑞采购坚果谷物棒");
+  assert.deepEqual(normalized.record.unmappedValues, { supplier: "贝瑞", product: "坚果谷物棒" });
+});
+
+test("approval sync maps supplier names and confirmed aliases from purchase reasons", async () => {
+  const state = normalizeSupplyChainState({
+    suppliers: [
+      { id: "supplier-pet", name: "江西宠办" },
+      { id: "supplier-berry", name: "潍坊贝瑞" }
+    ],
+    settings: {
+      purchaseProcessCode: "PROC-PURCHASE",
+      paymentProcessCode: "PROC-PAYMENT",
+      purchaseCategoryPrefixes: [],
+      fieldMappings: {
+        purchase: {
+          purposeFieldId: "事由",
+          supplierValueMap: { "贝瑞": "supplier-berry" }
+        }
+      }
+    }
+  });
+  const instances = {
+    "purchase-name": { process_instance_id: "purchase-name", result: "agree", form_component_values: [{ name: "事由", value: "向江西宠办采购防护喷雾" }] },
+    "purchase-alias": { process_instance_id: "purchase-alias", result: "agree", form_component_values: [{ name: "事由", value: "向贝瑞采购坚果谷物棒" }] }
+  };
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.process_code) {
+      return Response.json({ errcode: 0, result: { list: body.process_code === "PROC-PURCHASE" ? ["purchase-name", "purchase-alias"] : [] } });
+    }
+    return Response.json({ errcode: 0, process_instance: instances[body.process_instance_id] });
+  };
+
+  const result = await syncSupplyApprovals({ state, accessToken: "token", startTime: 1, endTime: 2, fetchImpl, sleepImpl: async () => {} });
+
+  assert.equal(result.state.purchaseApprovals.find(item => item.processInstanceId === "purchase-name").supplierId, "supplier-pet");
+  assert.equal(result.state.purchaseApprovals.find(item => item.processInstanceId === "purchase-alias").supplierId, "supplier-berry");
+});
+
+test("approval sync excludes payments without a related purchase approval", async () => {
+  const state = normalizeSupplyChainState({
+    settings: {
+      purchaseProcessCode: "PROC-PURCHASE",
+      paymentProcessCode: "PROC-PAYMENT",
+      purchaseCategoryPrefixes: []
+    }
+  });
+  const relation = JSON.stringify({ list: [{ instanceId: "purchase-1", rowValue: [{ label: "金额（元）", value: "800" }] }] });
+  const instances = {
+    "purchase-1": { process_instance_id: "purchase-1", result: "agree" },
+    "pay-purchase": { process_instance_id: "pay-purchase", result: "agree", form_component_values: [{ name: "采购申请单", value: "[\"采购\"]", extValue: relation }] },
+    "pay-reimbursement": { process_instance_id: "pay-reimbursement", result: "agree", form_component_values: [{ name: "采购申请单", value: "null" }, { name: "报销申请单", value: "[\"报销\"]" }] }
+  };
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.process_code === "PROC-PURCHASE") return Response.json({ errcode: 0, result: { list: ["purchase-1"] } });
+    if (body.process_code === "PROC-PAYMENT") return Response.json({ errcode: 0, result: { list: ["pay-purchase", "pay-reimbursement"] } });
+    return Response.json({ errcode: 0, process_instance: instances[body.process_instance_id] });
+  };
+
+  const result = await syncSupplyApprovals({ state, accessToken: "token", startTime: 1, endTime: 2, fetchImpl, sleepImpl: async () => {} });
+
+  assert.deepEqual(result.state.paymentApprovals.map(item => item.processInstanceId), ["pay-purchase"]);
+  assert.equal(result.synced.payment, 1);
+  assert.equal(result.synced.skipped, 1);
+});
+
 test("approval sync upserts purchase and payment instances idempotently", async () => {
   const state = normalizeSupplyChainState({
     settings: {
@@ -195,4 +277,77 @@ test("approval sync excludes categorized non-supply purchases and their linked p
   assert.equal(result.synced.purchase, 1);
   assert.equal(result.synced.payment, 1);
   assert.equal(result.synced.skipped, 2);
+});
+
+test("approval sync reads detail instances sequentially with QPS pacing", async () => {
+  const state = normalizeSupplyChainState({
+    settings: {
+      purchaseProcessCode: "PROC-PURCHASE",
+      paymentProcessCode: "PROC-PAYMENT",
+      purchaseCategoryPrefixes: []
+    }
+  });
+  const purchaseIds = Array.from({ length: 41 }, (_, index) => `purchase-${index + 1}`);
+  let active = 0;
+  let maxActive = 0;
+  const delays = [];
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.process_code) {
+      return Response.json({ errcode: 0, result: { list: body.process_code === "PROC-PURCHASE" ? purchaseIds : [] } });
+    }
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise(resolve => setImmediate(resolve));
+    active -= 1;
+    return Response.json({ errcode: 0, process_instance: { process_instance_id: body.process_instance_id, result: "agree" } });
+  };
+
+  const result = await syncSupplyApprovals({
+    state,
+    accessToken: "token",
+    startTime: 1,
+    endTime: 2,
+    fetchImpl,
+    sleepImpl: async milliseconds => { delays.push(milliseconds); }
+  });
+
+  assert.equal(result.synced.purchase, 41);
+  assert.equal(maxActive, 1);
+  assert.equal(delays.length, 40);
+  assert.ok(delays.every(milliseconds => milliseconds >= 30));
+});
+
+test("approval sync retries one throttled detail after DingTalk cooldown", async () => {
+  const state = normalizeSupplyChainState({
+    settings: {
+      purchaseProcessCode: "PROC-PURCHASE",
+      paymentProcessCode: "PROC-PAYMENT",
+      purchaseCategoryPrefixes: []
+    }
+  });
+  let detailAttempts = 0;
+  const delays = [];
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    if (body.process_code) {
+      return Response.json({ errcode: 0, result: { list: body.process_code === "PROC-PURCHASE" ? ["purchase-1"] : [] } });
+    }
+    detailAttempts += 1;
+    if (detailAttempts === 1) return Response.json({ errcode: 90018, errmsg: "触发qps流控，请求被暂时限制" });
+    return Response.json({ errcode: 0, process_instance: { process_instance_id: "purchase-1", result: "agree" } });
+  };
+
+  const result = await syncSupplyApprovals({
+    state,
+    accessToken: "token",
+    startTime: 1,
+    endTime: 2,
+    fetchImpl,
+    sleepImpl: async milliseconds => { delays.push(milliseconds); }
+  });
+
+  assert.equal(result.synced.purchase, 1);
+  assert.equal(detailAttempts, 2);
+  assert.deepEqual(delays, [1100]);
 });

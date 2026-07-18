@@ -42,6 +42,9 @@ export async function onRequest({ request, env, data = {} }) {
     if (action.type === "respond_collaboration") {
       const collaboration = current.collaborations.find(item => item.id === (action.id || action.record?.id));
       if (!collaboration || (!isOperationsManager(data.session) && (collaboration.targetDepartment !== department(data.session) || !isDepartmentManager(data.session)))) return jsonResponse({ message: "只能由责任部门主管处理协同事项。" }, 403);
+      const status = action.record?.status;
+      if (!["accepted", "returned"].includes(status)) return jsonResponse({ message: "协同事项只能接受或退回。" }, 400);
+      action.record = { id: collaboration.id, status, reason: String(action.record?.reason || "").trim() };
     }
     if (body.expectedRevision !== undefined && Number(body.expectedRevision) !== current.revision) return jsonResponse({ message: "数据已更新，请刷新后重试。", code: "REVISION_CONFLICT" }, 409);
     const next = reduceEcommerceOperationsState(current, { ...action, actor: user });

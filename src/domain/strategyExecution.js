@@ -48,6 +48,14 @@ const DEFAULT_APP_REGISTRY = [
     status: "connected"
   },
   {
+    id: "brand-content",
+    name: "品牌内容协同",
+    description: "协同内容生产、素材资产、发布归因、投放复盘与补充决策。",
+    route: "content-overview",
+    enabled: true,
+    status: "integrating"
+  },
+  {
     id: "supply-chain",
     name: "供应链管理",
     description: "归集供应商、采购付款、库存资金与质量问题。",

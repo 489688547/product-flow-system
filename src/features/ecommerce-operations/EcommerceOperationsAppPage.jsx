@@ -34,7 +34,7 @@ export function EcommerceOperationsAppPage({ section = "dashboard" }) {
   const [playbook, setPlaybook] = useState({ title: "", scenario: "", method: "" });
   const business = useMemo(() => summarizeDataCenterSales(salesRows, range), [range, salesRows]);
   const summary = useMemo(() => summarizeEcommerceOperations(state), [state]);
-  const manager = String(user?.department || "") === "总经办" || /主管|经理|总监|负责人/.test(String(user?.title || ""));
+  const manager = String(user?.department || "") === "运营部" && /主管|经理|总监|负责人/.test(String(user?.title || ""));
   const currentDepartment = String(user?.department || user?.departmentName || "");
   const departmentManager = manager || /主管|经理|总监|负责人/.test(String(user?.title || ""));
   const [title, description] = META[section] || META.dashboard;

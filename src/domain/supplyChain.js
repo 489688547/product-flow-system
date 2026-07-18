@@ -6,6 +6,8 @@ export const SUPPLY_COLLECTIONS = [
   "paymentApprovals",
   "inventoryBatches",
   "inventorySnapshots",
+  "materialInventorySnapshots",
+  "inventoryRisks",
   "inventoryAdjustments",
   "qualityImportBatches",
   "qualityIssues",
@@ -68,6 +70,24 @@ function buildProductBySku(products) {
     for (const code of skuCodes(product)) result.set(code, product);
   }
   return result;
+}
+
+export function isErpInventorySource(sourceType = "") {
+  return ["kuaimai-import", "dingtalk-stocktake-import", "dingtalk-finished-inventory"].includes(cleanText(sourceType));
+}
+
+export function isPhysicalInventorySource(sourceType = "") {
+  return ["stocktake-import", "dingtalk-stocktake-import", "dingtalk-finished-inventory"].includes(cleanText(sourceType));
+}
+
+export function inventorySourceLabel(sourceType = "") {
+  const labels = {
+    "kuaimai-import": "快麦 ERP 快照",
+    "stocktake-import": "文件盘点核对",
+    "dingtalk-stocktake-import": "钉钉盘点表",
+    "dingtalk-finished-inventory": "钉钉成品月末库存"
+  };
+  return labels[cleanText(sourceType)] || "库存文件快照";
 }
 
 function firstValue(row, names) {
@@ -306,7 +326,12 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     linkedCostProducts.add(link.productId);
   }
 
-  const { latestErp, latestPhysical } = latestInventorySnapshots(state.inventorySnapshots);
+  const resolvedInventorySnapshots = state.inventorySnapshots.map(snapshot => {
+    if (snapshot.productId) return snapshot;
+    const matchedProduct = productBySku.get(cleanText(snapshot.skuCode));
+    return matchedProduct ? { ...snapshot, productId: matchedProduct.id } : snapshot;
+  });
+  const { latestErp, latestPhysical } = latestInventorySnapshots(resolvedInventorySnapshots);
   for (const snapshot of latestErp.values()) {
     const product = productMap.get(snapshot.productId);
     const productRow = productRows.get(snapshot.productId) || emptyDimensionRow({ product: product || { id: snapshot.productId } });
@@ -436,13 +461,13 @@ export function parseInventoryImportRows(rows = [], { products = [], suppliers =
 
   rows.forEach((row, index) => {
     const rowNumber = index + 2;
-    const skuCode = cleanText(firstValue(row, ["商品编码", "SKU", "sku", "skuCode", "产品编码", "规格商家编码", "商家编码", "条码"]));
+    const skuCode = cleanText(firstValue(row, ["商品编码", "SKU", "sku", "skuCode", "产品编码", "规格商家编码", "商家编码", "条码", "条形码"]));
     const product = productBySku.get(skuCode);
     const erpMode = mode === "erp";
     const countedQuantity = erpMode
       ? null
       : finiteNumber(firstValue(row, ["盘点数量", "实盘数量", "实际库存", "countedQuantity"]), Number.NaN);
-    const erpQuantity = finiteNumber(firstValue(row, ["ERP库存", "系统库存", "账面库存", "erpQuantity", "实际可用数", "实际总库存", "库存数量"]), Number.NaN);
+    const erpQuantity = finiteNumber(firstValue(row, ["ERP库存", "erp数量", "ERP数量", "系统库存", "账面库存", "erpQuantity", "实际可用数", "实际总库存", "库存数量"]), Number.NaN);
     if (!skuCode || !product) errors.push({ rowNumber, field: "商品编码", message: "未找到对应产品" });
     if (!erpMode && (!Number.isFinite(countedQuantity) || countedQuantity < 0)) errors.push({ rowNumber, field: "盘点数量", message: "盘点数量必须是非负数字" });
     if (!Number.isFinite(erpQuantity) || erpQuantity < 0) errors.push({ rowNumber, field: "ERP库存", message: "ERP库存必须是非负数字" });
@@ -454,6 +479,7 @@ export function parseInventoryImportRows(rows = [], { products = [], suppliers =
     validRows.push({
       id: uniqueId("inventory"),
       productId: product.id,
+      productName: cleanText(firstValue(row, ["产品名称（规格）", "产品名称", "规格别名", "productName"])) || product.name || product.productName || "",
       supplierId: supplier?.id || "",
       skuCode,
       countedQuantity,

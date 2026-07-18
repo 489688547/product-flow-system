@@ -8,11 +8,12 @@ import { canAccessDataCenter, DEFAULT_PERMISSIONS, FEATURE_PERMISSION_ITEMS, NAV
 const root = resolve(new URL("..", import.meta.url).pathname);
 const read = path => readFileSync(resolve(root, path), "utf8");
 
-test("data center is the third registered business app", () => {
+test("data center remains registered alongside every independently delivered business app", () => {
   const registry = createDefaultPlatformState().appRegistry;
-  assert.deepEqual(registry.slice(0, 3).map(app => app.id), ["product-flow", "supply-chain", "data-center"]);
-  assert.equal(registry[2].route, "data-center");
-  assert.equal(registry[2].status, "connected");
+  assert.deepEqual(registry.map(app => app.id), ["product-flow", "brand-content", "supply-chain", "data-center", "ecommerce-operations", "performance-management"]);
+  const dataCenter = registry.find(app => app.id === "data-center");
+  assert.equal(dataCenter.route, "data-center");
+  assert.equal(dataCenter.status, "connected");
 });
 
 test("data center has navigation and feature permission defaults", () => {

@@ -8,7 +8,7 @@ const QUALITY_COLLECTIONS = new Set(["qualityImportBatches", "qualityIssues"]);
 const FINANCE_COLLECTIONS = new Set(["purchaseApprovals", "purchaseLines", "paymentApprovals", "syncRuns"]);
 const SUPPLY_EDIT_COLLECTIONS = new Set([
   "suppliers", "productSupplierLinks", "purchaseApprovals", "purchaseLines",
-  "inventoryBatches", "inventorySnapshots", "inventoryAdjustments", "syncRuns"
+  "inventoryBatches", "inventorySnapshots", "materialInventorySnapshots", "inventoryRisks", "inventoryAdjustments", "syncRuns"
 ]);
 
 function department(session = {}) {
@@ -48,6 +48,7 @@ export function filterSupplyStateForSession(input, session = {}) {
     purchaseApprovals: state.purchaseApprovals.map(({ approvedAmount, requestedAmount, rawPayload, ...record }) => record),
     purchaseLines: state.purchaseLines.map(({ amount, unitPrice, rawPayload, ...record }) => record),
     inventorySnapshots: state.inventorySnapshots.map(({ inventoryAmount, unitCost, rawPayload, ...record }) => record),
+    materialInventorySnapshots: state.materialInventorySnapshots.map(({ inventoryAmount, unitCost, rawPayload, ...record }) => record),
     inventoryAdjustments: state.inventoryAdjustments.map(({ adjustmentAmount, rawPayload, ...record }) => record),
     settings: {}
   });

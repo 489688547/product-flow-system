@@ -1,7 +1,7 @@
 const uid = session => String(session?.userId || session?.userid || session?.unionId || session?.name || "");
 const dept = session => String(session?.department || session?.departmentName || "");
-export const isHr = session => ["人事行政部", "人事部"].includes(dept(session)) || dept(session) === "总经办";
-export const isManager = session => isHr(session) || /主管|经理|总监|负责人/.test(String(session?.title || ""));
+export const isHr = session => ["人事行政部", "人事部"].includes(dept(session));
+export const isManager = session => !isHr(session) && dept(session) !== "总经办" && /主管|经理|总监|负责人/.test(String(session?.title || ""));
 export const actor = session => ({ userId: uid(session), name: session?.name || "系统" });
 export const currentUserId = uid;
 

@@ -13,11 +13,11 @@ export function canViewOperationsEvidence(session) {
 }
 
 export function isOperationsManager(session) {
-  return department(session) === "总经办" || (department(session) === "运营部" && /主管|经理|总监|负责人/.test(String(session.title || "")));
+  return department(session) === "运营部" && /主管|经理|总监|负责人/.test(String(session.title || ""));
 }
 
 export function isOperationsMember(session) {
-  return department(session) === "总经办" || department(session) === "运营部";
+  return department(session) === "运营部";
 }
 
 export function isDepartmentManager(session) {

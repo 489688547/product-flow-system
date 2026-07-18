@@ -187,6 +187,72 @@ export function parseIntegrationImpact(body = "") {
   return { declaredIds, reason: reasonMatch?.[1]?.trim() || "" };
 }
 
+export function isIntegrationCodePath(path = "") {
+  const normalized = String(path).trim();
+  return !normalized.startsWith("docs/")
+    && !normalized.startsWith("assets/")
+    && !normalized.startsWith("tests/")
+    && !normalized.startsWith("react-tests/")
+    && /\.(?:[cm]?[jt]sx?|json|ya?ml)$/.test(normalized);
+}
+
+const SHARED_BOUNDARY_PATHS = [
+  /^functions\/api\/platform\//,
+  /^server\/productionData/,
+  /^scripts\/check-deployed-readiness\.mjs$/,
+  /^scripts\/(?:integration-registry|check-integration-impact)\.mjs$/,
+  /(?:^|\/)migrations?\//,
+  /(?:^|\/)schema\.sql$/,
+  /^docs\/platform\/(?:environment-capabilities|integration-registry)\.json$/,
+  /^docs\/platform\/error-codes\.md$/
+];
+
+function isDurableRulePath(path) {
+  return path === "AGENTS.md"
+    || path.startsWith(".agents/skills/")
+    || path.startsWith("docs/platform/")
+    || path.startsWith("docs/decisions/");
+}
+
+export function parseRuleWriteback(body = "") {
+  const writebackMatch = String(body).match(/^Rule-Writeback:\s*(.+?)\s*$/im);
+  const reasonMatch = String(body).match(/^Rule-Writeback-Reason:\s*(.+?)\s*$/im);
+  const declaredPaths = writebackMatch
+    ? [...new Set(writebackMatch[1].split(",").map(value => value.trim()).filter(Boolean))]
+    : [];
+  return { declaredPaths, reason: reasonMatch?.[1]?.trim() || "" };
+}
+
+export function checkRuleWriteback({ paths = [], body = "" } = {}) {
+  const { declaredPaths, reason } = parseRuleWriteback(body);
+  const errors = [];
+  const changedPaths = new Set(paths);
+  const sharedBoundaryPaths = paths.filter(path => SHARED_BOUNDARY_PATHS.some(pattern => pattern.test(path)));
+  const changedDurablePaths = paths.filter(isDurableRulePath);
+  const declaresNone = declaredPaths.includes("none");
+
+  if (!declaredPaths.length) errors.push("缺少 Rule-Writeback 声明");
+  if (declaredPaths.length && !reason) errors.push("缺少 Rule-Writeback-Reason 或原因为空");
+  if (declaresNone && declaredPaths.length > 1) errors.push("Rule-Writeback 的 none 不能与文件路径同时声明");
+
+  const unchangedDeclarations = declaredPaths.filter(path => path !== "none" && !changedPaths.has(path));
+  if (unchangedDeclarations.length) {
+    errors.push(`Rule-Writeback 声明的文件未在本 PR 变更：${unchangedDeclarations.join(", ")}`);
+  }
+  const nonDurableDeclarations = declaredPaths.filter(path => path !== "none" && !isDurableRulePath(path));
+  if (nonDurableDeclarations.length) {
+    errors.push(`Rule-Writeback 只能声明长期规则文件：${nonDurableDeclarations.join(", ")}`);
+  }
+  if (sharedBoundaryPaths.length && declaresNone) {
+    errors.push(`共享边界变更必须反写长期规则：${sharedBoundaryPaths.join(", ")}`);
+  }
+  if (sharedBoundaryPaths.length && !changedDurablePaths.length) {
+    errors.push(`共享边界变更缺少长期规则文件：${sharedBoundaryPaths.join(", ")}`);
+  }
+
+  return { errors, declaredPaths, reason, sharedBoundaryPaths, changedDurablePaths };
+}
+
 export function checkIntegrationImpact(registry, { paths = [], content = "", body = "" } = {}) {
   const routing = matchIntegrationPlatforms(registry, { paths, content, expandRelated: false });
   const requiredIds = routing.direct.filter(match => match.required).map(match => match.id);
