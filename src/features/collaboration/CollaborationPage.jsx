@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, RefreshCw, Search } from "lucide-react";
 import { useCollaboration } from "../../state/CollaborationProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
@@ -25,6 +25,10 @@ export function CollaborationPage() {
   const [selectedId, setSelectedId] = useState("");
   const [editor, setEditor] = useState({ open: false, item: null });
   const selected = useMemo(() => items.find(item => item.id === selectedId) || null, [items, selectedId]);
+
+  useEffect(() => {
+    loadItems({ view: "pending_acceptance" }).catch(() => {});
+  }, []);
 
   async function apply(nextView = view, nextFilters = filters) {
     await loadItems({ view: nextView, ...nextFilters }).catch(() => {});
