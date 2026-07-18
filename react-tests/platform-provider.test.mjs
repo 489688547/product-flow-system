@@ -35,6 +35,7 @@ test("platform provider reconciles personal todos and safely writes back allowed
 test("platform provider exposes governed execution commands", () => {
   const provider = read("src/state/PlatformProvider.jsx");
   [
+    "saveStrategy",
     "saveRequiredResult",
     "saveDepartmentCommitment",
     "transitionCommitment",
@@ -42,9 +43,19 @@ test("platform provider exposes governed execution commands", () => {
     "saveIncentiveProject",
     "settleIncentive",
     "saveMonthlyReport",
+    "saveStatusUpdate",
     "transitionReport",
     "appendReportCorrection",
-    "ensureReports"
+    "ensureReports",
+    "archiveStrategy",
+    "archiveRequiredResult",
+    "archiveDepartmentCommitment",
+    "archiveCommitmentMilestone",
+    "archiveProject",
+    "archiveProjectChild",
+    "archiveIncentiveProject",
+    "archiveMonthlyReport",
+    "archiveStatusUpdate"
   ].forEach(command => assert.match(provider, new RegExp(command)));
   assert.match(provider, /state\.departmentCommitments/);
   assert.match(provider, /state\.commitmentMilestones/);

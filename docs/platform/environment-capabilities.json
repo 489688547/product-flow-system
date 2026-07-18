@@ -42,6 +42,21 @@
       ]
     },
     {
+      "id": "collaboration-execution",
+      "name": "跨 App 部门协同",
+      "description": "协同事项、参与范围、活动审计与钉钉待办镜像所需的生产能力。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1", "dingtalk"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "collaboration_items",
+        "collaboration_participants",
+        "collaboration_activities"
+      ]
+    },
+    {
       "id": "kuaimai-sales-sync",
       "name": "快麦销售同步",
       "description": "快麦订单拉取、会话刷新和销售聚合所需配置。",

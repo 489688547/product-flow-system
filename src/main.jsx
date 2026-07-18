@@ -11,9 +11,11 @@ import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
 import { DataCenterProvider } from "./state/DataCenterProvider.jsx";
 import { EcommerceOperationsProvider } from "./state/EcommerceOperationsProvider.jsx";
 import { PerformanceManagementProvider } from "./state/PerformanceManagementProvider.jsx";
+import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
+import "./features/collaboration/collaboration.css";
 
 function AuthenticatedApp() {
   const { user } = useAuth();
@@ -24,20 +26,22 @@ function AuthenticatedApp() {
   const hasPerformanceAccess = canAccessPerformanceManagement(user);
   return (
     <ProductFlowProvider>
-      <BrandContentProvider>
-        <DataCenterProvider enabled={hasDataCenterAccess}>
-          <EcommerceOperationsProvider enabled={hasOperationsAccess}>
-            <PerformanceManagementProvider enabled={hasPerformanceAccess}>
-              <SupplyChainProvider enabled={hasSupplyChainAccess}>
-                <PlatformProvider enabled={hasCompanyAccess}>
-                  {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-                  <App />
-                </PlatformProvider>
-              </SupplyChainProvider>
-            </PerformanceManagementProvider>
-          </EcommerceOperationsProvider>
-        </DataCenterProvider>
-      </BrandContentProvider>
+      <DataCenterProvider enabled={hasDataCenterAccess}>
+        <SupplyChainProvider enabled={hasSupplyChainAccess}>
+          <BrandContentProvider>
+            <CollaborationProvider>
+              <EcommerceOperationsProvider enabled={hasOperationsAccess}>
+                <PerformanceManagementProvider enabled={hasPerformanceAccess}>
+                  <PlatformProvider enabled={hasCompanyAccess}>
+                    {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+                    <App />
+                  </PlatformProvider>
+                </PerformanceManagementProvider>
+              </EcommerceOperationsProvider>
+            </CollaborationProvider>
+          </BrandContentProvider>
+        </SupplyChainProvider>
+      </DataCenterProvider>
     </ProductFlowProvider>
   );
 }

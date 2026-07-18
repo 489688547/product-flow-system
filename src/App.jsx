@@ -6,6 +6,7 @@ import { canAccessCompanyPlatform, canViewNavigation } from "./domain/permission
 import { useAuth } from "./state/AuthProvider.jsx";
 import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
+import { featureFlagEnabled } from "./domain/featureFlags.js";
 
 const lazyNamed = (loader, exportName) => lazy(async () => {
   const module = await loader();
@@ -40,18 +41,7 @@ const BrandDecisionPage = lazyNamed(() => import("./features/brand-content/Brand
 const BrandTeamPage = lazyNamed(() => import("./features/brand-content/BrandTeamPage.jsx"), "BrandTeamPage");
 const BrandDataIssuesPage = lazyNamed(() => import("./features/brand-content/BrandDataIssuesPage.jsx"), "BrandDataIssuesPage");
 const BrandContentSettingsPage = lazyNamed(() => import("./features/brand-content/BrandContentSettingsPage.jsx"), "BrandContentSettingsPage");
-
-const BRAND_NAV = [
-  ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
-  ["content-workbench", "内容作战台", Workflow, "品牌内容协同"],
-  ["content-assets", "素材资产", FileVideo2, "品牌内容协同"],
-  ["content-review", "投放复盘", ChartNoAxesCombined, "品牌内容协同"],
-  ["brand-accounts", "品牌账号", Smartphone, "品牌内容协同"],
-  ["content-decisions", "补充决策", ListChecks, "品牌内容协同"],
-  ["content-team", "团队效能", UsersRound, "品牌内容协同"],
-  ["content-issues", "数据问题", DatabaseZap, "品牌内容协同"],
-  ["content-settings", "设置", SlidersHorizontal, "品牌内容协同"]
-];
+const CollaborationPage = lazyNamed(() => import("./features/collaboration/CollaborationPage.jsx"), "CollaborationPage");
 
 const SUPPLY_CHAIN_NAV = [
   ["supply-overview", "供应链总览", LayoutDashboard, "供应链管理", "overview"],
@@ -75,7 +65,6 @@ const DATA_CENTER_NAV = [
   ["data-settings", "设置", Settings, "数据中心", "settings"]
 ];
 const DATA_CENTER_SCREEN_TO_SECTION = new Map(DATA_CENTER_NAV.map(([screen, , , , section]) => [screen, section]));
-
 const ECOMMERCE_OPERATIONS_NAV = [
   ["ops-dashboard", "经营驾驶舱", LayoutDashboard, "电商店铺运营", "dashboard"],
   ["ops-focus", "重点产品经营", Target, "电商店铺运营", "focus"],
@@ -94,12 +83,24 @@ const PERFORMANCE_MANAGEMENT_NAV = [
 ];
 const PERFORMANCE_MANAGEMENT_SCREEN_TO_SECTION = new Map(PERFORMANCE_MANAGEMENT_NAV.map(([screen, , , , section]) => [screen, section]));
 
+const BRAND_NAV = [
+  ["content-overview", "内容总览", Clapperboard, "品牌内容协同"],
+  ["content-workbench", "内容作战台", Workflow, "品牌内容协同"],
+  ["content-assets", "素材资产", FileVideo2, "品牌内容协同"],
+  ["content-review", "投放复盘", ChartNoAxesCombined, "品牌内容协同"],
+  ["brand-accounts", "品牌账号", Smartphone, "品牌内容协同"],
+  ["content-decisions", "补充决策", ListChecks, "品牌内容协同"],
+  ["content-team", "团队效能", UsersRound, "品牌内容协同"],
+  ["content-issues", "数据问题", DatabaseZap, "品牌内容协同"],
+  ["content-settings", "设置", SlidersHorizontal, "品牌内容协同"]
+];
 const COMPANY_NAV = [
   ["home", "公司首页", LayoutDashboard, "公司经营"],
   ["strategy", "战略中心", Target, "公司经营"],
   ["projects", "重点项目", BriefcaseBusiness, "公司经营"],
   ["incentives", "部门激励", BadgeDollarSign, "公司经营"],
   ["reviews", "经营检查", CalendarCheck, "公司经营"],
+  ["collaboration", "部门协同", Workflow, "公司经营"],
   ["apps", "业务 Apps", AppWindow, "公司经营"],
   ...SUPPLY_CHAIN_NAV,
   ["dashboard", "产品总览", PanelsTopLeft, "产品全周期"],
@@ -121,6 +122,7 @@ const PRODUCT_NAV = [
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
+  ["collaboration", "部门协同", Workflow, "协同执行"],
   ...SUPPLY_CHAIN_NAV,
   ...DATA_CENTER_NAV,
   ...ECOMMERCE_OPERATIONS_NAV,
@@ -167,7 +169,11 @@ export default function App() {
   const { loading: platformLoading, error: platformError } = usePlatform();
   const { state, loading, sharedError, currentUser, setCurrentProduct } = useProductFlow();
   const hasCompanyAccess = canAccessCompanyPlatform(sessionUser);
-  const navigation = hasCompanyAccess ? COMPANY_NAV : PRODUCT_NAV;
+  const collaborationEnabled = hasCompanyAccess || featureFlagEnabled("executiveCollaborationHub");
+  const navigation = useMemo(() => {
+    const base = hasCompanyAccess ? COMPANY_NAV : PRODUCT_NAV;
+    return collaborationEnabled ? base : base.filter(([key]) => key !== "collaboration");
+  }, [collaborationEnabled, hasCompanyAccess]);
   const visibleNavigation = useMemo(() => navigation.filter(([key]) => canViewNavigation(state.settings?.permissions, currentUser, navigationPermissionKey(key))), [currentUser, navigation, state.settings?.permissions]);
   const visibleScreenKeys = useMemo(() => new Set(visibleNavigation.map(([key]) => key)), [visibleNavigation]);
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
@@ -221,6 +227,7 @@ export default function App() {
     projects: <KeyProjectsPage />,
     incentives: <IncentiveProjectsPage />,
     reviews: <OperatingReviewPage />,
+    collaboration: <CollaborationPage />,
     apps: <AppCenterPage onNavigate={navigate} />,
     dashboard: <DashboardPage onNavigate={navigate} onOpenProgress={openProgress} />,
     demands: <DemandPoolPage onProjectCreated={productId => openProgress(productId, 1)} />,

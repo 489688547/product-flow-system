@@ -7,7 +7,7 @@ const safeDecode = segment => {
 };
 
 export function parseAppHash(hash) {
-  const path = String(hash ?? "").replace(/^#/, "");
+  const path = String(hash ?? "").replace(/^#\/?/, "");
   if (!path) return { screen: "", detail: "" };
 
   const [screenSegment, ...detailSegments] = path.split("/");

@@ -10,7 +10,7 @@ const read = path => readFileSync(resolve(root, path), "utf8");
 
 test("data center remains registered alongside every independently delivered business app", () => {
   const registry = createDefaultPlatformState().appRegistry;
-  assert.deepEqual(registry.map(app => app.id), ["product-flow", "brand-content", "supply-chain", "data-center", "ecommerce-operations", "performance-management"]);
+  assert.deepEqual(registry.map(app => app.id), ["product-flow", "supply-chain", "data-center", "ecommerce-operations", "performance-management", "brand-content"]);
   const dataCenter = registry.find(app => app.id === "data-center");
   assert.equal(dataCenter.route, "data-center");
   assert.equal(dataCenter.status, "connected");

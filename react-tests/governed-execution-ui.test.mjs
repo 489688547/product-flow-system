@@ -20,7 +20,12 @@ test("strategy center separates company attainment from department commitments",
   assert.match(strategy, /strategyAttainment/);
   assert.match(strategy, /saveRequiredResult/);
   assert.match(strategy, /transitionCommitment/);
-  assert.match(strategy, /全部必达结果核验通过/);
+  assert.doesNotMatch(strategy, /attainment-rule/);
+  assert.match(strategy, /aria-expanded=\{expandedResultId === result\.id\}/);
+  assert.match(strategy, /role="progressbar"/);
+  assert.match(strategy, /commitmentProgress/);
+  assert.match(strategy, /saveCommitmentMilestone/);
+  assert.match(strategy, /添加部门任务/);
 });
 
 test("incentive workspace enforces budget visibility and recorded settlement", () => {
@@ -29,6 +34,9 @@ test("incentive workspace enforces budget visibility and recorded settlement", (
   assert.match(incentives, /奖金上限/);
   assert.match(incentives, /结项定奖/);
   assert.match(incentives, /settleIncentive/);
+  assert.match(incentives, /archiveIncentiveProject/);
+  assert.match(incentives, /取消项目/);
+  assert.match(incentives, /ConfirmDialog/);
 });
 
 test("operating review collects manual department reports with freeze workflow", () => {
@@ -49,11 +57,11 @@ test("personal todos route governed responsibilities to their workspaces", () =>
   assert.match(workbench, /reward_payout/);
 });
 
-test("boss cockpit summarizes governed execution across all three modules", () => {
+test("boss action desk leads governed execution and retains the three operating modules", () => {
   const home = read("src/features/company/CompanyHomePage.jsx");
   assert.match(home, /strategyAttainment/);
   assert.match(home, /三大战略达成/);
-  assert.match(home, /部门承诺异常/);
+  assert.match(home, /ExecutiveActionDesk/);
   assert.match(home, /激励项目/);
-  assert.match(home, /月报待处理/);
+  assert.match(home, /部门月报进度/);
 });
