@@ -16,6 +16,7 @@ test("the app preserves the legacy product shell for non-executive-office users"
   assert.match(html, /const COMPANY_NAV =/);
   assert.match(html, /const PRODUCT_NAV =/);
   assert.match(html, /const hasCompanyAccess = canAccessCompanyPlatform\(sessionUser\)/);
+  assert.match(html, /const collaborationEnabled = hasCompanyAccess \|\| featureFlagEnabled\("executiveCollaborationHub"\)/);
   assert.match(html, /const base = hasCompanyAccess \? COMPANY_NAV : PRODUCT_NAV/);
   assert.match(html, /collaborationEnabled \? base : base\.filter/);
   assert.match(html, /hasCompanyAccess \? "经营执行平台" : "产品全周期"/);

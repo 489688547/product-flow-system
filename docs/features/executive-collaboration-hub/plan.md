@@ -157,13 +157,14 @@ useCollaboration() -> {
 
 ## 数据迁移
 
-1. `ensureCollaborationTables` 使用 `CREATE TABLE IF NOT EXISTS` 建立三张独立表和索引，可重复执行。
+1. `migrations/0002_collaboration_execution.sql` 在上线前建立三张独立表和索引；`ensureCollaborationTables` 作为旧环境兼容兜底，两者均可重复执行。
 2. 不迁移或删除 `platform_records`、`product_flow_state`、供应链、数据中心或品牌内容表。
 3. 不把历史 `appEvents` 批量转成协同事项；产品适配器只生成用户确认的草稿。
 4. `collaboration_items.payload` 保存小型业务字段；查询和权限字段同时保留独立列，单项负载限制 32KB，避免 D1 `SQLITE_TOOBIG`。
 5. 参与者变化时在同一 `db.batch` 中更新事项、参与者索引和活动；环境不支持 batch 时返回存储错误，不执行部分成功。
 6. 版本从 1 开始，每次修改或状态动作加 1；活动不覆盖。
 7. 回滚只关闭前端功能开关并停止写入；表和历史保留，不执行破坏性 down migration。
+8. `docs/platform/environment-capabilities.json` 将三张表登记为 preview/production 阻断能力，部署后的就绪检查必须确认它们存在。
 
 ## 风险与回滚
 

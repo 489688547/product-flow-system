@@ -10,6 +10,12 @@ import { normalizeSupplyChainState } from "../../../../src/domain/supplyChain.js
 import { readSupplyState, supplyDatabase, writeSupplyState } from "../_shared/storage.js";
 
 const SYNC_DEPARTMENTS = new Set(["总经办", "供应链", "供应链部", "供应链团队", "采购部", "财务部"]);
+const APPROVAL_DETAIL_INTERVAL_MS = 35;
+const APPROVAL_THROTTLE_COOLDOWN_MS = 1100;
+
+function sleep(milliseconds) {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
 
 function upsertByProcess(records, record) {
   const found = records.some(item => item.processInstanceId === record.processInstanceId);
@@ -26,6 +32,17 @@ function belongsToSupplyChain(record, settings) {
   return !category || !prefixes.length || prefixes.some(prefix => category.startsWith(prefix));
 }
 
+function supplierNameValueMap(suppliers = []) {
+  const names = new Map();
+  for (const supplier of suppliers) {
+    const name = String(supplier?.name || "").trim();
+    const id = String(supplier?.id || "").trim();
+    if (!name || !id) continue;
+    names.set(name, names.has(name) ? "" : id);
+  }
+  return Object.fromEntries([...names].filter(([, id]) => id));
+}
+
 async function listAllInstanceIds(accessToken, input, fetchImpl) {
   const ids = [];
   const seenCursors = new Set();
@@ -39,7 +56,30 @@ async function listAllInstanceIds(accessToken, input, fetchImpl) {
   return [...new Set(ids)];
 }
 
-export async function syncSupplyApprovals({ state: inputState, accessToken, startTime, endTime, fetchImpl = fetch }) {
+function isDingTalkThrottle(error) {
+  return Number(error?.detail?.errcode) === 90018 || /(?:90018|qps.*流控|请求被暂时限制)/i.test(String(error?.message || ""));
+}
+
+async function getApprovalInstanceWithThrottleRetry(accessToken, id, fetchImpl, sleepImpl) {
+  try {
+    return await getDingApprovalInstance(accessToken, id, fetchImpl);
+  } catch (error) {
+    if (!isDingTalkThrottle(error)) throw error;
+    await sleepImpl(APPROVAL_THROTTLE_COOLDOWN_MS);
+    return getDingApprovalInstance(accessToken, id, fetchImpl);
+  }
+}
+
+async function getApprovalInstancesWithPacing(accessToken, ids, fetchImpl, sleepImpl) {
+  const instances = [];
+  for (let index = 0; index < ids.length; index += 1) {
+    if (index > 0) await sleepImpl(APPROVAL_DETAIL_INTERVAL_MS);
+    instances.push(await getApprovalInstanceWithThrottleRetry(accessToken, ids[index], fetchImpl, sleepImpl));
+  }
+  return instances;
+}
+
+export async function syncSupplyApprovals({ state: inputState, accessToken, startTime, endTime, fetchImpl = fetch, sleepImpl = sleep }) {
   const state = normalizeSupplyChainState(inputState);
   const settings = state.settings || {};
   if (!settings.purchaseProcessCode || !settings.paymentProcessCode) {
@@ -54,22 +94,27 @@ export async function syncSupplyApprovals({ state: inputState, accessToken, star
   const next = normalizeSupplyChainState(state);
   next.purchaseApprovals = next.purchaseApprovals.filter(record => belongsToSupplyChain(record, settings));
   const allowedPurchaseIds = new Set(next.purchaseApprovals.map(record => record.processInstanceId));
-  next.paymentApprovals = next.paymentApprovals.filter(record => !record.purchaseProcessInstanceId || allowedPurchaseIds.has(record.purchaseProcessInstanceId));
+  next.paymentApprovals = next.paymentApprovals.filter(record => record.purchaseProcessInstanceId && allowedPurchaseIds.has(record.purchaseProcessInstanceId));
+  const purchaseSupplierValueMap = {
+    ...supplierNameValueMap(next.suppliers),
+    ...(settings.fieldMappings?.purchase?.supplierValueMap || {})
+  };
   const synced = { purchase: 0, payment: 0, unmapped: 0, skipped: 0 };
 
   for (const config of configs) {
     const ids = await listAllInstanceIds(accessToken, { processCode: config.processCode, startTime, endTime }, fetchImpl);
-    const instances = await Promise.all(ids.map(id => getDingApprovalInstance(accessToken, id, fetchImpl)));
+    const instances = await getApprovalInstancesWithPacing(accessToken, ids, fetchImpl, sleepImpl);
     for (const instance of instances) {
       const normalized = normalizeDingSupplyApproval(instance, {
         ...(settings.fieldMappings?.[config.kind] || {}),
+        ...(config.kind === "purchase" ? { supplierValueMap: purchaseSupplierValueMap } : {}),
         kind: config.kind
       });
       if (!belongsToSupplyChain(normalized.record, settings)) {
         synced.skipped += 1;
         continue;
       }
-      if (config.kind === "payment" && normalized.record.purchaseProcessInstanceId && !allowedPurchaseIds.has(normalized.record.purchaseProcessInstanceId)) {
+      if (config.kind === "payment" && (!normalized.record.purchaseProcessInstanceId || !allowedPurchaseIds.has(normalized.record.purchaseProcessInstanceId))) {
         synced.skipped += 1;
         continue;
       }

@@ -27,8 +27,8 @@ const KeyProjectsPage = lazyNamed(() => import("./features/projects/KeyProjectsP
 const OperatingReviewPage = lazyNamed(() => import("./features/reviews/OperatingReviewPage.jsx"), "OperatingReviewPage");
 const AppCenterPage = lazyNamed(() => import("./features/platform/AppCenterPage.jsx"), "AppCenterPage");
 const IncentiveProjectsPage = lazyNamed(() => import("./features/incentives/IncentiveProjectsPage.jsx"), "IncentiveProjectsPage");
-const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
 const SupplyChainAppPage = lazyNamed(() => import("./features/supply-chain/SupplyChainAppPage.jsx"), "SupplyChainAppPage");
+const HandbookPage = lazy(() => import("./features/handbook/HandbookPage.jsx"));
 const DataCenterAppPage = lazyNamed(() => import("./features/data-center/DataCenterAppPage.jsx"), "DataCenterAppPage");
 const BrandContentOverviewPage = lazyNamed(() => import("./features/brand-content/BrandContentOverviewPage.jsx"), "BrandContentOverviewPage");
 const BrandContentWorkbenchPage = lazyNamed(() => import("./features/brand-content/BrandContentWorkbenchPage.jsx"), "BrandContentWorkbenchPage");
@@ -76,7 +76,6 @@ const BRAND_NAV = [
   ["content-issues", "数据问题", DatabaseZap, "品牌内容协同"],
   ["content-settings", "设置", SlidersHorizontal, "品牌内容协同"]
 ];
-
 const COMPANY_NAV = [
   ["home", "公司首页", LayoutDashboard, "公司经营"],
   ["strategy", "战略中心", Target, "公司经营"],
@@ -143,7 +142,7 @@ export default function App() {
   const { loading: platformLoading, error: platformError } = usePlatform();
   const { state, loading, sharedError, currentUser, setCurrentProduct } = useProductFlow();
   const hasCompanyAccess = canAccessCompanyPlatform(sessionUser);
-  const collaborationEnabled = featureFlagEnabled("executiveCollaborationHub");
+  const collaborationEnabled = hasCompanyAccess || featureFlagEnabled("executiveCollaborationHub");
   const navigation = useMemo(() => {
     const base = hasCompanyAccess ? COMPANY_NAV : PRODUCT_NAV;
     return collaborationEnabled ? base : base.filter(([key]) => key !== "collaboration");

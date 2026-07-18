@@ -43,16 +43,21 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 - Existing APIs remain internal until their contract is documented. New multi-system APIs use `/api/platform/v1/...`.
 - API changes document authentication, authorization, request, response, errors, compatibility, deprecation, observability, and contract tests.
 - Database or persisted-state changes require migration, backwards compatibility, capacity impact, and rollback notes.
+- Environment or provider configuration changes must update `docs/platform/environment-capabilities.json`, regenerate platform modules, and pass `npm run check:environment-capabilities` in the same pull request.
+- A reusable component, middleware, skill, API, integration or environment rule discovered during feature work must be written back to `AGENTS.md`, `docs/platform/`, the integration registry or an ADR before merge; feature-only notes are not a durable rule.
 
 ## Security and external systems
 
+- Before changing environment variables, bindings, D1 tables, production-data access, Cloudflare deployment behavior, or provider configuration, use `.agents/skills/environment-parity/SKILL.md`. A request to skip review does not waive automated gates, migration, rollback, or deployed production verification.
 - Before coding, debugging, reviewing, or documenting work that may touch an external platform, use `.agents/skills/integration-router/SKILL.md` and route the task through `docs/platform/integration-registry.json`.
 - Treat prompt keywords as advisory. A changed path matched by the registry is mandatory and must be declared in the pull request with `Integration-Impact` and `Integration-Impact-Reason`.
+- Every pull request must declare `Rule-Writeback` and `Rule-Writeback-Reason`. Shared API, integration, environment, migration, error-contract, production-gateway, or provider-boundary changes must update and name an applicable durable rule file; CI rejects an ungrounded `none`.
 - New branches start from the latest `main`; branches created earlier must update from `main` before merge so they receive the current registry and routing rules.
 - Never commit credentials, access tokens, cookies, personal mobile numbers, or raw provider responses containing sensitive data.
 - Company documents remain behind the existing authenticated application boundary even when all employees may view them.
 - Validate authorization on the server; hidden UI is not an authorization boundary.
 - Keep local preview, Cloudflare deployment, DingTalk embedded WebView, and external-provider verification separate.
+- Local tests may read production data only through the server-side production data gateway. Cross-environment writes require a hashed personal token, active executive identity, 15-minute unlock, version check, snapshot and audit. Database write access never implies external-provider action access.
 - Do not publish, deploy, send DingTalk actions, or change remote repository settings without the required authorization.
 
 ## Definition of done
@@ -63,6 +68,7 @@ Run all of the following from the repository root:
 npm run lint
 npm run check:governance
 npm run check:integrations
+npm run check:environment-capabilities
 npm test
 npm run build
 ```

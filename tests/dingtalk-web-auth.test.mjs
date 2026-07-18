@@ -81,6 +81,20 @@ test("browser login start redirects to DingTalk with a protected callback state"
   assert.match(response.headers.get("set-cookie"), /HttpOnly/);
 });
 
+test("Cloudflare preview login starts OAuth on the registered production origin", async () => {
+  const response = await startBrowserLogin({
+    request: new Request("https://codex-brand-content-collabor.product-flow-system.pages.dev/api/auth/dingtalk/start"),
+    env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+  });
+
+  assert.equal(response.status, 302);
+  assert.equal(
+    response.headers.get("location"),
+    "https://product-flow-system.pages.dev/api/auth/dingtalk/start"
+  );
+  assert.equal(response.headers.get("set-cookie"), null);
+});
+
 test("group authorization remembers only a safe same-origin return path", async () => {
   const response = await startBrowserLogin({
     request: new Request("https://flow.example.com/api/auth/dingtalk/start?returnTo=%2F%3FproductId%3Dp1%23progress"),
@@ -372,6 +386,41 @@ test("API middleware keeps login bootstrap routes public", async () => {
     next: async () => new Response("public", { status: 200 })
   });
   assert.equal(await response.text(), "public");
+});
+
+test("API middleware attaches an employee session on alternate token-auth routes", async () => {
+  const db = createAuthD1Mock();
+  const created = await createSession(identity, "browser", { PRODUCT_FLOW_DB: db });
+  const context = {
+    request: new Request("https://flow.example.com/api/platform/v1/environment-readiness", {
+      headers: { cookie: created.cookie }
+    }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: {},
+    next: async () => Response.json({ ok: true })
+  };
+
+  const response = await apiMiddleware(context);
+  assert.equal(response.status, 200);
+  assert.equal(context.data.session.name, "周荣庆");
+});
+
+test("API middleware allows bearer-token routes to authorize inside their handler", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/platform/v1/environment-readiness", {
+      headers: { authorization: "Bearer personal-token" }
+    }),
+    env: { PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(continued, true);
 });
 
 test("readonly sessions cannot write shared company state", async () => {
