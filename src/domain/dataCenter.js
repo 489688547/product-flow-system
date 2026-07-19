@@ -20,6 +20,8 @@ export const DATA_CENTER_STATUS = [
   "disabled"
 ];
 
+// Legacy data_sources remains metadata-only. New encrypted values belong in the
+// shared credential vault and are referenced by ID from connector instances.
 const BLOCKED_SOURCE_KEY = /(?:password|passwd|cookie|token|secret|verificationcode|smscode|session)/i;
 const COLLECTION_LIMITS = {
   sources: 200,
