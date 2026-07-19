@@ -40,7 +40,7 @@
 - Produces: `groupSidebarNavigation(navigation)` returning `{ label, items, collapsible }[]`.
 - Produces: `expandedGroupForScreen(navigation, screen)` returning a group label or `""`.
 
-- [ ] **Step 1: Write the failing domain tests**
+- [x] **Step 1: Write the failing domain tests**
 
 ```js
 import test from "node:test";
@@ -86,13 +86,13 @@ test("auto expands an active child but not the first visible overview", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify RED**
+- [x] **Step 2: Run the test and verify RED**
 
 Run: `node --test react-tests/sidebar-navigation.test.mjs`
 
 Expected: FAIL with `ERR_MODULE_NOT_FOUND` for `src/domain/sidebarNavigation.js`.
 
-- [ ] **Step 3: Add the minimal grouping implementation**
+- [x] **Step 3: Add the minimal grouping implementation**
 
 ```js
 export const COLLAPSIBLE_APP_GROUPS = new Set([
@@ -126,13 +126,13 @@ export function expandedGroupForScreen(navigation = [], screen = "") {
 }
 ```
 
-- [ ] **Step 4: Run the domain test and verify GREEN**
+- [x] **Step 4: Run the domain test and verify GREEN**
 
 Run: `node --test react-tests/sidebar-navigation.test.mjs`
 
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit the domain behavior**
+- [x] **Step 5: Commit the domain behavior**
 
 ```bash
 git add src/domain/sidebarNavigation.js react-tests/sidebar-navigation.test.mjs
