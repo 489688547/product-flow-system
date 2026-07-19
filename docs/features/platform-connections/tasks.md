@@ -59,7 +59,7 @@
   - 验证：`node --test react-tests/platform-connections.test.mjs react-tests/data-center-app.test.mjs` 和浏览器检查。
   - 提交：`feat(data): add platform connection workspace`。
 
-- [ ] 发布并验证生产连接能力
+- [x] 发布并验证生产连接能力
   - 依赖：任务 2-5。
   - 文件：清单、生成模块、平台规范和发布记录。
   - 输入：D1 迁移、Cloudflare Secret、构建产物。
@@ -68,3 +68,4 @@
   - 实现步骤：生成清单；全量验证；应用迁移；设置主密钥；部署；生产就绪验证。
   - 验证：Definition of Done 和两个平台生产验证。
   - 提交：`chore(release): publish platform connections`。
+  - 发布证据：PR #24 合并为 `7758f08`；生产 D1 已应用 `0003_platform_credentials.sql`；Cloudflare Pages 部署 `cd842966`；钉钉、快麦生产就绪检查于 2026-07-19 18:36（Asia/Shanghai）通过。
