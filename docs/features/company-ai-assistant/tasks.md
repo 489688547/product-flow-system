@@ -9,19 +9,20 @@
 
 ## 任务
 
-- [ ] 任务 1：建立 AI 数据域、Provider 元数据和平台契约
+- [x] 任务 1：建立 AI 数据域、Provider 元数据和平台契约
   - 依赖：已评审 PRD 与设计。
-  - 文件：`src/domain/aiAssistant.js`、`src/domain/dataCenter.js`、平台与角色文档、集成注册表、领域测试。
+  - 文件：`src/domain/aiAssistant.js`、`src/domain/dataCenter.js`、`migrations/0003_company_ai_assistant.sql`、环境能力、平台与角色文档、集成注册表、领域测试。
   - 输入：已确认的数据域、总经办全权限、财务默认不外发规则。
   - 输出：稳定数据域 ID、Provider 安全配置、AI 数据策略和文档契约。
   - 失败测试：领域测试因模块、默认策略和财务阻止不存在而失败。
   - 实现步骤：先实现纯归一化和策略投影，再扩展数据中心集合并生成平台清单。
-  - 验证：领域测试、治理检查、集成检查通过。
+  - 验证：领域测试、环境能力、治理检查、集成检查通过。
+  - 证据：`node --test react-tests/ai-assistant-domain.test.mjs tests/data-center-api.test.mjs tests/environment-capabilities.test.mjs`（15/15）；`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities` 通过。
   - 提交：`feat(ai): define assistant policies`。
 
 - [ ] 任务 2：实现 Provider 中立网关和灵算 Responses 适配器
   - 依赖：任务 1。
-  - 文件：`functions/api/ai/_shared/provider-config.js`、`responses-adapter.js`、`tests/ai-provider.test.mjs`。
+  - 文件：`functions/api/platform/v1/ai/_shared/provider-config.js`、`responses-adapter.js`、`tests/ai-provider.test.mjs`。
   - 输入：注册表白名单、D1 安全元数据、`LINGSUAN_API_KEY` 和可选服务端 Header Secret。
   - 输出：`resolveProviderConfig()`、`testProviderConnection()`、`streamProviderResponse()`。
   - 失败测试：缺少模块；任意 URL、缺少密钥或 `store:true` 未被拒绝。
@@ -31,7 +32,7 @@
 
 - [ ] 任务 3：实现服务端 AI 数据权限和公司上下文目录
   - 依赖：任务 1。
-  - 文件：`functions/api/ai/_shared/data-policy.js`、`context-catalog.js`、`context-builders/*`、`tests/ai-context-policy.test.mjs`。
+  - 文件：`functions/api/platform/v1/ai/_shared/data-policy.js`、`context-catalog.js`、`context-builders/*`、`tests/ai-context-policy.test.mjs`。
   - 输入：登录会话、AI 数据策略、现有产品/平台/供应链/数据中心存储。
   - 输出：`resolveAiDataAccess()`、`buildCompanyContext()` 和来源元数据。
   - 失败测试：普通员工越权、总经办全局读取、财务外发阻止、隐私字段移除和 24,000 字符上限均未实现。
@@ -41,7 +42,7 @@
 
 - [ ] 任务 4：实现 AI 状态、Provider 管理和连接测试 API
   - 依赖：任务 1、2。
-  - 文件：`functions/api/ai/status.js`、`provider.js`、`provider/test.js`、审计存储、`tests/ai-api.test.mjs`。
+  - 文件：`functions/api/platform/v1/ai/status.js`、`provider.js`、`provider/test.js`、审计存储、`tests/ai-api.test.mjs`。
   - 输入：会话、Provider 网关、D1。
   - 输出：脱敏状态、总经办配置更新、合成连接测试和无内容审计。
   - 失败测试：认证、只读、运营越权、密钥不回显、合成测试和无 D1 错误均缺失。
@@ -51,7 +52,7 @@
 
 - [ ] 任务 5：实现流式总助聊天 API
   - 依赖：任务 2、3、4。
-  - 文件：`functions/api/ai/chat.js`、并发保护与审计模块、`tests/ai-api.test.mjs`。
+  - 文件：`functions/api/platform/v1/ai/chat.js`、并发保护与审计模块、`tests/ai-api.test.mjs`。
   - 输入：最多 12 条文本消息和当前 App 提示。
   - 输出：`meta`、`text_delta`、`sources`、`usage`、`error`、`done` SSE 事件。
   - 失败测试：客户端上下文字段未拒绝、财务未阻止、消息限额/并发/流取消未处理。

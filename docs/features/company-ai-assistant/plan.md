@@ -6,7 +6,7 @@
 
 ## 架构方案
 
-采用“公司数据能力目录 → 权限与外发策略 → 上下文压缩 → Provider 中立 AI 网关 → SSE 总助 UI”的单向依赖。各业务 App 不直接调用模型；Provider 密钥只存在服务端 Secret，浏览器不提交业务数据。首期保持模块化单体，新增内部 `/api/ai/*`，不提前声明对外平台 API。
+采用“公司数据能力目录 → 权限与外发策略 → 上下文压缩 → Provider 中立 AI 网关 → SSE 总助 UI”的单向依赖。各业务 App 不直接调用模型；Provider 密钥只存在服务端 Secret，浏览器不提交业务数据。首期保持模块化单体，新增内部 `/api/platform/v1/ai/*`，不提前声明对外平台 API。
 
 平台能力判断：
 
@@ -21,7 +21,7 @@
 
 - `docs/features/company-ai-assistant/*`：产品、设计、计划和任务事实源。
 - `docs/platform/integration-registry.json`：登记灵算 Provider、域名、环境变量、代码路径和 Cloudflare 关系；实现验证前为 `integrating`，完成后按证据更新状态。
-- `docs/platform/api-catalog.md`：记录 `/api/ai/status`、`/api/ai/provider`、`/api/ai/provider/test`、`/api/ai/chat` 契约。
+- `docs/platform/api-catalog.md`：记录 `/api/platform/v1/ai/status`、`/api/platform/v1/ai/provider`、`/api/platform/v1/ai/provider/test`、`/api/platform/v1/ai/chat` 契约。
 - `docs/platform/integrations.md`：记录 Provider 密钥、数据外发和无留存审核边界。
 - `docs/platform/error-codes.md`：新增 AI 错误码。
 - `docs/product/roles-and-permissions.md`：增加 AI 数据域权限与 Provider 外发策略。
@@ -37,16 +37,16 @@
 
 ### 服务端
 
-- `functions/api/ai/_shared/provider-config.js`：合并注册表、D1 安全元数据和服务端 Secret，输出脱敏状态。
-- `functions/api/ai/_shared/responses-adapter.js`：固定白名单 URL，发送 `store:false` 与流式请求，映射 Provider 错误。
-- `functions/api/ai/_shared/data-policy.js`：根据会话、AI 数据策略和 Provider 外发策略计算允许/阻止域。
-- `functions/api/ai/_shared/context-catalog.js`：登记公司战略、项目、产品、供应链、经营、销售、数据质量和财务只读提供器。
-- `functions/api/ai/_shared/context-builders/`：按现有存储边界读取并压缩各数据域，不复制业务持久化。
-- `functions/api/ai/_shared/audit.js`：创建 D1 审计表并保存无内容元数据。
-- `functions/api/ai/status.js`：所有已登录员工读取脱敏服务状态和自身可用域。
-- `functions/api/ai/provider.js`：总经办读取和更新安全元数据，其他用户只读脱敏状态。
-- `functions/api/ai/provider/test.js`：总经办使用合成数据测试 Provider。
-- `functions/api/ai/chat.js`：校验消息、读取可信上下文、调用网关并代理 SSE。
+- `functions/api/platform/v1/ai/_shared/provider-config.js`：合并注册表、D1 安全元数据和服务端 Secret，输出脱敏状态。
+- `functions/api/platform/v1/ai/_shared/responses-adapter.js`：固定白名单 URL，发送 `store:false` 与流式请求，映射 Provider 错误。
+- `functions/api/platform/v1/ai/_shared/data-policy.js`：根据会话、AI 数据策略和 Provider 外发策略计算允许/阻止域。
+- `functions/api/platform/v1/ai/_shared/context-catalog.js`：登记公司战略、项目、产品、供应链、经营、销售、数据质量和财务只读提供器。
+- `functions/api/platform/v1/ai/_shared/context-builders/`：按现有存储边界读取并压缩各数据域，不复制业务持久化。
+- `functions/api/platform/v1/ai/_shared/audit.js`：创建 D1 审计表并保存无内容元数据。
+- `functions/api/platform/v1/ai/status.js`：所有已登录员工读取脱敏服务状态和自身可用域。
+- `functions/api/platform/v1/ai/provider.js`：总经办读取和更新安全元数据，其他用户只读脱敏状态。
+- `functions/api/platform/v1/ai/provider/test.js`：总经办使用合成数据测试 Provider。
+- `functions/api/platform/v1/ai/chat.js`：校验消息、读取可信上下文、调用网关并代理 SSE。
 - `functions/api/_middleware.js`：沿用公司会话认证，不新增公开 AI 路径。
 - `server.mjs`：本地状态/聊天兼容；未配置密钥时明确降级，外部 Provider 请求默认关闭。
 
@@ -75,21 +75,21 @@
 
 ## 接口与契约
 
-### `GET /api/ai/status`
+### `GET /api/platform/v1/ai/status`
 
 返回功能开关、脱敏 Provider 状态、当前用户可用/被阻止数据域和数据新鲜度；不返回密钥、密钥尾号、内部 Header 或未授权域是否存在数据。
 
-### `GET|PUT /api/ai/provider`
+### `GET|PUT /api/platform/v1/ai/provider`
 
 - GET：总经办获取完整安全元数据；其他已登录用户只获取启用/可用布尔状态。
 - PUT：只允许总经办非只读身份；只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled`。
 - Base URL、协议、路径、`storeResponses=false` 和 Header 白名单由服务端注册表固定。
 
-### `POST /api/ai/provider/test`
+### `POST /api/platform/v1/ai/provider/test`
 
 只接受已登记 `providerId`；使用固定合成输入，不读取公司上下文。返回 `connected`、模型、耗时、测试时间、安全错误和 request ID。
 
-### `POST /api/ai/chat`
+### `POST /api/platform/v1/ai/chat`
 
 请求：
 
@@ -113,6 +113,7 @@
 
 - 数据中心增加 `aiProviders`、`aiDataPolicies` 两个安全元数据集合；旧状态归一化时补默认值，不改现有集合。
 - D1 增加 Provider 安全配置和 `ai_usage_audit`；不复制产品、平台、供应链、销售或财务事实。
+- 迁移 `migrations/0003_company_ai_assistant.sql` 增加 `data_ai_providers`、`data_ai_policies`、`ai_usage_audit` 和 `ai_request_leases`；环境能力清单将它们登记为可选 AI 能力依赖。
 - 默认 Provider 为禁用，`secretConfigured` 运行时派生。
 - 默认数据策略允许普通内部经营域，财务为 `providerTransfer=blocked`。
 - 容量影响主要来自无内容审计行；按月保留或后续归档，首期上限 10,000 行并记录容量监控。
@@ -144,6 +145,7 @@ node --test react-tests/ai-assistant-api.test.mjs react-tests/ai-assistant-ui.te
 npm run lint
 npm run check:governance
 npm run check:integrations
+npm run check:environment-capabilities
 npm test
 npm run build
 git diff --check

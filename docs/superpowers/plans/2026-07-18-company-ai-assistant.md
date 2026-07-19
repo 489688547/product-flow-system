@@ -12,7 +12,7 @@
 
 - Work only in `/Users/roger/Documents/product-flow-system/.worktrees/company-ai-assistant` on branch `codex/company-ai-assistant`.
 - Reuse the existing authenticated `/api` middleware; no public AI route and no client-supplied role, department, permissions, or business data.
-- First Provider is `lingsuan-responses`, fixed to `https://lingsuan.top/v1/responses`, `wireApi=responses`, model `gpt-5.6-sol`, reasoning effort `xhigh`.
+- First Provider is `lingsuan-responses`, fixed to `https://lingsuan.top/responses`, `wireApi=responses`, model `gpt-5.6-sol`, reasoning effort `xhigh`.
 - Every Provider request sets `store: false`; the UI cannot configure arbitrary URLs or HTTP headers.
 - Read secrets only from `LINGSUAN_API_KEY` and optional `LINGSUAN_ACTOR_AUTHORIZATION`; never write or display either value or a suffix.
 - The previously exposed API key is revoked input and must not be used, tested, copied, logged, or committed.
@@ -38,20 +38,20 @@
 
 ### Provider gateway and governed context
 
-- `functions/api/ai/_shared/provider-config.js`: fixed Provider registry, secret resolution, safe public projection, and D1 metadata updates.
-- `functions/api/ai/_shared/responses-adapter.js`: builds `store:false` Responses requests, applies timeout, parses Provider SSE, and maps safe errors.
-- `functions/api/ai/_shared/data-policy.js`: resolves user access and Provider-transfer access per data domain.
-- `functions/api/ai/_shared/context-catalog.js`: selects and caps authorized server-side context builders.
-- `functions/api/ai/_shared/context-builders/*.js`: summarizes product, strategy, supply-chain, sales, review, and data-quality facts.
-- `functions/api/ai/_shared/audit.js`: creates and writes content-free `ai_usage_audit` records.
+- `functions/api/platform/v1/ai/_shared/provider-config.js`: fixed Provider registry, secret resolution, safe public projection, and D1 metadata updates.
+- `functions/api/platform/v1/ai/_shared/responses-adapter.js`: builds `store:false` Responses requests, applies timeout, parses Provider SSE, and maps safe errors.
+- `functions/api/platform/v1/ai/_shared/data-policy.js`: resolves user access and Provider-transfer access per data domain.
+- `functions/api/platform/v1/ai/_shared/context-catalog.js`: selects and caps authorized server-side context builders.
+- `functions/api/platform/v1/ai/_shared/context-builders/*.js`: summarizes product, strategy, supply-chain, sales, review, and data-quality facts.
+- `functions/api/platform/v1/ai/_shared/audit.js`: creates and writes content-free `ai_usage_audit` records.
 - `functions/api/platform.js`: exports the existing platform reader for internal server reuse.
 
 ### APIs
 
-- `functions/api/ai/status.js`: safe status and current-user domain availability.
-- `functions/api/ai/provider.js`: safe GET and 总经办-only PUT.
-- `functions/api/ai/provider/test.js`: 总经办-only synthetic connection test.
-- `functions/api/ai/chat.js`: validates input, builds governed context, streams SSE, and records content-free audit metadata.
+- `functions/api/platform/v1/ai/status.js`: safe status and current-user domain availability.
+- `functions/api/platform/v1/ai/provider.js`: safe GET and 总经办-only PUT.
+- `functions/api/platform/v1/ai/provider/test.js`: 总经办-only synthetic connection test.
+- `functions/api/platform/v1/ai/chat.js`: validates input, builds governed context, streams SSE, and records content-free audit metadata.
 
 ### Browser state and UI
 
@@ -110,7 +110,7 @@ test("AI domains include governed finance and cross-App operating domains", () =
 test("LingSuan defaults are fixed, disabled and non-retaining", () => {
   assert.equal(DEFAULT_AI_PROVIDER.providerId, "lingsuan-responses");
   assert.equal(DEFAULT_AI_PROVIDER.baseUrl, "https://lingsuan.top");
-  assert.equal(DEFAULT_AI_PROVIDER.responsesPath, "/v1/responses");
+  assert.equal(DEFAULT_AI_PROVIDER.responsesPath, "/responses");
   assert.equal(DEFAULT_AI_PROVIDER.model, "gpt-5.6-sol");
   assert.equal(DEFAULT_AI_PROVIDER.reasoningEffort, "xhigh");
   assert.equal(DEFAULT_AI_PROVIDER.enabled, false);
@@ -132,7 +132,7 @@ test("provider normalization drops credential-shaped and arbitrary network field
   });
   assert.equal(provider.providerId, "lingsuan-responses");
   assert.equal(provider.baseUrl, "https://lingsuan.top");
-  assert.equal(provider.responsesPath, "/v1/responses");
+  assert.equal(provider.responsesPath, "/responses");
   assert.equal(provider.storeResponses, false);
   assert.doesNotMatch(JSON.stringify(provider), /secret|authorization|apiToken/i);
 });
@@ -209,7 +209,7 @@ export const DEFAULT_AI_PROVIDER = Object.freeze({
   displayName: "灵算",
   wireApi: "responses",
   baseUrl: "https://lingsuan.top",
-  responsesPath: "/v1/responses",
+  responsesPath: "/responses",
   model: "gpt-5.6-sol",
   reasoningEffort: "xhigh",
   enabled: false,
@@ -351,8 +351,8 @@ git commit -m "feat(ai): define assistant policies"
 ### Task 2: Build the fixed Responses Provider gateway
 
 **Files:**
-- Create: `functions/api/ai/_shared/provider-config.js`
-- Create: `functions/api/ai/_shared/responses-adapter.js`
+- Create: `functions/api/platform/v1/ai/_shared/provider-config.js`
+- Create: `functions/api/platform/v1/ai/_shared/responses-adapter.js`
 - Create: `tests/ai-provider.test.mjs`
 
 **Interfaces:**
@@ -366,14 +366,14 @@ Create `tests/ai-provider.test.mjs`:
 ```js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveProviderConfig, publicProviderStatus } from "../functions/api/ai/_shared/provider-config.js";
-import { responsesRequest, streamProviderResponse, testProviderConnection } from "../functions/api/ai/_shared/responses-adapter.js";
+import { resolveProviderConfig, publicProviderStatus } from "../functions/api/platform/v1/ai/_shared/provider-config.js";
+import { responsesRequest, streamProviderResponse, testProviderConnection } from "../functions/api/platform/v1/ai/_shared/responses-adapter.js";
 
 const enabled = { providerId: "lingsuan-responses", model: "gpt-5.6-sol", reasoningEffort: "xhigh", enabled: true };
 
 test("Provider configuration is allowlisted and secret-safe", () => {
   const config = resolveProviderConfig({ env: { LINGSUAN_API_KEY: "new-secret" }, storedProvider: { ...enabled, baseUrl: "https://evil.example" } });
-  assert.equal(config.endpoint, "https://lingsuan.top/v1/responses");
+  assert.equal(config.endpoint, "https://lingsuan.top/responses");
   assert.equal(config.apiKey, "new-secret");
   assert.equal(publicProviderStatus(config).secretConfigured, true);
   assert.doesNotMatch(JSON.stringify(publicProviderStatus(config)), /new-secret/);
@@ -383,7 +383,7 @@ test("Responses request always disables storage and caps output", () => {
   const config = resolveProviderConfig({ env: { LINGSUAN_API_KEY: "new-secret" }, storedProvider: enabled });
   const request = responsesRequest(config, [{ role: "user", content: "返回 ok" }]);
   const body = JSON.parse(request.body);
-  assert.equal(request.url, "https://lingsuan.top/v1/responses");
+  assert.equal(request.url, "https://lingsuan.top/responses");
   assert.equal(body.store, false);
   assert.equal(body.stream, true);
   assert.equal(body.max_output_tokens, 2000);
@@ -425,7 +425,7 @@ Expected: FAIL with module-not-found for `provider-config.js`.
 
 - [ ] **Step 3: Implement fixed Provider resolution**
 
-Create `functions/api/ai/_shared/provider-config.js`:
+Create `functions/api/platform/v1/ai/_shared/provider-config.js`:
 
 ```js
 import { DEFAULT_AI_PROVIDER, normalizeAiProvider } from "../../../../src/domain/aiAssistant.js";
@@ -433,7 +433,7 @@ import { DEFAULT_AI_PROVIDER, normalizeAiProvider } from "../../../../src/domain
 export const PROVIDER_REGISTRY = Object.freeze({
   "lingsuan-responses": Object.freeze({
     ...DEFAULT_AI_PROVIDER,
-    endpoint: "https://lingsuan.top/v1/responses",
+    endpoint: "https://lingsuan.top/responses",
     apiKeyEnv: "LINGSUAN_API_KEY",
     actorHeaderEnv: "LINGSUAN_ACTOR_AUTHORIZATION"
   })
@@ -474,7 +474,7 @@ export function publicProviderStatus(config) {
 
 - [ ] **Step 4: Implement request building, SSE parsing, timeout and safe errors**
 
-Create `functions/api/ai/_shared/responses-adapter.js`:
+Create `functions/api/platform/v1/ai/_shared/responses-adapter.js`:
 
 ```js
 const TIMEOUT_MS = 45_000;
@@ -569,7 +569,7 @@ export async function testProviderConnection({ config, fetchImpl = fetch } = {})
 
 ```bash
 node --test tests/ai-provider.test.mjs
-git add functions/api/ai/_shared/provider-config.js functions/api/ai/_shared/responses-adapter.js tests/ai-provider.test.mjs
+git add functions/api/platform/v1/ai/_shared/provider-config.js functions/api/platform/v1/ai/_shared/responses-adapter.js tests/ai-provider.test.mjs
 git commit -m "feat(ai): add responses provider gateway"
 ```
 
@@ -580,12 +580,12 @@ Expected: Provider tests PASS; no network request leaves the test process.
 ### Task 3: Enforce AI data permissions and build trusted company context
 
 **Files:**
-- Create: `functions/api/ai/_shared/data-policy.js`
-- Create: `functions/api/ai/_shared/context-catalog.js`
-- Create: `functions/api/ai/_shared/context-builders/product.js`
-- Create: `functions/api/ai/_shared/context-builders/strategy.js`
-- Create: `functions/api/ai/_shared/context-builders/supply-chain.js`
-- Create: `functions/api/ai/_shared/context-builders/data-center.js`
+- Create: `functions/api/platform/v1/ai/_shared/data-policy.js`
+- Create: `functions/api/platform/v1/ai/_shared/context-catalog.js`
+- Create: `functions/api/platform/v1/ai/_shared/context-builders/product.js`
+- Create: `functions/api/platform/v1/ai/_shared/context-builders/strategy.js`
+- Create: `functions/api/platform/v1/ai/_shared/context-builders/supply-chain.js`
+- Create: `functions/api/platform/v1/ai/_shared/context-builders/data-center.js`
 - Create: `tests/ai-context-policy.test.mjs`
 - Modify: `functions/api/platform.js`
 
@@ -601,8 +601,8 @@ Create `tests/ai-context-policy.test.mjs`:
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createDefaultAiDataPolicies } from "../src/domain/aiAssistant.js";
-import { resolveAiDataAccess } from "../functions/api/ai/_shared/data-policy.js";
-import { buildCompanyContext } from "../functions/api/ai/_shared/context-catalog.js";
+import { resolveAiDataAccess } from "../functions/api/platform/v1/ai/_shared/data-policy.js";
+import { buildCompanyContext } from "../functions/api/platform/v1/ai/_shared/context-catalog.js";
 
 test("总经办 receives all internal domains but finance remains transfer-blocked", () => {
   const access = resolveAiDataAccess({ session: { department: "总经办", title: "总经理" }, policies: createDefaultAiDataPolicies(), providerId: "lingsuan-responses" });
@@ -642,7 +642,7 @@ Expected: FAIL because `data-policy.js` and `context-catalog.js` do not exist.
 
 - [ ] **Step 3: Implement user and transfer policy resolution**
 
-Create `functions/api/ai/_shared/data-policy.js`:
+Create `functions/api/platform/v1/ai/_shared/data-policy.js`:
 
 ```js
 import { canAccessCompanyPlatform } from "../../../../src/domain/permissions.js";
@@ -683,7 +683,7 @@ In `functions/api/platform.js`, export the existing reader without changing its 
 export async function readPlatformState(db) {
 ```
 
-Create `functions/api/ai/_shared/context-builders/product.js`:
+Create `functions/api/platform/v1/ai/_shared/context-builders/product.js`:
 
 ```js
 import { readCompanyState } from "../../../state.js";
@@ -702,7 +702,7 @@ export async function buildProductContext(db) {
 }
 ```
 
-Create `functions/api/ai/_shared/context-builders/strategy.js`:
+Create `functions/api/platform/v1/ai/_shared/context-builders/strategy.js`:
 
 ```js
 import { readPlatformState } from "../../../platform.js";
@@ -722,7 +722,7 @@ export async function buildStrategyContext(db) {
 }
 ```
 
-Create `functions/api/ai/_shared/context-builders/supply-chain.js`:
+Create `functions/api/platform/v1/ai/_shared/context-builders/supply-chain.js`:
 
 ```js
 import { readSupplyState } from "../../../supply-chain/_shared/storage.js";
@@ -742,7 +742,7 @@ export async function buildSupplyChainContext(db) {
 }
 ```
 
-Create `functions/api/ai/_shared/context-builders/data-center.js` with non-financial sales selection:
+Create `functions/api/platform/v1/ai/_shared/context-builders/data-center.js` with non-financial sales selection:
 
 ```js
 import { readDataCenterState } from "../../../data-center/_shared/storage.js";
@@ -764,7 +764,7 @@ export async function buildSalesOperationsContext(db) {
 
 - [ ] **Step 5: Implement the capped context catalog and redaction**
 
-Create `functions/api/ai/_shared/context-catalog.js`:
+Create `functions/api/platform/v1/ai/_shared/context-catalog.js`:
 
 ```js
 import { buildProductContext } from "./context-builders/product.js";
@@ -817,7 +817,7 @@ export async function buildCompanyContext({ db, access, question, builders = DEF
 
 ```bash
 node --test tests/ai-context-policy.test.mjs
-git add functions/api/platform.js functions/api/ai/_shared/data-policy.js functions/api/ai/_shared/context-catalog.js functions/api/ai/_shared/context-builders tests/ai-context-policy.test.mjs
+git add functions/api/platform.js functions/api/platform/v1/ai/_shared/data-policy.js functions/api/platform/v1/ai/_shared/context-catalog.js functions/api/platform/v1/ai/_shared/context-builders tests/ai-context-policy.test.mjs
 git commit -m "feat(ai): build governed company context"
 ```
 
@@ -828,17 +828,17 @@ Expected: tests PASS; finance has no registered builder for the current Provider
 ### Task 4: Add safe status, Provider management, connection test, and audit APIs
 
 **Files:**
-- Create: `functions/api/ai/_shared/audit.js`
-- Create: `functions/api/ai/status.js`
-- Create: `functions/api/ai/provider.js`
-- Create: `functions/api/ai/provider/test.js`
+- Create: `functions/api/platform/v1/ai/_shared/audit.js`
+- Create: `functions/api/platform/v1/ai/status.js`
+- Create: `functions/api/platform/v1/ai/provider.js`
+- Create: `functions/api/platform/v1/ai/provider/test.js`
 - Create: `tests/ai-api.test.mjs`
 - Modify: `docs/platform/api-catalog.md`
 - Modify: `docs/platform/error-codes.md`
 
 **Interfaces:**
 - Consumes: Data Center D1 state, `resolveProviderConfig`, `publicProviderStatus`, `resolveAiDataAccess`, `testProviderConnection`, trusted `data.session`.
-- Produces: authenticated `/api/ai/status`, `/api/ai/provider`, `/api/ai/provider/test`, plus `writeAiAudit(db, record)`, `acquireAiLease(db, userId, requestId, now)`, and `releaseAiLease(db, userId, requestId)`.
+- Produces: authenticated `/api/platform/v1/ai/status`, `/api/platform/v1/ai/provider`, `/api/platform/v1/ai/provider/test`, plus `writeAiAudit(db, record)`, `acquireAiLease(db, userId, requestId, now)`, and `releaseAiLease(db, userId, requestId)`.
 
 - [ ] **Step 1: Write failing API tests for authentication, permissions and secret redaction**
 
@@ -847,18 +847,18 @@ Create `tests/ai-api.test.mjs` with a small D1 mock that supports Data Center ta
 ```js
 import test from "node:test";
 import assert from "node:assert/strict";
-import { onRequest as statusRequest } from "../functions/api/ai/status.js";
-import { onRequest as providerRequest } from "../functions/api/ai/provider.js";
-import { onRequest as providerTestRequest } from "../functions/api/ai/provider/test.js";
-import { acquireAiLease, releaseAiLease } from "../functions/api/ai/_shared/audit.js";
+import { onRequest as statusRequest } from "../functions/api/platform/v1/ai/status.js";
+import { onRequest as providerRequest } from "../functions/api/platform/v1/ai/provider.js";
+import { onRequest as providerTestRequest } from "../functions/api/platform/v1/ai/provider/test.js";
+import { acquireAiLease, releaseAiLease } from "../functions/api/platform/v1/ai/_shared/audit.js";
 import { createAiD1Mock } from "./helpers/ai-d1-mock.mjs";
 
 const executive = { userId: "u-1", name: "周总", department: "总经办", title: "总经理", role: "executive" };
 
 test("AI status is authenticated, flag-gated and secret-safe", async () => {
-  const missing = await statusRequest({ request: new Request("https://flow.example.com/api/ai/status"), env: {}, data: {} });
+  const missing = await statusRequest({ request: new Request("https://flow.example.com/api/platform/v1/ai/status"), env: {}, data: {} });
   assert.equal(missing.status, 401);
-  const response = await statusRequest({ request: new Request("https://flow.example.com/api/ai/status"), env: { PRODUCT_FLOW_DB: createAiD1Mock(), AI_ASSISTANT_ENABLED: "1", LINGSUAN_API_KEY: "new-secret" }, data: { session: executive } });
+  const response = await statusRequest({ request: new Request("https://flow.example.com/api/platform/v1/ai/status"), env: { PRODUCT_FLOW_DB: createAiD1Mock(), AI_ASSISTANT_ENABLED: "1", LINGSUAN_API_KEY: "new-secret" }, data: { session: executive } });
   const body = await response.json();
   assert.equal(body.enabled, true);
   assert.equal(body.provider.secretConfigured, true);
@@ -868,11 +868,11 @@ test("AI status is authenticated, flag-gated and secret-safe", async () => {
 
 test("only non-readonly 总经办 can update or test the Provider", async () => {
   const db = createAiD1Mock();
-  const update = body => providerRequest({ request: new Request("https://flow.example.com/api/ai/provider", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), env: { PRODUCT_FLOW_DB: db, AI_ASSISTANT_ENABLED: "1", LINGSUAN_API_KEY: "new-secret" }, data: { session: { name: "运营", department: "运营部", role: "operator" } } });
+  const update = body => providerRequest({ request: new Request("https://flow.example.com/api/platform/v1/ai/provider", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }), env: { PRODUCT_FLOW_DB: db, AI_ASSISTANT_ENABLED: "1", LINGSUAN_API_KEY: "new-secret" }, data: { session: { name: "运营", department: "运营部", role: "operator" } } });
   assert.equal((await update({ providerId: "lingsuan-responses", enabled: true })).status, 403);
-  const readonly = await providerRequest({ request: new Request("https://flow.example.com/api/ai/provider", { method: "PUT", body: "{}" }), env: { PRODUCT_FLOW_DB: db }, data: { session: { ...executive, role: "readonly" } } });
+  const readonly = await providerRequest({ request: new Request("https://flow.example.com/api/platform/v1/ai/provider", { method: "PUT", body: "{}" }), env: { PRODUCT_FLOW_DB: db }, data: { session: { ...executive, role: "readonly" } } });
   assert.equal(readonly.status, 403);
-  const tested = await providerTestRequest({ request: new Request("https://flow.example.com/api/ai/provider/test", { method: "POST" }), env: { PRODUCT_FLOW_DB: db }, data: { session: { name: "运营", department: "运营部" } } });
+  const tested = await providerTestRequest({ request: new Request("https://flow.example.com/api/platform/v1/ai/provider/test", { method: "POST" }), env: { PRODUCT_FLOW_DB: db }, data: { session: { name: "运营", department: "运营部" } } });
   assert.equal(tested.status, 403);
 });
 
@@ -954,7 +954,7 @@ Expected: FAIL because the AI API modules do not exist.
 
 - [ ] **Step 3: Implement content-free audit storage**
 
-Create `functions/api/ai/_shared/audit.js`:
+Create `functions/api/platform/v1/ai/_shared/audit.js`:
 
 ```js
 export async function ensureAiAuditTable(db) {
@@ -1010,7 +1010,7 @@ export async function writeAiAudit(db, record = {}) {
 
 - [ ] **Step 4: Implement shared AI API helpers and the three routes**
 
-Add `functions/api/ai/_shared/http.js`:
+Add `functions/api/platform/v1/ai/_shared/http.js`:
 
 ```js
 import { jsonResponse } from "../../dingtalk/_shared/dingtalk.js";
@@ -1033,7 +1033,7 @@ export async function loadAiConfiguration(env) {
 }
 ```
 
-Implement `functions/api/ai/status.js`:
+Implement `functions/api/platform/v1/ai/status.js`:
 
 ```js
 import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
@@ -1054,7 +1054,7 @@ export async function onRequest({ request, env, data = {} }) {
 }
 ```
 
-Implement `functions/api/ai/provider.js`:
+Implement `functions/api/platform/v1/ai/provider.js`:
 
 ```js
 import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
@@ -1081,7 +1081,7 @@ export async function onRequest({ request, env, data = {} }) {
 }
 ```
 
-Implement `functions/api/ai/provider/test.js`:
+Implement `functions/api/platform/v1/ai/provider/test.js`:
 
 ```js
 import { jsonResponse, optionsResponse } from "../../dingtalk/_shared/dingtalk.js";
@@ -1111,10 +1111,10 @@ export async function onRequest({ request, env, data = {} }) {
 Append this table to `docs/platform/api-catalog.md`:
 
 ```markdown
-| `GET /api/ai/status` | DingTalk session | All employees | Safe feature, Provider and current-user domain state |
-| `GET /api/ai/provider` | DingTalk session | All employees; policies only for 总经办 | Secret-free Provider state |
-| `PUT /api/ai/provider` | DingTalk session | Non-readonly 总经办 | Update allowlisted model metadata and enabled state |
-| `POST /api/ai/provider/test` | DingTalk session | Non-readonly 总经办 | Synthetic `store:false` Provider test; never loads company context |
+| `GET /api/platform/v1/ai/status` | DingTalk session | All employees | Safe feature, Provider and current-user domain state |
+| `GET /api/platform/v1/ai/provider` | DingTalk session | All employees; policies only for 总经办 | Secret-free Provider state |
+| `PUT /api/platform/v1/ai/provider` | DingTalk session | Non-readonly 总经办 | Update allowlisted model metadata and enabled state |
+| `POST /api/platform/v1/ai/provider/test` | DingTalk session | Non-readonly 总经办 | Synthetic `store:false` Provider test; never loads company context |
 ```
 
 Append to `docs/platform/error-codes.md`:
@@ -1137,7 +1137,7 @@ Append to `docs/platform/error-codes.md`:
 
 ```bash
 node --test tests/ai-api.test.mjs tests/ai-provider.test.mjs
-git add functions/api/ai tests/ai-api.test.mjs tests/helpers/ai-d1-mock.mjs docs/platform/api-catalog.md docs/platform/error-codes.md
+git add functions/api/platform/v1/ai tests/ai-api.test.mjs tests/helpers/ai-d1-mock.mjs docs/platform/api-catalog.md docs/platform/error-codes.md
 git commit -m "feat(ai): add provider management APIs"
 ```
 
@@ -1148,24 +1148,24 @@ Expected: tests PASS and serialized responses contain no secret.
 ### Task 5: Stream governed assistant chat
 
 **Files:**
-- Create: `functions/api/ai/chat.js`
+- Create: `functions/api/platform/v1/ai/chat.js`
 - Modify: `tests/ai-api.test.mjs`
 
 **Interfaces:**
 - Consumes: `loadAiConfiguration(env)`, `resolveAiDataAccess`, `buildCompanyContext`, `streamProviderResponse`, `writeAiAudit`.
-- Produces: `POST /api/ai/chat` with SSE events `meta`, `text_delta`, `sources`, `usage`, `error`, `done`.
+- Produces: `POST /api/platform/v1/ai/chat` with SSE events `meta`, `text_delta`, `sources`, `usage`, `error`, `done`.
 
 - [ ] **Step 1: Add failing chat validation and SSE tests**
 
 Append to `tests/ai-api.test.mjs`:
 
 ```js
-import { onRequest as chatRequest } from "../functions/api/ai/chat.js";
+import { onRequest as chatRequest } from "../functions/api/platform/v1/ai/chat.js";
 
 test("chat rejects excess messages and ignores client authority fields", async () => {
   const db = createAiD1Mock();
   const response = await chatRequest({
-    request: new Request("https://flow.example.com/api/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
       messages: Array.from({ length: 13 }, (_, index) => ({ role: "user", content: `问题 ${index}` })),
       role: "executive", allowedDomains: ["finance"], companyState: { secret: true }
     }) }),
@@ -1179,7 +1179,7 @@ test("chat rejects excess messages and ignores client authority fields", async (
 test("chat emits governed metadata, finance exclusion and completion", async () => {
   const db = createAiD1Mock({ providerEnabled: true });
   const response = await chatRequest({
-    request: new Request("https://flow.example.com/api/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "今天最需要关注什么？" }], appHint: { screen: "home", detail: "" } }) }),
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "今天最需要关注什么？" }], appHint: { screen: "home", detail: "" } }) }),
     env: { PRODUCT_FLOW_DB: db, AI_ASSISTANT_ENABLED: "1", LINGSUAN_API_KEY: "new-secret", AI_PROVIDER_FETCH: async () => new Response("event: response.output_text.delta\ndata: {\"delta\":\"关注项目风险\"}\n\nevent: response.completed\ndata: {\"response\":{\"usage\":{\"input_tokens\":10,\"output_tokens\":4}}}\n\n", { status: 200 }) },
     data: { session: executive }
   });
@@ -1199,11 +1199,11 @@ test("chat emits governed metadata, finance exclusion and completion", async () 
 node --test tests/ai-api.test.mjs
 ```
 
-Expected: FAIL with module-not-found for `functions/api/ai/chat.js`.
+Expected: FAIL with module-not-found for `functions/api/platform/v1/ai/chat.js`.
 
 - [ ] **Step 3: Implement request validation and SSE formatting**
 
-Create `functions/api/ai/chat.js`:
+Create `functions/api/platform/v1/ai/chat.js`:
 
 ```js
 import { optionsResponse } from "../dingtalk/_shared/dingtalk.js";
@@ -1311,7 +1311,7 @@ export async function onRequest({ request, env, data = {} }) {
 
 ```bash
 node --test tests/ai-api.test.mjs tests/ai-provider.test.mjs tests/ai-context-policy.test.mjs
-git add functions/api/ai/chat.js tests/ai-api.test.mjs
+git add functions/api/platform/v1/ai/chat.js tests/ai-api.test.mjs
 git commit -m "feat(ai): stream governed assistant responses"
 ```
 
@@ -1330,7 +1330,7 @@ Expected: all three suites PASS; audit mock rows contain no prompt or answer.
 - Modify: `tests/local-data-center-server.test.mjs`
 
 **Interfaces:**
-- Consumes: `/api/ai/status`, `/api/ai/provider`, `/api/ai/provider/test`, `/api/ai/chat` SSE.
+- Consumes: `/api/platform/v1/ai/status`, `/api/platform/v1/ai/provider`, `/api/platform/v1/ai/provider/test`, `/api/platform/v1/ai/chat` SSE.
 - Produces: `useAiAssistant()` with `{ status, panelOpen, messages, sending, error, open, close, send, stop, retry, clear, refreshStatus }`.
 
 - [ ] **Step 1: Write failing API/parser and Provider source tests**
@@ -1399,19 +1399,19 @@ async function jsonPayload(response, fallback) {
 }
 
 export async function loadAiStatus(fetchImpl = fetch) {
-  return jsonPayload(await fetchImpl("/api/ai/status"), "AI 总助状态加载失败。");
+  return jsonPayload(await fetchImpl("/api/platform/v1/ai/status"), "AI 总助状态加载失败。");
 }
 
 export async function loadAiProvider(fetchImpl = fetch) {
-  return jsonPayload(await fetchImpl("/api/ai/provider"), "模型服务状态加载失败。");
+  return jsonPayload(await fetchImpl("/api/platform/v1/ai/provider"), "模型服务状态加载失败。");
 }
 
 export async function saveAiProvider(provider, fetchImpl = fetch) {
-  return jsonPayload(await fetchImpl("/api/ai/provider", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId: provider.providerId, model: provider.model, reasoningEffort: provider.reasoningEffort, enabled: provider.enabled }) }), "模型服务保存失败。");
+  return jsonPayload(await fetchImpl("/api/platform/v1/ai/provider", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ providerId: provider.providerId, model: provider.model, reasoningEffort: provider.reasoningEffort, enabled: provider.enabled }) }), "模型服务保存失败。");
 }
 
 export async function testAiProvider(fetchImpl = fetch) {
-  return jsonPayload(await fetchImpl("/api/ai/provider/test", { method: "POST" }), "模型服务连接测试失败。");
+  return jsonPayload(await fetchImpl("/api/platform/v1/ai/provider/test", { method: "POST" }), "模型服务连接测试失败。");
 }
 
 export async function* parseAiSse(stream) {
@@ -1434,7 +1434,7 @@ export async function* parseAiSse(stream) {
 }
 
 export async function sendAiChat({ messages, appHint, signal, fetchImpl = fetch, onEvent }) {
-  const response = await fetchImpl("/api/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages, appHint }), signal });
+  const response = await fetchImpl("/api/platform/v1/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages, appHint }), signal });
   if (!response.ok) return jsonPayload(response, "AI 总助暂不可用。");
   for await (const event of parseAiSse(response.body)) onEvent(event);
 }
@@ -1523,7 +1523,7 @@ async function handleLocalAiPreview(req, res, url) {
     ...provider,
     secretConfigured: Boolean(process.env.LINGSUAN_API_KEY)
   };
-  if (req.method === "GET" && url.pathname === "/api/ai/status") {
+  if (req.method === "GET" && url.pathname === "/api/platform/v1/ai/status") {
     json(res, 200, {
       enabled: process.env.AI_ASSISTANT_ENABLED === "1",
       ready: provider.enabled && publicProvider.secretConfigured,
@@ -1534,7 +1534,7 @@ async function handleLocalAiPreview(req, res, url) {
     });
     return;
   }
-  if (req.method === "GET" && url.pathname === "/api/ai/provider") {
+  if (req.method === "GET" && url.pathname === "/api/platform/v1/ai/provider") {
     json(res, 200, { provider: publicProvider, policies: state.aiDataPolicies || [], localPreview: true });
     return;
   }
@@ -1545,7 +1545,7 @@ async function handleLocalAiPreview(req, res, url) {
 Register the routes before the generic 404 path:
 
 ```js
-if (["/api/ai/status", "/api/ai/provider", "/api/ai/provider/test", "/api/ai/chat"].includes(url.pathname)) {
+if (["/api/platform/v1/ai/status", "/api/platform/v1/ai/provider", "/api/platform/v1/ai/provider/test", "/api/platform/v1/ai/chat"].includes(url.pathname)) {
   await handleLocalAiPreview(req, res, url);
   return;
 }
@@ -1962,10 +1962,10 @@ Add this integration object to `docs/platform/integration-registry.json` using t
   "capabilities": ["流式 Responses", "固定 Provider 白名单", "store false", "合成连接测试", "数据域外发策略"],
   "businessQuestions": ["AI 总助未启用", "模型服务密钥缺失", "回答超时或限流", "数据域未纳入", "财务数据外发阻止"],
   "keywords": ["灵算", "AI 总助", "Responses", "LINGSUAN_API_KEY"],
-  "codePaths": ["functions/api/ai/**", "src/state/aiAssistantApi.js", "src/state/AiAssistantProvider.jsx", "src/features/ai-assistant/**", "src/features/data-center/AiProviderSettings.jsx"],
+  "codePaths": ["functions/api/platform/v1/ai/**", "src/state/aiAssistantApi.js", "src/state/AiAssistantProvider.jsx", "src/features/ai-assistant/**", "src/features/data-center/AiProviderSettings.jsx"],
   "envVars": ["AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"],
   "domains": ["lingsuan.top"],
-  "apiRoutes": ["/api/ai/status", "/api/ai/provider", "/api/ai/provider/test", "/api/ai/chat"],
+  "apiRoutes": ["/api/platform/v1/ai/status", "/api/platform/v1/ai/provider", "/api/platform/v1/ai/provider/test", "/api/platform/v1/ai/chat"],
   "publicDocs": [],
   "evidence": ["tests/ai-provider.test.mjs", "tests/ai-context-policy.test.mjs", "tests/ai-api.test.mjs"],
   "relations": [
@@ -1990,8 +1990,8 @@ Append to `docs/platform/integrations.md`:
 ```markdown
 ## 公司 AI 总助 Provider
 
-- Browser routes call only authenticated `/api/ai/*`; business facts are loaded from D1 by server-side context builders.
-- `lingsuan-responses` is fixed to `https://lingsuan.top/v1/responses`; arbitrary URLs and headers are rejected by construction.
+- Browser routes call only authenticated `/api/platform/v1/ai/*`; business facts are loaded from D1 by server-side context builders.
+- `lingsuan-responses` is fixed to `https://lingsuan.top/responses`; arbitrary URLs and headers are rejected by construction.
 - `LINGSUAN_API_KEY` and optional `LINGSUAN_ACTOR_AUTHORIZATION` are Cloudflare Secrets and never enter D1, UI responses, logs, or client bundles.
 - Every request uses `store:false`. The synthetic connection test sends only `返回 ok` and never loads company context.
 - Finance remains blocked from this Provider for every user until a separate reviewed non-retention commitment changes the durable policy.

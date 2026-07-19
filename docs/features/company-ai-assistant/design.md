@@ -41,7 +41,7 @@
 ## 交互流程
 
 1. 点击“AI 总助”后面板从右侧进入，焦点移到标题；原页面保持可见且不改变路由。
-2. 首次打开读取 `/api/ai/status`，展示功能、Provider、密钥和可用数据域状态。
+2. 首次打开读取 `/api/platform/v1/ai/status`，展示功能、Provider、密钥和可用数据域状态。
 3. 点击快捷问题或输入问题后，前端只提交消息历史和当前路由提示。
 4. 服务端返回首个 SSE 元事件，声明 request ID、允许域和被阻止域；UI 先展示数据范围再接收正文。
 5. 文本增量逐步追加；来源事件更新回答下方的 App 标签和数据日期。
@@ -128,7 +128,7 @@
 
 ```mermaid
 flowchart LR
-  Browser["总助 UI"] --> Api["/api/ai/chat"]
+  Browser["总助 UI"] --> Api["/api/platform/v1/ai/chat"]
   Api --> Auth["身份与 AI 数据权限"]
   Auth --> Catalog["公司数据能力目录"]
   Catalog --> Context["筛选 脱敏 压缩"]
