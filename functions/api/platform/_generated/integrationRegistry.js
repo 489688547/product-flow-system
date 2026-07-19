@@ -190,9 +190,12 @@ const integrationRegistry = {
         "404.html",
         "public/404.html",
         "_redirects",
+        "wrangler.toml",
         ".github/workflows/**"
       ],
-      "envVars": [],
+      "envVars": [
+        "LOCAL_LIVE_D1_PREVIEW"
+      ],
       "domains": [
         "pages.dev",
         "api.cloudflare.com",
@@ -217,7 +220,8 @@ const integrationRegistry = {
         "functions/",
         "src/state/deploymentRecovery.js",
         "docs/platform/architecture.md",
-        "scripts/prepare-pages-release.mjs"
+        "scripts/prepare-pages-release.mjs",
+        "wrangler.toml"
       ],
       "relations": [
         {
