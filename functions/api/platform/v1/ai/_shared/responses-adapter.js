@@ -10,7 +10,7 @@ function providerError(status) {
   return aiError("AI_PROVIDER_UNAVAILABLE", "模型服务暂不可用。", 502, status >= 500);
 }
 
-export function responsesRequest(config, input, { tools = [] } = {}) {
+export function responsesRequest(config, input, { tools = [], toolChoice = "auto" } = {}) {
   if (!config?.secretConfigured) {
     throw aiError("AI_PROVIDER_SECRET_MISSING", "模型服务尚未配置新的服务端密钥。", 503, false);
   }
@@ -29,7 +29,7 @@ export function responsesRequest(config, input, { tools = [] } = {}) {
   };
   if (Array.isArray(tools) && tools.length > 0) {
     payload.tools = tools;
-    payload.tool_choice = "auto";
+    payload.tool_choice = toolChoice;
   }
   const body = JSON.stringify(payload);
   return {
@@ -122,8 +122,8 @@ function outputItemEvents(item) {
   return events;
 }
 
-export async function* streamProviderResponse({ config, input, tools = [], fetchImpl = fetch, signal, timeoutMs = TIMEOUT_MS } = {}) {
-  const request = responsesRequest(config, input, { tools });
+export async function* streamProviderResponse({ config, input, tools = [], toolChoice = "auto", fetchImpl = fetch, signal, timeoutMs = TIMEOUT_MS } = {}) {
+  const request = responsesRequest(config, input, { tools, toolChoice });
   const managedSignal = requestSignal(signal, timeoutMs);
   const emittedItems = new Set();
   try {
@@ -174,7 +174,7 @@ const SYNTHETIC_STATUS_TOOL = Object.freeze({
   type: "function",
   name: "lookup_status",
   description: "读取合成状态",
-  parameters: Object.freeze({ type: "object", properties: Object.freeze({}), additionalProperties: false }),
+  parameters: Object.freeze({ type: "object", properties: Object.freeze({}), required: Object.freeze([]), additionalProperties: false }),
   strict: true
 });
 
@@ -185,7 +185,13 @@ export async function testProviderSkillConnection({ config, fetchImpl = fetch } 
     const input = [{ role: "user", content: "调用 lookup_status 获取合成状态，然后只返回 ok" }];
     const outputItems = [];
     const calls = [];
-    for await (const event of streamProviderResponse({ config, input, tools: [SYNTHETIC_STATUS_TOOL], fetchImpl })) {
+    for await (const event of streamProviderResponse({
+      config,
+      input,
+      tools: [SYNTHETIC_STATUS_TOOL],
+      toolChoice: { type: "function", name: SYNTHETIC_STATUS_TOOL.name },
+      fetchImpl
+    })) {
       if (event.type === "output_item") outputItems.push(event.item);
       if (event.type === "function_call") calls.push(event);
     }
@@ -206,6 +212,7 @@ export async function testProviderSkillConnection({ config, fetchImpl = fetch } 
       config,
       input: [...input, ...outputItems, { type: "function_call_output", call_id: calls[0].callId, output: JSON.stringify({ ok: true }) }],
       tools: [SYNTHETIC_STATUS_TOOL],
+      toolChoice: "none",
       fetchImpl
     })) {
       if (event.type === "text_delta") text += event.delta;

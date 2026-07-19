@@ -58,6 +58,15 @@ test("Responses request adds only strict registered function tools when supplied
   assert.equal(body.store, false);
 });
 
+test("Responses request can force one synthetic function without changing normal auto choice", async () => {
+  const { resolveProviderConfig } = await import(configUrl);
+  const { responsesRequest } = await import(adapterUrl);
+  const config = resolveProviderConfig({ env: { LINGSUAN_API_KEY: fakeSecret }, storedProvider: enabled });
+  const tool = { type: "function", name: "lookup_status", description: "读取合成状态", parameters: { type: "object", properties: {}, required: [], additionalProperties: false }, strict: true };
+  const forced = JSON.parse(responsesRequest(config, [], { tools: [tool], toolChoice: { type: "function", name: "lookup_status" } }).body);
+  assert.deepEqual(forced.tool_choice, { type: "function", name: "lookup_status" });
+});
+
 test("Responses request refuses a missing server-side secret", async () => {
   const { resolveProviderConfig } = await import(configUrl);
   const { responsesRequest } = await import(adapterUrl);
@@ -124,12 +133,14 @@ test("synthetic skill capability test completes a function call without company 
       assert.equal(request.tools[0].name, "lookup_status");
       assert.doesNotMatch(init.body, /公司|销售|财务/);
       if (calls === 1) {
+        assert.deepEqual(request.tool_choice, { type: "function", name: "lookup_status" });
         const item = { type: "function_call", id: "fc-1", call_id: "call-1", name: "lookup_status", arguments: "{}" };
         return new Response([
           `event: response.output_item.done\ndata: ${JSON.stringify({ item })}\n\n`,
           `event: response.completed\ndata: ${JSON.stringify({ response: { output: [item] } })}\n\n`
         ].join(""), { status: 200 });
       }
+      assert.equal(request.tool_choice, "none");
       assert.ok(request.input.some(item => item.type === "function_call" && item.call_id === "call-1"));
       assert.ok(request.input.some(item => item.type === "function_call_output" && item.call_id === "call-1" && item.output === '{"ok":true}'));
       return new Response([

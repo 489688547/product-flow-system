@@ -88,7 +88,7 @@ export function AiProviderSettings() {
       const result = await testAiProvider();
       setNotice(result.skillsSupported
         ? `连接与只读 Skill 能力测试通过，耗时 ${result.latencyMs || 0} ms。`
-        : "模型连接通过，但按需查询能力未通过；总助将使用只读摘要模式。");
+        : `模型连接通过，但按需查询能力未通过（${result.skillError?.code || "AI_PROVIDER_SKILLS_UNSUPPORTED"}）；总助将使用只读摘要模式。`);
       const next = await loadAiProvider();
       setData(next);
       setDraft(providerDraft(next.provider));
