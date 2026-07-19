@@ -7,6 +7,14 @@ import { Modal } from "../../ui/Modal.jsx";
 
 const money = value => `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const approved = status => ["COMPLETED", "APPROVED", "AGREE"].includes(String(status || "").toUpperCase());
+const mappingStatus = row => {
+  const supplierMapped = Boolean(row.supplierId);
+  const productMapped = Boolean(row.productIds?.length);
+  if (supplierMapped && productMapped) return { label: "已映射", tone: "success" };
+  if (supplierMapped) return { label: "供应商已关联 · 产品待关联", tone: "warning" };
+  if (productMapped) return { label: "产品已关联 · 供应商待关联", tone: "warning" };
+  return { label: "供应商与产品待关联", tone: "warning" };
+};
 
 export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
   const { state, dispatch, syncApprovals } = useSupplyChain();
@@ -59,7 +67,7 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
     { key: "requested", header: "申请金额", render: row => money(row.requestedAmount) },
     { key: "payment", header: "付款审批", render: row => row.payments.length ? <span><strong>{row.payments.filter(item => approved(item.status)).length} / {row.payments.length} 笔通过</strong><small className="table-secondary">{row.payments.some(item => item.amountSource === "related-purchase") ? "金额读取自关联采购单" : "金额读取自付款表单"}</small></span> : <span className="muted">尚未关联付款</span> },
     { key: "paid", header: "审批实付", render: row => <span><strong>{money(row.actualPaid)}</strong>{row.overpaid ? <small className="table-secondary text-warning">付款超申请</small> : null}</span> },
-    { key: "mapping", header: "映射", render: row => row.mappingStatus === "unmapped" ? <span className="status-badge warning">待映射</span> : <span className="status-badge success">已映射</span> },
+    { key: "mapping", header: "映射", render: row => { const status = mappingStatus(row); return <span className={`status-badge ${status.tone}`}>{status.label}</span>; } },
     { key: "actions", header: "操作", render: row => canEditMapping && row.mappingStatus === "unmapped" ? <TableActions><Button className="compact" onClick={() => openMapping(row)}>处理映射</Button></TableActions> : "—" }
   ];
   return <section className="supply-flat-workspace">{canSync ? <div className="supply-workspace-toolbar"><Button variant="primary" disabled={syncing} onClick={handleSync}><RefreshCw size={16} />{syncing ? "同步中…" : "同步钉钉审批"}</Button></div> : null}{error ? <p className="supply-message error" role="alert">{error}</p> : null}{notice ? <p className="supply-message success" role="status">{notice}</p> : null}<DataTable columns={columns} rows={rows} minWidth={1080} empty={<div className="empty-state compact-empty">还没有审批数据。已预置真实采购申请和付款审批流程，可直接同步最近 30 天。</div>} />{overpaidCount ? <p className="supply-message warning">有 {overpaidCount} 张采购申请出现付款超申请，请财务核对是否为重复关联或分次付款口径。</p> : null}{paymentsByPurchase.get("unmapped")?.length ? <p className="supply-message warning">有 {paymentsByPurchase.get("unmapped").length} 张付款审批未从钉钉关联审批字段识别到采购单。</p> : null}<Modal title="处理采购审批映射" open={Boolean(mappingRecord)} onClose={() => setMappingRecord(null)} footer={<><Button onClick={() => setMappingRecord(null)}>取消</Button><Button variant="primary" disabled={!mappingSelection.supplierId || !mappingSelection.productId} onClick={saveMapping}>确认映射</Button></>}><div className="form-grid supply-form-grid"><label>采购事由<input value={mappingRecord?.reason || mappingRecord?.title || "—"} disabled /></label><label>系统供应商<select value={mappingSelection.supplierId} onChange={event => setMappingSelection(current => ({ ...current, supplierId: event.target.value }))}><option value="">请选择</option>{state.suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label><label>钉钉产品值<input value={mappingRecord?.unmappedValues?.product || "未在审批中指定"} disabled /></label><label>系统产品<select value={mappingSelection.productId} onChange={event => setMappingSelection(current => ({ ...current, productId: event.target.value }))}><option value="">请选择</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label></div></Modal></section>;

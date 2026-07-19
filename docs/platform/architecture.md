@@ -21,10 +21,14 @@
 - `functions/api/state.js`：产品全周期共享状态持久化。
 - `functions/api/platform.js`：公司经营平台实体持久化。
 - `functions/api/sales.js`：产品销售数据查询。
+- `functions/api/platform/v1/environment-readiness.js`：按环境能力清单执行脱敏就绪检查。
+- `functions/api/platform/v1/production-data/`：个人令牌、短时解锁、版本冲突、快照、审计和回滚边界。
 
 ## 数据流
 
 浏览器先完成钉钉身份认证，再读取产品共享状态或公司平台状态。服务端验证会话和写权限后访问 D1，外部平台调用由对应适配层完成。客户端不得持有服务端密钥。
+
+本地测试读取生产数据时，浏览器仍只访问同源 `/api/state`；本地 Node 服务持有被忽略的个人令牌，并调用生产数据网关。生产数据库写入需要 15 分钟解锁，令牌与解锁令牌都不得进入浏览器。钉钉、快麦等外部副作用与数据库写入分开授权。
 
 ## 运行环境
 
@@ -32,8 +36,15 @@
 - Cloudflare Pages/Functions 是生产静态资源和 API 边界。
 - D1 保存公司共享状态、平台实体、会话、组织缓存和销售聚合。
 - 钉钉 WebView 是独立的嵌入环境，需要单独验证登录、视口和权限。
+- `docs/platform/environment-capabilities.json` 定义各环境必需的变量名、绑定名和表结构；生成模块供 Pages Functions 使用，CI 检查漂移。
+
+### 前端发布恢复
+
+- Cloudflare Pages 发布必须包含顶层 `404.html`。系统使用 Hash 路由，不依赖任意路径回退到首页；缺失的 JS/CSS 必须返回 404，不能伪装成首页 HTML。
+- 应用入口在 React 渲染前接管 Vite 的 `vite:preloadError`。旧标签页加载已被新部署替换的动态分包时，自动刷新获取当前版本。
+- 自动刷新使用会话级冷却时间防止循环；受限 WebView 无法使用会话存储时，仍允许执行一次浏览器刷新。
+- `_headers` 保持入口 HTML 不缓存；`scripts/prepare-pages-release.mjs` 负责同步构建后的入口、静态资源和 404 页面，避免手工发布遗漏。
 
 ## 未来平台化
 
 新多系统接口放在 `/api/platform/v1/`。通用 UI、契约和客户端只有在第二个真实调用方出现后才抽为 workspace package，避免基于假设建设中台。
-

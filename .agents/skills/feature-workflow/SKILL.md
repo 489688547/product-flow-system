@@ -5,13 +5,15 @@ description: Use when starting, planning, implementing, or resuming a medium or 
 
 # Feature Workflow
 
+**REQUIRED SUB-SKILL:** Use `environment-parity` when the feature may touch environment configuration, D1 schema, production data, deployment behavior, or an external provider.
+
 ## Overview
 
 Use the repository contract as the source of truth and leave a resumable product-to-code trail. If this Skill conflicts with `AGENTS.md` or CI, follow the repository and CI.
 
 ## Required workflow
 
-1. Read root `AGENTS.md`, relevant durable docs, current code, and tests.
+1. Read root `AGENTS.md`, relevant durable docs, current code, and tests. Invoke every required repository Skill before planning the affected boundary.
 2. Decide whether the change is truly small under the exception in `AGENTS.md`. Otherwise create `docs/features/<feature-slug>/` by copying all four repository templates:
    - `docs/templates/prd.md` → `prd.md`
    - `docs/templates/design.md` → `design.md`

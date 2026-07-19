@@ -10,6 +10,7 @@ export const REQUIRED_REPOSITORY_FILES = [
   ".agents/skills/verification/SKILL.md",
   ".agents/skills/platform-capability-review/SKILL.md",
   ".agents/skills/integration-router/SKILL.md",
+  ".agents/skills/environment-parity/SKILL.md",
   "docs/templates/prd.md",
   "docs/templates/design.md",
   "docs/templates/plan.md",
@@ -22,6 +23,7 @@ export const REQUIRED_REPOSITORY_FILES = [
   "docs/platform/api-catalog.md",
   "docs/platform/integrations.md",
   "docs/platform/error-codes.md",
+  "docs/platform/environment-parity-skill.md",
   "docs/platform/integration-registry.json"
 ];
 

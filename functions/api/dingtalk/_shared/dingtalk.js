@@ -313,6 +313,12 @@ function numberValue(value) {
   return Number.isFinite(number) ? number : 0;
 }
 
+function purchaseCandidatesFromReason(reason) {
+  const match = String(reason || "").trim().match(/^向\s*(.+?)\s*采购\s*(.+?)\s*[。；;,，]?$/);
+  if (!match) return {};
+  return { supplier: match[1].trim(), product: match[2].trim() };
+}
+
 export function normalizeDingSupplyApproval(instance = {}, mapping = {}) {
   const kind = mapping.kind === "payment" ? "payment" : "purchase";
   const processInstanceId = String(instance.processInstanceId || instance.process_instance_id || "").trim();
@@ -364,8 +370,10 @@ export function normalizeDingSupplyApproval(instance = {}, mapping = {}) {
   }
 
   const amount = numberValue(approvalField(instance, mapping.amountFieldId));
-  const supplierValue = String(approvalField(instance, mapping.supplierFieldId) || "").trim();
-  const productValue = String(approvalField(instance, mapping.productFieldId) || "").trim();
+  const reason = String(approvalField(instance, mapping.purposeFieldId) || "").trim();
+  const candidates = purchaseCandidatesFromReason(reason);
+  const supplierValue = String(approvalField(instance, mapping.supplierFieldId) || candidates.supplier || "").trim();
+  const productValue = String(approvalField(instance, mapping.productFieldId) || candidates.product || "").trim();
   const supplierId = mapping.supplierValueMap?.[supplierValue] || "";
   const mappedProducts = Array.isArray(mapping.productValueMap?.[productValue])
     ? mapping.productValueMap[productValue]
@@ -381,7 +389,7 @@ export function normalizeDingSupplyApproval(instance = {}, mapping = {}) {
       productIds: mappedProducts,
       requestedAmount: amount,
       approvedAmount: common.status === "COMPLETED" ? amount : 0,
-      reason: String(approvalField(instance, mapping.purposeFieldId) || "").trim(),
+      reason,
       businessCategory: String(approvalField(instance, mapping.businessCategoryFieldId) || "").trim(),
       requestedPaymentDate: String(approvalField(instance, mapping.paymentDateFieldId) || "").trim(),
       departmentName: String(approvalField(instance, mapping.departmentFieldId) || "").trim(),

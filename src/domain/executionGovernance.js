@@ -39,6 +39,19 @@ export function strategyAttainment(state, strategyId) {
   };
 }
 
+export function commitmentProgress(state, commitmentId) {
+  const milestones = (state?.commitmentMilestones || []).filter(item => item.commitmentId === commitmentId && !item.archived);
+  const completed = milestones.filter(item => item.status === "completed").length;
+  const total = milestones.length;
+  return {
+    completed,
+    total,
+    percent: total ? Math.round((completed / total) * 100) : 0,
+    label: total ? `${completed}/${total}` : "未设置里程碑",
+    milestones
+  };
+}
+
 export function transitionDepartmentCommitment(commitment, action = {}) {
   const current = commitment?.status || "draft";
   const nextStatus = COMMITMENT_TRANSITIONS[current]?.[action.type];

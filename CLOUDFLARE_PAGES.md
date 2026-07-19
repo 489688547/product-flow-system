@@ -34,7 +34,7 @@ DINGTALK_APP_KEY=你的钉钉 AppKey
 DINGTALK_APP_SECRET=你的钉钉 AppSecret
 ```
 
-如果 Cloudflare 同时配置 Production 和 Preview 环境，两个环境都要设置，至少 Production 必须设置。
+如果 Cloudflare 同时配置 Production 和 Preview 环境，两个环境都要设置。环境能力清单和生产就绪页面会检查缺失项；密钥值不会展示。
 
 ## 公司共享数据库
 
@@ -60,6 +60,17 @@ D1 database: product-flow-system
 ```
 
 Production 和 Preview 环境都建议绑定。没有这个绑定时，页面会提示“共享数据库未配置”，不同账号的数据不会同步。
+
+部署生产数据控制能力后执行：
+
+```bash
+npx wrangler d1 execute product-flow-system --remote --file migrations/0001_production_data_access.sql
+npx wrangler d1 execute product-flow-system --remote --file migrations/0002_business_data_apps.sql
+npx wrangler d1 execute product-flow-system --remote --file migrations/0002_collaboration_execution.sql
+npm run verify:production
+```
+
+本地测试如需实时读取生产数据，在被忽略的 `.env` 中配置 `PRODUCTION_DATA_API_URL` 与个人 `PRODUCTION_DATA_ACCESS_TOKEN`。个人令牌由平台管理员受控签发，仓库和浏览器都不能保存原始值。
 
 数据库表会由 `/api/state` 函数首次访问时自动创建，不需要手工执行 SQL。
 
@@ -111,4 +122,6 @@ http://127.0.0.1:8127/
 DINGTALK_APP_KEY=...
 DINGTALK_APP_SECRET=...
 DINGTALK_PORT=8127
+PRODUCTION_DATA_API_URL=https://product-flow-system.pages.dev
+PRODUCTION_DATA_ACCESS_TOKEN=仅属于当前授权账号的个人令牌
 ```
