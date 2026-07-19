@@ -4,17 +4,17 @@
 
 这个项目可以直接接入 Cloudflare Pages：
 
-- 前端发布入口：`cloudflare-entry.html`（由 `_redirects` 接管根路径）
+- 前端发布目录：`dist`
 - Cloudflare Functions：`functions/api/dingtalk/config.js`、`functions/api/dingtalk/login.js`
-- 不需要构建命令。
+- 构建命令：`npm run build`
 
-发布前先在本地生成并提交生产资源：
+本地发布验收仍可生成仓库根目录的兼容发布资源：
 
 ```bash
 npm run release:pages
 ```
 
-仓库中的 `index.html` 保留给 Vite 本地开发；Pages 继续使用“无构建、发布仓库根目录”的现有配置。
+GitHub 集成的 Pages 部署以 Vite 生成的 `dist` 为准；仓库根目录的兼容发布资源不作为 Pages 构建输入。
 
 `.env` 只用于本地调试，不能提交到 GitHub。
 
@@ -23,8 +23,8 @@ npm run release:pages
 在 Cloudflare Pages 连接 GitHub 仓库后：
 
 - Framework preset：`None`
-- Build command：留空
-- Build output directory：`/`
+- Build command：`npm run build`
+- Build output directory：`dist`
 - Functions directory：默认 `functions`
 
 在 Pages 项目的环境变量里添加：
