@@ -88,6 +88,7 @@
 - `AI_REQUEST_IN_FLIGHT`：当前用户已有一个回答正在生成，HTTP 409。
 - `AI_CONTEXT_EMPTY`：当前身份没有可用且可外发的公司数据上下文。
 - `AI_STREAM_CANCELLED`：客户端主动停止回答，租约已释放且审计标记未完成。
+- `AI_LOCAL_PREVIEW_READ_ONLY`：本地 Node 预览只展示脱敏状态，不调用 Provider 或修改配置。
 生产数据与环境 API 使用：
 
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。

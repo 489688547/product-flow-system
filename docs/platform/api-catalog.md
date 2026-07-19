@@ -70,6 +70,8 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 兼容策略：`AI_ASSISTANT_ENABLED` 默认关闭，关闭时状态接口返回 `enabled:false`，聊天接口返回 `AI_DISABLED`，不要求 D1 或 Provider Secret。回滚只需关闭开关；AI 元数据、外发策略和无内容审计表保留，不影响其他业务 App。电商运营旧 AI 点评本期保持原路由和规则降级，不属于该共享 API 的调用方。
 
+本地 Node 预览只实现 AI 状态和 Provider 的 GET 安全投影，允许查看功能是否配置，不读取线上 D1，也不调用模型。Provider 更新、连接测试和聊天统一返回 `AI_LOCAL_PREVIEW_READ_ONLY`；本地环境变量值永不进入响应。真实链路必须在正式 Pages Functions 会话与 D1 边界分别验收。
+
 ### 店铺运营与绩效契约
 
 店铺运营状态分别保存在 `ecommerce_operation_records` 和 `ecommerce_operation_meta`；绩效状态分别保存在 `performance_management_records` 和 `performance_management_meta`。两个动作接口都接收 `{ "expectedRevision": 1, "action": { "type": "..." } }`，旧版本写入返回 409。

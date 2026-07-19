@@ -64,7 +64,7 @@
   - 证据：`node --test tests/ai-api.test.mjs tests/ai-context-policy.test.mjs tests/ai-provider.test.mjs`（20/20）；验证越权字段忽略、财务值阻止、SSE 完整流、主动取消、并发冲突、Provider 失败、无内容审计和租约释放。
   - 提交：`feat(ai): stream governed assistant responses`。
 
-- [ ] 任务 6：实现前端 AI 会话状态和 SSE 客户端
+- [x] 任务 6：实现前端 AI 会话状态和 SSE 客户端
   - 依赖：任务 4、5。
   - 文件：`src/state/aiAssistantApi.js`、`AiAssistantProvider.jsx`、前端 API 与领域测试。
   - 输入：AI 状态与 SSE 事件。
@@ -72,6 +72,7 @@
   - 失败测试：sessionStorage 会话、AbortController、来源、未纳入范围和流中断状态不存在。
   - 实现步骤：先解析事件，再实现 reducer/Provider，最后持久化非敏感会话文本。
   - 验证：前端测试确认不把公司业务数据或权限放进请求。
+  - 证据：`node --test react-tests/ai-assistant-api.test.mjs tests/local-data-center-server.test.mjs`（5/5）；浏览器请求仅含消息和路由提示，会话只进 `sessionStorage`，本地预览拒绝 Provider 写入与调用。
   - 提交：`feat(ai): add assistant session orchestration`。
 
 - [ ] 任务 7：实现全局面板和总助工作台
