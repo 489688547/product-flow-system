@@ -9,7 +9,7 @@ export const NAV_PERMISSION_ITEMS = [
   { key: "supply-chain", label: "供应链管理" },
   { key: "data-center", label: "数据中心" },
   { key: "ecommerce-operations", label: "电商店铺运营" },
-  { key: "performance-management", label: "绩效管理" },
+  { key: "performance-management", label: "人事管理" },
   { key: "dashboard", label: "总览" },
   { key: "demands", label: "需求池" },
   { key: "planning", label: "产品规划" },

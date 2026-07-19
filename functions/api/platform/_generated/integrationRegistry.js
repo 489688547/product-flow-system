@@ -237,7 +237,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、绩效和跨 App 协同记录。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、人事绩效和跨 App 协同记录。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
@@ -246,6 +246,7 @@ const integrationRegistry = {
         "平台配置",
         "数据中心元数据",
         "店铺运营记录",
+        "人事核心记录",
         "绩效记录",
         "跨 App 协同",
         "生产写入审计",
@@ -256,6 +257,7 @@ const integrationRegistry = {
         "跨设备状态不同步",
         "数据库绑定缺失",
         "表结构或容量问题",
+        "人事数据表是否就绪",
         "跨部门事项如何留痕",
         "测试账号如何受控写生产数据",
         "生产写入如何回滚"
@@ -279,13 +281,15 @@ const integrationRegistry = {
         "functions/api/ecommerce-operations/**",
         "functions/api/performance-management.js",
         "functions/api/performance-management/**",
+        "functions/api/hr-management/**",
         "functions/api/auth/**",
         "functions/api/dingtalk/org/**",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/v1/production-data/**",
         "functions/api/platform/v1/collaboration-items/**",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
-        "migrations/**"
+        "migrations/**",
+        "migrations/0002_hr_management_core.sql"
       ],
       "envVars": [
         "PRODUCT_FLOW_DB"
@@ -302,6 +306,7 @@ const integrationRegistry = {
         "/api/data-center",
         "/api/ecommerce-operations",
         "/api/performance-management",
+        "/api/hr-management",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
@@ -329,11 +334,13 @@ const integrationRegistry = {
         "functions/api/ecommerce-operations/",
         "functions/api/performance-management.js",
         "functions/api/performance-management/",
+        "functions/api/hr-management/",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
         "migrations/0001_production_data_access.sql",
         "migrations/0002_business_data_apps.sql",
-        "migrations/0002_collaboration_execution.sql"
+        "migrations/0002_collaboration_execution.sql",
+        "migrations/0002_hr_management_core.sql"
       ],
       "relations": [
         {

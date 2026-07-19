@@ -14,6 +14,18 @@ const REQUIRED_PRODUCTION_TABLES = [
   "collaboration_participants",
   "collaboration_activities"
 ];
+const HR_CORE_TABLES = [
+  "hr_employees",
+  "hr_assignments",
+  "hr_role_assignments",
+  "hr_lifecycle_events",
+  "hr_performance_templates",
+  "hr_performance_cycles",
+  "hr_performance_items",
+  "hr_evidence_snapshots",
+  "hr_audit_logs",
+  "hr_management_meta"
+];
 
 async function loadRoute() {
   assert.equal(existsSync(routePath), true, "environment readiness route must exist");
@@ -82,7 +94,7 @@ test("environment readiness reports missing production bindings and variables wi
 
 test("warning capabilities do not block an otherwise ready production environment", async () => {
   const { onRequest } = await loadRoute();
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES];
   const response = await onRequest({
     request: request(),
     env: {
@@ -116,7 +128,7 @@ test("a server-only production data token can read readiness without an employee
   const bytes = new TextEncoder().encode(rawToken);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const tokenHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES];
   const db = {
     prepare(sql) {
       const statement = {

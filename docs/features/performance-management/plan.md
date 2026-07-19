@@ -1,8 +1,8 @@
-# 绩效管理 App 实施计划
+# 人事管理 App · 绩效管理模块实施计划
 
 ## 目标
 
-交付独立绩效管理 App，完成周期模板、个人方案、业务证据、自评、建议分、主管评估、一次复核和人事冻结。
+在人事管理 App 中交付绩效管理模块，完成周期模板、个人方案、业务证据、自评、建议分、主管评估、一次复核和人事冻结。
 
 ## 架构方案
 
@@ -14,7 +14,7 @@
 - `src/state/performanceManagementApi.js`、`PerformanceManagementProvider.jsx`：读取、动作、证据和错误状态。
 - `functions/api/performance-management.js`、`actions.js`、`_shared/storage.js`：范围过滤、动作权限、D1 和审计。
 - `src/features/performance-management/*`：五个页面和证据/评分组件。
-- App 壳、权限和注册：独立导航与 Provider。
+- App 壳、权限和注册：人事管理导航与绩效 Provider。
 - `react-tests/performance-management*.test.mjs`、`tests/performance-management-api.test.mjs`：领域、UI、权限和 API。
 
 ## 接口与契约
