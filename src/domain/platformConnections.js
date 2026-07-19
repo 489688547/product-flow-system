@@ -36,8 +36,8 @@ export const PLATFORM_CONNECTION_DEFINITIONS = Object.freeze([
     mark: "快",
     description: "订单拉取、销售聚合和接口会话维护",
     fields: [
-      connectionField("appKey", "App Key", "KUAIMAI_APP_KEY", { type: "text" }),
-      connectionField("appSecret", "App Secret", "KUAIMAI_APP_SECRET"),
+      connectionField("appKey", "应用凭证", "KUAIMAI_APP_KEY", { type: "text" }),
+      connectionField("appSecret", "应用密钥", "KUAIMAI_APP_SECRET"),
       connectionField("accessToken", "访问令牌", "KUAIMAI_ACCESS_TOKEN"),
       connectionField("refreshToken", "刷新令牌", "KUAIMAI_REFRESH_TOKEN", { required: false })
     ]

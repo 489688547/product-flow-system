@@ -21,7 +21,7 @@ test("data center exposes a dedicated platform connection workspace", () => {
 test("platform catalog uses specific fields and keeps unavailable platforms honest", () => {
   const domain = read("src/domain/platformConnections.js");
   assert.match(domain, /id: "dingtalk"[\s\S]*应用凭证[\s\S]*应用密钥/);
-  assert.match(domain, /id: "kuaimai"[\s\S]*App Key[\s\S]*访问令牌[\s\S]*刷新令牌/);
+  assert.match(domain, /id: "kuaimai"[\s\S]*应用凭证[\s\S]*应用密钥[\s\S]*访问令牌[\s\S]*刷新令牌/);
   assert.match(domain, /id: "aliyun"[\s\S]*available: false[\s\S]*当前尚无可用的系统适配器/);
 });
 
