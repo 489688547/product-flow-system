@@ -73,8 +73,8 @@ const DEFAULT_APP_REGISTRY = [
   },
   {
     id: "performance-management",
-    name: "绩效管理",
-    description: "由人事管理考核方案、自评、主管评估、复核与归档。",
+    name: "人事管理",
+    description: "统一管理员工关系、绩效考核、自评、主管评估、复核与人事归档。",
     route: "performance-management",
     enabled: true,
     status: "connected"

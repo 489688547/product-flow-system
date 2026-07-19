@@ -57,6 +57,28 @@
       ]
     },
     {
+      "id": "hr-management-core",
+      "name": "人事管理核心数据",
+      "description": "人事管理 Phase 1A 的员工任职、异动、绩效证据和审计表。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "hr_employees",
+        "hr_assignments",
+        "hr_role_assignments",
+        "hr_lifecycle_events",
+        "hr_performance_templates",
+        "hr_performance_cycles",
+        "hr_performance_items",
+        "hr_evidence_snapshots",
+        "hr_audit_logs",
+        "hr_management_meta"
+      ]
+    },
+    {
       "id": "kuaimai-sales-sync",
       "name": "快麦销售同步",
       "description": "快麦订单拉取、会话刷新和销售聚合所需配置。",
@@ -69,8 +91,8 @@
     },
     {
       "id": "business-data-apps",
-      "name": "数据中心、店铺运营与绩效管理",
-      "description": "三个业务 App 的标准数据、经营闭环和绩效归档所需的 D1 持久化能力。",
+      "name": "数据中心、店铺运营与人事管理",
+      "description": "三个业务 App 的标准数据、经营闭环和人事绩效归档所需的 D1 持久化能力。",
       "platforms": ["cloudflare-pages", "cloudflare-d1"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",
