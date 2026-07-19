@@ -32,10 +32,10 @@
   - 验证：2026-07-19 领域测试 8/8 通过，React 全套 315/315 通过，相关 ESLint 通过。
   - 提交：`feat(hr): add core domain rules`。
 
-- [ ] 认证 API 与 D1 存储
+- [x] 认证 API 与 D1 存储
   - 输出：范围裁剪 bootstrap、动作 POST、乐观冲突和安全错误。
   - 红灯：API 路由不存在。
-  - 验证：人事 API、认证和平台回归测试通过。
+  - 验证：2026-07-19 人事 API 6/6、API 全套 145/145 通过，相关 ESLint 通过。
   - 提交：`feat(hr): add authenticated core API`。
 
 - [ ] Provider 与本地空状态
