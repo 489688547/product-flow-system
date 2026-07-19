@@ -86,7 +86,9 @@ export function AiProviderSettings() {
     setNotice("");
     try {
       const result = await testAiProvider();
-      setNotice(`合成数据连接测试通过，耗时 ${result.latencyMs || 0} ms。`);
+      setNotice(result.skillsSupported
+        ? `连接与只读 Skill 能力测试通过，耗时 ${result.latencyMs || 0} ms。`
+        : "模型连接通过，但按需查询能力未通过；总助将使用只读摘要模式。");
       const next = await loadAiProvider();
       setData(next);
       setDraft(providerDraft(next.provider));
@@ -111,7 +113,7 @@ export function AiProviderSettings() {
         <div><span className="ai-provider-eyebrow">COMPANY AI</span><h2 id="ai-provider-title">AI 模型服务</h2><p>统一管理公司总助使用的第三方模型、安全状态和数据外发边界。</p></div>
         <div className="ai-provider-actions">
           {!canManage ? <span className="status-badge neutral">只读</span> : null}
-          <Button disabled={!canManage || !configured || testing || saving} onClick={testConnection}><RefreshCw size={16} aria-hidden="true" />{testing ? "测试中…" : "合成数据测试"}</Button>
+          <Button disabled={!canManage || !configured || testing || saving} onClick={testConnection}><RefreshCw size={16} aria-hidden="true" />{testing ? "测试中…" : "连接与 Skill 测试"}</Button>
           <Button variant="primary" disabled={!canManage || !changed || saving || testing} onClick={save}><Save size={16} aria-hidden="true" />{saving ? "保存中…" : "保存设置"}</Button>
         </div>
       </div>
@@ -120,6 +122,7 @@ export function AiProviderSettings() {
         <article><Bot size={18} aria-hidden="true" /><span>服务状态</span><strong>{provider.enabled ? "已启用" : "未启用"}</strong></article>
         <article>{configured ? <CheckCircle2 size={18} aria-hidden="true" /> : <CircleAlert size={18} aria-hidden="true" />}<span>服务端 Secret</span><strong>{configured ? "已配置" : "未配置"}</strong></article>
         <article><ShieldCheck size={18} aria-hidden="true" /><span>回答留存</span><strong>store=false</strong></article>
+        <article>{provider.skillsSupported ? <CheckCircle2 size={18} aria-hidden="true" /> : <CircleAlert size={18} aria-hidden="true" />}<span>按需查询</span><strong>{provider.skillsSupported ? "Skills 已验证" : "摘要模式"}</strong></article>
         <article><RefreshCw size={18} aria-hidden="true" /><span>最近测试</span><strong>{checkedAtLabel(provider.lastCheckedAt)}</strong></article>
       </div>
 
@@ -132,7 +135,7 @@ export function AiProviderSettings() {
         <label className="ai-provider-toggle"><input type="checkbox" checked={draft.enabled} disabled={!canManage || saving || testing || (!configured && !draft.enabled)} onChange={event => setDraft(current => ({ ...current, enabled: event.target.checked }))} /><span>启用公司 AI 总助</span></label>
       </fieldset>
 
-      <p className="ai-provider-secret-note"><ShieldCheck size={16} aria-hidden="true" />密钥仅通过部署环境的服务端 Secret 配置；此页面不会录入或回显凭据。连接测试只发送合成数据，不读取公司业务数据。</p>
+      <p className="ai-provider-secret-note"><ShieldCheck size={16} aria-hidden="true" />密钥仅通过部署环境的服务端 Secret 配置；此页面不会录入或回显凭据。连接与 Skill 测试只发送合成数据，不读取公司业务数据。</p>
       {error ? <div className="ai-provider-feedback danger" role="status">{error}</div> : null}
       {notice ? <div className="ai-provider-feedback success" role="status">{notice}</div> : null}
 

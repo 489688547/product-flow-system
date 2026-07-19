@@ -82,11 +82,18 @@
 - `AI_PROVIDER_TIMEOUT`：Provider 在 45 秒内未响应。
 - `AI_PROVIDER_UNAVAILABLE`：Provider 网络或 5xx 故障。
 - `AI_PROVIDER_STREAM_FAILED`：流式响应失败或中断；已生成内容可保留但不得当作完整回答。
+- `AI_PROVIDER_SKILLS_UNSUPPORTED`：Provider 未完成纯合成 Function Calling 测试；总助降级为服务端只读摘要模式。
+- `AI_PROVIDER_INVALID_TOOL_ARGUMENTS`：Provider 在合成能力测试中返回无效工具参数。
 - `AI_PROVIDER_NOT_READY`：Provider 未启用或服务端 Secret 未就绪。
 - `AI_MESSAGES_INVALID`：消息数量、角色、长度或顺序不符合契约。
 - `AI_FINANCE_TRANSFER_BLOCKED`：消息包含具体财务值，当前 Provider 未通过外发审核。
 - `AI_REQUEST_IN_FLIGHT`：当前用户已有一个回答正在生成，HTTP 409。
 - `AI_CONTEXT_EMPTY`：当前身份没有可用且可外发的公司数据上下文。
+- `AI_SKILL_UNKNOWN` / `AI_SKILL_DENIED`：Provider 请求了未登记或当前会话无权使用的只读 Skill。
+- `AI_SKILL_ARGUMENTS_INVALID`：Skill 参数不符合服务端固定 Schema。
+- `AI_SKILL_TIMEOUT`：单个只读 Skill 查询超过 8 秒。
+- `AI_SKILL_DUPLICATE`：同一回答内出现相同 Skill 和参数，服务端拒绝重复读取。
+- `AI_SKILL_CALL_LIMIT` / `AI_SKILL_LOOP_LIMIT`：单次回答超过六次调用或两轮工具循环，服务端停止生成。
 - `AI_STREAM_CANCELLED`：客户端主动停止回答，租约已释放且审计标记未完成。
 - `AI_LOCAL_PREVIEW_READ_ONLY`：本地 Node 预览只展示脱敏状态，不调用 Provider 或修改配置。
 生产数据与环境 API 使用：

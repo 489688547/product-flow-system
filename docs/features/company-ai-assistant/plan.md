@@ -6,7 +6,7 @@
 
 ## 架构方案
 
-采用“公司数据能力目录 → 权限与外发策略 → 上下文压缩 → Provider 中立 AI 网关 → SSE 总助 UI”的单向依赖。各业务 App 不直接调用模型；Provider 密钥只存在服务端 Secret，浏览器不提交业务数据。首期保持模块化单体，新增内部 `/api/platform/v1/ai/*`，不提前声明对外平台 API。
+采用“公司数据能力目录 → 权限与外发策略 → 服务端只读 Skill → Provider 中立 AI 网关 → SSE 总助 UI”的单向依赖。各业务 App 不直接调用模型；Provider 密钥只存在服务端 Secret，浏览器不提交业务数据。Provider 通过 Function Calling 按需选择服务端下发的 Skill，每次调用重新鉴权、限额并写无内容审计；未通过能力测试时降级到旧的服务端摘要上下文。首期保持模块化单体，新增内部 `/api/platform/v1/ai/*`，不提前声明对外平台 API。
 
 平台能力判断：
 

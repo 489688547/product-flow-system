@@ -47,9 +47,11 @@ test("company assistant declares Provider secrets and production D1 schema", () 
     "data_ai_providers",
     "data_ai_policies",
     "ai_usage_audit",
+    "ai_skill_audit",
     "ai_request_leases"
   ]);
   assert.equal(existsSync(resolve(root, "migrations/0003_company_ai_assistant.sql")), true);
+  assert.equal(existsSync(resolve(root, "migrations/0004_company_ai_skills.sql")), true);
 });
 
 test("environment capability validation rejects secret values and unknown platforms", async () => {

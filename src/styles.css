@@ -1694,7 +1694,7 @@ main { min-width: 0; overflow-x: hidden; }
 .ai-provider-heading p { margin: 0; color: var(--text-secondary); }
 .ai-provider-eyebrow { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
 .ai-provider-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
-.ai-provider-status-grid { padding: var(--space-4); display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
+.ai-provider-status-grid { padding: var(--space-4); display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); }
 .ai-provider-status-grid article { min-width: 0; padding: var(--space-3); display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 5px 8px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
 .ai-provider-status-grid svg { grid-row: 1 / span 2; color: var(--accent); }
 .ai-provider-status-grid span { color: var(--text-tertiary); font-size: 11px; font-weight: 700; }
