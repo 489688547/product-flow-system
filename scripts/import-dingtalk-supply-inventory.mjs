@@ -1,10 +1,13 @@
 import { execFile } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname } from "node:path";
 import { promisify } from "node:util";
 import {
   mergeImportedRecords,
   parseFinishedInventoryCsv,
   parseInventoryRiskCsv,
   parseMaterialInventoryCsv,
+  parseSupplierCsv,
   parseStocktakeCsv
 } from "./lib/dingtalkSupplyInventory.mjs";
 
@@ -17,6 +20,7 @@ function argument(name, fallback) {
 }
 
 const apiUrl = argument("--api", "http://127.0.0.1:8127/api/supply-chain");
+const outputPath = argument("--output", "");
 
 async function readSheet({ nodeId, sheetId, range, raw = true }) {
   const args = ["sheet", "csv-get", "--node", nodeId, "--sheet-id", sheetId, "--range", range];
@@ -29,6 +33,16 @@ async function readSheet({ nodeId, sheetId, range, raw = true }) {
 }
 
 const sources = [
+  {
+    kind: "suppliers",
+    collection: "suppliers",
+    nodeId: "QPGYqjpJYrpXrNZrSzMYzlp18akx1Z5N",
+    sheetId: "s1",
+    sheetName: "Sheet1",
+    range: "A1:N80",
+    documentName: "供应商清单（开票情况）",
+    parse: parseSupplierCsv
+  },
   {
     kind: "stocktake",
     collection: "inventorySnapshots",
@@ -113,11 +127,11 @@ async function main() {
   }));
 
   const state = { ...currentPayload.state };
-  for (const collection of ["inventorySnapshots", "materialInventorySnapshots", "inventoryRisks"]) {
+  for (const collection of ["suppliers", "inventorySnapshots", "materialInventorySnapshots", "inventoryRisks"]) {
     const imported = results.filter(result => result.source.collection === collection).flatMap(result => result.records);
     state[collection] = mergeImportedRecords(state[collection], imported);
   }
-  const batches = results.map(result => ({
+  const batches = results.filter(result => result.source.collection !== "suppliers").map(result => ({
     id: `dingtalk-inventory-batch-${result.source.kind}`,
     fileName: result.source.documentName,
     stocktakeDate: result.source.snapshotDate || result.records[0]?.stocktakeDate || "",
@@ -132,14 +146,31 @@ async function main() {
   }));
   state.inventoryBatches = mergeImportedRecords(state.inventoryBatches, batches);
   const counts = Object.fromEntries(results.map(result => [result.source.kind, result.records.length]));
-  state.syncRuns = mergeImportedRecords(state.syncRuns, [{
-    id: "sync-dingtalk-inventory-docs",
-    type: "dingtalk-inventory-docs",
+  const syncRun = {
+    id: "sync-dingtalk-supply-folder",
+    type: "dingtalk-supply-folder",
     status: "success",
     counts,
     completedAt: importedAt,
-    message: "已读取钉钉成品盘点、原辅料库存与异常库存文件快照。"
-  }]);
+    message: "已读取钉钉供应商、成品盘点、原辅料库存与异常库存文件快照。"
+  };
+  state.syncRuns = mergeImportedRecords(state.syncRuns, [syncRun]);
+
+  if (outputPath) {
+    const importedFor = collection => results.filter(result => result.source.collection === collection).flatMap(result => result.records);
+    const snapshot = {
+      version: "dingtalk-supply-snapshot-v1",
+      generatedAt: importedAt,
+      suppliers: importedFor("suppliers"),
+      inventorySnapshots: importedFor("inventorySnapshots"),
+      materialInventorySnapshots: importedFor("materialInventorySnapshots"),
+      inventoryRisks: importedFor("inventoryRisks"),
+      inventoryBatches: batches,
+      syncRuns: [syncRun]
+    };
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+  }
 
   const saved = await fetch(apiUrl, {
     method: "POST",
@@ -148,7 +179,7 @@ async function main() {
   });
   const savedPayload = await saved.json().catch(() => ({}));
   if (!saved.ok || savedPayload.synced === false) throw new Error(savedPayload.message || `写入供应链状态失败：${saved.status}`);
-  process.stdout.write(`${JSON.stringify({ synced: true, counts, skipped: Object.fromEntries(results.map(result => [result.source.kind, result.skipped])), updatedAt: savedPayload.updatedAt }, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify({ synced: true, counts, skipped: Object.fromEntries(results.map(result => [result.source.kind, result.skipped])), output: outputPath || undefined, updatedAt: savedPayload.updatedAt }, null, 2)}\n`);
 }
 
 main().catch(error => {

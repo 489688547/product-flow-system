@@ -6,18 +6,18 @@
       "id": "dingtalk",
       "name": "钉钉开放平台",
       "status": "connected",
-      "summary": "承载登录、组织通讯录、待办、群聊、日历、文档和钉钉内嵌工作台能力。",
-      "capabilities": ["身份登录", "组织通讯录", "待办任务", "群聊与成员", "日历", "文档读取", "内嵌工作台"],
-      "businessQuestions": ["登录或免登失败", "找不到人员或部门", "待办未创建或未同步", "群成员选择异常", "钉钉 WebView 行为异常"],
+      "summary": "承载登录、组织通讯录、待办、群聊、日历、文档、供应链文件快照和钉钉内嵌工作台能力。",
+      "capabilities": ["身份登录", "组织通讯录", "待办任务", "群聊与成员", "日历", "文档读取", "供应链文件快照", "内嵌工作台"],
+      "businessQuestions": ["登录或免登失败", "找不到人员或部门", "待办未创建或未同步", "群成员选择异常", "供应链文件快照未导入", "钉钉 WebView 行为异常"],
       "keywords": ["钉钉", "DingTalk", "免登", "待办", "通讯录", "群聊", "开放平台"],
-      "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "functions/api/platform/v1/collaboration-items/**/dingtalk.js", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "server.mjs"],
+      "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "functions/api/platform/v1/collaboration-items/**/dingtalk.js", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs", "server.mjs"],
       "envVars": ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET", "DINGTALK_CORP_ID", "DINGTALK_TOKEN_ENCRYPTION_KEY"],
       "domains": ["open.dingtalk.com", "api.dingtalk.com", "oapi.dingtalk.com"],
       "apiRoutes": ["/api/dingtalk/", "/api/auth/dingtalk/", "/api/platform/v1/collaboration-items/:id/dingtalk"],
       "publicDocs": [
         { "label": "钉钉开放平台能力中心", "url": "https://open.dingtalk.com/" }
       ],
-      "evidence": ["functions/api/dingtalk/", "functions/api/auth/dingtalk/", "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js"],
+      "evidence": ["functions/api/dingtalk/", "functions/api/auth/dingtalk/", "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "stores-session-and-org-data", "description": "登录会话、用户令牌与组织同步结果使用 D1 持久化。" },
         { "platformId": "cloudflare-pages", "type": "hosts-callbacks", "description": "Pages Functions 承载登录回调和开放平台 API 适配器。" }
@@ -73,15 +73,15 @@
       "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "数据中心元数据", "店铺运营记录", "绩效记录", "跨 App 协同", "生产写入审计", "写前快照"],
       "businessQuestions": ["数据只在本地可见", "跨设备状态不同步", "数据库绑定缺失", "表结构或容量问题", "跨部门事项如何留痕", "测试账号如何受控写生产数据", "生产写入如何回滚"],
       "keywords": ["D1", "数据库", "落库", "PRODUCT_FLOW_DB", "持久化"],
-      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/**", "functions/api/performance-management.js", "functions/api/performance-management/**", "functions/api/auth/**", "functions/api/dingtalk/org/**", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/v1/production-data/**", "functions/api/platform/v1/collaboration-items/**", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/**"],
+      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/**", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/**", "functions/api/performance-management.js", "functions/api/performance-management/**", "functions/api/auth/**", "functions/api/dingtalk/org/**", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/v1/production-data/**", "functions/api/platform/v1/collaboration-items/**", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/**"],
       "envVars": ["PRODUCT_FLOW_DB"],
       "domains": ["api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": ["/api/state", "/api/platform", "/api/sales", "/api/data-center", "/api/ecommerce-operations", "/api/performance-management", "/api/platform/v1/environment-readiness", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/collaboration-items"],
+      "apiRoutes": ["/api/state", "/api/platform", "/api/supply-chain", "/api/sales", "/api/data-center", "/api/ecommerce-operations", "/api/performance-management", "/api/platform/v1/environment-readiness", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/collaboration-items"],
       "publicDocs": [
         { "label": "Cloudflare D1 入门", "url": "https://developers.cloudflare.com/d1/get-started/" },
         { "label": "Pages D1 绑定", "url": "https://developers.cloudflare.com/pages/functions/bindings/" }
       ],
-      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/", "functions/api/performance-management.js", "functions/api/performance-management/", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/0001_production_data_access.sql", "migrations/0002_business_data_apps.sql", "migrations/0002_collaboration_execution.sql"],
+      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/", "functions/api/performance-management.js", "functions/api/performance-management/", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/0001_production_data_access.sql", "migrations/0002_business_data_apps.sql", "migrations/0002_collaboration_execution.sql"],
       "relations": [
         { "platformId": "cloudflare-pages", "type": "bound-to", "description": "D1 通过 Pages Functions 的环境绑定提供服务。" },
         { "platformId": "dingtalk", "type": "stores-data-for", "description": "保存钉钉会话、组织和用户令牌相关数据。" },
