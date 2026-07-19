@@ -31,6 +31,20 @@ const STATUS_LABELS = {
   blocked: "阻断"
 };
 
+const MISSING_LABELS = {
+  PRODUCT_FLOW_DB: "公司数据库连接",
+  PLATFORM_CREDENTIAL_MASTER_KEY: "平台连接安全保护",
+  DINGTALK_APP_KEY: "钉钉应用凭证",
+  DINGTALK_APP_SECRET: "钉钉应用密钥",
+  KUAIMAI_APP_KEY: "快麦应用凭证",
+  KUAIMAI_APP_SECRET: "快麦应用密钥",
+  KUAIMAI_ACCESS_TOKEN: "快麦访问授权"
+};
+
+function missingLabel(item) {
+  return MISSING_LABELS[item] || (String(item).includes("_") ? "系统运行配置" : item);
+}
+
 function StatusIcon({ status }) {
   if (status === "ready") return <CheckCircle2 size={17} aria-hidden="true" />;
   if (status === "warning") return <AlertTriangle size={17} aria-hidden="true" />;
@@ -61,7 +75,7 @@ function CapabilityList({ capabilities = [] }) {
               <strong>{STATUS_LABELS[capability.status] || capability.status}</strong>
             </div>
             {capability.missing?.length ? (
-              <div className="environment-missing"><span>缺少</span><ul>{capability.missing.map(item => <li key={item}><code>{item}</code></li>)}</ul></div>
+              <div className="environment-missing"><span>需要处理</span><ul>{capability.missing.map(item => <li key={item} title={item}>{missingLabel(item)}</li>)}</ul>{capability.platforms?.some(platform => ["dingtalk", "kuaimai"].includes(platform)) ? <a className="btn compact" href="#/data-connections">前往平台连接</a> : null}</div>
             ) : <p className="environment-complete"><ShieldCheck size={15} aria-hidden="true" />必要配置与表结构完整</p>}
           </article>
         ))}

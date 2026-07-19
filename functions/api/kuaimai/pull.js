@@ -1,4 +1,4 @@
-import { kuaimaiConfigFromEnv, pullKuaimaiDay } from "./_shared/kuaimai.js";
+import { pullKuaimaiDay, resolveKuaimaiConfig } from "./_shared/kuaimai.js";
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -9,7 +9,7 @@ function jsonResponse(payload, status = 200) {
 
 export async function onRequest({ request, env }) {
   if (request.method !== "GET") return jsonResponse({ message: "Method not allowed" }, 405);
-  const config = kuaimaiConfigFromEnv(env);
+  const config = await resolveKuaimaiConfig(env);
   if (!config.ready) return jsonResponse({ message: "缺少快麦API配置。" }, 400);
   const url = new URL(request.url);
   const date = String(url.searchParams.get("date") || "").trim();

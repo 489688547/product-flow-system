@@ -1,4 +1,4 @@
-import { getDingUserAccessToken } from "../../dingtalk/_shared/dingtalk.js";
+import { getDingUserAccessToken, resolveDingCredentials } from "../../dingtalk/_shared/dingtalk.js";
 import { ensureAuthTables, getSessionIdHash } from "./session.js";
 
 function tokenError(message, status = 500, code = "") {
@@ -20,9 +20,10 @@ function base64ToBytes(value) {
 
 async function encryptionKey(env = {}) {
   const raw = String(env.DINGTALK_TOKEN_ENCRYPTION_KEY || "").trim();
+  const credentials = raw ? null : await resolveDingCredentials(env);
   const bytes = raw
     ? base64ToBytes(raw)
-    : new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(env.DINGTALK_APP_SECRET || env.DINGTALK_CLIENT_SECRET || ""))));
+    : new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(String(credentials?.appSecret || ""))));
   if (bytes.length !== 32) throw tokenError("钉钉群授权加密配置无效，请联系管理员。");
   return crypto.subtle.importKey("raw", bytes, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 }

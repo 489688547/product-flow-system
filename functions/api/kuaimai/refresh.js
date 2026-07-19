@@ -1,4 +1,4 @@
-import { kuaimaiConfigFromEnv, refreshKuaimaiSession } from "./_shared/kuaimai.js";
+import { refreshKuaimaiSession, resolveKuaimaiConfig } from "./_shared/kuaimai.js";
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -9,7 +9,7 @@ function jsonResponse(payload, status = 200) {
 
 export async function onRequest({ request, env }) {
   if (request.method !== "POST") return jsonResponse({ message: "Method not allowed" }, 405);
-  const config = kuaimaiConfigFromEnv(env);
+  const config = await resolveKuaimaiConfig(env);
   if (!config.ready || !config.refreshToken) {
     return jsonResponse({ refreshed: false, message: "缺少快麦API配置或refreshToken。" }, 400);
   }

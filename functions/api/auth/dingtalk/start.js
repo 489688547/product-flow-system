@@ -1,4 +1,4 @@
-import { getDingCredentials, jsonResponse } from "../../dingtalk/_shared/dingtalk.js";
+import { jsonResponse, resolveDingCredentials } from "../../dingtalk/_shared/dingtalk.js";
 
 const PRODUCTION_ORIGIN = "https://product-flow-system.pages.dev";
 
@@ -36,7 +36,7 @@ export async function onRequest({ request, env }) {
       }
     });
   }
-  const { appKey, missing } = getDingCredentials(env);
+  const { appKey, missing } = await resolveDingCredentials(env);
   if (missing.length) return jsonResponse({ message: `缺少钉钉应用配置：${missing.join("、")}` }, 501);
 
   const origin = requestUrl.origin;

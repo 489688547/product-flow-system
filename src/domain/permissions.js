@@ -175,6 +175,10 @@ export function canManagePermissions(user) {
   return canAccessCompanyPlatform(user);
 }
 
+export function canManagePlatformConnections(user) {
+  return user?.role === "executive" && canManagePermissions(user);
+}
+
 function matchesScope(user, departments = [], titles = []) {
   if (canManagePermissions(user)) return true;
   const userDepts = userDepartments(user);
