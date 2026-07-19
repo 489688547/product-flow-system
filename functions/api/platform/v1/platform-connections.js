@@ -1,4 +1,4 @@
-import { canManagePermissions } from "../../../../src/domain/permissions.js";
+import { canManagePlatformConnections } from "../../../../src/domain/permissions.js";
 import {
   PLATFORM_CONNECTION_DEFINITIONS,
   platformEnvironmentValues,
@@ -46,7 +46,7 @@ function errorResponse(error, fallbackRequestId) {
 }
 
 function canManage(session) {
-  return Boolean(session && session.role !== "readonly" && canManagePermissions(session));
+  return canManagePlatformConnections(session);
 }
 
 function assertManage(session) {

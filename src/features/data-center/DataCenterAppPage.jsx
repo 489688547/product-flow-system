@@ -6,7 +6,7 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataAnalysis } from "./DataAnalysis.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
-import { canAccessCompanyPlatform, canManagePermissions } from "../../domain/permissions.js";
+import { canAccessCompanyPlatform, canManagePlatformConnections } from "../../domain/permissions.js";
 import { DataCenterSettingsWorkspace, DataQualityWorkspace, DataServicesWorkspace, DataSourcesWorkspace, MetricDefinitionsWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
 import { PlatformConnectionsWorkspace } from "./PlatformConnectionsWorkspace.jsx";
 
@@ -31,7 +31,7 @@ export function DataCenterAppPage({ section = "overview" }) {
   const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
   const productNames = useMemo(() => new Map((productState.products || []).flatMap(product => (product.skuCodes || []).map(item => [typeof item === "object" ? item.code : item, product.name]))), [productState.products]);
   const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
-  const canManageConnections = user?.role !== "readonly" && canManagePermissions(user);
+  const canManageConnections = canManagePlatformConnections(user);
   const content = {
     overview: <DataOverview summary={summary} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} />,
     analysis: <DataAnalysis rows={salesRows} range={range} productNames={productNames} />,

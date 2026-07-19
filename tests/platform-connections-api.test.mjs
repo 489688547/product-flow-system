@@ -56,6 +56,7 @@ function createD1Mock() {
 
 const executive = { userId: "u-exec", name: "最高权限账号", role: "executive", department: "总经办" };
 const employee = { userId: "u-ops", name: "运营同事", role: "employee", department: "运营部" };
+const executiveOfficeEmployee = { userId: "u-office", name: "总经办同事", role: "employee", department: "总经办" };
 
 function request(method = "GET", body) {
   return new Request("https://product-flow-system.pages.dev/api/platform/v1/platform-connections", {
@@ -92,6 +93,15 @@ test("employees read safe connection metadata but cannot write", async () => {
   const put = await call({ method: "PUT", session: employee, db, body: { platformId: "dingtalk", expectedVersion: 0, fields: { appKey: "key", appSecret: "secret" } } });
   assert.equal(put.status, 403);
   assert.equal((await put.json()).error.code, "PERMISSION_WRITE_DENIED");
+
+  const officePut = await call({
+    method: "PUT",
+    session: executiveOfficeEmployee,
+    db,
+    body: { platformId: "dingtalk", expectedVersion: 0, fields: { appKey: "key", appSecret: "secret" } }
+  });
+  assert.equal(officePut.status, 403);
+  assert.equal((await officePut.json()).error.code, "PERMISSION_WRITE_DENIED");
 });
 
 test("executive validation success saves metadata without echoing credentials", async () => {

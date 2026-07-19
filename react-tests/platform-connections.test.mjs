@@ -15,7 +15,8 @@ test("data center exposes a dedicated platform connection workspace", () => {
   assert.match(app, /data-connections/);
   assert.match(app, /平台连接/);
   assert.match(page, /connections: <PlatformConnectionsWorkspace/);
-  assert.match(page, /canManagePermissions/);
+  assert.match(page, /canManagePlatformConnections/);
+  assert.match(read("src/domain/permissions.js"), /canManagePlatformConnections[\s\S]*role === "executive"[\s\S]*canManagePermissions/);
 });
 
 test("platform catalog uses specific fields and keeps unavailable platforms honest", () => {
