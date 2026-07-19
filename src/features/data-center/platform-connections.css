@@ -17,7 +17,7 @@
 .platform-connection-summary small { overflow: hidden; color: var(--text-tertiary); text-overflow: ellipsis; white-space: nowrap; }
 .platform-connection-state { min-height: 26px; width: fit-content; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border-radius: 999px; background: var(--surface-subtle); color: var(--text-secondary); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .platform-connection-state.connected { background: var(--success-soft); color: var(--success); }
-.platform-connection-state.incomplete { background: var(--danger-soft); color: var(--danger); }
+.platform-connection-state.incomplete, .platform-connection-state.needs_attention { background: var(--danger-soft); color: var(--danger); }
 .platform-connection-state.configured { background: var(--warning-soft); color: var(--warning); }
 .platform-connection-state.unavailable, .platform-connection-state.disabled { color: var(--text-tertiary); }
 .platform-connection-action { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--accent); font-size: 12px; font-weight: 700; white-space: nowrap; }

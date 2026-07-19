@@ -13,12 +13,26 @@ function masterKey() {
   return platformCredentialCryptoInternals.bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
 }
 
-function createD1Mock() {
+function createD1Mock({ failAudit = false } = {}) {
   const rows = new Map();
   const audits = [];
-  return {
+  const db = {
     rows,
     audits,
+    async batch(statements) {
+      const rowsBefore = new Map([...rows].map(([key, value]) => [key, { ...value }]));
+      const auditLength = audits.length;
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        return results;
+      } catch (error) {
+        rows.clear();
+        for (const [key, value] of rowsBefore) rows.set(key, value);
+        audits.splice(auditLength);
+        throw error;
+      }
+    },
     prepare(sql) {
       const normalized = String(sql).replace(/\s+/g, " ").trim().toLowerCase();
       const statement = {
@@ -55,8 +69,17 @@ function createD1Mock() {
             return { success: true, meta: { changes: 1 } };
           }
           if (normalized.startsWith("insert into platform_credential_audit")) {
-            const [id, platformId, action, changedFields, result, requestId, actorId, actorName, createdAt] = statement.values;
+            if (failAudit) throw new Error("audit unavailable");
+            const platformId = statement.values[1];
+            const current = rows.get(platformId);
+            if (normalized.includes("where not exists") && current) return { success: true, meta: { changes: 0 } };
+            if (normalized.includes("where exists")) {
+              const expectedVersion = statement.values.at(-1);
+              if (!current || Number(current.version) !== Number(expectedVersion)) return { success: true, meta: { changes: 0 } };
+            }
+            const [id, , action, changedFields, result, requestId, actorId, actorName, createdAt] = statement.values;
             audits.push({ id, platform_id: platformId, action, changed_fields: changedFields, result, request_id: requestId, actor_id: actorId, actor_name: actorName, created_at: createdAt });
+            return { success: true, meta: { changes: 1 } };
           }
           return { success: true, meta: { changes: 1 } };
         }
@@ -64,6 +87,7 @@ function createD1Mock() {
       return statement;
     }
   };
+  return db;
 }
 
 const actor = { actorId: "u-exec", actorName: "最高权限账号", requestId: "req-test" };
@@ -107,6 +131,17 @@ test("failed validation leaves the active ciphertext and version unchanged", asy
   assert.deepEqual(db.rows.get("dingtalk"), before);
 });
 
+test("audit failure rolls back credential activation", async () => {
+  const db = createD1Mock({ failAudit: true });
+  await assert.rejects(() => savePlatformCredentials(db, {
+    platformId: "dingtalk",
+    expectedVersion: 0,
+    fields: { appKey: "key", appSecret: "secret" }
+  }, { ...actor, masterKey: masterKey(), validate: async () => ({ ok: true }) }), /audit unavailable/);
+  assert.equal(db.rows.has("dingtalk"), false);
+  assert.equal(db.audits.length, 0);
+});
+
 test("vault values override legacy environment and disabling restores fallback", async () => {
   const db = createD1Mock();
   const key = masterKey();
@@ -127,6 +162,22 @@ test("vault values override legacy environment and disabling restores fallback",
   const fallback = await readPlatformCredentials(env, "dingtalk");
   assert.equal(fallback.source, "environment");
   assert.deepEqual(fallback.values, { appKey: "legacy-key", appSecret: "legacy-secret" });
+});
+
+test("re-enabling a disabled connection preserves retained vault fields", async () => {
+  const db = createD1Mock();
+  const key = masterKey();
+  await savePlatformCredentials(db, {
+    platformId: "dingtalk", expectedVersion: 0,
+    fields: { appKey: "retained-key", appSecret: "old-secret" }
+  }, { ...actor, masterKey: key, validate: async () => ({ ok: true }) });
+  await disablePlatformCredentials(db, { platformId: "dingtalk", expectedVersion: 1 }, actor);
+  let validated;
+  await savePlatformCredentials(db, {
+    platformId: "dingtalk", expectedVersion: 2,
+    fields: { appSecret: "new-secret" }
+  }, { ...actor, masterKey: key, validate: async values => { validated = values; } });
+  assert.deepEqual(validated, { appKey: "retained-key", appSecret: "new-secret" });
 });
 
 test("unknown fields and stale versions are rejected", async () => {

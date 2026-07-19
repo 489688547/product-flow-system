@@ -35,6 +35,10 @@ function validMasterKey(masterKey) {
   }
 }
 
+export function isValidPlatformCredentialMasterKey(masterKey) {
+  return validMasterKey(masterKey);
+}
+
 async function importMasterKey(masterKey) {
   if (!validMasterKey(masterKey)) {
     throw credentialError("平台连接的加密能力暂不可用。", "PLATFORM_CREDENTIAL_KEY_UNAVAILABLE", 503);

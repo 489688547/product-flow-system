@@ -14,7 +14,7 @@
 ## 认证与权限
 
 - GET：有效公司员工会话。
-- PUT、DELETE：有效会话、非只读、`canManagePermissions` 为真。
+- PUT、DELETE：有效会话、非只读，且当前身份为总经办最高权限账号（`role=executive`）。
 - 适配器不经 HTTP 读取凭据，只调用服务端共享解析器。
 
 ## 请求
@@ -65,6 +65,8 @@ DELETE 只停用当前连接，密文和审计继续保留。
 
 响应禁止包含 `fields` 值、密文、IV、主密钥、外部 access token 和完整平台响应。
 
+`status` 取值：`connected` 已连接、`needs_attention` 已保存但密钥不可用或密文无法解密、`incomplete` 环境变量不完整、`not_connected` 未连接、`coming_soon` 暂未开放。`needs_attention` 必须在页面提示管理员重新保存连接，不能作为环境就绪依据。
+
 ## 错误码
 
 - `PLATFORM_CONNECTION_INVALID`：平台、字段或必填配置不合法，400。
@@ -94,7 +96,7 @@ GET 无分页。PUT 和 DELETE 使用 `expectedVersion` 防止覆盖；连接测
 
 ## 契约测试
 
-- GET 匿名 401、员工脱敏读取、管理员 `canManage=true`。
+- GET 匿名 401、员工脱敏读取、总经办最高权限账号 `canManage=true`。
 - PUT 普通员工 403、未知字段 400、首次缺少必填 400。
 - 验证失败不改变版本和密文；验证成功递增版本。
 - DELETE 冲突 409、成功后适配器回退环境变量。

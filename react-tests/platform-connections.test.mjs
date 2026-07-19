@@ -45,6 +45,10 @@ test("connection UI covers loading errors permissions disabled actions and inlin
   assert.match(workspace, /role="status"/);
   assert.match(workspace, /disabledReason/);
   assert.match(workspace, /确认停用/);
+  assert.match(workspace, /PLATFORM_CONNECTION_VERSION_CONFLICT/);
+  assert.match(workspace, /本次填写仍保留/);
+  assert.match(workspace, /放弃本次填写/);
+  assert.match(workspace, /platformButtonRefs[\s\S]*\.focus\(\)/);
   assert.match(workspace, /重新加载/);
   assert.match(workspace, /available/);
 });

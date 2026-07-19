@@ -9,6 +9,7 @@ import {
   disablePlatformCredentials,
   listPlatformCredentialMetadata,
   platformCredentialDatabase,
+  platformCredentialIsUsable,
   savePlatformCredentials
 } from "../_shared/platformCredentials.js";
 
@@ -58,9 +59,9 @@ function assertManage(session) {
   }
 }
 
-function connectionSummaries(env, metadataRows) {
+async function connectionSummaries(env, metadataRows) {
   const rows = new Map(metadataRows.map(row => [row.platformId, row]));
-  return PLATFORM_CONNECTION_DEFINITIONS.map(definition => {
+  return Promise.all(PLATFORM_CONNECTION_DEFINITIONS.map(async definition => {
     const row = rows.get(definition.id);
     if (!definition.available) {
       return {
@@ -78,7 +79,10 @@ function connectionSummaries(env, metadataRows) {
     const environmentFields = Object.keys(environmentValues).sort();
     const required = platformRequiredFields(definition.id);
     const environmentComplete = required.every(field => environmentFields.includes(field));
-    if (row?.enabled) return { ...row, status: "connected", source: "vault" };
+    if (row?.enabled) {
+      const usable = await platformCredentialIsUsable(env, definition.id);
+      return { ...row, status: usable ? "connected" : "needs_attention", source: "vault" };
+    }
     if (environmentFields.length) {
       return {
         platformId: definition.id,
@@ -101,7 +105,7 @@ function connectionSummaries(env, metadataRows) {
       verifiedBy: row?.verifiedBy || "",
       source: row ? "disabled" : "none"
     };
-  });
+  }));
 }
 
 export async function handlePlatformConnectionsRequest(context, dependencies = {}) {
@@ -122,7 +126,7 @@ export async function handlePlatformConnectionsRequest(context, dependencies = {
   try {
     if (request.method === "GET") {
       const metadata = await listPlatformCredentialMetadata(db);
-      return jsonResponse({ synced: true, canManage: canManage(data.session), connections: connectionSummaries(env, metadata) });
+      return jsonResponse({ synced: true, canManage: canManage(data.session), connections: await connectionSummaries(env, metadata) });
     }
 
     assertManage(data.session);

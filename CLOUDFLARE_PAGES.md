@@ -73,7 +73,7 @@ npm run verify:production
 
 本地测试如需实时读取生产数据，在被忽略的 `.env` 中配置 `PRODUCTION_DATA_API_URL` 与个人 `PRODUCTION_DATA_ACCESS_TOKEN`。个人令牌由平台管理员受控签发，仓库和浏览器都不能保存原始值。
 
-数据库表会由 `/api/state` 函数首次访问时自动创建，不需要手工执行 SQL。
+旧版共享状态表仍可由 `/api/state` 首次访问时兼容创建；平台连接保险箱等受治理能力必须先执行清单中的迁移，不能依赖页面请求临时建表。
 
 ## 钉钉接口权限
 

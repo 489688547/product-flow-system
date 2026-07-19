@@ -22,6 +22,7 @@ import "./platform-connections.css";
 const STATUS_LABELS = {
   connected: "已连接",
   configured: "已配置",
+  needs_attention: "需处理",
   incomplete: "配置不完整",
   disabled: "已停用",
   unconfigured: "未连接",
@@ -75,7 +76,7 @@ function statusText(connection, definition) {
   return STATUS_LABELS[connection?.status] || STATUS_LABELS.unconfigured;
 }
 
-function PlatformConnectionList({ connections, onSelect }) {
+function PlatformConnectionList({ connections, onSelect, buttonRefs }) {
   const byId = new Map(connections.map(item => [item.platformId, item]));
   return (
     <div className="platform-connection-list" aria-label="公司平台连接">
@@ -87,6 +88,10 @@ function PlatformConnectionList({ connections, onSelect }) {
             type="button"
             className="platform-connection-row"
             key={definition.id}
+            ref={node => {
+              if (node) buttonRefs.current.set(definition.id, node);
+              else buttonRefs.current.delete(definition.id);
+            }}
             disabled={unavailable}
             title={unavailable ? definition.disabledReason : undefined}
             onClick={() => onSelect(definition.id)}
@@ -108,13 +113,14 @@ function PlatformConnectionList({ connections, onSelect }) {
   );
 }
 
-function PlatformConnectionForm({ definition, connection, canManage, onBack, onSaved, onDisabled }) {
+function PlatformConnectionForm({ definition, connection, canManage, onBack, onConflict, onSaved, onDisabled }) {
   const [draft, setDraft] = useState(() => Object.fromEntries(definition.fields.map(field => [field.key, ""])));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [requestId, setRequestId] = useState("");
   const [notice, setNotice] = useState("");
   const [confirmDisable, setConfirmDisable] = useState(false);
+  const [confirmBack, setConfirmBack] = useState(false);
   const resultRef = useRef(null);
   const changedFields = useMemo(() => Object.fromEntries(Object.entries(draft).filter(([, value]) => value.trim())), [draft]);
   const changed = Object.keys(changedFields).length > 0;
@@ -135,12 +141,25 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onS
       onSaved(saved);
       requestAnimationFrame(() => resultRef.current?.focus());
     } catch (nextError) {
-      setError(`${nextError?.message || "连接验证失败。"} 原连接未受影响。`);
+      if (nextError?.code === "PLATFORM_CONNECTION_VERSION_CONFLICT") {
+        await onConflict();
+        setError("连接刚被其他人更新，当前状态已刷新。本次填写仍保留，请确认后再次保存。");
+      } else {
+        setError(`${nextError?.message || "连接验证失败。"} 原连接未受影响。`);
+      }
       setRequestId(nextError?.requestId || "");
       requestAnimationFrame(() => resultRef.current?.focus());
     } finally {
       setBusy(false);
     }
+  }
+
+  function handleBack() {
+    if (changed) {
+      setConfirmBack(true);
+      return;
+    }
+    onBack();
   }
 
   async function handleDisable() {
@@ -163,7 +182,13 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onS
 
   return (
     <div className="platform-connection-detail">
-      <button type="button" className="platform-connection-back" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />返回平台连接</button>
+      <button type="button" className="platform-connection-back" onClick={handleBack}><ArrowLeft size={16} aria-hidden="true" />返回平台连接</button>
+      {confirmBack ? (
+        <div className="platform-connection-disable-confirm" role="alert">
+          <div><strong>放弃本次填写？</strong><p>尚未保存的连接信息会被清空。</p></div>
+          <span><Button type="button" onClick={() => setConfirmBack(false)}>继续填写</Button><Button type="button" variant="danger" onClick={onBack}>放弃并返回</Button></span>
+        </div>
+      ) : null}
       <header className="platform-connection-detail-head">
         <PlatformMark definition={definition} size="large" />
         <div><h2>{definition.name}</h2><p>{definition.description}</p></div>
@@ -222,6 +247,8 @@ export function PlatformConnectionsWorkspace({ canManage = false }) {
   const [selectedId, setSelectedId] = useState("");
   const [loadState, setLoadState] = useState("loading");
   const [error, setError] = useState("");
+  const [returnFocusId, setReturnFocusId] = useState("");
+  const platformButtonRefs = useRef(new Map());
 
   const load = useCallback(async () => {
     setLoadState("loading");
@@ -237,6 +264,10 @@ export function PlatformConnectionsWorkspace({ canManage = false }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (selectedId || !returnFocusId) return;
+    requestAnimationFrame(() => platformButtonRefs.current.get(returnFocusId)?.focus());
+  }, [returnFocusId, selectedId]);
 
   const definition = PLATFORM_CONNECTION_DEFINITIONS.find(item => item.id === selectedId);
   const connection = connections.find(item => item.platformId === selectedId);
@@ -247,13 +278,25 @@ export function PlatformConnectionsWorkspace({ canManage = false }) {
     return <div className="platform-connections-error" role="alert"><AlertTriangle size={20} aria-hidden="true" /><div><strong>平台连接暂不可用</strong><p>{error}</p><Button onClick={load}><RefreshCw size={16} />重新加载</Button></div></div>;
   }
   if (definition?.available) {
-    return <PlatformConnectionForm definition={definition} connection={connection} canManage={canManage} onBack={() => setSelectedId("")} onSaved={updateConnection} onDisabled={updateConnection} />;
+    return <PlatformConnectionForm
+      definition={definition}
+      connection={connection}
+      canManage={canManage}
+      onBack={() => { setReturnFocusId(definition.id); setSelectedId(""); }}
+      onConflict={load}
+      onSaved={updateConnection}
+      onDisabled={updateConnection}
+    />;
   }
   return (
     <section className="platform-connections-workspace">
       <div className="platform-connections-intro"><div><h2>公司平台连接</h2><p>选择平台并完成安全连接；保存后系统会自动验证。</p></div><span><ShieldCheck size={15} aria-hidden="true" />已保存内容不会回显</span></div>
       {error ? <p className="platform-connection-message error" role="alert">{error}</p> : null}
-      <PlatformConnectionList connections={connections} onSelect={setSelectedId} />
+      <PlatformConnectionList
+        connections={connections}
+        onSelect={setSelectedId}
+        buttonRefs={platformButtonRefs}
+      />
     </section>
   );
 }

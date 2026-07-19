@@ -126,6 +126,23 @@ async function writeAudit(db, input, context, result = "success") {
   ).run();
 }
 
+function conditionalAuditStatement(db, input, context, { exists, expectedVersion }) {
+  const now = new Date().toISOString();
+  const conditionSql = exists
+    ? "EXISTS (SELECT 1 FROM platform_credentials WHERE platform_id = ? AND version = ?)"
+    : "NOT EXISTS (SELECT 1 FROM platform_credentials WHERE platform_id = ?)";
+  const conditionValues = exists ? [input.platformId, Number(expectedVersion)] : [input.platformId];
+  return db.prepare(`INSERT INTO platform_credential_audit
+    (id, platform_id, action, changed_fields, result, request_id, actor_id, actor_name, created_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${conditionSql}`).bind(
+    crypto.randomUUID(), input.platformId, input.action,
+    JSON.stringify([...new Set(input.changedFields || [])].sort()), "success",
+    cleanString(context.requestId || "", "requestId", 120),
+    cleanString(context.actorId || "unknown", "actorId", 160),
+    actorName(context), now, ...conditionValues
+  );
+}
+
 export async function listPlatformCredentialMetadata(db) {
   await ensurePlatformCredentialTables(db);
   const result = await db.prepare(`SELECT platform_id, configured_fields, version, enabled,
@@ -158,6 +175,14 @@ export async function readPlatformCredentials(env = {}, platformId) {
   }
 }
 
+export async function platformCredentialIsUsable(env = {}, platformId) {
+  try {
+    return (await readPlatformCredentials(env, platformId)).source === "vault";
+  } catch {
+    return false;
+  }
+}
+
 export async function platformEnv(env = {}, platformId) {
   const resolved = await readPlatformCredentials(env, platformId);
   if (resolved.source !== "vault") return env;
@@ -174,7 +199,12 @@ export async function configuredCredentialEnvVars(env = {}) {
   if (!db || !platformCredentialCryptoInternals.validMasterKey(env.PLATFORM_CREDENTIAL_MASTER_KEY)) return new Set();
   try {
     const rows = await listPlatformCredentialMetadata(db);
-    return new Set(rows.filter(row => row.enabled).flatMap(row => [...platformConfiguredEnvVars(row.platformId, row.configuredFields)]));
+    const configured = new Set();
+    for (const row of rows.filter(item => item.enabled)) {
+      if (!await platformCredentialIsUsable(env, row.platformId)) continue;
+      for (const name of platformConfiguredEnvVars(row.platformId, row.configuredFields)) configured.add(name);
+    }
+    return configured;
   } catch {
     return new Set();
   }
@@ -193,7 +223,7 @@ export async function savePlatformCredentials(db, input = {}, context = {}) {
   if (!platformCredentialCryptoInternals.validMasterKey(masterKey)) {
     throw platformError("平台连接的加密能力暂不可用。", "PLATFORM_CREDENTIAL_KEY_UNAVAILABLE", 503);
   }
-  const currentValues = row?.enabled
+  const currentValues = row
     ? await decryptPlatformCredentials(row, { masterKey, platformId, keyVersion: Number(row.key_version) })
     : normalizeFields(platformId, context.fallbackValues || {});
   const values = { ...currentValues, ...changed };
@@ -210,7 +240,7 @@ export async function savePlatformCredentials(db, input = {}, context = {}) {
   const verifiedBy = actorName(context);
   const version = expectedVersion + 1;
   const configuredFields = Object.keys(values).filter(key => values[key]).sort();
-  const result = await db.prepare(`INSERT INTO platform_credentials
+  const credentialStatement = db.prepare(`INSERT INTO platform_credentials
     (platform_id, ciphertext, iv, algorithm, key_version, configured_fields, version,
       enabled, verified_at, verified_by, updated_at, updated_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -229,11 +259,16 @@ export async function savePlatformCredentials(db, input = {}, context = {}) {
     WHERE platform_credentials.version = excluded.version - 1`).bind(
     platformId, encrypted.ciphertext, encrypted.iv, encrypted.algorithm, encrypted.keyVersion,
     JSON.stringify(configuredFields), version, 1, now, verifiedBy, now, verifiedBy
-  ).run();
-  if (Number(result?.meta?.changes ?? 1) !== 1) {
+  );
+  const auditStatement = conditionalAuditStatement(db, {
+    platformId,
+    action: row ? "replace" : "create",
+    changedFields: Object.keys(changed)
+  }, context, { exists: Boolean(row), expectedVersion });
+  const [auditResult, credentialResult] = await db.batch([auditStatement, credentialStatement]);
+  if (Number(auditResult?.meta?.changes ?? 0) !== 1 || Number(credentialResult?.meta?.changes ?? 0) !== 1) {
     throw platformError("连接已被其他人更新，请刷新后重试。", "PLATFORM_CONNECTION_VERSION_CONFLICT", 409);
   }
-  await writeAudit(db, { platformId, action: row ? "replace" : "create", changedFields: Object.keys(changed) }, context);
   return metadataFromRow({
     platform_id: platformId,
     configured_fields: JSON.stringify(configuredFields),
@@ -257,11 +292,16 @@ export async function disablePlatformCredentials(db, input = {}, context = {}) {
   const now = new Date().toISOString();
   const updatedBy = actorName(context);
   const version = expectedVersion + 1;
-  const result = await db.prepare(`UPDATE platform_credentials SET enabled = ?, version = ?, updated_at = ?, updated_by = ?
-    WHERE platform_id = ? AND version = ?`).bind(0, version, now, updatedBy, platformId, expectedVersion).run();
-  if (Number(result?.meta?.changes ?? 1) !== 1) {
+  const auditStatement = conditionalAuditStatement(db, {
+    platformId,
+    action: "disable",
+    changedFields: ["enabled"]
+  }, context, { exists: true, expectedVersion });
+  const updateStatement = db.prepare(`UPDATE platform_credentials SET enabled = ?, version = ?, updated_at = ?, updated_by = ?
+    WHERE platform_id = ? AND version = ?`).bind(0, version, now, updatedBy, platformId, expectedVersion);
+  const [auditResult, updateResult] = await db.batch([auditStatement, updateStatement]);
+  if (Number(auditResult?.meta?.changes ?? 0) !== 1 || Number(updateResult?.meta?.changes ?? 0) !== 1) {
     throw platformError("连接已被其他人更新，请刷新后重试。", "PLATFORM_CONNECTION_VERSION_CONFLICT", 409);
   }
-  await writeAudit(db, { platformId, action: "disable", changedFields: ["enabled"] }, context);
   return metadataFromRow({ ...row, version, enabled: 0, updated_at: now, updated_by: updatedBy });
 }

@@ -88,3 +88,38 @@ test("environment readiness accepts configured vault fields", async () => {
   assert.equal(readiness.ready, true);
   assert.deepEqual(readiness.capabilities[0].missing, []);
 });
+
+test("environment readiness rejects an invalid or wrong vault key", async () => {
+  const db = createPlatformCredentialD1Mock();
+  const key = masterKey();
+  await seed(db, key, "dingtalk", { appKey: "vault-key", appSecret: "vault-secret" });
+  const manifest = {
+    capabilities: [
+      {
+        id: "platform-credential-vault", name: "平台连接安全存储", description: "test",
+        platforms: ["dingtalk"], requiredIn: ["production"], level: "blocking",
+        envVars: ["PLATFORM_CREDENTIAL_MASTER_KEY"], bindings: [], tables: []
+      },
+      {
+        id: "dingtalk-core", name: "钉钉登录与组织能力", description: "test",
+        platforms: ["dingtalk"], requiredIn: ["production"], level: "blocking",
+        envVars: ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET"], bindings: [], tables: []
+      }
+    ]
+  };
+  const invalid = await inspectEnvironmentReadiness({
+    env: { RUNTIME_ENV: "production", PRODUCT_FLOW_DB: db, PLATFORM_CREDENTIAL_MASTER_KEY: "not-a-valid-key" },
+    requestUrl: "https://product-flow-system.pages.dev/api/platform/v1/environment-readiness",
+    manifest
+  });
+  assert.equal(invalid.ready, false);
+  assert.deepEqual(invalid.capabilities[0].missing, ["PLATFORM_CREDENTIAL_MASTER_KEY"]);
+
+  const wrong = await inspectEnvironmentReadiness({
+    env: { RUNTIME_ENV: "production", PRODUCT_FLOW_DB: db, PLATFORM_CREDENTIAL_MASTER_KEY: masterKey() },
+    requestUrl: "https://product-flow-system.pages.dev/api/platform/v1/environment-readiness",
+    manifest
+  });
+  assert.equal(wrong.ready, false);
+  assert.deepEqual(wrong.capabilities[1].missing, ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET"]);
+});

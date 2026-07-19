@@ -11,9 +11,23 @@ function masterKey() {
 function createD1Mock() {
   const rows = new Map();
   const audits = [];
-  return {
+  const db = {
     rows,
     audits,
+    async batch(statements) {
+      const rowsBefore = new Map([...rows].map(([key, value]) => [key, { ...value }]));
+      const auditLength = audits.length;
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        return results;
+      } catch (error) {
+        rows.clear();
+        for (const [key, value] of rowsBefore) rows.set(key, value);
+        audits.splice(auditLength);
+        throw error;
+      }
+    },
     prepare(sql) {
       const normalized = String(sql).replace(/\s+/g, " ").trim().toLowerCase();
       const statement = {
@@ -43,8 +57,16 @@ function createD1Mock() {
             return { success: true, meta: { changes: 1 } };
           }
           if (normalized.startsWith("insert into platform_credential_audit")) {
-            const [id, platformId, action, changedFields, result, requestId, actorId, actorName, createdAt] = statement.values;
-            audits.push({ id, platform_id: platformId, action, changed_fields: changedFields, result, request_id: requestId, actor_id: actorId, actor_name: actorName, created_at: createdAt });
+            const auditPlatformId = statement.values[1];
+            const current = rows.get(auditPlatformId);
+            if (normalized.includes("where not exists") && current) return { success: true, meta: { changes: 0 } };
+            if (normalized.includes("where exists")) {
+              const expectedVersion = statement.values.at(-1);
+              if (!current || Number(current.version) !== Number(expectedVersion)) return { success: true, meta: { changes: 0 } };
+            }
+            const [id, , action, changedFields, result, requestId, actorId, actorName, createdAt] = statement.values;
+            audits.push({ id, platform_id: auditPlatformId, action, changed_fields: changedFields, result, request_id: requestId, actor_id: actorId, actor_name: actorName, created_at: createdAt });
+            return { success: true, meta: { changes: 1 } };
           }
           return { success: true, meta: { changes: 1 } };
         }
@@ -52,6 +74,7 @@ function createD1Mock() {
       return statement;
     }
   };
+  return db;
 }
 
 const executive = { userId: "u-exec", name: "最高权限账号", role: "executive", department: "总经办" };
@@ -118,6 +141,18 @@ test("executive validation success saves metadata without echoing credentials", 
   assert.deepEqual(payload.connection.configuredFields, ["appKey", "appSecret"]);
   assert.deepEqual(seen, [{ platformId: "dingtalk", values: { appKey: "ding-key", appSecret: "ding-secret" } }]);
   assert.doesNotMatch(JSON.stringify(payload), /ding-key|ding-secret|ciphertext|\"iv\"/);
+});
+
+test("an unreadable vault is reported as needing attention", async () => {
+  const db = createD1Mock();
+  const originalKey = masterKey();
+  await call({
+    method: "PUT", db, key: originalKey,
+    body: { platformId: "dingtalk", expectedVersion: 0, fields: { appKey: "key", appSecret: "secret" } }
+  });
+  const response = await call({ db, key: masterKey(), session: employee });
+  const payload = await response.json();
+  assert.equal(payload.connections.find(item => item.platformId === "dingtalk").status, "needs_attention");
 });
 
 test("an executive can replace one legacy environment field without re-entering every secret", async () => {
