@@ -75,11 +75,11 @@ const ECOMMERCE_OPERATIONS_NAV = [
 const ECOMMERCE_OPERATIONS_SCREEN_TO_SECTION = new Map(ECOMMERCE_OPERATIONS_NAV.map(([screen, , , , section]) => [screen, section]));
 
 const PERFORMANCE_MANAGEMENT_NAV = [
-  ["performance-overview", "绩效总览", BarChart3, "绩效管理", "overview"],
-  ["performance-schemes", "考核方案", ListChecks, "绩效管理", "schemes"],
-  ["performance-mine", "我的绩效", ClipboardCheck, "绩效管理", "mine"],
-  ["performance-manager", "主管评估", Users, "绩效管理", "manager"],
-  ["performance-archive", "复核与归档", RefreshCcw, "绩效管理", "archive"]
+  ["performance-overview", "绩效总览", BarChart3, "人事管理", "overview"],
+  ["performance-schemes", "考核方案", ListChecks, "人事管理", "schemes"],
+  ["performance-mine", "我的绩效", ClipboardCheck, "人事管理", "mine"],
+  ["performance-manager", "主管评估", Users, "人事管理", "manager"],
+  ["performance-archive", "复核与归档", RefreshCcw, "人事管理", "archive"]
 ];
 const PERFORMANCE_MANAGEMENT_SCREEN_TO_SECTION = new Map(PERFORMANCE_MANAGEMENT_NAV.map(([screen, , , , section]) => [screen, section]));
 
