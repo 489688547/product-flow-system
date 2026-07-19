@@ -193,7 +193,9 @@ export async function savePlatformCredentials(db, input = {}, context = {}) {
   if (!platformCredentialCryptoInternals.validMasterKey(masterKey)) {
     throw platformError("平台连接的加密能力暂不可用。", "PLATFORM_CREDENTIAL_KEY_UNAVAILABLE", 503);
   }
-  const currentValues = row ? await decryptPlatformCredentials(row, { masterKey, platformId, keyVersion: Number(row.key_version) }) : {};
+  const currentValues = row?.enabled
+    ? await decryptPlatformCredentials(row, { masterKey, platformId, keyVersion: Number(row.key_version) })
+    : normalizeFields(platformId, context.fallbackValues || {});
   const values = { ...currentValues, ...changed };
   assertRequired(platformId, values);
   try {

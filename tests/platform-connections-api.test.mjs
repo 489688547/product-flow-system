@@ -65,10 +65,10 @@ function request(method = "GET", body) {
   });
 }
 
-async function call({ method = "GET", body, session = executive, db = createD1Mock(), key = masterKey(), validate = async () => ({ connected: true }) } = {}) {
+async function call({ method = "GET", body, session = executive, db = createD1Mock(), key = masterKey(), env: envOverrides = {}, validate = async () => ({ connected: true }) } = {}) {
   return handlePlatformConnectionsRequest({
     request: request(method, body),
-    env: { PRODUCT_FLOW_DB: db, PLATFORM_CREDENTIAL_MASTER_KEY: key },
+    env: { PRODUCT_FLOW_DB: db, PLATFORM_CREDENTIAL_MASTER_KEY: key, ...envOverrides },
     data: session ? { session } : {}
   }, { testConnection: validate });
 }
@@ -108,6 +108,23 @@ test("executive validation success saves metadata without echoing credentials", 
   assert.deepEqual(payload.connection.configuredFields, ["appKey", "appSecret"]);
   assert.deepEqual(seen, [{ platformId: "dingtalk", values: { appKey: "ding-key", appSecret: "ding-secret" } }]);
   assert.doesNotMatch(JSON.stringify(payload), /ding-key|ding-secret|ciphertext|\"iv\"/);
+});
+
+test("an executive can replace one legacy environment field without re-entering every secret", async () => {
+  const db = createD1Mock();
+  const seen = [];
+  const response = await call({
+    method: "PUT",
+    db,
+    env: { DINGTALK_APP_KEY: "legacy-key", DINGTALK_APP_SECRET: "legacy-secret" },
+    body: { platformId: "dingtalk", expectedVersion: 0, fields: { appSecret: "replacement-secret" } },
+    validate: async (platformId, values) => { seen.push({ platformId, values }); return { connected: true }; }
+  });
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.deepEqual(seen, [{ platformId: "dingtalk", values: { appKey: "legacy-key", appSecret: "replacement-secret" } }]);
+  assert.deepEqual(payload.connection.configuredFields, ["appKey", "appSecret"]);
+  assert.doesNotMatch(JSON.stringify(payload), /legacy-key|legacy-secret|replacement-secret/);
 });
 
 test("validation failure keeps the previous connection and returns a safe error", async () => {

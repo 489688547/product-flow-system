@@ -135,6 +135,7 @@ export async function handlePlatformConnectionsRequest(context, dependencies = {
     }
     const operationContext = {
       masterKey: env.PLATFORM_CREDENTIAL_MASTER_KEY,
+      fallbackValues: platformEnvironmentValues(env, body.platformId),
       actorId: data.session.userId || data.session.unionId || "unknown",
       actorName: data.session.name || "未知管理员",
       requestId: id
