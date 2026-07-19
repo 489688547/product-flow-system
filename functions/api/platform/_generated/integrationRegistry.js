@@ -164,7 +164,8 @@ const integrationRegistry = {
         "预览环境",
         "回滚",
         "环境就绪检查",
-        "生产数据网关"
+        "生产数据网关",
+        "凭证加密服务"
       ],
       "businessQuestions": [
         "构建或部署失败",
@@ -194,7 +195,8 @@ const integrationRegistry = {
         ".github/workflows/**"
       ],
       "envVars": [
-        "LOCAL_LIVE_D1_PREVIEW"
+        "LOCAL_LIVE_D1_PREVIEW",
+        "DATA_CREDENTIAL_MASTER_KEY"
       ],
       "domains": [
         "pages.dev",
@@ -204,7 +206,8 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/production-write-session",
-        "/api/platform/v1/production-data/"
+        "/api/platform/v1/production-data/",
+        "/api/platform/v1/credential-vault"
       ],
       "publicDocs": [
         {
@@ -235,7 +238,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、绩效和跨 App 协同记录。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、加密凭证、店铺运营、绩效和跨 App 协同记录。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
@@ -243,6 +246,7 @@ const integrationRegistry = {
         "销售聚合",
         "平台配置",
         "数据中心元数据",
+        "加密凭证密文与审计",
         "店铺运营记录",
         "绩效记录",
         "跨 App 协同",
@@ -254,6 +258,7 @@ const integrationRegistry = {
         "跨设备状态不同步",
         "数据库绑定缺失",
         "表结构或容量问题",
+        "凭证是否只以密文保存",
         "跨部门事项如何留痕",
         "测试账号如何受控写生产数据",
         "生产写入如何回滚"
@@ -278,6 +283,8 @@ const integrationRegistry = {
         "functions/api/auth/**",
         "functions/api/dingtalk/org/**",
         "functions/api/platform/_shared/productionDataAccess.js",
+        "functions/api/platform/_shared/credential*.js",
+        "functions/api/platform/v1/credential-vault/**",
         "functions/api/platform/v1/production-data/**",
         "functions/api/platform/v1/collaboration-items/**",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
@@ -300,7 +307,8 @@ const integrationRegistry = {
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
-        "/api/platform/v1/collaboration-items"
+        "/api/platform/v1/collaboration-items",
+        "/api/platform/v1/credential-vault"
       ],
       "publicDocs": [
         {
@@ -323,10 +331,13 @@ const integrationRegistry = {
         "functions/api/performance-management.js",
         "functions/api/performance-management/",
         "functions/api/platform/_shared/productionDataAccess.js",
+        "functions/api/platform/_shared/credentialVaultStorage.js",
+        "functions/api/platform/_shared/credentialCrypto.js",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
         "migrations/0001_production_data_access.sql",
         "migrations/0002_business_data_apps.sql",
-        "migrations/0002_collaboration_execution.sql"
+        "migrations/0002_collaboration_execution.sql",
+        "migrations/0003_data_center_credentials.sql"
       ],
       "relations": [
         {

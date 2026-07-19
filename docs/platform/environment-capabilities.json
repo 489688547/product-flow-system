@@ -96,6 +96,23 @@
       ]
     },
     {
+      "id": "data-credential-vault",
+      "name": "数据中心加密凭证保险箱",
+      "description": "连接器和内部系统凭证的版本化加密、权限与审计所需生产能力。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": ["DATA_CREDENTIAL_MASTER_KEY"],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "data_connector_instances",
+        "credential_vault_entries",
+        "credential_vault_permissions",
+        "credential_vault_audit",
+        "internal_vault_items"
+      ]
+    },
+    {
       "id": "operations-ai-review",
       "name": "经营方案 AI 点评",
       "description": "可选的 OpenAI Responses API 点评；未配置时使用本地规则检查，不阻断经营流程。",
