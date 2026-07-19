@@ -210,7 +210,7 @@ Commit: `feat(ai): expose business app read skills`
 - Produces: `streamProviderTurn({ config, input, tools, fetchImpl, signal })` events `text_delta`, `function_call`, `output_item`, `usage`.
 - Produces: `testProviderSkillConnection()` returning `{ supported, checkedAt, latencyMs, error? }` using only a synthetic `lookup_status` tool.
 
-- [ ] **Step 1: Write failing adapter tests**
+- [x] **Step 1: Write failing adapter tests**
 
 Assert request JSON contains strict tools and `store:false`, parse `response.output_item.done` function calls, preserve output items for the next turn, and map malformed arguments or upstream errors to safe `AI_PROVIDER_*` codes.
 
@@ -224,21 +224,21 @@ assert.deepEqual(body.tools[0], {
 });
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 Run: `node --test tests/ai-provider.test.mjs`
 
 Expected: FAIL because adapter requests and parser do not handle Function Calling.
 
-- [ ] **Step 3: Add optional tools to provider requests**
+- [x] **Step 3: Add optional tools to provider requests**
 
 Keep the current request unchanged when tools are empty. When present, add `tools` and `tool_choice: "auto"`; parse completed function-call items into `{ callId, name, arguments, item }` while retaining text streaming and usage.
 
-- [ ] **Step 4: Add synthetic capability test**
+- [x] **Step 4: Add synthetic capability test**
 
 Send no company data. The only valid call is `lookup_status({})`; return a synthetic function output and require a final response containing `ok`. Persist only `skillsSupported`, `lastSkillCheckedAt` and safe status metadata in the existing Provider record.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run: `node --test tests/ai-provider.test.mjs react-tests/ai-assistant-domain.test.mjs`
 

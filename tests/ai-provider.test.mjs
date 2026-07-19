@@ -41,6 +41,23 @@ test("Responses request always disables storage and caps output", async () => {
   assert.equal(body.reasoning.effort, "xhigh");
 });
 
+test("Responses request adds only strict registered function tools when supplied", async () => {
+  const { resolveProviderConfig } = await import(configUrl);
+  const { responsesRequest } = await import(adapterUrl);
+  const config = resolveProviderConfig({ env: { LINGSUAN_API_KEY: fakeSecret }, storedProvider: enabled });
+  const tool = {
+    type: "function",
+    name: "lookup_status",
+    description: "读取合成状态",
+    parameters: { type: "object", properties: {}, additionalProperties: false },
+    strict: true
+  };
+  const body = JSON.parse(responsesRequest(config, [], { tools: [tool] }).body);
+  assert.deepEqual(body.tools, [tool]);
+  assert.equal(body.tool_choice, "auto");
+  assert.equal(body.store, false);
+});
+
 test("Responses request refuses a missing server-side secret", async () => {
   const { resolveProviderConfig } = await import(configUrl);
   const { responsesRequest } = await import(adapterUrl);
@@ -69,6 +86,61 @@ test("stream adapter emits text and usage while ignoring unknown events", async 
     { type: "text_delta", delta: "k" },
     { type: "usage", inputTokens: 3, outputTokens: 1 }
   ]);
+});
+
+test("stream adapter preserves function calls for a following provider turn", async () => {
+  const { resolveProviderConfig } = await import(configUrl);
+  const { streamProviderResponse } = await import(adapterUrl);
+  const config = resolveProviderConfig({ env: { LINGSUAN_API_KEY: fakeSecret }, storedProvider: enabled });
+  const item = { type: "function_call", id: "fc-1", call_id: "call-1", name: "lookup_status", arguments: "{}" };
+  const body = [
+    `event: response.output_item.done\ndata: ${JSON.stringify({ item })}\n\n`,
+    `event: response.completed\ndata: ${JSON.stringify({ response: { output: [item], usage: { input_tokens: 3, output_tokens: 2 } } })}\n\n`
+  ].join("");
+  const events = [];
+  for await (const event of streamProviderResponse({
+    config,
+    input: [{ role: "user", content: "调用工具" }],
+    tools: [{ type: "function", name: "lookup_status", description: "读取合成状态", parameters: { type: "object", properties: {}, additionalProperties: false }, strict: true }],
+    fetchImpl: async () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } })
+  })) events.push(event);
+  assert.deepEqual(events, [
+    { type: "output_item", item },
+    { type: "function_call", callId: "call-1", name: "lookup_status", arguments: "{}", item },
+    { type: "usage", inputTokens: 3, outputTokens: 2 }
+  ]);
+});
+
+test("synthetic skill capability test completes a function call without company data", async () => {
+  const { resolveProviderConfig } = await import(configUrl);
+  const { testProviderSkillConnection } = await import(adapterUrl);
+  const config = resolveProviderConfig({ env: { LINGSUAN_API_KEY: fakeSecret }, storedProvider: enabled });
+  let calls = 0;
+  const result = await testProviderSkillConnection({
+    config,
+    fetchImpl: async (_url, init) => {
+      calls += 1;
+      const request = JSON.parse(init.body);
+      assert.equal(request.tools[0].name, "lookup_status");
+      assert.doesNotMatch(init.body, /公司|销售|财务/);
+      if (calls === 1) {
+        const item = { type: "function_call", id: "fc-1", call_id: "call-1", name: "lookup_status", arguments: "{}" };
+        return new Response([
+          `event: response.output_item.done\ndata: ${JSON.stringify({ item })}\n\n`,
+          `event: response.completed\ndata: ${JSON.stringify({ response: { output: [item] } })}\n\n`
+        ].join(""), { status: 200 });
+      }
+      assert.ok(request.input.some(item => item.type === "function_call" && item.call_id === "call-1"));
+      assert.ok(request.input.some(item => item.type === "function_call_output" && item.call_id === "call-1" && item.output === '{"ok":true}'));
+      return new Response([
+        "event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n",
+        "event: response.completed\ndata: {\"response\":{\"output\":[]}}\n\n"
+      ].join(""), { status: 200 });
+    }
+  });
+  assert.equal(calls, 2);
+  assert.equal(result.supported, true);
+  assert.equal(result.statusCode, 200);
 });
 
 test("Provider status errors map safely without returning raw bodies", async () => {

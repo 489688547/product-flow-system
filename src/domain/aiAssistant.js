@@ -28,7 +28,9 @@ export const DEFAULT_AI_PROVIDER = Object.freeze({
   storeResponses: false,
   lastCheckedAt: "",
   lastLatencyMs: 0,
-  lastStatusCode: 0
+  lastStatusCode: 0,
+  skillsSupported: false,
+  lastSkillCheckedAt: ""
 });
 
 function safeNonNegativeNumber(value) {
@@ -42,7 +44,9 @@ export function normalizeAiProvider(input = {}) {
     enabled: input.enabled === true,
     lastCheckedAt: typeof input.lastCheckedAt === "string" ? input.lastCheckedAt.slice(0, 40) : "",
     lastLatencyMs: safeNonNegativeNumber(input.lastLatencyMs),
-    lastStatusCode: safeNonNegativeNumber(input.lastStatusCode)
+    lastStatusCode: safeNonNegativeNumber(input.lastStatusCode),
+    skillsSupported: input.skillsSupported === true,
+    lastSkillCheckedAt: typeof input.lastSkillCheckedAt === "string" ? input.lastSkillCheckedAt.slice(0, 40) : ""
   };
 }
 

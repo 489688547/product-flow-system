@@ -64,16 +64,34 @@ test("executive updates safe metadata and runs only a synthetic connection test"
   const { onRequest: providerRequest } = await import(providerUrl);
   const { onRequest: providerTestRequest } = await import(providerTestUrl);
   const db = createAiD1Mock();
+  let providerCalls = 0;
   const env = {
     PRODUCT_FLOW_DB: db,
     AI_ASSISTANT_ENABLED: "1",
     LINGSUAN_API_KEY: fakeSecret,
     AI_PROVIDER_FETCH: async (_url, init) => {
-      assert.match(init.body, /返回 ok/);
+      providerCalls += 1;
       assert.doesNotMatch(init.body, /公司|销售|财务/);
+      if (providerCalls === 1) {
+        assert.match(init.body, /返回 ok/);
+        return new Response([
+          "event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n",
+          "event: response.completed\ndata: {\"response\":{\"usage\":{\"input_tokens\":2,\"output_tokens\":1}}}\n\n"
+        ].join(""), { status: 200 });
+      }
+      const request = JSON.parse(init.body);
+      assert.equal(request.tools[0].name, "lookup_status");
+      if (providerCalls === 2) {
+        const item = { type: "function_call", id: "fc-1", call_id: "call-1", name: "lookup_status", arguments: "{}" };
+        return new Response([
+          `event: response.output_item.done\ndata: ${JSON.stringify({ item })}\n\n`,
+          `event: response.completed\ndata: ${JSON.stringify({ response: { output: [item] } })}\n\n`
+        ].join(""), { status: 200 });
+      }
+      assert.ok(request.input.some(item => item.type === "function_call_output" && item.call_id === "call-1"));
       return new Response([
         "event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n",
-        "event: response.completed\ndata: {\"response\":{\"usage\":{\"input_tokens\":2,\"output_tokens\":1}}}\n\n"
+        "event: response.completed\ndata: {\"response\":{\"output\":[]}}\n\n"
       ].join(""), { status: 200 });
     }
   };
@@ -100,6 +118,8 @@ test("executive updates safe metadata and runs only a synthetic connection test"
   const testedBody = await tested.json();
   assert.equal(tested.status, 200);
   assert.equal(testedBody.connected, true);
+  assert.equal(testedBody.skillsSupported, true);
+  assert.equal(providerCalls, 3);
   assert.ok(testedBody.requestId);
   assert.doesNotMatch(JSON.stringify(testedBody), /test-secret/);
 });

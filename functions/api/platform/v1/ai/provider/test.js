@@ -2,7 +2,7 @@ import { jsonResponse, optionsResponse } from "../../../../dingtalk/_shared/ding
 import { canAccessCompanyPlatform } from "../../../../../../src/domain/permissions.js";
 import { normalizeAiProvider } from "../../../../../../src/domain/aiAssistant.js";
 import { writeDataCenterState } from "../../../../data-center/_shared/storage.js";
-import { testProviderConnection } from "../_shared/responses-adapter.js";
+import { testProviderConnection, testProviderSkillConnection } from "../_shared/responses-adapter.js";
 import { aiError, loadAiConfiguration } from "../_shared/http.js";
 
 function requestId() {
@@ -22,18 +22,29 @@ export async function onRequest({ request, env, data = {} }) {
       config: loaded.provider,
       fetchImpl: env.AI_PROVIDER_FETCH || fetch
     });
+    const skillResult = result.connected
+      ? await testProviderSkillConnection({ config: loaded.provider, fetchImpl: env.AI_PROVIDER_FETCH || fetch })
+      : { supported: false, checkedAt: result.checkedAt };
     const next = normalizeAiProvider({
       ...loaded.stored.state.aiProviders[0],
       lastCheckedAt: result.checkedAt,
       lastLatencyMs: result.latencyMs,
-      lastStatusCode: result.statusCode
+      lastStatusCode: result.statusCode,
+      skillsSupported: skillResult.supported,
+      lastSkillCheckedAt: skillResult.checkedAt
     });
     await writeDataCenterState(
       loaded.db,
       { ...loaded.stored.state, aiProviders: [next] },
       String(data.session.name || data.session.userId || "unknown").slice(0, 120)
     );
-    return jsonResponse({ ...result, requestId: requestId() }, result.connected ? 200 : result.statusCode === 429 ? 429 : 502);
+    return jsonResponse({
+      ...result,
+      skillsSupported: skillResult.supported,
+      lastSkillCheckedAt: skillResult.checkedAt,
+      skillError: skillResult.error,
+      requestId: requestId()
+    }, result.connected ? 200 : result.statusCode === 429 ? 429 : 502);
   } catch (error) {
     return aiError(error.message || "AI 模型服务测试失败。", error.status || 500, error.code || "AI_PROVIDER_TEST_FAILED", Boolean(error.retryable));
   }

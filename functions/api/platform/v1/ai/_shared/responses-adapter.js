@@ -10,7 +10,7 @@ function providerError(status) {
   return aiError("AI_PROVIDER_UNAVAILABLE", "模型服务暂不可用。", 502, status >= 500);
 }
 
-export function responsesRequest(config, input) {
+export function responsesRequest(config, input, { tools = [] } = {}) {
   if (!config?.secretConfigured) {
     throw aiError("AI_PROVIDER_SECRET_MISSING", "模型服务尚未配置新的服务端密钥。", 503, false);
   }
@@ -19,14 +19,19 @@ export function responsesRequest(config, input) {
     authorization: `Bearer ${config.apiKey}`
   };
   if (config.actorAuthorization) headers["x-openai-actor-authorization"] = config.actorAuthorization;
-  const body = JSON.stringify({
+  const payload = {
     model: config.model,
     input,
     reasoning: { effort: config.reasoningEffort },
     max_output_tokens: 2000,
     store: false,
     stream: true
-  });
+  };
+  if (Array.isArray(tools) && tools.length > 0) {
+    payload.tools = tools;
+    payload.tool_choice = "auto";
+  }
+  const body = JSON.stringify(payload);
   return {
     url: config.endpoint,
     init: { method: "POST", headers, body },
@@ -97,9 +102,30 @@ function requestSignal(signal, timeoutMs) {
   };
 }
 
-export async function* streamProviderResponse({ config, input, fetchImpl = fetch, signal, timeoutMs = TIMEOUT_MS } = {}) {
-  const request = responsesRequest(config, input);
+function outputItemKey(item = {}) {
+  return String(item.id || item.call_id || "");
+}
+
+function outputItemEvents(item) {
+  if (!item || typeof item !== "object") return [];
+  if (!["function_call", "reasoning", "message"].includes(item.type)) return [];
+  const events = [{ type: "output_item", item }];
+  if (item.type === "function_call") {
+    events.push({
+      type: "function_call",
+      callId: String(item.call_id || ""),
+      name: String(item.name || ""),
+      arguments: typeof item.arguments === "string" ? item.arguments : "",
+      item
+    });
+  }
+  return events;
+}
+
+export async function* streamProviderResponse({ config, input, tools = [], fetchImpl = fetch, signal, timeoutMs = TIMEOUT_MS } = {}) {
+  const request = responsesRequest(config, input, { tools });
   const managedSignal = requestSignal(signal, timeoutMs);
+  const emittedItems = new Set();
   try {
     let response;
     try {
@@ -117,7 +143,18 @@ export async function* streamProviderResponse({ config, input, fetchImpl = fetch
     for await (const frame of parseSse(response.body)) {
       if (frame.event === "response.output_text.delta" && typeof frame.data.delta === "string") {
         yield { type: "text_delta", delta: frame.data.delta };
+      } else if (frame.event === "response.output_item.done") {
+        const item = frame.data.item;
+        const key = outputItemKey(item);
+        if (key) emittedItems.add(key);
+        for (const event of outputItemEvents(item)) yield event;
       } else if (frame.event === "response.completed") {
+        for (const item of frame.data.response?.output || []) {
+          const key = outputItemKey(item);
+          if (key && emittedItems.has(key)) continue;
+          if (key) emittedItems.add(key);
+          for (const event of outputItemEvents(item)) yield event;
+        }
         const usage = frame.data.response?.usage || frame.data.usage || {};
         yield {
           type: "usage",
@@ -130,6 +167,63 @@ export async function* streamProviderResponse({ config, input, fetchImpl = fetch
     }
   } finally {
     managedSignal.dispose();
+  }
+}
+
+const SYNTHETIC_STATUS_TOOL = Object.freeze({
+  type: "function",
+  name: "lookup_status",
+  description: "读取合成状态",
+  parameters: Object.freeze({ type: "object", properties: Object.freeze({}), additionalProperties: false }),
+  strict: true
+});
+
+export async function testProviderSkillConnection({ config, fetchImpl = fetch } = {}) {
+  const started = Date.now();
+  const checkedAt = new Date().toISOString();
+  try {
+    const input = [{ role: "user", content: "调用 lookup_status 获取合成状态，然后只返回 ok" }];
+    const outputItems = [];
+    const calls = [];
+    for await (const event of streamProviderResponse({ config, input, tools: [SYNTHETIC_STATUS_TOOL], fetchImpl })) {
+      if (event.type === "output_item") outputItems.push(event.item);
+      if (event.type === "function_call") calls.push(event);
+    }
+    if (calls.length !== 1 || calls[0].name !== SYNTHETIC_STATUS_TOOL.name || !calls[0].callId) {
+      throw aiError("AI_PROVIDER_SKILLS_UNSUPPORTED", "模型服务未完成 Skill 能力测试。", 502, false);
+    }
+    let argumentsValue;
+    try {
+      argumentsValue = JSON.parse(calls[0].arguments || "{}");
+    } catch {
+      throw aiError("AI_PROVIDER_INVALID_TOOL_ARGUMENTS", "模型服务返回了无效的 Skill 参数。", 502, false);
+    }
+    if (!argumentsValue || Array.isArray(argumentsValue) || typeof argumentsValue !== "object" || Object.keys(argumentsValue).length > 0) {
+      throw aiError("AI_PROVIDER_INVALID_TOOL_ARGUMENTS", "模型服务返回了无效的 Skill 参数。", 502, false);
+    }
+    let text = "";
+    for await (const event of streamProviderResponse({
+      config,
+      input: [...input, ...outputItems, { type: "function_call_output", call_id: calls[0].callId, output: JSON.stringify({ ok: true }) }],
+      tools: [SYNTHETIC_STATUS_TOOL],
+      fetchImpl
+    })) {
+      if (event.type === "text_delta") text += event.delta;
+    }
+    if (!/ok/i.test(text)) throw aiError("AI_PROVIDER_INVALID_RESPONSE", "模型服务未返回预期测试结果。", 502, true);
+    return { supported: true, latencyMs: Date.now() - started, checkedAt, statusCode: 200 };
+  } catch (error) {
+    return {
+      supported: false,
+      latencyMs: Date.now() - started,
+      checkedAt,
+      statusCode: error.status || 502,
+      error: {
+        code: error.code || "AI_PROVIDER_SKILLS_UNSUPPORTED",
+        message: error.message || "模型服务暂不支持 Skills。",
+        retryable: Boolean(error.retryable)
+      }
+    };
   }
 }
 

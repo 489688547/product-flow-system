@@ -46,6 +46,8 @@ export function publicProviderStatus(config = {}) {
     secretConfigured: Boolean(config.secretConfigured),
     lastCheckedAt: config.lastCheckedAt || "",
     lastLatencyMs: Number(config.lastLatencyMs) || 0,
-    lastStatusCode: Number(config.lastStatusCode) || 0
+    lastStatusCode: Number(config.lastStatusCode) || 0,
+    skillsSupported: config.skillsSupported === true,
+    lastSkillCheckedAt: config.lastSkillCheckedAt || ""
   };
 }

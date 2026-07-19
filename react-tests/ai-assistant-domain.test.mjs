@@ -40,7 +40,9 @@ test("LingSuan Provider defaults are fixed disabled and non-retaining", async ()
     storeResponses: false,
     lastCheckedAt: "",
     lastLatencyMs: 0,
-    lastStatusCode: 0
+    lastStatusCode: 0,
+    skillsSupported: false,
+    lastSkillCheckedAt: ""
   });
   const normalized = normalizeAiProvider({
     providerId: "untrusted-provider",

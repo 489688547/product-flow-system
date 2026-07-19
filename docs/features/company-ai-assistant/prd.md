@@ -109,6 +109,7 @@
 - `enabled`：总经办控制的启停状态；缺少服务端密钥时不能启用。
 - `storeResponses`：固定 `false`，不可改为 `true`。
 - `lastCheckedAt`、`lastLatencyMs`、`lastStatusCode`：最近一次合成数据连接测试结果。
+- `skillsSupported`、`lastSkillCheckedAt`：最近一次纯合成 Function Calling 能力测试结果，不包含公司数据。
 - `secretConfigured`：由服务端环境变量派生，只返回布尔值，不写入 D1。
 
 服务端密钥使用 `LINGSUAN_API_KEY`；如 Provider 必须使用专用 Actor Header，其值使用独立服务端 Secret，不进入数据中心状态。`AI_ASSISTANT_ENABLED` 控制总入口和 API 可用性。
