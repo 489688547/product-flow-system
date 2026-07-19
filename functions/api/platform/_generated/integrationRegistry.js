@@ -183,9 +183,12 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/**",
+        "src/state/deploymentRecovery.js",
         "scripts/prepare-pages-release.mjs",
         "scripts/check-deployed-readiness.mjs",
         "cloudflare-entry.html",
+        "404.html",
+        "public/404.html",
         "_redirects",
         ".github/workflows/**"
       ],
@@ -212,6 +215,8 @@ const integrationRegistry = {
       ],
       "evidence": [
         "functions/",
+        "src/state/deploymentRecovery.js",
+        "docs/platform/architecture.md",
         "scripts/prepare-pages-release.mjs"
       ],
       "relations": [
