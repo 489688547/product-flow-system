@@ -57,6 +57,7 @@ const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , 
 const DATA_CENTER_NAV = [
   ["data-overview", "数据总览", Database, "数据中心", "overview"],
   ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
+  ["data-products", "商品主数据", PackageSearch, "数据中心", "products"],
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
   ["data-metrics", "指标管理", Ruler, "数据中心", "metrics"],
   ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],

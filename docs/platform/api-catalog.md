@@ -26,6 +26,9 @@
 | `/api/platform/v1/collaboration-items/:id/transitions` | 执行协同状态动作 | 状态机和角色双重校验；动作幂等；追加活动 |
 | `/api/platform/v1/collaboration-items/:id/activities` | 读取协同活动记录 | 与事项相同的读取范围；按时间倒序 |
 | `/api/platform/v1/collaboration-items/:id/dingtalk` | 同步协同责任到钉钉待办 | 已确认稳定主负责人；平台统一调用；失败不回滚协同状态 |
+| `/api/platform/v1/product-catalog` | 读取共享 ERP 商品、SKU 与同步元数据 | 全员登录后可读；产品/品牌等非授权部门不返回采购成本 |
+| `/api/platform/v1/product-catalog/import` | 导入数据中心确认后的 ERP 商品文件 | 仅总经办、运营部非只读身份；幂等合并，不保存原始整行 |
+| `/api/platform/v1/product-catalog/sync/kuaimai` | 分页读取快麦商品并合并共享目录 | 仅总经办、运营部非只读身份；全部分页成功后写入；不反向修改快麦 |
 | `/api/platform/v1/environment-readiness` | 读取当前或生产环境脱敏就绪状态 | 员工会话或 read 个人令牌；只返回配置名称与存在性 |
 | `/api/platform/v1/production-write-session` | 解锁、查询和锁定跨环境生产写入 | active executive + write 个人令牌；确认短语；15 分钟有效 |
 | `/api/platform/v1/production-data/state` | 本地测试实时读取、受控写入和回滚生产公司状态 | Bearer 个人令牌；写入需解锁、基线版本、快照与审计 |
@@ -50,6 +53,14 @@
 ```
 
 兼容策略：数据中心不复制销售事实，继续复用 `product_sales_daily`。本地开发没有 D1 时，元数据写入 `.local-data/data-center-state.json`，销售读取返回 501 并由前端降级到现有浏览器销售仓库；销售行不会写入 `localStorage`。
+
+### 商品主数据契约
+
+`GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是产品全周期、供应链和供应商管理共同消费的目录；采购成本仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、SKU、标准/非标准/缺失条码数量，以及最后成功同步时间、来源和方式。
+
+`POST /api/platform/v1/product-catalog/import` 接收 `{ source, fileName, items, errors }`。客户端只提交已标准化商品与异常摘要，不提交原始文件内容；服务端按主商家编码和规格商家编码幂等合并。`POST /api/platform/v1/product-catalog/sync/kuaimai` 无业务参数，服务端使用密钥读取全部 `item.list.query` 分页，任何分页不完整都返回 409 且不写本批。
+
+快麦 API 与商品档案导出覆盖范围不同，自动同步不把 API 未返回的文件补齐商品标记为删除。回滚前端时保留新增 D1 表；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`、`KUAIMAI_CONFIG_MISSING`、`KUAIMAI_PRODUCT_SYNC_INCOMPLETE`、`KUAIMAI_PRODUCT_SYNC_FAILED`。
 
 ### 店铺运营与绩效契约
 

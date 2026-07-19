@@ -8,10 +8,12 @@ import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
 import { canAccessCompanyPlatform } from "../../domain/permissions.js";
 import { DataCenterSettingsWorkspace, DataQualityWorkspace, DataServicesWorkspace, DataSourcesWorkspace, MetricDefinitionsWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
+import { ProductCatalogWorkspace } from "./ProductCatalogWorkspace.jsx";
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据和数据健康状态。"],
   analysis: ["数据分析", "按时间、平台和商品下钻经营表现。"],
+  products: ["商品主数据", "统一维护 ERP 商品、SKU、69 码及跨 App 关联。"],
   sources: ["数据接入", "管理店铺、广告平台和 ERP 数据源。"],
   metrics: ["指标管理", "维护指标口径、负责人和版本。"],
   quality: ["数据质量", "定位缺失、重复、延迟和映射异常。"],
@@ -32,6 +34,7 @@ export function DataCenterAppPage({ section = "overview" }) {
   const content = {
     overview: <DataOverview summary={summary} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} />,
     analysis: <DataAnalysis rows={salesRows} range={range} productNames={productNames} />,
+    products: <ProductCatalogWorkspace canEdit={canEdit} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} />,
     metrics: <MetricDefinitionsWorkspace />,
     quality: <DataQualityWorkspace quality={quality} />,

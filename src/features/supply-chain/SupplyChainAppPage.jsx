@@ -16,6 +16,8 @@ import { ProductSupplyWorkspace } from "./ProductSupplyWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
 import { SupplyChainOverview } from "./SupplyChainOverview.jsx";
+import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
+import { catalogBackedProduct } from "../../domain/productCatalog.js";
 
 function departmentOf(user) {
   return String(user?.department || "").trim();
@@ -94,8 +96,12 @@ export function SupplyChainAppPage({ section = "overview" }) {
   const [salesRows, setSalesRows] = useState([]);
   const { user } = useAuth();
   const { state: productState } = useProductFlow();
+  const { items: catalogItems } = useProductCatalog();
   const { state, loading, error } = useSupplyChain();
-  const products = productState.products || [];
+  const lifecycleProducts = useMemo(() => (productState.products || []).map(product => catalogBackedProduct(product, catalogItems)), [catalogItems, productState.products]);
+  const linkedCatalogIds = useMemo(() => new Set(lifecycleProducts.map(product => product.catalogProductId).filter(Boolean)), [lifecycleProducts]);
+  const catalogProducts = useMemo(() => catalogItems.filter(item => !linkedCatalogIds.has(item.id)).map(item => ({ id: item.id, catalogProductId: item.id, name: item.name, stage: 1, status: item.active ? "ERP 启用" : "ERP 停用", skuCodes: (item.skus || []).filter(sku => sku.barcodeType === "sales_barcode").map(sku => ({ code: sku.barcode, price: sku.salePrice ?? "" })) })), [catalogItems, linkedCatalogIds]);
+  const products = useMemo(() => [...lifecycleProducts, ...catalogProducts], [catalogProducts, lifecycleProducts]);
   const codes = useMemo(() => [...new Set(products.flatMap(product => (product.skuCodes || []).map(value => typeof value === "object" ? value.code : value).filter(Boolean)))], [products]);
   useEffect(() => { let active = true; fetchSalesForCodes(codes).then(rows => { if (active) setSalesRows(rows); }).catch(() => { if (active) setSalesRows([]); }); return () => { active = false; }; }, [codes]);
   const summary = useMemo(() => buildSupplyChainSummary({ supplyState: state, products, salesRows }), [products, salesRows, state]);
@@ -106,9 +112,9 @@ export function SupplyChainAppPage({ section = "overview" }) {
   const qualityEditor = executive || dept === "质量管理部";
   const content = {
     overview: <SupplyChainOverview summary={summary} />,
-    suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} />,
+    suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} />,
     approvals: <ApprovalWorkspace canSync={financeEditor} canEditMapping={supplyEditor} products={products} />,
-    products: <ProductSupplyWorkspace products={products} canEdit={supplyEditor} />,
+    products: <ProductSupplyWorkspace catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} canEdit={supplyEditor} />,
     inventory: <InventoryWorkspace products={products} summary={summary} canEdit={supplyEditor} />,
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,
     records: <SyncRecordsWorkspace salesRows={salesRows} canEdit={supplyEditor} />,

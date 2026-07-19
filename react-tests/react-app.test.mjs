@@ -700,6 +700,7 @@ test("issue feedback and settings pages persist company-wide operational data", 
   assert.match(floating, /disabled=\{!desc\.trim\(\) \|\| !screenshot\}/);
   assert.match(floating, /addFeedbackIssue/);
   assert.match(styles, /\.floating-issue-button\s*\{[\s\S]*position: fixed;[\s\S]*right: 22px;[\s\S]*bottom: 22px;/);
+  assert.match(styles, /\.page\s*\{[^}]*padding-bottom:\s*calc\(80px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(settings, /PermissionSettings/);
   assert.match(settings, /总经办/);
   assert.match(settings, /updateSettings/);

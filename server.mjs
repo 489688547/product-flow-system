@@ -24,10 +24,12 @@ import {
 import {
   callKuaimai,
   kuaimaiConfigFromEnv,
+  pullKuaimaiProductCatalog,
   pullKuaimaiDay,
   refreshKuaimaiSession
 } from "./functions/api/kuaimai/_shared/kuaimai.js";
 import { syncSupplyApprovals } from "./functions/api/supply-chain/approvals/sync.js";
+import { mergeCatalogRecords, normalizeCatalogPayload } from "./src/domain/productCatalog.js";
 import { normalizeSupplyChainState } from "./src/domain/supplyChain.js";
 import { normalizeDataCenterState } from "./src/domain/dataCenter.js";
 import {
@@ -47,6 +49,7 @@ const LOCAL_DATA_DIR = path.join(__dirname, ".local-data");
 const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 const LOCAL_SUPPLY_STATE_PATH = path.join(LOCAL_DATA_DIR, "supply-chain-state.json");
 const LOCAL_DATA_CENTER_STATE_PATH = path.join(LOCAL_DATA_DIR, "data-center-state.json");
+const LOCAL_PRODUCT_CATALOG_PATH = path.join(LOCAL_DATA_DIR, "product-catalog.json");
 const LOCAL_COLLABORATION_PATH = path.join(LOCAL_DATA_DIR, "collaboration-items.json");
 let orgCache = null;
 let productionDataClient;
@@ -89,12 +92,12 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-function readBody(req) {
+function readBody(req, maxBytes = 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", chunk => {
       body += chunk;
-      if (body.length > 1024 * 1024) reject(new Error("request body too large"));
+      if (body.length > maxBytes) reject(new Error("request body too large"));
     });
     req.on("end", () => {
       try {
@@ -149,6 +152,64 @@ async function writeLocalDataCenterState(state, updatedBy = "") {
   await mkdir(LOCAL_DATA_DIR, { recursive: true });
   await writeFile(LOCAL_DATA_CENTER_STATE_PATH, JSON.stringify(payload, null, 2));
   return payload;
+}
+
+function productCatalogCounts(items = []) {
+  const skus = items.flatMap(item => item.skus || []);
+  return {
+    products: items.length,
+    skus: skus.length,
+    salesBarcodes: skus.filter(sku => sku.barcodeType === "sales_barcode").length,
+    nonStandardBarcodes: skus.filter(sku => sku.barcodeType === "non_standard").length,
+    missingBarcodes: skus.filter(sku => sku.barcodeType === "missing").length
+  };
+}
+
+async function readLocalProductCatalog() {
+  try {
+    const payload = JSON.parse(await readFile(LOCAL_PRODUCT_CATALOG_PATH, "utf8"));
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    return {
+      items,
+      runs: Array.isArray(payload.runs) ? payload.runs : [],
+      meta: { ...productCatalogCounts(items), ...(payload.meta || {}), version: "product-catalog-v1" }
+    };
+  } catch {
+    return { items: [], runs: [], meta: { ...productCatalogCounts([]), lastSuccessfulSyncAt: "", lastSource: "", lastMode: "", version: "product-catalog-v1" } };
+  }
+}
+
+async function writeLocalProductCatalog(input, { mode, fileName = "", replaceSource = false } = {}) {
+  const previous = await readLocalProductCatalog();
+  const completedAt = new Date().toISOString();
+  const normalized = normalizeCatalogPayload({ ...input, syncedAt: input.syncedAt || completedAt });
+  const byId = new Map(previous.items.map(item => [item.id, item]));
+  if (replaceSource) {
+    for (const [id, item] of byId) {
+      if (item.source === normalized.source) byId.set(id, { ...item, presentInSource: false });
+    }
+  }
+  for (const item of normalized.items) byId.set(item.id, { ...mergeCatalogRecords(byId.get(item.id), item), presentInSource: true, syncedAt: completedAt });
+  const items = [...byId.values()].sort((left, right) => Number(right.active) - Number(left.active) || left.name.localeCompare(right.name, "zh-CN"));
+  const run = {
+    id: `product-catalog-${mode}-${Date.now()}`,
+    source: normalized.source,
+    mode,
+    status: "success",
+    fileName: String(fileName || "").slice(0, 240),
+    counts: normalized.counts,
+    startedAt: input.startedAt || completedAt,
+    completedAt,
+    updatedBy: LOCAL_COLLABORATION_ACTOR.name
+  };
+  const payload = {
+    items,
+    runs: [run, ...previous.runs].slice(0, 20),
+    meta: { ...productCatalogCounts(items), lastSuccessfulSyncAt: completedAt, lastSource: normalized.source, lastMode: mode, version: "product-catalog-v1" }
+  };
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_PRODUCT_CATALOG_PATH, JSON.stringify(payload, null, 2));
+  return { ...payload, counts: normalized.counts, run };
 }
 
 function relativeIso(days, hour = 18) {
@@ -494,6 +555,44 @@ async function handleKuaimaiPull(res, url) {
   }
 }
 
+async function handleLocalProductCatalog(req, res, url) {
+  try {
+    if (url.pathname === "/api/platform/v1/product-catalog" && req.method === "GET") {
+      json(res, 200, await readLocalProductCatalog());
+      return;
+    }
+    if (url.pathname === "/api/platform/v1/product-catalog/import" && req.method === "POST") {
+      const body = await readBody(req, 12 * 1024 * 1024);
+      if (!Array.isArray(body.items) || !body.items.length) {
+        json(res, 400, { synced: false, message: "导入内容中没有有效商品。", error: { code: "PRODUCT_CATALOG_IMPORT_INVALID", retryable: false } });
+        return;
+      }
+      const saved = await writeLocalProductCatalog({ source: body.source || "erp-file", items: body.items }, { mode: "file", fileName: body.fileName });
+      json(res, 200, { synced: true, counts: saved.counts, run: saved.run, meta: saved.meta });
+      return;
+    }
+    if (url.pathname === "/api/platform/v1/product-catalog/sync/kuaimai" && req.method === "POST") {
+      const config = kuaimaiConfigFromEnv(process.env);
+      if (!config.ready) {
+        json(res, 400, { synced: false, message: "缺少快麦商品同步配置。", error: { code: "KUAIMAI_CONFIG_MISSING", retryable: false } });
+        return;
+      }
+      const startedAt = new Date().toISOString();
+      const pulled = await pullKuaimaiProductCatalog(config, { pageSize: 200, maxPages: 20 });
+      if (!pulled.complete) {
+        json(res, 409, { synced: false, message: `快麦商品分页未完整读取，已读取 ${pulled.items.length} 条，本次没有写入。`, error: { code: "KUAIMAI_PRODUCT_SYNC_INCOMPLETE", retryable: true } });
+        return;
+      }
+      const saved = await writeLocalProductCatalog({ source: "kuaimai", items: pulled.items, startedAt }, { mode: "kuaimai_api" });
+      json(res, 200, { synced: true, providerTotal: pulled.total, pagesFetched: pulled.pagesFetched, counts: saved.counts, run: saved.run, meta: saved.meta });
+      return;
+    }
+    json(res, 405, { synced: false, message: "Method not allowed" });
+  } catch (error) {
+    json(res, 502, { synced: false, message: error.message || "商品主数据处理失败。", error: { code: "PRODUCT_CATALOG_LOCAL_FAILED", retryable: true } });
+  }
+}
+
 async function handleState(req, res) {
   try {
     if (productionDataClient.configured) {
@@ -649,7 +748,7 @@ async function handleDataCenterState(req, res) {
   try {
     if (req.method === "GET") {
       const state = await readLocalDataCenterState();
-      json(res, 200, { synced: Boolean(state.updatedAt), state, version: state.version, updatedAt: state.updatedAt || "" });
+      json(res, 200, { synced: true, state, version: state.version, updatedAt: state.updatedAt || "" });
       return;
     }
     if (req.method !== "POST") {
@@ -920,6 +1019,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/platform/v1/collaboration-items" || url.pathname.startsWith("/api/platform/v1/collaboration-items/")) {
     await handleLocalCollaboration(req, res, url);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/product-catalog" || url.pathname === "/api/platform/v1/product-catalog/import" || url.pathname === "/api/platform/v1/product-catalog/sync/kuaimai") {
+    await handleLocalProductCatalog(req, res, url);
     return;
   }
   if (url.pathname === "/api/state") {

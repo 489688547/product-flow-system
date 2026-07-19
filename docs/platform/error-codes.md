@@ -30,6 +30,7 @@
 | `STATE_` | 共享状态、版本或持久化 | `STATE_SAVE_FAILED` |
 | `DINGTALK_` | 钉钉授权和接口调用 | `DINGTALK_PERMISSION_MISSING` |
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
+| `PRODUCT_CATALOG_` | 商品目录校验、权限和存储 | `PRODUCT_CATALOG_STORAGE_UNAVAILABLE` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
 | `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
 | `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
@@ -66,6 +67,15 @@
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+商品主数据 API 使用：
+
+- `PRODUCT_CATALOG_STORAGE_UNAVAILABLE`：缺少 `PRODUCT_FLOW_DB` 或商品目录表不可用。
+- `PRODUCT_CATALOG_IMPORT_INVALID` / `PRODUCT_CATALOG_IMPORT_EMPTY`：导入内容缺少有效商品身份或为空。
+- `PRODUCT_CATALOG_WRITE_DENIED`：当前身份不是总经办或运营部维护人，或账号为只读。
+- `KUAIMAI_CONFIG_MISSING`：部署缺少快麦商品读取配置。
+- `KUAIMAI_PRODUCT_SYNC_INCOMPLETE`：分页保护触发，本批没有写入。
+- `KUAIMAI_PRODUCT_SYNC_FAILED`：快麦拒绝、超时或返回失败，可按 `retryable` 判断重试。
 
 生产数据与环境 API 使用：
 

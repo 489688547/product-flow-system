@@ -211,10 +211,23 @@ function emptyDimensionRow({ product, supplierId = "" }) {
   };
 }
 
-function activePrimarySupplyLinks(links = []) {
+export function resolveSupplyLinkProductId(link = {}, products = []) {
+  const direct = cleanText(link.productId);
+  if (direct && products.some(product => product.id === direct)) return direct;
+  const catalogProductId = cleanText(link.catalogProductId);
+  if (catalogProductId) {
+    const lifecycle = products.find(product => product.catalogProductId === catalogProductId);
+    return lifecycle?.id || catalogProductId;
+  }
+  return direct;
+}
+
+function activePrimarySupplyLinks(links = [], products = []) {
   const groups = new Map();
-  for (const link of links) {
-    if (!link?.productId || cleanText(link.status).toLowerCase() === "inactive") continue;
+  for (const original of links) {
+    const productId = resolveSupplyLinkProductId(original, products);
+    if (!productId || cleanText(original.status).toLowerCase() === "inactive") continue;
+    const link = { ...original, productId };
     const materialKey = cleanText(link.materialName) || cleanText(link.category) || link.id;
     const key = `${link.productId}::${cleanText(link.category)}::${materialKey}`;
     groups.set(key, [...(groups.get(key) || []), link]);
@@ -303,7 +316,7 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
   }
 
   const linkedCostProducts = new Set();
-  const primarySupplyLinks = activePrimarySupplyLinks(state.productSupplierLinks);
+  const primarySupplyLinks = activePrimarySupplyLinks(state.productSupplierLinks, products);
   const bomUnitCostByProduct = new Map();
   for (const link of primarySupplyLinks) {
     if (!link.productId || !link.supplierId) continue;
