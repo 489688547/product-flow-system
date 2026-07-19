@@ -20,7 +20,7 @@
   - 证据：`node --test react-tests/ai-assistant-domain.test.mjs tests/data-center-api.test.mjs tests/environment-capabilities.test.mjs`（15/15）；`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities` 通过。
   - 提交：`feat(ai): define assistant policies`。
 
-- [ ] 任务 2：实现 Provider 中立网关和灵算 Responses 适配器
+- [x] 任务 2：实现 Provider 中立网关和灵算 Responses 适配器
   - 依赖：任务 1。
   - 文件：`functions/api/platform/v1/ai/_shared/provider-config.js`、`responses-adapter.js`、`tests/ai-provider.test.mjs`。
   - 输入：注册表白名单、D1 安全元数据、`LINGSUAN_API_KEY` 和可选服务端 Header Secret。
@@ -28,6 +28,7 @@
   - 失败测试：缺少模块；任意 URL、缺少密钥或 `store:true` 未被拒绝。
   - 实现步骤：实现固定域名与路径、`store:false`、超时中止、Responses SSE 解析和安全错误映射。
   - 验证：Provider 测试覆盖成功、401、429、5xx、超时、未知事件和流中断。
+  - 证据：`node --test tests/ai-provider.test.mjs`（6/6），全部使用注入的假 `fetch`，未发起外部请求。
   - 提交：`feat(ai): add responses provider gateway`。
 
 - [ ] 任务 3：实现服务端 AI 数据权限和公司上下文目录
