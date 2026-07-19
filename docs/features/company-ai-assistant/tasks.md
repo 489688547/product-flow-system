@@ -86,7 +86,7 @@
   - 证据：`node --test react-tests/ai-assistant-ui.test.mjs react-tests/ai-assistant-api.test.mjs`（6/6）、`npm run lint`、`npm run build`；1440/1280/900/640/390px 均无横向溢出，390px 面板为整屏，Escape 关闭后焦点回到入口，完整工作台不与侧边面板重叠。
   - 提交：`feat(ai): add company assistant workspace`。
 
-- [ ] 任务 8：在数据中心接入 AI 模型服务设置
+- [x] 任务 8：在数据中心接入 AI 模型服务设置
   - 依赖：任务 4、6。
   - 文件：`src/features/data-center/AiProviderSettings.jsx`、`DataGovernanceWorkspaces.jsx`、样式和测试。
   - 输入：Provider 状态、配置 API、连接测试 API。
@@ -94,6 +94,7 @@
   - 失败测试：密钥输入/回显防线、总经办编辑、其他身份只读和财务阻止展示缺失。
   - 实现步骤：安全摘要 → 配置表单 → 外发矩阵 → 测试状态。
   - 验证：数据中心 Provider UI 测试和响应式验收。
+  - 证据：`node --test react-tests/ai-provider-settings.test.mjs react-tests/data-center-app.test.mjs react-tests/ai-assistant-api.test.mjs`（13/13）、`npm run lint`、`npm run build`；1440px 与 390px 浏览器验收无横向溢出，窄屏配置为单列，本地只读预览未执行保存和 Provider 连接测试。
   - 提交：`feat(data): manage ai provider service`。
 
 - [ ] 任务 9：全量验证与安全交付
