@@ -4,6 +4,13 @@ import { normalizeSkuCodes } from "../domain/salesData.js";
 import { fetchSalesForCodes } from "./salesStore.js";
 import { useProductFlow } from "./ProductFlowProvider.jsx";
 import { dataCenterRangeFromSearch, loadDataCenterSales, loadDataCenterState, saveDataCenterState } from "./dataCenterApi.js";
+import {
+  loadCredentialMetadata,
+  loadDataCenterConnections,
+  persistConnectorConnection,
+  persistInternalVaultConnection,
+  revealCredential
+} from "./dataCenterConnectionsApi.js";
 
 const DataCenterContext = createContext(null);
 const STORAGE_KEY = "dataCenterMetadata";
@@ -30,6 +37,11 @@ export function DataCenterProvider({ children, enabled = true }) {
   const [salesMeta, setSalesMeta] = useState({ timeBasis: "create_time", timezone: "Asia/Shanghai", excludeOther: true });
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState("");
+  const [connections, setConnections] = useState([]);
+  const [vaultItems, setVaultItems] = useState([]);
+  const [vaultEntries, setVaultEntries] = useState([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(enabled);
+  const [connectionsError, setConnectionsError] = useState("");
   const dirty = useRef(false);
   const codes = useMemo(() => [...new Set((productState.products || [])
     .flatMap(product => normalizeSkuCodes(product.skuCodes).map(item => item.code)))], [productState.products]);
@@ -64,6 +76,32 @@ export function DataCenterProvider({ children, enabled = true }) {
     refresh();
   }, [refresh]);
 
+  const refreshConnections = useCallback(async () => {
+    if (!enabled) return;
+    setConnectionsLoading(true);
+    try {
+      const [recordsResult, credentialsResult] = await Promise.allSettled([
+        loadDataCenterConnections(),
+        loadCredentialMetadata()
+      ]);
+      if (recordsResult.status === "rejected") throw recordsResult.reason;
+      setConnections(recordsResult.value.connectors);
+      setVaultItems(recordsResult.value.vaultItems);
+      if (credentialsResult.status === "fulfilled") setVaultEntries(credentialsResult.value.entries);
+      else if (credentialsResult.reason?.status !== 403) throw credentialsResult.reason;
+      else setVaultEntries([]);
+      setConnectionsError("");
+    } catch (loadError) {
+      setConnectionsError(friendlyMessage(loadError, "数据连接加载失败。"));
+    } finally {
+      setConnectionsLoading(false);
+    }
+  }, [enabled]);
+
+  useEffect(() => {
+    refreshConnections();
+  }, [refreshConnections]);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     if (!enabled || !dirty.current) return undefined;
@@ -87,6 +125,22 @@ export function DataCenterProvider({ children, enabled = true }) {
     }));
   }, [currentUser?.name]);
 
+  const saveConnection = useCallback(async ({ instance, secretPayload = {} }) => {
+    const saved = await persistConnectorConnection({ instance, secretPayload, vaultEntries });
+    await refreshConnections();
+    return saved;
+  }, [refreshConnections, vaultEntries]);
+
+  const saveVaultItem = useCallback(async ({ item, secretPayload = {} }) => {
+    const saved = await persistInternalVaultConnection({ item, secretPayload, vaultEntries });
+    await refreshConnections();
+    return saved;
+  }, [refreshConnections, vaultEntries]);
+
+  const revealConnectionCredential = useCallback((id, purpose, confirmation) => (
+    revealCredential(id, purpose, confirmation)
+  ), []);
+
   const value = useMemo(() => ({
     state,
     range,
@@ -95,9 +149,18 @@ export function DataCenterProvider({ children, enabled = true }) {
     salesMeta,
     loading,
     error,
+    connections,
+    vaultItems,
+    vaultEntries,
+    connectionsLoading,
+    connectionsError,
     dispatch,
-    refresh
-  }), [dispatch, error, loading, range, refresh, salesMeta, salesRows, state]);
+    refresh,
+    refreshConnections,
+    saveConnection,
+    saveVaultItem,
+    revealConnectionCredential
+  }), [connections, connectionsError, connectionsLoading, dispatch, error, loading, range, refresh, refreshConnections, revealConnectionCredential, salesMeta, salesRows, saveConnection, saveVaultItem, state, vaultEntries, vaultItems]);
 
   return <DataCenterContext.Provider value={value}>{children}</DataCenterContext.Provider>;
 }
