@@ -38,6 +38,7 @@ test("supply chain page is controlled by the primary route and has no internal n
 test("inventory and quality imports preview before saving", () => {
   const inventory = read("src/features/supply-chain/InventoryWorkspace.jsx");
   const quality = read("src/features/supply-chain/QualityWorkspace.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
   assert.match(inventory, /streamSpreadsheetRows/);
   assert.match(inventory, /确认导入/);
   assert.match(inventory, /ERP库存/);
@@ -50,6 +51,7 @@ test("inventory and quality imports preview before saving", () => {
   assert.match(quality, /streamSpreadsheetRows/);
   assert.match(quality, /确认导入/);
   assert.match(quality, /公关处理/);
+  assert.match(page, /钉钉供应链文件/);
 });
 
 test("approval workspace keeps purchase requests separate from linked payments", () => {

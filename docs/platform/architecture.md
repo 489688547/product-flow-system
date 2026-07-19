@@ -38,6 +38,13 @@
 - 钉钉 WebView 是独立的嵌入环境，需要单独验证登录、视口和权限。
 - `docs/platform/environment-capabilities.json` 定义各环境必需的变量名、绑定名和表结构；生成模块供 Pages Functions 使用，CI 检查漂移。
 
+### 前端发布恢复
+
+- Cloudflare Pages 发布必须包含顶层 `404.html`。系统使用 Hash 路由，不依赖任意路径回退到首页；缺失的 JS/CSS 必须返回 404，不能伪装成首页 HTML。
+- 应用入口在 React 渲染前接管 Vite 的 `vite:preloadError`。旧标签页加载已被新部署替换的动态分包时，自动刷新获取当前版本。
+- 自动刷新使用会话级冷却时间防止循环；受限 WebView 无法使用会话存储时，仍允许执行一次浏览器刷新。
+- `_headers` 保持入口 HTML 不缓存；`scripts/prepare-pages-release.mjs` 负责同步构建后的入口、静态资源和 404 页面，避免手工发布遗漏。
+
 ## 未来平台化
 
 新多系统接口放在 `/api/platform/v1/`。通用 UI、契约和客户端只有在第二个真实调用方出现后才抽为 workspace package，避免基于假设建设中台。

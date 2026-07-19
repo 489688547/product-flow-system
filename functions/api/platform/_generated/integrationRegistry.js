@@ -7,7 +7,7 @@ const integrationRegistry = {
       "id": "dingtalk",
       "name": "钉钉开放平台",
       "status": "connected",
-      "summary": "承载登录、组织通讯录、待办、群聊、日历、文档和钉钉内嵌工作台能力。",
+      "summary": "承载登录、组织通讯录、待办、群聊、日历、文档、供应链文件快照和钉钉内嵌工作台能力。",
       "capabilities": [
         "身份登录",
         "组织通讯录",
@@ -15,6 +15,7 @@ const integrationRegistry = {
         "群聊与成员",
         "日历",
         "文档读取",
+        "供应链文件快照",
         "内嵌工作台"
       ],
       "businessQuestions": [
@@ -22,6 +23,7 @@ const integrationRegistry = {
         "找不到人员或部门",
         "待办未创建或未同步",
         "群成员选择异常",
+        "供应链文件快照未导入",
         "钉钉 WebView 行为异常"
       ],
       "keywords": [
@@ -39,6 +41,8 @@ const integrationRegistry = {
         "functions/api/platform/v1/collaboration-items/**/dingtalk.js",
         "src/state/dingtalk*.js",
         "src/features/**/DingTalk*.jsx",
+        "scripts/import-dingtalk-supply-inventory.mjs",
+        "scripts/lib/dingtalkSupplyInventory.mjs",
         "server.mjs"
       ],
       "envVars": [
@@ -66,7 +70,9 @@ const integrationRegistry = {
       "evidence": [
         "functions/api/dingtalk/",
         "functions/api/auth/dingtalk/",
-        "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js"
+        "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js",
+        "scripts/import-dingtalk-supply-inventory.mjs",
+        "scripts/lib/dingtalkSupplyInventory.mjs"
       ],
       "relations": [
         {
@@ -183,9 +189,12 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/**",
+        "src/state/deploymentRecovery.js",
         "scripts/prepare-pages-release.mjs",
         "scripts/check-deployed-readiness.mjs",
         "cloudflare-entry.html",
+        "404.html",
+        "public/404.html",
         "_redirects",
         "wrangler.toml",
         ".github/workflows/**"
@@ -219,6 +228,8 @@ const integrationRegistry = {
       ],
       "evidence": [
         "functions/",
+        "src/state/deploymentRecovery.js",
+        "docs/platform/architecture.md",
         "scripts/prepare-pages-release.mjs",
         "wrangler.toml"
       ],
@@ -270,6 +281,8 @@ const integrationRegistry = {
       "codePaths": [
         "functions/api/state.js",
         "functions/api/platform.js",
+        "functions/api/supply-chain.js",
+        "functions/api/supply-chain/**",
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/**",
@@ -296,6 +309,7 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/state",
         "/api/platform",
+        "/api/supply-chain",
         "/api/sales",
         "/api/data-center",
         "/api/ecommerce-operations",
@@ -319,6 +333,8 @@ const integrationRegistry = {
       "evidence": [
         "functions/api/state.js",
         "functions/api/platform.js",
+        "functions/api/supply-chain.js",
+        "functions/api/supply-chain/",
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/",

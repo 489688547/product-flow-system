@@ -13,6 +13,7 @@ import { EcommerceOperationsProvider } from "./state/EcommerceOperationsProvider
 import { PerformanceManagementProvider } from "./state/PerformanceManagementProvider.jsx";
 import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import { AiAssistantProvider } from "./state/AiAssistantProvider.jsx";
+import { installDeploymentRecovery } from "./state/deploymentRecovery.js";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
@@ -48,6 +49,8 @@ function AuthenticatedApp() {
     </ProductFlowProvider>
   );
 }
+
+installDeploymentRecovery();
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
