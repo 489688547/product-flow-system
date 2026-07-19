@@ -107,3 +107,27 @@
   - 验证：Definition of Done 全部通过；外部连接测试仅在新 Secret 获授权配置后执行。
   - 证据：敏感值扫描 0 命中；AI 安全专项 29/29；全量 React 415/415、API 218/218；`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm run build` 全部退出 0。1440/1280/900/640/390px 浏览器验收无横向溢出，焦点、Escape、只读/禁用状态和控制台 0 错误。未部署、未配置生产 Secret、未执行真实 Provider 连接、未写入生产数据；DingTalk 嵌入运行时与 Cloudflare 生产环境需部署授权后单独验收。
   - 提交：`docs(ai): record assistant verification`。
+
+- [ ] 任务 10：修复对话输入与滚动
+  - 范围：`AiComposer`、`AiConversation`、面板/工作台网格和 UI 测试。
+  - 验收：Enter 发送、Shift+Enter 换行、IME 不误发、长回答可滚动、手动上滚后可回到最新。
+
+- [ ] 任务 11：建立跨 App 只读 Skill 注册表
+  - 范围：公司经营、产品全周期、供应链和数据中心读取执行器，固定 Schema、权限、超时和结果限额。
+  - 验收：客户端不能声明 Skill，越权 Skill 不下发且不能执行，财务外发继续阻止。
+
+- [ ] 任务 12：扩展店铺运营、品牌内容和绩效 Skill
+  - 范围：复用各 App 的服务端读取与权限投影；抽取品牌内容只读存储边界。
+  - 验收：普通员工只读取原本可见记录，总经办范围更广但仍不外发财务字段。
+
+- [ ] 任务 13：实现 Provider Function Calling 与受控循环
+  - 范围：Responses 工具事件、两轮六次限制、重复调用去重、超时/取消和部分失败。
+  - 验收：合成工具连接测试通过；Provider 不支持时明确降级；最终回答保留来源。
+
+- [ ] 任务 14：记录并展示 Skill 调用
+  - 范围：`ai_skill_audit`、SSE Skill 事件、前端安全状态和可展开调用记录。
+  - 验收：审计和 UI 不保存或显示原始结果、问题或回答正文。
+
+- [ ] 任务 15：全量、浏览器与生产交付
+  - 范围：平台清单、API/错误文档、迁移、完整门禁、响应式/WebView 和生产实测。
+  - 验收：至少一个生产问题调用两个 App Skill；匿名仍为 401；正式生产验证器按实际凭证状态报告。
