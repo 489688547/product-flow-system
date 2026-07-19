@@ -228,6 +228,7 @@ export async function onRequest({ request, env, data = {} }) {
                   displayName: result?.displayName || definition?.displayName || skillEvent.skillId,
                   recordCount: Number(result?.recordCount) || 0,
                   latencyMs: Number(skillEvent.latencyMs) || 0,
+                  updatedAt: result?.updatedAt || "",
                   code: skillEvent.code
                 };
                 enqueue(skillEvent.type, payload);

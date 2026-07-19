@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../../ui/Button.jsx";
 import { isAiConversationNearBottom } from "./aiComposerBehavior.js";
+import { AiSkillActivity } from "./AiSkillActivity.jsx";
 
 const QUICK_PROMPTS = [
   "今天公司最需要关注的三个风险是什么？",
@@ -75,6 +76,7 @@ export function AiConversation({ messages, sending, error, onPrompt, onRetry }) 
               message.content ? <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown> : sending ? <span className="ai-thinking">正在读取授权数据并分析…</span> : <span>回答未完整生成。</span>
             ) : <p>{message.content}</p>}
           </div>
+          {message.role === "assistant" ? <AiSkillActivity activity={message.skillActivity} /> : null}
           <SourceList sources={message.sources} />
           {message.blockedDomains?.includes("finance") ? <p className="ai-message-limit"><ShieldCheck size={13} aria-hidden="true" />未纳入财务数据</p> : null}
           {message.error ? (

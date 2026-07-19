@@ -858,6 +858,18 @@ main { min-width: 0; overflow-x: hidden; }
 .ai-thinking { color: var(--text-tertiary); }
 .ai-message-sources, .ai-message-limit { grid-column: 2; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin: 0; color: var(--text-tertiary); font-size: 10px; }
 .ai-message-sources span { padding: 3px 6px; border-radius: 6px; background: var(--surface-subtle); }
+.ai-skill-running { grid-column: 2; display: flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 11px; }
+.ai-skill-activity { grid-column: 2; min-width: 0; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); color: var(--text-secondary); font-size: 11px; }
+.ai-skill-activity summary { display: flex; align-items: center; gap: 6px; padding: 7px 9px; cursor: pointer; font-weight: 700; }
+.ai-skill-activity summary:focus-visible { outline: 2px solid color-mix(in oklch, var(--accent), white 28%); outline-offset: 2px; }
+.ai-skill-activity ul { display: grid; gap: 0; margin: 0; padding: 0 9px 7px; list-style: none; }
+.ai-skill-activity li { min-width: 0; display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 6px 0; border-top: 1px solid var(--border); }
+.ai-skill-activity li > span:first-of-type { min-width: 0; display: grid; }
+.ai-skill-activity li strong { overflow: hidden; color: var(--text-primary); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.ai-skill-activity li small { color: var(--text-tertiary); font-size: 10px; }
+.ai-skill-activity li > span:last-child { color: var(--text-tertiary); white-space: nowrap; }
+.ai-skill-activity li.completed > svg { color: var(--success); }
+.ai-skill-activity li.failed > svg { color: var(--danger); }
 .ai-message-error { grid-column: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 8px 9px; border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); font-size: 11px; }
 .ai-message-error span { flex: 1 1 180px; }
 .ai-conversation-error { display: flex; align-items: flex-start; gap: 7px; padding: 9px 10px; border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); font-size: 12px; }

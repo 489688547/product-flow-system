@@ -317,25 +317,25 @@ Commit: `feat(ai): run and audit read skills`
 - SSE activity item: `{ callId, skillId, appId, displayName, status, recordCount, updatedAt, errorCode }`.
 - Assistant message adds `skillActivity: []`; current-session storage keeps only this safe metadata.
 
-- [ ] **Step 1: Write failing parser and UI tests**
+- [x] **Step 1: Write failing parser and UI tests**
 
 Assert new events parse, Provider reduces events by `callId`, and the UI includes accessible querying, success and failure labels without rendering raw result values.
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 Run: `node --test react-tests/ai-assistant-api.test.mjs react-tests/ai-assistant-ui.test.mjs`
 
 Expected: FAIL because the browser ignores Skill events and no activity component exists.
 
-- [ ] **Step 3: Extend the SSE client and state reducer**
+- [x] **Step 3: Extend the SSE client and state reducer**
 
 Add the three event names to `KNOWN_EVENTS`. Upsert activity by `callId` with functional state updates; keep stable array order and cap at six.
 
-- [ ] **Step 4: Add restrained activity UI**
+- [x] **Step 4: Add restrained activity UI**
 
 During execution show one compact status line. After completion use a native `<details>` summary such as `已查询 3 个公司能力` and rows with App, Skill, status, count and date. Reuse existing success/warning/danger tokens, visible focus and no decorative animation.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run: `node --test react-tests/ai-assistant-api.test.mjs react-tests/ai-assistant-ui.test.mjs`
 

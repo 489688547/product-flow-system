@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
-const featureFiles = ["AiAssistantTrigger.jsx", "AiAssistantPanel.jsx", "AiConversation.jsx", "AiComposer.jsx", "AiAssistantWorkspace.jsx"];
+const featureFiles = ["AiAssistantTrigger.jsx", "AiAssistantPanel.jsx", "AiConversation.jsx", "AiComposer.jsx", "AiAssistantWorkspace.jsx", "AiSkillActivity.jsx"];
 
 test("assistant composer sends Enter but preserves newline and IME composition", async () => {
   const { shouldSendAiComposerKey } = await import("../src/features/ai-assistant/aiComposerBehavior.js");
@@ -39,6 +39,10 @@ test("assistant UI explains read-only finance exclusion and recoverable states",
   assert.match(files, /aria-live="polite"/);
   assert.match(files, /aria-controls="company-ai-assistant-panel"/);
   assert.match(files, /onKeyDown/);
+  assert.match(files, /已查询.*公司能力/);
+  assert.match(files, /正在查询/);
+  assert.match(files, /查询失败/);
+  assert.doesNotMatch(files, /result\.records|rawResult/);
 });
 
 test("assistant styles cover panel workspace mobile focus and reduced motion", () => {

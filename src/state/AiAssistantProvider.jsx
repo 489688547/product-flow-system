@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { loadAiStatus, sendAiChat } from "./aiAssistantApi.js";
+import { sanitizeAiSkillActivity, upsertAiSkillActivity } from "./aiAssistantActivity.js";
 
 const AiAssistantContext = createContext(null);
 const STORAGE_KEY = "companyAiAssistantSessionV1";
@@ -11,7 +12,10 @@ function id() {
 function loadSession() {
   try {
     const value = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
-    return Array.isArray(value.messages) ? value.messages.slice(-12) : [];
+    return Array.isArray(value.messages) ? value.messages.slice(-12).map(message => ({
+      ...message,
+      skillActivity: sanitizeAiSkillActivity(message.skillActivity)
+    })) : [];
   } catch {
     return [];
   }
@@ -62,6 +66,7 @@ export function AiAssistantProvider({ children }) {
       role: "assistant",
       content: "",
       sources: [],
+      skillActivity: [],
       blockedDomains: [],
       complete: false
     }].slice(-12));
@@ -80,6 +85,9 @@ export function AiAssistantProvider({ children }) {
             if (event.type === "text_delta") return { ...message, content: message.content + event.delta };
             if (event.type === "sources") return { ...message, sources: event.sources || [], blockedDomains: event.blockedDomains || [] };
             if (event.type === "meta") return { ...message, requestId: event.requestId, blockedDomains: event.blockedDomains || [] };
+            if (["skill_started", "skill_completed", "skill_failed"].includes(event.type)) {
+              return { ...message, skillActivity: upsertAiSkillActivity(message.skillActivity, event) };
+            }
             if (event.type === "done") return { ...message, complete: Boolean(event.complete) };
             if (event.type === "error") return { ...message, error: event, complete: false };
             return message;

@@ -1,4 +1,4 @@
-const KNOWN_EVENTS = new Set(["meta", "text_delta", "sources", "usage", "error", "done"]);
+const KNOWN_EVENTS = new Set(["meta", "text_delta", "sources", "usage", "skill_started", "skill_completed", "skill_failed", "error", "done"]);
 
 async function jsonPayload(response, fallback) {
   const body = await response.json().catch(() => ({}));
