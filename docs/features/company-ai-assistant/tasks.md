@@ -123,16 +123,17 @@
   - 验收：普通员工只读取原本可见记录，总经办范围更广但仍不外发财务字段。
   - 证据：业务 Skill 与原 API 回归 `node --test ...`（29/29）；`npm run lint` 通过。
 
-- [ ] 任务 13：实现 Provider Function Calling 与受控循环
+- [x] 任务 13：实现 Provider Function Calling 与受控循环
   - 范围：Responses 工具事件、两轮六次限制、重复调用去重、超时/取消和部分失败。
   - 验收：合成工具连接测试通过；Provider 不支持时明确降级；最终回答保留来源。
-  - 进度：服务端 Function Calling、两轮六次限制、重复去重、权限重校验、无内容审计和 Provider 不支持时的旧摘要降级已完成；前端调用活动展示和真实 Provider 验收待完成。
+  - 证据：原生合成能力测试确认灵算返回 `AI_PROVIDER_SKILLS_UNSUPPORTED`；受控服务端回退复用权限、限额与审计并在生产问题中完成三次只读调用。`node --test tests/ai-skill-loop.test.mjs tests/ai-api.test.mjs`（16/16）通过。
 
-- [ ] 任务 14：记录并展示 Skill 调用
+- [x] 任务 14：记录并展示 Skill 调用
   - 范围：`ai_skill_audit`、SSE Skill 事件、前端安全状态和可展开调用记录。
   - 验收：审计和 UI 不保存或显示原始结果、问题或回答正文。
-  - 进度：安全 SSE 解析、按 call ID 更新、最多六项会话元数据和无原始结果的可展开界面已完成；浏览器与生产验收待完成。
+  - 证据：生产 UI 可展开查看“重点项目、经营复盘、供应链状态”三项调用；远程 `ai_skill_audit` 仅记录 Skill/App/结果数/耗时/结果码，无问题、回答和业务结果正文。
 
-- [ ] 任务 15：全量、浏览器与生产交付
+- [x] 任务 15：全量、浏览器与生产交付
   - 范围：平台清单、API/错误文档、迁移、完整门禁、响应式/WebView 和生产实测。
   - 验收：至少一个生产问题调用两个 App Skill；匿名仍为 401；正式生产验证器按实际凭证状态报告。
+  - 证据：生产部署 `https://affb3bef.product-flow-system.pages.dev`；稳定入口资源指向 `assets/index-DDo-2tj1.js`。生产登录态使用 Enter 提问后调用 strategy 与 supply-chain 三个 Skill 并生成带来源建议；侧栏滚动区 `scrollHeight=1690`、`clientHeight=914`，Home/End 可到 0/731.5；匿名 AI 状态接口为 401。全量 React 425/425、API 224/224，lint、治理、集成、环境能力、构建与 diff 检查通过。`npm run verify:production` 因本机未提供 `PRODUCTION_DATA_ACCESS_TOKEN` 明确退出，不影响钉钉登录态实测结论。

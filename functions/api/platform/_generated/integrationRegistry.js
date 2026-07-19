@@ -721,7 +721,7 @@ const integrationRegistry = {
     {
       "id": "lingsuan-ai-gateway",
       "name": "灵算 AI 网关",
-      "status": "integrating",
+      "status": "connected",
       "summary": "为公司 AI 总助提供服务端 Responses 兼容模型调用；功能默认关闭，密钥只存在服务端 Secret。",
       "capabilities": [
         "Responses 流式生成",

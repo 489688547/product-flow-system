@@ -234,7 +234,7 @@
     {
       "id": "lingsuan-ai-gateway",
       "name": "灵算 AI 网关",
-      "status": "integrating",
+      "status": "connected",
       "summary": "为公司 AI 总助提供服务端 Responses 兼容模型调用；功能默认关闭，密钥只存在服务端 Secret。",
       "capabilities": ["Responses 流式生成", "固定模型配置", "原生 Function Calling 能力探测", "服务端受控 Skill 路由", "公司只读 Skills", "合成连接测试", "无留存请求参数", "安全错误映射"],
       "businessQuestions": ["AI 总助不可用", "模型服务连接失败", "Skill 调用失败", "响应超时或限流", "公司数据能否外发", "密钥是否安全"],
