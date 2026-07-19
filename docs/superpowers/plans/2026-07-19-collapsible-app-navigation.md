@@ -293,7 +293,7 @@ git commit -m "feat(navigation): collapse business app groups"
 - Consumes: the completed sidebar behavior from Tasks 1–2.
 - Produces: durable design guidance and a verified handoff; no new runtime interface.
 
-- [ ] **Step 1: Record the durable navigation rule**
+- [x] **Step 1: Record the durable navigation rule**
 
 Add under `## 页面布局` in `DESIGN.md`:
 
@@ -301,13 +301,13 @@ Add under `## 页面布局` in `DESIGN.md`:
 桌面左侧导航按业务 App 分组折叠：默认保留每个 App 的第一个已授权入口，同一时间只展开一个 App，进入子页面时自动展开对应分组。导航必须先按组织权限过滤；移动端保持已授权入口的扁平横向导航。
 ```
 
-- [ ] **Step 2: Run focused navigation regression tests**
+- [x] **Step 2: Run focused navigation regression tests**
 
 Run: `node --test react-tests/sidebar-navigation.test.mjs react-tests/sidebar-navigation-ui.test.mjs react-tests/supply-chain-ui.test.mjs react-tests/data-center-app.test.mjs react-tests/ecommerce-performance-navigation.test.mjs react-tests/brand-content-navigation.test.mjs`
 
 Expected: PASS with no skipped or failed tests.
 
-- [ ] **Step 3: Run the complete repository Definition of Done**
+- [x] **Step 3: Run the complete repository Definition of Done**
 
 ```bash
 npm run lint
@@ -320,7 +320,7 @@ npm run build
 
 Expected: every command exits 0; all React and API tests pass; production JavaScript chunks remain under 500,000 bytes.
 
-- [ ] **Step 4: Run local browser acceptance**
+- [x] **Step 4: Run local browser acceptance**
 
 Run `npm run dev`, open `http://127.0.0.1:8132/`, and verify:
 
@@ -333,7 +333,7 @@ Run `npm run dev`, open `http://127.0.0.1:8132/`, and verify:
 - Console: no errors or React warnings.
 - DingTalk WebView structural review: sticky mobile navigation, safe viewport height, and touch targets remain usable.
 
-- [ ] **Step 5: Inspect the final diff and commit documentation**
+- [x] **Step 5: Inspect the final diff and commit documentation**
 
 ```bash
 git diff --check

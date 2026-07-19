@@ -9,6 +9,10 @@ const navigation = [
   ["progress", "产品进度", null, "产品全周期", "progress"],
   ["supply-overview", "供应链总览", null, "供应链管理", "supply-chain"],
   ["supply-quality", "质量管理", null, "供应链管理", "supply-chain"],
+  ["data-overview", "数据总览", null, "数据中心", "data-center"],
+  ["data-quality", "数据质量", null, "数据中心", "data-center"],
+  ["ops-dashboard", "经营驾驶舱", null, "电商店铺运营", "ecommerce-operations"],
+  ["ops-team", "运营团队", null, "电商店铺运营", "ecommerce-operations"],
   ["performance-overview", "绩效总览", null, "人事管理", "performance-management"],
   ["performance-mine", "我的绩效", null, "人事管理", "performance-management"],
   ["content-overview", "内容总览", null, "品牌内容协同", "content-overview"],
@@ -16,17 +20,32 @@ const navigation = [
   ["handbook", "说明书", null, "平台", "handbook"]
 ];
 
-const visibleFor = user => navigation.filter(([, , , , permissionKey]) =>
+const visibleFor = (user, items = navigation) => items.filter(([, , , , permissionKey]) =>
   canViewNavigation(DEFAULT_PERMISSIONS, user, permissionKey)
 );
 
 test("groups authorized navigation without creating empty or unauthorized app groups", () => {
-  const groups = groupSidebarNavigation(visibleFor({ department: "客服部", title: "客服" }));
-  assert.deepEqual(groups.map(group => group.label), ["公司经营", "产品全周期", "人事管理", "品牌内容协同", "平台"]);
+  const employeeNavigation = navigation.filter(([screen]) => screen !== "home");
+  const groups = groupSidebarNavigation(visibleFor({ department: "客服部", title: "客服" }, employeeNavigation));
+  assert.deepEqual(groups.map(group => group.label), ["产品全周期", "人事管理", "品牌内容协同", "平台"]);
   assert.equal(groups.find(group => group.label === "产品全周期").collapsible, true);
   assert.equal(groups.find(group => group.label === "品牌内容协同").items.length, 1);
   assert.equal(groups.find(group => group.label === "品牌内容协同").collapsible, false);
   assert.equal(groups.some(group => group.label === "供应链管理"), false);
+});
+
+test("department leaders see their authorized business apps without executive-only shell groups", () => {
+  const employeeNavigation = navigation.filter(([screen]) => screen !== "home");
+  const groups = groupSidebarNavigation(visibleFor({ department: "运营部", title: "运营负责人" }, employeeNavigation));
+  assert.deepEqual(groups.map(group => group.label), [
+    "产品全周期",
+    "供应链管理",
+    "数据中心",
+    "电商店铺运营",
+    "人事管理",
+    "品牌内容协同",
+    "平台"
+  ]);
 });
 
 test("keeps only multi-route business apps collapsible for executive accounts", () => {
