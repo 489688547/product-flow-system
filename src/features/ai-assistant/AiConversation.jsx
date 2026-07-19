@@ -1,7 +1,9 @@
 import { AlertTriangle, Database, RefreshCcw, ShieldCheck, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "../../ui/Button.jsx";
+import { isAiConversationNearBottom } from "./aiComposerBehavior.js";
 
 const QUICK_PROMPTS = [
   "今天公司最需要关注的三个风险是什么？",
@@ -23,8 +25,36 @@ function SourceList({ sources = [] }) {
 }
 
 export function AiConversation({ messages, sending, error, onPrompt, onRetry }) {
+  const conversationRef = useRef(null);
+  const [followingLatest, setFollowingLatest] = useState(true);
+  const latestUserId = [...messages].reverse().find(message => message.role === "user")?.id || "";
+
+  const scrollToLatest = useCallback(behavior => {
+    const node = conversationRef.current;
+    if (node) node.scrollTo({ top: node.scrollHeight, behavior });
+  }, []);
+
+  useEffect(() => {
+    setFollowingLatest(true);
+    scrollToLatest("auto");
+  }, [latestUserId, scrollToLatest]);
+
+  useEffect(() => {
+    if (!followingLatest) return undefined;
+    const frame = globalThis.requestAnimationFrame?.(() => scrollToLatest("auto"));
+    return () => frame && globalThis.cancelAnimationFrame?.(frame);
+  }, [error, followingLatest, messages, scrollToLatest, sending]);
+
   return (
-    <div className="ai-assistant-conversation" role="log" aria-live="polite" aria-relevant="additions text">
+    <div
+      ref={conversationRef}
+      className="ai-assistant-conversation"
+      role="log"
+      aria-live="polite"
+      aria-relevant="additions text"
+      data-following-latest={followingLatest ? "true" : "false"}
+      onScroll={event => setFollowingLatest(isAiConversationNearBottom(event.currentTarget))}
+    >
       {!messages.length ? (
         <div className="ai-assistant-welcome">
           <span className="ai-welcome-mark"><Sparkles size={18} aria-hidden="true" /></span>
@@ -57,6 +87,7 @@ export function AiConversation({ messages, sending, error, onPrompt, onRetry }) 
         </article>
       ))}
       {error ? <div className="ai-conversation-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /><span>{error.message || "AI 总助暂不可用。"}</span></div> : null}
+      {!followingLatest ? <button className="ai-scroll-latest" type="button" onClick={() => { setFollowingLatest(true); scrollToLatest("smooth"); }}>回到最新</button> : null}
     </div>
   );
 }

@@ -830,6 +830,9 @@ main { min-width: 0; overflow-x: hidden; }
 .ai-assistant-panel-head span { color: var(--text-tertiary); font-size: 11px; }
 .ai-assistant-panel-head span.ready { color: var(--success); }
 .ai-panel-actions { display: inline-flex; gap: 6px; }
+.ai-assistant-panel > .ai-assistant-not-ready { grid-row: 2; }
+.ai-assistant-panel > .ai-assistant-conversation { grid-row: 3; min-height: 0; }
+.ai-assistant-panel > .ai-assistant-composer { grid-row: 4; }
 .ai-assistant-not-ready { margin: 12px 16px 0; padding: 11px 12px; border: 1px solid color-mix(in oklch, var(--warning), white 68%); border-radius: var(--radius-control); background: var(--warning-soft); }
 .ai-assistant-not-ready strong { font-size: 12px; }
 .ai-assistant-not-ready p { margin-top: 3px; color: var(--text-secondary); font-size: 12px; }
@@ -858,6 +861,8 @@ main { min-width: 0; overflow-x: hidden; }
 .ai-message-error { grid-column: 2; display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 8px 9px; border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); font-size: 11px; }
 .ai-message-error span { flex: 1 1 180px; }
 .ai-conversation-error { display: flex; align-items: flex-start; gap: 7px; padding: 9px 10px; border-radius: var(--radius-control); background: var(--danger-soft); color: var(--danger); font-size: 12px; }
+.ai-scroll-latest { position: sticky; bottom: 0; justify-self: center; min-height: 30px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-secondary); font-size: 11px; font-weight: 700; box-shadow: 0 4px 8px color-mix(in oklch, var(--text-primary), transparent 92%); }
+.ai-scroll-latest:hover { color: var(--text-primary); background: var(--surface-subtle); }
 .ai-assistant-composer { padding: 12px 14px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid var(--border); background: var(--surface); display: grid; gap: 7px; }
 .ai-assistant-composer > label { color: var(--text-secondary); font-size: 11px; font-weight: 700; }
 .ai-assistant-composer textarea { width: 100%; min-height: 72px; max-height: 160px; resize: vertical; padding: 9px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); line-height: 1.5; }

@@ -34,7 +34,7 @@
 - Consumes: `AiComposer({ sending, disabled, onSend, onStop, autoFocus, idSuffix })`.
 - Produces: `Enter` send behavior and an `AiConversation` scroll container with `data-following-latest` state.
 
-- [ ] **Step 1: Write failing keyboard and layout tests**
+- [x] **Step 1: Write failing keyboard and layout tests**
 
 Add assertions that the composer rejects composition, sends plain Enter, preserves Shift+Enter, and that panel children use explicit rows:
 
@@ -46,13 +46,13 @@ assert.match(styles, /\.ai-assistant-panel > \.ai-assistant-composer\s*\{[^}]*gr
 assert.match(conversation, /回到最新/);
 ```
 
-- [ ] **Step 2: Run the focused test and confirm RED**
+- [x] **Step 2: Run the focused test and confirm RED**
 
 Run: `node --test react-tests/ai-assistant-ui.test.mjs`
 
 Expected: FAIL because plain Enter, IME protection, explicit grid rows and latest-message control are absent.
 
-- [ ] **Step 3: Implement the keyboard contract**
+- [x] **Step 3: Implement the keyboard contract**
 
 Use this event condition in `AiComposer` and update the hint to `Enter 发送 · Shift + Enter 换行`:
 
@@ -64,7 +64,7 @@ onKeyDown={event => {
 }}
 ```
 
-- [ ] **Step 4: Implement bounded auto-follow**
+- [x] **Step 4: Implement bounded auto-follow**
 
 Give `AiConversation` a scroll ref and boolean state. Treat a distance of 80px or less as following; stream updates scroll only when following. A new user message resets following, and the “回到最新” button calls `scrollTo({ top: scrollHeight, behavior: "smooth" })`.
 
@@ -81,7 +81,7 @@ Assign panel rows explicitly and keep the status row collapsible:
 .ai-assistant-panel > .ai-assistant-composer { grid-row: 4; }
 ```
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run: `node --test react-tests/ai-assistant-ui.test.mjs react-tests/ai-assistant-api.test.mjs`
 

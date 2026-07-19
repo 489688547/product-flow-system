@@ -108,9 +108,10 @@
   - 证据：敏感值扫描 0 命中；AI 安全专项 29/29；全量 React 415/415、API 218/218；`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm run build` 全部退出 0。1440/1280/900/640/390px 浏览器验收无横向溢出，焦点、Escape、只读/禁用状态和控制台 0 错误。未部署、未配置生产 Secret、未执行真实 Provider 连接、未写入生产数据；DingTalk 嵌入运行时与 Cloudflare 生产环境需部署授权后单独验收。
   - 提交：`docs(ai): record assistant verification`。
 
-- [ ] 任务 10：修复对话输入与滚动
+- [x] 任务 10：修复对话输入与滚动
   - 范围：`AiComposer`、`AiConversation`、面板/工作台网格和 UI 测试。
   - 验收：Enter 发送、Shift+Enter 换行、IME 不误发、长回答可滚动、手动上滚后可回到最新。
+  - 证据：`node --test react-tests/ai-assistant-ui.test.mjs react-tests/ai-assistant-api.test.mjs`（8/8）；`npm run lint` 通过。
 
 - [ ] 任务 11：建立跨 App 只读 Skill 注册表
   - 范围：公司经营、产品全周期、供应链和数据中心读取执行器，固定 Schema、权限、超时和结果限额。
