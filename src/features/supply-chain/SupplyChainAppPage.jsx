@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { Upload } from "lucide-react";
 import { buildSupplyChainSummary, isErpInventorySource, isPhysicalInventorySource } from "../../domain/supplyChain.js";
+import { buildSupplySnapshotActions } from "../../domain/supplyChainSnapshot.js";
 import { canAccessCompanyPlatform } from "../../domain/permissions.js";
 import { fetchSalesForCodes } from "../../state/salesStore.js";
 import { useAuth } from "../../state/AuthProvider.jsx";
@@ -25,21 +27,39 @@ function latestDate(rows, keys) {
 }
 
 function syncRunType(row) {
+  if (row.type === "dingtalk-supply-folder") return "钉钉供应链文件";
   return row.type === "dingtalk-inventory-docs" ? "钉钉库存文件" : "钉钉采购/付款审批";
 }
 
 function syncRunResult(row) {
   if (row.status !== "success") return row.message || "同步失败";
-  if (row.type === "dingtalk-inventory-docs") {
+  if (["dingtalk-supply-folder", "dingtalk-inventory-docs"].includes(row.type)) {
     const finished = Number(row.counts?.stocktake || 0) + Number(row.counts?.["finished-lanshan"] || 0) + Number(row.counts?.["finished-shanxi"] || 0);
     const materials = Number(row.counts?.["materials-lanshan"] || 0) + Number(row.counts?.["materials-shanxi"] || 0);
-    return `成品 ${finished} · 原辅料 ${materials} · 异常 ${Number(row.counts?.risks || 0)}`;
+    const suppliers = Number(row.counts?.suppliers || 0);
+    return `${suppliers ? `供应商 ${suppliers} · ` : ""}成品 ${finished} · 原辅料 ${materials} · 异常 ${Number(row.counts?.risks || 0)}`;
   }
   return `采购 ${row.counts?.purchase || 0} · 付款 ${row.counts?.payment || 0} · 待映射 ${row.counts?.unmapped || 0} · 过滤 ${row.counts?.skipped || 0}`;
 }
 
-function SyncRecordsWorkspace({ salesRows }) {
-  const { state } = useSupplyChain();
+function SyncRecordsWorkspace({ salesRows, canEdit }) {
+  const { state, dispatch } = useSupplyChain();
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+  const [importNotice, setImportNotice] = useState("");
+  async function importSnapshot(file) {
+    if (!file) return;
+    setImporting(true); setImportError(""); setImportNotice("");
+    try {
+      const result = buildSupplySnapshotActions(JSON.parse(await file.text()));
+      dispatch({ type: "batch", actions: result.actions });
+      setImportNotice(`已导入供应商 ${result.counts.suppliers || 0} 家、成品及盘点 ${result.counts.inventorySnapshots || 0} 条、原辅料 ${result.counts.materialInventorySnapshots || 0} 条、异常库存 ${result.counts.inventoryRisks || 0} 条。`);
+    } catch (event) {
+      setImportError(event instanceof SyntaxError ? "快照文件不是有效的 JSON。" : event.message || "供应链快照导入失败。");
+    } finally {
+      setImporting(false);
+    }
+  }
   const successfulApprovals = state.syncRuns.filter(row => row.type === "dingtalk-approvals" && row.status === "success");
   const erpSnapshots = state.inventorySnapshots.filter(row => isErpInventorySource(row.sourceType));
   const stocktakes = state.inventorySnapshots.filter(row => isPhysicalInventorySource(row.sourceType) && row.countedQuantity !== null && row.countedQuantity !== undefined);
@@ -59,7 +79,7 @@ function SyncRecordsWorkspace({ salesRows }) {
     { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : "danger"}`}>{row.status === "success" ? "成功" : "失败"}</span> },
     { key: "counts", header: "结果", render: row => syncRunResult(row) }
   ];
-  return <div className="supply-work-grid"><section className="section-panel"><div className="section-head"><div><h2>数据源中心</h2><p>每个数字都标明来源和新鲜度；快麦库存接口验证前只显示文件快照，不伪装自动同步。</p></div></div><div className="supply-source-grid">{sources.map(source => <article key={source.name}><div><strong>{source.name}</strong><span className="status-badge neutral">{source.status}</span></div><p>{source.role}</p><b>{source.count}</b><small>最近更新：{source.updatedAt}</small></article>)}</div></section><section className="section-panel"><div className="section-head"><div><h2>钉钉同步记录</h2><p>保留审批和库存文件的读取结果，失败不覆盖上次成功数据。</p></div></div><DataTable minWidth={680} columns={columns} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有执行过数据同步。</div>} /></section></div>;
+  return <div className="supply-work-grid"><section className="section-panel"><div className="section-head"><div><h2>数据源中心</h2><p>每个数字都标明来源和新鲜度；快麦库存接口验证前只显示文件快照，不伪装自动同步。</p></div>{canEdit ? <label className={`upload-field ${importing ? "is-busy" : ""}`}><Upload size={16} />{importing ? "正在导入…" : "导入钉钉供应链快照"}<input type="file" accept=".json" disabled={importing} onChange={event => { importSnapshot(event.target.files?.[0]); event.target.value = ""; }} /></label> : null}</div>{importError ? <p className="supply-message error" role="alert">{importError}</p> : null}{importNotice ? <p className="supply-message success" role="status">{importNotice}</p> : null}<div className="supply-source-grid">{sources.map(source => <article key={source.name}><div><strong>{source.name}</strong><span className="status-badge neutral">{source.status}</span></div><p>{source.role}</p><b>{source.count}</b><small>最近更新：{source.updatedAt}</small></article>)}</div></section><section className="section-panel"><div className="section-head"><div><h2>钉钉同步记录</h2><p>保留审批和库存文件的读取结果，失败不覆盖上次成功数据。</p></div></div><DataTable minWidth={680} columns={columns} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有执行过数据同步。</div>} /></section></div>;
 }
 
 function SupplySettingsWorkspace({ canEdit }) {
@@ -91,7 +111,7 @@ export function SupplyChainAppPage({ section = "overview" }) {
     products: <ProductSupplyWorkspace products={products} canEdit={supplyEditor} />,
     inventory: <InventoryWorkspace products={products} summary={summary} canEdit={supplyEditor} />,
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,
-    records: <SyncRecordsWorkspace salesRows={salesRows} />,
+    records: <SyncRecordsWorkspace salesRows={salesRows} canEdit={supplyEditor} />,
     settings: <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
   };
   return (

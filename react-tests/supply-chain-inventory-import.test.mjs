@@ -5,8 +5,35 @@ import {
   parseFinishedInventoryCsv,
   parseInventoryRiskCsv,
   parseMaterialInventoryCsv,
+  parseSupplierCsv,
   parseStocktakeCsv
 } from "../scripts/lib/dingtalkSupplyInventory.mjs";
+
+test("supplier CSV imports only operational fields and inherits source categories", () => {
+  const result = parseSupplierCsv([
+    "[row=1] 类别,供应商名称（简称或联系人）,采购产品、耗材、服务,开票主体,,,,,,,,,收款人银行账号,收款人资料",
+    "[row=2] 原料、成品,临沂火火,爱心冻干、纸棉,某开票主体,,,,,,,,,622200001234,身份证附件.jpg",
+    "[row=3] ,山东金久,蓝袋粮、奶酪,另一开票主体,,,,,,,,,621700009876,银行卡附件.jpg",
+    "[row=4] 快递、服务,德尚青柏对接供应商,,,,,,,,,,,,",
+    "[row=5] ,临沂智派,兰山云仓发货仓,仓储公司,,,,,,,,,623100001111,"
+  ].join("\n"), {
+    nodeId: "supplier-node",
+    sheetId: "s1",
+    documentName: "供应商清单（开票情况）",
+    importedAt: "2026-07-19T00:00:00.000Z"
+  });
+
+  assert.equal(result.records.length, 3);
+  assert.deepEqual(result.records.map(row => row.name), ["临沂火火", "山东金久", "临沂智派"]);
+  assert.deepEqual(result.records.map(row => row.category), ["原料", "原料", "加工"]);
+  assert.equal(result.records[1].sourceCategory, "原料、成品");
+  assert.equal(result.records[2].supplyScope, "兰山云仓发货仓");
+  assert.equal(result.records[0].sourceRow, 2);
+  assert.equal("bankAccount" in result.records[0], false);
+  assert.equal("contactPhone" in result.records[0], false);
+  assert.equal(JSON.stringify(result.records).includes("622200001234"), false);
+  assert.equal(JSON.stringify(result.records).includes("身份证附件"), false);
+});
 
 test("stocktake CSV keeps source evidence and converts Excel dates", () => {
   const result = parseStocktakeCsv([
