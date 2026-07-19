@@ -26,10 +26,10 @@
   - 验证：2026-07-19 运行迁移、环境能力、生产就绪与集成测试，13/13 通过；环境生成模块检查与集成检查通过。
   - 提交：`build(hr): add core data contract`。
 
-- [ ] 人事领域规则
+- [x] 人事领域规则
   - 输出：稳定身份、有效期、绩效权重、建议分、状态机、冻结和审计纯函数。
   - 红灯：领域模块不存在。
-  - 验证：`react-tests/hr-management-domain.test.mjs` 通过。
+  - 验证：2026-07-19 领域测试 8/8 通过，React 全套 315/315 通过，相关 ESLint 通过。
   - 提交：`feat(hr): add core domain rules`。
 
 - [ ] 认证 API 与 D1 存储
