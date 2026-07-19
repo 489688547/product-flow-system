@@ -118,9 +118,10 @@
   - 验收：客户端不能声明 Skill，越权 Skill 不下发且不能执行，财务外发继续阻止。
   - 证据：`node --test tests/ai-skills.test.mjs tests/ai-context-policy.test.mjs`（8/8）；`npm run lint` 通过。
 
-- [ ] 任务 12：扩展店铺运营、品牌内容和绩效 Skill
+- [x] 任务 12：扩展店铺运营、品牌内容和绩效 Skill
   - 范围：复用各 App 的服务端读取与权限投影；抽取品牌内容只读存储边界。
   - 验收：普通员工只读取原本可见记录，总经办范围更广但仍不外发财务字段。
+  - 证据：业务 Skill 与原 API 回归 `node --test ...`（29/29）；`npm run lint` 通过。
 
 - [ ] 任务 13：实现 Provider Function Calling 与受控循环
   - 范围：Responses 工具事件、两轮六次限制、重复调用去重、超时/取消和部分失败。

@@ -1,4 +1,5 @@
 import { CORE_SKILL_EXECUTORS } from "./skill-executors/core.js";
+import { BUSINESS_SKILL_EXECUTORS } from "./skill-executors/business-apps.js";
 
 const PRIVATE_KEY = /(?:phone|mobile|email|address|cookie|token|password|secret|authorization|verification|session|cost|gross.?profit|profit|margin|budget|settlement|bonus|salary|commission)/i;
 const PRIVATE_VALUE = /(?:\b1[3-9]\d{9}\b|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,})/;
@@ -31,7 +32,7 @@ function definition(name, appId, displayName, description, domainId, properties,
     maxRows,
     maxChars,
     timeoutMs: 8_000,
-    execute: CORE_SKILL_EXECUTORS[name]
+    execute: CORE_SKILL_EXECUTORS[name] || BUSINESS_SKILL_EXECUTORS[name]
   });
 }
 
@@ -43,7 +44,10 @@ export const AI_SKILL_DEFINITIONS = Object.freeze([
   definition("product_flow_query_lifecycle", "product-flow", "产品全周期", "查询需求、产品阶段和未完成任务", "product_lifecycle", QUERY_PROPERTIES),
   definition("supply_chain_query_status", "supply-chain", "供应链状态", "查询供应商、库存、质量问题和审批状态", "supply_chain", QUERY_PROPERTIES),
   definition("data_center_query_sales", "data-center", "销售经营", "按日期和平台查询销售经营聚合", "sales_operations", SALES_PROPERTIES, 300, 16_000),
-  definition("data_center_query_quality", "data-center", "数据质量", "查询数据质量问题和同步状态", "data_quality", QUERY_PROPERTIES)
+  definition("data_center_query_quality", "data-center", "数据质量", "查询数据质量问题和同步状态", "data_quality", QUERY_PROPERTIES),
+  definition("ecommerce_operations_query", "ecommerce-operations", "店铺运营", "查询可见店铺、重点产品、方案、执行、协同和复盘", "ecommerce_operations", QUERY_PROPERTIES),
+  definition("brand_content_query", "brand-content", "品牌内容", "查询内容任务、素材、发布和非财务表现", "brand_content", QUERY_PROPERTIES),
+  definition("performance_management_query", "performance-management", "绩效管理", "查询当前身份可见的考核状态与经营证据", "performance_management", QUERY_PROPERTIES)
 ]);
 
 function skillError(code, message, status = 400) {

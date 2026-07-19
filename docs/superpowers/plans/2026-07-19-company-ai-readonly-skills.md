@@ -165,7 +165,7 @@ Commit: `feat(ai): register governed read skills`
 - Produces: `readBrandContentState(db)` and three additional Skill IDs: `ecommerce_operations_query`, `brand_content_query`, `performance_management_query`.
 - Reuses: `readOperationsState`, `filterOperationsStateForSession`, `readPerformanceState`, `filterPerformanceState`.
 
-- [ ] **Step 1: Write failing projection tests**
+- [x] **Step 1: Write failing projection tests**
 
 Create fixtures containing both allowed and hidden records, plus salary/bonus/cost-like fields. Assert ordinary employees receive only their existing App projection and no restricted keys; total-office sessions receive wider records but still no finance-transfer fields.
 
@@ -174,21 +174,21 @@ assert.equal(result.records.auditLogs, undefined);
 assert.doesNotMatch(JSON.stringify(result.records), /salary|bonus|cost|profit/i);
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 Run: `node --test tests/ai-skills-business-apps.test.mjs`
 
 Expected: FAIL because the business-App executors and shared brand reader do not exist.
 
-- [ ] **Step 3: Extract brand read storage without changing route behavior**
+- [x] **Step 3: Extract brand read storage without changing route behavior**
 
 Move `ensureTable`, `parseStoredState` and `readStoredState` into `functions/api/brand-content/_shared/storage.js` as `ensureBrandContentTable`, `parseBrandContentState` and `readBrandContentState`. Keep the route response and write path contract unchanged.
 
-- [ ] **Step 4: Implement three read projections**
+- [x] **Step 4: Implement three read projections**
 
 Call existing storage and access functions directly. Select only approved fields and cap each collection before returning. Never import React state or call the App's HTTP route from the Skill executor.
 
-- [ ] **Step 5: Run compatibility tests and commit**
+- [x] **Step 5: Run compatibility tests and commit**
 
 Run: `node --test tests/ai-skills-business-apps.test.mjs tests/brand-content-api.test.mjs tests/ecommerce-operations-api.test.mjs tests/performance-management-api.test.mjs`
 

@@ -16,6 +16,9 @@ test("AI assistant domain module defines governed cross-App data domains", async
     "operating_reviews",
     "sales_operations",
     "data_quality",
+    "ecommerce_operations",
+    "brand_content",
+    "performance_management",
     "finance"
   ]);
   assert.equal(AI_DATA_DOMAINS.find(item => item.id === "finance")?.classification, "restricted");

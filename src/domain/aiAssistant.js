@@ -9,6 +9,9 @@ export const AI_DATA_DOMAINS = Object.freeze([
   { id: "operating_reviews", name: "经营检查", classification: "internal", viewDepartments: ["运营部", "品牌部"], viewTitles: ["运营主管"] },
   { id: "sales_operations", name: "销售经营摘要", classification: "internal", viewDepartments: ["运营部", "品牌部"], viewTitles: ["运营主管"] },
   { id: "data_quality", name: "数据质量与同步状态", classification: "internal", viewDepartments: ["运营部", "财务部", "产品部", "供应链部"], viewTitles: [] },
+  { id: "ecommerce_operations", name: "电商店铺运营", classification: "internal", viewDepartments: ["运营部", "品牌部", "产品部", "供应链部", "供应链", "供应链团队", "采购部", "财务部"], viewTitles: [] },
+  { id: "brand_content", name: "品牌内容协同", classification: "internal", viewDepartments: ["品牌部", "运营部"], viewTitles: ["品牌", "编导", "剪辑", "运营"] },
+  { id: "performance_management", name: "绩效管理", classification: "sensitive", viewDepartments: ["运营部", "品牌部", "产品部", "供应链部", "供应链", "供应链团队", "采购部", "财务部", "人事行政部", "人事部", "质量管理部"], viewTitles: [] },
   { id: "finance", name: "财务", classification: "restricted", viewDepartments: ["财务部"], viewTitles: [] }
 ]);
 
