@@ -103,7 +103,7 @@ Commit: `fix(ai): repair chat input and scrolling`
 - Produces: `listAvailableSkills({ db, session, access })`, `executeSkill({ db, session, access, skillId, argumentsText, signal })`.
 - Skill result: `{ skillId, appId, displayName, records, recordCount, updatedAt, source, safeArguments }`.
 
-- [ ] **Step 1: Write failing registry tests**
+- [x] **Step 1: Write failing registry tests**
 
 Cover executive visibility, ordinary-user removal, unknown IDs, extra JSON fields, date limits, finance removal and result truncation:
 
@@ -116,13 +116,13 @@ await assert.rejects(
 );
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 Run: `node --test tests/ai-skills.test.mjs`
 
 Expected: FAIL because the registry module does not exist.
 
-- [ ] **Step 3: Define fixed Skill metadata**
+- [x] **Step 3: Define fixed Skill metadata**
 
 Register these core Skills with strict schemas and limits:
 
@@ -138,11 +138,11 @@ const SKILLS = Object.freeze([
 
 The public Provider shape must be `{ type: "function", name, description, parameters, strict: true }`. Reject unknown fields with `additionalProperties: false`.
 
-- [ ] **Step 4: Implement validation and execution guards**
+- [x] **Step 4: Implement validation and execution guards**
 
 Parse JSON once, allow only schema properties, race execution against an 8-second abort, redact private keys and truncate rows/chars after the existing App reader returns. Recheck that every `domainId` is present in `access.allowed` immediately before execution.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run: `node --test tests/ai-skills.test.mjs tests/ai-context-policy.test.mjs`
 

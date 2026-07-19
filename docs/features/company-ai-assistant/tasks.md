@@ -113,9 +113,10 @@
   - 验收：Enter 发送、Shift+Enter 换行、IME 不误发、长回答可滚动、手动上滚后可回到最新。
   - 证据：`node --test react-tests/ai-assistant-ui.test.mjs react-tests/ai-assistant-api.test.mjs`（8/8）；`npm run lint` 通过。
 
-- [ ] 任务 11：建立跨 App 只读 Skill 注册表
+- [x] 任务 11：建立跨 App 只读 Skill 注册表
   - 范围：公司经营、产品全周期、供应链和数据中心读取执行器，固定 Schema、权限、超时和结果限额。
   - 验收：客户端不能声明 Skill，越权 Skill 不下发且不能执行，财务外发继续阻止。
+  - 证据：`node --test tests/ai-skills.test.mjs tests/ai-context-policy.test.mjs`（8/8）；`npm run lint` 通过。
 
 - [ ] 任务 12：扩展店铺运营、品牌内容和绩效 Skill
   - 范围：复用各 App 的服务端读取与权限投影；抽取品牌内容只读存储边界。
