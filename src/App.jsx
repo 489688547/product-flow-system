@@ -7,6 +7,8 @@ import { useAuth } from "./state/AuthProvider.jsx";
 import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
 import { featureFlagEnabled } from "./domain/featureFlags.js";
+import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
+import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
 
 const lazyNamed = (loader, exportName) => lazy(async () => {
   const module = await loader();
@@ -42,6 +44,7 @@ const BrandTeamPage = lazyNamed(() => import("./features/brand-content/BrandTeam
 const BrandDataIssuesPage = lazyNamed(() => import("./features/brand-content/BrandDataIssuesPage.jsx"), "BrandDataIssuesPage");
 const BrandContentSettingsPage = lazyNamed(() => import("./features/brand-content/BrandContentSettingsPage.jsx"), "BrandContentSettingsPage");
 const CollaborationPage = lazyNamed(() => import("./features/collaboration/CollaborationPage.jsx"), "CollaborationPage");
+const AiAssistantWorkspace = lazyNamed(() => import("./features/ai-assistant/AiAssistantWorkspace.jsx"), "AiAssistantWorkspace");
 
 const SUPPLY_CHAIN_NAV = [
   ["supply-overview", "供应链总览", LayoutDashboard, "供应链管理", "overview"],
@@ -132,7 +135,7 @@ const PRODUCT_NAV = [
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
 ];
-const HIDDEN_SCREENS = new Set(["packages"]);
+const HIDDEN_SCREENS = new Set(["packages", "ai-assistant"]);
 const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NAV.map(([key]) => key), ...HIDDEN_SCREENS]);
 
 function resolveScreen(screen) {
@@ -165,6 +168,7 @@ export default function App() {
   const [progressFocus, setProgressFocus] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
+  const aiTriggerRef = useRef(null);
   const { logout, user: sessionUser } = useAuth();
   const { loading: platformLoading, error: platformError } = usePlatform();
   const { state, loading, sharedError, currentUser, setCurrentProduct } = useProductFlow();
@@ -177,7 +181,7 @@ export default function App() {
   const visibleNavigation = useMemo(() => navigation.filter(([key]) => canViewNavigation(state.settings?.permissions, currentUser, navigationPermissionKey(key))), [currentUser, navigation, state.settings?.permissions]);
   const visibleScreenKeys = useMemo(() => new Set(visibleNavigation.map(([key]) => key)), [visibleNavigation]);
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
-  const screenAllowed = visibleScreenKeys.has(screen) || (screen === "packages" && visibleScreenKeys.has("archive"));
+  const screenAllowed = visibleScreenKeys.has(screen) || screen === "ai-assistant" || (screen === "packages" && visibleScreenKeys.has("archive"));
   const activeScreen = screenAllowed ? screen : defaultScreen;
   const accountMeta = [currentUser?.department, currentUser?.title].filter(Boolean).join(" / ") || "组织信息待同步";
   const accountName = currentUser?.name || "未登录";
@@ -205,7 +209,7 @@ export default function App() {
   function showScreen(nextScreen, detail = "") {
     const resolvedScreen = resolveScreen(nextScreen);
     if (!VALID_SCREENS.has(resolvedScreen)) return;
-    if (!visibleScreenKeys.has(resolvedScreen) && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
+    if (!visibleScreenKeys.has(resolvedScreen) && resolvedScreen !== "ai-assistant" && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
     setRoute({ screen: resolvedScreen, detail });
     window.scrollTo({ top: 0, behavior: "auto" });
     document.body.scrollTo({ top: 0, behavior: "auto" });
@@ -235,6 +239,7 @@ export default function App() {
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
+    "ai-assistant": <AiAssistantWorkspace appHint={{ screen: activeScreen, detail: routeDetail }} />,
     "content-overview": <BrandContentOverviewPage onNavigate={showScreen} />,
     "content-workbench": <BrandContentWorkbenchPage />,
     "content-assets": <BrandAssetLibraryPage />,
@@ -263,6 +268,7 @@ export default function App() {
       <main id="main-content">
         <header className="topbar">
           {sharedError || (hasCompanyAccess && platformError) ? <em role="status">{sharedError || platformError}</em> : null}
+          {activeScreen !== "ai-assistant" ? <AiAssistantTrigger triggerRef={aiTriggerRef} /> : null}
           <div className="account-menu-wrap" ref={accountMenuRef}>
             <button className="account-chip" type="button" aria-label={`${accountName} · ${accountMeta}`} aria-haspopup="menu" aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen(open => !open)}>
               <span className="account-avatar">{accountName.slice(0, 1)}</span>
@@ -280,6 +286,7 @@ export default function App() {
           {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
+      <AiAssistantPanel active={activeScreen !== "ai-assistant"} triggerRef={aiTriggerRef} appHint={{ screen: activeScreen, detail: routeDetail }} />
       <FloatingIssueButton />
     </div>
   );

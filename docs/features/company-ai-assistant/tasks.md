@@ -75,7 +75,7 @@
   - 证据：`node --test react-tests/ai-assistant-api.test.mjs tests/local-data-center-server.test.mjs`（5/5）；浏览器请求仅含消息和路由提示，会话只进 `sessionStorage`，本地预览拒绝 Provider 写入与调用。
   - 提交：`feat(ai): add assistant session orchestration`。
 
-- [ ] 任务 7：实现全局面板和总助工作台
+- [x] 任务 7：实现全局面板和总助工作台
   - 依赖：任务 6。
   - 文件：`src/features/ai-assistant/*`、`src/App.jsx`、`src/main.jsx`、`src/styles.css`、UI 测试。
   - 输入：`useAiAssistant()`。
@@ -83,6 +83,7 @@
   - 失败测试：顶部入口、`#ai-assistant`、键盘、焦点恢复、窄屏全屏和状态文案缺失。
   - 实现步骤：入口与路由 → 面板容器 → 对话与输入 → 状态和响应式样式。
   - 验证：UI 测试与 1440/1280/900/640/390px 浏览器验收。
+  - 证据：`node --test react-tests/ai-assistant-ui.test.mjs react-tests/ai-assistant-api.test.mjs`（6/6）、`npm run lint`、`npm run build`；1440/1280/900/640/390px 均无横向溢出，390px 面板为整屏，Escape 关闭后焦点回到入口，完整工作台不与侧边面板重叠。
   - 提交：`feat(ai): add company assistant workspace`。
 
 - [ ] 任务 8：在数据中心接入 AI 模型服务设置
