@@ -26,5 +26,5 @@ test("performance work is presented as the Human Resources app", () => {
   assert.match(app, /\["performance-mine", "我的绩效", ClipboardCheck, "人事管理", "mine"\]/);
   assert.match(registry, /id: "performance-management",\s+name: "人事管理"/);
   assert.match(permissions, /key: "performance-management", label: "人事管理"/);
-  assert.match(permissions, /key: "performanceManagement", label: "绩效管理"/);
+  assert.match(permissions, /key: "performanceManagement", label: "人事管理"/);
 });

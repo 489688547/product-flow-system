@@ -34,7 +34,7 @@ export const FEATURE_PERMISSION_ITEMS = [
   { key: "supplyChain", label: "供应链管理", description: "查看或维护供应商、采购付款、库存资金和质量问题。" },
   { key: "dataCenter", label: "数据中心", description: "查看统一经营指标，维护数据接入、质量规则和应用订阅。" }
   ,{ key: "ecommerceOperations", label: "电商店铺运营", description: "管理重点产品方案、执行复盘、跨部门协同和运营团队责任。" }
-  ,{ key: "performanceManagement", label: "绩效管理", description: "管理考核方案、自评、主管评估、复核和人事归档。" }
+  ,{ key: "performanceManagement", label: "人事管理", description: "管理考核方案、自评、主管评估、复核和人事归档。" }
 ];
 
 export const DEFAULT_PERMISSIONS = {
