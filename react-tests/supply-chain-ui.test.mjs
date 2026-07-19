@@ -43,6 +43,10 @@ test("inventory and quality imports preview before saving", () => {
   assert.match(inventory, /ERP库存/);
   assert.match(inventory, /ERP 快照/);
   assert.match(inventory, /盘点核对/);
+  assert.match(inventory, /异常库存与到货风险/);
+  assert.match(inventory, /原辅料库存明细/);
+  assert.match(inventory, /materialInventorySnapshots/);
+  assert.match(inventory, /inventoryRisks/);
   assert.match(quality, /streamSpreadsheetRows/);
   assert.match(quality, /确认导入/);
   assert.match(quality, /公关处理/);
@@ -59,6 +63,8 @@ test("approval workspace keeps purchase requests separate from linked payments",
   assert.match(approval, /productValueMap/);
   assert.match(approval, /审批实付/);
   assert.match(approval, /付款超申请/);
+  assert.match(approval, /供应商已关联 · 产品待关联/);
+  assert.match(approval, /供应商与产品待关联/);
 });
 
 test("supplier product and quality workspaces dispatch auditable domain changes", () => {
@@ -96,6 +102,7 @@ test("supply chain workbench has stable responsive structure", () => {
   assert.match(css, /\.supply-chain-app/);
   assert.match(css, /\.supply-metric-strip/);
   assert.match(css, /\.supply-import-preview/);
+  assert.match(css, /\.section-panel\s*\{[^}]*min-width:\s*0/);
   assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.supply-metric-strip\s*\{[^}]*grid-template-columns:\s*repeat\(2, minmax\(170px, 1fr\)\)/);
 });
 
@@ -105,7 +112,9 @@ test("overview and sync records expose cash inventory and source truth separatel
   for (const label of ["审批实付", "ERP库存价值", "实盘库存价值", "ERP库存", "实盘库存"]) {
     assert.match(overview, new RegExp(label));
   }
-  for (const label of ["供应商档案", "钉钉审批", "快麦销售成本", "ERP库存快照", "盘点导入", "质量导入", "文件快照"]) {
+  for (const label of ["供应商档案", "钉钉审批", "快麦销售成本", "ERP库存快照", "盘点导入", "原辅料库存", "异常库存", "质量导入", "文件快照"]) {
     assert.match(page, new RegExp(label));
   }
+  assert.match(page, /dingtalk-inventory-docs/);
+  assert.match(page, /钉钉库存文件/);
 });

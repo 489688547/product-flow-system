@@ -14,21 +14,22 @@ test("company shell exposes strategy execution as first-class workspaces", () =>
   assert.match(app, /产品全周期/);
 });
 
-test("executive cockpit prioritizes decisions and deviations", () => {
+test("executive action desk prioritizes decisions coordination and changes", () => {
   const page = read("src/features/company/CompanyHomePage.jsx");
-  assert.match(page, /待决策事项/);
-  assert.match(page, /重大异常与风险/);
+  const desk = read("src/features/company/ExecutiveActionDesk.jsx");
+  assert.match(desk, /待拍板/);
+  assert.match(desk, /需要协调/);
+  assert.match(desk, /重要变化/);
   assert.match(page, /战略执行地图/);
   assert.match(page, /重点项目组合/);
-  assert.match(page, /三分钟/);
+  assert.match(page, /处理今天需要拍板、协调和升级的经营事项/);
 });
 
-test("executive home defaults to the personal todo workbench", () => {
+test("executive home retains the personal todo workbench below the action desk", () => {
   const home = read("src/features/company/CompanyHomePage.jsx");
   const workbench = read("src/features/company/PersonalTodoWorkbench.jsx");
-  assert.match(home, /useState\("todos"\)/);
+  assert.match(home, /ExecutiveActionDesk/);
   assert.match(home, /我的待办/);
-  assert.match(home, /公司驾驶舱/);
   assert.match(home, /PersonalTodoWorkbench/);
   assert.match(workbench, /已逾期/);
   assert.match(workbench, /今日截止/);
@@ -59,6 +60,7 @@ test("local real-data panel is explicitly read-only and development-only", () =>
 
 test("strategy center governs company results and department commitments", () => {
   const page = read("src/features/strategy/StrategyCenterPage.jsx");
+  const strategyModal = read("src/features/strategy/StrategyEditorModal.jsx");
   const resultModal = read("src/features/strategy/RequiredResultModal.jsx");
   const commitmentModal = read("src/features/strategy/DepartmentCommitmentModal.jsx");
   assert.match(page, /公司战略/);
@@ -66,8 +68,24 @@ test("strategy center governs company results and department commitments", () =>
   assert.match(page, /部门承诺/);
   assert.match(resultModal, /验收标准/);
   assert.match(commitmentModal, /月度里程碑/);
+  assert.match(commitmentModal, /requiredResultId/);
+  assert.match(commitmentModal, /关联必达结果/);
+  assert.match(commitmentModal, /item\.strategyId === form\.strategyId/);
+  assert.match(page, /requiredResults=\{state\.requiredResults/);
+  assert.match(page, /待关联必达结果/);
+  assert.match(page, /任务进度/);
   assert.match(page, /总经办审核/);
   assert.match(page, /老板确认/);
+  assert.match(page, /新建公司战略/);
+  assert.match(page, /StrategyEditorModal/);
+  assert.match(page, /saveStrategy/);
+  assert.match(page, /archiveStrategy/);
+  assert.match(page, /archiveRequiredResult/);
+  assert.match(page, /archiveDepartmentCommitment/);
+  assert.match(page, /ConfirmDialog/);
+  assert.doesNotMatch(page, /attainment-rule/);
+  assert.doesNotMatch(page, /达成规则：全部必达结果核验通过/);
+  assert.match(strategyModal, /战略意图/);
 });
 
 test("key project workspace manages milestones risks and decisions", () => {
@@ -77,6 +95,10 @@ test("key project workspace manages milestones risks and decisions", () => {
   assert.match(detail, /关键里程碑/);
   assert.match(detail, /风险与阻塞/);
   assert.match(detail, /待决策/);
+  assert.match(page, /archiveProject/);
+  assert.match(detail, /archiveProjectChild/);
+  assert.match(detail, /编辑里程碑/);
+  assert.match(detail, /归档风险/);
 });
 
 test("operating reviews retain weekly updates and monthly snapshots", () => {
@@ -87,12 +109,17 @@ test("operating reviews retain weekly updates and monthly snapshots", () => {
   assert.match(modal, /本周关键变化/);
   assert.match(modal, /当前最大风险/);
   assert.match(modal, /需要协调或决策/);
+  assert.match(page, /archiveMonthlyReport/);
+  assert.match(page, /archiveStatusUpdate/);
+  assert.match(page, /saveStatusUpdate/);
+  assert.match(page, /ConfirmDialog/);
 });
 
-test("business App center keeps Product Lifecycle as the first connected App", () => {
+test("business App center exposes App freshness and collaboration health", () => {
   const page = read("src/features/platform/AppCenterPage.jsx");
-  assert.match(page, /产品全周期/);
   assert.match(page, /数据新鲜度/);
+  assert.match(page, /AppCollaborationHealth/);
+  assert.match(page, /未关闭协同/);
   assert.match(page, /打开 App/);
 });
 

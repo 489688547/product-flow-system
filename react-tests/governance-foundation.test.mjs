@@ -49,7 +49,7 @@ test("handbook, product, and platform source documents are present", () => {
 
 test("governance checker accepts the repository and rejects incomplete feature docs", async () => {
   const { checkProjectGovernance, REQUIRED_REPOSITORY_FILES } = await import("../scripts/check-project-governance.mjs");
-  for (const skill of ["feature-workflow", "verification", "platform-capability-review"]) {
+  for (const skill of ["feature-workflow", "verification", "platform-capability-review", "environment-parity"]) {
     const path = `.agents/skills/${skill}/SKILL.md`;
     assert.equal(REQUIRED_REPOSITORY_FILES.includes(path), true, `${path} should be governed`);
     assert.match(read(path), /AGENTS\.md/);
@@ -71,6 +71,34 @@ test("governance checker accepts the repository and rejects incomplete feature d
   } finally {
     rmSync(fixture, { recursive: true, force: true });
   }
+});
+
+test("environment parity skill is mandatory, discoverable, and wired into delivery", () => {
+  const skillPath = ".agents/skills/environment-parity/SKILL.md";
+  const skill = read(skillPath);
+  const agents = read("AGENTS.md");
+  const featureWorkflow = read(".agents/skills/feature-workflow/SKILL.md");
+  const verification = read(".agents/skills/verification/SKILL.md");
+  const introduction = read("docs/platform/environment-parity-skill.md");
+  const pullRequestTemplate = read(".github/pull_request_template.md");
+
+  assert.match(skill, /^---\nname: environment-parity\ndescription: Use when /);
+  assert.match(skill, /environment-capabilities\.json/);
+  assert.match(skill, /integration-router/);
+  assert.match(skill, /check:environment-capabilities/);
+  assert.match(skill, /verify:production/);
+  assert.match(skill, /生产数据库写入权.*外部平台/);
+  assert.match(skill, /反写/);
+  assert.match(skill, /--require-platform/);
+  assert.match(skill, /Rule-Writeback/);
+  assert.match(agents, /environment-parity\/SKILL\.md/);
+  assert.match(featureWorkflow, /environment-parity/);
+  assert.match(verification, /verify:production/);
+  assert.match(introduction, /解决什么问题/);
+  assert.match(introduction, /框架/);
+  assert.match(introduction, /如何确保使用/);
+  assert.match(pullRequestTemplate, /Rule-Writeback:/);
+  assert.match(pullRequestTemplate, /Rule-Writeback-Reason:/);
 });
 
 test("package exposes the repository lint gate", () => {

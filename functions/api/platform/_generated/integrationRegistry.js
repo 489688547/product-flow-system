@@ -36,6 +36,7 @@ const integrationRegistry = {
       "codePaths": [
         "functions/api/dingtalk/**",
         "functions/api/auth/dingtalk/**",
+        "functions/api/platform/v1/collaboration-items/**/dingtalk.js",
         "src/state/dingtalk*.js",
         "src/features/**/DingTalk*.jsx",
         "server.mjs"
@@ -53,7 +54,8 @@ const integrationRegistry = {
       ],
       "apiRoutes": [
         "/api/dingtalk/",
-        "/api/auth/dingtalk/"
+        "/api/auth/dingtalk/",
+        "/api/platform/v1/collaboration-items/:id/dingtalk"
       ],
       "publicDocs": [
         {
@@ -63,7 +65,8 @@ const integrationRegistry = {
       ],
       "evidence": [
         "functions/api/dingtalk/",
-        "functions/api/auth/dingtalk/"
+        "functions/api/auth/dingtalk/",
+        "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js"
       ],
       "relations": [
         {
@@ -227,7 +230,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合和数据中心元数据。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、绩效和跨 App 协同记录。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
@@ -235,6 +238,9 @@ const integrationRegistry = {
         "销售聚合",
         "平台配置",
         "数据中心元数据",
+        "店铺运营记录",
+        "绩效记录",
+        "跨 App 协同",
         "生产写入审计",
         "写前快照"
       ],
@@ -243,6 +249,7 @@ const integrationRegistry = {
         "跨设备状态不同步",
         "数据库绑定缺失",
         "表结构或容量问题",
+        "跨部门事项如何留痕",
         "测试账号如何受控写生产数据",
         "生产写入如何回滚"
       ],
@@ -259,10 +266,16 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/**",
+        "functions/api/ecommerce-operations.js",
+        "functions/api/ecommerce-operations/**",
+        "functions/api/performance-management.js",
+        "functions/api/performance-management/**",
         "functions/api/auth/**",
         "functions/api/dingtalk/org/**",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/v1/production-data/**",
+        "functions/api/platform/v1/collaboration-items/**",
+        "functions/api/platform/v1/_shared/collaborationStorage.js",
         "migrations/**"
       ],
       "envVars": [
@@ -277,9 +290,12 @@ const integrationRegistry = {
         "/api/platform",
         "/api/sales",
         "/api/data-center",
+        "/api/ecommerce-operations",
+        "/api/performance-management",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/production-write-session",
-        "/api/platform/v1/production-data/"
+        "/api/platform/v1/production-data/",
+        "/api/platform/v1/collaboration-items"
       ],
       "publicDocs": [
         {
@@ -297,8 +313,15 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/",
+        "functions/api/ecommerce-operations.js",
+        "functions/api/ecommerce-operations/",
+        "functions/api/performance-management.js",
+        "functions/api/performance-management/",
         "functions/api/platform/_shared/productionDataAccess.js",
-        "migrations/0001_production_data_access.sql"
+        "functions/api/platform/v1/_shared/collaborationStorage.js",
+        "migrations/0001_production_data_access.sql",
+        "migrations/0002_business_data_apps.sql",
+        "migrations/0002_collaboration_execution.sql"
       ],
       "relations": [
         {
@@ -566,6 +589,63 @@ const integrationRegistry = {
       ]
     },
     {
+      "id": "ugreen-nas",
+      "name": "绿联 NAS / UGOS Pro",
+      "status": "planned",
+      "summary": "计划通过公司 Mac 的 SMB/WebDAV 挂载和只读索引器关联品牌内容素材；官方未提供 MCP Server，MCP 仅作为可选文件搜索入口。",
+      "capabilities": [
+        "SMB 文件访问",
+        "WebDAV 文件访问",
+        "Docker 应用",
+        "NAS 用户认证",
+        "素材目录索引"
+      ],
+      "businessQuestions": [
+        "品牌素材目录如何只读索引",
+        "NAS 离线和文件移动如何恢复",
+        "AI 文件搜索是否需要可选 MCP"
+      ],
+      "keywords": [
+        "绿联 NAS",
+        "UGREEN NAS",
+        "UGOS Pro",
+        "NAS",
+        "SMB",
+        "WebDAV",
+        "素材目录",
+        "文件索引"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [
+        "developer.ugnas.com",
+        "ugnas.com"
+      ],
+      "apiRoutes": [],
+      "publicDocs": [
+        {
+          "label": "绿联云开发者平台",
+          "url": "https://developer.ugnas.com/"
+        },
+        {
+          "label": "UGOS Pro Docker 应用开发",
+          "url": "https://developer.ugnas.com/en/doc/backend/quick-start/develop-docker-app.html"
+        },
+        {
+          "label": "绿联 NAS WebDAV 指南",
+          "url": "https://ai.ugreen.com/blogs/how-to/access-ugreen-nas-files-via-webdav"
+        }
+      ],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "oceanengine-qianchuan",
+          "type": "asset-to-performance",
+          "description": "NAS 内容资产通过内容主键和素材 ID 与投放表现关联，不能直接以文件名猜测归因。"
+        }
+      ]
+    },
+    {
       "id": "oceanengine-qianchuan",
       "name": "巨量引擎 / 巨量千川",
       "status": "planned",
@@ -609,6 +689,60 @@ const integrationRegistry = {
           "platformId": "xiaohongshu-open-platform",
           "type": "cross-channel-content",
           "description": "跨渠道素材分析需要区分平台内容与投放数据口径。"
+        }
+      ]
+    },
+    {
+      "id": "openai-responses",
+      "name": "OpenAI Responses API",
+      "status": "integrating",
+      "summary": "为电商店铺运营方案提供可选的服务端优化建议；未配置时明确降级为规则检查。",
+      "capabilities": [
+        "方案结构点评",
+        "问题与对策检查",
+        "监测指标建议"
+      ],
+      "businessQuestions": [
+        "AI 点评不可用",
+        "模型响应超时",
+        "建议是否替代主管审批",
+        "输入是否包含敏感字段"
+      ],
+      "keywords": [
+        "OpenAI",
+        "Responses API",
+        "AI 点评",
+        "智能建议",
+        "OPENAI_API_KEY"
+      ],
+      "codePaths": [
+        "functions/api/ecommerce-operations/ai-review.js"
+      ],
+      "envVars": [
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL"
+      ],
+      "domains": [
+        "api.openai.com",
+        "platform.openai.com"
+      ],
+      "apiRoutes": [
+        "/api/ecommerce-operations/ai-review"
+      ],
+      "publicDocs": [
+        {
+          "label": "OpenAI API 开发者快速入门",
+          "url": "https://platform.openai.com/docs/quickstart/make-your-first-api-request"
+        }
+      ],
+      "evidence": [
+        "functions/api/ecommerce-operations/ai-review.js"
+      ],
+      "relations": [
+        {
+          "platformId": "cloudflare-pages",
+          "type": "called-by",
+          "description": "Pages Function 从服务端调用 Responses API，密钥不进入浏览器。"
         }
       ]
     }

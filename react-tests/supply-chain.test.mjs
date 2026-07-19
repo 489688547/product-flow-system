@@ -125,6 +125,30 @@ test("latest ERP and physical stock use primary BOM cost without counting backup
   assert.equal(summary.byProduct[0].physicalInventoryValue, 240);
 });
 
+test("inventory snapshots with an exact SKU dynamically link to the product summary", () => {
+  const summary = buildSupplyChainSummary({
+    supplyState: normalizeSupplyChainState({
+      inventorySnapshots: [{
+        id: "dingtalk-row",
+        productId: "",
+        productName: "莓果粮",
+        skuCode: "6977173969783",
+        warehouse: "全仓汇总",
+        stocktakeDate: "2026-04-01",
+        erpQuantity: 10,
+        countedQuantity: 12,
+        sourceType: "dingtalk-stocktake-import"
+      }]
+    }),
+    products: [{ id: "p1", name: "莓果粮", skuCodes: [{ code: "6977173969783" }] }],
+    salesRows: []
+  });
+
+  assert.equal(summary.byProduct[0].erpInventoryQuantity, 10);
+  assert.equal(summary.byProduct[0].physicalInventoryQuantity, 12);
+  assert.equal(summary.byProduct[0].quantityVariance, 2);
+});
+
 test("inventory import validates product mapping and computes ERP variance", () => {
   const result = parseInventoryImportRows([
     { 商品编码: "6977173969783", 盘点数量: "12", ERP库存: "10", 库存金额: "240", 供应商编码: "SUP-1" },
@@ -231,4 +255,6 @@ test("reducer upserts records and keeps the normalized state shape", () => {
   assert.equal(updated.suppliers.length, 1);
   assert.equal(updated.suppliers[0].name, "杭州鲜宠食品有限公司");
   assert.ok(Array.isArray(updated.syncRuns));
+  assert.ok(Array.isArray(updated.materialInventorySnapshots));
+  assert.ok(Array.isArray(updated.inventoryRisks));
 });

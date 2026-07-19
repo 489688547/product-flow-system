@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { buildSupplyChainSummary } from "../../domain/supplyChain.js";
+import { buildSupplyChainSummary, isErpInventorySource, isPhysicalInventorySource } from "../../domain/supplyChain.js";
 import { canAccessCompanyPlatform } from "../../domain/permissions.js";
 import { fetchSalesForCodes } from "../../state/salesStore.js";
 import { useAuth } from "../../state/AuthProvider.jsx";
@@ -24,26 +24,42 @@ function latestDate(rows, keys) {
   return timestamps.length ? new Date(Math.max(...timestamps)).toLocaleString("zh-CN", { hour12: false }) : "尚未同步";
 }
 
+function syncRunType(row) {
+  return row.type === "dingtalk-inventory-docs" ? "钉钉库存文件" : "钉钉采购/付款审批";
+}
+
+function syncRunResult(row) {
+  if (row.status !== "success") return row.message || "同步失败";
+  if (row.type === "dingtalk-inventory-docs") {
+    const finished = Number(row.counts?.stocktake || 0) + Number(row.counts?.["finished-lanshan"] || 0) + Number(row.counts?.["finished-shanxi"] || 0);
+    const materials = Number(row.counts?.["materials-lanshan"] || 0) + Number(row.counts?.["materials-shanxi"] || 0);
+    return `成品 ${finished} · 原辅料 ${materials} · 异常 ${Number(row.counts?.risks || 0)}`;
+  }
+  return `采购 ${row.counts?.purchase || 0} · 付款 ${row.counts?.payment || 0} · 待映射 ${row.counts?.unmapped || 0} · 过滤 ${row.counts?.skipped || 0}`;
+}
+
 function SyncRecordsWorkspace({ salesRows }) {
   const { state } = useSupplyChain();
   const successfulApprovals = state.syncRuns.filter(row => row.type === "dingtalk-approvals" && row.status === "success");
-  const erpSnapshots = state.inventorySnapshots.filter(row => row.sourceType === "kuaimai-import");
-  const stocktakes = state.inventorySnapshots.filter(row => row.sourceType !== "kuaimai-import" && row.countedQuantity !== null && row.countedQuantity !== undefined);
+  const erpSnapshots = state.inventorySnapshots.filter(row => isErpInventorySource(row.sourceType));
+  const stocktakes = state.inventorySnapshots.filter(row => isPhysicalInventorySource(row.sourceType) && row.countedQuantity !== null && row.countedQuantity !== undefined);
   const sources = [
     { name: "供应商档案", role: "钉钉供应链文件夹的名称、类别与供货范围", status: state.suppliers.length ? "文件快照" : "待导入", count: `${state.suppliers.length} 家供应商`, updatedAt: latestDate(state.suppliers, ["importedAt", "updatedAt"]) },
     { name: "钉钉审批", role: "采购申请、付款审批与关联关系", status: successfulApprovals.length ? "已连接" : "待首次同步", count: `${state.purchaseApprovals.length} 张采购 · ${state.paymentApprovals.length} 张付款`, updatedAt: latestDate(successfulApprovals, ["completedAt"]) },
     { name: "快麦销售成本", role: "SKU 销量与库存消耗", status: salesRows.length ? "已读取" : "待导入 / 同步", count: `${salesRows.length} 条成本记录`, updatedAt: salesRows.length ? "随销售数据刷新" : "尚无数据" },
     { name: "ERP库存快照", role: "SKU × 仓库当前库存", status: erpSnapshots.length ? "文件快照" : "待导入", count: `${erpSnapshots.length} 条库存记录`, updatedAt: latestDate(erpSnapshots, ["stocktakeDate", "importedAt"]) },
     { name: "盘点导入", role: "ERP 与实盘数量及金额校准", status: stocktakes.length ? "已校准" : "待盘点", count: `${stocktakes.length} 条盘点记录`, updatedAt: latestDate(stocktakes, ["stocktakeDate", "importedAt"]) },
+    { name: "原辅料库存", role: "产品 × 物料 × 仓库的数量与金额", status: state.materialInventorySnapshots.length ? "文件快照" : "待导入", count: `${state.materialInventorySnapshots.length} 条物料记录`, updatedAt: latestDate(state.materialInventorySnapshots, ["snapshotDate", "importedAt"]) },
+    { name: "异常库存", role: "可售天数、预计到货与异常处理", status: state.inventoryRisks.some(row => row.status === "active") ? "有待处理" : state.inventoryRisks.length ? "已记录" : "待导入", count: `${state.inventoryRisks.filter(row => row.status === "active").length} 条处理中`, updatedAt: latestDate(state.inventoryRisks, ["importedAt"]) },
     { name: "质量导入", role: "差评、抽检、整改与验证", status: state.qualityImportBatches.length ? "文件快照" : "待导入", count: `${state.qualityIssues.length} 个质量事件`, updatedAt: latestDate(state.qualityImportBatches, ["importedAt"]) }
   ];
   const columns = [
     { key: "time", header: "执行时间", render: row => row.completedAt ? new Date(row.completedAt).toLocaleString("zh-CN", { hour12: false }) : "—" },
-    { key: "type", header: "类型", render: () => "钉钉采购/付款审批" },
+    { key: "type", header: "类型", render: row => syncRunType(row) },
     { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : "danger"}`}>{row.status === "success" ? "成功" : "失败"}</span> },
-    { key: "counts", header: "结果", render: row => row.status === "success" ? `采购 ${row.counts?.purchase || 0} · 付款 ${row.counts?.payment || 0} · 待映射 ${row.counts?.unmapped || 0} · 过滤 ${row.counts?.skipped || 0}` : row.message || "同步失败" }
+    { key: "counts", header: "结果", render: row => syncRunResult(row) }
   ];
-  return <div className="supply-work-grid"><section className="section-panel"><div className="section-head"><div><h2>数据源中心</h2><p>每个数字都标明来源和新鲜度；快麦库存接口验证前只显示文件快照，不伪装自动同步。</p></div></div><div className="supply-source-grid">{sources.map(source => <article key={source.name}><div><strong>{source.name}</strong><span className="status-badge neutral">{source.status}</span></div><p>{source.role}</p><b>{source.count}</b><small>最近更新：{source.updatedAt}</small></article>)}</div></section><section className="section-panel"><div className="section-head"><div><h2>钉钉同步记录</h2><p>保留每次采购与付款审批读取结果，失败不覆盖上次成功数据。</p></div></div><DataTable minWidth={680} columns={columns} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有执行过审批同步。</div>} /></section></div>;
+  return <div className="supply-work-grid"><section className="section-panel"><div className="section-head"><div><h2>数据源中心</h2><p>每个数字都标明来源和新鲜度；快麦库存接口验证前只显示文件快照，不伪装自动同步。</p></div></div><div className="supply-source-grid">{sources.map(source => <article key={source.name}><div><strong>{source.name}</strong><span className="status-badge neutral">{source.status}</span></div><p>{source.role}</p><b>{source.count}</b><small>最近更新：{source.updatedAt}</small></article>)}</div></section><section className="section-panel"><div className="section-head"><div><h2>钉钉同步记录</h2><p>保留审批和库存文件的读取结果，失败不覆盖上次成功数据。</p></div></div><DataTable minWidth={680} columns={columns} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有执行过数据同步。</div>} /></section></div>;
 }
 
 function SupplySettingsWorkspace({ canEdit }) {

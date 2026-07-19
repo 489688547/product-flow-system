@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  checkRuleWriteback,
   checkIntegrationImpact,
+  isIntegrationCodePath,
   loadIntegrationRegistry,
   matchIntegrationPlatforms,
   parseIntegrationImpact,
@@ -107,6 +109,15 @@ test("router keeps ambiguous candidates instead of silently choosing one", () =>
   assert.equal(result.ambiguous, true);
 });
 
+test("integration content routing ignores generated Pages assets but keeps source code", () => {
+  assert.equal(isIntegrationCodePath("assets/HandbookPage-QWj1s2m5.js"), false);
+  assert.equal(isIntegrationCodePath("assets/index-DJmNTJZv.js"), false);
+  assert.equal(isIntegrationCodePath("react-tests/integration-routing.test.mjs"), false);
+  assert.equal(isIntegrationCodePath("tests/deployed-readiness.test.mjs"), false);
+  assert.equal(isIntegrationCodePath("src/features/handbook/HandbookPage.jsx"), true);
+  assert.equal(isIntegrationCodePath("functions/api/platform/v1/example.js"), true);
+});
+
 test("PR impact parser reads machine-readable fields", () => {
   assert.deepEqual(parseIntegrationImpact(`
 ## 变更
@@ -174,4 +185,38 @@ test("none is allowed only with a reason and no mandatory path matches", () => {
     paths: ["functions/api/kuaimai/pull.js"],
     body: "Integration-Impact: none\nIntegration-Impact-Reason: 没有外部影响"
   }).errors.some(error => error.includes("kuaimai")));
+});
+
+test("shared boundary changes require an explicit durable rule write-back", () => {
+  const missing = checkRuleWriteback({
+    paths: ["functions/api/platform/v1/example.js"],
+    body: "Rule-Writeback: none\nRule-Writeback-Reason: 只是一个功能实现，不需要更新长期规则"
+  });
+  assert.ok(missing.errors.some(error => error.includes("长期规则")));
+
+  const accepted = checkRuleWriteback({
+    paths: ["functions/api/platform/v1/example.js", "docs/platform/api-catalog.md"],
+    body: [
+      "Rule-Writeback: docs/platform/api-catalog.md",
+      "Rule-Writeback-Reason: 共享 API 契约已同步到平台目录"
+    ].join("\n")
+  });
+  assert.deepEqual(accepted.errors, []);
+});
+
+test("every pull request declares rule write-back and only names changed durable files", () => {
+  assert.ok(checkRuleWriteback({
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: ""
+  }).errors.some(error => error.includes("Rule-Writeback")));
+
+  assert.ok(checkRuleWriteback({
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: "Rule-Writeback: docs/platform/api-catalog.md\nRule-Writeback-Reason: 已更新目录"
+  }).errors.some(error => error.includes("未在本 PR 变更")));
+
+  assert.deepEqual(checkRuleWriteback({
+    paths: ["src/features/handbook/HandbookPage.jsx"],
+    body: "Rule-Writeback: none\nRule-Writeback-Reason: 仅调整现有手册布局，没有改变共享契约"
+  }).errors, []);
 });

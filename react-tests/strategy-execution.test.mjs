@@ -7,11 +7,170 @@ import {
   buildMonthlyTrend,
   createDefaultPlatformState,
   metricHealth,
+  migratePlatformState,
   normalizePlatformState,
   objectiveHealth,
   projectHealth,
   reducePlatformState
 } from "../src/domain/strategyExecution.js";
+
+test("v2 strategy data migrates the DingTalk annual plan into v4 without losing user records", () => {
+  const migrated = migratePlatformState({
+    version: "strategy-platform-v2",
+    strategies: [
+      { id: "strategy-organization-2026", name: "旧组织目标", status: "at_risk", createdAt: "2026-01-02" },
+      { id: "strategy-user-created", name: "用户自建战略", status: "active" }
+    ],
+    requiredResults: [{ id: "result-user-created", strategyId: "strategy-user-created", title: "用户结果" }],
+    departmentCommitments: [],
+    commitmentMilestones: []
+  });
+
+  assert.equal(migrated.version, "strategy-platform-v4");
+  assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").name, "组织建设全面加强");
+  assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").status, "at_risk");
+  assert.equal(migrated.strategies.find(item => item.id === "strategy-organization-2026").createdAt, "2026-01-02");
+  assert.equal(migrated.strategies.some(item => item.id === "strategy-user-created"), true);
+  assert.equal(migrated.requiredResults.some(item => item.id === "result-org-review-cadence"), true);
+  assert.equal(migrated.requiredResults.some(item => item.id === "result-hamster-brand-decisions"), true);
+  assert.equal(migrated.requiredResults.some(item => item.id === "result-user-created"), true);
+  assert.equal(migrated.departmentCommitments.some(item => item.id === "commitment-brand-ip-2026"), true);
+  assert.equal(migrated.departmentCommitments.some(item => item.id === "commitment-ops-channel-2026"), true);
+  assert.equal(migrated.commitmentMilestones.some(item => item.commitmentId === "commitment-ops-channel-2026"), true);
+  assert.equal(migrated.departmentCommitments.find(item => item.id === "commitment-ops-data-2026").requiredResultId, "result-org-data");
+});
+
+test("v3 commitments migrate to v4 required-result links without guessing custom records", () => {
+  const current = {
+    version: "strategy-platform-v3",
+    strategies: [{ id: "strategy-organization-2026", name: "我修改后的战略名称" }],
+    requiredResults: [],
+    departmentCommitments: [
+      { id: "commitment-ops-data-2026", strategyId: "strategy-organization-2026" },
+      { id: "custom", strategyId: "strategy-organization-2026" }
+    ],
+    commitmentMilestones: []
+  };
+  const migrated = migratePlatformState(current);
+  assert.equal(migrated.version, "strategy-platform-v4");
+  assert.equal(migrated.strategies[0].name, "我修改后的战略名称");
+  assert.equal(migrated.departmentCommitments[0].requiredResultId, "result-org-data");
+  assert.equal(migrated.departmentCommitments[1].requiredResultId, undefined);
+});
+
+test("v4 strategy migration is idempotent and preserves later edits", () => {
+  const current = {
+    version: "strategy-platform-v4",
+    strategies: [{ id: "strategy-organization-2026", name: "我修改后的战略名称" }],
+    requiredResults: [],
+    departmentCommitments: [{ id: "commitment-ops-data-2026", requiredResultId: "my-result" }],
+    commitmentMilestones: []
+  };
+  assert.equal(migratePlatformState(current), current);
+});
+
+test("strategy archive blocks active dependencies and cascades required results", () => {
+  const blocked = normalizePlatformState({
+    version: "strategy-platform-v3",
+    strategies: [{ id: "s1", name: "增长" }],
+    requiredResults: [{ id: "r1", strategyId: "s1", title: "结果" }],
+    departmentCommitments: [{ id: "c1", strategyId: "s1", status: "active" }]
+  });
+  assert.throws(() => reducePlatformState(blocked, { type: "archive_strategy", id: "s1", actor: "周总" }), /部门承诺/);
+
+  const objectiveLinked = normalizePlatformState({
+    ...blocked,
+    departmentCommitments: [],
+    objectives: [{ id: "o1", strategyId: "s1" }],
+    projects: [{ id: "p1", objectiveId: "o1", status: "active" }]
+  });
+  assert.throws(() => reducePlatformState(objectiveLinked, { type: "archive_strategy", id: "s1", actor: "周总" }), /重点项目/);
+
+  const archived = reducePlatformState({ ...blocked, departmentCommitments: [] }, {
+    type: "archive_strategy",
+    id: "s1",
+    actor: "周总",
+    reason: "年度调整",
+    timestamp: "2026-07-17T08:00:00.000Z"
+  });
+  assert.equal(archived.strategies[0].archived, true);
+  assert.equal(archived.requiredResults[0].archived, true);
+  assert.equal(archived.strategies[0].archivedBy, "周总");
+  assert.equal(archived.auditLogs[0].action, "archive");
+  assert.equal(archived.auditLogs[0].reason, "年度调整");
+});
+
+test("required result archive blocks linked unarchived department tasks", () => {
+  const linked = normalizePlatformState({
+    requiredResults: [{ id: "r1", strategyId: "s1", title: "必达结果" }],
+    departmentCommitments: [{ id: "c1", strategyId: "s1", requiredResultId: "r1", status: "draft" }]
+  });
+  assert.throws(() => reducePlatformState(linked, { type: "archive_required_result", id: "r1" }), /部门任务/);
+
+  const archivedTask = normalizePlatformState({
+    ...linked,
+    departmentCommitments: [{ ...linked.departmentCommitments[0], archived: true }]
+  });
+  const archivedResult = reducePlatformState(archivedTask, { type: "archive_required_result", id: "r1", actor: "周总" });
+  assert.equal(archivedResult.requiredResults[0].archived, true);
+});
+
+test("governed records only archive in safe workflow states", () => {
+  const base = normalizePlatformState({
+    version: "strategy-platform-v3",
+    departmentCommitments: [{ id: "draft-commitment", status: "draft" }, { id: "active-commitment", status: "active" }],
+    commitmentMilestones: [{ id: "commitment-milestone-1", commitmentId: "draft-commitment" }],
+    incentiveProjects: [{ id: "draft-incentive", status: "draft" }, { id: "active-incentive", status: "active" }],
+    monthlyReports: [{ id: "draft-report", status: "draft" }, { id: "submitted-report", status: "submitted" }]
+  });
+  const commitment = reducePlatformState(base, { type: "archive_department_commitment", id: "draft-commitment", actor: "周总" });
+  assert.equal(commitment.departmentCommitments.find(item => item.id === "draft-commitment").archived, true);
+  assert.equal(commitment.commitmentMilestones[0].archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_department_commitment", id: "active-commitment" }), /草稿或退回/);
+  const incentive = reducePlatformState(base, { type: "archive_incentive_project", id: "draft-incentive", actor: "周总" });
+  assert.equal(incentive.incentiveProjects.find(item => item.id === "draft-incentive").archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_incentive_project", id: "active-incentive" }), /草稿或已取消/);
+  const report = reducePlatformState(base, { type: "archive_monthly_report", id: "draft-report", actor: "周总" });
+  assert.equal(report.monthlyReports.find(item => item.id === "draft-report").archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_monthly_report", id: "submitted-report" }), /草稿月报/);
+});
+
+test("closed incentives and frozen monthly reports are immutable", () => {
+  const base = normalizePlatformState({
+    version: "strategy-platform-v3",
+    incentiveProjects: [{ id: "closed-incentive", name: "已结项", status: "closed" }],
+    monthlyReports: [{ id: "frozen-report", month: "2026-06", status: "frozen", keyResults: "原始成果" }]
+  });
+  assert.throws(() => reducePlatformState(base, { type: "upsert_incentive_project", record: { id: "closed-incentive", name: "被修改" } }), /已结项/);
+  assert.throws(() => reducePlatformState(base, { type: "upsert_monthly_report", record: { id: "frozen-report", keyResults: "被覆盖" } }), /已冻结/);
+});
+
+test("project archive cascades children while project child and weekly updates archive independently", () => {
+  const base = normalizePlatformState({
+    version: "strategy-platform-v3",
+    projects: [{ id: "p1", name: "重点项目" }],
+    milestones: [{ id: "m1", projectId: "p1" }],
+    risks: [{ id: "risk1", projectId: "p1" }],
+    decisionRequests: [{ id: "d1", projectId: "p1", dingTodo: { id: "ding-1" } }],
+    statusUpdates: [{ id: "u1", projectId: "p1", owner: "项目负责人" }]
+  });
+  const child = reducePlatformState(base, { type: "archive_project_child", collection: "risks", id: "risk1", actor: "周总" });
+  assert.equal(child.risks[0].archived, true);
+  assert.throws(() => reducePlatformState(base, { type: "archive_project_child", collection: "strategies", id: "p1" }), /不支持/);
+
+  const archived = reducePlatformState(base, { type: "archive_project", id: "p1", actor: "周总" });
+  assert.equal(archived.projects[0].archived, true);
+  assert.equal(archived.milestones[0].archived, true);
+  assert.equal(archived.risks[0].archived, true);
+  assert.equal(archived.decisionRequests[0].archived, true);
+  assert.equal(archived.decisionRequests[0].dingTodo.id, "ding-1");
+
+  const weekly = reducePlatformState(base, { type: "archive_status_update", id: "u1", actor: "项目负责人" });
+  assert.equal(weekly.statusUpdates[0].archived, true);
+  const edited = reducePlatformState(base, { type: "upsert_status_update", record: { ...base.statusUpdates[0], change: "已完成投放复盘" }, actor: "项目负责人" });
+  assert.equal(edited.statusUpdates[0].change, "已完成投放复盘");
+  assert.equal(edited.auditLogs[0].action, "update");
+});
 
 test("severe child health cannot be averaged away", () => {
   assert.equal(aggregateHealth(["normal", "off_track", "completed"]), "off_track");

@@ -1,5 +1,7 @@
 import { getDingCredentials, jsonResponse } from "../../dingtalk/_shared/dingtalk.js";
 
+const PRODUCTION_ORIGIN = "https://product-flow-system.pages.dev";
+
 function randomState() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let binary = "";
@@ -18,10 +20,25 @@ function safeReturnTo(value = "") {
 
 export async function onRequest({ request, env }) {
   if (request.method !== "GET") return jsonResponse({ message: "Method not allowed" }, 405);
+  const requestUrl = new URL(request.url);
+  if (
+    requestUrl.hostname.endsWith(".product-flow-system.pages.dev")
+    && requestUrl.origin !== PRODUCTION_ORIGIN
+  ) {
+    const productionStart = new URL("/api/auth/dingtalk/start", PRODUCTION_ORIGIN);
+    const returnTo = safeReturnTo(requestUrl.searchParams.get("returnTo"));
+    if (returnTo) productionStart.searchParams.set("returnTo", returnTo);
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: productionStart.toString(),
+        "cache-control": "no-store"
+      }
+    });
+  }
   const { appKey, missing } = getDingCredentials(env);
   if (missing.length) return jsonResponse({ message: `缺少钉钉应用配置：${missing.join("、")}` }, 501);
 
-  const requestUrl = new URL(request.url);
   const origin = requestUrl.origin;
   const returnTo = safeReturnTo(requestUrl.searchParams.get("returnTo"));
   const state = randomState();

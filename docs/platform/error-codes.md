@@ -31,10 +31,11 @@
 | `DINGTALK_` | 钉钉授权和接口调用 | `DINGTALK_PERMISSION_MISSING` |
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
+| `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
+| `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
-| `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -45,6 +46,26 @@
 - `INTEGRATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定，公开资料仍可降级展示。
 - `VALIDATION_METHOD_NOT_ALLOWED`：请求方法不受支持。
 
+部门协同 API 使用：
+
+- `PERMISSION_READ_DENIED`：当前身份不能读取请求范围。
+- `PERMISSION_WRITE_DENIED`：当前身份不能执行写操作或状态动作。
+- `COLLABORATION_ITEM_INVALID`：字段、身份、来源、时间或证据不符合契约。
+- `COLLABORATION_TRANSITION_INVALID`：当前状态或角色不能执行请求动作。
+- `COLLABORATION_ITEM_NOT_FOUND`：事项不存在或对当前用户不可见。
+- `COLLABORATION_VERSION_CONFLICT`：读取版本已经过期，写入未执行。
+- `COLLABORATION_IDEMPOTENCY_CONFLICT`：同一幂等键与现有业务来源不一致。
+- `COLLABORATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定或协同表写入不可用。
+- `DINGTALK_TODO_SYNC_FAILED`：协同状态已保存，但钉钉待办同步失败。
+
+数据中心 API 使用：
+
+- `AUTH_SESSION_REQUIRED`：没有有效公司会话。
+- `PERMISSION_VIEW_DENIED`：当前部门无权查看数据中心。
+- `PERMISSION_WRITE_DENIED`：当前身份不能维护数据中心元数据。
+- `DATA_STATE_INVALID`：提交的元数据状态结构无效。
+- `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
+- `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 生产数据与环境 API 使用：
 
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。
@@ -55,15 +76,6 @@
 - `PRODUCTION_SNAPSHOT_NOT_FOUND` / `PRODUCTION_ROLLBACK_NOT_AVAILABLE`：写前快照不存在或不可回滚。
 - `ENVIRONMENT_READINESS_FAILED`：环境能力检查失败。
 - `EXTERNAL_ACTION_DISABLED_IN_TEST`：本地测试试图执行真实外部平台写操作。
-
-数据中心 API 使用：
-
-- `AUTH_SESSION_REQUIRED`：没有有效公司会话。
-- `PERMISSION_VIEW_DENIED`：当前部门无权查看数据中心。
-- `PERMISSION_WRITE_DENIED`：当前身份不能维护数据中心元数据。
-- `DATA_STATE_INVALID`：提交的元数据状态结构无效。
-- `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
-- `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 
 ## HTTP 状态
 

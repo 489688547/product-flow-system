@@ -30,6 +30,16 @@ import {
 import { syncSupplyApprovals } from "./functions/api/supply-chain/approvals/sync.js";
 import { normalizeSupplyChainState } from "./src/domain/supplyChain.js";
 import { normalizeDataCenterState } from "./src/domain/dataCenter.js";
+import {
+  applyCollaborationTransition,
+  filterCollaborationItems,
+  normalizeCollaborationDraft
+} from "./src/domain/collaboration.js";
+import {
+  validateCreateInput,
+  validatePatchInput,
+  validateTransitionInput
+} from "./functions/api/platform/v1/_shared/collaborationValidation.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.DINGTALK_PORT || 8127);
@@ -37,8 +47,19 @@ const LOCAL_DATA_DIR = path.join(__dirname, ".local-data");
 const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 const LOCAL_SUPPLY_STATE_PATH = path.join(LOCAL_DATA_DIR, "supply-chain-state.json");
 const LOCAL_DATA_CENTER_STATE_PATH = path.join(LOCAL_DATA_DIR, "data-center-state.json");
+const LOCAL_COLLABORATION_PATH = path.join(LOCAL_DATA_DIR, "collaboration-items.json");
 let orgCache = null;
 let productionDataClient;
+
+const LOCAL_COLLABORATION_ACTOR = {
+  userId: "u-zhou",
+  unionId: "union-zhou",
+  name: "周荣庆",
+  departmentIds: ["exec"],
+  departmentNames: ["总经办"],
+  executive: true,
+  readonly: false
+};
 
 loadDotEnv();
 productionDataClient = createProductionDataClient({
@@ -62,7 +83,7 @@ function json(res, status, body) {
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
-    "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
+    "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "access-control-allow-headers": "content-type"
   });
   res.end(JSON.stringify(body));
@@ -128,6 +149,293 @@ async function writeLocalDataCenterState(state, updatedBy = "") {
   await mkdir(LOCAL_DATA_DIR, { recursive: true });
   await writeFile(LOCAL_DATA_CENTER_STATE_PATH, JSON.stringify(payload, null, 2));
   return payload;
+}
+
+function relativeIso(days, hour = 18) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  date.setHours(hour, 0, 0, 0);
+  return date.toISOString();
+}
+
+function localCollaborationIdentity() {
+  return {
+    requesterUser: {
+      userId: LOCAL_COLLABORATION_ACTOR.userId,
+      unionId: LOCAL_COLLABORATION_ACTOR.unionId,
+      name: LOCAL_COLLABORATION_ACTOR.name
+    },
+    requesterDepartment: { id: "exec", name: "总经办" }
+  };
+}
+
+function localCollaborationSeed() {
+  const now = new Date().toISOString();
+  const executive = localCollaborationIdentity().requesterUser;
+  const definitions = [
+    {
+      id: "demo-decision-douyin",
+      idempotencyKey: "demo:decision:douyin-budget",
+      kind: "decision",
+      title: "抖音投流优化方案需要确认增量预算",
+      description: "增长组已完成两轮素材与人群测试，继续放量前需要确认预算上限。",
+      requestedAction: "确认采用推荐方案并批准下一阶段预算。",
+      impactLevel: "high",
+      businessImpact: "若本周不决策，将错过当前素材起量窗口。",
+      status: "pending_acceptance",
+      requesterUser: { userId: "u-growth", unionId: "union-growth", name: "李晴" },
+      requesterDepartment: { id: "growth", name: "增长部" },
+      ownerDepartment: { id: "exec", name: "总经办" },
+      decisionOwner: executive,
+      partnerDepartments: [{ id: "brand", name: "品牌内容部" }],
+      dueAt: relativeIso(2),
+      source: { appId: "brand-content", entityType: "campaign", entityId: "douyin-q3", sourceRecordId: "douyin-q3", sourceRoute: "#/content-review", sourceLabel: "品牌内容 · 抖音投流优化" },
+      strategyLinks: { strategyId: "growth", projectId: "douyin-investment" }
+    },
+    {
+      id: "demo-risk-supply",
+      idempotencyKey: "demo:risk:supply-delay",
+      kind: "risk",
+      title: "鹦鹉谷物棒首批包材交期存在延误风险",
+      description: "供应商交期较原计划晚三天，可能影响首批排产。",
+      requestedAction: "协调供应商锁定补救交期，并同步销售侧是否调整首发节奏。",
+      impactLevel: "high",
+      businessImpact: "若不能在两天内恢复，将影响新品首发和投流计划。",
+      status: "blocked",
+      requesterUser: { userId: "u-product", unionId: "union-product", name: "陈薇" },
+      requesterDepartment: { id: "product", name: "产品部" },
+      ownerUser: executive,
+      ownerDepartment: { id: "exec", name: "总经办" },
+      partnerDepartments: [{ id: "supply", name: "供应链部" }, { id: "sales", name: "销售部" }],
+      dueAt: relativeIso(-1),
+      blockedReason: "供应商尚未给出可承诺的新交期。",
+      coordinationNeed: "需要总经办协调供应链与销售共同确认补救方案。",
+      blockedAt: relativeIso(-2, 10),
+      source: { appId: "supply-chain", entityType: "quality_issue", entityId: "parrot-bar-packaging", sourceRecordId: "parrot-bar-packaging", sourceRoute: "#/supply-chain", sourceLabel: "供应链 · 鹦鹉谷物棒" },
+      strategyLinks: { strategyId: "product", requiredResultId: "new-product-launch" }
+    },
+    {
+      id: "demo-handoff-product",
+      idempotencyKey: "demo:handoff:launch-material",
+      kind: "handoff",
+      title: "新品上市素材需求等待总经办确认优先级",
+      description: "产品部已提交上市节奏，品牌内容部需要明确资源排序。",
+      requestedAction: "确认该新品是否进入本月重点资源位，并指定牵头人。",
+      impactLevel: "medium",
+      businessImpact: "影响新品上市素材交付时间和渠道启动。",
+      status: "pending_acceptance",
+      requesterUser: { userId: "u-product", unionId: "union-product", name: "陈薇" },
+      requesterDepartment: { id: "product", name: "产品部" },
+      ownerDepartment: { id: "exec", name: "总经办" },
+      partnerDepartments: [{ id: "brand", name: "品牌内容部" }],
+      dueAt: relativeIso(4),
+      source: { appId: "product-flow", entityType: "product_task", entityId: "launch-material", sourceRecordId: "launch-material", sourceRoute: "#/progress", sourceLabel: "产品全周期 · 新品上市" },
+      strategyLinks: { strategyId: "product" }
+    },
+    {
+      id: "demo-data-verification",
+      idempotencyKey: "demo:data:gmv-definition",
+      kind: "data_issue",
+      title: "月度汇报 GMV 口径已完成修正，等待验收",
+      description: "数据中心已统一创建时间口径并排除其它渠道。",
+      requestedAction: "核对本月汇报数字与经营口径是否一致。",
+      impactLevel: "medium",
+      businessImpact: "决定月度经营复盘中的核心数据是否可信。",
+      status: "pending_verification",
+      requesterUser: executive,
+      requesterDepartment: { id: "exec", name: "总经办" },
+      ownerUser: { userId: "u-data", unionId: "union-data", name: "王衡" },
+      ownerDepartment: { id: "data", name: "数据中心" },
+      partnerDepartments: [],
+      dueAt: relativeIso(1),
+      completionSummary: "已按订单创建时间重算，并完成异常渠道排除。",
+      submittedAt: now,
+      source: { appId: "data-center", entityType: "data_quality", entityId: "monthly-gmv", sourceRecordId: "monthly-gmv", sourceRoute: "#/data-center", sourceLabel: "数据中心 · 月度经营数据" }
+    }
+  ];
+  const items = definitions.map(definition => normalizeCollaborationDraft({
+    ...definition,
+    version: 1,
+    createdAt: relativeIso(-5, 9),
+    updatedAt: now,
+    createdBy: definition.requesterUser,
+    updatedBy: definition.requesterUser
+  }, { now }));
+  return {
+    items,
+    activitiesByItem: Object.fromEntries(items.map(item => [item.id, [{
+      id: `activity:${item.id}:demo-create`,
+      itemId: item.id,
+      idempotencyKey: `demo-create:${item.id}`,
+      action: "create",
+      fromStatus: "",
+      toStatus: item.status,
+      actorUser: item.requesterUser,
+      actorDepartment: item.requesterDepartment,
+      reason: "本地演示数据",
+      changedFields: [],
+      createdAt: item.createdAt
+    }]])),
+    updatedAt: now
+  };
+}
+
+async function readLocalCollaborationState() {
+  try {
+    const raw = JSON.parse(await readFile(LOCAL_COLLABORATION_PATH, "utf8"));
+    return {
+      items: Array.isArray(raw.items) ? raw.items.map(item => normalizeCollaborationDraft(item)) : [],
+      activitiesByItem: raw.activitiesByItem && typeof raw.activitiesByItem === "object" ? raw.activitiesByItem : {},
+      updatedAt: raw.updatedAt || ""
+    };
+  } catch {
+    const seeded = localCollaborationSeed();
+    await writeLocalCollaborationState(seeded);
+    return seeded;
+  }
+}
+
+async function writeLocalCollaborationState(state) {
+  const payload = { ...state, updatedAt: new Date().toISOString() };
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_COLLABORATION_PATH, JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+function localCollaborationError(res, error) {
+  const status = Number(error?.status) || (error?.code === "COLLABORATION_VERSION_CONFLICT" ? 409 : 400);
+  json(res, status, {
+    synced: false,
+    message: error?.message || "本地协同数据处理失败。",
+    error: { code: error?.code || "COLLABORATION_ITEM_INVALID", retryable: false, details: error?.details }
+  });
+}
+
+function localActivity(item, action, before, reason = "") {
+  return {
+    id: `activity:${item.id}:${action}:${item.version}`,
+    itemId: item.id,
+    idempotencyKey: `${action}:${item.id}:${item.version}`,
+    action,
+    fromStatus: before?.status || "",
+    toStatus: item.status,
+    actorUser: localCollaborationIdentity().requesterUser,
+    actorDepartment: localCollaborationIdentity().requesterDepartment,
+    reason,
+    changedFields: before ? Object.keys(item).filter(key => JSON.stringify(item[key]) !== JSON.stringify(before[key])) : [],
+    createdAt: item.updatedAt
+  };
+}
+
+async function handleLocalCollaboration(req, res, url) {
+  try {
+    const base = "/api/platform/v1/collaboration-items";
+    const tail = url.pathname.slice(base.length).replace(/^\//, "");
+    const [encodedId = "", action = ""] = tail.split("/");
+    const id = decodeURIComponent(encodedId);
+    const state = await readLocalCollaborationState();
+
+    if (!id) {
+      if (req.method === "GET") {
+        const query = {
+          view: url.searchParams.get("view") || "my_scope",
+          status: url.searchParams.getAll("status").flatMap(value => value.split(",")).filter(Boolean),
+          appId: url.searchParams.get("appId") || "",
+          kind: url.searchParams.get("kind") || "",
+          impactLevel: url.searchParams.get("impactLevel") || "",
+          departmentId: url.searchParams.get("departmentId") || "",
+          query: url.searchParams.get("query") || "",
+          dueBefore: url.searchParams.get("dueBefore") || "",
+          includeArchived: ["true", "1"].includes(url.searchParams.get("includeArchived"))
+        };
+        json(res, 200, {
+          synced: true,
+          items: filterCollaborationItems(state.items, query, LOCAL_COLLABORATION_ACTOR),
+          nextCursor: "",
+          scope: { mode: "company", departmentIds: LOCAL_COLLABORATION_ACTOR.departmentIds }
+        });
+        return;
+      }
+      if (req.method === "POST") {
+        const body = await readBody(req);
+        const existing = state.items.find(item => item.idempotencyKey === body.idempotencyKey);
+        if (existing) {
+          json(res, 200, { synced: true, deduplicated: true, item: existing });
+          return;
+        }
+        const item = validateCreateInput(body, localCollaborationIdentity(), new Date());
+        state.items.unshift(item);
+        state.activitiesByItem[item.id] = [localActivity(item, "create")];
+        await writeLocalCollaborationState(state);
+        json(res, 201, { synced: true, item });
+        return;
+      }
+      json(res, 405, { synced: false, message: "Method not allowed" });
+      return;
+    }
+
+    const index = state.items.findIndex(item => item.id === id);
+    if (index < 0) {
+      json(res, 404, { synced: false, message: "协同事项不存在。", error: { code: "COLLABORATION_ITEM_NOT_FOUND" } });
+      return;
+    }
+    const current = state.items[index];
+
+    if (!action && req.method === "GET") {
+      json(res, 200, { synced: true, item: current });
+      return;
+    }
+    if (!action && req.method === "PATCH") {
+      const body = await readBody(req);
+      if (body.version !== current.version) {
+        const error = new Error("事项已被其他同事更新，请刷新后重试。");
+        error.code = "COLLABORATION_VERSION_CONFLICT";
+        error.details = { currentVersion: current.version, updatedAt: current.updatedAt };
+        throw error;
+      }
+      const update = validatePatchInput(body, current, LOCAL_COLLABORATION_ACTOR, new Date());
+      state.items[index] = update.item;
+      state.activitiesByItem[id] = [localActivity(update.item, update.action, current, update.reason), ...(state.activitiesByItem[id] || [])];
+      await writeLocalCollaborationState(state);
+      json(res, 200, { synced: true, item: update.item });
+      return;
+    }
+    if (action === "activities" && req.method === "GET") {
+      json(res, 200, { synced: true, activities: state.activitiesByItem[id] || [] });
+      return;
+    }
+    if (action === "transitions" && req.method === "POST") {
+      const body = validateTransitionInput(await readBody(req));
+      const duplicate = (state.activitiesByItem[id] || []).some(activity => activity.idempotencyKey === body.idempotencyKey);
+      if (duplicate) {
+        json(res, 200, { synced: true, deduplicated: true, item: current });
+        return;
+      }
+      if (body.version !== current.version) {
+        const error = new Error("事项已被其他同事更新，请刷新后重试。");
+        error.code = "COLLABORATION_VERSION_CONFLICT";
+        error.details = { currentVersion: current.version, updatedAt: current.updatedAt };
+        throw error;
+      }
+      const result = applyCollaborationTransition(current, body, LOCAL_COLLABORATION_ACTOR, new Date());
+      state.items[index] = result.item;
+      state.activitiesByItem[id] = [result.activity, ...(state.activitiesByItem[id] || [])];
+      await writeLocalCollaborationState(state);
+      json(res, 200, { synced: true, item: result.item });
+      return;
+    }
+    if (action === "dingtalk" && req.method === "POST") {
+      json(res, 501, {
+        synced: false,
+        message: "本地预览不会发送真实钉钉待办，请在线上验收环境验证。",
+        error: { code: "COLLABORATION_LOCAL_DINGTALK_DISABLED", retryable: false }
+      });
+      return;
+    }
+    json(res, 405, { synced: false, message: "Method not allowed" });
+  } catch (error) {
+    localCollaborationError(res, error);
+  }
 }
 
 function validateCompanyState(state) {
@@ -608,6 +916,10 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       json(res, 502, { readonly: true, message: error.message || "DWS 待办查询失败。" });
     }
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/collaboration-items" || url.pathname.startsWith("/api/platform/v1/collaboration-items/")) {
+    await handleLocalCollaboration(req, res, url);
     return;
   }
   if (url.pathname === "/api/state") {

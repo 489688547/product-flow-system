@@ -67,6 +67,30 @@ const environmentCapabilities = {
       ]
     },
     {
+      "id": "collaboration-execution",
+      "name": "跨 App 部门协同",
+      "description": "协同事项、参与范围、活动审计与钉钉待办镜像所需的生产能力。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1",
+        "dingtalk"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "collaboration_items",
+        "collaboration_participants",
+        "collaboration_activities"
+      ]
+    },
+    {
       "id": "kuaimai-sales-sync",
       "name": "快麦销售同步",
       "description": "快麦订单拉取、会话刷新和销售聚合所需配置。",
@@ -89,6 +113,59 @@ const environmentCapabilities = {
       "tables": [
         "product_sales_daily"
       ]
+    },
+    {
+      "id": "business-data-apps",
+      "name": "数据中心、店铺运营与绩效管理",
+      "description": "三个业务 App 的标准数据、经营闭环和绩效归档所需的 D1 持久化能力。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "data_sources",
+        "data_runners",
+        "data_sync_runs",
+        "data_source_files",
+        "data_dimension_mappings",
+        "data_metric_definitions",
+        "data_quality_issues",
+        "data_app_subscriptions",
+        "data_audit_logs",
+        "data_center_meta",
+        "ecommerce_operation_records",
+        "ecommerce_operation_meta",
+        "ecommerce_operation_state",
+        "performance_management_records",
+        "performance_management_meta",
+        "performance_management_state"
+      ]
+    },
+    {
+      "id": "operations-ai-review",
+      "name": "经营方案 AI 点评",
+      "description": "可选的 OpenAI Responses API 点评；未配置时使用本地规则检查，不阻断经营流程。",
+      "platforms": [
+        "openai-responses",
+        "cloudflare-pages"
+      ],
+      "requiredIn": [],
+      "level": "warning",
+      "envVars": [
+        "OPENAI_API_KEY",
+        "OPENAI_MODEL"
+      ],
+      "bindings": [],
+      "tables": []
     }
   ]
 };

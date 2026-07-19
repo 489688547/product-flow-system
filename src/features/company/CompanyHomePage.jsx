@@ -1,27 +1,17 @@
-import { AlertTriangle, ArrowRight, BadgeDollarSign, CircleHelp, Flag, GitBranch, Target } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRight, BadgeDollarSign, Flag, GitBranch, Target } from "lucide-react";
+import { useEffect, useMemo } from "react";
 import { personalTodosForUser } from "../../domain/personalTodos.js";
 import { buildExecutiveSummary } from "../../domain/strategyExecution.js";
+import { buildExecutiveActions } from "../../domain/collaboration.js";
 import { strategyAttainment } from "../../domain/executionGovernance.js";
 import { canManagePermissions } from "../../domain/permissions.js";
 import { usePlatform } from "../../state/PlatformProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
+import { useCollaboration } from "../../state/CollaborationProvider.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { HealthBadge } from "./HealthBadge.jsx";
 import { PersonalTodoWorkbench } from "./PersonalTodoWorkbench.jsx";
-
-function MetricStrip({ summary, state }) {
-  const attained = state.strategies.filter(strategy => strategyAttainment(state, strategy.id).attained).length;
-  const items = [
-    [`${attained}/${state.strategies.length}`, "战略达成", attained === state.strategies.length ? "" : "warning"],
-    [state.departmentCommitments.filter(item => ["returned", "at_risk", "off_track"].includes(item.status)).length, "部门承诺异常", "danger"],
-    [summary.offTrackProjects.length + summary.atRiskProjects.length, "异常项目", "warning"],
-    [summary.pendingDecisions.length, "待决策", "info"],
-    [state.incentiveProjects.filter(item => !["closed", "cancelled"].includes(item.status)).length, "激励项目", "info"],
-    [state.monthlyReports.filter(item => item.status !== "frozen").length, "月报待处理", "warning"]
-  ];
-  return <div className="company-status-strip">{items.map(([value, label, tone]) => <div key={label} className={`company-status-item ${tone}`}><strong>{value}</strong><span>{label}</span></div>)}</div>;
-}
+import { ExecutiveActionDesk } from "./ExecutiveActionDesk.jsx";
 
 function CompanyCockpit({ summary, state, onNavigate }) {
   const governedStrategies = state.strategies.filter(item => !item.archived).map(strategy => ({
@@ -30,22 +20,6 @@ function CompanyCockpit({ summary, state, onNavigate }) {
     commitments: state.departmentCommitments.filter(item => item.strategyId === strategy.id && !item.archived)
   }));
   return <>
-    <MetricStrip summary={summary} state={state} />
-    <div className="executive-priority-grid">
-      <section className="company-work-section executive-decisions">
-        <div className="panel-title"><CircleHelp size={18} /><h2>待决策事项</h2><button type="button" onClick={() => onNavigate("projects")}>查看全部</button></div>
-        {summary.pendingDecisions.slice(0, 5).map(decision => {
-          const project = state.projects.find(item => item.id === decision.projectId);
-          return <button key={decision.id} className="decision-priority-row" onClick={() => onNavigate("projects")}><span className="decision-date">{decision.dueDate?.slice(5) || "待定"}</span><span><strong>{decision.title}</strong><small>{project?.name || "未关联项目"} · {decision.recommendation || "等待补充建议"}</small></span><ArrowRight size={16} /></button>;
-        })}
-        {!summary.pendingDecisions.length ? <div className="empty-state">当前没有待管理层处理的事项。</div> : null}
-      </section>
-      <section className="company-work-section">
-        <div className="panel-title"><AlertTriangle size={18} /><h2>重大异常与风险</h2></div>
-        {[...summary.offTrackObjectives, ...summary.offTrackProjects].slice(0, 5).map((item, index) => <button key={item.objective?.id || item.project?.id || index} className="company-work-row" onClick={() => onNavigate(item.objective ? "strategy" : "projects")}><span><strong>{item.objective?.title || item.project?.name}</strong><small>{item.project?.owner || item.objective?.owner || "待指定负责人"} · {item.reasons?.[0] || "关键事实已突破容忍线"}</small></span><HealthBadge health="off_track" /></button>)}
-        {!summary.offTrackObjectives.length && !summary.offTrackProjects.length ? <div className="empty-state">当前没有偏离事项。</div> : null}
-      </section>
-    </div>
     <section className="company-work-section strategy-map-section">
       <div className="panel-title"><Target size={18} /><h2>三大战略达成 · 战略执行地图</h2><button type="button" onClick={() => onNavigate("strategy")}>进入战略中心</button></div>
       <div className="cockpit-strategy-list">
@@ -86,12 +60,17 @@ function CompanyCockpit({ summary, state, onNavigate }) {
 export function CompanyHomePage({ onNavigate }) {
   const { state, error } = usePlatform();
   const { state: productState, currentUser } = useProductFlow();
+  const { items: collaborationItems, loading: collaborationLoading, error: collaborationError, loadItems } = useCollaboration();
   const executive = canManagePermissions(currentUser);
   const summary = useMemo(() => buildExecutiveSummary(state, { currentUser, productState, today: new Date() }), [currentUser, productState, state]);
-  const [executiveView, setExecutiveView] = useState("todos");
   const myTodos = useMemo(() => personalTodosForUser(state.personalTodos, currentUser), [currentUser, state.personalTodos]);
+  const executiveActions = useMemo(() => buildExecutiveActions(collaborationItems, new Date()), [collaborationItems]);
   const ownedProjects = summary.projects.filter(item => [item.project.owner, item.project.sponsor].includes(currentUser?.name));
   const ownedObjectives = summary.objectives.filter(item => item.objective.owner === currentUser?.name);
+
+  useEffect(() => {
+    if (executive) loadItems({ view: "my_scope", limit: 100 }).catch(() => {});
+  }, [executive]);
 
   if (!executive) {
     const myTasks = productState.tasks.filter(task => !task.done && String(task.ownerDept || "").includes(currentUser?.department || "__none__"));
@@ -120,15 +99,11 @@ export function CompanyHomePage({ onNavigate }) {
 
   return (
     <section className="page company-home">
-      <PageHeader title="公司首页" description={executiveView === "todos" ? "先处理明确分配给你的责任事项，再查看全公司的战略执行状态。" : "三分钟内看清偏离、重大风险和需要管理层拍板的事项。"} />
-      {error ? <div className="inline-alert" role="status">{error}</div> : null}
-      <div className="company-view-switch" role="tablist" aria-label="公司首页视图">
-        <button type="button" role="tab" aria-selected={executiveView === "todos"} className={executiveView === "todos" ? "active" : ""} onClick={() => setExecutiveView("todos")}>我的待办<span>{myTodos.filter(todo => todo.status === "pending").length}</span></button>
-        <button type="button" role="tab" aria-selected={executiveView === "cockpit"} className={executiveView === "cockpit" ? "active" : ""} onClick={() => setExecutiveView("cockpit")}>公司驾驶舱</button>
-      </div>
-      {executiveView === "todos"
-        ? <PersonalTodoWorkbench todos={myTodos} onNavigate={onNavigate} />
-        : <CompanyCockpit summary={summary} state={state} onNavigate={onNavigate} />}
+      <PageHeader title="公司首页" description="处理今天需要拍板、协调和升级的经营事项。" />
+      {error || collaborationError ? <div className="inline-alert" role="status">{error || collaborationError?.message}</div> : null}
+      <ExecutiveActionDesk actions={executiveActions} items={collaborationItems} loading={collaborationLoading} onNavigate={onNavigate} />
+      <section className="executive-personal-todos"><div className="panel-title"><Flag size={18} /><h2>我的待办</h2><span>{myTodos.filter(todo => todo.status === "pending").length} 项待处理</span></div><PersonalTodoWorkbench todos={myTodos} onNavigate={onNavigate} /></section>
+      <CompanyCockpit summary={summary} state={state} onNavigate={onNavigate} />
     </section>
   );
 }

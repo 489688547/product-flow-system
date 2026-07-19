@@ -32,3 +32,42 @@ test("deployed readiness fails with the exact blocking configuration names", asy
     }), { status: 200 })
   }), /DINGTALK_APP_SECRET/);
 });
+
+test("deployed readiness blocks warnings for every explicitly affected platform", async () => {
+  const { checkDeployedReadiness } = await loadScript();
+  await assert.rejects(() => checkDeployedReadiness({
+    baseUrl: "https://product-flow-system.pages.dev",
+    accessToken: "token",
+    requiredPlatforms: ["kuaimai"],
+    fetchImpl: async () => new Response(JSON.stringify({
+      environment: "production",
+      ready: true,
+      capabilities: [{
+        id: "kuaimai-sales-sync",
+        status: "warning",
+        platforms: ["kuaimai", "cloudflare-d1"],
+        missing: ["KUAIMAI_APP_SECRET"]
+      }]
+    }), { status: 200 })
+  }), /kuaimai-sales-sync.*KUAIMAI_APP_SECRET/);
+});
+
+test("deployed readiness does not promote unrelated warnings to blocking", async () => {
+  const { checkDeployedReadiness } = await loadScript();
+  const payload = await checkDeployedReadiness({
+    baseUrl: "https://product-flow-system.pages.dev",
+    accessToken: "token",
+    requiredPlatforms: ["dingtalk"],
+    fetchImpl: async () => new Response(JSON.stringify({
+      environment: "production",
+      ready: true,
+      capabilities: [{
+        id: "kuaimai-sales-sync",
+        status: "warning",
+        platforms: ["kuaimai", "cloudflare-d1"],
+        missing: ["KUAIMAI_APP_SECRET"]
+      }]
+    }), { status: 200 })
+  });
+  assert.equal(payload.ready, true);
+});
