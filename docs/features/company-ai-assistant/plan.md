@@ -6,7 +6,7 @@
 
 ## 架构方案
 
-采用“公司数据能力目录 → 权限与外发策略 → 服务端只读 Skill → Provider 中立 AI 网关 → SSE 总助 UI”的单向依赖。各业务 App 不直接调用模型；Provider 密钥只存在服务端 Secret，浏览器不提交业务数据。Provider 通过 Function Calling 按需选择服务端下发的 Skill，每次调用重新鉴权、限额并写无内容审计；未通过能力测试时降级到旧的服务端摘要上下文。首期保持模块化单体，新增内部 `/api/platform/v1/ai/*`，不提前声明对外平台 API。
+采用“公司数据能力目录 → 权限与外发策略 → 服务端只读 Skill → Provider 中立 AI 网关 → SSE 总助 UI”的单向依赖。各业务 App 不直接调用模型；Provider 密钥只存在服务端 Secret，浏览器不提交业务数据。Provider 支持 Function Calling 时按需选择服务端下发的 Skill；不支持时由服务端按问题从同一授权清单中路由最多三个只读 Skill。两种模式每次调用都重新鉴权、限额并写无内容审计；没有匹配 Skill 时才降级到服务端摘要上下文。首期保持模块化单体，新增内部 `/api/platform/v1/ai/*`，不提前声明对外平台 API。
 
 平台能力判断：
 
@@ -41,6 +41,7 @@
 - `functions/api/platform/v1/ai/_shared/responses-adapter.js`：固定白名单 URL，发送 `store:false` 与流式请求，映射 Provider 错误。
 - `functions/api/platform/v1/ai/_shared/data-policy.js`：根据会话、AI 数据策略和 Provider 外发策略计算允许/阻止域。
 - `functions/api/platform/v1/ai/_shared/context-catalog.js`：登记公司战略、项目、产品、供应链、经营、销售、数据质量和财务只读提供器。
+- `functions/api/platform/v1/ai/_shared/routed-skill-fallback.js`：在 Provider 不支持原生 Function Calling 时按受控关键词选择当前身份已授权的只读 Skill，并把限额结果作为定界引用交给 Provider。
 - `functions/api/platform/v1/ai/_shared/context-builders/`：按现有存储边界读取并压缩各数据域，不复制业务持久化。
 - `functions/api/platform/v1/ai/_shared/audit.js`：创建 D1 审计表并保存无内容元数据。
 - `functions/api/platform/v1/ai/status.js`：所有已登录员工读取脱敏服务状态和自身可用域。

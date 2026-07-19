@@ -45,8 +45,8 @@
 1. 点击“AI 总助”后面板从右侧进入，焦点移到标题；原页面保持可见且不改变路由。
 2. 首次打开读取 `/api/platform/v1/ai/status`，展示功能、Provider、密钥和可用数据域状态。
 3. 点击快捷问题或输入问题后，前端只提交消息历史和当前路由提示。
-4. 服务端返回首个 SSE 元事件，声明 request ID、允许域、被阻止域和本次可用 Skill；UI 先展示数据范围再等待模型选择查询。
-5. 模型请求 Skill 后，服务端发送 `skill_started`，校验并执行只读能力，再发送 `skill_completed` 或 `skill_failed`；浏览器不参与执行。
+4. 服务端返回首个 SSE 元事件，声明 request ID、允许域、被阻止域、本次是否使用 Skill 以及 `provider`、`server` 或 `summary` 模式。
+5. Provider 支持原生 Function Calling 时等待模型选择 Skill；否则服务端按问题从当前授权清单中路由最多三个只读 Skill。两种模式都会发送 `skill_started`，校验并执行后发送 `skill_completed` 或 `skill_failed`；浏览器不参与执行。
 6. 服务端把安全结果交回 Provider，直至模型生成回答或达到两轮、六次调用上限。
 7. 文本增量逐步追加；来源事件更新回答下方的 App 标签和数据日期。
 8. 用户点击停止时中止浏览器请求；服务端停止未完成 Skill/Provider 流并记录取消，不自动重试。
@@ -151,7 +151,8 @@ flowchart LR
   Auth --> Registry["只读 Skill 注册表"]
   Registry --> Gateway["公司 AI 网关"]
   Gateway --> Provider["灵算 Responses API"]
-  Provider -->|选择 Skill| Executor["参数与权限校验"]
+  Provider -->|原生选择 Skill| Executor["参数与权限校验"]
+  Registry -->|服务端受控路由| Executor
   Executor --> Stores["现有 App 存储边界"]
   Stores --> SafeResult["筛选 脱敏 限额"]
   SafeResult --> Gateway
@@ -186,7 +187,7 @@ flowchart LR
 - 业务差异：每个 App 继续拥有自己的读取投影、字段白名单、权限函数和来源新鲜度计算，AI 层不得复制这些业务规则。
 - 真实消费者：公司 AI 总助首先消费注册表；数据中心消费相同的安全元数据展示 Skill 就绪状态和最近调用结果。
 - 兼容：保留现有 `/api/platform/v1/ai/chat`、SSE 文本和来源事件；新增 Skill 事件，旧前端可忽略未知事件并继续显示最终回答。
-- 回滚：关闭 Skill 能力开关或让 Provider 状态标记为不支持工具调用后，聊天退回现有只读摘要路径；不影响其他 App 读取接口。
+- 回滚：关闭公司 AI 总开关后停止所有 Provider 和 Skill 调用；Provider 原生工具状态不可用时自动切换到服务端只读 Skills，不影响其他 App 读取接口。
 
 ## 错误与观测
 
@@ -196,4 +197,4 @@ flowchart LR
 - Skill 审计追加 Skill ID、参数键名或脱敏摘要、结果数量、耗时和结果码，不记录原始结果。
 - Provider 原始错误正文、响应 Header 和堆栈不得返回浏览器或写入审计。
 - 基础连接测试使用固定合成问题“返回 ok”，不执行任何业务 Skill。
-- Provider 连接测试增加合成 Function Calling 能力检查；不支持工具调用时保留基础回答能力，但状态页和总助 UI 明确显示 Skill 不可用。
+- Provider 连接测试增加合成 Function Calling 能力检查；不支持原生工具调用时保留基础回答能力并启用服务端只读 Skills，状态页明确显示“服务端 Skills”。

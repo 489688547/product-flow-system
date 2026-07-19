@@ -726,7 +726,8 @@ const integrationRegistry = {
       "capabilities": [
         "Responses 流式生成",
         "固定模型配置",
-        "Function Calling",
+        "原生 Function Calling 能力探测",
+        "服务端受控 Skill 路由",
         "公司只读 Skills",
         "合成连接测试",
         "无留存请求参数",
@@ -778,6 +779,7 @@ const integrationRegistry = {
       ],
       "evidence": [
         "src/domain/aiAssistant.js",
+        "functions/api/platform/v1/ai/_shared/routed-skill-fallback.js",
         "react-tests/ai-assistant-domain.test.mjs",
         "tests/ai-skill-loop.test.mjs",
         "migrations/0003_company_ai_assistant.sql",

@@ -70,7 +70,7 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 聊天 SSE 在原有 `meta`、`text_delta`、`sources`、`usage`、`error`、`done` 之外，增加 `skill_started`、`skill_completed`、`skill_failed`。事件只包含 request/call/Skill/App 标识、记录数、耗时和安全结果码，不返回查询参数或业务结果；旧客户端可继续忽略未知事件。
 
-兼容策略：`AI_ASSISTANT_ENABLED` 默认关闭，关闭时状态接口返回 `enabled:false`，聊天接口返回 `AI_DISABLED`，不要求 D1 或 Provider Secret。Provider 未通过 Function Calling 合成测试时继续使用旧的服务端摘要上下文，并在 `meta.skillsEnabled=false` 明确降级。回滚只需关闭开关；AI 元数据、外发策略和无内容审计表保留，不影响其他业务 App。电商运营旧 AI 点评本期保持原路由和规则降级，不属于该共享 API 的调用方。
+兼容策略：`AI_ASSISTANT_ENABLED` 默认关闭，关闭时状态接口返回 `enabled:false`，聊天接口返回 `AI_DISABLED`，不要求 D1 或 Provider Secret。Provider 未通过 Function Calling 合成测试时，服务端从当前身份已授权的注册表按问题路由最多三个只读 Skill；命中时 `meta.skillsEnabled=true`、`meta.skillMode=server`，未命中时使用服务端摘要并标记 `summary`。原生工具模式标记为 `provider`。回滚只需关闭开关；AI 元数据、外发策略和无内容审计表保留，不影响其他业务 App。电商运营旧 AI 点评本期保持原路由和规则降级，不属于该共享 API 的调用方。
 
 本地 Node 预览只实现 AI 状态和 Provider 的 GET 安全投影，允许查看功能是否配置，不读取线上 D1，也不调用模型。Provider 更新、连接测试和聊天统一返回 `AI_LOCAL_PREVIEW_READ_ONLY`；本地环境变量值永不进入响应。真实链路必须在正式 Pages Functions 会话与 D1 边界分别验收。
 

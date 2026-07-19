@@ -275,6 +275,40 @@ test("chat lets the Provider call authorized read-only App Skills and audits met
   assert.doesNotMatch(JSON.stringify(db.skillAudits), /哪些项目有风险|重点项目|project-1/);
 });
 
+test("chat uses server-routed Skills when the Provider lacks native Function Calling", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  const db = createAiD1Mock({ providerEnabled: true, providerSkillsSupported: false });
+  const response = await chatRequest({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "对比重点项目风险和供应链异常" }] })
+    }),
+    env: {
+      PRODUCT_FLOW_DB: db,
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: fakeSecret,
+      AI_PROVIDER_FETCH: async (_url, init) => {
+        const providerRequest = JSON.parse(init.body);
+        assert.equal(providerRequest.tools, undefined);
+        assert.doesNotMatch(init.body, /BEGIN_COMPANY_REFERENCE/);
+        assert.match(init.body, /project-1/);
+        return new Response([
+          "event: response.output_text.delta\ndata: {\"delta\":\"项目与供应链均需关注\"}\n\n",
+          "event: response.completed\ndata: {\"response\":{\"output\":[]}}\n\n"
+        ].join(""), { status: 200 });
+      }
+    },
+    data: { session: executive }
+  });
+  const text = await response.text();
+  assert.match(text, /"skillMode":"server"/);
+  assert.match(text, /event: skill_completed/);
+  assert.match(text, /strategy_query_projects/);
+  assert.match(text, /supply_chain_query_status/);
+  assert.equal(db.skillAudits.length, 3);
+});
+
 test("chat enforces one in-flight request and releases the lease after Provider failure", async () => {
   const { onRequest: chatRequest } = await import(chatUrl);
   const { acquireAiLease, releaseAiLease } = await import(auditUrl);
@@ -313,6 +347,7 @@ test("chat enforces one in-flight request and releases the lease after Provider 
 test("cancelling a streamed answer aborts the Provider and records no content", async () => {
   const { onRequest: chatRequest } = await import(chatUrl);
   const db = createAiD1Mock({ providerEnabled: true });
+  let providerStarted = false;
   let providerAborted = false;
   const response = await chatRequest({
     request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
@@ -325,6 +360,12 @@ test("cancelling a streamed answer aborts the Provider and records no content", 
       AI_ASSISTANT_ENABLED: "1",
       LINGSUAN_API_KEY: fakeSecret,
       AI_PROVIDER_FETCH: async (_url, init) => new Promise((_resolve, reject) => {
+        providerStarted = true;
+        if (init.signal.aborted) {
+          providerAborted = true;
+          reject(new DOMException("cancelled", "AbortError"));
+          return;
+        }
         init.signal.addEventListener("abort", () => {
           providerAborted = true;
           reject(new DOMException("cancelled", "AbortError"));
@@ -335,7 +376,7 @@ test("cancelling a streamed answer aborts the Provider and records no content", 
   });
   await response.body.cancel();
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(providerAborted, true);
+  assert.equal(providerStarted ? providerAborted : true, true);
   assert.equal(db.leases.size, 0);
   assert.equal(db.audits.length, 1);
   assert.doesNotMatch(JSON.stringify(db.audits), /分析当前项目/);

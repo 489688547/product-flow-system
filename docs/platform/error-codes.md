@@ -82,7 +82,7 @@
 - `AI_PROVIDER_TIMEOUT`：Provider 在 45 秒内未响应。
 - `AI_PROVIDER_UNAVAILABLE`：Provider 网络或 5xx 故障。
 - `AI_PROVIDER_STREAM_FAILED`：流式响应失败或中断；已生成内容可保留但不得当作完整回答。
-- `AI_PROVIDER_SKILLS_UNSUPPORTED`：Provider 未完成纯合成 Function Calling 测试；总助降级为服务端只读摘要模式。
+- `AI_PROVIDER_SKILLS_UNSUPPORTED`：Provider 未完成纯合成 Function Calling 测试；状态标记原生能力不可用，总助改用受控服务端只读 Skills，未命中 Skill 的问题才使用摘要模式。
 - `AI_PROVIDER_INVALID_TOOL_ARGUMENTS`：Provider 在合成能力测试中返回无效工具参数。
 - `AI_PROVIDER_NOT_READY`：Provider 未启用或服务端 Secret 未就绪。
 - `AI_MESSAGES_INVALID`：消息数量、角色、长度或顺序不符合契约。

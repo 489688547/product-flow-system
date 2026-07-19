@@ -73,6 +73,7 @@ test("assistant Provider keeps only current-session text and supports abort", ()
   assert.match(source, /AbortController/);
   assert.match(source, /slice\(-12\)/);
   assert.match(source, /skillActivity/);
+  assert.match(source, /skillMode/);
   assert.match(source, /upsertAiSkillActivity/);
   assert.doesNotMatch(source, /localStorage|useProductFlow|usePlatform|useDataCenter/);
 });

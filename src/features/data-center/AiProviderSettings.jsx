@@ -88,7 +88,7 @@ export function AiProviderSettings() {
       const result = await testAiProvider();
       setNotice(result.skillsSupported
         ? `连接与只读 Skill 能力测试通过，耗时 ${result.latencyMs || 0} ms。`
-        : `模型连接通过，但按需查询能力未通过（${result.skillError?.code || "AI_PROVIDER_SKILLS_UNSUPPORTED"}）；总助将使用只读摘要模式。`);
+        : `模型连接通过，但原生 Function Calling 未通过（${result.skillError?.code || "AI_PROVIDER_SKILLS_UNSUPPORTED"}）；总助将使用受控服务端 Skills。`);
       const next = await loadAiProvider();
       setData(next);
       setDraft(providerDraft(next.provider));
@@ -122,7 +122,7 @@ export function AiProviderSettings() {
         <article><Bot size={18} aria-hidden="true" /><span>服务状态</span><strong>{provider.enabled ? "已启用" : "未启用"}</strong></article>
         <article>{configured ? <CheckCircle2 size={18} aria-hidden="true" /> : <CircleAlert size={18} aria-hidden="true" />}<span>服务端 Secret</span><strong>{configured ? "已配置" : "未配置"}</strong></article>
         <article><ShieldCheck size={18} aria-hidden="true" /><span>回答留存</span><strong>store=false</strong></article>
-        <article>{provider.skillsSupported ? <CheckCircle2 size={18} aria-hidden="true" /> : <CircleAlert size={18} aria-hidden="true" />}<span>按需查询</span><strong>{provider.skillsSupported ? "Skills 已验证" : "摘要模式"}</strong></article>
+        <article>{provider.skillsSupported ? <CheckCircle2 size={18} aria-hidden="true" /> : <ShieldCheck size={18} aria-hidden="true" />}<span>按需查询</span><strong>{provider.skillsSupported ? "原生 Skills" : "服务端 Skills"}</strong></article>
         <article><RefreshCw size={18} aria-hidden="true" /><span>最近测试</span><strong>{checkedAtLabel(provider.lastCheckedAt)}</strong></article>
       </div>
 

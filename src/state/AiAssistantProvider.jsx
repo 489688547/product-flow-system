@@ -84,7 +84,12 @@ export function AiAssistantProvider({ children }) {
             if (message.id !== assistantId) return message;
             if (event.type === "text_delta") return { ...message, content: message.content + event.delta };
             if (event.type === "sources") return { ...message, sources: event.sources || [], blockedDomains: event.blockedDomains || [] };
-            if (event.type === "meta") return { ...message, requestId: event.requestId, blockedDomains: event.blockedDomains || [] };
+            if (event.type === "meta") return {
+              ...message,
+              requestId: event.requestId,
+              blockedDomains: event.blockedDomains || [],
+              skillMode: event.skillMode || "summary"
+            };
             if (["skill_started", "skill_completed", "skill_failed"].includes(event.type)) {
               return { ...message, skillActivity: upsertAiSkillActivity(message.skillActivity, event) };
             }

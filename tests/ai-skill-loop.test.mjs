@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createAiD1Mock } from "./helpers/ai-d1-mock.mjs";
 
 const loopUrl = new URL("../functions/api/platform/v1/ai/_shared/skill-loop.js", import.meta.url);
+const fallbackUrl = new URL("../functions/api/platform/v1/ai/_shared/routed-skill-fallback.js", import.meta.url);
 const auditUrl = new URL("../functions/api/platform/v1/ai/_shared/audit.js", import.meta.url);
 const config = {
   endpoint: "https://lingsuan.top/responses",
@@ -162,4 +163,49 @@ test("Skill audit stores metadata without argument values or returned business c
   assert.equal(db.skillAudits.length, 1);
   assert.doesNotMatch(JSON.stringify(db.skillAudits), /秘密项目|具体业务内容/);
   assert.match(JSON.stringify(db.skillAudits), /strategy_query_projects|query|status/);
+});
+
+test("server fallback routes an unsupported Provider through authorized read Skills", async () => {
+  const { selectRoutedSkillIds, streamRoutedSkillResponse } = await import(fallbackUrl);
+  const definitions = [
+    { name: "strategy_query_projects" },
+    { name: "strategy_query_reviews" },
+    { name: "supply_chain_query_status" },
+    { name: "data_center_query_sales" }
+  ];
+  assert.deepEqual(selectRoutedSkillIds("对比重点项目风险和供应链异常", definitions), [
+    "strategy_query_projects",
+    "strategy_query_reviews",
+    "supply_chain_query_status"
+  ]);
+  const activity = [];
+  const executed = [];
+  const output = [];
+  for await (const event of streamRoutedSkillResponse({
+    config,
+    messages: [{ role: "user", content: "对比重点项目风险和供应链异常" }],
+    appHint: "strategy",
+    skillIds: ["strategy_query_projects", "supply_chain_query_status"],
+    fetchImpl: async (_url, init) => {
+      const request = JSON.parse(init.body);
+      assert.equal(request.tools, undefined);
+      assert.match(init.body, /project-1|stock-risk/);
+      return providerStream([], "需要关注两个 App 的异常", { input_tokens: 16, output_tokens: 5 });
+    },
+    execute: async call => {
+      executed.push(call.skillId);
+      return {
+        skillId: call.skillId,
+        appId: call.skillId.startsWith("supply") ? "supply-chain" : "strategy",
+        displayName: call.skillId.startsWith("supply") ? "供应链状态" : "重点项目",
+        records: [{ id: call.skillId.startsWith("supply") ? "stock-risk" : "project-1" }],
+        recordCount: 1,
+        source: { appId: call.skillId.startsWith("supply") ? "supply-chain" : "strategy", domainIds: [call.skillId.startsWith("supply") ? "supply_chain" : "projects"] }
+      };
+    },
+    onEvent: event => activity.push(event)
+  })) output.push(event);
+  assert.deepEqual(executed, ["strategy_query_projects", "supply_chain_query_status"]);
+  assert.deepEqual(activity.map(item => item.type), ["skill_started", "skill_completed", "skill_started", "skill_completed"]);
+  assert.equal(output[0].delta, "需要关注两个 App 的异常");
 });

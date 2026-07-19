@@ -18,8 +18,8 @@ test("Provider settings expose safe metadata without credential inputs", () => {
   assert.match(settings, /testAiProvider/);
   assert.match(settings, /服务端 Secret/);
   assert.match(settings, /合成数据/);
-  assert.match(settings, /Skills 已验证/);
-  assert.match(settings, /摘要模式/);
+  assert.match(settings, /原生 Skills/);
+  assert.match(settings, /服务端 Skills/);
   assert.match(settings, /store=false/);
   assert.match(settings, /财务/);
   assert.match(settings, /阻止外发/);

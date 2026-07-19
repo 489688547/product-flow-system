@@ -3,6 +3,7 @@ import { resolveAiDataAccess } from "./_shared/data-policy.js";
 import { buildCompanyContext } from "./_shared/context-catalog.js";
 import { streamProviderResponse } from "./_shared/responses-adapter.js";
 import { runSkillLoop } from "./_shared/skill-loop.js";
+import { selectRoutedSkillIds, streamRoutedSkillResponse } from "./_shared/routed-skill-fallback.js";
 import { executeSkill, listAvailableSkillDefinitions, listAvailableSkills } from "./_shared/skill-registry.js";
 import { acquireAiLease, releaseAiLease, writeAiAudit, writeAiSkillAudit } from "./_shared/audit.js";
 import { aiError, loadAiConfiguration } from "./_shared/http.js";
@@ -131,7 +132,10 @@ export async function onRequest({ request, env, data = {} }) {
       .map(item => item.domainId);
     const skillDefinitions = listAvailableSkillDefinitions({ access });
     const tools = listAvailableSkills({ access });
-    const useSkills = loaded.provider.skillsSupported === true && tools.length > 0;
+    const useNativeSkills = loaded.provider.skillsSupported === true && tools.length > 0;
+    const routedSkillIds = useNativeSkills ? [] : selectRoutedSkillIds(messages.at(-1).content, skillDefinitions);
+    const useRoutedSkills = routedSkillIds.length > 0;
+    const useSkills = useNativeSkills || useRoutedSkills;
     const context = useSkills ? null : await buildCompanyContext({
       db: loaded.db,
       access,
@@ -188,65 +192,81 @@ export async function onRequest({ request, env, data = {} }) {
         };
         let resultCode = "AI_COMPLETED";
         let completed = false;
-        enqueue("meta", { requestId: id, allowedDomains: access.allowed, blockedDomains, skillsEnabled: useSkills });
+        const skillMode = useNativeSkills ? "provider" : useRoutedSkills ? "server" : "summary";
+        enqueue("meta", { requestId: id, allowedDomains: access.allowed, blockedDomains, skillsEnabled: useSkills, skillMode });
         try {
-          const input = [...(useSkills ? skillSystemInput(body.appHint) : systemInput(context, body.appHint)), ...messages];
-          const providerEvents = useSkills
+          const handleSkillEvent = async skillEvent => {
+            const definition = skillById.get(skillEvent.skillId);
+            const result = skillEvent.result;
+            if (skillEvent.type === "skill_completed" && result?.source) {
+              for (const domainId of result.source.domainIds || []) {
+                domainCounts[domainId] = (domainCounts[domainId] || 0) + (Number(result.recordCount) || 0);
+                sourceMap.set(domainId, {
+                  domainId,
+                  appId: result.source.appId || result.appId,
+                  updatedAt: result.updatedAt || "",
+                  recordCount: domainCounts[domainId]
+                });
+              }
+            }
+            const payload = {
+              requestId: id,
+              callId: skillEvent.callId,
+              skillId: skillEvent.skillId,
+              appId: result?.appId || definition?.appId || "unknown",
+              displayName: result?.displayName || definition?.displayName || skillEvent.skillId,
+              recordCount: Number(result?.recordCount) || 0,
+              latencyMs: Number(skillEvent.latencyMs) || 0,
+              updatedAt: result?.updatedAt || "",
+              code: skillEvent.code
+            };
+            enqueue(skillEvent.type, payload);
+            if (skillEvent.type !== "skill_started") {
+              await writeAiSkillAudit(loaded.db, {
+                requestId: id,
+                callId: skillEvent.callId,
+                skillId: skillEvent.skillId,
+                appId: payload.appId,
+                argumentSummary: skillEvent.argumentSummary,
+                resultCount: payload.recordCount,
+                latencyMs: payload.latencyMs,
+                resultCode: skillEvent.type === "skill_completed" ? "AI_SKILL_COMPLETED" : skillEvent.code || "AI_SKILL_FAILED"
+              });
+            }
+          };
+          const executeReadSkill = call => executeSkill({
+            db: loaded.db,
+            session: data.session,
+            access,
+            skillId: call.skillId,
+            argumentsText: call.argumentsText,
+            signal: call.signal
+          });
+          const input = useNativeSkills
+            ? [...skillSystemInput(body.appHint), ...messages]
+            : useRoutedSkills
+              ? null
+              : [...systemInput(context, body.appHint), ...messages];
+          const providerEvents = useNativeSkills
             ? runSkillLoop({
               config: loaded.provider,
               input,
               tools,
               fetchImpl: env.AI_PROVIDER_FETCH || fetch,
               signal: providerAbort.signal,
-              execute: call => executeSkill({
-                db: loaded.db,
-                session: data.session,
-                access,
-                skillId: call.skillId,
-                argumentsText: call.argumentsText,
-                signal: call.signal
-              }),
-              onEvent: async skillEvent => {
-                const definition = skillById.get(skillEvent.skillId);
-                const result = skillEvent.result;
-                if (skillEvent.type === "skill_completed" && result?.source) {
-                  for (const domainId of result.source.domainIds || []) {
-                    domainCounts[domainId] = (domainCounts[domainId] || 0) + (Number(result.recordCount) || 0);
-                    sourceMap.set(domainId, {
-                      domainId,
-                      appId: result.source.appId || result.appId,
-                      updatedAt: result.updatedAt || "",
-                      recordCount: domainCounts[domainId]
-                    });
-                  }
-                }
-                const payload = {
-                  requestId: id,
-                  callId: skillEvent.callId,
-                  skillId: skillEvent.skillId,
-                  appId: result?.appId || definition?.appId || "unknown",
-                  displayName: result?.displayName || definition?.displayName || skillEvent.skillId,
-                  recordCount: Number(result?.recordCount) || 0,
-                  latencyMs: Number(skillEvent.latencyMs) || 0,
-                  updatedAt: result?.updatedAt || "",
-                  code: skillEvent.code
-                };
-                enqueue(skillEvent.type, payload);
-                if (skillEvent.type !== "skill_started") {
-                  await writeAiSkillAudit(loaded.db, {
-                    requestId: id,
-                    callId: skillEvent.callId,
-                    skillId: skillEvent.skillId,
-                    appId: payload.appId,
-                    argumentSummary: skillEvent.argumentSummary,
-                    resultCount: payload.recordCount,
-                    latencyMs: payload.latencyMs,
-                    resultCode: skillEvent.type === "skill_completed" ? "AI_SKILL_COMPLETED" : skillEvent.code || "AI_SKILL_FAILED"
-                  });
-                }
-              }
+              execute: executeReadSkill,
+              onEvent: handleSkillEvent
             })
-            : streamProviderResponse({
+            : useRoutedSkills ? streamRoutedSkillResponse({
+              config: loaded.provider,
+              messages,
+              appHint: body.appHint,
+              skillIds: routedSkillIds,
+              fetchImpl: env.AI_PROVIDER_FETCH || fetch,
+              signal: providerAbort.signal,
+              execute: executeReadSkill,
+              onEvent: handleSkillEvent
+            }) : streamProviderResponse({
               config: loaded.provider,
               input,
               fetchImpl: env.AI_PROVIDER_FETCH || fetch,
