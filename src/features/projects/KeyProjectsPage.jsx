@@ -5,19 +5,21 @@ import { canManagePermissions } from "../../domain/permissions.js";
 import { usePlatform } from "../../state/PlatformProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { HealthBadge } from "../company/HealthBadge.jsx";
 import { ProjectDetailModal } from "./ProjectDetailModal.jsx";
 import { ProjectEditorModal } from "./ProjectEditorModal.jsx";
 
 export function KeyProjectsPage() {
-  const { state, dispatch, syncDecisionTodo } = usePlatform();
+  const { state, dispatch, syncDecisionTodo, archiveProject, archiveProjectChild } = usePlatform();
   const { currentUser, orgCache } = useProductFlow();
   const [query, setQuery] = useState("");
   const [healthFilter, setHealthFilter] = useState("all");
   const [selectedId, setSelectedId] = useState("");
   const [editorProject, setEditorProject] = useState(undefined);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [deleting, setDeleting] = useState(null);
   const canCreate = canManagePermissions(currentUser) || /负责人|经理/.test(currentUser?.title || "");
   const projects = useMemo(() => state.projects.filter(item => !item.archived).map(project => ({ project, ...projectHealth(state, project, new Date()) })).filter(item => {
     const matchesQuery = !query.trim() || [item.project.name, item.project.owner, item.project.department].some(value => String(value || "").includes(query.trim()));
@@ -49,7 +51,7 @@ export function KeyProjectsPage() {
         {!projects.length ? <div className="empty-state">当前筛选条件下没有重点项目。</div> : null}
       </section>
       <ProjectEditorModal open={editorOpen} project={editorProject} strategies={state.strategies.filter(item => !item.archived)} objectives={state.objectives.filter(item => !item.archived)} orgCache={orgCache} onClose={() => setEditorOpen(false)} onSave={saveProject} />
-      <ProjectDetailModal open={Boolean(selected)} project={selected} state={state} orgCache={orgCache} currentUser={currentUser} onClose={() => setSelectedId("")} dispatch={dispatch} onEdit={() => { setSelectedId(""); openEditor(selected); }} onSyncDecisionTodo={decision => {
+      <ProjectDetailModal open={Boolean(selected)} project={selected} state={state} orgCache={orgCache} currentUser={currentUser} onClose={() => setSelectedId("")} dispatch={dispatch} archiveProjectChild={archiveProjectChild} onDelete={() => setDeleting(selected)} onEdit={() => { setSelectedId(""); openEditor(selected); }} onSyncDecisionTodo={decision => {
         const users = orgCache?.users || [];
         const creator = users.find(user => user.name === currentUser?.name) || currentUser;
         const executor = users.find(user => user.name === decision.decisionOwner) || {};
@@ -57,6 +59,7 @@ export function KeyProjectsPage() {
         detailUrl.hash = "projects";
         return syncDecisionTodo?.(decision.id, { creator, executor, detailUrl: detailUrl.toString() });
       }} />
+      <ConfirmDialog open={Boolean(deleting)} title="归档重点项目" message={deleting?.name || "该重点项目"} description="项目下的里程碑、风险和待决策会一并归档，历史审计记录会保留。" confirmLabel="确认归档" onClose={() => setDeleting(null)} onConfirm={() => { archiveProject(deleting.id); setDeleting(null); setSelectedId(""); }} />
     </section>
   );
 }
