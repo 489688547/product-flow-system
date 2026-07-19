@@ -150,7 +150,7 @@ git commit -m "feat(navigation): group authorized app routes"
 - Consumes: `groupSidebarNavigation(visibleNavigation)` and `expandedGroupForScreen(visibleNavigation, activeScreen)` from Task 1.
 - Produces: one controlled desktop App group with `aria-expanded`; preserves every authorized route in the DOM for the mobile flat layout.
 
-- [ ] **Step 1: Write the failing integration and CSS contract tests**
+- [x] **Step 1: Write the failing integration and CSS contract tests**
 
 ```js
 import test from "node:test";
@@ -180,13 +180,13 @@ test("desktop collapses App children while mobile restores the flat authorized n
 });
 ```
 
-- [ ] **Step 2: Run the UI test and verify RED**
+- [x] **Step 2: Run the UI test and verify RED**
 
 Run: `node --test react-tests/sidebar-navigation-ui.test.mjs`
 
 Expected: FAIL because `App.jsx` does not use grouped navigation and the new CSS selectors do not exist.
 
-- [ ] **Step 3: Integrate grouped navigation in App.jsx**
+- [x] **Step 3: Integrate grouped navigation in App.jsx**
 
 Add the domain import:
 
@@ -248,7 +248,7 @@ Replace the flat `<nav>` mapping with:
 </nav>
 ```
 
-- [ ] **Step 4: Add restrained desktop and mobile styles**
+- [x] **Step 4: Add restrained desktop and mobile styles**
 
 ```css
 .sidebar-app-group, .sidebar-group-items { min-width: 0; display: grid; gap: 2px; }
@@ -271,13 +271,13 @@ Replace the flat `<nav>` mapping with:
 }
 ```
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [x] **Step 5: Run focused tests and verify GREEN**
 
 Run: `node --test react-tests/sidebar-navigation.test.mjs react-tests/sidebar-navigation-ui.test.mjs react-tests/company-access-gate.test.mjs react-tests/shared-state.test.mjs`
 
 Expected: PASS with the new accordion tests plus existing access and permission tests.
 
-- [ ] **Step 6: Commit the interface behavior**
+- [x] **Step 6: Commit the interface behavior**
 
 ```bash
 git add src/App.jsx src/styles.css react-tests/sidebar-navigation-ui.test.mjs
