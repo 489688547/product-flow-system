@@ -16,7 +16,7 @@
     "check:environment-capabilities": "node scripts/generate-platform-manifests.mjs --check",
     "verify:production": "node scripts/check-deployed-readiness.mjs --url https://product-flow-system.pages.dev",
     "test:react": "node --test react-tests/*.test.mjs",
-    "test:api": "node --test tests/environment-capabilities.test.mjs tests/environment-readiness-api.test.mjs tests/deployed-readiness.test.mjs tests/production-data-access.test.mjs tests/local-production-data-client.test.mjs tests/shared-state.test.mjs tests/platform-api.test.mjs tests/integration-profiles-api.test.mjs tests/brand-content-api.test.mjs tests/dingtalk-api.test.mjs tests/dingtalk-org.test.mjs tests/dingtalk-org-routes.test.mjs tests/dingtalk-sync.test.mjs tests/dingtalk-todo-update.test.mjs tests/dingtalk-todo-list.test.mjs tests/dws-todo-preview.test.mjs tests/dingtalk-web-auth.test.mjs tests/dingtalk-group-auth.test.mjs tests/dingtalk-groups.test.mjs",
+    "test:api": "node --test tests/environment-capabilities.test.mjs tests/hr-management-migration.test.mjs tests/environment-readiness-api.test.mjs tests/deployed-readiness.test.mjs tests/production-data-access.test.mjs tests/local-production-data-client.test.mjs tests/shared-state.test.mjs tests/platform-api.test.mjs tests/integration-profiles-api.test.mjs tests/brand-content-api.test.mjs tests/dingtalk-api.test.mjs tests/dingtalk-org.test.mjs tests/dingtalk-org-routes.test.mjs tests/dingtalk-sync.test.mjs tests/dingtalk-todo-update.test.mjs tests/dingtalk-todo-list.test.mjs tests/dws-todo-preview.test.mjs tests/dingtalk-web-auth.test.mjs tests/dingtalk-group-auth.test.mjs tests/dingtalk-groups.test.mjs",
     "test": "npm run test:react && npm run test:api",
     "start": "node server.mjs"
   },

@@ -4,6 +4,18 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const routePath = resolve("functions/api/platform/v1/environment-readiness.js");
+const HR_CORE_TABLES = [
+  "hr_employees",
+  "hr_assignments",
+  "hr_role_assignments",
+  "hr_lifecycle_events",
+  "hr_performance_templates",
+  "hr_performance_cycles",
+  "hr_performance_items",
+  "hr_evidence_snapshots",
+  "hr_audit_logs",
+  "hr_management_meta"
+];
 
 async function loadRoute() {
   assert.equal(existsSync(routePath), true, "environment readiness route must exist");
@@ -58,7 +70,8 @@ test("warning capabilities do not block an otherwise ready production environmen
     "production_write_unlocks",
     "production_data_snapshots",
     "production_data_snapshot_parts",
-    "production_data_audit"
+    "production_data_audit",
+    ...HR_CORE_TABLES
   ];
   const response = await onRequest({
     request: request(),
@@ -98,7 +111,8 @@ test("a server-only production data token can read readiness without an employee
     "production_write_unlocks",
     "production_data_snapshots",
     "production_data_snapshot_parts",
-    "production_data_audit"
+    "production_data_audit",
+    ...HR_CORE_TABLES
   ];
   const db = {
     prepare(sql) {
