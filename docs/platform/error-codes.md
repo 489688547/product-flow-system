@@ -30,6 +30,7 @@
 | `STATE_` | 共享状态、版本或持久化 | `STATE_SAVE_FAILED` |
 | `DINGTALK_` | 钉钉授权和接口调用 | `DINGTALK_PERMISSION_MISSING` |
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
+| `PLATFORM_` | 公司级平台连接、验证、版本和安全存储 | `PLATFORM_CONNECTION_VALIDATION_FAILED` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
 | `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
 | `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
@@ -45,6 +46,15 @@
 - `INTEGRATION_PROFILE_INVALID`：字段、URL、日期、平台 ID 或敏感内容校验失败。
 - `INTEGRATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定，公开资料仍可降级展示。
 - `VALIDATION_METHOD_NOT_ALLOWED`：请求方法不受支持。
+
+平台连接 API 使用：
+
+- `PLATFORM_CONNECTION_INVALID`：平台、字段或请求结构不符合该平台契约。
+- `PLATFORM_CONNECTION_NOT_FOUND`：要停用的保险箱连接不存在。
+- `PLATFORM_CONNECTION_VERSION_CONFLICT`：读取版本已经过期，候选连接未切换，HTTP 409。
+- `PLATFORM_CONNECTION_VALIDATION_FAILED`：候选配置未通过只读平台验证，原连接不受影响，HTTP 422。
+- `PLATFORM_CREDENTIAL_KEY_UNAVAILABLE`：当前部署缺少有效的加密主密钥。
+- `PLATFORM_CONNECTION_STORAGE_UNAVAILABLE`：当前部署缺少 D1 绑定或保险箱表不可用。
 
 部门协同 API 使用：
 
@@ -85,6 +95,7 @@
 - 403：已登录但没有操作权限。
 - 404：资源不存在或对当前用户不可见。
 - 409：版本、重复操作或状态冲突。
+- 422：请求结构正确，但候选平台连接未通过验证。
 - 423：资源已锁定，生产写入需要重新解锁。
 - 429：达到接口限流。
 - 500：未预期服务端错误。

@@ -19,7 +19,7 @@
   - 验证：`npm run check:governance`。
   - 提交：`docs(platform): define managed platform connections`。
 
-- [ ] 建立加密存储和 D1 迁移
+- [x] 建立加密存储和 D1 迁移
   - 依赖：任务 1。
   - 文件：`credentialCrypto.js`、`platformCredentials.js`、迁移和单元测试。
   - 输入：32 字节 Base64URL 主密钥、平台字段对象。
@@ -29,7 +29,7 @@
   - 验证：`node --test tests/platform-credential-crypto.test.mjs tests/platform-credential-storage.test.mjs`。
   - 提交：`feat(platform): add encrypted credential vault`。
 
-- [ ] 建立管理员 API 和只读连接验证
+- [x] 建立管理员 API 和只读连接验证
   - 依赖：任务 2。
   - 文件：v1 路由、测试器、API 客户端和契约测试。
   - 输入：平台 ID、版本、本次修改字段。
@@ -39,7 +39,7 @@
   - 验证：`node --test tests/platform-connections-api.test.mjs`。
   - 提交：`feat(platform): expose governed connection API`。
 
-- [ ] 统一钉钉、快麦和环境就绪读取
+- [x] 统一钉钉、快麦和环境就绪读取
   - 依赖：任务 3。
   - 文件：两个适配器、登录路由、环境就绪检查及回归测试。
   - 输入：保险箱或旧环境变量。
@@ -49,7 +49,7 @@
   - 验证：聚焦 API 测试和现有钉钉、快麦回归。
   - 提交：`feat(integrations): resolve managed credentials`。
 
-- [ ] 交付老板可用的平台连接页面
+- [x] 交付老板可用的平台连接页面
   - 依赖：任务 3。
   - 文件：domain、state、React 工作区、路由、CSS 和 UI 测试。
   - 输入：脱敏连接状态和平台定义。

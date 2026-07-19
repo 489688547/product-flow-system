@@ -54,6 +54,7 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 - Every pull request must declare `Rule-Writeback` and `Rule-Writeback-Reason`. Shared API, integration, environment, migration, error-contract, production-gateway, or provider-boundary changes must update and name an applicable durable rule file; CI rejects an ungrounded `none`.
 - New branches start from the latest `main`; branches created earlier must update from `main` before merge so they receive the current registry and routing rules.
 - Never commit credentials, access tokens, cookies, personal mobile numbers, or raw provider responses containing sensitive data.
+- Company-wide provider credentials must be managed through the 平台连接保险箱. 浏览器、API 响应、日志和审计记录不得暴露任何明文凭据. Validate candidate credentials with a read-only provider request before switching the active version; provider adapters must resolve credentials through the shared vault resolver, with legacy environment variables used only as a fallback.
 - Company documents remain behind the existing authenticated application boundary even when all employees may view them.
 - Validate authorization on the server; hidden UI is not an authorization boundary.
 - Keep local preview, Cloudflare deployment, DingTalk embedded WebView, and external-provider verification separate.

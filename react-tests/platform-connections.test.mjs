@@ -77,3 +77,16 @@ test("environment blockers link directly to platform connection management", () 
   assert.match(panel, /钉钉应用凭证/);
   assert.match(panel, /公司数据库连接/);
 });
+
+test("durable platform sources register the shared API and provider boundaries", () => {
+  const registry = JSON.parse(read("docs/platform/integration-registry.json"));
+  for (const platformId of ["dingtalk", "kuaimai", "cloudflare-pages", "cloudflare-d1"]) {
+    const platform = registry.platforms.find(item => item.id === platformId);
+    assert.ok(platform, `${platformId} must stay registered`);
+    assert.equal(platform.apiRoutes.includes("/api/platform/v1/platform-connections"), true);
+  }
+  assert.match(read("docs/platform/api-catalog.md"), /\/api\/platform\/v1\/platform-connections/);
+  assert.match(read("docs/platform/integrations.md"), /平台连接保险箱/);
+  assert.match(read("PRODUCT.md"), /平台连接/);
+  assert.match(read("DESIGN.md"), /平台专属配置/);
+});

@@ -14,6 +14,8 @@ test("repository contract defines architecture, workflow, and verification rules
   assert.match(agents, /npm run check:governance/);
   assert.match(agents, /npm test/);
   assert.match(agents, /npm run build/);
+  assert.match(agents, /平台连接保险箱/);
+  assert.match(agents, /浏览器.*明文/);
 });
 
 test("repository provides complete feature and platform templates", () => {
