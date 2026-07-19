@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { normalizePlatformState } from "../src/domain/strategyExecution.js";
 
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 const main = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
@@ -27,4 +28,21 @@ test("performance work is presented as the Human Resources app", () => {
   assert.match(registry, /id: "performance-management",\s+name: "人事管理"/);
   assert.match(permissions, /key: "performance-management", label: "人事管理"/);
   assert.match(permissions, /key: "performanceManagement", label: "人事管理"/);
+});
+
+test("legacy persisted app registry names normalize to Human Resources", () => {
+  const state = normalizePlatformState({
+    appRegistry: [{
+      id: "performance-management",
+      name: "绩效管理",
+      description: "旧的绩效应用说明",
+      route: "performance-management",
+      enabled: true,
+      status: "connected"
+    }]
+  });
+  const hrApp = state.appRegistry.find(item => item.id === "performance-management");
+  assert.equal(hrApp.name, "人事管理");
+  assert.match(hrApp.description, /员工关系/);
+  assert.equal(hrApp.status, "connected");
 });

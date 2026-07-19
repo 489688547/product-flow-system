@@ -560,7 +560,12 @@ export function normalizePlatformState(input) {
       const incoming = Array.isArray(migrated[key]) ? migrated[key] : [];
       const incomingById = new Map(incoming.map(item => [item.id, item]));
       state[key] = [
-        ...DEFAULT_APP_REGISTRY.map(item => ({ ...item, ...(incomingById.get(item.id) || {}) })),
+        ...DEFAULT_APP_REGISTRY.map(item => {
+          const merged = { ...item, ...(incomingById.get(item.id) || {}) };
+          return item.id === "performance-management"
+            ? { ...merged, name: item.name, description: item.description, route: item.route }
+            : merged;
+        }),
         ...incoming.filter(item => !DEFAULT_APP_REGISTRY.some(fallbackItem => fallbackItem.id === item.id)).map(item => ({ ...item }))
       ];
     } else {
