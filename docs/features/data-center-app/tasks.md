@@ -1,27 +1,38 @@
 # 数据中心 App 执行任务
 
-> 以下为已完成的一期任务记录。2026-07-19 确认的连接器目录、加密凭证保险箱和本地采集器扩展任务将在新版实施计划通过后追加。
+> 以下记录一期交付，以及 2026-07-19 确认的连接器目录、加密凭证保险箱和后续本地采集器扩展任务。
 
 ## 2026-07-19 连接器与加密保险箱扩展
 
-- [ ] 连接器领域定义
+- [x] 连接器领域定义
   - 输出：八个经营连接器、五类内部系统、平台专属字段 schema、状态优先级和安全配置校验。
-  - 验证：`node --test react-tests/data-center-connectors.test.mjs`。
-- [ ] 加密与 D1 存储
+  - 验证：`node --test react-tests/data-center-connectors.test.mjs`，8/8 通过。
+  - 提交：`26b6b83 feat(data): define connector schemas`。
+- [x] 加密与 D1 存储
   - 输出：AES-256-GCM、版本化密钥、凭证/权限/审计/连接实例迁移和环境能力清单。
-  - 验证：`node --test tests/credential-vault-crypto.test.mjs tests/credential-vault-storage.test.mjs`。
-- [ ] 凭证保险箱 API
+  - 验证：`node --test tests/credential-vault-crypto.test.mjs tests/credential-vault-storage.test.mjs`，13/13 通过。
+  - 提交：`b4cd098 feat(platform): add encrypted credential storage`。
+- [x] 凭证保险箱 API
   - 输出：脱敏列表、创建、替换、归档、15 分钟内总经办 reveal 和稳定错误码。
-  - 验证：`node --test tests/credential-vault-api.test.mjs`。
-- [ ] 连接实例 API
+  - 验证：`node --test tests/credential-vault-api.test.mjs`，15/15 通过。
+  - 提交：`321a630 feat(platform): expose credential vault API`。
+- [x] 连接实例 API
   - 输出：经营连接器和内部保险箱的非敏感实例，保存后保持 `pending_validation`。
-  - 验证：`node --test tests/data-center-connectors-api.test.mjs`。
-- [ ] 数据接入界面
+  - 验证：`node --test tests/data-center-connectors-api.test.mjs`，12/12 通过。
+  - 提交：`57924cf feat(data): persist connector instances`。
+- [x] 前端状态编排
+  - 输出：连接器、凭据元数据和内部保险箱的统一客户端与 Provider 状态，不在浏览器持久化密文。
+  - 验证：`node --test react-tests/data-center-connections-api.test.mjs`，8/8 通过。
+  - 提交：`3eadcb6 feat(data): orchestrate connector settings`。
+- [x] 数据接入界面
   - 输出：Logo 目录、经营/保险箱分区、平台专属弹窗、已有密文替换交互和完整页面状态。
-  - 验证：`node --test react-tests/data-center-connections-ui.test.mjs react-tests/data-center-app.test.mjs`。
-- [ ] 阶段 1 交付验证
+  - 验证：`node --test react-tests/data-center-connections-ui.test.mjs react-tests/data-center-app.test.mjs`，12/12 通过；1440px 与 390px 本地浏览器无页面横向溢出，弹窗键盘关闭正常。
+  - 提交：`8f85d83 feat(data): add connector and vault workspace`。
+- [x] 阶段 1 交付验证
   - 输出：文档、API 目录、环境清单、迁移、测试、构建与响应式检查一致。
-  - 验证：完整 Definition of Done 命令。
+  - 验证：`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm test`（React 422/422、API 195/195）和 `npm run build` 全部通过；生产 JavaScript 分块均小于 500 KB。
+  - 实页检查：1440px 与 390px 本地预览无页面横向溢出；平台弹窗、Esc 关闭、中文业务标签、经营/保险箱切换和接口失败态正常。Vite 本地预览未挂载 Cloudflare Functions，因此未把本地接口失败误报为生产接通。
+  - 未执行：Cloudflare 部署、D1 生产迁移、Secret 写入、真实凭证导入、真实平台登录和钉钉 WebView 验收；这些操作需要单独授权并属于后续生产发布窗口。
 
 ## 后续阶段
 

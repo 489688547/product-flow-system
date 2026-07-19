@@ -1,4 +1,4 @@
-# Data Center Connectors and Credential Vault Implementation Plan
+# 数据中心连接器与凭据保险箱实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
