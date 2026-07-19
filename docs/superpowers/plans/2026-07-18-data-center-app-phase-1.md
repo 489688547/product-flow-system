@@ -1,4 +1,6 @@
-# 数据中心应用第一阶段实施计划
+# 数据中心应用第一阶段实施计划（历史版本）
+
+> 本文只记录 2026-07-18 已完成的一期执行步骤，其中“不保存凭证”的测试不再适用于 2026-07-19 确认的连接器与加密保险箱扩展。当前规则见 `docs/features/data-center-app/prd.md`、`docs/features/data-center-app/design.md` 和 `docs/decisions/2026-07-19-encrypted-credential-vault.md`。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

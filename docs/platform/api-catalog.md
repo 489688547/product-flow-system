@@ -21,6 +21,9 @@
 | `/api/performance-management` | 按角色读取绩效状态 | 员工只读本人；主管看管理范围；人事管理归档 |
 | `/api/performance-management/actions` | 自评、终评、复核、冻结和更正 | 角色动作白名单、版本冲突、一次复核、冻结后追加更正 |
 | `/api/platform/v1/integrations` | 读取和维护内部平台资料 | 全员可读；仅总经办非只读身份可写；字段白名单；D1 审计只记录字段名 |
+| `/api/platform/v1/credential-vault` | 保存和读取加密凭证的脱敏元数据 | 公司会话；动作级权限；普通读取永不返回明文；D1 使用版本化密文 |
+| `/api/platform/v1/credential-vault/:id/reveal` | 受控查看或复制单条凭证 | 近期认证、条目范围授权、明确用途、限流、禁止缓存和追加式审计 |
+| `/api/platform/v1/credential-vault/:id/task-grants` | 向指定本地采集器签发短时凭证授权 | 绑定任务、采集器和字段范围；默认一次消费；采集器不持有主密钥 |
 | `/api/platform/v1/collaboration-items` | 查询和创建跨 App 部门协同事项 | 公司会话；普通员工按本人和部门参与范围；游标分页；业务幂等键 |
 | `/api/platform/v1/collaboration-items/:id` | 读取、修改和归档单个协同事项 | 参与范围；版本乐观锁；无物理 DELETE |
 | `/api/platform/v1/collaboration-items/:id/transitions` | 执行协同状态动作 | 状态机和角色双重校验；动作幂等；追加活动 |
@@ -32,7 +35,13 @@
 
 ### 数据中心契约
 
-`GET /api/data-center` 返回标准化元数据状态；`POST /api/data-center` 接收 `{ "state": { ... } }`。元数据分别保存到 `data_sources`、`data_runners`、`data_sync_runs`、`data_source_files`、`data_dimension_mappings`、`data_metric_definitions`、`data_quality_issues`、`data_app_subscriptions` 和 `data_audit_logs`，设置与版本保存在 `data_center_meta`。来源记录只包含网页地址、采集方式、负责人、状态和口径，不接收凭据。
+`GET /api/data-center` 返回标准化元数据状态；`POST /api/data-center` 接收 `{ "state": { ... } }`。元数据分别保存到 `data_sources`、`data_runners`、`data_sync_runs`、`data_source_files`、`data_dimension_mappings`、`data_metric_definitions`、`data_quality_issues`、`data_app_subscriptions` 和 `data_audit_logs`，设置与版本保存在 `data_center_meta`。连接实例只保存凭证引用，不接收或返回明文；敏感值由共享 credential-vault API 处理。
+
+### 加密凭证保险箱契约
+
+凭证保险箱是数据连接器、内部系统保险箱和本地采集器共用的平台能力。普通 GET 只返回条目 ID、分类、范围、schema 版本、是否已配置、更新时间和脱敏提示。创建或替换接口接收字段白名单内的敏感 payload，服务端使用 Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY` 和 AES-256-GCM 加密后写入 D1；请求体、密文和明文均不得进入日志或审计详情。
+
+OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果不属于凭证 payload。明文查看/复制使用独立 reveal 动作；本地采集器使用绑定任务、机器和字段范围的短时 task grant。完整请求、响应、权限、错误、密钥轮换和兼容契约在实施时写入 `docs/platform/apis/credential-vault-v1.md`，在该契约和迁移完成前这些路径不得宣称生产可用。
 
 `GET /api/data-center/sales?from=YYYY-MM-DD&to=YYYY-MM-DD` 读取现有 `product_sales_daily`，响应包含 `rows` 和以下口径元数据：
 

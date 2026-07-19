@@ -33,6 +33,7 @@
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
 | `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
 | `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
+| `CREDENTIAL_` | 加密凭证、密钥、查看和采集器授权 | `CREDENTIAL_KEY_UNAVAILABLE` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
@@ -66,6 +67,18 @@
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+加密凭证 API 使用：
+
+- `CREDENTIAL_ENTRY_INVALID`：凭证类型、字段 schema、范围或敏感 payload 不合法。
+- `CREDENTIAL_ENTRY_NOT_FOUND`：条目不存在或对当前身份不可见。
+- `CREDENTIAL_KEY_UNAVAILABLE`：加密主密钥或对应密钥版本未配置，不能保存或取用凭证。
+- `CREDENTIAL_DECRYPT_FAILED`：密文校验或解密失败；响应不包含密文、字段值或底层异常。
+- `CREDENTIAL_REAUTH_REQUIRED`：查看或复制明文需要近期重新认证。
+- `CREDENTIAL_REVEAL_DENIED`：当前身份没有该条目的明文查看权限。
+- `CREDENTIAL_TASK_GRANT_INVALID`：采集器、任务、字段范围或授权状态不合法。
+- `CREDENTIAL_TASK_GRANT_EXPIRED`：短时授权已过期、已消费或已吊销。
+- `CREDENTIAL_STORAGE_UNAVAILABLE`：D1 绑定或凭证表不可用。
 
 生产数据与环境 API 使用：
 
