@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="淘系">
+  <rect width="48" height="48" rx="12" fill="#ff6a00"/>
+  <path d="M13 16h22v5H13zm4 8h14v5H17zm3 8h8v5h-8z" fill="#fff"/>
+  <circle cx="14" cy="14" r="3" fill="#fff"/><circle cx="34" cy="14" r="3" fill="#fff"/>
+</svg>

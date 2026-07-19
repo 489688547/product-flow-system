@@ -24,9 +24,10 @@ export function DataCenterAppPage({ section = "overview" }) {
   const summary = useMemo(() => summarizeDataCenterSales(salesRows, range), [range, salesRows]);
   const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
   const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
+  const canManage = user?.role !== "readonly" && canAccessCompanyPlatform(user);
   const content = {
     overview: <DataOverview summary={summary} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} />,
-    sources: <DataSourcesWorkspace canEdit={canEdit} />,
+    sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} />,
     metrics: <MetricDefinitionsWorkspace />,
     quality: <DataQualityWorkspace quality={quality} />,
     sync: <SyncRunsWorkspace />,

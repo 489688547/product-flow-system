@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" role="img" aria-label="巨量引擎">
+  <defs><linearGradient id="o" x1="8" y1="40" x2="40" y2="8"><stop stop-color="#ff3d58"/><stop offset="1" stop-color="#ff9d2e"/></linearGradient></defs>
+  <rect width="48" height="48" rx="12" fill="#fff3ec"/>
+  <path d="M12 29c5-13 12-18 23-17-3 3-5 6-5 9 3-1 6-1 9 0-5 2-8 5-9 9 3 1 5 3 7 5-8 2-15 0-20-4-2 2-3 4-4 7-2-3-2-6-1-9Z" fill="url(#o)"/>
+  <circle cx="24" cy="24" r="5" fill="#fff"/>
+</svg>

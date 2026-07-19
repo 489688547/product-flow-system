@@ -1,0 +1,80 @@
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import test from "node:test";
+
+const root = resolve(new URL("..", import.meta.url).pathname);
+const read = path => readFileSync(resolve(root, path), "utf8");
+
+test("connector catalog uses eight local logo assets and one Ocean Engine entry", () => {
+  for (const name of ["douyin", "oceanengine", "kuaishou", "taobao", "pinduoduo", "xiaohongshu", "jd", "kuaimai"]) {
+    assert.equal(existsSync(resolve(root, `src/assets/connectors/${name}.svg`)), true, `${name}.svg must exist`);
+  }
+  const catalog = read("src/features/data-center/connections/ConnectorCatalog.jsx");
+  assert.match(catalog, /DATA_CONNECTOR_DEFINITIONS/);
+  assert.match(catalog, /douyin\.svg/);
+  assert.match(catalog, /oceanengine\.svg/);
+  assert.match(catalog, /kuaimai\.svg/);
+  assert.match(catalog, /添加连接/);
+  assert.match(catalog, /管理连接/);
+  assert.doesNotMatch(catalog, /巨量千川[\s\S]*巨量千川/);
+});
+
+test("connector dialog is schema driven and treats OTP as instructions", () => {
+  const dialog = read("src/features/data-center/connections/ConnectorConfigDialog.jsx");
+  assert.match(dialog, /definition\.fields/);
+  assert.match(dialog, /definition\.methods/);
+  assert.match(dialog, /definition\.accountTypes/);
+  assert.match(dialog, /definition\.datasets/);
+  assert.match(dialog, /ACCOUNT_TYPE_LABELS/);
+  assert.match(dialog, /DATASET_LABELS/);
+  assert.match(dialog, /type=\{field\.type === "password"/);
+  assert.match(dialog, /已加密保存/);
+  assert.match(dialog, /验证码不会被保存/);
+  assert.match(dialog, /等待人工验证/);
+  assert.match(dialog, /aria-modal="true"/);
+  assert.match(dialog, /role="dialog"/);
+  assert.match(dialog, /保存并验证/);
+  assert.doesNotMatch(dialog, /localStorage|sessionStorage|indexedDB/);
+});
+
+test("data connections workspace separates business connectors from internal vault", () => {
+  const workspace = read("src/features/data-center/connections/DataConnectionsWorkspace.jsx");
+  const vault = read("src/features/data-center/connections/InternalVaultWorkspace.jsx");
+  assert.match(workspace, /经营数据连接器/);
+  assert.match(workspace, /内部系统保险箱/);
+  assert.match(workspace, /ConnectorCatalog/);
+  assert.match(workspace, /ConnectorConfigDialog/);
+  assert.match(workspace, /InternalVaultWorkspace/);
+  assert.match(workspace, /saveConnection/);
+  assert.match(workspace, /saveVaultItem/);
+  assert.match(vault, /INTERNAL_VAULT_TYPES/);
+  for (const text of ["NAS", "邮箱", "财务系统", "政务 / SaaS", "自定义内部系统"]) assert.match(vault, new RegExp(text));
+  assert.match(vault, /查看与复制全程留痕/);
+  assert.match(vault, /查看加密凭证/);
+  assert.match(vault, /setTimeout[\s\S]*60000/);
+});
+
+test("legacy generic source form is removed and security copy is updated", () => {
+  const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
+  const page = read("src/features/data-center/DataCenterAppPage.jsx");
+  assert.match(workspaces, /DataConnectionsWorkspace/);
+  assert.doesNotMatch(workspaces, /function SourceForm/);
+  assert.doesNotMatch(workspaces, /新增数据源/);
+  assert.match(workspaces, /敏感信息加密保存/);
+  assert.match(page, /canManage/);
+  assert.doesNotMatch(page, /DataAnalysis|analysis:/);
+});
+
+test("connector UI has responsive dialog and visible focus rules", () => {
+  const styles = read("src/styles.css");
+  assert.match(styles, /\.connector-catalog-grid/);
+  assert.match(styles, /\.connector-card/);
+  assert.match(styles, /\.connection-tabs/);
+  assert.match(styles, /\.connector-dialog/);
+  assert.match(styles, /\.internal-vault/);
+  assert.match(styles, /\.connector-card:focus-visible/);
+  assert.match(styles, /@media \(max-width: 900px\)[\s\S]*connector-catalog-grid/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*connector-catalog-grid/);
+  assert.match(styles, /@media \(max-width: 390px\)[\s\S]*connector-dialog/);
+});

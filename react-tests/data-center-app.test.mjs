@@ -70,14 +70,9 @@ test("governance workspaces cover safe sources metrics quality sync services and
   assert.match(page, /SyncRunsWorkspace/);
   assert.match(page, /DataServicesWorkspace/);
   assert.match(page, /DataCenterSettingsWorkspace/);
-  assert.match(workspaces, /不保存账号密码、Cookie、验证码或 Token/);
-  assert.doesNotMatch(workspaces, /type="password"/);
-  assert.match(workspaces, /抖音店铺/);
-  assert.match(workspaces, /快手店铺/);
-  assert.match(workspaces, /天猫店铺/);
-  assert.match(workspaces, /快麦 ERP/);
-  assert.match(workspaces, /巨量引擎/);
-  assert.match(workspaces, /待验证/);
+  assert.match(workspaces, /DataConnectionsWorkspace/);
+  assert.match(workspaces, /敏感信息加密保存/);
+  assert.doesNotMatch(workspaces, /function SourceForm/);
   assert.match(workspaces, /订单创建时间/);
   assert.match(workspaces, /Asia\/Shanghai/);
   assert.match(workspaces, /应用订阅/);
