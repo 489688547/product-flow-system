@@ -39,8 +39,11 @@ function evidence(meta, rowNumber) {
   };
 }
 
-function supplierCategory(sourceCategory) {
+function supplierCategory(sourceCategory, supplyScope) {
   const value = text(sourceCategory);
+  if (value.includes("对接供应商")) {
+    return /(罐|包装袋|包装盒|贴纸|干燥剂)/.test(text(supplyScope)) ? "包材" : "原料";
+  }
   if (value.includes("快递") || value.includes("服务") || value.includes("加工")) return "加工";
   if (value.includes("产品耗材") || value.includes("包装袋") || value.includes("包装盒") || value.includes("贴纸")) return "包材";
   if (value.includes("打包耗材") || value.includes("快递箱")) return "耗材";
@@ -86,12 +89,17 @@ export function parseSupplierCsv(csv, meta = {}) {
     const supplyScope = text(values[2]);
     const isHeader = rowNumber === 1 || name.includes("供应商名称");
     const isSectionMarker = name.endsWith("对接供应商") && !supplyScope;
-    if (!name || isHeader || isSectionMarker) { skipped += 1; continue; }
+    if (isSectionMarker) {
+      sourceCategory = name;
+      skipped += 1;
+      continue;
+    }
+    if (!name || isHeader) { skipped += 1; continue; }
     records.push({
       id: recordId("supplier", meta, rowNumber),
       code: `DT-SUP-${String(rowNumber).padStart(3, "0")}`,
       name,
-      category: supplierCategory(sourceCategory),
+      category: supplierCategory(sourceCategory, supplyScope),
       sourceCategory,
       supplyScope,
       status: "active",

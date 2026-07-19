@@ -14,8 +14,10 @@ test("supplier CSV imports only operational fields and inherits source categorie
     "[row=1] 类别,供应商名称（简称或联系人）,采购产品、耗材、服务,开票主体,,,,,,,,,收款人银行账号,收款人资料",
     "[row=2] 原料、成品,临沂火火,爱心冻干、纸棉,某开票主体,,,,,,,,,622200001234,身份证附件.jpg",
     "[row=3] ,山东金久,蓝袋粮、奶酪,另一开票主体,,,,,,,,,621700009876,银行卡附件.jpg",
-    "[row=4] 快递、服务,德尚青柏对接供应商,,,,,,,,,,,,",
-    "[row=5] ,临沂智派,兰山云仓发货仓,仓储公司,,,,,,,,,623100001111,"
+    "[row=4] 快递、服务,临沂智派,兰山云仓发货仓,仓储公司,,,,,,,,,623100001111,",
+    "[row=5] ,德尚青柏对接供应商,,,,,,,,,,,,",
+    "[row=6] ,河北海士达,罐子,,,,,,,,,,,,",
+    "[row=7] ,兴化东奥,果蔬干（烘干冻干）,,,,,,,,,,,,"
   ].join("\n"), {
     nodeId: "supplier-node",
     sheetId: "s1",
@@ -23,11 +25,13 @@ test("supplier CSV imports only operational fields and inherits source categorie
     importedAt: "2026-07-19T00:00:00.000Z"
   });
 
-  assert.equal(result.records.length, 3);
-  assert.deepEqual(result.records.map(row => row.name), ["临沂火火", "山东金久", "临沂智派"]);
-  assert.deepEqual(result.records.map(row => row.category), ["原料", "原料", "加工"]);
+  assert.equal(result.records.length, 5);
+  assert.deepEqual(result.records.map(row => row.name), ["临沂火火", "山东金久", "临沂智派", "河北海士达", "兴化东奥"]);
+  assert.deepEqual(result.records.map(row => row.category), ["原料", "原料", "加工", "包材", "原料"]);
   assert.equal(result.records[1].sourceCategory, "原料、成品");
   assert.equal(result.records[2].supplyScope, "兰山云仓发货仓");
+  assert.equal(result.records[3].sourceCategory, "德尚青柏对接供应商");
+  assert.equal(result.records[4].sourceCategory, "德尚青柏对接供应商");
   assert.equal(result.records[0].sourceRow, 2);
   assert.equal("bankAccount" in result.records[0], false);
   assert.equal("contactPhone" in result.records[0], false);
