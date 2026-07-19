@@ -36,6 +36,7 @@
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
+| `AI_` | 公司 AI 总助、数据权限、Provider 和流式响应 | `AI_PROVIDER_RATE_LIMITED` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -66,6 +67,21 @@
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+公司 AI 总助 API 使用：
+
+- `AI_DISABLED`：公司 AI 总助功能开关关闭。
+- `AI_SESSION_REQUIRED`：没有有效公司会话。
+- `AI_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+- `AI_PROVIDER_NOT_REGISTERED`：Provider 不在服务端白名单。
+- `AI_PROVIDER_SECRET_MISSING`：新的服务端 Secret 尚未配置。
+- `AI_PROVIDER_MANAGE_DENIED`：当前身份不能修改 Provider 元数据。
+- `AI_PROVIDER_TEST_DENIED`：当前身份不能执行合成连接测试。
+- `AI_PROVIDER_AUTH_FAILED`：Provider 拒绝服务端凭据。
+- `AI_PROVIDER_RATE_LIMITED`：Provider 返回 429，适合稍后手动重试。
+- `AI_PROVIDER_TIMEOUT`：Provider 在 45 秒内未响应。
+- `AI_PROVIDER_UNAVAILABLE`：Provider 网络或 5xx 故障。
+- `AI_PROVIDER_STREAM_FAILED`：流式响应失败或中断；已生成内容可保留但不得当作完整回答。
 生产数据与环境 API 使用：
 
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。

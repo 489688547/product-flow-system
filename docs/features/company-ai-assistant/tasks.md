@@ -42,7 +42,7 @@
   - 证据：`node --test tests/ai-context-policy.test.mjs react-tests/ai-assistant-domain.test.mjs tests/data-center-api.test.mjs`（16/16）；上下文按域白名单、部门范围、24,000 字符上限和财务阻止验证通过。
   - 提交：`feat(ai): build governed company context`。
 
-- [ ] 任务 4：实现 AI 状态、Provider 管理和连接测试 API
+- [x] 任务 4：实现 AI 状态、Provider 管理和连接测试 API
   - 依赖：任务 1、2。
   - 文件：`functions/api/platform/v1/ai/status.js`、`provider.js`、`provider/test.js`、审计存储、`tests/ai-api.test.mjs`。
   - 输入：会话、Provider 网关、D1。
@@ -50,6 +50,7 @@
   - 失败测试：认证、只读、运营越权、密钥不回显、合成测试和无 D1 错误均缺失。
   - 实现步骤：状态 GET → Provider GET/PUT → 测试 POST → 审计写入。
   - 验证：API 测试确认非总经办不能编辑/测试，任何响应不含 Secret。
+  - 证据：`node --test tests/ai-api.test.mjs tests/ai-provider.test.mjs tests/ai-context-policy.test.mjs`（15/15）；总经办安全更新、合成测试、运营/只读拒绝和单用户并发租约通过。
   - 提交：`feat(ai): add provider management APIs`。
 
 - [ ] 任务 5：实现流式总助聊天 API

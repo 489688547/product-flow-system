@@ -29,6 +29,10 @@
 | `/api/platform/v1/environment-readiness` | 读取当前或生产环境脱敏就绪状态 | 员工会话或 read 个人令牌；只返回配置名称与存在性 |
 | `/api/platform/v1/production-write-session` | 解锁、查询和锁定跨环境生产写入 | active executive + write 个人令牌；确认短语；15 分钟有效 |
 | `/api/platform/v1/production-data/state` | 本地测试实时读取、受控写入和回滚生产公司状态 | Bearer 个人令牌；写入需解锁、基线版本、快照与审计 |
+| `GET /api/platform/v1/ai/status` | 读取公司 AI 总助和当前用户数据域状态 | 钉钉会话；全员可读；只返回脱敏状态 |
+| `GET /api/platform/v1/ai/provider` | 读取 AI Provider 安全状态 | 钉钉会话；全员可读；外发策略仅总经办可见 |
+| `PUT /api/platform/v1/ai/provider` | 更新白名单内 Provider 元数据和启用状态 | 钉钉会话；仅非只读总经办；不接收 Secret、URL 或任意 Header |
+| `POST /api/platform/v1/ai/provider/test` | 使用合成内容测试 Provider 连接 | 钉钉会话；仅非只读总经办；不加载公司上下文 |
 
 ### 数据中心契约
 
@@ -52,6 +56,14 @@
 兼容策略：数据中心不复制销售事实，继续复用 `product_sales_daily`。本地开发没有 D1 时，元数据写入 `.local-data/data-center-state.json`，销售读取返回 501 并由前端降级到现有浏览器销售仓库；销售行不会写入 `localStorage`。
 
 远程只读预览：`wrangler pages dev` 通过 `wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1` 且显式设置 `LOCAL_LIVE_D1_PREVIEW=1` 时，中间件才注入总经办预览身份；该模式只允许 GET，所有写请求返回 403。非本地主机即使设置同名变量也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
+
+### 公司 AI 总助契约
+
+AI 路由统一使用 `/api/platform/v1/ai/*`，沿用公司钉钉会话。状态与 Provider 响应只包含功能开关、是否就绪、是否已配置服务端 Secret、固定模型元数据、连接测试状态及当前身份可使用或被外发策略阻止的数据域；任何响应不得包含 Secret、Secret 尾号、内部 Header 或 Provider 原始错误。
+
+Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled`，实际域名、Responses 路径、`store:false` 与 Header 白名单由服务端固定。连接测试输入固定为“返回 ok”，不读取 D1 业务事实。写入安全元数据后由数据中心 D1 表持久化；密钥仍只存在 Cloudflare Secret。
+
+兼容策略：`AI_ASSISTANT_ENABLED` 默认关闭，关闭时状态接口返回 `enabled:false`，不要求 D1 或 Provider Secret。回滚只需关闭开关；AI 元数据、外发策略和无内容审计表保留，不影响其他业务 App。电商运营旧 AI 点评本期保持原路由和规则降级，不属于该共享 API 的调用方。
 
 ### 店铺运营与绩效契约
 
