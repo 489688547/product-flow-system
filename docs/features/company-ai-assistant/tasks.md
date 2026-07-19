@@ -31,7 +31,7 @@
   - 证据：`node --test tests/ai-provider.test.mjs`（6/6），全部使用注入的假 `fetch`，未发起外部请求。
   - 提交：`feat(ai): add responses provider gateway`。
 
-- [ ] 任务 3：实现服务端 AI 数据权限和公司上下文目录
+- [x] 任务 3：实现服务端 AI 数据权限和公司上下文目录
   - 依赖：任务 1。
   - 文件：`functions/api/platform/v1/ai/_shared/data-policy.js`、`context-catalog.js`、`context-builders/*`、`tests/ai-context-policy.test.mjs`。
   - 输入：登录会话、AI 数据策略、现有产品/平台/供应链/数据中心存储。
@@ -39,6 +39,7 @@
   - 失败测试：普通员工越权、总经办全局读取、财务外发阻止、隐私字段移除和 24,000 字符上限均未实现。
   - 实现步骤：先实现纯策略，再逐域接只读存储；财务提供器登记但在当前 Provider 下不读取内容。
   - 验证：上下文测试覆盖跨 App、缺失、过期、未授权、提示注入和限额。
+  - 证据：`node --test tests/ai-context-policy.test.mjs react-tests/ai-assistant-domain.test.mjs tests/data-center-api.test.mjs`（16/16）；上下文按域白名单、部门范围、24,000 字符上限和财务阻止验证通过。
   - 提交：`feat(ai): build governed company context`。
 
 - [ ] 任务 4：实现 AI 状态、Provider 管理和连接测试 API

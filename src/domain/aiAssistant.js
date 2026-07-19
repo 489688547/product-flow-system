@@ -1,15 +1,15 @@
 const PROVIDER_ID = "lingsuan-responses";
 
 export const AI_DATA_DOMAINS = Object.freeze([
-  { id: "strategy", name: "公司战略", classification: "internal", departments: ["总经办"] },
-  { id: "projects", name: "重点项目", classification: "internal", departments: ["总经办"] },
-  { id: "commitments", name: "部门承诺", classification: "internal", departments: [] },
-  { id: "product_lifecycle", name: "产品需求与生命周期", classification: "internal", departments: ["产品部"] },
-  { id: "supply_chain", name: "供应链", classification: "internal", departments: ["供应链部", "供应链", "供应链团队", "采购部"] },
-  { id: "operating_reviews", name: "经营检查", classification: "internal", departments: ["运营部"] },
-  { id: "sales_operations", name: "销售经营摘要", classification: "internal", departments: ["运营部"] },
-  { id: "data_quality", name: "数据质量与同步状态", classification: "internal", departments: ["运营部", "财务部", "产品部", "供应链部"] },
-  { id: "finance", name: "财务", classification: "restricted", departments: ["财务部"] }
+  { id: "strategy", name: "公司战略", classification: "internal", viewDepartments: ["总经办"], viewTitles: [] },
+  { id: "projects", name: "重点项目", classification: "internal", viewDepartments: ["总经办"], viewTitles: [] },
+  { id: "commitments", name: "部门承诺", classification: "internal", viewDepartments: [], viewTitles: ["负责人", "主管", "总监"] },
+  { id: "product_lifecycle", name: "产品需求与生命周期", classification: "internal", viewDepartments: ["产品部"], viewTitles: ["产品经理"] },
+  { id: "supply_chain", name: "供应链", classification: "internal", viewDepartments: ["供应链部", "供应链", "供应链团队", "采购部"], viewTitles: [] },
+  { id: "operating_reviews", name: "经营检查", classification: "internal", viewDepartments: ["运营部", "品牌部"], viewTitles: ["运营主管"] },
+  { id: "sales_operations", name: "销售经营摘要", classification: "internal", viewDepartments: ["运营部", "品牌部"], viewTitles: ["运营主管"] },
+  { id: "data_quality", name: "数据质量与同步状态", classification: "internal", viewDepartments: ["运营部", "财务部", "产品部", "供应链部"], viewTitles: [] },
+  { id: "finance", name: "财务", classification: "restricted", viewDepartments: ["财务部"], viewTitles: [] }
 ]);
 
 export const DEFAULT_AI_PROVIDER = Object.freeze({
@@ -49,7 +49,8 @@ export function createDefaultAiDataPolicies() {
     domainId: domain.id,
     name: domain.name,
     classification: domain.classification,
-    departments: [...domain.departments],
+    viewDepartments: [...domain.viewDepartments],
+    viewTitles: [...domain.viewTitles],
     providerTransfer: {
       [PROVIDER_ID]: domain.id === "finance" ? "blocked" : "allowed"
     },
@@ -70,6 +71,8 @@ export function normalizeAiDataPolicies(input = []) {
     const transfer = item.providerTransfer?.[PROVIDER_ID] === "blocked" ? "blocked" : "allowed";
     return {
       ...fallback,
+      viewDepartments: stringList(item.viewDepartments, fallback.viewDepartments),
+      viewTitles: stringList(item.viewTitles, fallback.viewTitles),
       providerTransfer: {
         [PROVIDER_ID]: fallback.domainId === "finance" ? "blocked" : transfer
       },
@@ -78,4 +81,9 @@ export function normalizeAiDataPolicies(input = []) {
       reviewedBy: typeof item.reviewedBy === "string" ? item.reviewedBy.slice(0, 120) : ""
     };
   });
+}
+
+function stringList(value, fallback) {
+  if (!Array.isArray(value)) return [...fallback];
+  return [...new Set(value.map(item => String(item || "").trim()).filter(Boolean))].slice(0, 50);
 }
