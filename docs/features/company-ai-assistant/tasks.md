@@ -97,7 +97,7 @@
   - 证据：`node --test react-tests/ai-provider-settings.test.mjs react-tests/data-center-app.test.mjs react-tests/ai-assistant-api.test.mjs`（13/13）、`npm run lint`、`npm run build`；1440px 与 390px 浏览器验收无横向溢出，窄屏配置为单列，本地只读预览未执行保存和 Provider 连接测试。
   - 提交：`feat(data): manage ai provider service`。
 
-- [ ] 任务 9：全量验证与安全交付
+- [x] 任务 9：全量验证与安全交付
   - 依赖：任务 1–8。
   - 文件：任务文档验证记录、必要的平台/产品/设计文档更新。
   - 输入：完整分支差异。
@@ -105,4 +105,5 @@
   - 失败测试：不适用；必须新鲜运行完整门禁。
   - 实现步骤：敏感值扫描 → 全量命令 → 浏览器矩阵 → diff/status 核对。
   - 验证：Definition of Done 全部通过；外部连接测试仅在新 Secret 获授权配置后执行。
+  - 证据：敏感值扫描 0 命中；AI 安全专项 29/29；全量 React 415/415、API 218/218；`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm run build` 全部退出 0。1440/1280/900/640/390px 浏览器验收无横向溢出，焦点、Escape、只读/禁用状态和控制台 0 错误。未部署、未配置生产 Secret、未执行真实 Provider 连接、未写入生产数据；DingTalk 嵌入运行时与 Cloudflare 生产环境需部署授权后单独验收。
   - 提交：`docs(ai): record assistant verification`。
