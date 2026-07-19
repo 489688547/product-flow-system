@@ -82,6 +82,12 @@
 - `AI_PROVIDER_TIMEOUT`：Provider 在 45 秒内未响应。
 - `AI_PROVIDER_UNAVAILABLE`：Provider 网络或 5xx 故障。
 - `AI_PROVIDER_STREAM_FAILED`：流式响应失败或中断；已生成内容可保留但不得当作完整回答。
+- `AI_PROVIDER_NOT_READY`：Provider 未启用或服务端 Secret 未就绪。
+- `AI_MESSAGES_INVALID`：消息数量、角色、长度或顺序不符合契约。
+- `AI_FINANCE_TRANSFER_BLOCKED`：消息包含具体财务值，当前 Provider 未通过外发审核。
+- `AI_REQUEST_IN_FLIGHT`：当前用户已有一个回答正在生成，HTTP 409。
+- `AI_CONTEXT_EMPTY`：当前身份没有可用且可外发的公司数据上下文。
+- `AI_STREAM_CANCELLED`：客户端主动停止回答，租约已释放且审计标记未完成。
 生产数据与环境 API 使用：
 
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。

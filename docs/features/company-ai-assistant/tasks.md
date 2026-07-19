@@ -53,7 +53,7 @@
   - 证据：`node --test tests/ai-api.test.mjs tests/ai-provider.test.mjs tests/ai-context-policy.test.mjs`（15/15）；总经办安全更新、合成测试、运营/只读拒绝和单用户并发租约通过。
   - 提交：`feat(ai): add provider management APIs`。
 
-- [ ] 任务 5：实现流式总助聊天 API
+- [x] 任务 5：实现流式总助聊天 API
   - 依赖：任务 2、3、4。
   - 文件：`functions/api/platform/v1/ai/chat.js`、并发保护与审计模块、`tests/ai-api.test.mjs`。
   - 输入：最多 12 条文本消息和当前 App 提示。
@@ -61,6 +61,7 @@
   - 失败测试：客户端上下文字段未拒绝、财务未阻止、消息限额/并发/流取消未处理。
   - 实现步骤：校验 → 数据访问 → 上下文 → Provider → SSE → 审计；失败不自动重试。
   - 验证：API 测试覆盖完整流、取消、超时、429、Provider 5xx 和未知 SSE 事件。
+  - 证据：`node --test tests/ai-api.test.mjs tests/ai-context-policy.test.mjs tests/ai-provider.test.mjs`（20/20）；验证越权字段忽略、财务值阻止、SSE 完整流、主动取消、并发冲突、Provider 失败、无内容审计和租约释放。
   - 提交：`feat(ai): stream governed assistant responses`。
 
 - [ ] 任务 6：实现前端 AI 会话状态和 SSE 客户端

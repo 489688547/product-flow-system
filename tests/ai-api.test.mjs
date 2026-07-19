@@ -6,6 +6,7 @@ const statusUrl = new URL("../functions/api/platform/v1/ai/status.js", import.me
 const providerUrl = new URL("../functions/api/platform/v1/ai/provider.js", import.meta.url);
 const providerTestUrl = new URL("../functions/api/platform/v1/ai/provider/test.js", import.meta.url);
 const auditUrl = new URL("../functions/api/platform/v1/ai/_shared/audit.js", import.meta.url);
+const chatUrl = new URL("../functions/api/platform/v1/ai/chat.js", import.meta.url);
 const fakeSecret = ["test", "secret"].join("-");
 const executive = { userId: "u-1", name: "周总", department: "总经办", title: "总经理", role: "executive" };
 
@@ -110,4 +111,158 @@ test("D1 lease permits only one in-flight request per user", async () => {
   assert.equal(await acquireAiLease(db, "u-1", "r-2", 1_001), false);
   await releaseAiLease(db, "u-1", "r-1");
   assert.equal(await acquireAiLease(db, "u-1", "r-3", 1_002), true);
+});
+
+test("chat rejects excess messages and ignores client authority fields", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  const db = createAiD1Mock({ providerEnabled: true });
+  const response = await chatRequest({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        messages: Array.from({ length: 13 }, (_, index) => ({ role: "user", content: `问题 ${index}` })),
+        role: "executive",
+        allowedDomains: ["finance"],
+        companyState: { secret: true }
+      })
+    }),
+    env: { PRODUCT_FLOW_DB: db, AI_ASSISTANT_ENABLED: "1", LINGSUAN_API_KEY: fakeSecret },
+    data: { session: executive }
+  });
+  assert.equal(response.status, 400);
+  assert.equal((await response.json()).error.code, "AI_MESSAGES_INVALID");
+});
+
+test("chat blocks user-pasted financial values before any Provider call", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  let providerCalled = false;
+  const response = await chatRequest({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "请分析本月利润 123456 元和预算差异" }] })
+    }),
+    env: {
+      PRODUCT_FLOW_DB: createAiD1Mock({ providerEnabled: true }),
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: fakeSecret,
+      AI_PROVIDER_FETCH: async () => { providerCalled = true; return new Response(""); }
+    },
+    data: { session: executive }
+  });
+  assert.equal(response.status, 403);
+  assert.equal((await response.json()).error.code, "AI_FINANCE_TRANSFER_BLOCKED");
+  assert.equal(providerCalled, false);
+});
+
+test("chat emits governed metadata finance exclusion sources and completion", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  const db = createAiD1Mock({ providerEnabled: true });
+  const response = await chatRequest({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        messages: [{ role: "user", content: "今天最需要关注什么？" }],
+        appHint: { screen: "home", detail: "" },
+        role: "executive",
+        allowedDomains: ["finance"],
+        companyState: { note: "client-secret-marker" }
+      })
+    }),
+    env: {
+      PRODUCT_FLOW_DB: db,
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: fakeSecret,
+      AI_PROVIDER_FETCH: async (_url, init) => {
+        assert.doesNotMatch(init.body, /client-secret-marker/);
+        assert.match(init.body, /BEGIN_COMPANY_REFERENCE/);
+        return new Response([
+          "event: response.output_text.delta\ndata: {\"delta\":\"关注项目风险\"}\n\n",
+          "event: response.completed\ndata: {\"response\":{\"usage\":{\"input_tokens\":10,\"output_tokens\":4}}}\n\n"
+        ].join(""), { status: 200 });
+      }
+    },
+    data: { session: executive }
+  });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") || "", /text\/event-stream/);
+  const text = await response.text();
+  assert.match(text, /event: meta/);
+  assert.match(text, /finance/);
+  assert.match(text, /event: text_delta/);
+  assert.match(text, /event: sources/);
+  assert.match(text, /event: usage/);
+  assert.match(text, /event: done/);
+  assert.doesNotMatch(text, /test-secret|client-secret-marker/);
+  assert.equal(db.audits.length, 1);
+  assert.doesNotMatch(JSON.stringify(db.audits), /今天最需要关注|关注项目风险|client-secret-marker/);
+  assert.equal(db.leases.size, 0);
+});
+
+test("chat enforces one in-flight request and releases the lease after Provider failure", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  const { acquireAiLease, releaseAiLease } = await import(auditUrl);
+  const db = createAiD1Mock({ providerEnabled: true });
+  await acquireAiLease(db, executive.userId, "existing", Date.now());
+  const request = () => new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ messages: [{ role: "user", content: "分析风险" }] })
+  });
+  const conflict = await chatRequest({
+    request: request(),
+    env: { PRODUCT_FLOW_DB: db, AI_ASSISTANT_ENABLED: "1", LINGSUAN_API_KEY: fakeSecret },
+    data: { session: executive }
+  });
+  assert.equal(conflict.status, 409);
+  assert.equal((await conflict.json()).error.code, "AI_REQUEST_IN_FLIGHT");
+  await releaseAiLease(db, executive.userId, "existing");
+
+  const failed = await chatRequest({
+    request: request(),
+    env: {
+      PRODUCT_FLOW_DB: db,
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: fakeSecret,
+      AI_PROVIDER_FETCH: async () => new Response("private upstream body", { status: 503 })
+    },
+    data: { session: executive }
+  });
+  const text = await failed.text();
+  assert.match(text, /AI_PROVIDER_UNAVAILABLE/);
+  assert.doesNotMatch(text, /private upstream body/);
+  assert.equal(db.leases.size, 0);
+});
+
+test("cancelling a streamed answer aborts the Provider and records no content", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  const db = createAiD1Mock({ providerEnabled: true });
+  let providerAborted = false;
+  const response = await chatRequest({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "分析当前项目" }] })
+    }),
+    env: {
+      PRODUCT_FLOW_DB: db,
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: fakeSecret,
+      AI_PROVIDER_FETCH: async (_url, init) => new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => {
+          providerAborted = true;
+          reject(new DOMException("cancelled", "AbortError"));
+        }, { once: true });
+      })
+    },
+    data: { session: executive }
+  });
+  await response.body.cancel();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(providerAborted, true);
+  assert.equal(db.leases.size, 0);
+  assert.equal(db.audits.length, 1);
+  assert.doesNotMatch(JSON.stringify(db.audits), /分析当前项目/);
 });

@@ -79,6 +79,6 @@ test("missing builders and builder failures do not expose other domains", async 
       data_quality: async () => ({ records: [], updatedAt: "" })
     }
   });
-  assert.deepEqual(result.sources.map(item => item.domainId), ["data_quality"]);
+  assert.deepEqual(result.sources, []);
   assert.doesNotMatch(result.text, /private database failure|finance/);
 });

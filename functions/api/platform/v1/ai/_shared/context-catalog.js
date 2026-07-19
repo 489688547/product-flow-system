@@ -66,11 +66,12 @@ export async function buildCompanyContext({ db, access = {}, question = "", buil
       continue;
     }
     const safe = redact(built?.records ?? {});
+    const count = recordCount(safe);
+    if (!count) continue;
     const serialized = `[${domainId}]\n${JSON.stringify(safe)}`;
     const chunk = serialized.slice(0, remaining);
     if (chunk) chunks.push(chunk);
     remaining -= chunk.length + 1;
-    const count = recordCount(safe);
     domainCounts[domainId] = count;
     sources.push({
       domainId,
