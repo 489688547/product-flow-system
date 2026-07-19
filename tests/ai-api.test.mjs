@@ -221,6 +221,60 @@ test("chat emits governed metadata finance exclusion sources and completion", as
   assert.equal(db.leases.size, 0);
 });
 
+test("chat lets the Provider call authorized read-only App Skills and audits metadata only", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  const db = createAiD1Mock({ providerEnabled: true, providerSkillsSupported: true });
+  let providerCalls = 0;
+  const response = await chatRequest({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "哪些项目有风险？" }], appHint: { screen: "strategy" } })
+    }),
+    env: {
+      PRODUCT_FLOW_DB: db,
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: fakeSecret,
+      AI_PROVIDER_FETCH: async (_url, init) => {
+        providerCalls += 1;
+        const providerRequest = JSON.parse(init.body);
+        assert.ok(providerRequest.tools.some(tool => tool.name === "strategy_query_projects"));
+        assert.doesNotMatch(init.body, /BEGIN_COMPANY_REFERENCE/);
+        if (providerCalls === 1) {
+          const item = {
+            type: "function_call",
+            id: "fc-projects",
+            call_id: "call-projects",
+            name: "strategy_query_projects",
+            arguments: '{"status":"at_risk","limit":5}'
+          };
+          return new Response([
+            `event: response.output_item.done\ndata: ${JSON.stringify({ item })}\n\n`,
+            `event: response.completed\ndata: ${JSON.stringify({ response: { output: [item], usage: { input_tokens: 8, output_tokens: 2 } } })}\n\n`
+          ].join(""), { status: 200 });
+        }
+        const toolOutput = providerRequest.input.find(item => item.type === "function_call_output" && item.call_id === "call-projects");
+        assert.ok(toolOutput);
+        assert.match(toolOutput.output, /重点项目|project-1/);
+        return new Response([
+          "event: response.output_text.delta\ndata: {\"delta\":\"重点关注风险项目\"}\n\n",
+          "event: response.completed\ndata: {\"response\":{\"output\":[],\"usage\":{\"input_tokens\":12,\"output_tokens\":4}}}\n\n"
+        ].join(""), { status: 200 });
+      }
+    },
+    data: { session: executive }
+  });
+  assert.equal(response.status, 200);
+  const text = await response.text();
+  assert.equal(providerCalls, 2);
+  assert.match(text, /event: skill_started/);
+  assert.match(text, /event: skill_completed/);
+  assert.match(text, /重点关注风险项目/);
+  assert.match(text, /projects/);
+  assert.equal(db.skillAudits.length, 1);
+  assert.doesNotMatch(JSON.stringify(db.skillAudits), /哪些项目有风险|重点项目|project-1/);
+});
+
 test("chat enforces one in-flight request and releases the lease after Provider failure", async () => {
   const { onRequest: chatRequest } = await import(chatUrl);
   const { acquireAiLease, releaseAiLease } = await import(auditUrl);

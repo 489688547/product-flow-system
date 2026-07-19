@@ -726,6 +726,8 @@ const integrationRegistry = {
       "capabilities": [
         "Responses 流式生成",
         "固定模型配置",
+        "Function Calling",
+        "公司只读 Skills",
         "合成连接测试",
         "无留存请求参数",
         "安全错误映射"
@@ -733,6 +735,7 @@ const integrationRegistry = {
       "businessQuestions": [
         "AI 总助不可用",
         "模型服务连接失败",
+        "Skill 调用失败",
         "响应超时或限流",
         "公司数据能否外发",
         "密钥是否安全"
@@ -742,6 +745,8 @@ const integrationRegistry = {
         "LingSuan",
         "AI 总助",
         "Responses API",
+        "Function Calling",
+        "Skills",
         "LINGSUAN_API_KEY"
       ],
       "codePaths": [
@@ -774,7 +779,9 @@ const integrationRegistry = {
       "evidence": [
         "src/domain/aiAssistant.js",
         "react-tests/ai-assistant-domain.test.mjs",
-        "migrations/0003_company_ai_assistant.sql"
+        "tests/ai-skill-loop.test.mjs",
+        "migrations/0003_company_ai_assistant.sql",
+        "migrations/0004_company_ai_skills.sql"
       ],
       "relations": [
         {

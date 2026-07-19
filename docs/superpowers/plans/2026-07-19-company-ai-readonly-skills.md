@@ -266,7 +266,7 @@ Commit: `feat(ai): support responses function calls`
 - Adds SSE events: `skill_started`, `skill_completed`, `skill_failed`.
 - Adds D1 table `ai_skill_audit(request_id, call_id, skill_id, app_id, argument_summary, result_count, latency_ms, result_code, created_at)`.
 
-- [ ] **Step 1: Write failing loop, permission and audit tests**
+- [x] **Step 1: Write failing loop, permission and audit tests**
 
 Cover successful two-turn answer, six-call cap, two-round cap, duplicate fingerprint, denied Skill, one-call timeout, partial failure, cancellation and content-free audit.
 
@@ -275,21 +275,21 @@ assert.equal(db.skillAudits[0].skillId, "data_center_query_sales");
 assert.doesNotMatch(JSON.stringify(db.skillAudits), /销售原始值|用户问题|最终回答/);
 ```
 
-- [ ] **Step 2: Run tests and confirm RED**
+- [x] **Step 2: Run tests and confirm RED**
 
 Run: `node --test tests/ai-skill-loop.test.mjs tests/ai-api.test.mjs`
 
 Expected: FAIL because the loop and audit table do not exist.
 
-- [ ] **Step 3: Implement the bounded loop**
+- [x] **Step 3: Implement the bounded loop**
 
 Start with only Skills returned by `listAvailableSkills`. For each Provider call, collect function calls, reject unknown names, deduplicate `name + canonical JSON arguments`, execute at most six, and append the Provider output item plus `{ type: "function_call_output", call_id, output: JSON.stringify(safeResult) }` to the next input. Stop after two tool rounds and require a final text turn.
 
-- [ ] **Step 4: Emit safe activity and persist audit**
+- [x] **Step 4: Emit safe activity and persist audit**
 
 Send only `{ callId, skillId, appId, displayName, status, recordCount, updatedAt, errorCode }`. Store safe argument key names and bounded scalar filters, never the records. Update environment capabilities and regenerate platform manifests.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run: `node --test tests/ai-skill-loop.test.mjs tests/ai-api.test.mjs tests/ai-skills.test.mjs tests/ai-skills-business-apps.test.mjs`
 

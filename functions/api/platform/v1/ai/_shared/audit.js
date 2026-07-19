@@ -21,6 +21,38 @@ export async function ensureAiAuditTables(db) {
     request_id TEXT NOT NULL,
     expires_at TEXT NOT NULL
   )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS ai_skill_audit (
+    request_id TEXT NOT NULL,
+    call_id TEXT NOT NULL,
+    skill_id TEXT NOT NULL,
+    app_id TEXT NOT NULL,
+    argument_summary TEXT NOT NULL DEFAULT '[]',
+    result_count INTEGER NOT NULL DEFAULT 0,
+    latency_ms INTEGER NOT NULL DEFAULT 0,
+    result_code TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (request_id, call_id)
+  )`).run();
+}
+
+export async function writeAiSkillAudit(db, record = {}) {
+  await ensureAiAuditTables(db);
+  const argumentSummary = safeStringList(record.argumentSummary).slice(0, 20);
+  await db.prepare(`INSERT INTO ai_skill_audit
+    (request_id, call_id, skill_id, app_id, argument_summary, result_count, latency_ms, result_code, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    .bind(
+      String(record.requestId || "").slice(0, 120),
+      String(record.callId || "").slice(0, 120),
+      String(record.skillId || "").slice(0, 120),
+      String(record.appId || "unknown").slice(0, 80),
+      JSON.stringify(argumentSummary),
+      Math.max(0, Number(record.resultCount) || 0),
+      Math.max(0, Number(record.latencyMs) || 0),
+      String(record.resultCode || "AI_SKILL_UNKNOWN").slice(0, 80),
+      String(record.createdAt || new Date().toISOString()).slice(0, 40)
+    )
+    .run();
 }
 
 export async function acquireAiLease(db, userId, requestId, now = Date.now()) {

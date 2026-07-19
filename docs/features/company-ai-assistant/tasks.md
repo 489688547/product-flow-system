@@ -126,7 +126,7 @@
 - [ ] 任务 13：实现 Provider Function Calling 与受控循环
   - 范围：Responses 工具事件、两轮六次限制、重复调用去重、超时/取消和部分失败。
   - 验收：合成工具连接测试通过；Provider 不支持时明确降级；最终回答保留来源。
-  - 进度：Responses 请求、函数调用流解析、后续轮次输出项保留和纯合成能力测试已完成；受控业务 Skill 循环待接入。
+  - 进度：服务端 Function Calling、两轮六次限制、重复去重、权限重校验、无内容审计和 Provider 不支持时的旧摘要降级已完成；前端调用活动展示和真实 Provider 验收待完成。
 
 - [ ] 任务 14：记录并展示 Skill 调用
   - 范围：`ai_skill_audit`、SSE Skill 事件、前端安全状态和可展开调用记录。

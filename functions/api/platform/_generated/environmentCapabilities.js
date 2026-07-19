@@ -190,6 +190,7 @@ const environmentCapabilities = {
         "data_ai_providers",
         "data_ai_policies",
         "ai_usage_audit",
+        "ai_skill_audit",
         "ai_request_leases"
       ]
     }

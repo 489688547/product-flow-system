@@ -41,7 +41,7 @@ Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状
 
 公司级 AI 能力统一经过 `/api/platform/v1/ai/*` 服务端网关。业务 App 不直接调用模型供应商，也不把浏览器中的业务状态作为可信上下文；服务端根据钉钉会话、数据域权限和外发策略读取、脱敏并限额公司数据。灵算首期使用固定 `https://lingsuan.top/responses`、`gpt-5.6-sol` 和 `store: false`，设置页不得覆盖域名、路径、任意 Header 或保存凭据。
 
-`AI_ASSISTANT_ENABLED` 默认关闭。`LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 只允许作为 Pages 服务端 Secret 配置，D1 只保存非敏感 Provider 元数据。连接测试仅使用固定合成输入；未经单独授权不得配置生产 Secret、部署或发送真实公司数据。
+`AI_ASSISTANT_ENABLED` 默认关闭。`LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 只允许作为 Pages 服务端 Secret 配置，D1 只保存非敏感 Provider 元数据。连接测试仅使用固定合成输入；Function Calling 另用 `lookup_status({})` 做无公司数据能力测试。业务查询只能从服务端按当前会话权限下发的只读 Skill 中选择，每次调用重新校验固定 Schema、数据域和外发策略，并限制为两轮、六次。调用审计只保存 Skill、App、参数名、数量、耗时和结果码，不保存参数值、业务结果或对话内容。
 
 模型使用审计只记录身份、数据域、记录数、数据时间、token、耗时和结果码，不保存问题、回答、上下文或 Provider 原始响应。财务数据即使用户内部有权查看，也在当前 Provider 下统一阻止外发；只有获得可审计的不留存承诺并完成新的安全决策后才能调整。
 

@@ -236,9 +236,9 @@
       "name": "灵算 AI 网关",
       "status": "integrating",
       "summary": "为公司 AI 总助提供服务端 Responses 兼容模型调用；功能默认关闭，密钥只存在服务端 Secret。",
-      "capabilities": ["Responses 流式生成", "固定模型配置", "合成连接测试", "无留存请求参数", "安全错误映射"],
-      "businessQuestions": ["AI 总助不可用", "模型服务连接失败", "响应超时或限流", "公司数据能否外发", "密钥是否安全"],
-      "keywords": ["灵算", "LingSuan", "AI 总助", "Responses API", "LINGSUAN_API_KEY"],
+      "capabilities": ["Responses 流式生成", "固定模型配置", "Function Calling", "公司只读 Skills", "合成连接测试", "无留存请求参数", "安全错误映射"],
+      "businessQuestions": ["AI 总助不可用", "模型服务连接失败", "Skill 调用失败", "响应超时或限流", "公司数据能否外发", "密钥是否安全"],
+      "keywords": ["灵算", "LingSuan", "AI 总助", "Responses API", "Function Calling", "Skills", "LINGSUAN_API_KEY"],
       "codePaths": ["functions/api/platform/v1/ai/**", "src/domain/aiAssistant.js", "src/state/aiAssistant*.js", "src/features/ai-assistant/**", "src/features/data-center/AiProviderSettings.jsx"],
       "envVars": ["AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"],
       "domains": ["lingsuan.top"],
@@ -246,7 +246,7 @@
       "publicDocs": [
         { "label": "灵算 AI API Gateway", "url": "https://lingsuan.top/" }
       ],
-      "evidence": ["src/domain/aiAssistant.js", "react-tests/ai-assistant-domain.test.mjs", "migrations/0003_company_ai_assistant.sql"],
+      "evidence": ["src/domain/aiAssistant.js", "react-tests/ai-assistant-domain.test.mjs", "tests/ai-skill-loop.test.mjs", "migrations/0003_company_ai_assistant.sql", "migrations/0004_company_ai_skills.sql"],
       "relations": [
         { "platformId": "cloudflare-pages", "type": "called-by", "description": "Pages Functions 在服务端调用 Provider，浏览器不接触密钥或公司上下文。" },
         { "platformId": "cloudflare-d1", "type": "governed-by", "description": "D1 保存 Provider 安全元数据、外发策略、并发租约和无内容审计。" }

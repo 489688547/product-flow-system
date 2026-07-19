@@ -14,12 +14,13 @@ const TABLE_TO_COLLECTION = {
   data_ai_policies: "aiDataPolicies"
 };
 
-export function createAiD1Mock({ providerEnabled = false } = {}) {
+export function createAiD1Mock({ providerEnabled = false, providerSkillsSupported = false } = {}) {
   const records = new Map();
   const meta = new Map();
   const audits = [];
+  const skillAudits = [];
   const leases = new Map();
-  const provider = normalizeAiProvider({ enabled: providerEnabled });
+  const provider = normalizeAiProvider({ enabled: providerEnabled, skillsSupported: providerSkillsSupported });
   records.set(`aiProviders:${provider.providerId}`, {
     entity_type: "aiProviders",
     id: provider.providerId,
@@ -40,6 +41,7 @@ export function createAiD1Mock({ providerEnabled = false } = {}) {
     records,
     meta,
     audits,
+    skillAudits,
     leases,
     prepare(sql) {
       const statement = {
@@ -58,6 +60,8 @@ export function createAiD1Mock({ providerEnabled = false } = {}) {
             meta.set(statement.values[0], statement.values[1]);
           } else if (/insert into ai_usage_audit/i.test(sql)) {
             audits.push(statement.values);
+          } else if (/insert into ai_skill_audit/i.test(sql)) {
+            skillAudits.push(statement.values);
           } else if (/insert into ai_request_leases/i.test(sql)) {
             const [userId, requestId, expiresAt] = statement.values;
             if (leases.has(userId)) throw new Error("UNIQUE constraint failed");
