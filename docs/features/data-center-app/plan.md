@@ -1,73 +1,70 @@
-# 数据中心 App 实施计划
+# 数据中心连接器与加密保险箱实施计划
 
-> 本文记录已完成的数据中心一期实施。2026-07-19 确认的连接器目录、加密凭证保险箱和本地采集器扩展尚未拆解为实施计划；在新版 PRD 与设计书书面确认后更新本文。
+## 交付策略
 
-## 目标
+按三个可以独立验收和回滚的阶段交付：
 
-交付第三个可运行的业务 App，在不复制销售事实的前提下完成 D1 元数据、销售查询、权限、七个工作区和完整页面状态。
+1. 连接器目录与加密保险箱：内置平台、专属配置弹窗、内部系统保险箱、D1 密文、权限、查看/替换和审计。
+2. 本地采集器与任务调度：机器身份、短时 task grant、`07:30` 日任务、人工验证恢复和按月历史回填。
+3. 生产迁移与平台适配：在单独授权窗口导入钉钉账密表，逐个平台验证真实导出/API/页面适配器并启用生产同步。
 
-## 架构方案
+本轮实施阶段 1。阶段 2 依赖阶段 1 的 credential-vault API；阶段 3 依赖真实账号、生产迁移和外部平台操作授权，不能由本地 UI 完成情况替代。
 
-领域规则位于 `src/domain/dataCenter.js`；Provider 和客户端位于 `src/state`；页面组合位于 `src/features/data-center`；认证后的 Cloudflare Functions 负责元数据和销售查询。销售继续由 `product_sales_daily` 提供，数据中心只增加稳定查询契约和元数据记录。
+## 阶段 1 架构
 
-共享能力结论：扩展现有 App 注册、权限、认证、D1 和销售能力；数据中心页面组合局部保留，不新增推测性通用 UI。
-
-## 文件职责
-
-- `src/domain/dataCenter.js`：日期、平台过滤、标准化、摘要和审计。
-- `src/state/dataCenterApi.js`、`DataCenterProvider.jsx`：API 编排、缓存和本地降级。
-- `functions/api/data-center*`：元数据持久化和只读销售查询。
-- `src/features/data-center/*`：七个工作区。
-- `src/App.jsx`、`main.jsx`、`permissions.js`、`strategyExecution.js`：第三 App 装配。
-- `styles.css`：沿用现有 Token 的数据中心布局和响应式规则。
-- `react-tests/data-center.test.mjs`、`tests/data-center-api.test.mjs`：领域、UI、契约和权限测试。
-
-## 接口与契约
-
-- `useDataCenter()` 返回元数据状态、销售响应、范围、加载/刷新/错误、dispatch 和刷新方法。
-- `GET /api/data-center` 返回标准元数据状态。
-- `POST /api/data-center` 仅允许总经办或授权运营写入安全字段。
-- `GET /api/data-center/sales?from&to` 返回行、范围、`create_time`、`Asia/Shanghai`、最后同步和数据日期、覆盖率、指标版本及警告。
-- 本地销售 API 返回 501 后，由 Provider 使用现有 IndexedDB 销售仓库构造同形响应。
+- `src/domain/dataCenterConnectors.js` 保存纯连接器定义、字段 schema、状态优先级和输入校验。
+- `functions/api/platform/_shared/credentialCrypto.js` 只负责 AES-256-GCM 和密钥版本。
+- `functions/api/platform/_shared/credentialVaultStorage.js` 只负责 D1 条目、权限和追加式审计。
+- `/api/platform/v1/credential-vault*` 提供脱敏列表、创建/替换、归档和受控 reveal。
+- `functions/api/data-center/connectors.js` 保存非敏感连接实例及凭证引用；保存配置不改变真实连接状态。
+- `src/state/dataCenterConnectionsApi.js` 是连接器和保险箱的唯一前端 API 客户端。
+- `src/features/data-center/connections/` 组合连接器目录、配置弹窗和内部保险箱；不直接调用外部平台。
 
 ## 数据迁移
 
-- 新增 `data_sources`、`data_runners`、`data_sync_runs`、`data_source_files`、`data_dimension_mappings`、`data_metric_definitions`、`data_quality_issues`、`data_app_subscriptions`、`data_audit_logs` 和 `data_center_meta`。
-- 不迁移或复制 `product_sales_daily`。
-- 默认指标和消费订阅由状态归一化补齐，旧部署无元数据时可安全启动。
-- 元数据按实体记录存储，容量增长与销售事实分离。
-- D1 元数据批量写入每批最多 50 条；运行记录、质量问题和审计记录按集合上限归一化，避免单次元数据保存无限增长。
-- 本实现没有读取线上 D1 配额或当前占用量；上线前仍需在 Cloudflare 环境单独确认容量和绑定状态。
+新增 `migrations/0003_data_center_credentials.sql`：
 
-## 风险与回滚
+- `data_connector_instances`
+- `credential_vault_entries`
+- `credential_vault_permissions`
+- `credential_vault_audit`
+- `internal_vault_items`
 
-- App 壳整合冲突：已在隔离分支合入供应链基线并用完整测试确认。
-- 销售口径漂移：接口和领域测试固定创建时间、上海时区和其它排除规则。
-- D1 不可用：生产返回 501，本地使用明确降级，不修改事实。
-- 权限泄漏：服务端按部门/readonly 二次校验。
-- 回滚时移除导航和 Provider；新增表保留但停止读取，销售数据不受影响。
+阶段 2 再新增 `data_runner_identities` 和 `data_runner_task_grants`，避免在没有采集器协议时提前创建无消费者的表。旧 `data_sources` 保留只读兼容，不在阶段 1 删除或自动迁移。
 
-## 验证命令
+## 环境与发布
+
+- 新增 Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY`，值为 32 字节随机密钥的 base64url 表示。
+- `docs/platform/environment-capabilities.json` 登记凭证表、D1 绑定和 Secret 名称，并重新生成平台清单。
+- 本地测试使用每次测试生成的临时密钥，不把真实密钥写入 `.env.example`、日志或快照。
+- 生产迁移前先运行环境就绪检查和数据库备份；未配置密钥时凭证写入、替换、reveal 返回 `CREDENTIAL_KEY_UNAVAILABLE`，非敏感目录仍可读取。
+
+## 权限
+
+- 总经办非只读身份：创建、替换、归档、reveal、权限管理。
+- 运营部非只读身份：维护经营连接器并替换相应凭证，阶段 1 不开放 reveal。
+- 财务、产品、供应链：只读连接状态，无凭证元数据列表权限。
+- 内部保险箱：阶段 1 仅总经办管理和 reveal；条目级授权表先建立，细粒度授权 UI 在采集器阶段前交付。
+- reveal 要求总经办、非只读、会话创建不超过 15 分钟、确认短语和用途；响应禁止缓存。
+
+## 兼容与回滚
+
+- 现有 `/api/data-center`、`/api/data-center/sales`、`product_sales_daily` 和七个左侧入口保持不变。
+- 新页面读取失败时保留连接器目录并显示环境错误，不回退到 localStorage 保存敏感值。
+- 回滚可隐藏新连接区并停用新 API；新表与密文保留，不覆盖主密钥、不物理删除审计。
+- 旧前端继续读取 `data_sources`，新前端只写 `data_connector_instances`；阶段 2 再决定旧来源迁移。
+
+## 验证
+
+每个任务先写失败测试再实现。阶段 1 完成后运行：
 
 ```bash
-node --test react-tests/data-center.test.mjs
-node --test tests/data-center-api.test.mjs
 npm run lint
 npm run check:governance
 npm run check:integrations
+npm run check:environment-capabilities
 npm test
 npm run build
 ```
 
-页面验收使用本地 Vite 服务，检查键盘、焦点、空/错/禁用/过期、1440/1280/900/640/390px 和钉钉 WebView。
-
-## 任务顺序
-
-1. 领域契约和测试。
-2. D1 元数据与销售查询 API。
-3. Provider 和本地降级。
-4. 第三 App 注册、权限和主导航。
-5. 数据总览。
-6. 数据治理工作区。
-7. 本地服务一致性。
-8. 视觉、响应式和 Definition of Done。
+并在 1440、900、640、390px 与钉钉 WebView 检查键盘、焦点、弹窗、空/错/禁用/无权限状态。未经单独授权不执行 Cloudflare 部署、D1 生产迁移或真实凭证导入。

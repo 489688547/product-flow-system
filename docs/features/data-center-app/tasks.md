@@ -2,6 +2,35 @@
 
 > 以下为已完成的一期任务记录。2026-07-19 确认的连接器目录、加密凭证保险箱和本地采集器扩展任务将在新版实施计划通过后追加。
 
+## 2026-07-19 连接器与加密保险箱扩展
+
+- [ ] 连接器领域定义
+  - 输出：八个经营连接器、五类内部系统、平台专属字段 schema、状态优先级和安全配置校验。
+  - 验证：`node --test react-tests/data-center-connectors.test.mjs`。
+- [ ] 加密与 D1 存储
+  - 输出：AES-256-GCM、版本化密钥、凭证/权限/审计/连接实例迁移和环境能力清单。
+  - 验证：`node --test tests/credential-vault-crypto.test.mjs tests/credential-vault-storage.test.mjs`。
+- [ ] 凭证保险箱 API
+  - 输出：脱敏列表、创建、替换、归档、15 分钟内总经办 reveal 和稳定错误码。
+  - 验证：`node --test tests/credential-vault-api.test.mjs`。
+- [ ] 连接实例 API
+  - 输出：经营连接器和内部保险箱的非敏感实例，保存后保持 `pending_validation`。
+  - 验证：`node --test tests/data-center-connectors-api.test.mjs`。
+- [ ] 数据接入界面
+  - 输出：Logo 目录、经营/保险箱分区、平台专属弹窗、已有密文替换交互和完整页面状态。
+  - 验证：`node --test react-tests/data-center-connections-ui.test.mjs react-tests/data-center-app.test.mjs`。
+- [ ] 阶段 1 交付验证
+  - 输出：文档、API 目录、环境清单、迁移、测试、构建与响应式检查一致。
+  - 验证：完整 Definition of Done 命令。
+
+## 后续阶段
+
+- [ ] 公司 Mac 采集器、机器身份和短时 task grant。
+- [ ] 每日 `07:30` 调度、人工验证恢复与最近日期重拉。
+- [ ] 按月历史回填、幂等覆盖和数据质量闸门。
+- [ ] 钉钉账密表 `总表` 的授权预览与一次性加密迁移。
+- [ ] 抖音、巨量、快手、淘系、拼多多、小红书、京东/京麦和快麦逐一真实验证；只有具备成功证据后从 `planned` 改为已接通。
+
 ## 执行规则
 
 - 每项任务只交付一个可独立验证的结果。
