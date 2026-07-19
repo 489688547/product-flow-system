@@ -72,6 +72,9 @@
 
 - `CREDENTIAL_ENTRY_INVALID`：凭证类型、字段 schema、范围或敏感 payload 不合法。
 - `CREDENTIAL_ENTRY_NOT_FOUND`：条目不存在或对当前身份不可见。
+- `CREDENTIAL_VERSION_CONFLICT`：提交的凭证版本已经过期，HTTP 409，刷新后重新操作。
+- `CREDENTIAL_RATE_LIMITED`：同一条目短时间明文查看次数过多，HTTP 429。
+- `CREDENTIAL_ENCRYPT_FAILED`：服务端未能完成加密；响应不包含输入值或底层异常。
 - `CREDENTIAL_KEY_UNAVAILABLE`：加密主密钥或对应密钥版本未配置，不能保存或取用凭证。
 - `CREDENTIAL_DECRYPT_FAILED`：密文校验或解密失败；响应不包含密文、字段值或底层异常。
 - `CREDENTIAL_REAUTH_REQUIRED`：查看或复制明文需要近期重新认证。

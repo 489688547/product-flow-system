@@ -12,6 +12,8 @@
 
 `functions/api/auth/_shared/session.js` 管理 Cookie 会话、令牌哈希、员工身份和有效期。原始会话令牌不能持久化或写入日志。
 
+`functions/api/platform/_shared/credentialVaultAuthorization.js` 只判断凭证动作、业务范围和 reveal 的 15 分钟近期登录要求；不读取密文、不执行加解密、不写审计。`credentialVaultHttp.js` 只构造禁止缓存的安全响应和稳定错误结构，不记录请求体。
+
 ## 外部平台共享适配
 
 - `functions/api/dingtalk/_shared/dingtalk.js`：钉钉 Token、组织、待办、日历、文档和会议数据的共同请求与响应处理。

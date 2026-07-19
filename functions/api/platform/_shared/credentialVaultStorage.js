@@ -254,3 +254,15 @@ export async function revealCredentialEntry(db, id, context = {}) {
   await audit(db, id, "reveal", Object.keys(secretPayload), context);
   return { entry: metadataFromRow(current), secretPayload };
 }
+
+export async function assertCredentialRevealRateLimit(db, id, { limit = 5, windowMs = 15 * 60 * 1000 } = {}) {
+  await ensureCredentialVaultTables(db);
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const row = await db.prepare(`SELECT COUNT(*) AS count FROM credential_vault_audit
+    WHERE entry_id = ? AND action = ? AND result = 'success' AND created_at >= ?`)
+    .bind(id, "reveal", since)
+    .first();
+  if (Number(row?.count || 0) >= limit) {
+    throw storageError("明文查看过于频繁，请稍后再试。", "CREDENTIAL_RATE_LIMITED", 429);
+  }
+}

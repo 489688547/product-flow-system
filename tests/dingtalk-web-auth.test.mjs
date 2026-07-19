@@ -43,6 +43,9 @@ test("server session stores only a token hash and resolves an active employee", 
   const session = await readSession(requestWithCookie(created.cookie), { PRODUCT_FLOW_DB: db });
   assert.equal(session.unionId, "union-1");
   assert.equal(session.loginMode, "browser");
+  assert.match(created.session.createdAt, /^\d{4}-\d{2}-\d{2}T/);
+  assert.equal(session.createdAt, created.session.createdAt);
+  assert.equal("sessionIdHash" in session, false);
 });
 
 test("expired server sessions cannot be read", async () => {

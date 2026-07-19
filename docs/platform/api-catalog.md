@@ -23,7 +23,7 @@
 | `/api/platform/v1/integrations` | 读取和维护内部平台资料 | 全员可读；仅总经办非只读身份可写；字段白名单；D1 审计只记录字段名 |
 | `/api/platform/v1/credential-vault` | 保存和读取加密凭证的脱敏元数据 | 公司会话；动作级权限；普通读取永不返回明文；D1 使用版本化密文 |
 | `/api/platform/v1/credential-vault/:id/reveal` | 受控查看或复制单条凭证 | 近期认证、条目范围授权、明确用途、限流、禁止缓存和追加式审计 |
-| `/api/platform/v1/credential-vault/:id/task-grants` | 向指定本地采集器签发短时凭证授权 | 绑定任务、采集器和字段范围；默认一次消费；采集器不持有主密钥 |
+| `/api/platform/v1/credential-vault/:id/task-grants`（计划） | 向指定本地采集器签发短时凭证授权 | 阶段 1 未实现；后续绑定任务、采集器和字段范围，默认一次消费 |
 | `/api/platform/v1/collaboration-items` | 查询和创建跨 App 部门协同事项 | 公司会话；普通员工按本人和部门参与范围；游标分页；业务幂等键 |
 | `/api/platform/v1/collaboration-items/:id` | 读取、修改和归档单个协同事项 | 参与范围；版本乐观锁；无物理 DELETE |
 | `/api/platform/v1/collaboration-items/:id/transitions` | 执行协同状态动作 | 状态机和角色双重校验；动作幂等；追加活动 |
@@ -41,7 +41,7 @@
 
 凭证保险箱是数据连接器、内部系统保险箱和本地采集器共用的平台能力。普通 GET 只返回条目 ID、分类、范围、schema 版本、是否已配置、更新时间和脱敏提示。创建或替换接口接收字段白名单内的敏感 payload，服务端使用 Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY` 和 AES-256-GCM 加密后写入 D1；请求体、密文和明文均不得进入日志或审计详情。
 
-OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果不属于凭证 payload。明文查看/复制使用独立 reveal 动作；本地采集器使用绑定任务、机器和字段范围的短时 task grant。完整请求、响应、权限、错误、密钥轮换和兼容契约在实施时写入 `docs/platform/apis/credential-vault-v1.md`，在该契约和迁移完成前这些路径不得宣称生产可用。
+OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果不属于凭证 payload。明文查看/复制使用独立 reveal 动作；本地采集器未来使用绑定任务、机器和字段范围的短时 task grant，阶段 1 不实现该路径。完整请求、响应、权限、错误、密钥轮换和兼容契约见 `docs/platform/apis/credential-vault-v1.md`；当前代码完成不代表已经部署生产。
 
 `GET /api/data-center/sales?from=YYYY-MM-DD&to=YYYY-MM-DD` 读取现有 `product_sales_daily`，响应包含 `rows` 和以下口径元数据：
 

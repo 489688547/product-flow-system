@@ -49,6 +49,7 @@ function publicSession(row = {}) {
     department: row.department || "",
     title: row.title || "",
     loginMode: row.login_mode || "",
+    createdAt: row.created_at || "",
     expiresAt: row.expires_at || ""
   };
 }
@@ -164,6 +165,7 @@ export async function createSession(identity = {}, loginMode = "browser", env = 
     session: {
       ...identity,
       loginMode,
+      createdAt: createdAt.toISOString(),
       expiresAt: expiresAt.toISOString()
     }
   };
