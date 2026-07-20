@@ -63,6 +63,7 @@ export function DataConnectionsWorkspace({
       </section>
       <DataAccessTabs value={category} onChange={nextCategory => { setSelection(null); setCategory(nextCategory); }} />
       {connectionsError ? <div className="connector-form-error" role="alert"><span>{connectionsError}</span><button type="button" onClick={refreshConnections}>重试</button></div> : null}
+      {["erp", "company"].includes(category) && platformController.error ? <div className="connector-form-error" role="alert"><span>{platformController.error}</span><button type="button" onClick={() => platformController.refresh().catch(() => {})}>重试平台连接</button></div> : null}
       {connectionsLoading ? <div className="connection-loading" aria-label="正在加载数据接入"><span /><span /><span /></div> : null}
       {!connectionsLoading && category === "ecommerce" ? (
         <ConnectorCatalog

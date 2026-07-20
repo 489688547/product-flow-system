@@ -81,7 +81,7 @@ export function ErpAccessWorkspace({
         {instances.length ? (
           <div className="data-access-instance-list">
             {instances.map(instance => (
-              <button type="button" key={instance.id} onClick={() => onManage(KUAIMAI_CONNECTOR, instance)}>
+              <button type="button" key={instance.id} disabled={!canEdit} title={!canEdit ? "当前账号没有数据接入编辑权限" : undefined} onClick={() => onManage(KUAIMAI_CONNECTOR, instance)}>
                 <span><strong>{instance.name}</strong><small>{SYNC_STATUS_LABELS[instance.status] || instance.status || "等待首次验证"}</small></span>
                 <span><Settings2 size={14} aria-hidden="true" />管理同步</span>
               </button>

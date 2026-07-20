@@ -83,6 +83,13 @@ test("data connections workspace organizes ecommerce ERP and company data", () =
   assert.match(vault, /setTimeout[\s\S]*60000/);
 });
 
+test("read-only users cannot open connector or ERP sync editors", () => {
+  const catalog = read("src/features/data-center/connections/ConnectorCatalog.jsx");
+  const erp = read("src/features/data-center/connections/ErpAccessWorkspace.jsx");
+  assert.match(catalog, /<button[^>]*aria-label=\{`管理\$\{instance\.name\}`\}[^>]*disabled=\{!canEdit\}[^>]*>/);
+  assert.match(erp, /<button[^>]*key=\{instance\.id\}[^>]*disabled=\{!canEdit\}[^>]*>[\s\S]*管理同步/);
+});
+
 test("legacy generic source form is removed and security copy is updated", () => {
   const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
   const page = read("src/features/data-center/DataCenterAppPage.jsx");

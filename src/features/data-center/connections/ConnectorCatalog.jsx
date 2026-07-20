@@ -60,7 +60,13 @@ export function ConnectorCatalog({ definitions = DATA_CONNECTOR_DEFINITIONS, ins
                 {configured.slice(0, 3).map(instance => (
                   <li key={instance.id}>
                     <span><b>{instance.name}</b><small>{STATUS_LABELS[instance.status] || instance.status}</small></span>
-                    <button type="button" onClick={() => onManage(definition, instance)} aria-label={`管理${instance.name}`}><Settings2 size={14} />管理连接</button>
+                    <button
+                      type="button"
+                      aria-label={`管理${instance.name}`}
+                      disabled={!canEdit}
+                      title={!canEdit ? "当前账号没有数据接入编辑权限" : undefined}
+                      onClick={() => onManage(definition, instance)}
+                    ><Settings2 size={14} />管理连接</button>
                   </li>
                 ))}
               </ul>

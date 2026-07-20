@@ -42,6 +42,7 @@ test("the workspace exposes the three approved categories and no old tabs", () =
   assert.match(workspace, /DataAccessTabs/);
   assert.match(workspace, /ErpAccessWorkspace/);
   assert.match(workspace, /CompanyDataWorkspace/);
+  assert.match(workspace, /\["erp", "company"\]\.includes\(category\)[\s\S]*platformController\.error[\s\S]*platformController\.refresh/);
   assert.doesNotMatch(workspace, /经营数据连接器|内部系统保险箱/);
 });
 
