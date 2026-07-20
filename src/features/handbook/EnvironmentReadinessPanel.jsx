@@ -45,6 +45,13 @@ function missingLabel(item) {
   return MISSING_LABELS[item] || (String(item).includes("_") ? "系统运行配置" : item);
 }
 
+function dataAccessHref(platforms = []) {
+  const relevant = [...new Set(platforms.filter(platform => ["dingtalk", "kuaimai"].includes(platform)))];
+  if (relevant.length === 1 && relevant[0] === "dingtalk") return "#/data-sources/company";
+  if (relevant.length === 1 && relevant[0] === "kuaimai") return "#/data-sources/erp";
+  return "#/data-sources";
+}
+
 function StatusIcon({ status }) {
   if (status === "ready") return <CheckCircle2 size={17} aria-hidden="true" />;
   if (status === "warning") return <AlertTriangle size={17} aria-hidden="true" />;
@@ -75,7 +82,7 @@ function CapabilityList({ capabilities = [] }) {
               <strong>{STATUS_LABELS[capability.status] || capability.status}</strong>
             </div>
             {capability.missing?.length ? (
-              <div className="environment-missing"><span>需要处理</span><ul>{capability.missing.map(item => <li key={item} title={item}>{missingLabel(item)}</li>)}</ul>{capability.platforms?.some(platform => ["dingtalk", "kuaimai"].includes(platform)) ? <a className="btn compact" href="#/data-connections">前往平台连接</a> : null}</div>
+              <div className="environment-missing"><span>需要处理</span><ul>{capability.missing.map(item => <li key={item} title={item}>{missingLabel(item)}</li>)}</ul>{capability.platforms?.some(platform => ["dingtalk", "kuaimai"].includes(platform)) ? <a className="btn compact" href={dataAccessHref(capability.platforms)}>前往数据接入</a> : null}</div>
             ) : <p className="environment-complete"><ShieldCheck size={15} aria-hidden="true" />必要配置与表结构完整</p>}
           </article>
         ))}
