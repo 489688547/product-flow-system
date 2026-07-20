@@ -6,7 +6,7 @@ const AGGREGATE_OPERATIONS = new Set(["sum", "average", "weighted_average", "cou
 const ARITHMETIC_OPERATIONS = new Set(["add", "subtract", "multiply", "divide"]);
 const DATE_OPERATIONS = new Set(["difference", "days_in_period", "valid_days"]);
 const FILTER_OPERATIONS = new Set(["equals", "contains", "in", "not_in", "between", "is_null", "not_null"]);
-const SERVER_CONTROLLED_DRAFT_FIELDS = new Set(["actor", "createdBy", "createdAt", "updatedBy", "updatedAt", "publishedAt", "archivedAt", "archivedBy", "audit"]);
+const SERVER_CONTROLLED_DRAFT_FIELDS = new Set(["actor", "createdBy", "createdAt", "updatedBy", "updatedAt", "publishedAt", "archivedAt", "archivedBy", "audit", "validationContext"]);
 
 export const DATA_STANDARD_OWNER_DEPARTMENTS = Object.freeze(["运营部", "财务部", "供应链部"]);
 
@@ -183,9 +183,16 @@ function validateNode(ast, context) {
     if (!input.ok) return input;
     const filters = validateFilters(ast.filters || [], context);
     if (!filters.ok) return filters;
+    if (ast.operation === "weighted_average") {
+      if (!Object.hasOwn(ast, "weight")) return validationFailure("DATA_STANDARD_INVALID");
+      const weight = validateNode(ast.weight, context);
+      if (!weight.ok) return weight;
+    } else if (Object.hasOwn(ast, "weight")) {
+      return validationFailure("DATA_STANDARD_INVALID");
+    }
     return result(true, {
       unit: ["count", "count_distinct"].includes(ast.operation) ? "COUNT" : input.unit,
-      executable: input.executable
+      executable: ast.operation === "sum" && input.executable
     });
   }
   if (ast.type === "arithmetic") {
@@ -200,10 +207,18 @@ function validateNode(ast, context) {
     return combined.ok ? result(true, { ...combined, executable: left.executable && right.executable }) : combined;
   }
   if (ast.type === "date") {
-    if (!hasOnlyKeys(ast, ["type", "operation", "start", "end", "period"])) return validationFailure("DATA_STANDARD_INVALID");
-    return DATE_OPERATIONS.has(ast.operation)
-      ? result(true, { unit: "DAY", executable: false })
-      : validationFailure("DATA_STANDARD_INVALID");
+    if (!DATE_OPERATIONS.has(ast.operation)) return validationFailure("DATA_STANDARD_INVALID");
+    if (ast.operation === "days_in_period") {
+      return hasOnlyKeys(ast, ["type", "operation", "period"]) && PERIOD_VALUES.has(ast.period)
+        ? result(true, { unit: "DAY", executable: false })
+        : validationFailure("DATA_STANDARD_INVALID");
+    }
+    if (!hasOnlyKeys(ast, ["type", "operation", "start", "end"])) return validationFailure("DATA_STANDARD_INVALID");
+    const start = validateNode(ast.start, context);
+    if (!start.ok || ast.start?.type !== "date") return validationFailure("DATA_STANDARD_INVALID");
+    const end = validateNode(ast.end, context);
+    if (!end.ok || ast.end?.type !== "date") return validationFailure("DATA_STANDARD_INVALID");
+    return result(true, { unit: "DAY", executable: false });
   }
   return validationFailure("DATA_STANDARD_INVALID");
 }
@@ -272,7 +287,7 @@ function cleanText(value, maxLength = 240) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
-export function normalizeDataStandardDraft(input = {}) {
+export function normalizeDataStandardDraft(input = {}, trustedContext = {}) {
   const safeInput = Object.fromEntries(Object.entries(input).filter(([key]) => !SERVER_CONTROLLED_DRAFT_FIELDS.has(key)));
   const formulaAst = safeInput.formulaAst && typeof safeInput.formulaAst === "object" ? safeInput.formulaAst : null;
   const metricCode = cleanText(safeInput.metricCode, 120);
@@ -281,19 +296,28 @@ export function normalizeDataStandardDraft(input = {}) {
   const period = cleanText(safeInput.period, 20);
   const category = cleanText(safeInput.category, 40);
   const sourceFields = Array.isArray(safeInput.sourceFields) ? safeInput.sourceFields.map(field => cleanText(field, 120)).filter(Boolean) : [];
-  const sourceFieldValidation = sourceFields.every(field => fieldRegistry(safeInput.validationContext || {})[field])
+  const sourceFieldValidation = sourceFields.every(field => fieldRegistry(trustedContext)[field])
     ? null
     : validationFailure("DATA_STANDARD_FIELD_UNKNOWN");
+  const allowsUncoveredSourceCoverage = trustedContext.allowUncoveredSourceCoverage === true && category === "goods_flow";
+  const formulaValidation = formulaAst
+    ? validateFormulaAst(formulaAst, trustedContext)
+    : allowsUncoveredSourceCoverage
+      ? result(true, { executable: false })
+      : validationFailure("DATA_STANDARD_INVALID");
   const validation = !METRIC_CODE_PATTERN.test(metricCode)
     || !DATA_STANDARD_OWNER_DEPARTMENTS.includes(ownerDepartment)
     || !UNIT_VALUES.has(unit)
     || !PERIOD_VALUES.has(period)
     || !CATEGORY_VALUES.has(category)
-    || !formulaAst
     ? validationFailure("DATA_STANDARD_INVALID")
     : sourceFieldValidation
       ? sourceFieldValidation
-    : validateFormulaAst(formulaAst, safeInput.validationContext || {});
+      : !formulaValidation.ok
+        ? formulaValidation
+        : formulaAst && formulaValidation.unit !== unit
+          ? validationFailure("DATA_STANDARD_UNIT_MISMATCH")
+          : formulaValidation;
   return {
     metricCode,
     name: cleanText(safeInput.name, 120),
@@ -307,6 +331,8 @@ export function normalizeDataStandardDraft(input = {}) {
     sourceFields,
     expectedVersion: Number.isInteger(Number(safeInput.expectedVersion)) && Number(safeInput.expectedVersion) > 0 ? Number(safeInput.expectedVersion) : undefined,
     dependencies: formulaAst ? collectFormulaDependencies(formulaAst) : [],
+    coverageStatus: allowsUncoveredSourceCoverage ? "DATA_NOT_COVERED" : "COMPLETE",
+    executable: allowsUncoveredSourceCoverage ? false : validation.ok && validation.executable === true,
     validation
   };
 }

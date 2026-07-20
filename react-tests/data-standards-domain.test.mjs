@@ -170,3 +170,97 @@ test("draft normalization rejects source fields outside the fact registry", () =
   });
   assert.deepEqual(draft.validation, { ok: false, code: "DATA_STANDARD_FIELD_UNKNOWN" });
 });
+
+test("draft normalization ignores client supplied validation context", () => {
+  const draft = normalizeDataStandardDraft({
+    metricCode: "sales.new_metric",
+    name: "新指标",
+    category: "sales",
+    ownerDepartment: "财务部",
+    unit: "CNY",
+    period: "day",
+    formulaAst: { type: "aggregate", operation: "sum", input: { type: "field", field: "sales.client_injected" }, filters: [] },
+    sourceFields: ["sales.client_injected"],
+    validationContext: {
+      factFieldRegistry: {
+        "sales.client_injected": { source: "arbitrary", column: "expression", unit: "CNY" }
+      }
+    }
+  });
+  assert.deepEqual(draft.validation, { ok: false, code: "DATA_STANDARD_FIELD_UNKNOWN" });
+});
+
+test("schema-valid advanced aggregates remain non-executable and weighted averages require a safe weight", () => {
+  for (const operation of ["average", "count", "count_distinct"]) {
+    const validation = validateFormulaAst({
+      type: "aggregate",
+      operation,
+      input: { type: "field", field: "sales.net_sales" },
+      filters: []
+    });
+    assert.equal(validation.ok, true);
+    assert.equal(validation.executable, false);
+  }
+  assert.deepEqual(validateFormulaAst({
+    type: "aggregate",
+    operation: "weighted_average",
+    input: { type: "field", field: "sales.net_sales" },
+    filters: []
+  }), { ok: false, code: "DATA_STANDARD_INVALID" });
+  const weighted = validateFormulaAst({
+    type: "aggregate",
+    operation: "weighted_average",
+    input: { type: "field", field: "sales.net_sales" },
+    weight: { type: "field", field: "sales.quantity" },
+    filters: []
+  });
+  assert.equal(weighted.ok, true);
+  assert.equal(weighted.executable, false);
+});
+
+test("date nodes require complete operation-specific recursive schemas", () => {
+  const valid = validateFormulaAst({
+    type: "date",
+    operation: "difference",
+    start: { type: "date", operation: "days_in_period", period: "day" },
+    end: { type: "date", operation: "days_in_period", period: "month" }
+  });
+  assert.equal(valid.ok, true);
+  assert.equal(valid.executable, false);
+  assert.deepEqual(validateFormulaAst({
+    type: "date",
+    operation: "difference",
+    start: { type: "date", operation: "days_in_period", period: "day", code: "return 1" },
+    end: { type: "sql", statement: "select 1" }
+  }), { ok: false, code: "DATA_STANDARD_INVALID" });
+});
+
+test("draft normalization compares the declared unit with the derived formula unit", () => {
+  const draft = normalizeDataStandardDraft({
+    metricCode: "sales.new_metric",
+    name: "新指标",
+    category: "sales",
+    ownerDepartment: "财务部",
+    unit: "CNY",
+    period: "day",
+    formulaAst: { type: "aggregate", operation: "sum", input: { type: "field", field: "sales.quantity" }, filters: [] }
+  });
+  assert.deepEqual(draft.validation, { ok: false, code: "DATA_STANDARD_UNIT_MISMATCH" });
+});
+
+test("only trusted unavailable-source normalization can preserve data-not-covered definitions", () => {
+  const input = {
+    metricCode: "goods_flow.new_metric",
+    name: "货流新指标",
+    category: "goods_flow",
+    ownerDepartment: "供应链部",
+    unit: "DAY",
+    period: "month"
+  };
+  const ordinary = normalizeDataStandardDraft({ ...input, coverageStatus: "DATA_NOT_COVERED" });
+  assert.deepEqual(ordinary.validation, { ok: false, code: "DATA_STANDARD_INVALID" });
+  const uncovered = normalizeDataStandardDraft(input, { allowUncoveredSourceCoverage: true });
+  assert.equal(uncovered.validation.ok, true);
+  assert.equal(uncovered.coverageStatus, "DATA_NOT_COVERED");
+  assert.equal(uncovered.executable, false);
+});
