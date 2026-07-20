@@ -83,6 +83,27 @@ test("legacy import commits valid rows and returns mapping failures as partial s
 
 test("stocktake transitions enforce warehouse, supply and finance responsibilities", async () => {
   const db = createGoodsFlowD1Mock();
+  await call(imports, {
+    method: "POST",
+    session: sessions.data,
+    db,
+    headers: { "idempotency-key": "stocktake-inventory-seed" },
+    body: {
+      asOf: "2026-07-20",
+      products: [{ id: "product-1", name: "木丝绒", skuCodes: ["690001"] }],
+      supplyState: {
+        inventorySnapshots: [{
+          id: "inventory-before-stocktake",
+          skuCode: "690001",
+          warehouse: "兰山云仓",
+          erpQuantity: 10,
+          unitCost: 5,
+          sourceType: "kuaimai-import",
+          stocktakeDate: "2026-07-20"
+        }]
+      }
+    }
+  });
   const created = await call(stocktakes, {
     method: "POST",
     session: sessions.warehouse,
@@ -117,20 +138,68 @@ test("stocktake transitions enforce warehouse, supply and finance responsibiliti
     body: { action: "confirm_amount", expectedVersion: 2 }
   });
   assert.equal(amount.body.data.status, "confirmed");
+  const calibrated = await call(inventory, { session: sessions.supply, db });
+  assert.equal(calibrated.body.data[0].calibratedQuantity, 9);
+  assert.equal(calibrated.body.data[0].stocktakeStatus, "calibrated");
+  assert.equal(calibrated.body.data[0].stocktakeId, "stocktake-1");
+  assert.equal([...db.tables.goods_flow_events.values()].some(row => row.event_type === "inventory_adjustment_confirmed"), true);
 });
 
-test("CCC recalculation appends versions and only finance can freeze", async () => {
+test("CCC recalculation derives facts from storage, ignores client metric rows and only finance can freeze", async () => {
   const db = createGoodsFlowD1Mock();
+  await call(receivableTerms, {
+    method: "PUT", session: sessions.finance, db,
+    headers: { "idempotency-key": "term-tmall-30-for-ccc" },
+    body: { id: "tmall-30", platform: "天猫", days: 30, effectiveFrom: "2026-01-01", reason: "平台约定", version: 1 }
+  });
+  await call(imports, {
+    method: "POST", session: sessions.data, db,
+    headers: { "idempotency-key": "ccc-source-facts" },
+    body: {
+      asOf: "2026-07-31",
+      products: [{ id: "product-1", name: "木丝绒", skuCodes: ["690001"] }],
+      salesRows: [{ id: "sale-1", code: "690001", platform: "天猫", netSales: 1000, cost: 310, date: "2026-07-19" }],
+      supplyState: {
+        purchaseApprovals: [{
+          id: "purchase-1", processInstanceId: "purchase-process-1", supplierId: "supplier-1",
+          status: "COMPLETED", approvedAmount: 100, receivedAt: "2026-07-01", completedAt: "2026-07-01"
+        }],
+        paymentApprovals: [{
+          id: "payment-1", processInstanceId: "payment-process-1", purchaseProcessInstanceId: "purchase-process-1",
+          status: "COMPLETED", amount: 100, completedAt: "2026-07-21"
+        }],
+        inventorySnapshots: [{
+          id: "inventory-1", skuCode: "690001", warehouse: "兰山云仓", erpQuantity: 10,
+          unitCost: 31, sellableQuantity: 0, sourceType: "kuaimai-import", stocktakeDate: "2026-07-31"
+        }]
+      }
+    }
+  });
+  await call(stocktakes, {
+    method: "POST", session: sessions.warehouse, db,
+    headers: { "idempotency-key": "ccc-stocktake-create" },
+    body: {
+      id: "ccc-stocktake", warehouseId: "兰山云仓", countedAt: "2026-07-31", version: 1,
+      lines: [{ skuId: "product-1::690001", warehouseId: "兰山云仓", erpQuantity: 10, countedQuantity: 10, unitCost: 31 }]
+    }
+  });
+  await call(stocktakeTransitions, {
+    method: "POST", session: sessions.supply, db, params: { id: "ccc-stocktake" },
+    headers: { "idempotency-key": "ccc-stocktake-difference" },
+    body: { action: "confirm_difference", expectedVersion: 1 }
+  });
+  await call(stocktakeTransitions, {
+    method: "POST", session: sessions.finance, db, params: { id: "ccc-stocktake" },
+    headers: { "idempotency-key": "ccc-stocktake-amount" },
+    body: { action: "confirm_amount", expectedVersion: 2 }
+  });
   const recalculated = await call(recalculateCcc, {
     method: "POST", session: sessions.finance, db, params: { month: "2026-07" },
     headers: { "idempotency-key": "ccc-2026-07-v1" },
     body: {
-      periodEnd: "2026-07-31", daysInPeriod: 31,
-      inventoryDaily: [{ date: "2026-07-31", calibratedInventoryValue: 310, isCore: true, sellableQuantity: 0, stocktakeStatus: "calibrated" }],
-      sales: [{ platform: "天猫", netSales: 1000, cost: 310 }],
-      receivableTerms: [{ platform: "天猫", days: 30, effectiveFrom: "2026-01-01" }],
-      purchases: [{ id: "purchase-1", amount: 100, receivedAt: "2026-07-01" }],
-      payments: [{ purchaseId: "purchase-1", amount: 100, paidAt: "2026-07-21" }]
+      periodEnd: "2026-07-31",
+      inventoryDaily: [{ date: "2026-07-31", calibratedInventoryValue: 999999 }],
+      sales: [{ platform: "伪造平台", netSales: 999999, cost: 1 }]
     }
   });
   assert.equal(recalculated.response.status, 201);
@@ -139,14 +208,7 @@ test("CCC recalculation appends versions and only finance can freeze", async () 
   const retried = await call(recalculateCcc, {
     method: "POST", session: sessions.finance, db, params: { month: "2026-07" },
     headers: { "idempotency-key": "ccc-2026-07-v1" },
-    body: {
-      periodEnd: "2026-07-31", daysInPeriod: 31,
-      inventoryDaily: [{ date: "2026-07-31", calibratedInventoryValue: 310, isCore: true, sellableQuantity: 0, stocktakeStatus: "calibrated" }],
-      sales: [{ platform: "天猫", netSales: 1000, cost: 310 }],
-      receivableTerms: [{ platform: "天猫", days: 30, effectiveFrom: "2026-01-01" }],
-      purchases: [{ id: "purchase-1", amount: 100, receivedAt: "2026-07-01" }],
-      payments: [{ purchaseId: "purchase-1", amount: 100, paidAt: "2026-07-21" }]
-    }
+    body: { periodEnd: "2030-12-31" }
   });
   assert.deepEqual(retried.body.data, recalculated.body.data);
 

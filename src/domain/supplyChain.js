@@ -207,7 +207,12 @@ function emptyDimensionRow({ product, supplierId = "" }) {
     erpInventoryValue: 0,
     physicalInventoryValue: 0,
     hasErpSnapshot: false,
-    hasPhysicalSnapshot: false
+    hasPhysicalSnapshot: false,
+    hasPaymentEvidence: false,
+    hasSalesCostEvidence: false,
+    hasAdjustmentEvidence: false,
+    hasInventoryFundsEvidence: false,
+    hasBomCostEvidence: false
   };
 }
 
@@ -273,6 +278,7 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
       const product = productMap.get(allocation.productId);
       const productRow = productRows.get(allocation.productId) || emptyDimensionRow({ product: product || { id: allocation.productId } });
       productRow.actualPaid += amount;
+      productRow.hasPaymentEvidence = true;
       productRows.set(allocation.productId, productRow);
 
       const supplierId = cleanText(purchase.supplierId) || "unmapped";
@@ -298,6 +304,7 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     if (!product) continue;
     const productRow = productRows.get(product.id) || emptyDimensionRow({ product });
     productRow.consumedSalesCost += finiteNumber(salesRow.cost ?? salesRow.salesCost);
+    productRow.hasSalesCostEvidence = true;
     productRows.set(product.id, productRow);
     soldQuantityByProduct.set(product.id, (soldQuantityByProduct.get(product.id) || 0) + finiteNumber(salesRow.qty ?? salesRow.quantity));
   }
@@ -372,6 +379,7 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     const product = productMap.get(adjustment.productId);
     const productRow = productRows.get(adjustment.productId) || emptyDimensionRow({ product: product || { id: adjustment.productId } });
     productRow.adjustmentAmount += finiteNumber(adjustment.adjustmentAmount);
+    productRow.hasAdjustmentEvidence = true;
     productRows.set(adjustment.productId, productRow);
     if (adjustment.supplierId) {
       const supplier = state.suppliers.find(item => item.id === adjustment.supplierId);
@@ -401,7 +409,9 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     }
     productRow.rawInventoryFunds = productRow.actualPaid - productRow.consumedSalesCost;
     productRow.adjustedInventoryFunds = productRow.rawInventoryFunds + productRow.adjustmentAmount;
+    productRow.hasInventoryFundsEvidence = productRow.hasPaymentEvidence || productRow.hasSalesCostEvidence || productRow.hasAdjustmentEvidence;
     productRow.bomUnitCost = bomUnitCostByProduct.get(productRow.productId) || 0;
+    productRow.hasBomCostEvidence = bomUnitCostByProduct.has(productRow.productId);
     productRow.quantityVariance = productRow.hasPhysicalSnapshot && productRow.hasErpSnapshot
       ? productRow.physicalInventoryQuantity - productRow.erpInventoryQuantity
       : 0;

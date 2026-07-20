@@ -2,6 +2,7 @@ import { AlertTriangle, Banknote, Boxes, CircleDollarSign, Database, ShieldAlert
 import { DataTable } from "../../ui/DataTable.jsx";
 
 const money = value => `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const evidencedMoney = (value, available) => available ? money(value) : "—";
 const quantity = (value, available) => available ? Number(value || 0).toLocaleString("zh-CN") : "—";
 
 export function SupplyChainProductFundsTable({
@@ -10,10 +11,10 @@ export function SupplyChainProductFundsTable({
   description = "审批实付回答钱花了多少；ERP库存与实盘库存回答货还剩多少。"
 }) {
   const productColumns = [
-    { key: "product", header: "产品", render: row => <span><strong>{row.productName}</strong><small className="table-secondary">BOM {money(row.bomUnitCost)} / 件</small></span> },
-    { key: "paid", header: "审批实付", render: row => money(row.actualPaid) },
-    { key: "cost", header: "销量消耗成本", render: row => money(row.consumedSalesCost) },
-    { key: "funds", header: "库存资金", render: row => <strong>{money(row.adjustedInventoryFunds)}</strong> },
+    { key: "product", header: "产品", render: row => <span><strong>{row.productName}</strong><small className="table-secondary">{row.hasBomCostEvidence ? `BOM ${money(row.bomUnitCost)} / 件` : "BOM 尚无来源"}</small></span> },
+    { key: "paid", header: "审批实付", render: row => evidencedMoney(row.actualPaid, row.hasPaymentEvidence) },
+    { key: "cost", header: "销量消耗成本", render: row => evidencedMoney(row.consumedSalesCost, row.hasSalesCostEvidence) },
+    { key: "funds", header: "库存资金", render: row => <strong>{evidencedMoney(row.adjustedInventoryFunds, row.hasInventoryFundsEvidence)}</strong> },
     { key: "erp", header: "ERP库存", render: row => <span><strong>{quantity(row.erpInventoryQuantity, row.hasErpSnapshot)}</strong><small className="table-secondary">{row.hasErpSnapshot ? money(row.erpInventoryValue) : "暂无快照"}</small></span> },
     { key: "physical", header: "实盘库存", render: row => <span><strong>{quantity(row.physicalInventoryQuantity, row.hasPhysicalSnapshot)}</strong><small className="table-secondary">{row.hasPhysicalSnapshot ? money(row.physicalInventoryValue) : "尚未盘点"}</small></span> },
     { key: "variance", header: "盘点差异", render: row => row.hasErpSnapshot && row.hasPhysicalSnapshot ? <strong className={row.quantityVariance ? "text-warning" : ""}>{row.quantityVariance > 0 ? "+" : ""}{row.quantityVariance}</strong> : "—" }

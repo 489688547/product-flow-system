@@ -96,7 +96,9 @@ export function projectLegacyGoodsFlow({ supplyState = {}, products = [], salesR
       payload: {
         approvedAmount: number(purchase.approvedAmount ?? purchase.amount),
         productIds: Array.isArray(purchase.productIds) ? purchase.productIds.filter(Boolean) : [],
-        processInstanceId: reference
+        processInstanceId: reference,
+        receivedAt: purchase.receivedAt ? isoDate(purchase.receivedAt, asOf) : null,
+        payableDateBasis: purchase.receivedAt ? "received_at" : "approval_fallback"
       },
       createdAt: isoDate(asOf, new Date().toISOString())
     });
@@ -168,7 +170,8 @@ export function projectLegacyGoodsFlow({ supplyState = {}, products = [], salesR
         skuCode,
         platform: clean(sale.platform),
         quantity: number(sale.qty ?? sale.quantity),
-        cost: number(sale.cost ?? sale.salesCost)
+        cost: number(sale.cost ?? sale.salesCost),
+        netSales: number(sale.netSales ?? sale.salesAmount ?? sale.amount)
       },
       createdAt: isoDate(asOf, new Date().toISOString())
     });

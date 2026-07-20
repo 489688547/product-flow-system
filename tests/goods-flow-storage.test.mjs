@@ -101,10 +101,10 @@ test("legacy projection keeps linked approvals and reports uncertain mappings", 
   const projection = projectLegacyGoodsFlow({
     asOf: "2026-07-20",
     products: [{ id: "product-1", name: "木丝绒", skuCodes: ["690001"] }],
-    salesRows: [{ code: "690001", platform: "天猫", qty: 2, cost: 20, date: "2026-07-19" }],
+    salesRows: [{ code: "690001", platform: "天猫", qty: 2, netSales: 80, cost: 20, date: "2026-07-19" }],
     supplyState: {
       suppliers: [{ id: "supplier-1", name: "德杉工厂" }],
-      purchaseApprovals: [{ id: "purchase-1", processInstanceId: "purchase-1", supplierId: "supplier-1", productIds: ["product-1"], status: "COMPLETED", approvedAmount: 100 }],
+      purchaseApprovals: [{ id: "purchase-1", processInstanceId: "purchase-1", supplierId: "supplier-1", productIds: ["product-1"], status: "COMPLETED", approvedAmount: 100, receivedAt: "2026-07-02" }],
       paymentApprovals: [
         { id: "payment-1", processInstanceId: "payment-1", purchaseProcessInstanceId: "purchase-1", amount: 100, status: "COMPLETED", completedAt: "2026-07-10" },
         { id: "payment-2", processInstanceId: "payment-2", amount: 50, status: "COMPLETED", completedAt: "2026-07-11" }
@@ -120,4 +120,6 @@ test("legacy projection keeps linked approvals and reports uncertain mappings", 
   assert.equal(projection.exceptions.some(row => row.code === "GOODS_FLOW_PURCHASE_LINK_REQUIRED"), true);
   assert.equal(projection.exceptions.some(row => row.code === "GOODS_FLOW_SKU_MAPPING_REQUIRED"), true);
   assert.equal(projection.inventoryDaily[0].skuId, "product-1::690001");
+  assert.equal(projection.events.find(row => row.eventType === "sale_consumed").payload.netSales, 80);
+  assert.equal(projection.events.find(row => row.eventType === "purchase_approved").payload.receivedAt, "2026-07-02T00:00:00.000Z");
 });

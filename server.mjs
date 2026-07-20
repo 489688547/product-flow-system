@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isLoopbackAddress, readDwsTodoPreview } from "./server/dwsTodoPreview.mjs";
 import { createProductionDataClient } from "./server/productionDataClient.mjs";
+import { createGoodsFlowLocalPreview } from "./server/goodsFlowLocalPreview.mjs";
 import {
   buildConfigResponse,
   createDingCalendarEvent,
@@ -49,6 +50,8 @@ const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 const LOCAL_SUPPLY_STATE_PATH = path.join(LOCAL_DATA_DIR, "supply-chain-state.json");
 const LOCAL_DATA_CENTER_STATE_PATH = path.join(LOCAL_DATA_DIR, "data-center-state.json");
 const LOCAL_COLLABORATION_PATH = path.join(LOCAL_DATA_DIR, "collaboration-items.json");
+const LOCAL_GOODS_FLOW_PATH = path.join(LOCAL_DATA_DIR, "goods-flow-preview.json");
+const handleGoodsFlowLocalPreview = createGoodsFlowLocalPreview({ storagePath: LOCAL_GOODS_FLOW_PATH });
 let orgCache = null;
 let productionDataClient;
 
@@ -85,7 +88,7 @@ function json(res, status, body) {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-origin": "*",
     "access-control-allow-methods": "GET,POST,PATCH,DELETE,OPTIONS",
-    "access-control-allow-headers": "content-type"
+    "access-control-allow-headers": "content-type,idempotency-key"
   });
   res.end(JSON.stringify(body));
 }
@@ -948,6 +951,9 @@ const server = http.createServer(async (req, res) => {
   if (url.pathname === "/api/platform/v1/collaboration-items" || url.pathname.startsWith("/api/platform/v1/collaboration-items/")) {
     await handleLocalCollaboration(req, res, url);
     return;
+  }
+  if (url.pathname.startsWith("/api/platform/v1/goods-flow/")) {
+    if (await handleGoodsFlowLocalPreview(req, res, url)) return;
   }
   if ([
     "/api/platform/v1/ai/status",

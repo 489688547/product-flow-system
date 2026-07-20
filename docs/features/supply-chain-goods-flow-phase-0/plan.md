@@ -583,6 +583,11 @@ git commit -m "feat: add stocktake and cash cycle workspaces"
 **Files:**
 - Create: `scripts/preview-goods-flow-migration.mjs`
 - Create: `tests/goods-flow-migration-preview.test.mjs`
+- Create: `functions/api/platform/v1/goods-flow/_shared/metricsProjection.js`
+- Create: `server/goodsFlowLocalDatabase.mjs`
+- Create: `server/goodsFlowLocalPreview.mjs`
+- Create: `tests/goods-flow-metrics-projection.test.mjs`
+- Create: `tests/local-goods-flow-server.test.mjs`
 - Modify: `docs/product/data-definitions.md`
 - Modify: `docs/product/roles-and-permissions.md`
 - Modify: `DESIGN.md`
@@ -593,7 +598,7 @@ git commit -m "feat: add stocktake and cash cycle workspaces"
 - Consumes: exported legacy projection and a sanitized supply snapshot.
 - Produces: a no-write JSON reconciliation report with counts, mapped/unmapped entities, metric coverage and blocking differences.
 
-- [ ] **Step 1: Write failing no-write migration preview test**
+- [x] **Step 1: Write failing no-write migration preview test**
 
 ```js
 const report = buildGoodsFlowMigrationPreview(snapshot);
@@ -601,7 +606,7 @@ assert.deepEqual(Object.keys(report), ["counts", "coverage", "unmapped", "blocki
 assert.equal(report.blockingDifferences.some(row => row.type === "payment_without_purchase"), true);
 ```
 
-- [ ] **Step 2: Implement preview-only script**
+- [x] **Step 2: Implement preview-only script**
 
 The CLI accepts an input JSON path and optional output path, never accepts a database binding or writes production. It redacts provider payloads and personal fields.
 
@@ -617,11 +622,11 @@ export function buildGoodsFlowMigrationPreview(snapshot) {
 }
 ```
 
-- [ ] **Step 3: Update durable sources and task evidence**
+- [x] **Step 3: Update durable sources and task evidence**
 
 Document double inventory ledgers, CCC components, versioned terms, server permissions, one App entry, no nested single-purpose title cards, horizontal table text, migration/rollback and Kuaimai inventory limitation. Mark each completed task with its actual test command and commit.
 
-- [ ] **Step 4: Run focused integration checks**
+- [x] **Step 4: Run focused integration checks**
 
 ```bash
 node scripts/check-integration-impact.mjs --route --text "goods flow ERP DingTalk Kuaimai D1" --paths "functions/api/platform/v1/goods-flow,migrations,src/features/supply-chain"
@@ -632,7 +637,9 @@ npm run check:environment-capabilities
 
 Expected: all affected platforms are declared and generated modules are current.
 
-- [ ] **Step 5: Run the repository Definition of Done**
+Actual verification: routing identified Cloudflare Pages/D1、钉钉、快麦和 ERP 文件导入；平台清单生成、集成检查和环境能力检查均通过。快麦只登记销售来源，未声明库存自动同步。
+
+- [x] **Step 5: Run the repository Definition of Done**
 
 ```bash
 npm run lint
@@ -645,11 +652,15 @@ npm run build
 
 Expected: every command exits 0.
 
-- [ ] **Step 6: Perform UI verification**
+Actual verification: `npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm test`、`npm run build` 和 `git diff --check` 均退出 0；API 测试 280 项、附加货流投影测试 3 项通过，构建产物所有 JavaScript chunk 小于 500 KB。
+
+- [x] **Step 6: Perform UI verification**
 
 Verify keyboard/focus, normal, loading, empty, stale, partial-success, error, no-permission, disabled and version-conflict states at 1440px, 1180px and a narrow 钉钉 WebView. Record local verification separately from Preview and Production; do not deploy without explicit release authorization.
 
-- [ ] **Step 7: Commit final evidence**
+Actual local verification: 1440/1180/768 无整页横向溢出或竖排表头；10 个供应链导航项、3 个驾驶舱指标、库存/盘点空状态、财务冻结禁用原因、供应商直表和采购 Tab 切换通过。Preview 与 Production 未部署、未验收。
+
+- [x] **Step 7: Commit final evidence**
 
 ```bash
 git add scripts/preview-goods-flow-migration.mjs tests/goods-flow-migration-preview.test.mjs docs DESIGN.md

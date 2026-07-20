@@ -71,8 +71,8 @@ test("goods-flow metrics combine inventory receivable payable stockout and cash"
       stocktakeStatus: "calibrated"
     }],
     sales: [
-      { platform: "天猫", netSales: 7000, cost: 3100 },
-      { platform: "抖音", netSales: 3000, cost: 0 }
+      { platform: "天猫", date: "2026-07-10", netSales: 7000, cost: 3100 },
+      { platform: "抖音", date: "2026-07-10", netSales: 3000, cost: 0 }
     ],
     receivableTerms: [
       { platform: "天猫", days: 30, effectiveFrom: "2026-01-01" },

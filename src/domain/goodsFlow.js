@@ -118,7 +118,7 @@ function calculateReceivableDays({ sales, receivableTerms, periodEnd }) {
     const netSales = Math.max(0, numberOrNull(row?.netSales) ?? 0);
     if (!netSales) continue;
     totalSales += netSales;
-    const term = resolveReceivableTerm(receivableTerms, row.platform, periodEnd);
+    const term = resolveReceivableTerm(receivableTerms, row.platform, row.date || periodEnd);
     const days = numberOrNull(term?.days);
     if (days === null) continue;
     matchedSales += netSales;
