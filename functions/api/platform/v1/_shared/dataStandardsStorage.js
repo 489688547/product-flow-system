@@ -246,6 +246,10 @@ export async function listDefinitions(db, filters = {}) {
   return (result?.results || []).map(definitionFromRow);
 }
 
+export async function appendDataStandardAudit(db, definitionId, audit) {
+  await auditInsert(db, definitionId, audit).run();
+}
+
 export async function getDefinitionDetail(db, id) {
   const row = await db.prepare("SELECT * FROM data_metric_definitions WHERE id = ?").bind(id).first();
   if (!row) return null;

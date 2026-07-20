@@ -8,6 +8,7 @@
 - 集合：`GET|POST /api/platform/v1/data-standards`
 - 单项：`GET|PUT /api/platform/v1/data-standards/:id`
 - 归档：`POST /api/platform/v1/data-standards/:id/archive`
+- 预览：`POST /api/platform/v1/data-standards/preview`
 - 存储：`PRODUCT_FLOW_DB` 中的版本化数据口径表
 
 该 API 是数据口径定义、版本、依赖和最近有效结果的共享边界。它不接收任意 SQL 或 JavaScript，不执行外部平台动作，也不替代结果查询、预览和重算的后续独立契约。
@@ -81,6 +82,14 @@ PUT 使用与创建相同的字段白名单，并且必须提交整数 `expected
 ```
 
 归档使用乐观版本检查，只把当前定义状态改为 `archived`。版本、依赖、历史结果和审计记录全部保留，不提供物理 DELETE。
+
+### POST 安全预览
+
+预览使用与创建相同的口径字段，并增加 `from`、`to`。日期范围按上海时区解释，首尾均包含，最多连续 31 天。权限与发布一致；财务、运营、供应链只能预览自己责任部门的口径。
+
+预览和正式计算共用受控 AST 编译器与执行器。表名、列名、聚合和过滤只能来自服务端 registry，日期和值使用 D1 bound parameters；请求不能提交 SQL、JavaScript 或任意列名。销售事实固定读取 `product_sales_daily`，按 `create_time` 日聚合并排除“其它/其他/未知/未知平台”。
+
+成功响应返回 `result`，包含 `value`（可为 `null`）、`unit`、`version`、`coverageRate`、`confidence`、`estimated`、`status`、`reasonCode` 和 `dataCutoffAt`。分母为零或事实缺失不补零；尚未覆盖的货流口径返回 `data_not_covered / DATA_NOT_COVERED`，不生成模拟值。预览不写 `data_metric_results`，但成功和失败均追加脱敏审计，只记录口径引用、范围、操作者和结果动作。
 
 ## 响应
 

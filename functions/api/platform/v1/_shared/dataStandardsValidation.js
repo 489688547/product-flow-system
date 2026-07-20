@@ -27,7 +27,7 @@ function sanitizedBody(body) {
   return Object.fromEntries(Object.entries(body).filter(([key]) => WRITE_FIELDS.has(key)));
 }
 
-export function validateDefinitionInput(body, actor, { existing = null, definitions = [] } = {}) {
+export function validateDefinitionInput(body, actor, { existing = null, definitions = [], preview = false } = {}) {
   const submitted = sanitizedBody(body);
   if (existing && submitted.metricCode && submitted.metricCode !== existing.metricCode) {
     invalid("已发布口径的 metricCode 不能修改。", "DATA_STANDARD_INVALID", { fields: ["metricCode"] });
@@ -52,7 +52,7 @@ export function validateDefinitionInput(body, actor, { existing = null, definiti
     ...submitted
   } : submitted;
   input.ownerDepartment = lockOwnerDepartment(actor, input.ownerDepartment);
-  if (existing) validateExpectedVersion(body);
+  if (existing && !preview) validateExpectedVersion(body);
   if (!String(input.name || "").trim() || !String(input.displayFormula || "").trim() || !isDateOnly(input.effectiveFrom)) {
     invalid("名称、展示公式和有效生效日期为必填项。");
   }
