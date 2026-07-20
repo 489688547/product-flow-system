@@ -49,13 +49,13 @@
       "name": "Cloudflare Pages",
       "status": "connected",
       "summary": "托管 React 应用与 Pages Functions，并提供生产和预览运行边界。",
-      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "本地线上账号运行", "回滚", "环境就绪检查", "生产数据网关", "加密平台连接"],
+      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "本地线上账号运行", "回滚", "环境就绪检查", "生产数据网关", "加密平台连接", "用户洞察共享 API"],
       "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失", "测试环境与生产配置漂移", "本地如何使用真实线上账号、数据与外部动作"],
       "keywords": ["Cloudflare", "Pages", "Pages Functions", "部署", "生产环境"],
       "codePaths": ["functions/**", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/state/deploymentRecovery.js", "scripts/prepare-pages-build.mjs", "scripts/prepare-pages-release.mjs", "scripts/check-deployed-readiness.mjs", "cloudflare-entry.html", "404.html", "public/404.html", "_redirects", "wrangler.toml", ".github/workflows/**"],
       "envVars": ["PLATFORM_CREDENTIAL_MASTER_KEY", "LOCAL_ONLINE_ACCOUNT_MODE", "PRODUCTION_DATA_ACCESS_TOKEN", "AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"],
       "domains": ["pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": ["/api/platform/v1/environment-readiness", "/api/platform/v1/platform-connections", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/ai/"],
+      "apiRoutes": ["/api/platform/v1/environment-readiness", "/api/platform/v1/platform-connections", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/user-insights", "/api/platform/v1/user-insights/", "/api/platform/v1/ai/"],
       "publicDocs": [
         { "label": "Cloudflare Pages 文档", "url": "https://developers.cloudflare.com/pages/" },
         { "label": "Pages Functions 文档", "url": "https://developers.cloudflare.com/pages/functions/" }
@@ -69,19 +69,19 @@
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
-      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "数据中心元数据", "店铺运营记录", "人事核心记录", "绩效记录", "跨 App 协同", "AI Provider 元数据", "AI 外发策略", "AI 无内容审计", "生产写入审计", "写前快照", "加密平台连接"],
-      "businessQuestions": ["数据只在本地可见", "跨设备状态不同步", "数据库绑定缺失", "表结构或容量问题", "人事数据表是否就绪", "跨部门事项如何留痕", "测试账号如何受控写生产数据", "生产写入如何回滚"],
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、用户洞察、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "数据中心元数据", "用户洞察标准事实", "用户洞察部门规则", "采集设备令牌哈希", "店铺运营记录", "人事核心记录", "绩效记录", "跨 App 协同", "AI Provider 元数据", "AI 外发策略", "AI 无内容审计", "生产写入审计", "写前快照", "加密平台连接"],
+      "businessQuestions": ["数据只在本地可见", "跨设备状态不同步", "数据库绑定缺失", "表结构或容量问题", "用户洞察采集结果未落库", "人事数据表是否就绪", "跨部门事项如何留痕", "测试账号如何受控写生产数据", "生产写入如何回滚"],
       "keywords": ["D1", "数据库", "落库", "PRODUCT_FLOW_DB", "持久化"],
-      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/**", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/**", "functions/api/performance-management.js", "functions/api/performance-management/**", "functions/api/hr-management/**", "functions/api/auth/**", "functions/api/dingtalk/org/**", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/v1/production-data/**", "functions/api/platform/v1/collaboration-items/**", "functions/api/platform/v1/ai/**", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/**", "migrations/0002_hr_management_core.sql", "migrations/0003_platform_credentials.sql"],
+      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/**", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/**", "functions/api/performance-management.js", "functions/api/performance-management/**", "functions/api/hr-management/**", "functions/api/auth/**", "functions/api/dingtalk/org/**", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/v1/production-data/**", "functions/api/platform/v1/collaboration-items/**", "functions/api/platform/v1/user-insights.js", "functions/api/platform/v1/user-insights/**", "functions/api/platform/v1/ai/**", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/**", "migrations/0002_hr_management_core.sql", "migrations/0003_platform_credentials.sql", "migrations/0005_user_insights.sql"],
       "envVars": ["PRODUCT_FLOW_DB"],
       "domains": ["api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": ["/api/state", "/api/platform", "/api/supply-chain", "/api/sales", "/api/data-center", "/api/ecommerce-operations", "/api/performance-management", "/api/hr-management", "/api/platform/v1/environment-readiness", "/api/platform/v1/platform-connections", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/collaboration-items", "/api/platform/v1/ai/"],
+      "apiRoutes": ["/api/state", "/api/platform", "/api/supply-chain", "/api/sales", "/api/data-center", "/api/ecommerce-operations", "/api/performance-management", "/api/hr-management", "/api/platform/v1/environment-readiness", "/api/platform/v1/platform-connections", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/collaboration-items", "/api/platform/v1/user-insights", "/api/platform/v1/user-insights/", "/api/platform/v1/ai/"],
       "publicDocs": [
         { "label": "Cloudflare D1 入门", "url": "https://developers.cloudflare.com/d1/get-started/" },
         { "label": "Pages D1 绑定", "url": "https://developers.cloudflare.com/pages/functions/bindings/" }
       ],
-      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/", "functions/api/performance-management.js", "functions/api/performance-management/", "functions/api/hr-management/", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/v1/_shared/collaborationStorage.js", "functions/api/platform/v1/ai/", "migrations/0001_production_data_access.sql", "migrations/0002_business_data_apps.sql", "migrations/0002_collaboration_execution.sql", "migrations/0002_hr_management_core.sql", "migrations/0003_platform_credentials.sql", "migrations/0003_company_ai_assistant.sql", "migrations/0004_company_ai_skills.sql"],
+      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/", "functions/api/performance-management.js", "functions/api/performance-management/", "functions/api/hr-management/", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/v1/_shared/collaborationStorage.js", "functions/api/platform/v1/user-insights.js", "functions/api/platform/v1/user-insights/", "functions/api/platform/v1/ai/", "migrations/0001_production_data_access.sql", "migrations/0002_business_data_apps.sql", "migrations/0002_collaboration_execution.sql", "migrations/0002_hr_management_core.sql", "migrations/0003_platform_credentials.sql", "migrations/0003_company_ai_assistant.sql", "migrations/0004_company_ai_skills.sql", "migrations/0005_user_insights.sql"],
       "relations": [
         { "platformId": "cloudflare-pages", "type": "bound-to", "description": "D1 通过 Pages Functions 的环境绑定提供服务。" },
         { "platformId": "dingtalk", "type": "stores-data-for", "description": "保存钉钉会话、组织和用户令牌相关数据。" },
@@ -229,6 +229,25 @@
       "evidence": [],
       "relations": [
         { "platformId": "xiaohongshu-open-platform", "type": "cross-channel-content", "description": "跨渠道素材分析需要区分平台内容与投放数据口径。" }
+      ]
+    },
+    {
+      "id": "browser-market-collector",
+      "name": "浏览器市场采集器",
+      "status": "connected",
+      "summary": "公司 Mac 通过 Chrome 调试协议只读采集已登记、已确认的平台市场类目页面，并写入用户洞察标准事实。",
+      "capabilities": ["工作日采集", "已登记页面白名单", "用户市场", "商品市场", "视频市场", "直播市场", "页面结构版本", "登录失效停止", "幂等批次"],
+      "businessQuestions": ["平台市场数据没有更新", "页面要求重新登录", "页面字段发生变化", "类目尚未确认", "采集器未连接", "周末为什么未自动采集"],
+      "keywords": ["用户洞察", "浏览器采集", "市场", "类目", "竞品", "Chrome", "CDP"],
+      "codePaths": ["scripts/user-insights-collector/**", "functions/api/platform/v1/user-insights.js", "functions/api/platform/v1/user-insights/**", "src/domain/userInsights.js", "src/state/userInsightsApi.js", "src/state/UserInsightsProvider.jsx", "src/features/data-center/UserInsightsWorkspace.jsx", "src/features/data-center/user-insights.css", "docs/features/user-insights/**", "docs/platform/apis/user-insights-v1.md", "docs/platform/browser-market-collection.md", "migrations/0005_user_insights.sql"],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": ["/api/platform/v1/user-insights", "/api/platform/v1/user-insights/collector", "/api/platform/v1/user-insights/ingest"],
+      "publicDocs": [],
+      "evidence": ["scripts/user-insights-collector/", "functions/api/platform/v1/user-insights.js", "functions/api/platform/v1/user-insights/", "src/domain/userInsights.js", "src/state/userInsightsApi.js", "src/state/UserInsightsProvider.jsx", "src/features/data-center/UserInsightsWorkspace.jsx", "docs/features/user-insights/", "migrations/0005_user_insights.sql"],
+      "relations": [
+        { "platformId": "cloudflare-pages", "type": "writes-through", "description": "采集器只能通过受限 Pages Functions ingest 契约写入，不能直连 D1。" },
+        { "platformId": "cloudflare-d1", "type": "stores-standard-facts", "description": "D1 只保存标准事实、规则、质量和审计，不保存完整页面、Cookie 或凭证。" }
       ]
     },
     {

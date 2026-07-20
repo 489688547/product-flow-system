@@ -34,6 +34,7 @@
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
 | `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
 | `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
+| `USER_INSIGHTS_` | 用户洞察未预期处理错误 | `USER_INSIGHTS_UNEXPECTED` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `LOCAL_ONLINE_` | 本地线上账号配置、数据库与运行时 | `LOCAL_ONLINE_TOKEN_REQUIRED` |
@@ -77,6 +78,18 @@
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+用户洞察共享 API 使用：
+
+- `AUTH_RUNNER_TOKEN_REQUIRED` / `AUTH_RUNNER_TOKEN_INVALID`：采集设备令牌缺失、无效或已停用。
+- `PERMISSION_RULE_WRITE_DENIED`：当前部门不能修改目标 App 的规则。
+- `PERMISSION_CATEGORY_UNCONFIRMED`：平台类目尚未人工确认，采集批次被拒绝。
+- `PERMISSION_RUNNER_SCOPE_DENIED`：批次平台或店铺超出设备授权范围。
+- `VALIDATION_RULE_INVALID` / `VALIDATION_INGEST_INVALID`：规则或采集批次字段不完整。
+- `VALIDATION_COMPETITOR_TRANSITION`：候选确认、驳回或停用缺少原因或状态无效。
+- `CATEGORY_CONFIRMATION_REQUIRED`：手动重试前尚未确认当前平台类目。
+- `VERSION_CONFLICT`：规则、类目或竞品版本已变化，HTTP 409。
+- `STORAGE_D1_UNAVAILABLE`：当前部署缺少用户洞察所需的 D1 绑定或表。
 
 公司 AI 总助 API 使用：
 
