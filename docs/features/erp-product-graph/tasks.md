@@ -27,11 +27,12 @@
   - 输出：组件关系持久化、覆盖率、部分成功兼容。
   - 验证：`node --test tests/product-catalog-api.test.mjs tests/product-catalog-kuaimai.test.mjs`。
   - 结果：13/13 通过；组合详情按父商品替换，成本按角色脱敏，同步接口返回游标、进度和失败摘要。
-- [ ] 商品主数据 UI 与同步进度
+- [x] 商品主数据 UI 与同步进度
   - 依赖：同步 API。
   - 文件：商品目录客户端、Provider、工作区和 React 测试。
   - 输出：扁平库存组成表、内部唯一码和游标进度。
   - 验证：`node --test react-tests/product-catalog-provider.test.mjs react-tests/product-catalog-ui.test.mjs`。
+  - 结果：11/11 通过；客户端自动续跑游标，页面直接展示库存单位、组合比例、组合成本和同步进度。
 - [ ] 货流组合消耗
   - 依赖：共享目录读取。
   - 文件：货流导入、旧数据投影和货流测试。

@@ -21,6 +21,7 @@ export function ProductCatalogProvider({ children }) {
   const [notice, setNotice] = useState("");
   const requestSequence = useRef(0);
   const salesQueryRef = useRef(salesQuery);
+  const [syncProgress, setSyncProgress] = useState(null);
 
   const refresh = useCallback(async ({ quiet = false, query = salesQueryRef.current } = {}) => {
     const requestId = requestSequence.current + 1;
@@ -68,17 +69,20 @@ export function ProductCatalogProvider({ children }) {
   }, [refresh]);
 
   const syncKuaimai = useCallback(async () => {
-    setBusy("kuaimai"); setError(""); setNotice("");
+    setBusy("kuaimai"); setError(""); setNotice(""); setSyncProgress({ processed: 0, totalCandidates: 0, components: 0, failed: 0 });
     try {
-      const result = await syncKuaimaiProductCatalog();
+      const result = await syncKuaimaiProductCatalog(undefined, setSyncProgress);
       await refresh({ quiet: true });
-      setNotice(`快麦同步完成：${Number(result.counts?.products || 0)} 个商品、${Number(result.counts?.skus || 0)} 个 SKU。`);
+      const componentText = `、${Number(result.progress?.components || 0)} 条库存组成`;
+      const failureText = result.failures?.length ? `；${result.failures.length} 个组合商品详情待重试` : "";
+      setNotice(`快麦同步完成：${Number(result.counts?.products || 0)} 个商品、${Number(result.counts?.skus || 0)} 个库存单位${componentText}${failureText}。`);
       return result;
     } catch (syncError) {
       setError(friendlyMessage(syncError, "快麦商品同步失败。"));
       throw syncError;
     } finally {
       setBusy("");
+      setSyncProgress(null);
     }
   }, [refresh]);
 
@@ -93,10 +97,11 @@ export function ProductCatalogProvider({ children }) {
     busy,
     error,
     notice,
+    syncProgress,
     refresh,
     importRows,
     syncKuaimai
-  }), [busy, error, importRows, items, loading, meta, notice, refresh, runs, salesLoading, salesQuery, syncKuaimai]);
+  }), [busy, error, importRows, items, loading, meta, notice, refresh, runs, salesLoading, salesQuery, syncKuaimai, syncProgress]);
 
   return <ProductCatalogContext.Provider value={value}>{children}</ProductCatalogContext.Provider>;
 }

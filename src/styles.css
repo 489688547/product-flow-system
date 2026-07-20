@@ -2122,14 +2122,16 @@ main { min-width: 0; overflow-x: hidden; }
 .product-catalog-table .data-table th, .product-catalog-table .data-table td { vertical-align: top; }
 .product-catalog-table .data-table th { white-space: nowrap; }
 .product-catalog-table .data-table th:nth-child(1), .product-catalog-table .data-table td:nth-child(1) { min-width: 220px; }
-.product-catalog-table .data-table th:nth-child(2), .product-catalog-table .data-table td:nth-child(2) { min-width: 320px; }
-.product-catalog-table .data-table th:nth-child(3), .product-catalog-table .data-table td:nth-child(3) { min-width: 190px; }
-.product-catalog-table .data-table th:nth-child(4), .product-catalog-table .data-table td:nth-child(4) { min-width: 144px; text-align: right; white-space: nowrap; }
-.product-catalog-table .data-table th:nth-child(5), .product-catalog-table .data-table td:nth-child(5) { min-width: 108px; white-space: nowrap; }
-.product-catalog-table .data-table th:nth-child(6), .product-catalog-table .data-table td:nth-child(6) { min-width: 220px; }
+.product-catalog-table .data-table th:nth-child(2), .product-catalog-table .data-table td:nth-child(2) { min-width: 280px; }
+.product-catalog-table .data-table th:nth-child(3), .product-catalog-table .data-table td:nth-child(3) { min-width: 220px; }
+.product-catalog-table .data-table th:nth-child(4), .product-catalog-table .data-table td:nth-child(4) { min-width: 190px; }
+.product-catalog-table .data-table th:nth-child(5), .product-catalog-table .data-table td:nth-child(5) { min-width: 144px; text-align: right; white-space: nowrap; }
+.product-catalog-table .data-table th:nth-child(6), .product-catalog-table .data-table td:nth-child(6) { min-width: 112px; white-space: nowrap; }
+.product-catalog-table .data-table th:nth-child(7), .product-catalog-table .data-table td:nth-child(7) { min-width: 108px; white-space: nowrap; }
+.product-catalog-table .data-table th:nth-child(8), .product-catalog-table .data-table td:nth-child(8) { min-width: 220px; }
 .catalog-product-cell, .catalog-code-list, .catalog-code-list > span { min-width: 0; display: grid; gap: 2px; }
 .catalog-product-cell strong { max-width: 34ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.catalog-product-cell small, .catalog-code-list small { color: var(--text-tertiary); font-size: 10px; }
+.catalog-product-cell small, .catalog-code-list small, .catalog-component-list small { color: var(--text-tertiary); font-size: 10px; }
 .catalog-code-list { gap: 7px; }
 .catalog-code-list > span + span { padding-top: 6px; border-top: 1px solid var(--border); }
 .catalog-code-list em { color: var(--text-tertiary); font-size: 10px; font-style: normal; }
@@ -2138,6 +2140,11 @@ main { min-width: 0; overflow-x: hidden; }
 .product-catalog-sales-cell small, .product-catalog-sales-cell em { color: var(--text-tertiary); font-size: 10px; font-style: normal; }
 .product-catalog-sales-cell.has-sales em { color: var(--text-secondary); }
 .product-catalog-sales-cell.no-sales strong { color: var(--text-secondary); }
+.catalog-component-list { min-width: 0; display: grid; align-content: start; gap: 5px; }
+.catalog-component-list > span { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 8px; }
+.catalog-component-list b, .catalog-component-list strong, .catalog-component-list small, .catalog-component-list em { white-space: nowrap; }
+.catalog-component-list em { color: var(--text-tertiary); font-size: 10px; font-style: normal; }
+.catalog-component-list.pending strong { color: var(--warning); }
 .catalog-code { font: 650 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .01em; white-space: nowrap; }
 .product-catalog-select { min-width: 0; }
 .product-catalog-select > button { width: 100%; min-height: var(--control-height); padding: 7px 9px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; }
