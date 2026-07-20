@@ -292,7 +292,7 @@ git commit -m "feat(platform): expose data standards CRUD"
 - Create: `tests/data-standards-calculation.test.mjs`
 - Modify: `tests/data-standards-api.test.mjs`
 
-- [ ] 4.1 先写失败测试，使用固定销售事实验证：净销售额、毛利、销量、退款率、毛利率；排除其它；分母为零返回 `value: null`；缺数据不是 0；版本按 `periodEnd` 选择；覆盖率、可信等级、估算标识、截止时间和版本随结果返回；货流指标返回 `DATA_NOT_COVERED`。
+- [x] 4.1 先写失败测试，使用固定销售事实验证：净销售额、毛利、销量、退款率、毛利率；排除其它；分母为零返回 `value: null`；缺数据不是 0；版本按 `periodEnd` 选择；覆盖率、可信等级、估算标识、截止时间和版本随结果返回；货流指标返回 `DATA_NOT_COVERED`。
 
 运行：
 
@@ -302,7 +302,7 @@ node --test tests/data-standards-calculation.test.mjs
 
 预期：计算模块不存在而失败。
 
-- [ ] 4.2 编译器只把已验证 AST 转成内部执行计划，不拼接用户输入 SQL：
+- [x] 4.2 编译器只把已验证 AST 转成内部执行计划，不拼接用户输入 SQL：
 
 ```js
 export function compileDataStandard(version, registry = FACT_FIELD_REGISTRY) {
@@ -319,7 +319,7 @@ export function compileDataStandard(version, registry = FACT_FIELD_REGISTRY) {
 
 SQL 列名、表名、聚合函数和过滤器只能从服务端 registry 映射；日期始终使用 bound parameters，不能把 AST 字符串插入 SQL。
 
-- [ ] 4.3 实现执行入口：
+- [x] 4.3 实现执行入口：
 
 ```js
 export async function calculateMetricRange({ db, definition, version, from, to, dependencyResults = new Map() }) {}
@@ -328,15 +328,15 @@ export async function calculateMetricSet({ db, definitions, versions, from, to }
 
 五项销售指标都从 `product_sales_daily` 聚合。退款率使用 `SUM(refund) / SUM(sales) * 100`；毛利率使用 `SUM(gross_profit) / SUM(net_sales) * 100`。结果状态为 `complete | incomplete | data_not_covered | failed`，不得以 `Number(value) || 0` 抹掉空值。
 
-- [ ] 4.4 实现 `POST /api/platform/v1/data-standards/preview`。请求范围最多 31 天、最多 5 个指标，不持久化业务结果；仍追加一次脱敏审计，只记录指标、版本、日期范围和成功/错误代码。预览权限与定义发布权限相同。
+- [x] 4.4 实现 `POST /api/platform/v1/data-standards/preview`。请求范围最多 31 天、最多 5 个指标，不持久化业务结果；仍追加一次脱敏审计，只记录指标、版本、日期范围和成功/错误代码。预览权限与定义发布权限相同。
 
-- [ ] 4.5 验证预览与正式执行共用编译器：
+- [x] 4.5 验证预览与正式执行共用编译器：
 
 ```bash
 node --test tests/data-standards-calculation.test.mjs tests/data-standards-api.test.mjs
 ```
 
-- [ ] 4.6 提交：
+- [x] 4.6 提交：
 
 ```bash
 git add functions/api/platform/v1/_shared/dataStandardsCompiler.js functions/api/platform/v1/_shared/dataStandardsCalculation.js functions/api/platform/v1/data-standards/preview.js tests/data-standards-calculation.test.mjs tests/data-standards-api.test.mjs
