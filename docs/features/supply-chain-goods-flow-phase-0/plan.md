@@ -518,17 +518,17 @@ git commit -m "feat: merge goods flow into supply chain ui"
 - Consumes: `inventory`, `stocktakes`, `terms` and actions from `useGoodsFlow()`.
 - Produces: readable SKU×warehouse inventory table, monthly stocktake state flow, finance term editor and CCC version/freeze controls.
 
-- [ ] **Step 1: Write failing structure and action tests**
+- [x] **Step 1: Write failing structure and action tests**
 
 Assertions require headers `69码`, `ERP账面`, `最近实盘`, `校准库存`, `盘点差异`, `可售天数`, `库龄`, `库存资金`, horizontal category labels, role-disabled reasons, import preview and the five stocktake stages.
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `node --test react-tests/goods-flow-stocktake-ui.test.mjs`
 
 Expected: FAIL because the new columns and workflows are absent.
 
-- [ ] **Step 3: Implement inventory table and monthly stocktake**
+- [x] **Step 3: Implement inventory table and monthly stocktake**
 
 Replace the current snapshot-only table with a projection table while keeping source history below it. Import previews valid/failed rows. Warehouse submits counts, supply confirms differences, finance confirms amount when required; confirmed rows expose only “追加更正”.
 
@@ -546,7 +546,7 @@ const projectionColumns = [
 ];
 ```
 
-- [ ] **Step 4: Implement finance term and CCC controls**
+- [x] **Step 4: Implement finance term and CCC controls**
 
 Term rows contain platform, days, effective-from, optional effective-to and reason. Overlapping dates fail inline. Recalculate shows a version comparison; freeze requires a confirmation dialog and displays actor/time/version.
 
@@ -561,11 +561,13 @@ Term rows contain platform, days, effective-from, optional effective-to and reas
 </form>
 ```
 
-- [ ] **Step 5: Test responsive, empty, stale, error and permission states**
+- [x] **Step 5: Test responsive, empty, stale, error and permission states**
 
 The test verifies no amount placeholder leaks to unauthorized roles, stale source banner appears beside affected rows, buttons expose disabled reasons, and original ERP source rows remain visible after stocktake confirmation.
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
+
+Actual verification: `node --test react-tests/goods-flow-stocktake-ui.test.mjs react-tests/supply-chain-ui.test.mjs react-tests/goods-flow-ui.test.mjs` (17 tests passed); focused ESLint, production build and `git diff --check` passed. Legacy inventory import now writes ERP snapshots only; monthly实盘 must pass through warehouse, supply and finance confirmation instead of creating an immediately confirmed adjustment.
 
 Run: `node --test react-tests/goods-flow-stocktake-ui.test.mjs react-tests/supply-chain-ui.test.mjs`
 

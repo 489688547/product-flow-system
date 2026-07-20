@@ -38,13 +38,15 @@ test("supply chain page is controlled by the primary route and has no internal n
 
 test("inventory and quality imports preview before saving", () => {
   const inventory = read("src/features/supply-chain/InventoryWorkspace.jsx");
+  const inventoryImport = read("src/features/supply-chain/inventoryImportRows.js");
+  const stocktake = read("src/features/supply-chain/StocktakeWorkspace.jsx");
   const quality = read("src/features/supply-chain/QualityWorkspace.jsx");
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
-  assert.match(inventory, /streamSpreadsheetRows/);
+  assert.match(inventoryImport, /streamSpreadsheetRows/);
   assert.match(inventory, /确认导入/);
   assert.match(inventory, /ERP库存/);
   assert.match(inventory, /ERP 快照/);
-  assert.match(inventory, /盘点核对/);
+  assert.match(stocktake, /月度线下盘点/);
   assert.match(inventory, /异常库存与到货风险/);
   assert.match(inventory, /原辅料库存明细/);
   assert.match(inventory, /materialInventorySnapshots/);

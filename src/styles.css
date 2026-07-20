@@ -1590,6 +1590,12 @@ main { min-width: 0; overflow-x: hidden; }
 /* Goods flow: one operational hierarchy inside the existing supply-chain App */
 .goods-flow-workspace { min-width: 0; display: grid; gap: var(--space-3); }
 .goods-flow-workspace .data-table th { white-space: nowrap; word-break: keep-all; }
+.goods-flow-inventory-table .data-table th { white-space: nowrap; word-break: keep-all; }
+.goods-flow-inventory-table .data-table td { vertical-align: top; }
+.goods-flow-inventory-table .data-table th:first-child, .goods-flow-inventory-table .data-table td:first-child { min-width: 240px; }
+.goods-flow-inventory-table .data-table th:last-child, .goods-flow-inventory-table .data-table td:last-child { min-width: 130px; }
+.permission-hidden { color: var(--text-tertiary); font-size: 11px; white-space: nowrap; }
+.permission-note { margin: 0 0 var(--space-3); padding: 8px 10px; border-radius: var(--radius-control); background: var(--surface-subtle); color: var(--text-secondary); font-size: 11px; }
 .goods-flow-status { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .goods-flow-status > div:first-child { min-width: 0; display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
 .goods-flow-status strong { color: var(--text-primary); font-size: 13px; }
@@ -1634,6 +1640,29 @@ main { min-width: 0; overflow-x: hidden; }
 .cash-cycle-equation strong { color: var(--text-primary); font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .cash-cycle-equation .cash-cycle-result { background: var(--accent-soft); }
 .cash-cycle-equation .cash-cycle-result span, .cash-cycle-equation .cash-cycle-result strong { color: var(--accent); }
+.cash-cycle-controlbar { min-width: 0; padding: var(--space-3); display: flex; align-items: end; justify-content: flex-end; gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.cash-cycle-controlbar > div { min-width: 0; margin-right: auto; display: grid; gap: 2px; }
+.cash-cycle-controlbar > div strong { font-size: 12px; }
+.cash-cycle-controlbar > div span { color: var(--text-tertiary); font-size: 11px; }
+.cash-cycle-controlbar label, .stocktake-import label, .goods-flow-term-form label { min-width: 0; display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.cash-cycle-controlbar input, .stocktake-import input, .goods-flow-term-form input { width: 100%; min-width: 0; height: var(--control-height); padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); }
+.goods-flow-term-form { margin-bottom: var(--space-3); }
+.goods-flow-term-form fieldset { min-width: 0; margin: 0; padding: var(--space-3); display: grid; grid-template-columns: minmax(130px, .8fr) minmax(100px, .55fr) minmax(140px, .75fr) minmax(140px, .75fr) minmax(220px, 1.3fr) auto; align-items: end; gap: var(--space-2); border: 0; border-radius: var(--radius-control); background: var(--surface-subtle); }
+.goods-flow-term-form fieldset:disabled { opacity: .7; }
+.cash-freeze-confirm { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: start; gap: var(--space-3); }
+.cash-freeze-confirm > svg { color: var(--accent); }
+.cash-freeze-confirm p { margin-top: 5px; color: var(--text-secondary); }
+.stocktake-workspace { display: grid; gap: var(--space-3); }
+.stocktake-workspace .section-head { margin-bottom: 0; }
+.stocktake-stages { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(120px, 1fr)); overflow-x: auto; list-style: none; border: 1px solid var(--border); border-radius: var(--radius-control); }
+.stocktake-stage { min-width: 120px; min-height: 42px; padding: 0 var(--space-2); display: flex; align-items: center; justify-content: center; gap: 7px; border-left: 1px solid var(--border); color: var(--text-tertiary); font-size: 11px; font-weight: 700; white-space: nowrap; }
+.stocktake-stage:first-child { border-left: 0; }
+.stocktake-stage > span { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 999px; background: var(--surface-subtle); color: var(--text-tertiary); font-size: 10px; }
+.stocktake-stage.complete { color: var(--success); }
+.stocktake-stage.complete > span { background: var(--success-soft); color: var(--success); }
+.stocktake-import { min-width: 0; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(160px, .6fr) minmax(180px, .8fr) auto; align-items: end; justify-content: start; gap: var(--space-3); border: 0; }
+.stocktake-import .upload-field { align-self: end; }
+.stocktake-table .data-table th { white-space: nowrap; }
 
 @keyframes supply-loading-pulse { 50% { opacity: .52; } }
 
@@ -1643,6 +1672,8 @@ main { min-width: 0; overflow-x: hidden; }
   .goods-flow-exceptions { grid-template-columns: 160px minmax(0, 1fr); }
   .goods-flow-exceptions ul { grid-template-columns: 1fr; }
   .goods-flow-exceptions li:nth-last-child(2) { border-bottom: 1px solid var(--border); }
+  .goods-flow-term-form fieldset { grid-template-columns: repeat(3, minmax(150px, 1fr)); }
+  .goods-flow-term-form .term-reason { grid-column: span 2; }
 }
 
 @media (max-width: 768px) {
@@ -1659,6 +1690,13 @@ main { min-width: 0; overflow-x: hidden; }
   .goods-flow-coming-note { padding: var(--space-3) var(--space-4); align-items: flex-start; }
   .supply-procurement-switcher { width: 100%; overflow-x: auto; }
   .supply-procurement-switcher button { flex: 0 0 auto; }
+  .cash-cycle-controlbar { align-items: stretch; flex-direction: column; }
+  .cash-cycle-controlbar > div { margin-right: 0; }
+  .cash-cycle-controlbar .btn { width: 100%; }
+  .goods-flow-term-form fieldset { grid-template-columns: 1fr; }
+  .goods-flow-term-form .term-reason { grid-column: auto; }
+  .stocktake-import { grid-template-columns: 1fr; }
+  .stocktake-import .upload-field { width: 100%; }
 }
 
 @media (max-width: 900px) {
