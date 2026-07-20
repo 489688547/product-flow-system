@@ -9,7 +9,7 @@ const read = path => readFileSync(resolve(root, path), "utf8");
 test("project uses React Vite and Tailwind v4 as the new frontend foundation", () => {
   const pkg = JSON.parse(read("package.json"));
   assert.equal(pkg.scripts.dev, "vite --host 127.0.0.1 --port 8132");
-  assert.equal(pkg.scripts.build, "npm run check:environment-capabilities && vite build && node scripts/check-build-chunks.mjs");
+  assert.equal(pkg.scripts.build, "npm run check:environment-capabilities && vite build && node scripts/prepare-pages-build.mjs && node scripts/check-build-chunks.mjs");
   assert.equal(pkg.scripts["test:react"], "node --test react-tests/*.test.mjs");
   assert.match(pkg.scripts.test, /test:react/);
   assert.match(pkg.scripts.test, /test:api/);
