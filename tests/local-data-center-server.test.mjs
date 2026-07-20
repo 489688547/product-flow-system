@@ -11,6 +11,7 @@ test("local helper persists data center metadata without pretending local sales 
   assert.match(server, /writeLocalDataCenterState/);
   assert.match(server, /url\.pathname === "\/api\/data-center"/);
   assert.match(server, /url\.pathname === "\/api\/data-center\/sales"/);
+  assert.match(server, /json\(res, 200, \{ synced: true, state, version: state\.version/);
   assert.match(server, /本地测试模式没有 D1 数据库/);
 });
 

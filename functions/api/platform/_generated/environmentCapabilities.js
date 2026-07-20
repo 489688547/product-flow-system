@@ -198,6 +198,59 @@ const environmentCapabilities = {
       ]
     },
     {
+      "id": "product-catalog-storage",
+      "name": "共享商品主数据",
+      "description": "数据中心、产品全周期和供应链共用的 ERP 商品、SKU、69 码与同步批次存储。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1",
+        "erp-file-import"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "product_catalog_items",
+        "product_catalog_skus",
+        "product_catalog_sync_runs",
+        "product_catalog_meta"
+      ]
+    },
+    {
+      "id": "kuaimai-product-sync",
+      "name": "快麦商品目录同步",
+      "description": "从快麦开放平台分页读取 ERP 商品并合并共享商品目录；缺少配置时仍可使用文件导入。",
+      "platforms": [
+        "kuaimai",
+        "cloudflare-d1"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "warning",
+      "envVars": [
+        "KUAIMAI_APP_KEY",
+        "KUAIMAI_APP_SECRET",
+        "KUAIMAI_ACCESS_TOKEN"
+      ],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "product_catalog_items",
+        "product_catalog_skus",
+        "product_catalog_sync_runs",
+        "product_catalog_meta"
+      ]
+    },
+    {
       "id": "business-data-apps",
       "name": "数据中心、店铺运营与人事管理",
       "description": "三个业务 App 的标准数据、经营闭环和人事绩效归档所需的 D1 持久化能力。",

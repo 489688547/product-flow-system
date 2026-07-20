@@ -198,3 +198,54 @@ export async function pullKuaimaiDay(config, { date, pageNo = 1, maxPages = 8 },
   // 退出循环时 page 已指向下一个未拉取的页码
   return { ...result, date, nextPage: hasNext ? page : null, hasNext };
 }
+
+function kuaimaiProductItems(payload = {}) {
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.body?.items)) return payload.body.items;
+  if (typeof payload.body === "string") {
+    try {
+      const body = JSON.parse(payload.body);
+      return Array.isArray(body?.items) ? body.items : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+// 商品档案是平台共享主数据。一次同步只返回完整或明确未完成的分页结果，
+// 调用方必须在 complete=true 时才写入目录，避免提供商中途失败覆盖旧数据。
+export async function pullKuaimaiProductCatalog(config, { pageNo = 1, pageSize = 200, maxPages = 8 } = {}, fetchImpl = fetch) {
+  const size = Math.min(200, Math.max(1, Number(pageSize) || 200));
+  const pageLimit = Math.min(20, Math.max(1, Number(maxPages) || 8));
+  let page = Math.max(1, Number(pageNo) || 1);
+  let pagesFetched = 0;
+  let total = null;
+  const items = [];
+  let complete = false;
+  while (pagesFetched < pageLimit) {
+    const payload = await callKuaimai("item.list.query", {
+      pageNo: page,
+      pageSize: size,
+      orderBy: "modified:asc",
+      whetherReturnPurchase: 0
+    }, config, fetchImpl);
+    const pageItems = kuaimaiProductItems(payload);
+    const reportedTotal = Number(payload.total ?? payload.body?.total);
+    if (Number.isFinite(reportedTotal) && reportedTotal >= 0) total = reportedTotal;
+    items.push(...pageItems);
+    pagesFetched += 1;
+    if ((total !== null && items.length >= total) || pageItems.length < size) {
+      complete = true;
+      break;
+    }
+    page += 1;
+  }
+  return {
+    items,
+    total: total ?? items.length,
+    pagesFetched,
+    complete,
+    nextPage: complete ? null : page
+  };
+}

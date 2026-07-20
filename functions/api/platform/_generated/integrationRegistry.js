@@ -104,9 +104,10 @@ const integrationRegistry = {
       "id": "kuaimai",
       "name": "快麦开放平台",
       "status": "connected",
-      "summary": "按天拉取订单并聚合为产品销售数据，同时保留文件导入校准通道。",
+      "summary": "按天拉取订单并聚合销售，同时分页读取 ERP 商品主数据并与商品档案文件互补合并。",
       "capabilities": [
         "订单拉取",
+        "商品目录同步",
         "会话刷新",
         "销售日聚合",
         "连接状态检查",
@@ -115,10 +116,12 @@ const integrationRegistry = {
       "businessQuestions": [
         "快麦连接失败",
         "订单同步缺失",
+        "ERP 商品或 69 码未同步",
         "销售数据未落库",
         "本地如何触发真实同步",
         "刷新令牌失败",
-        "月度数据校准"
+        "月度数据校准",
+        "API 与商品档案覆盖不同"
       ],
       "keywords": [
         "快麦",
@@ -130,11 +133,16 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/api/kuaimai/**",
+        "functions/api/platform/v1/product-catalog.js",
+        "functions/api/platform/v1/product-catalog/**",
         "functions/api/sales.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
-        "src/features/settings/KuaimaiSyncSettings.jsx",
+        "src/domain/productCatalog.js",
+        "src/state/ProductCatalogProvider.jsx",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/data-center/PlatformConnectionsWorkspace.jsx",
+        "src/features/settings/KuaimaiSyncSettings.jsx",
         "src/state/salesStore.js",
         "server.mjs"
       ],
@@ -152,7 +160,10 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/kuaimai/",
         "/api/sales",
-        "/api/platform/v1/platform-connections"
+        "/api/platform/v1/platform-connections",
+        "/api/platform/v1/product-catalog",
+        "/api/platform/v1/product-catalog/import",
+        "/api/platform/v1/product-catalog/sync/kuaimai"
       ],
       "publicDocs": [
         {
@@ -164,19 +175,22 @@ const integrationRegistry = {
         "functions/api/kuaimai/",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
-        "src/features/settings/KuaimaiSyncSettings.jsx",
-        "src/features/data-center/PlatformConnectionsWorkspace.jsx"
+        "functions/api/platform/v1/product-catalog/sync/kuaimai.js",
+        "src/domain/productCatalog.js",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
+        "src/features/data-center/PlatformConnectionsWorkspace.jsx",
+        "src/features/settings/KuaimaiSyncSettings.jsx"
       ],
       "relations": [
         {
           "platformId": "cloudflare-d1",
-          "type": "stores-sales-aggregates",
-          "description": "快麦订单按日聚合后写入销售数据表。"
+          "type": "stores-sales-and-product-catalog",
+          "description": "快麦订单日聚合与共享商品目录分别写入 D1。"
         },
         {
           "platformId": "erp-file-import",
           "type": "reconciled-by",
-          "description": "月底可用 ERP 文件整月重导校准退款和缺失数据。"
+          "description": "销售文件校准月度事实，商品档案文件补齐 API 未返回的规格、69 码和供应商字段。"
         }
       ]
     },
@@ -281,12 +295,13 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、用户洞察、货流事实、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、共享商品目录、用户洞察、货流事实、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
         "组织数据",
         "销售聚合",
+        "共享商品目录",
         "用户洞察标准事实",
         "用户洞察部门规则",
         "采集设备令牌哈希",
@@ -332,6 +347,8 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/**",
+        "functions/api/platform/v1/product-catalog.js",
+        "functions/api/platform/v1/product-catalog/**",
         "functions/api/ecommerce-operations.js",
         "functions/api/ecommerce-operations/**",
         "functions/api/performance-management.js",
@@ -350,6 +367,7 @@ const integrationRegistry = {
         "functions/api/platform/v1/_shared/collaborationStorage.js",
         "migrations/**",
         "migrations/0002_hr_management_core.sql",
+        "migrations/0003_product_catalog.sql",
         "migrations/0003_platform_credentials.sql",
         "migrations/0005_user_insights.sql",
         "migrations/0005_goods_flow_core.sql"
@@ -368,6 +386,9 @@ const integrationRegistry = {
         "/api/platform/v1/goods-flow/",
         "/api/sales",
         "/api/data-center",
+        "/api/platform/v1/product-catalog",
+        "/api/platform/v1/product-catalog/import",
+        "/api/platform/v1/product-catalog/sync/kuaimai",
         "/api/ecommerce-operations",
         "/api/performance-management",
         "/api/hr-management",
@@ -399,6 +420,8 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/",
+        "functions/api/platform/v1/product-catalog.js",
+        "functions/api/platform/v1/product-catalog/",
         "functions/api/ecommerce-operations.js",
         "functions/api/ecommerce-operations/",
         "functions/api/performance-management.js",
@@ -415,6 +438,7 @@ const integrationRegistry = {
         "migrations/0002_business_data_apps.sql",
         "migrations/0002_collaboration_execution.sql",
         "migrations/0002_hr_management_core.sql",
+        "migrations/0003_product_catalog.sql",
         "migrations/0003_platform_credentials.sql",
         "migrations/0003_company_ai_assistant.sql",
         "migrations/0004_company_ai_skills.sql",
@@ -435,7 +459,7 @@ const integrationRegistry = {
         {
           "platformId": "kuaimai",
           "type": "stores-data-for",
-          "description": "保存快麦同步后的销售聚合数据。"
+          "description": "保存快麦同步后的销售聚合与共享商品目录。"
         }
       ]
     },
@@ -501,17 +525,20 @@ const integrationRegistry = {
       "id": "erp-file-import",
       "name": "ERP / 文件导入",
       "status": "integrating",
-      "summary": "承接销售明细、ERP 库存快照和月度盘点文件，并作为 API 同步的校准和兼容通道。",
+      "summary": "承接销售明细、ERP 商品档案、库存快照和月度盘点文件，作为 API 同步的校准、补齐和兼容通道。",
       "capabilities": [
         "销售明细导入",
+        "商品档案导入",
         "ERP 库存快照导入",
         "月度盘点导入",
+        "GB18030 CSV",
         "字段映射",
         "整月重导",
         "数据校准"
       ],
       "businessQuestions": [
-        "Excel 导入失败",
+        "Excel 或 CSV 导入失败",
+        "商品 69 码或供应商字段缺失",
         "库存或盘点字段口径不一致",
         "历史数据补录",
         "API 与文件结果不同"
@@ -525,36 +552,44 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "src/features/settings/SalesDataSettings.jsx",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/supply-chain/InventoryWorkspace.jsx",
         "src/domain/salesData.js",
+        "src/domain/productCatalog.js",
+        "src/domain/xlsxLite.js",
         "src/domain/supplyChain.js",
         "src/state/salesStore.js",
         "functions/api/sales.js",
+        "functions/api/platform/v1/product-catalog/import.js",
         "functions/api/platform/v1/goods-flow/imports.js"
       ],
       "envVars": [],
       "domains": [],
       "apiRoutes": [
         "/api/sales",
+        "/api/platform/v1/product-catalog/import",
         "/api/platform/v1/goods-flow/imports"
       ],
       "publicDocs": [],
       "evidence": [
         "src/features/settings/SalesDataSettings.jsx",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/supply-chain/InventoryWorkspace.jsx",
         "src/domain/salesData.js",
+        "src/domain/productCatalog.js",
+        "src/domain/xlsxLite.js",
         "src/domain/supplyChain.js"
       ],
       "relations": [
         {
           "platformId": "kuaimai",
           "type": "reconciles",
-          "description": "文件导入用于校准快麦 API 的月度销售结果。"
+          "description": "销售文件校准月度事实，商品档案文件补齐快麦 API 缺少的规格字段。"
         },
         {
           "platformId": "cloudflare-d1",
           "type": "stores-imports",
-          "description": "聚合后的导入结果通过销售 API 写入 D1。"
+          "description": "聚合销售结果和标准化商品目录分别通过内部 API 写入 D1。"
         }
       ]
     },
