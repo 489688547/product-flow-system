@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { RefreshCw, ShieldCheck } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
@@ -18,28 +18,30 @@ export function DataSourcesWorkspace({ canEdit, canManage }) {
   return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} />;
 }
 
-export function DataQualityWorkspace({ quality }) {
-  const { state } = useDataCenter();
-  const cards = [["待处理问题", quality.openIssues], ["待确认商品映射", quality.unmappedProducts], ["本期口径排除", quality.excludedRows]];
-  return <div className="data-workspace"><div className="data-quality-summary">{cards.map(([label, value]) => <article key={label}><ShieldCheck size={18} /><span>{label}</span><strong>{value}</strong></article>)}</div><section className="section-panel"><div className="section-head"><div><h2>质量问题队列</h2><p>缺失、重复、延迟和页面结构变化都在这里闭环。</p></div></div><DataTable minWidth={680} columns={[
-    { key: "title", header: "问题", render: row => row.title || row.message || "未命名问题" },
-    { key: "type", header: "类型", render: row => row.type || "数据校验" },
-    { key: "owner", header: "负责人", render: row => row.owner || "待认领" },
-    { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "resolved" ? "success" : "warning"}`}>{row.status === "resolved" ? "已解决" : "待处理"}</span> },
-    { key: "actions", header: "操作", render: row => <TableActions><AppCollaborationButton draft={collaborationDraftFromDataIssue(row)} disabled={row.status === "resolved"} disabledReason="已解决的数据问题无需再发起协同" /></TableActions> }
-  ]} rows={state.qualityIssues} empty={<div className="empty-state compact-empty">当前没有待处理的数据质量问题。</div>} /></section></div>;
-}
-
-export function SyncRunsWorkspace() {
+export function SyncRunsWorkspace({ quality }) {
   const { state, refresh } = useDataCenter();
-  return <section className="section-panel"><div className="section-head"><div><h2>同步记录</h2><p>记录每次采集的来源、范围、行数和失败原因；失败不会覆盖上次成功数据。</p></div><Button onClick={refresh}><RefreshCw size={16} />刷新状态</Button></div><DataTable minWidth={760} columns={[
-    { key: "time", header: "执行时间", render: row => row.completedAt || row.startedAt || "—" },
-    { key: "source", header: "数据源", render: row => row.sourceName || row.sourceId || "未知来源" },
-    { key: "range", header: "数据范围", render: row => [row.from, row.to].filter(Boolean).join(" 至 ") || "—" },
-    { key: "rows", header: "行数", render: row => row.rowCount || 0 },
-    { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : row.status === "running" ? "warning" : "danger"}`}>{statusLabel(row.status)}</span> },
-    { key: "message", header: "结果", render: row => row.message || "—" }
-  ]} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} /></section>;
+  const cards = [["待处理问题", quality.openIssues], ["待确认商品映射", quality.unmappedProducts], ["本期口径排除", quality.excludedRows]];
+  return <div className="data-workspace data-sync-workspace">
+    <div className="data-sync-status-bar">
+      <div className="data-quality-summary" aria-label="数据质量摘要">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
+      <Button onClick={refresh}><RefreshCw size={16} />刷新状态</Button>
+    </div>
+    <section className="section-panel"><div className="section-head"><div><h2>执行记录</h2><p>每次采集和导入的范围、行数与结果；失败不会覆盖上次成功数据。</p></div></div><DataTable minWidth={760} columns={[
+      { key: "time", header: "执行时间", render: row => row.completedAt || row.startedAt || "—" },
+      { key: "source", header: "数据源", render: row => row.sourceName || row.sourceId || "未知来源" },
+      { key: "range", header: "数据范围", render: row => [row.from, row.to].filter(Boolean).join(" 至 ") || "—" },
+      { key: "rows", header: "行数", render: row => row.rowCount || 0 },
+      { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : row.status === "running" ? "warning" : "danger"}`}>{statusLabel(row.status)}</span> },
+      { key: "message", header: "结果", render: row => row.message || "—" }
+    ]} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} /></section>
+    <section className="section-panel"><div className="section-head"><div><h2>待处理数据问题</h2><p>同步产生的缺失、重复、延迟和映射异常在这里闭环。</p></div></div><DataTable minWidth={680} columns={[
+      { key: "title", header: "问题", render: row => row.title || row.message || "未命名问题" },
+      { key: "type", header: "类型", render: row => row.type || "数据校验" },
+      { key: "owner", header: "负责人", render: row => row.owner || "待认领" },
+      { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "resolved" ? "success" : "warning"}`}>{row.status === "resolved" ? "已解决" : "待处理"}</span> },
+      { key: "actions", header: "操作", render: row => <TableActions><AppCollaborationButton draft={collaborationDraftFromDataIssue(row)} disabled={row.status === "resolved"} disabledReason="已解决的数据问题无需再发起协同" /></TableActions> }
+    ]} rows={state.qualityIssues} empty={<div className="empty-state compact-empty">当前没有待处理的数据质量问题。</div>} /></section>
+  </div>;
 }
 
 export function DataServicesWorkspace() {
