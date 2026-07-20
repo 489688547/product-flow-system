@@ -23,6 +23,9 @@ test("the standard local launcher supervises Vite and Pages Functions behind one
   assert.doesNotMatch(launcher, /"--proxy"/);
   assert.match(launcher, /resolve\(ROOT, "\.env"\)/);
   assert.match(launcher, /existsSync\(ENV_FILE\)/);
+  assert.match(launcher, /checkBranchBase/);
+  assert.match(launcher, /refresh:\s*true/);
+  assert.ok(launcher.indexOf("checkBranchBase") < launcher.indexOf("existsSync(ENV_FILE)"));
   assert.match(launcher, /SIGINT/);
   assert.match(launcher, /SIGTERM/);
   assert.match(launcher, /killChild/);

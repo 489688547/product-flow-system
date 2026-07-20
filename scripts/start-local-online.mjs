@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { connect } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkBranchBase } from "./check-branch-base.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HOST = "127.0.0.1";
@@ -73,6 +74,10 @@ process.once("SIGTERM", shutdown);
 process.once("exit", shutdown);
 
 async function main() {
+  const branchBase = checkBranchBase(ROOT, process.env, { refresh: true });
+  if (!branchBase.current) {
+    throw new Error(`本地环境启动已阻止：${branchBase.reason}`);
+  }
   if (!existsSync(ENV_FILE)) {
     throw new Error("缺少本地 .env，请先配置个人令牌和平台连接。");
   }

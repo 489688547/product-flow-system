@@ -10,11 +10,12 @@
 
 ## 任务
 
-- [ ] 最新分支启动门禁
+- [x] 最新分支启动门禁
   - 依赖：无。
   - 文件：`tests/branch-base-check.test.mjs`、`tests/local-online-start.test.mjs`、`scripts/check-branch-base.mjs`、`scripts/start-local-online.mjs`。
   - 失败测试：本地 main 分叉、普通分支落后和 fetch 失败必须在子进程启动前失败。
   - 输出：任何分支都必须包含最新 `origin/main` 才能运行完整本地环境。
+  - 验证：`node --test tests/branch-base-check.test.mjs tests/local-online-start.test.mjs`，5/5 通过；本地 `main` 分叉、普通分支最新和 fetch 失败均已覆盖。
 
 - [ ] Pages 三环境契约
   - 依赖：最新分支启动门禁。

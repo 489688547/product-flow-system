@@ -11,19 +11,31 @@ export function requiredBaseRef(env = process.env) {
   return `origin/${base}`;
 }
 
-export function checkBranchBase(cwd, env = process.env) {
-  const branch = String(env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || "").trim() || git(["branch", "--show-current"], cwd);
-  if (branch === "main") return { branch, baseRef: "origin/main", current: true };
-
+export function checkBranchBase(cwd, env = process.env, options = {}) {
+  const runGit = options.runGit || git;
+  const branch = String(env.GITHUB_HEAD_REF || env.GITHUB_REF_NAME || "").trim() || runGit(["branch", "--show-current"], cwd);
   const baseRef = requiredBaseRef(env);
+  if (options.refresh) {
+    const baseBranch = baseRef.replace(/^origin\//, "");
+    try {
+      runGit(["fetch", "origin", baseBranch], cwd);
+    } catch {
+      return {
+        branch,
+        baseRef,
+        current: false,
+        reason: `无法获取最新 ${baseRef}，请检查网络或远端权限后重试。`
+      };
+    }
+  }
   try {
-    git(["rev-parse", "--verify", baseRef], cwd);
+    runGit(["rev-parse", "--verify", baseRef], cwd);
   } catch {
     return { branch, baseRef, current: false, reason: `缺少 ${baseRef}，请先执行 git fetch origin main。` };
   }
 
   try {
-    git(["merge-base", "--is-ancestor", baseRef, "HEAD"], cwd);
+    runGit(["merge-base", "--is-ancestor", baseRef, "HEAD"], cwd);
     return { branch, baseRef, current: true };
   } catch {
     return {
