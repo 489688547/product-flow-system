@@ -1,6 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loadDingTalkGroupMembers, searchDingTalkGroups } from "../src/domain/dingTalkGroups.js";
+import * as groupClient from "../src/domain/dingTalkGroups.js";
+
+test("my groups load from the authenticated group collection route", async () => {
+  assert.equal(typeof groupClient.loadMyDingTalkGroups, "function");
+  let requested;
+  const result = await groupClient.loadMyDingTalkGroups(async (url, options) => {
+    requested = { url: String(url), options };
+    return Response.json({ groups: [{ id: "g1", name: "产品群", myRole: "OWNER" }] });
+  });
+  assert.equal(requested.url, "/api/dingtalk/groups");
+  assert.equal(requested.options.credentials, "same-origin");
+  assert.equal(result.groups[0].name, "产品群");
+});
 
 test("group search encodes the query and keeps the session cookie", async () => {
   let requested;

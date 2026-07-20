@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   addGroupExecutors,
   excludeExecutor,
+  hydrateSavedExecutors,
   initialExecutorSelection,
   removeGroupExecutors,
   selectedExecutorUsers,
@@ -16,6 +17,19 @@ test("group members merge with manually selected executors", () => {
   ]);
   assert.deepEqual(selectedExecutorUsers(state).map(user => user.unionid), ["u1", "u2"]);
   assert.equal(state.people.u1.manual, true);
+});
+
+test("late organization data hydrates saved executors without overwriting active choices", () => {
+  let state = toggleManualExecutor(initialExecutorSelection([], []), { unionid: "manual", name: "人工选择" });
+  state = hydrateSavedExecutors(state, [{ unionid: "saved", name: "已同步人员" }], ["saved"]);
+  assert.deepEqual(selectedExecutorUsers(state).map(user => user.unionid).sort(), ["manual", "saved"]);
+});
+
+test("late organization data does not restore a saved executor the user excluded", () => {
+  let state = initialExecutorSelection([{ unionid: "saved", name: "已同步人员" }], ["saved"]);
+  state = excludeExecutor(state, "saved");
+  state = hydrateSavedExecutors(state, [{ unionid: "saved", name: "已同步人员" }], ["saved"]);
+  assert.deepEqual(selectedExecutorUsers(state), []);
 });
 
 test("removing a group preserves manual and overlapping sources", () => {

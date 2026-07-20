@@ -344,8 +344,9 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /data-testid="sync-task-todo"/);
   assert.match(page, /<TodoSyncModal/);
   assert.match(page, /todoSyncStatus\(task\)/);
-  assert.match(page, /normalizeTaskDueDate\(task\.due\)/);
-  assert.match(page, /disabled=\{!hasValidDue\}/);
+  assert.doesNotMatch(page, /disabled=\{!hasValidDue\}/);
+  assert.doesNotMatch(page, /updateTask\(todoTask\.id, \{ due: draft\.dueDate \}\)/);
+  assert.match(page, /const effectiveTask = \{ \.\.\.todoTask, due: draft\.dueDate \}/);
   assert.doesNotMatch(page, /markTodoSynced/);
   assert.match(page, /stagePolicyTone/);
   assert.match(page, /policy-\$\{stagePolicyTone\(policy\.mode\)\}/);

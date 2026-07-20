@@ -47,7 +47,8 @@ export function normalizeGroupSearch(payload = {}) {
   const groups = (Array.isArray(result.groups) ? result.groups : []).map(group => ({
     id: String(group.openConversationId || group.id || ""),
     name: String(group.title || group.name || "钉钉群"),
-    memberCount: Number(group.memberCount) || 0
+    memberCount: Number(group.memberCount) || 0,
+    ...(group.myRole ? { myRole: String(group.myRole) } : {})
   })).filter(group => group.id);
   return {
     groups,
@@ -75,6 +76,14 @@ export async function searchDingGroups(accessToken, query, cursor = "0", fetchIm
     keyword: String(query || "").trim(),
     cursor: String(cursor || "0"),
     limit: 20
+  }, fetchImpl);
+  return normalizeGroupSearch(payload);
+}
+
+export async function listOwnedDingGroups(accessToken, fetchImpl = fetch) {
+  const payload = await callMcp(GROUP_SEARCH_ENDPOINT, accessToken, "list_owned_or_admin_groups", {
+    excludeMuted: false,
+    limit: 50
   }, fetchImpl);
   return normalizeGroupSearch(payload);
 }
@@ -112,7 +121,7 @@ export async function searchDingContacts(accessToken, keyword, fetchImpl = fetch
 export async function resolveGroupMembers(rawMembers, { corpId, db, searchContact }) {
   const contactsByName = new Map();
   const resolved = [];
-  let skipped = 0;
+  const skippedMembers = [];
   for (const member of rawMembers) {
     let contacts = contactsByName.get(member.name);
     if (!contacts) {
@@ -120,11 +129,17 @@ export async function resolveGroupMembers(rawMembers, { corpId, db, searchContac
       contactsByName.set(member.name, contacts);
     }
     const contact = contacts.find(item => item.openDingTalkId === member.openDingTalkId);
-    if (!contact?.userId) { skipped += 1; continue; }
+    if (!contact?.userId) {
+      skippedMembers.push({ name: member.name, reason: "不在当前企业组织架构或身份无法确认" });
+      continue;
+    }
     const row = await db.prepare(`SELECT user_id, union_id, name, department, title
       FROM product_flow_org_members WHERE corp_id = ? AND user_id = ? AND active = 1`)
       .bind(corpId, contact.userId).first();
-    if (!row?.union_id) { skipped += 1; continue; }
+    if (!row?.union_id) {
+      skippedMembers.push({ name: member.name, reason: "不在当前企业组织架构或身份无法确认" });
+      continue;
+    }
     resolved.push({
       unionId: String(row.union_id),
       userId: String(row.user_id),
@@ -136,7 +151,8 @@ export async function resolveGroupMembers(rawMembers, { corpId, db, searchContac
   const members = [...new Map(resolved.map(member => [member.unionId, member])).values()];
   return {
     members,
-    skippedCount: skipped,
-    skippedReasons: skipped ? [`${skipped} 人不在当前企业组织架构或身份无法确认`] : []
+    skippedCount: skippedMembers.length,
+    skippedReasons: skippedMembers.length ? [`${skippedMembers.length} 人不在当前企业组织架构或身份无法确认`] : [],
+    skippedMembers
   };
 }
