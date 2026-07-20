@@ -595,7 +595,7 @@ git status --short
 
 - [x] 10.5 启动本地页面，分别检查 1440、900、640、390px：层级、间距、对齐、卡片/表格切换、弹窗、键盘、焦点、Esc、空/错/禁用/无权限/版本冲突/计算中/数据未覆盖/重算失败状态、控制台错误和页面横向溢出。记录本地没有 D1 时的 501 是边界，不把它写成生产已接通。
 
-- [ ] 10.6 在有授权的独立发布窗口执行迁移前备份、Preview 迁移、只读对账、Production 迁移、结果生成和读取切换。部署后分别运行：
+- [x] 10.6 在有授权的独立发布窗口执行迁移前备份、Preview 迁移、只读对账、Production 迁移、结果生成和读取切换。部署后分别运行：
 
 ```bash
 npm run verify:production -- --require-platform cloudflare-d1
@@ -604,7 +604,7 @@ npm run verify:production -- --require-platform cloudflare-pages
 
 无授权时将生产迁移、部署、线上结果写入、钉钉 WebView 验收标记为“未执行”或“受阻”，不能用本地构建代替。
 
-- [ ] 10.7 最终检查只包含本功能文件，提交交付记录：
+- [x] 10.7 最终检查只包含本功能文件，提交交付记录：
 
 ```bash
 git add docs/features/data-center-app/tasks.md docs/features/data-center-app/prd.md
