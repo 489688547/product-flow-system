@@ -104,7 +104,7 @@ const integrationRegistry = {
       "id": "kuaimai",
       "name": "快麦开放平台",
       "status": "connected",
-      "summary": "按天拉取订单并聚合销售，同时分页读取 ERP 商品主数据并与商品档案文件互补合并。",
+      "summary": "按订单创建时间逐日拉取订单并聚合销售，同时分页读取 ERP 商品主数据并与商品档案文件互补合并；商品视图按平台和日期关联两类已落库事实。",
       "capabilities": [
         "订单拉取",
         "商品目录同步",
@@ -139,7 +139,9 @@ const integrationRegistry = {
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
         "src/domain/productCatalog.js",
+        "src/domain/productCatalogSales.js",
         "src/state/ProductCatalogProvider.jsx",
+        "src/state/productCatalogApi.js",
         "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/data-center/PlatformConnectionsWorkspace.jsx",
         "src/features/settings/KuaimaiSyncSettings.jsx",
@@ -176,7 +178,9 @@ const integrationRegistry = {
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
         "functions/api/platform/v1/product-catalog/sync/kuaimai.js",
+        "functions/api/platform/v1/product-catalog/_shared/sales.js",
         "src/domain/productCatalog.js",
+        "src/domain/productCatalogSales.js",
         "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/data-center/PlatformConnectionsWorkspace.jsx",
         "src/features/settings/KuaimaiSyncSettings.jsx"

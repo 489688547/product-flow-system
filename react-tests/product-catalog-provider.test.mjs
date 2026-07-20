@@ -5,6 +5,7 @@ import {
   importProductCatalog,
   loadProductCatalog,
   productCatalogApiUrl,
+  productCatalogQueryUrl,
   productCatalogImportUrl,
   productCatalogSyncUrl,
   syncKuaimaiProductCatalog
@@ -16,6 +17,17 @@ test("product catalog client uses stable platform v1 routes", () => {
   assert.equal(productCatalogApiUrl(), "/api/platform/v1/product-catalog");
   assert.equal(productCatalogImportUrl(), "/api/platform/v1/product-catalog/import");
   assert.equal(productCatalogSyncUrl(), "/api/platform/v1/product-catalog/sync/kuaimai");
+});
+
+test("product catalog client encodes the persisted sales range and platform", async () => {
+  assert.equal(productCatalogQueryUrl({ from: "2026-07-01", to: "2026-07-20", platform: "抖音" }), "/api/platform/v1/product-catalog?from=2026-07-01&to=2026-07-20&platform=%E6%8A%96%E9%9F%B3");
+  assert.equal(productCatalogQueryUrl(), productCatalogApiUrl());
+  const calls = [];
+  await loadProductCatalog({ from: "2026-07-01", to: "2026-07-20", platform: "天猫" }, async url => {
+    calls.push(url);
+    return new Response(JSON.stringify({ synced: true, items: [], meta: {} }), { status: 200 });
+  });
+  assert.equal(calls[0], "/api/platform/v1/product-catalog?from=2026-07-01&to=2026-07-20&platform=%E5%A4%A9%E7%8C%AB");
 });
 
 test("catalog client loads, imports and synchronizes through one boundary", async () => {
@@ -51,4 +63,6 @@ test("authenticated app mounts one shared catalog provider above every business 
   assert.match(main, /<ProductCatalogProvider>[\s\S]*<ProductFlowProvider>[\s\S]*<DataCenterProvider[\s\S]*<SupplyChainProvider/);
   assert.match(provider, /export function useProductCatalog/);
   assert.match(provider, /items,[\s\S]*meta,[\s\S]*refresh,[\s\S]*importRows,[\s\S]*syncKuaimai/);
+  assert.match(provider, /salesQuery,[\s\S]*setSalesQuery,[\s\S]*salesLoading/);
+  assert.match(provider, /requestSequence/);
 });

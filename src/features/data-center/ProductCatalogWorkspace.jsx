@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Barcode, Boxes, FileSpreadsheet, Link2, PackageSearch, RefreshCw, Search, Upload } from "lucide-react";
+import { Banknote, Boxes, CircleAlert, FileSpreadsheet, PackageCheck, PackageSearch, RefreshCw, Search, ShoppingBasket, Upload } from "lucide-react";
 import { parseProductCatalogRows } from "../../domain/productCatalog.js";
+import { productCatalogSalesRange, sortProductCatalogBySales } from "../../domain/productCatalogSales.js";
 import { streamSpreadsheetRows } from "../../domain/xlsxLite.js";
 import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
@@ -52,21 +53,48 @@ function codeList(item) {
 }
 
 function priceRange(item) {
-  const costs = (item.skus || []).map(sku => sku.purchasePrice).filter(value => Number.isFinite(Number(value)));
+  const costs = (item.skus || []).map(sku => sku.purchasePrice).filter(value => value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value)));
   if (!costs.length) return "—";
   const min = Math.min(...costs);
   const max = Math.max(...costs);
   return min === max ? `¥${min.toFixed(2)}` : `¥${min.toFixed(2)}–${max.toFixed(2)}`;
 }
 
+function quantity(value) {
+  return Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
+}
+
+function money(value) {
+  return `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function salesCell(item) {
+  const sales = item.sales || { quantity: 0, netSales: 0, platforms: [], matchedCodeCount: 0 };
+  const platforms = (sales.platforms || []).slice(0, 2).map(entry => `${entry.platform} ${quantity(entry.quantity)}`).join(" · ");
+  return <span className={`product-catalog-sales-cell ${sales.quantity ? "has-sales" : "no-sales"}`}>
+    <strong>{quantity(sales.quantity)}</strong>
+    <small>{sales.quantity ? `${money(sales.netSales)} · ${sales.matchedCodeCount} 个匹配编码` : "该范围暂无销售"}</small>
+    {platforms ? <em>{platforms}</em> : null}
+  </span>;
+}
+
+const DATE_OPTIONS = [
+  { value: "last7", label: "最近 7 天" },
+  { value: "last30", label: "最近 30 天" },
+  { value: "thisMonth", label: "本月" },
+  { value: "lastMonth", label: "上月" },
+  { value: "custom", label: "自定义" }
+];
+
 export function ProductCatalogWorkspace({ canEdit }) {
-  const { items, meta, loading, busy, error, notice, importRows, syncKuaimai } = useProductCatalog();
+  const { items, meta, loading, salesLoading, salesQuery, setSalesQuery, busy, error, notice, refresh, importRows, syncKuaimai } = useProductCatalog();
   const { state: productState } = useProductFlow();
   const { state: supplyState } = useSupplyChain();
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
   const [category, setCategory] = useState("all");
   const [linked, setLinked] = useState("all");
+  const [customRange, setCustomRange] = useState(() => ({ from: salesQuery.from, to: salesQuery.to }));
+  const [rangeError, setRangeError] = useState("");
   const [parsing, setParsing] = useState(false);
   const [parseError, setParseError] = useState("");
   const [pending, setPending] = useState(null);
@@ -82,20 +110,53 @@ export function ProductCatalogWorkspace({ canEdit }) {
     return counts;
   }, [supplyState.productSupplierLinks]);
   const categories = useMemo(() => [...new Set(items.map(item => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN")), [items]);
-  const filtered = useMemo(() => items
+  const salesMeta = meta.sales || {};
+  const platforms = useMemo(() => {
+    const values = new Set(salesMeta.availablePlatforms || []);
+    if (salesQuery.platform) values.add(salesQuery.platform);
+    return [...values].sort((left, right) => left.localeCompare(right, "zh-CN"));
+  }, [salesMeta.availablePlatforms, salesQuery.platform]);
+  const filtered = useMemo(() => sortProductCatalogBySales(items
     .filter(item => includesQuery(item, query.trim()))
-    .filter(item => status === "all" || (status === "active" ? item.active && item.presentInSource !== false : status === "inactive" ? !item.active : item.presentInSource === false))
     .filter(item => category === "all" || item.category === category)
-    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id))), [category, items, linked, productLinks, query, status]);
-  useEffect(() => setPage(1), [category, linked, query, status]);
+    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id)))), [category, items, linked, productLinks, query]);
+  useEffect(() => setPage(1), [category, linked, query, salesQuery.from, salesQuery.platform, salesQuery.to]);
   const visible = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
   const totals = useMemo(() => ({
     products: items.length,
     skus: items.reduce((sum, item) => sum + (item.skus || []).length, 0),
     barcodes: items.flatMap(item => item.skus || []).filter(sku => sku.barcodeType === "sales_barcode").length,
-    exceptions: items.flatMap(item => item.skus || []).filter(sku => sku.barcodeType !== "sales_barcode").length,
-    linked: productLinks.size
-  }), [items, productLinks.size]);
+    quantity: Number(salesMeta.totalQuantity) || 0,
+    netSales: Number(salesMeta.totalNetSales) || 0,
+    coveredProducts: Number(salesMeta.coveredProducts) || 0
+  }), [items, salesMeta.coveredProducts, salesMeta.totalNetSales, salesMeta.totalQuantity]);
+
+  function selectPlatform(value) {
+    setSalesQuery(current => ({ ...current, platform: value }));
+  }
+
+  function selectDatePreset(preset) {
+    try {
+      const range = productCatalogSalesRange(preset, customRange);
+      setRangeError("");
+      setCustomRange({ from: range.from, to: range.to });
+      setSalesQuery(current => ({ ...current, ...range }));
+    } catch (event) {
+      setRangeError(event.message || "日期范围无效。");
+    }
+  }
+
+  function changeCustomDate(field, value) {
+    const next = { ...customRange, [field]: value };
+    setCustomRange(next);
+    try {
+      const range = productCatalogSalesRange("custom", next);
+      setRangeError("");
+      setSalesQuery(current => ({ ...current, ...range }));
+    } catch (event) {
+      setRangeError(event.message || "日期范围无效。");
+    }
+  }
 
   async function handleFile(file) {
     if (!file) return;
@@ -126,8 +187,8 @@ export function ProductCatalogWorkspace({ canEdit }) {
     { key: "product", header: "商品", render: item => <span className="catalog-product-cell"><strong>{item.name}</strong><small>主商家编码 <b className="catalog-code">{item.merchantCode || "—"}</b></small></span> },
     { key: "codes", header: "SKU / 69 码", render: codeList },
     { key: "classification", header: "分类 / 品牌", render: item => <span><strong>{item.category || "未分类"}</strong><small className="table-secondary">{item.brand || "未设置品牌"}</small></span> },
+    { key: "sales", header: "销量", render: salesCell },
     { key: "cost", header: "ERP 成本", render: item => <span><strong>{priceRange(item)}</strong><small className="table-secondary">{(item.skus || []).length} 个 SKU</small></span> },
-    { key: "status", header: "ERP 状态", render: item => <span className={`status-badge ${item.presentInSource === false ? "warning" : item.active ? "success" : "neutral"}`}>{item.presentInSource === false ? "来源已缺失" : item.active ? "启用" : "停用"}</span> },
     { key: "link", header: "业务关联", render: item => {
       const product = productLinks.get(item.id);
       return <span><strong>{product ? `已关联产品：${product.name}` : "未关联产品"}</strong><small className="table-secondary">{supplierCounts.get(item.id) || 0} 家关联供应商</small></span>;
@@ -142,19 +203,20 @@ export function ProductCatalogWorkspace({ canEdit }) {
   return <div className="data-workspace product-catalog-workspace">
     <section className="product-catalog-metrics" aria-label="商品主数据概况">
       {[
-        [PackageSearch, "商品", totals.products],
-        [Boxes, "SKU", totals.skus],
-        [Barcode, "标准 69 码", totals.barcodes],
-        [FileSpreadsheet, "条码异常", totals.exceptions],
-        [Link2, "已关联产品", totals.linked]
-      ].map(([Icon, label, value]) => <div key={label}><Icon size={18} aria-hidden="true" /><span>{label}<strong>{Number(value || 0).toLocaleString("zh-CN")}</strong></span></div>)}
-      <small>最近同步：{dateTime(meta.lastSuccessfulSyncAt)}</small>
+        [PackageSearch, "商品", quantity(totals.products), "ERP 主商品"],
+        [Boxes, "SKU", quantity(totals.skus), `${quantity(totals.barcodes)} 个标准 69 码`],
+        [ShoppingBasket, "销量", quantity(totals.quantity), totals.quantity ? `${salesQuery.from} 至 ${salesQuery.to}` : "当前范围暂无销售"],
+        [Banknote, "净销售额", money(totals.netSales), salesQuery.platform || "全部正常平台"],
+        [PackageCheck, "已售商品", quantity(totals.coveredProducts), `共 ${quantity(totals.products)} 个商品`]
+      ].map(([Icon, label, value, detail]) => <div key={label}><Icon size={18} aria-hidden="true" /><span>{label}<strong>{value}</strong><small>{detail}</small></span></div>)}
+      <small className="product-catalog-sources"><span>商品档案 {dateTime(meta.lastSuccessfulSyncAt)}</span><span>销售数据至 {salesMeta.latestDataDate || "—"} · 入库 {dateTime(salesMeta.lastSuccessfulSyncAt)}</span></small>
     </section>
 
     <section className="product-catalog-toolbar" aria-label="商品搜索与操作">
       <label className="product-catalog-search"><Search size={16} aria-hidden="true" /><span className="sr-only">搜索商品</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索商品、69 码或商家编码" /></label>
       <div className="product-catalog-filters">
-        <HeaderFilter label="状态" value={status} onChange={setStatus} options={[{ value: "all", label: "全部状态" }, { value: "active", label: "启用" }, { value: "inactive", label: "停用" }, { value: "missing", label: "来源已缺失" }]} />
+        <HeaderFilter label="平台" value={salesQuery.platform} onChange={selectPlatform} options={[{ value: "", label: "全部平台" }, ...platforms.map(value => ({ value, label: value }))]} />
+        <HeaderFilter label="日期" value={salesQuery.preset} onChange={selectDatePreset} options={DATE_OPTIONS} />
         <HeaderFilter label="分类" value={category} onChange={setCategory} options={[{ value: "all", label: "全部分类" }, ...categories.map(value => ({ value, label: value }))]} />
         <HeaderFilter label="关联" value={linked} onChange={setLinked} options={[{ value: "all", label: "全部关联状态" }, { value: "linked", label: "已关联产品" }, { value: "unlinked", label: "未关联产品" }]} />
       </div>
@@ -162,9 +224,20 @@ export function ProductCatalogWorkspace({ canEdit }) {
         {canEdit ? <label className={`upload-field ${parsing || busy === "import" ? "is-busy" : ""}`}><Upload size={16} />{parsing ? "正在解析…" : busy === "import" ? "正在导入…" : "导入 ERP 商品文件"}<input type="file" accept=".xlsx,.csv" disabled={parsing || Boolean(busy)} onChange={event => { handleFile(event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
         <Button variant="primary" disabled={!canEdit || Boolean(busy)} disabledReason="仅总经办和运营部可同步商品主数据" onClick={() => syncKuaimai().catch(() => {})}><RefreshCw size={16} className={busy === "kuaimai" ? "is-spinning" : ""} />{busy === "kuaimai" ? "正在同步…" : "同步快麦商品"}</Button>
       </div>
+      {salesQuery.preset === "custom" ? <div className="product-catalog-date-range" aria-label="自定义销量日期范围">
+        <label><span>开始日期</span><input type="date" value={customRange.from} onChange={event => changeCustomDate("from", event.target.value)} /></label>
+        <span aria-hidden="true">至</span>
+        <label><span>结束日期</span><input type="date" value={customRange.to} onChange={event => changeCustomDate("to", event.target.value)} /></label>
+      </div> : null}
+      <div className="product-catalog-query-state" role="status">
+        <span>{salesLoading ? <><RefreshCw size={14} className="is-spinning" />销量更新中</> : `${salesQuery.from} 至 ${salesQuery.to} · ${salesQuery.platform || "全部平台"}`}</span>
+        {!salesLoading && salesMeta.latestDataDate && salesMeta.latestDataDate < salesQuery.to ? <span className="product-catalog-coverage-warning"><CircleAlert size={14} />销售事实仅更新至 {salesMeta.latestDataDate}</span> : null}
+        {Number(salesMeta.unmatchedRowCount) > 0 ? <span className="product-catalog-coverage-warning"><CircleAlert size={14} />{quantity(salesMeta.unmatchedRowCount)} 条销售汇总未匹配商品</span> : null}
+      </div>
     </section>
 
-    {error ? <p className="supply-message error" role="alert">{error}</p> : null}
+    {rangeError ? <p className="supply-message error" role="alert">{rangeError}</p> : null}
+    {error ? <div className="product-catalog-error supply-message error" role="alert"><span>{error}</span><Button onClick={() => refresh().catch(() => {})}>重试</Button></div> : null}
     {parseError ? <p className="supply-message error" role="alert">{parseError}</p> : null}
     {notice ? <p className="supply-message success" role="status">{notice}</p> : null}
     {pending ? <section className="supply-import-preview product-catalog-preview"><FileSpreadsheet size={20} /><div><strong>{pending.fileName}</strong><span>识别 {pending.items.length} 个商品、{pending.counts.skus} 个 SKU · 异常 {pending.errors.length} 行</span>{pending.errors.slice(0, 3).map(item => <small key={`${item.rowNumber}-${item.field}`}>第 {item.rowNumber} 行：{item.message}</small>)}</div><div className="supply-import-actions"><Button onClick={() => setPending(null)}>取消</Button><Button variant="primary" disabled={!pending.items.length || Boolean(busy)} onClick={confirmImport}>确认导入</Button></div></section> : null}

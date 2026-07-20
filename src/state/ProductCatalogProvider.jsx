@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { productCatalogSalesRange } from "../domain/productCatalogSales.js";
 import { importProductCatalog, loadProductCatalog, syncKuaimaiProductCatalog } from "./productCatalogApi.js";
 
 const ProductCatalogContext = createContext(null);
@@ -10,33 +11,46 @@ function friendlyMessage(error, fallback) {
 
 export function ProductCatalogProvider({ children }) {
   const [items, setItems] = useState([]);
-  const [meta, setMeta] = useState({ products: 0, skus: 0, salesBarcodes: 0, nonStandardBarcodes: 0, missingBarcodes: 0, lastSuccessfulSyncAt: "" });
+  const [meta, setMeta] = useState({ products: 0, skus: 0, salesBarcodes: 0, nonStandardBarcodes: 0, missingBarcodes: 0, lastSuccessfulSyncAt: "", sales: {} });
   const [runs, setRuns] = useState([]);
+  const [salesQuery, setSalesQuery] = useState(() => ({ ...productCatalogSalesRange(), platform: "" }));
   const [loading, setLoading] = useState(true);
+  const [salesLoading, setSalesLoading] = useState(false);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const requestSequence = useRef(0);
+  const salesQueryRef = useRef(salesQuery);
 
-  const refresh = useCallback(async ({ quiet = false } = {}) => {
+  const refresh = useCallback(async ({ quiet = false, query = salesQueryRef.current } = {}) => {
+    const requestId = requestSequence.current + 1;
+    requestSequence.current = requestId;
     if (!quiet) setLoading(true);
+    setSalesLoading(true);
     try {
-      const payload = await loadProductCatalog();
+      const payload = await loadProductCatalog(query);
+      if (requestId !== requestSequence.current) return payload;
       setItems(Array.isArray(payload.items) ? payload.items : []);
       setMeta(current => ({ ...current, ...(payload.meta || {}) }));
       setRuns(Array.isArray(payload.runs) ? payload.runs : []);
       setError("");
       return payload;
     } catch (loadError) {
+      if (requestId !== requestSequence.current) throw loadError;
       setError(friendlyMessage(loadError, "商品主数据加载失败，请刷新重试。"));
       throw loadError;
     } finally {
-      if (!quiet) setLoading(false);
+      if (requestId === requestSequence.current) {
+        if (!quiet) setLoading(false);
+        setSalesLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    refresh().catch(() => {});
-  }, [refresh]);
+    salesQueryRef.current = salesQuery;
+    refresh({ query: salesQuery }).catch(() => {});
+  }, [refresh, salesQuery]);
 
   const importRows = useCallback(async input => {
     setBusy("import"); setError(""); setNotice("");
@@ -72,14 +86,17 @@ export function ProductCatalogProvider({ children }) {
     items,
     meta,
     runs,
+    salesQuery,
+    setSalesQuery,
     loading,
+    salesLoading,
     busy,
     error,
     notice,
     refresh,
     importRows,
     syncKuaimai
-  }), [busy, error, importRows, items, loading, meta, notice, refresh, runs, syncKuaimai]);
+  }), [busy, error, importRows, items, loading, meta, notice, refresh, runs, salesLoading, salesQuery, syncKuaimai]);
 
   return <ProductCatalogContext.Provider value={value}>{children}</ProductCatalogContext.Provider>;
 }

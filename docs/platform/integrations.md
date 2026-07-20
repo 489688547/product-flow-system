@@ -37,6 +37,8 @@
 
 ERP 或 Excel 导入作为销售数据和商品主数据的补充来源。销售导入必须记录来源文件、时间范围和口径，避免用导入时间替代订单时间。商品档案导入接受 XLSX、UTF-8 CSV 与 GB18030 CSV，记录文件名、行数和批次结果，不保存原始整行。产品映射不明确的数据进入异常检查，不自动分配。
 
+快麦订单自动读取使用官方 `erp.trade.list.query` 的 `timeType=created` 和 `created` 下单时间，聚合后写入 `product_sales_daily`；商品读取继续使用 `item.list.query` 写入 `product_catalog_*`。商品主数据查询只在服务端按 69 码关联两类已落库事实，不保存快麦原始响应，也不把销售事实复制进商品 payload。
+
 ## Cloudflare Pages 与 D1
 
 Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状态、公司平台实体、会话、组织缓存和销售聚合。绑定、迁移和部署属于生产基础设施验证，不能用本地预览结果替代。
