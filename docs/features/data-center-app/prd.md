@@ -206,7 +206,7 @@
 ## 发布、迁移与回滚
 
 - 实施先新增表、Secret 和 API，再启用 UI；迁移可重复执行，不修改现有销售事实。
-- 首次生产启用前检查 D1 容量、创建数据库备份、配置 `DATA_CREDENTIAL_MASTER_KEY` Cloudflare Secret，并验证只读环境就绪。
+- 首次生产启用前检查 D1 容量、创建数据库备份、配置 `PLATFORM_CREDENTIAL_MASTER_KEY` Cloudflare Secret，并验证只读环境就绪；旧名 `DATA_CREDENTIAL_MASTER_KEY` 只保留服务端兼容读取。
 - 钉钉账密表只在授权后的迁移窗口执行；先预览数量与分类，再确认加密写入。
 - 可通过停用采集器和连接器入口回滚；已加密凭证与审计记录保留，不自动删除。
 - 密钥轮换先增加新版本、迁移密文并验证，再撤销旧密钥；不能通过覆盖 Secret 直接使旧数据不可解密。

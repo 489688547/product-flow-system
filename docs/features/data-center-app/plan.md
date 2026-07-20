@@ -38,7 +38,7 @@
 
 ## 环境与发布
 
-- 新增 Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY`，值为 32 字节随机密钥的 base64url 表示。
+- 复用 Cloudflare Secret `PLATFORM_CREDENTIAL_MASTER_KEY`，值为 32 字节随机密钥的 base64url 表示；旧名 `DATA_CREDENTIAL_MASTER_KEY` 只保留服务端兼容读取。
 - `docs/platform/environment-capabilities.json` 登记凭证表、D1 绑定和 Secret 名称，并重新生成平台清单。
 - 本地测试使用每次测试生成的临时密钥，不把真实密钥写入 `.env.example`、日志或快照。
 - 生产迁移前先运行环境就绪检查和数据库备份；未配置密钥时凭证写入、替换、reveal 返回 `CREDENTIAL_KEY_UNAVAILABLE`，非敏感目录仍可读取。

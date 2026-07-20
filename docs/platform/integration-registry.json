@@ -53,7 +53,7 @@
       "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失", "测试环境与生产配置漂移", "本地如何受控读取生产数据"],
       "keywords": ["Cloudflare", "Pages", "Pages Functions", "部署", "生产环境"],
       "codePaths": ["functions/**", "functions/api/platform/v1/data-standards/**", "functions/api/platform/v1/_shared/dataStandards*.js", "src/state/deploymentRecovery.js", "scripts/prepare-pages-release.mjs", "scripts/check-deployed-readiness.mjs", "cloudflare-entry.html", "404.html", "public/404.html", "_redirects", "wrangler.toml", ".github/workflows/**"],
-      "envVars": ["LOCAL_LIVE_D1_PREVIEW", "DATA_CREDENTIAL_MASTER_KEY"],
+      "envVars": ["LOCAL_LIVE_D1_PREVIEW", "PLATFORM_CREDENTIAL_MASTER_KEY"],
       "domains": ["pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
       "apiRoutes": ["/api/platform/v1/environment-readiness", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/credential-vault", "/api/platform/v1/data-standards"],
       "publicDocs": [

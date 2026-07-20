@@ -40,7 +40,7 @@ export function credentialErrorResponse(error, requestId = credentialRequestId()
 
 export function credentialContext(session, env, requestId, extra = {}) {
   return {
-    masterKey: env.DATA_CREDENTIAL_MASTER_KEY || "",
+    masterKey: env.PLATFORM_CREDENTIAL_MASTER_KEY || env.DATA_CREDENTIAL_MASTER_KEY || "",
     actorType: "employee",
     actorId: String(session.userId || session.unionId || "unknown"),
     actorName: String(session.name || session.userId || "unknown"),

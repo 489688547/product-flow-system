@@ -140,7 +140,7 @@ API 的完整契约在实施阶段写入 `docs/platform/apis/credential-vault-v1
 
 ## 加密与密钥管理
 
-- Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY` 保存当前 256 位主密钥，代码和 D1 均不保存主密钥明文。
+- Cloudflare Secret `PLATFORM_CREDENTIAL_MASTER_KEY` 保存当前 256 位主密钥，代码和 D1 均不保存主密钥明文；服务端暂时兼容旧名 `DATA_CREDENTIAL_MASTER_KEY`，仅用于平滑迁移，不要求同时配置两项。
 - 使用 Web Crypto AES-256-GCM；每次写入生成独立随机 96 位 IV，认证附加数据绑定条目 ID、用途和密钥版本。
 - D1 保存 `ciphertext`、`iv`、`algorithm`、`key_version` 和非敏感元数据；敏感 payload 在加密前统一序列化。
 - 修改敏感字段时生成新 IV 和新密文；不重复使用 nonce。

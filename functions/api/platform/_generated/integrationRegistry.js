@@ -198,7 +198,7 @@ const integrationRegistry = {
       ],
       "envVars": [
         "LOCAL_LIVE_D1_PREVIEW",
-        "DATA_CREDENTIAL_MASTER_KEY"
+        "PLATFORM_CREDENTIAL_MASTER_KEY"
       ],
       "domains": [
         "pages.dev",

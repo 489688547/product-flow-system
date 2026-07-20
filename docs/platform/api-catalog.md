@@ -46,7 +46,7 @@
 
 ### 加密凭证保险箱契约
 
-凭证保险箱是数据连接器、内部系统保险箱和本地采集器共用的平台能力。普通 GET 只返回条目 ID、分类、范围、schema 版本、是否已配置、更新时间和脱敏提示。创建或替换接口接收字段白名单内的敏感 payload，服务端使用 Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY` 和 AES-256-GCM 加密后写入 D1；请求体、密文和明文均不得进入日志或审计详情。
+凭证保险箱是数据连接器、内部系统保险箱和本地采集器共用的平台能力。普通 GET 只返回条目 ID、分类、范围、schema 版本、是否已配置、更新时间和脱敏提示。创建或替换接口接收字段白名单内的敏感 payload，服务端使用 Cloudflare Secret `PLATFORM_CREDENTIAL_MASTER_KEY` 和 AES-256-GCM 加密后写入 D1；迁移期兼容旧名 `DATA_CREDENTIAL_MASTER_KEY`，请求体、密文和明文均不得进入日志或审计详情。
 
 OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果不属于凭证 payload。明文查看/复制使用独立 reveal 动作；本地采集器未来使用绑定任务、机器和字段范围的短时 task grant，阶段 1 不实现该路径。完整请求、响应、权限、错误、密钥轮换和兼容契约见 `docs/platform/apis/credential-vault-v1.md`；当前代码完成不代表已经部署生产。
 

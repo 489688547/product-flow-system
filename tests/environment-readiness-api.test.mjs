@@ -100,7 +100,7 @@ test("warning capabilities do not block an otherwise ready production environmen
       PRODUCT_FLOW_DB: createTableDb(tables),
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
-      DATA_CREDENTIAL_MASTER_KEY: "configured"
+      PLATFORM_CREDENTIAL_MASTER_KEY: "configured"
     },
     data: { session: { name: "员工", role: "product", department: "产品部" } }
   });
@@ -151,7 +151,7 @@ test("a server-only production data token can read readiness without an employee
   };
   const response = await onRequest({
     request: new Request(request().url, { headers: { authorization: `Bearer ${rawToken}` } }),
-    env: { RUNTIME_ENV: "production", PRODUCT_FLOW_DB: db, DINGTALK_APP_KEY: "configured", DINGTALK_APP_SECRET: "configured", DATA_CREDENTIAL_MASTER_KEY: "configured" },
+    env: { RUNTIME_ENV: "production", PRODUCT_FLOW_DB: db, DINGTALK_APP_KEY: "configured", DINGTALK_APP_SECRET: "configured", PLATFORM_CREDENTIAL_MASTER_KEY: "configured" },
     data: {}
   });
   assert.equal(response.status, 200);

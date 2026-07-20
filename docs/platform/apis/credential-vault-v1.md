@@ -6,7 +6,7 @@
 - 调用方：数据中心经营连接器、内部系统保险箱。
 - 不在阶段 1：本地采集器机器身份和 task grant；对应路径不得调用或显示为可用。
 - 存储：D1 `credential_vault_entries`、`credential_vault_permissions`、`credential_vault_audit`。
-- 加密：Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY`，AES-256-GCM，随机 96 位 IV，当前 `keyVersion=1`。
+- 加密：Cloudflare Secret `PLATFORM_CREDENTIAL_MASTER_KEY`，AES-256-GCM，随机 96 位 IV，当前 `keyVersion=1`；服务端兼容读取旧名 `DATA_CREDENTIAL_MASTER_KEY`，主名称存在时优先使用主名称。
 
 普通响应不包含明文、密文、IV、密码长度、Token 前缀或可复用会话片段。OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果不允许写入。
 

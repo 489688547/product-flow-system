@@ -11,7 +11,7 @@
 
 ## 决策
 
-1. 在 D1 保存凭证密文及权限、版本和审计元数据，使用 Cloudflare Secret `DATA_CREDENTIAL_MASTER_KEY` 和 AES-256-GCM 加密。
+1. 在 D1 保存凭证密文及权限、版本和审计元数据，使用 Cloudflare Secret `PLATFORM_CREDENTIAL_MASTER_KEY` 和 AES-256-GCM 加密；旧名 `DATA_CREDENTIAL_MASTER_KEY` 仅作为迁移期兼容别名。
 2. OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果永不持久化；密码、API Secret、Token、Cookie 和可复用会话可以加密持久化。
 3. 普通列表和详情 API 永不返回明文。替换、查看/复制、采集器取用和权限管理是不同动作权限。
 4. 明文查看需要近期认证、条目范围授权、明确用途、禁止缓存和追加式审计。

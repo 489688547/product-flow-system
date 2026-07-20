@@ -169,7 +169,7 @@ const environmentCapabilities = {
       ],
       "level": "blocking",
       "envVars": [
-        "DATA_CREDENTIAL_MASTER_KEY"
+        "PLATFORM_CREDENTIAL_MASTER_KEY"
       ],
       "bindings": [
         "PRODUCT_FLOW_DB"

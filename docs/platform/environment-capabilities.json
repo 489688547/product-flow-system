@@ -107,7 +107,7 @@
       "platforms": ["cloudflare-pages", "cloudflare-d1"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",
-      "envVars": ["DATA_CREDENTIAL_MASTER_KEY"],
+      "envVars": ["PLATFORM_CREDENTIAL_MASTER_KEY"],
       "bindings": ["PRODUCT_FLOW_DB"],
       "tables": [
         "data_connector_instances",

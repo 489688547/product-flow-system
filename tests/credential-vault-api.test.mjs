@@ -143,6 +143,24 @@ test("vault reports missing D1 missing key and unknown input fields", async () =
   assert.equal((await unknown.json()).error.code, "CREDENTIAL_ENTRY_INVALID");
 });
 
+test("vault uses the deployed platform credential key while retaining the legacy data key alias", async () => {
+  const platformDb = createD1Mock();
+  const platformResponse = await vaultRequest({
+    request: request("", "POST", connectorCredential),
+    env: { PRODUCT_FLOW_DB: platformDb, PLATFORM_CREDENTIAL_MASTER_KEY: masterKey() },
+    data: { session: admin }
+  });
+  assert.equal(platformResponse.status, 200);
+  assert.equal((await platformResponse.json()).entry.hasSecret, true);
+
+  const legacyResponse = await vaultRequest({
+    request: request("", "POST", { ...connectorCredential, scopeId: "legacy-key" }),
+    env: env(),
+    data: { session: admin }
+  });
+  assert.equal(legacyResponse.status, 200);
+});
+
 test("administrator can list replace and archive a credential with version checks", async () => {
   const db = createD1Mock();
   const availableEnv = env(db);
