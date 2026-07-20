@@ -1613,6 +1613,14 @@ main { min-width: 0; overflow-x: hidden; }
 .connector-form-grid label, .vault-reveal-purpose { min-width: 0; display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
 .connector-form-grid label.full { grid-column: 1 / -1; }
 .connector-form-grid input, .connector-form-grid select, .vault-reveal-purpose input { width: 100%; min-width: 0; height: var(--control-height); padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); font: inherit; }
+.connector-credential-group { padding-top: var(--space-3); display: grid; gap: var(--space-3); border-top: 1px solid var(--border); }
+.connector-credential-group > div:first-child { display: grid; gap: 3px; }
+.connector-credential-group h3 { margin: 0; font-size: 12px; }
+.connector-credential-group p { margin: 0; color: var(--text-tertiary); font-size: 10px; line-height: 1.55; }
+.connector-method-indicator { min-width: 0; padding: 10px 12px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px var(--space-3); align-items: center; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.connector-method-indicator span { color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.connector-method-indicator strong { color: var(--accent); font-size: 12px; }
+.connector-method-indicator small { grid-column: 1 / -1; color: var(--text-tertiary); font-size: 10px; line-height: 1.5; }
 .connector-datasets { margin: 0; padding: var(--space-3); display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-control); }
 .connector-datasets legend { padding: 0 5px; color: var(--text-secondary); font-size: 11px; font-weight: 800; }
 .connector-datasets label { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 11px; }

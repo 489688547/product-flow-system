@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, LockKeyhole, X } from "lucide-react";
+import { inferConnectorCaptureMethod } from "../../../domain/dataCenterConnectors.js";
 import { Button } from "../../../ui/Button.jsx";
 
 const METHOD_LABELS = { api: "API 接口", browser: "网页登录", export: "文件导出" };
@@ -28,12 +29,10 @@ function initialDraft(definition, instance) {
     id: instance?.id || "",
     connectorId: definition.id,
     name: instance?.name || "",
-    companySubject: instance?.companySubject || "",
     accountType: instance?.accountType || definition.accountTypes[0] || "",
-    captureMethod: instance?.captureMethod || definition.methods[0],
+    captureMethod: instance?.captureMethod || "",
     consoleUrl: instance?.consoleUrl || "",
     datasets: instance?.datasets || [],
-    owner: instance?.owner || "运营部",
     credentialEntryId: instance?.credentialEntryId || "",
     version: instance?.version || 0,
     enabled: instance?.enabled !== false
@@ -72,9 +71,27 @@ export function ConnectorConfigDialog({ definition, instance, credentialMetadata
     return () => document.removeEventListener("keydown", keydown);
   }, [onClose, saving]);
 
-  const visibleFields = useMemo(() => definition.fields.filter(field => (
-    !field.methods || field.methods.includes(draft.captureMethod)
-  )), [definition.fields, draft.captureMethod]);
+  const generalFields = definition.fields.filter(field => !field.methods?.length);
+  const browserFields = definition.fields.filter(field => field.methods?.includes("browser"));
+  const apiFields = definition.fields.filter(field => field.methods?.includes("api"));
+  const inferredMethod = inferConnectorCaptureMethod(definition, {
+    secretPayload: secretValues,
+    existingMethod: instance?.captureMethod
+  });
+
+  const renderField = field => (
+    <label key={field.key}>{field.label}
+      <input
+        type={field.type === "password" || field.type === "secret" ? "password" : field.type === "email" ? "email" : "text"}
+        value={secretValues[field.key] || ""}
+        required={field.required && !credentialMetadata?.hasSecret}
+        maxLength={field.maxLength}
+        autoComplete="new-password"
+        placeholder={credentialMetadata?.hasSecret && field.sensitive ? "已加密保存；留空表示不替换" : ""}
+        onChange={event => setSecretValues(current => ({ ...current, [field.key]: event.target.value }))}
+      />
+    </label>
+  );
 
   const toggleDataset = dataset => setDraft(current => ({
     ...current,
@@ -111,26 +128,14 @@ export function ConnectorConfigDialog({ definition, instance, credentialMetadata
           </section>
           {error ? <div className="connector-form-error" role="alert">{error}</div> : null}
           <div className="connector-form-grid">
-            <label>连接名称<input required maxLength={120} value={draft.name} placeholder={`${definition.name}账号或店铺名称`} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
-            <label>公司主体<input maxLength={160} value={draft.companySubject} onChange={event => setDraft(current => ({ ...current, companySubject: event.target.value }))} /></label>
+            <label>{definition.identityLabel}<input required maxLength={120} value={draft.name} placeholder={`填写${definition.identityLabel}`} onChange={event => setDraft(current => ({ ...current, name: event.target.value }))} /></label>
             {definition.accountTypes.length ? <label>账户类型<select value={draft.accountType} onChange={event => setDraft(current => ({ ...current, accountType: event.target.value }))}>{definition.accountTypes.map(type => <option key={type} value={type}>{ACCOUNT_TYPE_LABELS[type] || type}</option>)}</select></label> : null}
-            <label>接入方式<select value={draft.captureMethod} onChange={event => setDraft(current => ({ ...current, captureMethod: event.target.value }))}>{definition.methods.map(method => <option key={method} value={method}>{METHOD_LABELS[method]}</option>)}</select></label>
             <label className="full">后台地址<input type="url" value={draft.consoleUrl} placeholder="https://" onChange={event => setDraft(current => ({ ...current, consoleUrl: event.target.value }))} /></label>
-            <label>负责人<input maxLength={120} value={draft.owner} onChange={event => setDraft(current => ({ ...current, owner: event.target.value }))} /></label>
-            {visibleFields.map(field => (
-              <label key={field.key}>{field.label}
-                <input
-                  type={field.type === "password" || field.type === "secret" ? "password" : field.type === "email" ? "email" : "text"}
-                  value={secretValues[field.key] || ""}
-                  required={field.required && !credentialMetadata?.hasSecret}
-                  maxLength={field.maxLength}
-                  autoComplete="new-password"
-                  placeholder={credentialMetadata?.hasSecret && field.sensitive ? "已加密保存；留空表示不替换" : ""}
-                  onChange={event => setSecretValues(current => ({ ...current, [field.key]: event.target.value }))}
-                />
-              </label>
-            ))}
+            {generalFields.map(renderField)}
           </div>
+          {browserFields.length ? <section className="connector-credential-group"><div><h3>网页登录信息</h3><p>填写账号、邮箱或手机号后，系统会采用网页登录采集；验证码仍需人工处理。</p></div><div className="connector-form-grid">{browserFields.map(renderField)}</div></section> : null}
+          {apiFields.length ? <section className="connector-credential-group"><div><h3>API 接口信息</h3><p>填写 API 凭据后优先使用接口接入，密钥只会加密保存。</p></div><div className="connector-form-grid">{apiFields.map(renderField)}</div></section> : null}
+          <div className="connector-method-indicator" role="status"><span>自动识别接入方式</span><strong>{METHOD_LABELS[inferredMethod]}</strong><small>{inferredMethod === "export" ? "未填写登录或 API 凭据时使用文件导出。" : "保存时根据已填写的凭据信息自动确定，无需手工选择。"}</small></div>
           <fieldset className="connector-datasets"><legend>同步数据</legend>{definition.datasets.map(dataset => <label key={dataset}><input type="checkbox" checked={draft.datasets.includes(dataset)} onChange={() => toggleDataset(dataset)} />{DATASET_LABELS[dataset] || dataset}</label>)}</fieldset>
           <div className="connector-verification-note"><AlertTriangle size={17} /><p><strong>首次保存状态：等待首次验证</strong>。保存配置不会直接标记为已接通；真实验证需要后续平台适配器或公司 Mac 采集器。</p></div>
         </div>

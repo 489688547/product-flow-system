@@ -36,9 +36,13 @@ test("connector catalog uses eight local logo assets and one Ocean Engine entry"
 test("connector dialog is schema driven and treats OTP as instructions", () => {
   const dialog = read("src/features/data-center/connections/ConnectorConfigDialog.jsx");
   assert.match(dialog, /definition\.fields/);
-  assert.match(dialog, /definition\.methods/);
+  assert.match(dialog, /definition\.identityLabel/);
   assert.match(dialog, /definition\.accountTypes/);
   assert.match(dialog, /definition\.datasets/);
+  assert.match(dialog, /inferConnectorCaptureMethod/);
+  assert.match(dialog, /自动识别接入方式/);
+  assert.match(dialog, /网页登录信息/);
+  assert.match(dialog, /API 接口信息/);
   assert.match(dialog, /ACCOUNT_TYPE_LABELS/);
   assert.match(dialog, /DATASET_LABELS/);
   assert.match(dialog, /type=\{field\.type === "password"/);
@@ -48,6 +52,10 @@ test("connector dialog is schema driven and treats OTP as instructions", () => {
   assert.match(dialog, /aria-modal="true"/);
   assert.match(dialog, /role="dialog"/);
   assert.match(dialog, /保存并验证/);
+  assert.doesNotMatch(dialog, /<label>连接名称/);
+  assert.doesNotMatch(dialog, /<label>公司主体/);
+  assert.doesNotMatch(dialog, /<label>接入方式/);
+  assert.doesNotMatch(dialog, /<label>负责人/);
   assert.doesNotMatch(dialog, /localStorage|sessionStorage|indexedDB/);
 });
 
@@ -85,6 +93,8 @@ test("connector UI has responsive dialog and visible focus rules", () => {
   assert.match(styles, /\.connector-card/);
   assert.match(styles, /\.connection-tabs/);
   assert.match(styles, /\.connector-dialog/);
+  assert.match(styles, /\.connector-method-indicator/);
+  assert.match(styles, /\.connector-credential-group/);
   assert.match(styles, /\.internal-vault/);
   assert.match(styles, /\.connector-card:focus-visible/);
   assert.match(styles, /@media \(max-width: 900px\)[\s\S]*connector-catalog-grid/);
