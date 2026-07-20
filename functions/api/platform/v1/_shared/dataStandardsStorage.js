@@ -328,11 +328,11 @@ export async function archiveDefinition(db, id, expectedVersion, audit) {
   const auditStatement = db.prepare(`INSERT INTO data_metric_audit_logs
     (id, definition_id, action, actor_id, actor_name, definition_version, changed_fields, range_start, range_end, created_at)
     SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM data_metric_definitions
-    WHERE id = ? AND current_version = ? AND status = 'archived' AND archived_at = ?`).bind(
-    ...auditValues(id, { ...audit, definitionVersion: Number(expectedVersion) }), id, Number(expectedVersion), archivedAt
+    WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
+    ...auditValues(id, { ...audit, definitionVersion: Number(expectedVersion) }), id, Number(expectedVersion)
   );
-  const batchResults = await db.batch([updateStatement, auditStatement]);
-  if (changes(batchResults?.[0]) !== 1) {
+  const batchResults = await db.batch([auditStatement, updateStatement]);
+  if (changes(batchResults?.[1]) !== 1) {
     throw storageError("口径版本已更新，请刷新后重试。", "DATA_STANDARD_VERSION_CONFLICT");
   }
   return definitionFromRow(await db.prepare("SELECT * FROM data_metric_definitions WHERE id = ?").bind(id).first());

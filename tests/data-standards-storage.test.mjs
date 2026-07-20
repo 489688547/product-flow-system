@@ -489,6 +489,53 @@ test("archive keeps definition versions and audit history", async () => {
   assert.equal(db.audits.length, 2);
 });
 
+test("a concurrent losing archive never writes an audit for the winner", async () => {
+  const db = createD1Mock();
+  await insertDefinitionWithVersion(db, definitionInput(), versionInput(), auditInput());
+  const archivedAt = "2026-07-20T05:00:00.000Z";
+  db.setBeforeNextBatch(({ definitions, audits }) => {
+    const current = definitions.get("sales-net-sales");
+    definitions.set("sales-net-sales", {
+      ...current,
+      status: "archived",
+      archived_at: archivedAt,
+      archived_by: "winner",
+      updated_at: archivedAt,
+      updated_by: "winner"
+    });
+    audits.push({
+      id: "audit-archive-winner",
+      definition_id: "sales-net-sales",
+      action: "archive",
+      actor_id: "winner",
+      actor_name: "winner",
+      definition_version: 1,
+      changed_fields: "[\"status\"]",
+      range_start: null,
+      range_end: null,
+      created_at: archivedAt
+    });
+  });
+
+  await assert.rejects(
+    () => archiveDefinition(
+      db,
+      "sales-net-sales",
+      1,
+      auditInput({
+        id: "audit-archive-loser",
+        action: "archive",
+        actorId: "loser",
+        actorName: "loser",
+        changedFields: ["status"],
+        createdAt: archivedAt
+      })
+    ),
+    error => error.code === "DATA_STANDARD_VERSION_CONFLICT"
+  );
+  assert.deepEqual(db.audits.map(item => item.id), ["audit-1", "audit-archive-winner"]);
+});
+
 test("calculation runs are idempotent and a batch atomically switches current results", async () => {
   const db = createD1Mock();
   const first = await createCalculationRun(db, {
