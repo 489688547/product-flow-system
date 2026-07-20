@@ -15,6 +15,7 @@ const integrationRegistry = {
         "群聊与成员",
         "日历",
         "文档读取",
+        "采购与付款审批同步",
         "供应链文件快照",
         "内嵌工作台",
         "平台连接配置"
@@ -40,6 +41,7 @@ const integrationRegistry = {
       "codePaths": [
         "functions/api/dingtalk/**",
         "functions/api/auth/dingtalk/**",
+        "functions/api/supply-chain/approvals/sync.js",
         "functions/api/platform/v1/collaboration-items/**/dingtalk.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
@@ -64,6 +66,7 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/dingtalk/",
         "/api/auth/dingtalk/",
+        "/api/supply-chain/approvals/sync",
         "/api/platform/v1/collaboration-items/:id/dingtalk",
         "/api/platform/v1/platform-connections"
       ],
@@ -76,6 +79,7 @@ const integrationRegistry = {
       "evidence": [
         "functions/api/dingtalk/",
         "functions/api/auth/dingtalk/",
+        "functions/api/supply-chain/approvals/sync.js",
         "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
@@ -277,17 +281,18 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、用户洞察、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、用户洞察、货流事实、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
         "组织数据",
         "销售聚合",
-        "平台配置",
-        "数据中心元数据",
         "用户洞察标准事实",
         "用户洞察部门规则",
         "采集设备令牌哈希",
+        "货流事件与指标",
+        "平台配置",
+        "数据中心元数据",
         "店铺运营记录",
         "人事核心记录",
         "绩效记录",
@@ -305,6 +310,7 @@ const integrationRegistry = {
         "数据库绑定缺失",
         "表结构或容量问题",
         "用户洞察采集结果未落库",
+        "货流事实或指标未落库",
         "人事数据表是否就绪",
         "跨部门事项如何留痕",
         "测试账号如何受控写生产数据",
@@ -322,6 +328,7 @@ const integrationRegistry = {
         "functions/api/platform.js",
         "functions/api/supply-chain.js",
         "functions/api/supply-chain/**",
+        "functions/api/platform/v1/goods-flow/**",
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/**",
@@ -344,7 +351,8 @@ const integrationRegistry = {
         "migrations/**",
         "migrations/0002_hr_management_core.sql",
         "migrations/0003_platform_credentials.sql",
-        "migrations/0005_user_insights.sql"
+        "migrations/0005_user_insights.sql",
+        "migrations/0005_goods_flow_core.sql"
       ],
       "envVars": [
         "PRODUCT_FLOW_DB"
@@ -357,6 +365,7 @@ const integrationRegistry = {
         "/api/state",
         "/api/platform",
         "/api/supply-chain",
+        "/api/platform/v1/goods-flow/",
         "/api/sales",
         "/api/data-center",
         "/api/ecommerce-operations",
@@ -386,6 +395,7 @@ const integrationRegistry = {
         "functions/api/platform.js",
         "functions/api/supply-chain.js",
         "functions/api/supply-chain/",
+        "functions/api/platform/v1/goods-flow/",
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/",
@@ -408,7 +418,8 @@ const integrationRegistry = {
         "migrations/0003_platform_credentials.sql",
         "migrations/0003_company_ai_assistant.sql",
         "migrations/0004_company_ai_skills.sql",
-        "migrations/0005_user_insights.sql"
+        "migrations/0005_user_insights.sql",
+        "migrations/0005_goods_flow_core.sql"
       ],
       "relations": [
         {
@@ -490,16 +501,18 @@ const integrationRegistry = {
       "id": "erp-file-import",
       "name": "ERP / 文件导入",
       "status": "integrating",
-      "summary": "承接销售明细 Excel 等人工导入，并作为 API 同步的校准和兼容通道。",
+      "summary": "承接销售明细、ERP 库存快照和月度盘点文件，并作为 API 同步的校准和兼容通道。",
       "capabilities": [
         "销售明细导入",
+        "ERP 库存快照导入",
+        "月度盘点导入",
         "字段映射",
         "整月重导",
         "数据校准"
       ],
       "businessQuestions": [
         "Excel 导入失败",
-        "字段口径不一致",
+        "库存或盘点字段口径不一致",
         "历史数据补录",
         "API 与文件结果不同"
       ],
@@ -512,19 +525,25 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "src/features/settings/SalesDataSettings.jsx",
+        "src/features/supply-chain/InventoryWorkspace.jsx",
         "src/domain/salesData.js",
+        "src/domain/supplyChain.js",
         "src/state/salesStore.js",
-        "functions/api/sales.js"
+        "functions/api/sales.js",
+        "functions/api/platform/v1/goods-flow/imports.js"
       ],
       "envVars": [],
       "domains": [],
       "apiRoutes": [
-        "/api/sales"
+        "/api/sales",
+        "/api/platform/v1/goods-flow/imports"
       ],
       "publicDocs": [],
       "evidence": [
         "src/features/settings/SalesDataSettings.jsx",
-        "src/domain/salesData.js"
+        "src/features/supply-chain/InventoryWorkspace.jsx",
+        "src/domain/salesData.js",
+        "src/domain/supplyChain.js"
       ],
       "relations": [
         {

@@ -234,6 +234,36 @@ const environmentCapabilities = {
       ]
     },
     {
+      "id": "goods-flow-core",
+      "name": "供应链货流核心数据",
+      "description": "货流事件、每日库存、月度线下盘点、平台账期、CCC 版本和异常队列所需的生产能力。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1",
+        "dingtalk",
+        "kuaimai",
+        "erp-file-import"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "goods_flow_events",
+        "goods_flow_inventory_daily",
+        "goods_flow_stocktakes",
+        "goods_flow_stocktake_lines",
+        "goods_flow_receivable_terms",
+        "goods_flow_ccc_monthly",
+        "goods_flow_exceptions"
+      ]
+    },
+    {
       "id": "operations-ai-review",
       "name": "经营方案 AI 点评",
       "description": "可选的 OpenAI Responses API 点评；未配置时使用本地规则检查，不阻断经营流程。",

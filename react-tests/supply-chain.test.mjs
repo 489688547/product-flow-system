@@ -28,6 +28,20 @@ test("approved payments aggregate one purchase without counting running or rejec
   assert.equal(summary.actualPaid, 30);
   assert.equal(summary.byProduct[0].actualPaid, 30);
   assert.equal(summary.bySupplier[0].actualPaid, 30);
+  assert.equal(summary.byProduct[0].hasPaymentEvidence, true);
+});
+
+test("product funds preserve missing source evidence instead of presenting synthetic zero", () => {
+  const summary = buildSupplyChainSummary({
+    supplyState: normalizeSupplyChainState(),
+    products: [{ id: "p1", name: "待接入产品" }],
+    salesRows: []
+  });
+  assert.equal(summary.byProduct[0].actualPaid, 0);
+  assert.equal(summary.byProduct[0].hasPaymentEvidence, false);
+  assert.equal(summary.byProduct[0].hasSalesCostEvidence, false);
+  assert.equal(summary.byProduct[0].hasInventoryFundsEvidence, false);
+  assert.equal(summary.byProduct[0].hasBomCostEvidence, false);
 });
 
 test("approved payments flag purchases paid above the approved request amount", () => {
@@ -82,6 +96,8 @@ test("inventory funds subtract sales cost and include confirmed adjustment", () 
   assert.equal(summary.consumedSalesCost, 40);
   assert.equal(summary.rawInventoryFunds, 60);
   assert.equal(summary.adjustedInventoryFunds, 55);
+  assert.equal(summary.byProduct[0].hasSalesCostEvidence, true);
+  assert.equal(summary.byProduct[0].hasInventoryFundsEvidence, true);
 });
 
 test("supplier inventory funds use product material consumption per sale", () => {

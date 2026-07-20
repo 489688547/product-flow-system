@@ -8,6 +8,7 @@ import { BrandContentProvider } from "./state/BrandContentProvider.jsx";
 import { ProductFlowPlatformBridge } from "./features/platform/ProductFlowPlatformBridge.jsx";
 import { canAccessCompanyPlatform, canAccessDataCenter, canAccessEcommerceOperations, canAccessPerformanceManagement, canAccessSupplyChain } from "./domain/permissions.js";
 import { SupplyChainProvider } from "./state/SupplyChainProvider.jsx";
+import { GoodsFlowProvider } from "./state/GoodsFlowProvider.jsx";
 import { DataCenterProvider } from "./state/DataCenterProvider.jsx";
 import { EcommerceOperationsProvider } from "./state/EcommerceOperationsProvider.jsx";
 import { PerformanceManagementProvider } from "./state/PerformanceManagementProvider.jsx";
@@ -31,18 +32,20 @@ function AuthenticatedApp() {
       <DataCenterProvider enabled={hasDataCenterAccess}>
         <AiAssistantProvider>
           <SupplyChainProvider enabled={hasSupplyChainAccess}>
-            <BrandContentProvider>
-              <CollaborationProvider>
-                <EcommerceOperationsProvider enabled={hasOperationsAccess}>
-                  <PerformanceManagementProvider enabled={hasPerformanceAccess}>
-                    <PlatformProvider enabled={hasCompanyAccess}>
-                      {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-                      <App />
-                    </PlatformProvider>
-                  </PerformanceManagementProvider>
-                </EcommerceOperationsProvider>
-              </CollaborationProvider>
-            </BrandContentProvider>
+            <GoodsFlowProvider enabled={hasSupplyChainAccess}>
+              <BrandContentProvider>
+                <CollaborationProvider>
+                  <EcommerceOperationsProvider enabled={hasOperationsAccess}>
+                    <PerformanceManagementProvider enabled={hasPerformanceAccess}>
+                      <PlatformProvider enabled={hasCompanyAccess}>
+                        {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+                        <App />
+                      </PlatformProvider>
+                    </PerformanceManagementProvider>
+                  </EcommerceOperationsProvider>
+                </CollaborationProvider>
+              </BrandContentProvider>
+            </GoodsFlowProvider>
           </SupplyChainProvider>
         </AiAssistantProvider>
       </DataCenterProvider>
