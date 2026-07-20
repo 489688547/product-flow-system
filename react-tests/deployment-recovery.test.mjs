@@ -73,6 +73,22 @@ test("应用启动前安装恢复监听，Pages 发布包含顶层 404 页面", 
   );
 });
 
+test("自动 Pages 构建包含兼容入口和缓存重写契约", () => {
+  const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  assert.match(
+    packageJson.scripts.build,
+    /prepare-pages-build\.mjs/,
+    "Cloudflare Git 自动构建必须补齐完整 Pages 发布产物",
+  );
+
+  const buildPreparationPath = new URL("../scripts/prepare-pages-build.mjs", import.meta.url);
+  assert.equal(existsSync(buildPreparationPath), true, "应提供 dist 发布后处理脚本");
+  const buildPreparationSource = readFileSync(buildPreparationPath, "utf8");
+  assert.match(buildPreparationSource, /cloudflare-entry\.html/);
+  assert.match(buildPreparationSource, /_headers/);
+  assert.match(buildPreparationSource, /_redirects/);
+});
+
 test("钉钉受限 WebView 禁用会话存储时也不会连续刷新", async () => {
   assert.equal(existsSync(recoveryPath), true);
   const { installDeploymentRecovery } = await import(pathToFileURL(recoveryPath.pathname));

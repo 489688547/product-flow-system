@@ -1,3 +1,5 @@
+import { platformEnv } from "../../platform/_shared/platformCredentials.js";
+
 // 快麦ERP开放平台客户端。使用 Web Crypto（hmac-sha256 签名），
 // 同一份代码跑在 Cloudflare Pages Functions 和本地 server.mjs（Node 18+）里。
 const GATEWAY = "https://gw.superboss.cc/router";
@@ -32,6 +34,10 @@ export function kuaimaiConfigFromEnv(env = {}) {
   };
   config.ready = Boolean(config.appKey && config.appSecret && config.accessToken);
   return config;
+}
+
+export async function resolveKuaimaiConfig(env = {}) {
+  return kuaimaiConfigFromEnv(await platformEnv(env, "kuaimai"));
 }
 
 export function gmt8Timestamp(date = new Date()) {

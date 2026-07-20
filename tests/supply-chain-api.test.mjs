@@ -49,6 +49,15 @@ function createD1Mock() {
 
 const executive = { name: "周总", role: "executive", department: "总经办" };
 
+test("executive role can view supply chain with multi-department organization data", async () => {
+  const response = await onRequest({
+    request: new Request("https://flow.example.com/api/supply-chain"),
+    env: { PRODUCT_FLOW_DB: createD1Mock() },
+    data: { session: { ...executive, department: "总经办 / 运营部 / 品牌部" } }
+  });
+  assert.equal(response.status, 200);
+});
+
 test("supply-chain API requires D1 and rejects unrelated departments", async () => {
   const missing = await onRequest({
     request: new Request("https://flow.example.com/api/supply-chain"),

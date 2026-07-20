@@ -1,0 +1,12 @@
+name = "product-flow-system"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-07-18"
+
+[vars]
+LOCAL_ONLINE_ACCOUNT_MODE = "1"
+
+[[d1_databases]]
+binding = "PRODUCT_FLOW_DB"
+database_name = "product-flow-system"
+database_id = "64389843-2c2f-4781-862d-48fe27caa012"
+remote = true

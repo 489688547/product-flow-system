@@ -9,7 +9,9 @@ const TABLES = {
   metricDefinitions: "data_metric_definitions",
   qualityIssues: "data_quality_issues",
   subscriptions: "data_app_subscriptions",
-  auditLogs: "data_audit_logs"
+  auditLogs: "data_audit_logs",
+  aiProviders: "data_ai_providers",
+  aiDataPolicies: "data_ai_policies"
 };
 const BATCH_SIZE = 50;
 

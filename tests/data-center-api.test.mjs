@@ -48,7 +48,9 @@ function createD1Mock() {
               data_metric_definitions: "metricDefinitions",
               data_quality_issues: "qualityIssues",
               data_app_subscriptions: "subscriptions",
-              data_audit_logs: "auditLogs"
+              data_audit_logs: "auditLogs",
+              data_ai_providers: "aiProviders",
+              data_ai_policies: "aiDataPolicies"
             };
             const table = Object.keys(tableToCollection).find(name => new RegExp(`from ${name}`, "i").test(sql));
             const collection = tableToCollection[table];
@@ -76,6 +78,24 @@ function createD1Mock() {
 }
 
 const executive = { name: "周总", userId: "u-1", role: "executive", department: "总经办" };
+
+test("executive role can view data center with multi-department organization data", async () => {
+  const response = await onDataCenterRequest({
+    request: new Request("https://flow.example.com/api/data-center"),
+    env: { PRODUCT_FLOW_DB: createD1Mock() },
+    data: { session: { ...executive, department: "总经办 / 运营部 / 品牌部" } }
+  });
+  assert.equal(response.status, 200);
+});
+
+test("executive role can read sales with multi-department organization data", async () => {
+  const response = await onSalesRequest({
+    request: new Request("https://flow.example.com/api/data-center/sales?from=2026-07-01&to=2026-07-20"),
+    env: { PRODUCT_FLOW_DB: createD1Mock() },
+    data: { session: { ...executive, department: "总经办 / 运营部 / 品牌部" } }
+  });
+  assert.equal(response.status, 200);
+});
 
 test("data center API requires a session, allowed department and D1", async () => {
   const missingSession = await onDataCenterRequest({ request: new Request("https://flow.example.com/api/data-center"), env: {}, data: {} });
@@ -177,4 +197,43 @@ test("data center sales validates date range and permissions", async () => {
     data: { session: { name: "访客", department: "品牌部" } }
   });
   assert.equal(forbidden.status, 403);
+});
+
+test("data center state includes protected AI metadata and blocks operations overrides", async () => {
+  const db = createD1Mock();
+  const initial = await onDataCenterRequest({
+    request: new Request("https://flow.example.com/api/data-center"),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: executive }
+  });
+  const initialPayload = await initial.json();
+  assert.equal(initialPayload.state.aiProviders[0].providerId, "lingsuan-responses");
+  assert.equal(initialPayload.state.aiDataPolicies.find(item => item.domainId === "finance").providerTransfer["lingsuan-responses"], "blocked");
+
+  const attempted = normalizeDataCenterState({
+    ...initialPayload.state,
+    aiProviders: [{ ...initialPayload.state.aiProviders[0], model: "untrusted-model", enabled: true }],
+    aiDataPolicies: initialPayload.state.aiDataPolicies.map(item => item.domainId === "finance"
+      ? { ...item, providerTransfer: { "lingsuan-responses": "allowed" } }
+      : item)
+  });
+  const saved = await onDataCenterRequest({
+    request: new Request("https://flow.example.com/api/data-center", {
+      method: "POST",
+      body: JSON.stringify({ state: attempted })
+    }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { name: "运营", department: "运营部", role: "operator" } }
+  });
+  assert.equal(saved.status, 200);
+
+  const reloaded = await onDataCenterRequest({
+    request: new Request("https://flow.example.com/api/data-center"),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: executive }
+  });
+  const reloadedPayload = await reloaded.json();
+  assert.equal(reloadedPayload.state.aiProviders[0].model, "gpt-5.6-sol");
+  assert.equal(reloadedPayload.state.aiProviders[0].enabled, false);
+  assert.equal(reloadedPayload.state.aiDataPolicies.find(item => item.domainId === "finance").providerTransfer["lingsuan-responses"], "blocked");
 });

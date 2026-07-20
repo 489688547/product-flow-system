@@ -1,3 +1,5 @@
+import { platformEnv } from "../../platform/_shared/platformCredentials.js";
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "access-control-allow-origin": "*",
@@ -39,8 +41,17 @@ export function buildConfigResponse(env = {}, origin = "") {
   };
 }
 
+export async function resolveDingCredentials(env = {}) {
+  return getDingCredentials(await platformEnv(env, "dingtalk"));
+}
+
+export async function buildResolvedConfigResponse(env = {}, origin = "") {
+  const resolvedEnv = await platformEnv(env, "dingtalk");
+  return buildConfigResponse(resolvedEnv, origin);
+}
+
 export async function getDingAccessToken(env = {}, fetchImpl = fetch) {
-  const { appKey, appSecret, missing } = getDingCredentials(env);
+  const { appKey, appSecret, missing } = await resolveDingCredentials(env);
   if (missing.length) {
     const err = new Error(`缺少钉钉应用配置：${missing.join("、")}`);
     err.status = 501;
@@ -59,7 +70,7 @@ export async function getDingAccessToken(env = {}, fetchImpl = fetch) {
 }
 
 export async function getDingUserAccessToken(env = {}, input = {}, fetchImpl = fetch) {
-  const { appKey, appSecret, missing } = getDingCredentials(env);
+  const { appKey, appSecret, missing } = await resolveDingCredentials(env);
   if (missing.length) {
     const err = new Error(`缺少钉钉应用配置：${missing.join("、")}`);
     err.status = 501;

@@ -1,4 +1,6 @@
 import environmentCapabilities from "../_generated/environmentCapabilities.js";
+import { isValidPlatformCredentialMasterKey } from "./credentialCrypto.js";
+import { configuredCredentialEnvVars } from "./platformCredentials.js";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -38,10 +40,15 @@ export async function inspectEnvironmentReadiness({ env = {}, requestUrl = "", m
   const required = (manifest.capabilities || []).filter(capability => capability.requiredIn.includes(environment));
   const db = readinessDatabase(env);
   const tableNames = [...new Set(required.flatMap(capability => capability.tables || []))];
-  const tables = await existingTables(db, tableNames);
+  const [tables, vaultEnvVars] = await Promise.all([
+    existingTables(db, tableNames),
+    configuredCredentialEnvVars(env)
+  ]);
   const capabilities = required.map(capability => {
     const missing = [
-      ...(capability.envVars || []).filter(name => !env[name]),
+      ...(capability.envVars || []).filter(name => name === "PLATFORM_CREDENTIAL_MASTER_KEY"
+        ? !isValidPlatformCredentialMasterKey(env[name])
+        : !env[name] && !vaultEnvVars.has(name)),
       ...(capability.bindings || []).filter(name => name === "PRODUCT_FLOW_DB" ? !db : !env[name]),
       ...(capability.tables || []).filter(name => !tables.has(name))
     ];

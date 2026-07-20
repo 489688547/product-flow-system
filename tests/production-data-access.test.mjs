@@ -131,7 +131,16 @@ async function seedAccess(db, { raw = "personal-token", capabilities = ["read", 
     expires_at: expiresAt,
     revoked_at: null
   });
-  db.data.org.set("ding-user-1", { user_id: "ding-user-1", union_id: "ding-union-1", name: "最高权限账号", role, active: 1 });
+  db.data.org.set("ding-user-1", {
+    corp_id: "corp-main",
+    user_id: "ding-user-1",
+    union_id: "ding-union-1",
+    name: "周荣庆",
+    department: "总经办",
+    title: "总经理",
+    role,
+    active: 1
+  });
   return raw;
 }
 
@@ -175,6 +184,40 @@ test("personal token is stored only as a hash and can read production state", as
   assert.equal(response.status, 200);
   assert.equal(payload.state.marker, "before");
   assert.equal(payload.updatedAt, "2026-07-18T08:00:00.000Z");
+});
+
+test("raw personal token resolves the current complete organization identity", async () => {
+  const { access } = await loadRoutes();
+  const db = createProductionDb();
+  const raw = await seedAccess(db);
+
+  const authorized = await access.authorizeProductionToken(raw, db, {
+    capability: "read",
+    now: new Date("2026-07-20T03:00:00.000Z")
+  });
+
+  assert.deepEqual(authorized, {
+    tokenHash: await sha256(raw),
+    capabilities: ["read", "write"],
+    corpId: "corp-main",
+    userId: "ding-user-1",
+    unionId: "ding-union-1",
+    name: "周荣庆",
+    department: "总经办",
+    title: "总经理",
+    role: "executive"
+  });
+});
+
+test("raw personal token enforces the requested capability", async () => {
+  const { access } = await loadRoutes();
+  const db = createProductionDb();
+  const raw = await seedAccess(db, { capabilities: ["read"] });
+
+  await assert.rejects(
+    () => access.authorizeProductionToken(raw, db, { capability: "write" }),
+    error => error.code === "PRODUCTION_CAPABILITY_REQUIRED"
+  );
 });
 
 test("production writes require the exact confirmation, reason, and active unlock", async () => {

@@ -30,6 +30,7 @@ import {
 import { syncSupplyApprovals } from "./functions/api/supply-chain/approvals/sync.js";
 import { normalizeSupplyChainState } from "./src/domain/supplyChain.js";
 import { normalizeDataCenterState } from "./src/domain/dataCenter.js";
+import { AI_DATA_DOMAINS, normalizeAiProvider } from "./src/domain/aiAssistant.js";
 import {
   applyCollaborationTransition,
   filterCollaborationItems,
@@ -149,6 +150,32 @@ async function writeLocalDataCenterState(state, updatedBy = "") {
   await mkdir(LOCAL_DATA_DIR, { recursive: true });
   await writeFile(LOCAL_DATA_CENTER_STATE_PATH, JSON.stringify(payload, null, 2));
   return payload;
+}
+
+async function handleLocalAiPreview(req, res, url) {
+  const state = await readLocalDataCenterState();
+  const provider = normalizeAiProvider(state.aiProviders?.[0]);
+  const secretConfigured = Boolean(process.env.LINGSUAN_API_KEY);
+  const publicProvider = { ...provider, secretConfigured };
+  if (req.method === "GET" && url.pathname === "/api/platform/v1/ai/status") {
+    json(res, 200, {
+      enabled: process.env.AI_ASSISTANT_ENABLED === "1",
+      ready: provider.enabled && secretConfigured,
+      provider: publicProvider,
+      allowedDomains: AI_DATA_DOMAINS.filter(item => item.id !== "finance").map(item => item.id),
+      blockedDomains: ["finance"],
+      localPreview: true
+    });
+    return;
+  }
+  if (req.method === "GET" && url.pathname === "/api/platform/v1/ai/provider") {
+    json(res, 200, { provider: publicProvider, policies: state.aiDataPolicies || [], canManage: false, localPreview: true });
+    return;
+  }
+  json(res, 403, {
+    message: "本地 AI 预览为只读模式，不调用外部模型或修改 Provider。",
+    error: { code: "AI_LOCAL_PREVIEW_READ_ONLY", retryable: false }
+  });
 }
 
 function relativeIso(days, hour = 18) {
@@ -614,11 +641,11 @@ async function handleProductionRollback(req, res) {
   }
 }
 
-function blockExternalAction(res) {
-  json(res, 409, {
+function requireLocalOnlineRuntime(res) {
+  json(res, 501, {
     synced: false,
-    message: "测试环境只允许修改数据库，不能执行真实外部平台操作。",
-    error: { code: "EXTERNAL_ACTION_DISABLED_IN_TEST" }
+    message: "旧 Node 预览不提供真实外部操作，请通过 npm start 运行完整 Pages Functions。",
+    error: { code: "LOCAL_ONLINE_RUNTIME_REQUIRED" }
   });
 }
 
@@ -922,6 +949,15 @@ const server = http.createServer(async (req, res) => {
     await handleLocalCollaboration(req, res, url);
     return;
   }
+  if ([
+    "/api/platform/v1/ai/status",
+    "/api/platform/v1/ai/provider",
+    "/api/platform/v1/ai/provider/test",
+    "/api/platform/v1/ai/chat"
+  ].includes(url.pathname)) {
+    await handleLocalAiPreview(req, res, url);
+    return;
+  }
   if (url.pathname === "/api/state") {
     await handleState(req, res);
     return;
@@ -963,7 +999,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/kuaimai/refresh" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/kuaimai/pull" && req.method === "GET") {
@@ -987,15 +1023,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/create" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/sync" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/create" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/events" && req.method === "POST") {

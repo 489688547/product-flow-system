@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-18",
+  "updatedAt": "2026-07-20",
   "platforms": [
     {
       "id": "dingtalk",
       "name": "钉钉开放平台",
       "status": "connected",
       "summary": "承载登录、组织通讯录、待办、群聊、日历、文档、供应链文件快照和钉钉内嵌工作台能力。",
-      "capabilities": ["身份登录", "组织通讯录", "待办任务", "群聊与成员", "日历", "文档读取", "供应链文件快照", "内嵌工作台"],
-      "businessQuestions": ["登录或免登失败", "找不到人员或部门", "待办未创建或未同步", "群成员选择异常", "供应链文件快照未导入", "钉钉 WebView 行为异常"],
+      "capabilities": ["身份登录", "组织通讯录", "待办任务", "群聊与成员", "日历", "文档读取", "供应链文件快照", "内嵌工作台", "平台连接配置"],
+      "businessQuestions": ["登录或免登失败", "找不到人员或部门", "待办未创建或未同步", "本地如何执行真实待办与日历动作", "群成员选择异常", "供应链文件快照未导入", "钉钉 WebView 行为异常"],
       "keywords": ["钉钉", "DingTalk", "免登", "待办", "通讯录", "群聊", "开放平台"],
-      "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "functions/api/platform/v1/collaboration-items/**/dingtalk.js", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs", "server.mjs"],
+      "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "functions/api/platform/v1/collaboration-items/**/dingtalk.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs", "server.mjs"],
       "envVars": ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET", "DINGTALK_CORP_ID", "DINGTALK_TOKEN_ENCRYPTION_KEY"],
       "domains": ["open.dingtalk.com", "api.dingtalk.com", "oapi.dingtalk.com"],
-      "apiRoutes": ["/api/dingtalk/", "/api/auth/dingtalk/", "/api/platform/v1/collaboration-items/:id/dingtalk"],
+      "apiRoutes": ["/api/dingtalk/", "/api/auth/dingtalk/", "/api/platform/v1/collaboration-items/:id/dingtalk", "/api/platform/v1/platform-connections"],
       "publicDocs": [
         { "label": "钉钉开放平台能力中心", "url": "https://open.dingtalk.com/" }
       ],
-      "evidence": ["functions/api/dingtalk/", "functions/api/auth/dingtalk/", "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs"],
+      "evidence": ["functions/api/dingtalk/", "functions/api/auth/dingtalk/", "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "stores-session-and-org-data", "description": "登录会话、用户令牌与组织同步结果使用 D1 持久化。" },
         { "platformId": "cloudflare-pages", "type": "hosts-callbacks", "description": "Pages Functions 承载登录回调和开放平台 API 适配器。" }
@@ -28,17 +28,17 @@
       "name": "快麦开放平台",
       "status": "connected",
       "summary": "按天拉取订单并聚合为产品销售数据，同时保留文件导入校准通道。",
-      "capabilities": ["订单拉取", "会话刷新", "销售日聚合", "连接状态检查"],
-      "businessQuestions": ["快麦连接失败", "订单同步缺失", "销售数据未落库", "刷新令牌失败", "月度数据校准"],
+      "capabilities": ["订单拉取", "会话刷新", "销售日聚合", "连接状态检查", "平台连接配置"],
+      "businessQuestions": ["快麦连接失败", "订单同步缺失", "销售数据未落库", "本地如何触发真实同步", "刷新令牌失败", "月度数据校准"],
       "keywords": ["快麦", "Kuaimai", "订单同步", "销售数据", "ERP", "开放平台"],
-      "codePaths": ["functions/api/kuaimai/**", "functions/api/sales.js", "src/features/settings/KuaimaiSyncSettings.jsx", "src/state/salesStore.js", "server.mjs"],
+      "codePaths": ["functions/api/kuaimai/**", "functions/api/sales.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/features/settings/KuaimaiSyncSettings.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "src/state/salesStore.js", "server.mjs"],
       "envVars": ["KUAIMAI_APP_KEY", "KUAIMAI_APP_SECRET", "KUAIMAI_ACCESS_TOKEN", "KUAIMAI_REFRESH_TOKEN"],
       "domains": ["open.kuaimai.com", "api.kuaimai.com", "scm.superboss.cc"],
-      "apiRoutes": ["/api/kuaimai/", "/api/sales"],
+      "apiRoutes": ["/api/kuaimai/", "/api/sales", "/api/platform/v1/platform-connections"],
       "publicDocs": [
         { "label": "快麦开放平台 API 文档", "url": "https://open.kuaimai.com/docs/" }
       ],
-      "evidence": ["functions/api/kuaimai/", "src/features/settings/KuaimaiSyncSettings.jsx"],
+      "evidence": ["functions/api/kuaimai/", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/features/settings/KuaimaiSyncSettings.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "stores-sales-aggregates", "description": "快麦订单按日聚合后写入销售数据表。" },
         { "platformId": "erp-file-import", "type": "reconciled-by", "description": "月底可用 ERP 文件整月重导校准退款和缺失数据。" }
@@ -49,18 +49,18 @@
       "name": "Cloudflare Pages",
       "status": "connected",
       "summary": "托管 React 应用与 Pages Functions，并提供生产和预览运行边界。",
-      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "回滚", "环境就绪检查", "生产数据网关"],
-      "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失", "测试环境与生产配置漂移", "本地如何受控读取生产数据"],
+      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "本地线上账号运行", "回滚", "环境就绪检查", "生产数据网关", "加密平台连接"],
+      "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失", "测试环境与生产配置漂移", "本地如何使用真实线上账号、数据与外部动作"],
       "keywords": ["Cloudflare", "Pages", "Pages Functions", "部署", "生产环境"],
-      "codePaths": ["functions/**", "src/state/deploymentRecovery.js", "scripts/prepare-pages-release.mjs", "scripts/check-deployed-readiness.mjs", "cloudflare-entry.html", "404.html", "public/404.html", "_redirects", ".github/workflows/**"],
-      "envVars": [],
+      "codePaths": ["functions/**", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/state/deploymentRecovery.js", "scripts/prepare-pages-build.mjs", "scripts/prepare-pages-release.mjs", "scripts/check-deployed-readiness.mjs", "cloudflare-entry.html", "404.html", "public/404.html", "_redirects", "wrangler.toml", ".github/workflows/**"],
+      "envVars": ["PLATFORM_CREDENTIAL_MASTER_KEY", "LOCAL_ONLINE_ACCOUNT_MODE", "PRODUCTION_DATA_ACCESS_TOKEN", "AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"],
       "domains": ["pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": ["/api/platform/v1/environment-readiness", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/"],
+      "apiRoutes": ["/api/platform/v1/environment-readiness", "/api/platform/v1/platform-connections", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/ai/"],
       "publicDocs": [
         { "label": "Cloudflare Pages 文档", "url": "https://developers.cloudflare.com/pages/" },
         { "label": "Pages Functions 文档", "url": "https://developers.cloudflare.com/pages/functions/" }
       ],
-      "evidence": ["functions/", "src/state/deploymentRecovery.js", "docs/platform/architecture.md", "scripts/prepare-pages-release.mjs"],
+      "evidence": ["functions/", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/state/deploymentRecovery.js", "docs/platform/architecture.md", "scripts/prepare-pages-build.mjs", "scripts/prepare-pages-release.mjs", "wrangler.toml"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "binds", "description": "Pages Functions 通过 PRODUCT_FLOW_DB 绑定访问 D1。" }
       ]
@@ -69,19 +69,19 @@
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、人事绩效和跨 App 协同记录。",
-      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "数据中心元数据", "店铺运营记录", "人事核心记录", "绩效记录", "跨 App 协同", "生产写入审计", "写前快照"],
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "capabilities": ["共享状态持久化", "登录会话", "组织数据", "销售聚合", "平台配置", "数据中心元数据", "店铺运营记录", "人事核心记录", "绩效记录", "跨 App 协同", "AI Provider 元数据", "AI 外发策略", "AI 无内容审计", "生产写入审计", "写前快照", "加密平台连接"],
       "businessQuestions": ["数据只在本地可见", "跨设备状态不同步", "数据库绑定缺失", "表结构或容量问题", "人事数据表是否就绪", "跨部门事项如何留痕", "测试账号如何受控写生产数据", "生产写入如何回滚"],
       "keywords": ["D1", "数据库", "落库", "PRODUCT_FLOW_DB", "持久化"],
-      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/**", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/**", "functions/api/performance-management.js", "functions/api/performance-management/**", "functions/api/hr-management/**", "functions/api/auth/**", "functions/api/dingtalk/org/**", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/v1/production-data/**", "functions/api/platform/v1/collaboration-items/**", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/**", "migrations/0002_hr_management_core.sql"],
+      "codePaths": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/**", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/**", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/**", "functions/api/performance-management.js", "functions/api/performance-management/**", "functions/api/hr-management/**", "functions/api/auth/**", "functions/api/dingtalk/org/**", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/v1/production-data/**", "functions/api/platform/v1/collaboration-items/**", "functions/api/platform/v1/ai/**", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/**", "migrations/0002_hr_management_core.sql", "migrations/0003_platform_credentials.sql"],
       "envVars": ["PRODUCT_FLOW_DB"],
       "domains": ["api.cloudflare.com", "dash.cloudflare.com"],
-      "apiRoutes": ["/api/state", "/api/platform", "/api/supply-chain", "/api/sales", "/api/data-center", "/api/ecommerce-operations", "/api/performance-management", "/api/hr-management", "/api/platform/v1/environment-readiness", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/collaboration-items"],
+      "apiRoutes": ["/api/state", "/api/platform", "/api/supply-chain", "/api/sales", "/api/data-center", "/api/ecommerce-operations", "/api/performance-management", "/api/hr-management", "/api/platform/v1/environment-readiness", "/api/platform/v1/platform-connections", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/collaboration-items", "/api/platform/v1/ai/"],
       "publicDocs": [
         { "label": "Cloudflare D1 入门", "url": "https://developers.cloudflare.com/d1/get-started/" },
         { "label": "Pages D1 绑定", "url": "https://developers.cloudflare.com/pages/functions/bindings/" }
       ],
-      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/", "functions/api/performance-management.js", "functions/api/performance-management/", "functions/api/hr-management/", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/v1/_shared/collaborationStorage.js", "migrations/0001_production_data_access.sql", "migrations/0002_business_data_apps.sql", "migrations/0002_collaboration_execution.sql", "migrations/0002_hr_management_core.sql"],
+      "evidence": ["functions/api/state.js", "functions/api/platform.js", "functions/api/supply-chain.js", "functions/api/supply-chain/", "functions/api/sales.js", "functions/api/data-center.js", "functions/api/data-center/", "functions/api/ecommerce-operations.js", "functions/api/ecommerce-operations/", "functions/api/performance-management.js", "functions/api/performance-management/", "functions/api/hr-management/", "functions/api/platform/_shared/productionDataAccess.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/v1/_shared/collaborationStorage.js", "functions/api/platform/v1/ai/", "migrations/0001_production_data_access.sql", "migrations/0002_business_data_apps.sql", "migrations/0002_collaboration_execution.sql", "migrations/0002_hr_management_core.sql", "migrations/0003_platform_credentials.sql", "migrations/0003_company_ai_assistant.sql", "migrations/0004_company_ai_skills.sql"],
       "relations": [
         { "platformId": "cloudflare-pages", "type": "bound-to", "description": "D1 通过 Pages Functions 的环境绑定提供服务。" },
         { "platformId": "dingtalk", "type": "stores-data-for", "description": "保存钉钉会话、组织和用户令牌相关数据。" },
@@ -229,6 +229,27 @@
       "evidence": [],
       "relations": [
         { "platformId": "xiaohongshu-open-platform", "type": "cross-channel-content", "description": "跨渠道素材分析需要区分平台内容与投放数据口径。" }
+      ]
+    },
+    {
+      "id": "lingsuan-ai-gateway",
+      "name": "灵算 AI 网关",
+      "status": "connected",
+      "summary": "为公司 AI 总助提供服务端 Responses 兼容模型调用；功能默认关闭，密钥只存在服务端 Secret。",
+      "capabilities": ["Responses 流式生成", "固定模型配置", "原生 Function Calling 能力探测", "服务端受控 Skill 路由", "公司只读 Skills", "合成连接测试", "无留存请求参数", "安全错误映射"],
+      "businessQuestions": ["AI 总助不可用", "模型服务连接失败", "Skill 调用失败", "响应超时或限流", "公司数据能否外发", "密钥是否安全"],
+      "keywords": ["灵算", "LingSuan", "AI 总助", "Responses API", "Function Calling", "Skills", "LINGSUAN_API_KEY"],
+      "codePaths": ["functions/api/platform/v1/ai/**", "src/domain/aiAssistant.js", "src/state/aiAssistant*.js", "src/features/ai-assistant/**", "src/features/data-center/AiProviderSettings.jsx"],
+      "envVars": ["AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"],
+      "domains": ["lingsuan.top"],
+      "apiRoutes": ["/api/platform/v1/ai/status", "/api/platform/v1/ai/provider", "/api/platform/v1/ai/provider/test", "/api/platform/v1/ai/chat"],
+      "publicDocs": [
+        { "label": "灵算 AI API Gateway", "url": "https://lingsuan.top/" }
+      ],
+      "evidence": ["src/domain/aiAssistant.js", "functions/api/platform/v1/ai/_shared/routed-skill-fallback.js", "react-tests/ai-assistant-domain.test.mjs", "tests/ai-skill-loop.test.mjs", "migrations/0003_company_ai_assistant.sql", "migrations/0004_company_ai_skills.sql"],
+      "relations": [
+        { "platformId": "cloudflare-pages", "type": "called-by", "description": "Pages Functions 在服务端调用 Provider，浏览器不接触密钥或公司上下文。" },
+        { "platformId": "cloudflare-d1", "type": "governed-by", "description": "D1 保存 Provider 安全元数据、外发策略、并发租约和无内容审计。" }
       ]
     },
     {

@@ -36,7 +36,7 @@ test("Vite build applies and enforces the shared 500 KB chunk policy", async () 
     config.build.rollupOptions.output.manualChunks("/repo/node_modules/react-dom/client.js"),
     "react-vendor"
   );
-  assert.equal(pkg.scripts.build, "npm run check:environment-capabilities && vite build && node scripts/check-build-chunks.mjs");
+  assert.equal(pkg.scripts.build, "npm run check:environment-capabilities && vite build && node scripts/prepare-pages-build.mjs && node scripts/check-build-chunks.mjs");
 });
 
 test("application pages load through route-level dynamic imports", () => {

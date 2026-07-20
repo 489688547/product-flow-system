@@ -16,11 +16,11 @@ function department(session = {}) {
 }
 
 function isExecutive(session) {
-  return department(session) === "总经办";
+  return session?.role === "executive" || department(session).split("/").map(value => value.trim()).includes("总经办");
 }
 
 function canView(session) {
-  return VIEW_DEPARTMENTS.has(department(session));
+  return isExecutive(session) || VIEW_DEPARTMENTS.has(department(session));
 }
 
 function editableCollections(session) {

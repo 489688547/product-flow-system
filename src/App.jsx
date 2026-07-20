@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, KeyRound, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -8,6 +8,9 @@ import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
 import { featureFlagEnabled } from "./domain/featureFlags.js";
 import { expandedGroupForScreen, groupSidebarNavigation } from "./domain/sidebarNavigation.js";
+import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
+import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
+import { LocalOnlineEnvironmentBanner } from "./ui/LocalOnlineEnvironmentBanner.jsx";
 
 const lazyNamed = (loader, exportName) => lazy(async () => {
   const module = await loader();
@@ -43,6 +46,7 @@ const BrandTeamPage = lazyNamed(() => import("./features/brand-content/BrandTeam
 const BrandDataIssuesPage = lazyNamed(() => import("./features/brand-content/BrandDataIssuesPage.jsx"), "BrandDataIssuesPage");
 const BrandContentSettingsPage = lazyNamed(() => import("./features/brand-content/BrandContentSettingsPage.jsx"), "BrandContentSettingsPage");
 const CollaborationPage = lazyNamed(() => import("./features/collaboration/CollaborationPage.jsx"), "CollaborationPage");
+const AiAssistantWorkspace = lazyNamed(() => import("./features/ai-assistant/AiAssistantWorkspace.jsx"), "AiAssistantWorkspace");
 
 const SUPPLY_CHAIN_NAV = [
   ["supply-overview", "供应链总览", LayoutDashboard, "供应链管理", "overview"],
@@ -59,6 +63,7 @@ const DATA_CENTER_NAV = [
   ["data-overview", "数据总览", Database, "数据中心", "overview"],
   ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
+  ["data-connections", "平台连接", KeyRound, "数据中心", "connections"],
   ["data-metrics", "指标管理", Ruler, "数据中心", "metrics"],
   ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],
   ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
@@ -133,7 +138,7 @@ const PRODUCT_NAV = [
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
 ];
-const HIDDEN_SCREENS = new Set(["packages"]);
+const HIDDEN_SCREENS = new Set(["packages", "ai-assistant"]);
 const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NAV.map(([key]) => key), ...HIDDEN_SCREENS]);
 
 function resolveScreen(screen) {
@@ -166,6 +171,7 @@ export default function App() {
   const [progressFocus, setProgressFocus] = useState(null);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
+  const aiTriggerRef = useRef(null);
   const { logout, user: sessionUser } = useAuth();
   const { loading: platformLoading, error: platformError } = usePlatform();
   const { state, loading, sharedError, currentUser, setCurrentProduct } = useProductFlow();
@@ -178,7 +184,7 @@ export default function App() {
   const visibleNavigation = useMemo(() => navigation.filter(([key]) => canViewNavigation(state.settings?.permissions, currentUser, navigationPermissionKey(key))), [currentUser, navigation, state.settings?.permissions]);
   const visibleScreenKeys = useMemo(() => new Set(visibleNavigation.map(([key]) => key)), [visibleNavigation]);
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
-  const screenAllowed = visibleScreenKeys.has(screen) || (screen === "packages" && visibleScreenKeys.has("archive"));
+  const screenAllowed = visibleScreenKeys.has(screen) || screen === "ai-assistant" || (screen === "packages" && visibleScreenKeys.has("archive"));
   const activeScreen = screenAllowed ? screen : defaultScreen;
   const [expandedAppGroup, setExpandedAppGroup] = useState(() => expandedGroupForScreen(visibleNavigation, activeScreen));
   const sidebarNavigationGroups = useMemo(() => groupSidebarNavigation(visibleNavigation), [visibleNavigation]);
@@ -211,7 +217,7 @@ export default function App() {
   function showScreen(nextScreen, detail = "") {
     const resolvedScreen = resolveScreen(nextScreen);
     if (!VALID_SCREENS.has(resolvedScreen)) return;
-    if (!visibleScreenKeys.has(resolvedScreen) && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
+    if (!visibleScreenKeys.has(resolvedScreen) && resolvedScreen !== "ai-assistant" && !(resolvedScreen === "packages" && visibleScreenKeys.has("archive"))) return;
     setRoute({ screen: resolvedScreen, detail });
     window.scrollTo({ top: 0, behavior: "auto" });
     document.body.scrollTo({ top: 0, behavior: "auto" });
@@ -241,6 +247,7 @@ export default function App() {
     progress: <ProductProgressPage focusStage={progressFocus} onNavigate={navigate} />,
     archive: <ProductArchivePage onNavigate={navigate} onOpenProgress={openProgress} />,
     packages: <PackagePage />,
+    "ai-assistant": <AiAssistantWorkspace appHint={{ screen: activeScreen, detail: routeDetail }} />,
     "content-overview": <BrandContentOverviewPage onNavigate={showScreen} />,
     "content-workbench": <BrandContentWorkbenchPage />,
     "content-assets": <BrandAssetLibraryPage />,
@@ -301,6 +308,7 @@ export default function App() {
       <main id="main-content">
         <header className="topbar">
           {sharedError || (hasCompanyAccess && platformError) ? <em role="status">{sharedError || platformError}</em> : null}
+          {activeScreen !== "ai-assistant" ? <AiAssistantTrigger triggerRef={aiTriggerRef} /> : null}
           <div className="account-menu-wrap" ref={accountMenuRef}>
             <button className="account-chip" type="button" aria-label={`${accountName} · ${accountMeta}`} aria-haspopup="menu" aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen(open => !open)}>
               <span className="account-avatar">{accountName.slice(0, 1)}</span>
@@ -314,10 +322,12 @@ export default function App() {
             ) : null}
           </div>
         </header>
+        <LocalOnlineEnvironmentBanner sessionUser={sessionUser} />
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
           {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
+      <AiAssistantPanel active={activeScreen !== "ai-assistant"} triggerRef={aiTriggerRef} appHint={{ screen: activeScreen, detail: routeDetail }} />
       <FloatingIssueButton />
     </div>
   );

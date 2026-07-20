@@ -94,7 +94,7 @@ async function readMeta(db, key) {
   return row?.value || "";
 }
 
-async function readPlatformState(db) {
+export async function readPlatformState(db) {
   await ensureTables(db);
   const result = await db.prepare("SELECT entity_type, id, payload, updated_at, updated_by FROM platform_records").all();
   const rows = result?.results || [];

@@ -1,6 +1,7 @@
 import { createEmptyBrandContentState, normalizeBrandContentState, reduceBrandContentState } from "../../src/domain/brandContent.js";
 import { canAccessCompanyPlatform } from "../../src/domain/permissions.js";
 import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
+import { ensureBrandContentTable, readBrandContentState } from "./brand-content/_shared/storage.js";
 
 const ACTION_TYPES = new Set([
   "create_content",
@@ -98,39 +99,8 @@ function canApplyAction(session, action, state) {
   return { allowed: true };
 }
 
-async function ensureTable(db) {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS brand_content_state (
-    id TEXT PRIMARY KEY,
-    version INTEGER NOT NULL,
-    payload TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    updated_by TEXT NOT NULL
-  )`).run();
-}
-
-function parseStoredState(row) {
-  if (!row) return null;
-  try {
-    const state = normalizeBrandContentState(JSON.parse(row.payload));
-    const version = Math.max(0, Math.trunc(Number(row.version) || 0));
-    return { state: { ...state, version }, version, updatedAt: row.updated_at || "", updatedBy: row.updated_by || "" };
-  } catch {
-    const error = new Error("品牌内容数据损坏，已停止写入，请联系平台管理员恢复。");
-    error.status = 500;
-    error.code = "BRAND_CONTENT_STATE_CORRUPT";
-    throw error;
-  }
-}
-
-async function readStoredState(db) {
-  await ensureTable(db);
-  const row = await db.prepare("SELECT id, version, payload, updated_at, updated_by FROM brand_content_state WHERE id = ?")
-    .bind("company")
-    .first();
-  return parseStoredState(row);
-}
-
 async function writeStoredState(db, state, version, updatedBy) {
+  await ensureBrandContentTable(db);
   const updatedAt = new Date().toISOString();
   const payload = JSON.stringify({ ...state, version });
   await db.prepare(`INSERT INTO brand_content_state (id, version, payload, updated_at, updated_by)
@@ -172,7 +142,7 @@ export async function onRequest({ request, env, data = {} }) {
   }
 
   try {
-    const stored = await readStoredState(db);
+    const stored = await readBrandContentState(db);
     if (request.method === "GET") {
       return jsonResponse(stored ? { synced: true, ...stored } : { synced: false, state: null, version: 0, updatedAt: "", updatedBy: "" });
     }

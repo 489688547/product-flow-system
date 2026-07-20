@@ -25,9 +25,9 @@ test("data center has navigation and feature permission defaults", () => {
   assert.equal(canAccessDataCenter({ department: "品牌部" }), false);
 });
 
-test("data center navigation sits after product lifecycle with eight routes", () => {
+test("data center navigation sits after product lifecycle with nine routes", () => {
   const app = read("src/App.jsx");
-  assert.match(app, /const DATA_CENTER_NAV = \[[\s\S]*data-overview[\s\S]*data-analysis[\s\S]*data-sources[\s\S]*data-metrics[\s\S]*data-quality[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
+  assert.match(app, /const DATA_CENTER_NAV = \[[\s\S]*data-overview[\s\S]*data-analysis[\s\S]*data-sources[\s\S]*data-connections[\s\S]*data-metrics[\s\S]*data-quality[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
   assert.match(app, /\["archive", "产品档案"[\s\S]*\.\.\.DATA_CENTER_NAV[\s\S]*\["handbook", "说明书"/);
   assert.match(app, /screen === "data-center" \? "data-overview"/);
   assert.match(app, /DATA_CENTER_SCREEN_TO_SECTION\.has\(screen\) \? "data-center"/);
