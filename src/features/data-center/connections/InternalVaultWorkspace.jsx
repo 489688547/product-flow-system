@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Archive, Copy, KeyRound, LockKeyhole, Plus, Server, X } from "lucide-react";
+import { Archive, ArrowLeft, Copy, KeyRound, LockKeyhole, Plus, Server, X } from "lucide-react";
 import { INTERNAL_VAULT_TYPES } from "../../../domain/dataCenterConnectors.js";
 import { Button } from "../../../ui/Button.jsx";
 
@@ -17,8 +17,20 @@ function emptyDraft(type) {
   return { itemType: type, name: "", companySubject: "", location: "", address: "", protocol: "HTTPS", resourcePath: "", owner: "", purpose: "", reviewDate: "", credentialEntryId: "", version: 0 };
 }
 
-export function InternalVaultWorkspace({ items = [], vaultEntries = [], canManage = false, onSave, onReveal }) {
-  const [selectedType, setSelectedType] = useState("nas");
+export function InternalVaultWorkspace({
+  items = [],
+  vaultEntries = [],
+  canManage = false,
+  onSave,
+  onReveal,
+  initialType = "nas",
+  visibleTypes = INTERNAL_VAULT_TYPES.map(item => item.id),
+  onBack
+}) {
+  const allowedTypes = INTERNAL_VAULT_TYPES.filter(type => visibleTypes.includes(type.id));
+  const [selectedType, setSelectedType] = useState(
+    allowedTypes.some(type => type.id === initialType) ? initialType : allowedTypes[0]?.id || "nas"
+  );
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState(() => emptyDraft("nas"));
   const [secrets, setSecrets] = useState({ username: "", password: "" });
@@ -79,13 +91,14 @@ export function InternalVaultWorkspace({ items = [], vaultEntries = [], canManag
 
   return (
     <div className="internal-vault">
+      {onBack ? <button type="button" className="platform-connection-back" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />返回公司数据</button> : null}
       <section className="internal-vault-hero">
-        <div><LockKeyhole size={20} /><span><strong>内部系统保险箱</strong><small>敏感信息加密保存，查看与复制全程留痕。</small></span></div>
+        <div><LockKeyhole size={20} /><span><strong>公司数据</strong><small>敏感信息加密保存，查看与复制全程留痕。</small></span></div>
         <span className="status-badge neutral">仅授权人员</span>
       </section>
-      <div className="internal-vault-types" role="tablist" aria-label="内部系统类型">
-        {INTERNAL_VAULT_TYPES.map(type => <button key={type.id} type="button" role="tab" aria-selected={selectedType === type.id} onClick={() => setSelectedType(type.id)}><Server size={17} /><span>{VAULT_TYPE_LABELS[type.id]}<small>{type.description}</small></span></button>)}
-      </div>
+      {allowedTypes.length > 1 ? <div className="internal-vault-types" role="tablist" aria-label="公司数据类型">
+        {allowedTypes.map(type => <button key={type.id} type="button" role="tab" aria-selected={selectedType === type.id} onClick={() => setSelectedType(type.id)}><Server size={17} /><span>{VAULT_TYPE_LABELS[type.id]}<small>{type.description}</small></span></button>)}
+      </div> : null}
       <section className="section-panel internal-vault-list">
         <div className="section-head"><div><h2>{VAULT_TYPE_LABELS[selectedType]}</h2><p>列表只显示非敏感元数据，不显示用户名、密码长度或 Token 前缀。</p></div>{canManage ? <Button variant="primary" onClick={() => openEditor(selectedType)}><Plus size={15} />添加条目</Button> : <span className="status-badge neutral">只读</span>}</div>
         {error ? <div className="connector-form-error" role="alert">{error}</div> : null}

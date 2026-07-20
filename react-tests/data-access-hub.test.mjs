@@ -71,3 +71,17 @@ test("platform orchestration lives in state and the catalog primitives are acces
   assert.match(card, /disabledReason/);
   assert.match(card, /aria-label/);
 });
+
+test("Kuaimai is one ERP card and company data owns DingTalk Aliyun and NAS", () => {
+  const connectorCatalog = read("src/features/data-center/connections/ConnectorCatalog.jsx");
+  const erp = read("src/features/data-center/connections/ErpAccessWorkspace.jsx");
+  const company = read("src/features/data-center/connections/CompanyDataWorkspace.jsx");
+  assert.match(connectorCatalog, /definitions = DATA_CONNECTOR_DEFINITIONS/);
+  assert.match(erp, /kuaimai-erp/);
+  assert.match(erp, /platformIds=\{\["kuaimai"\]\}/);
+  assert.match(erp, /数据同步/);
+  assert.match(company, /dingtalk/);
+  assert.match(company, /aliyun/);
+  assert.match(company, /nas/);
+  assert.doesNotMatch(company, /KUAIMAI_APP_KEY|DINGTALK_APP_SECRET/);
+});
