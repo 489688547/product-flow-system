@@ -17,8 +17,33 @@ const ALTERNATE_AUTH_PATHS = new Set([
   "/api/platform/v1/environment-readiness"
 ]);
 
+const LOCAL_LIVE_PREVIEW_SESSION = Object.freeze({
+  corpId: "local-live-preview",
+  userId: "local-live-preview",
+  unionId: "local-live-preview",
+  name: "周荣庆",
+  role: "executive",
+  department: "总经办",
+  title: "总经理",
+  loginMode: "local-live-d1-preview"
+});
+
+function localLivePreviewSession(request, env = {}) {
+  if (env.LOCAL_LIVE_D1_PREVIEW !== "1") return null;
+  const hostname = new URL(request.url).hostname;
+  return ["localhost", "127.0.0.1", "::1"].includes(hostname) ? LOCAL_LIVE_PREVIEW_SESSION : null;
+}
+
 export async function onRequest(context) {
   if (context.request.method === "OPTIONS") return optionsResponse();
+  const previewSession = localLivePreviewSession(context.request, context.env);
+  if (previewSession) {
+    if (context.request.method !== "GET") {
+      return jsonResponse({ synced: false, message: "线上 D1 本地预览为只读模式，禁止写入。" }, 403);
+    }
+    context.data.session = previewSession;
+    return context.next();
+  }
   const path = new URL(context.request.url).pathname.replace(/\/$/, "") || "/";
   if (PUBLIC_PATHS.has(path)) return context.next();
 

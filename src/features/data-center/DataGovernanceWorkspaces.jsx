@@ -5,6 +5,7 @@ import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapters.js";
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
+import { AiProviderSettings } from "./AiProviderSettings.jsx";
 
 const SOURCE_CATALOG = [
   ["douyin-shop", "抖音店铺", "店铺订单与商品经营数据", "文件导出 / 浏览器辅助", "可配置"],
@@ -98,7 +99,7 @@ export function SyncRunsWorkspace() {
 
 export function DataServicesWorkspace() {
   const { state } = useDataCenter();
-  return <div className="data-workspace"><section className="data-service-intro"><div><span>DATA SERVICE</span><h2>应用订阅</h2><p>业务 App 只读取数据库，不重复登录店铺后台，也不各自维护指标口径。</p></div><strong>{state.subscriptions.filter(item => item.enabled).length}</strong><small>个启用订阅</small></section><section className="section-panel"><DataTable minWidth={680} columns={[
+  return <div className="data-workspace"><AiProviderSettings /><section className="data-service-intro"><div><span>DATA SERVICE</span><h2>应用订阅</h2><p>业务 App 只读取数据库，不重复登录店铺后台，也不各自维护指标口径。</p></div><strong>{state.subscriptions.filter(item => item.enabled).length}</strong><small>个启用订阅</small></section><section className="section-panel"><DataTable minWidth={680} columns={[
     { key: "app", header: "消费 App", render: row => row.appId },
     { key: "dataset", header: "数据集", render: row => row.dataset },
     { key: "version", header: "接口版本", render: row => row.apiVersion },

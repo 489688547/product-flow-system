@@ -1,3 +1,10 @@
+import {
+  DEFAULT_AI_PROVIDER,
+  createDefaultAiDataPolicies,
+  normalizeAiDataPolicies,
+  normalizeAiProvider
+} from "./aiAssistant.js";
+
 export const DATA_CENTER_COLLECTIONS = [
   "sources",
   "runners",
@@ -7,7 +14,9 @@ export const DATA_CENTER_COLLECTIONS = [
   "metricDefinitions",
   "qualityIssues",
   "subscriptions",
-  "auditLogs"
+  "auditLogs",
+  "aiProviders",
+  "aiDataPolicies"
 ];
 
 export const DATA_CENTER_STATUS = [
@@ -30,7 +39,9 @@ const COLLECTION_LIMITS = {
   metricDefinitions: 100,
   qualityIssues: 500,
   subscriptions: 100,
-  auditLogs: 500
+  auditLogs: 500,
+  aiProviders: 10,
+  aiDataPolicies: 50
 };
 const EXCLUDED_PLATFORMS = new Set(["", "其它", "其他", "未知", "未知平台"]);
 const SALES_METRICS = ["qty", "sales", "netSales", "grossProfit", "refund", "cost"];
@@ -153,6 +164,8 @@ export function createDefaultDataCenterState() {
       }
     ],
     auditLogs: [],
+    aiProviders: [{ ...DEFAULT_AI_PROVIDER }],
+    aiDataPolicies: createDefaultAiDataPolicies(),
     settings: {
       timezone: "Asia/Shanghai",
       cutoff: "07:30",
@@ -172,6 +185,8 @@ export function normalizeDataCenterState(input = {}) {
   for (const key of DATA_CENTER_COLLECTIONS) {
     state[key] = normalizeCollection(input[key], base[key], key);
   }
+  state.aiProviders = [normalizeAiProvider(state.aiProviders[0])];
+  state.aiDataPolicies = normalizeAiDataPolicies(state.aiDataPolicies);
   state.sources = state.sources.map(source => ({
     captureMethod: "export",
     timeBasis: "create_time",

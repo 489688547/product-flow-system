@@ -216,10 +216,15 @@ const integrationRegistry = {
         "404.html",
         "public/404.html",
         "_redirects",
+        "wrangler.toml",
         ".github/workflows/**"
       ],
       "envVars": [
-        "PLATFORM_CREDENTIAL_MASTER_KEY"
+        "PLATFORM_CREDENTIAL_MASTER_KEY",
+        "LOCAL_LIVE_D1_PREVIEW",
+        "AI_ASSISTANT_ENABLED",
+        "LINGSUAN_API_KEY",
+        "LINGSUAN_ACTOR_AUTHORIZATION"
       ],
       "domains": [
         "pages.dev",
@@ -230,7 +235,8 @@ const integrationRegistry = {
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/production-write-session",
-        "/api/platform/v1/production-data/"
+        "/api/platform/v1/production-data/",
+        "/api/platform/v1/ai/"
       ],
       "publicDocs": [
         {
@@ -249,7 +255,8 @@ const integrationRegistry = {
         "src/state/deploymentRecovery.js",
         "docs/platform/architecture.md",
         "scripts/prepare-pages-build.mjs",
-        "scripts/prepare-pages-release.mjs"
+        "scripts/prepare-pages-release.mjs",
+        "wrangler.toml"
       ],
       "relations": [
         {
@@ -263,7 +270,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、人事绩效和跨 App 协同记录。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
@@ -275,6 +282,9 @@ const integrationRegistry = {
         "人事核心记录",
         "绩效记录",
         "跨 App 协同",
+        "AI Provider 元数据",
+        "AI 外发策略",
+        "AI 无内容审计",
         "生产写入审计",
         "写前快照",
         "加密平台连接"
@@ -316,6 +326,7 @@ const integrationRegistry = {
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/v1/production-data/**",
         "functions/api/platform/v1/collaboration-items/**",
+        "functions/api/platform/v1/ai/**",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
         "migrations/**",
         "migrations/0002_hr_management_core.sql",
@@ -341,7 +352,8 @@ const integrationRegistry = {
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
-        "/api/platform/v1/collaboration-items"
+        "/api/platform/v1/collaboration-items",
+        "/api/platform/v1/ai/"
       ],
       "publicDocs": [
         {
@@ -370,11 +382,14 @@ const integrationRegistry = {
         "functions/api/platform/_shared/platformCredentials.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
+        "functions/api/platform/v1/ai/",
         "migrations/0001_production_data_access.sql",
         "migrations/0002_business_data_apps.sql",
         "migrations/0002_collaboration_execution.sql",
         "migrations/0002_hr_management_core.sql",
-        "migrations/0003_platform_credentials.sql"
+        "migrations/0003_platform_credentials.sql",
+        "migrations/0003_company_ai_assistant.sql",
+        "migrations/0004_company_ai_skills.sql"
       ],
       "relations": [
         {
@@ -742,6 +757,86 @@ const integrationRegistry = {
           "platformId": "xiaohongshu-open-platform",
           "type": "cross-channel-content",
           "description": "跨渠道素材分析需要区分平台内容与投放数据口径。"
+        }
+      ]
+    },
+    {
+      "id": "lingsuan-ai-gateway",
+      "name": "灵算 AI 网关",
+      "status": "connected",
+      "summary": "为公司 AI 总助提供服务端 Responses 兼容模型调用；功能默认关闭，密钥只存在服务端 Secret。",
+      "capabilities": [
+        "Responses 流式生成",
+        "固定模型配置",
+        "原生 Function Calling 能力探测",
+        "服务端受控 Skill 路由",
+        "公司只读 Skills",
+        "合成连接测试",
+        "无留存请求参数",
+        "安全错误映射"
+      ],
+      "businessQuestions": [
+        "AI 总助不可用",
+        "模型服务连接失败",
+        "Skill 调用失败",
+        "响应超时或限流",
+        "公司数据能否外发",
+        "密钥是否安全"
+      ],
+      "keywords": [
+        "灵算",
+        "LingSuan",
+        "AI 总助",
+        "Responses API",
+        "Function Calling",
+        "Skills",
+        "LINGSUAN_API_KEY"
+      ],
+      "codePaths": [
+        "functions/api/platform/v1/ai/**",
+        "src/domain/aiAssistant.js",
+        "src/state/aiAssistant*.js",
+        "src/features/ai-assistant/**",
+        "src/features/data-center/AiProviderSettings.jsx"
+      ],
+      "envVars": [
+        "AI_ASSISTANT_ENABLED",
+        "LINGSUAN_API_KEY",
+        "LINGSUAN_ACTOR_AUTHORIZATION"
+      ],
+      "domains": [
+        "lingsuan.top"
+      ],
+      "apiRoutes": [
+        "/api/platform/v1/ai/status",
+        "/api/platform/v1/ai/provider",
+        "/api/platform/v1/ai/provider/test",
+        "/api/platform/v1/ai/chat"
+      ],
+      "publicDocs": [
+        {
+          "label": "灵算 AI API Gateway",
+          "url": "https://lingsuan.top/"
+        }
+      ],
+      "evidence": [
+        "src/domain/aiAssistant.js",
+        "functions/api/platform/v1/ai/_shared/routed-skill-fallback.js",
+        "react-tests/ai-assistant-domain.test.mjs",
+        "tests/ai-skill-loop.test.mjs",
+        "migrations/0003_company_ai_assistant.sql",
+        "migrations/0004_company_ai_skills.sql"
+      ],
+      "relations": [
+        {
+          "platformId": "cloudflare-pages",
+          "type": "called-by",
+          "description": "Pages Functions 在服务端调用 Provider，浏览器不接触密钥或公司上下文。"
+        },
+        {
+          "platformId": "cloudflare-d1",
+          "type": "governed-by",
+          "description": "D1 保存 Provider 安全元数据、外发策略、并发租约和无内容审计。"
         }
       ]
     },
