@@ -97,7 +97,7 @@ Commit: `feat(auth): use real account in local online mode`
 
 - [ ] **Step 1: Write the failing launcher contract**
 
-Assert the parent script starts Vite on 8132, waits for that port, starts `wrangler pages dev --proxy 8132 --port 8127 --env-file .env`, forwards termination, and that `npm start` points to the script.
+Assert the parent script starts Vite on 8132, waits for that port, starts `wrangler pages dev --proxy 8132 --port 8127`, requires the ignored root `.env` that Wrangler loads into Pages Functions, forwards termination, and that `npm start` points to the script.
 
 - [ ] **Step 2: Run the launcher test and confirm RED**
 

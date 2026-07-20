@@ -16,12 +16,12 @@
   - 输出：`local-online-account` 标准会话；无硬编码身份和无统一只读拦截。
   - 验证：`node --test tests/production-data-access.test.mjs tests/dingtalk-web-auth.test.mjs`，34/34 通过。
 
-- [ ] 唯一完整本地启动入口
+- [x] 唯一完整本地启动入口
   - 依赖：真实本地会话鉴权。
   - 文件：`tests/local-online-start.test.mjs`、`scripts/start-local-online.mjs`、`package.json`、`启动服务.command`、`.env.example`、`wrangler.toml`。
   - 失败测试：标准命令必须同时包含 Vite 代理、Pages Functions、8127 用户端口、`.env` 服务端加载和进程清理。
   - 输出：双击或 `npm start` 均运行与线上相同的 Functions 和远程 D1。
-  - 验证：启动器结构测试通过，手工启动后 8127 可访问。
+  - 验证：`node --test tests/local-online-start.test.mjs` 2/2 通过；Vite 与 Wrangler 8127 启动成功，真实 `.env` 会话验收在合并到持有本地密钥的主工作区后执行。
 
 - [ ] 真实环境可见性
   - 依赖：真实本地会话鉴权。
