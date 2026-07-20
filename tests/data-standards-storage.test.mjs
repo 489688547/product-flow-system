@@ -81,6 +81,7 @@ function createD1Mock() {
   const tables = new Set();
   const batches = [];
   let failBatchPattern = null;
+  let beforeNextBatch = null;
 
   function cloneState() {
     return {
@@ -135,6 +136,7 @@ function createD1Mock() {
     tables,
     batches,
     setBatchFailure(pattern) { failBatchPattern = pattern; },
+    setBeforeNextBatch(callback) { beforeNextBatch = callback; },
     prepare(sql) {
       const normalized = normalizeSql(sql);
       const statement = {
@@ -191,7 +193,15 @@ function createD1Mock() {
           }
           if (normalized.startsWith("insert into data_metric_audit_logs")) {
             const [id, definitionId, action, actorId, actorName, definitionVersion, changedFields, rangeStart, rangeEnd, createdAt] = statement.values;
-            if (normalized.includes("select") && !definitions.has(definitionId)) return { success: true, meta: { changes: 0 } };
+            if (normalized.includes("select")) {
+              const guardDefinitionId = statement.values[10];
+              const guardVersion = statement.values[11];
+              const current = definitions.get(guardDefinitionId);
+              if (!current || current.current_version !== guardVersion) return { success: true, meta: { changes: 0 } };
+              if (normalized.includes("status = 'active'") && current.status !== "active") return { success: true, meta: { changes: 0 } };
+              if (normalized.includes("status = 'archived'") && current.status !== "archived") return { success: true, meta: { changes: 0 } };
+              if (normalized.includes("archived_at = ?") && current.archived_at !== statement.values[12]) return { success: true, meta: { changes: 0 } };
+            }
             audits.push({ id, definition_id: definitionId, action, actor_id: actorId, actor_name: actorName, definition_version: definitionVersion, changed_fields: changedFields, range_start: rangeStart, range_end: rangeEnd, created_at: createdAt });
             return { success: true, meta: { changes: 1 } };
           }
@@ -248,6 +258,11 @@ function createD1Mock() {
           throw new Error(`Unexpected run SQL: ${sql}`);
         },
         async first() {
+          if (normalized.includes("from data_metric_definition_versions") && normalized.includes("order by effective_from desc")) {
+            return [...versions.values()]
+              .filter(row => row.definition_id === statement.values[0])
+              .sort((left, right) => right.effective_from.localeCompare(left.effective_from))[0] || null;
+          }
           if (normalized.includes("from data_metric_definition_versions") && normalized.includes("effective_from = ?")) {
             const [definitionId, effectiveFrom] = statement.values;
             return [...versions.values()].find(row => row.definition_id === definitionId && row.effective_from === effectiveFrom) || null;
@@ -293,6 +308,11 @@ function createD1Mock() {
       return statement;
     },
     async batch(statements) {
+      if (beforeNextBatch) {
+        const callback = beforeNextBatch;
+        beforeNextBatch = null;
+        await callback({ definitions, versions, audits });
+      }
       batches.push(statements.map(statement => statement.normalized));
       const snapshot = cloneState();
       try {
@@ -323,21 +343,25 @@ test("migration preserves the legacy payload table and seeds 11 versioned defini
 
   const directory = mkdtempSync(join(tmpdir(), "data-standards-migration-"));
   const database = join(directory, "test.sqlite");
-  const legacyNetSales = JSON.stringify({ id: "legacy-net-sales", metricCode: "sales.net_sales", name: "旧净销售额", formula: "旧净销售额口径", owner: "财务部" }).replaceAll("'", "''");
-  const legacyGrossProfit = JSON.stringify({ id: "legacy-gross-profit", metricCode: "sales.gross_profit", name: "旧毛利", formula: "旧毛利口径", owner: "财务部" }).replaceAll("'", "''");
+  const legacyNetSalesOlder = JSON.stringify({ metricCode: "sales.net_sales", name: "旧净销售额", formula: "旧净销售额口径", owner: "运营部" }).replaceAll("'", "''");
+  const legacyNetSalesLatestA = JSON.stringify({ metricCode: "sales.net_sales", name: "确定净销售额", formula: "确定净销售额口径", owner: "供应链部" }).replaceAll("'", "''");
+  const legacyNetSalesLatestB = JSON.stringify({ metricCode: "sales.net_sales", name: "不应选中的同时间记录", formula: "不应选中的同时间公式", owner: "运营部" }).replaceAll("'", "''");
+  const legacyGrossProfit = JSON.stringify({ metricCode: "sales.gross_profit", name: "旧毛利", formula: "旧毛利口径", owner: "运营部" }).replaceAll("'", "''");
   try {
     execFileSync("sqlite3", [database], {
-      input: `CREATE TABLE data_metric_definitions (entity_type TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT, PRIMARY KEY (entity_type, id));\nINSERT INTO data_metric_definitions VALUES ('metricDefinitions', 'legacy-net-sales', '${legacyNetSales}', '2026-07-18T00:00:00.000Z', 'legacy-user');\nINSERT INTO data_metric_definitions VALUES ('metricDefinitions', 'legacy-gross-profit', '${legacyGrossProfit}', '2026-07-18T00:00:00.000Z', 'legacy-user');\n${sql}`
+      input: `CREATE TABLE data_metric_definitions (entity_type TEXT NOT NULL, id TEXT NOT NULL, payload TEXT NOT NULL, updated_at TEXT NOT NULL, updated_by TEXT, PRIMARY KEY (entity_type, id));\nINSERT INTO data_metric_definitions VALUES ('metricDefinitions', 'z-older', '${legacyNetSalesOlder}', '2026-07-17T00:00:00.000Z', 'legacy-old');\nINSERT INTO data_metric_definitions VALUES ('metricDefinitions', 'b-latest', '${legacyNetSalesLatestB}', '2026-07-18T00:00:00.000Z', 'legacy-b');\nINSERT INTO data_metric_definitions VALUES ('metricDefinitions', 'a-latest', '${legacyNetSalesLatestA}', '2026-07-18T00:00:00.000Z', 'legacy-a');\nINSERT INTO data_metric_definitions VALUES ('metricDefinitions', 'legacy-gross-profit', '${legacyGrossProfit}', '2026-07-18T00:00:00.000Z', 'legacy-user');\n${sql}`
     });
-    const definitions = JSON.parse(execFileSync("sqlite3", ["-json", database, "SELECT metric_code, name, current_version FROM data_metric_definitions ORDER BY metric_code"], { encoding: "utf8" }));
+    const definitions = JSON.parse(execFileSync("sqlite3", ["-json", database, "SELECT metric_code, name, owner_department, current_version FROM data_metric_definitions ORDER BY metric_code"], { encoding: "utf8" }));
     const versions = JSON.parse(execFileSync("sqlite3", ["-json", database, "SELECT d.metric_code, v.version, v.display_formula FROM data_metric_definition_versions v JOIN data_metric_definitions d ON d.id = v.definition_id ORDER BY d.metric_code"], { encoding: "utf8" }));
     const legacyCount = Number(execFileSync("sqlite3", [database, "SELECT COUNT(*) FROM data_metric_definitions_legacy"], { encoding: "utf8" }).trim());
     assert.equal(definitions.length, 11);
     assert.equal(new Set(definitions.map(item => item.metric_code)).size, 11);
     assert.equal(versions.length, 11);
-    assert.equal(definitions.find(item => item.metric_code === "sales.net_sales").name, "旧净销售额");
-    assert.equal(versions.find(item => item.metric_code === "sales.net_sales").display_formula, "旧净销售额口径");
-    assert.equal(legacyCount, 2);
+    assert.equal(definitions.find(item => item.metric_code === "sales.net_sales").name, "确定净销售额");
+    assert.equal(definitions.find(item => item.metric_code === "sales.net_sales").owner_department, "财务部");
+    assert.equal(definitions.find(item => item.metric_code === "sales.gross_profit").owner_department, "财务部");
+    assert.equal(versions.find(item => item.metric_code === "sales.net_sales").display_formula, "确定净销售额口径");
+    assert.equal(legacyCount, 4);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -366,6 +390,11 @@ test("environment and integration manifests declare versioned data-standard pers
   }
 });
 
+test("the default API test command includes data-standard storage regressions", () => {
+  const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  assert.match(packageJson.scripts["test:api"], /tests\/data-standards-storage\.test\.mjs/);
+});
+
 test("storage uses the governed D1 binding and creates all normalized tables", async () => {
   const db = createD1Mock();
   assert.equal(dataStandardsDatabase({ PRODUCT_FLOW_DB: db }), db);
@@ -381,7 +410,7 @@ test("storage uses the governed D1 binding and creates all normalized tables", a
   ]);
 });
 
-test("definition versions append and reject stale or same-day writes", async () => {
+test("definition versions append and reject stale or non-increasing effective dates", async () => {
   const db = createD1Mock();
   await insertDefinitionWithVersion(db, definitionInput(), versionInput(), auditInput());
   const appended = await appendDefinitionVersion(
@@ -403,6 +432,10 @@ test("definition versions append and reject stale or same-day writes", async () 
     () => appendDefinitionVersion(db, "sales-net-sales", 2, versionInput({ version: 3, effectiveFrom: "2026-08-01" }), auditInput({ id: "audit-date" })),
     error => error.code === "DATA_STANDARD_EFFECTIVE_DATE_CONFLICT"
   );
+  await assert.rejects(
+    () => appendDefinitionVersion(db, "sales-net-sales", 2, versionInput({ version: 3, effectiveFrom: "2026-07-15" }), auditInput({ id: "audit-backdated" })),
+    error => error.code === "DATA_STANDARD_EFFECTIVE_DATE_CONFLICT"
+  );
   assert.equal(db.versions.size, 2);
   assert.equal(db.audits.length, 2);
 
@@ -411,6 +444,34 @@ test("definition versions append and reject stale or same-day writes", async () 
   assert.equal(listed.length, 1);
   assert.equal(detail.versions.length, 2);
   assert.equal(detail.auditLogs.length, 2);
+});
+
+test("a concurrent losing append never writes an audit for the winner's version", async () => {
+  const db = createD1Mock();
+  await insertDefinitionWithVersion(db, definitionInput(), versionInput(), auditInput());
+  db.setBeforeNextBatch(({ definitions, versions, audits }) => {
+    const current = definitions.get("sales-net-sales");
+    definitions.set("sales-net-sales", { ...current, current_version: 2, updated_at: "2026-07-20T02:00:00.000Z", updated_by: "winner" });
+    versions.set("sales-net-sales:2", {
+      definition_id: "sales-net-sales", version: 2, effective_from: "2026-08-01",
+      display_formula: "winner formula", formula_ast: "{}", source_fields: "[]",
+      dependencies: "[]", executable: 1, coverage_status: "COMPLETE",
+      created_at: "2026-07-20T02:00:00.000Z", created_by: "winner"
+    });
+    audits.push({ id: "audit-winner", definition_id: "sales-net-sales", action: "publish_version", actor_id: "winner", actor_name: "winner", definition_version: 2, changed_fields: "[]", range_start: null, range_end: null, created_at: "2026-07-20T02:00:00.000Z" });
+  });
+
+  await assert.rejects(
+    () => appendDefinitionVersion(
+      db,
+      "sales-net-sales",
+      1,
+      versionInput({ version: 2, effectiveFrom: "2026-09-01", createdAt: "2026-07-20T03:00:00.000Z", createdBy: "loser" }),
+      auditInput({ id: "audit-loser", action: "publish_version", actorId: "loser", actorName: "loser", definitionVersion: 2, createdAt: "2026-07-20T03:00:00.000Z" })
+    ),
+    error => error.code === "DATA_STANDARD_VERSION_CONFLICT"
+  );
+  assert.deepEqual(db.audits.map(item => item.id), ["audit-1", "audit-winner"]);
 });
 
 test("archive keeps definition versions and audit history", async () => {
@@ -491,4 +552,33 @@ test("a failed calculation batch leaves the previous current result visible", as
   assert.equal(db.results.get("old-result").is_current, 1);
   assert.equal(db.results.has("new-result"), false);
   assert.equal(db.runs.get("run-fail").status, "failed");
+});
+
+test("reordered nested dimension keys share one canonical current scope", async () => {
+  const db = createD1Mock();
+  const runOne = await createCalculationRun(db, {
+    id: "run-dimensions-1", idempotencyKey: "dimensions-1", definitionIds: ["sales-net-sales"],
+    rangeStart: "2026-07-01", rangeEnd: "2026-07-31", targetVersion: 1, requestedBy: "user-1", createdAt: "2026-07-20T01:00:00.000Z"
+  });
+  const runTwo = await createCalculationRun(db, {
+    id: "run-dimensions-2", idempotencyKey: "dimensions-2", definitionIds: ["sales-net-sales"],
+    rangeStart: "2026-07-01", rangeEnd: "2026-07-31", targetVersion: 1, requestedBy: "user-1", createdAt: "2026-07-20T02:00:00.000Z"
+  });
+  const common = {
+    definitionId: "sales-net-sales", definitionVersion: 1, metricCode: "sales.net_sales",
+    periodStart: "2026-07-01", periodEnd: "2026-07-31", unit: "CNY", coverageRate: 1,
+    confidence: "high", estimated: false, status: "complete", reason: null, dataCutoffAt: "2026-07-31"
+  };
+  await writeCalculationBatch(db, runOne, [{
+    ...common, id: "dimension-result-1", value: 100,
+    dimensions: { product: { sku: "A", color: "红" }, channel: "抖音" }, createdAt: "2026-07-20T03:00:00.000Z"
+  }]);
+  await writeCalculationBatch(db, runTwo, [{
+    ...common, id: "dimension-result-2", value: 120,
+    dimensions: { channel: "抖音", product: { color: "红", sku: "A" } }, createdAt: "2026-07-20T04:00:00.000Z"
+  }]);
+
+  const current = await listCurrentResults(db, { metricCode: "sales.net_sales" });
+  assert.deepEqual(current.map(item => item.id), ["dimension-result-2"]);
+  assert.equal(db.results.get("dimension-result-2").dimensions_json, '{"channel":"抖音","product":{"color":"红","sku":"A"}}');
 });

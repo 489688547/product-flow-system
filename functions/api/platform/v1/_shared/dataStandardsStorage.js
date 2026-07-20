@@ -14,6 +14,15 @@ function parseJson(value, fallback) {
   }
 }
 
+function canonicalJson(value) {
+  function canonicalize(nested) {
+    if (Array.isArray(nested)) return nested.map(canonicalize);
+    if (!nested || typeof nested !== "object") return nested;
+    return Object.fromEntries(Object.keys(nested).sort().map(key => [key, canonicalize(nested[key])]));
+  }
+  return JSON.stringify(canonicalize(value));
+}
+
 function changes(result) {
   return Number(result?.meta?.changes ?? result?.changes ?? 0);
 }
@@ -271,9 +280,11 @@ export async function appendDefinitionVersion(db, id, expectedVersion, version, 
   if (nextVersion !== Number(expectedVersion) + 1) {
     throw storageError("口径版本必须连续追加。", "DATA_STANDARD_VERSION_CONFLICT");
   }
-  const sameDate = await db.prepare(`SELECT definition_id FROM data_metric_definition_versions
-    WHERE definition_id = ? AND effective_from = ?`).bind(id, version.effectiveFrom).first();
-  if (sameDate) throw storageError("同一口径不能在同一天发布多个版本。", "DATA_STANDARD_EFFECTIVE_DATE_CONFLICT");
+  const latest = await db.prepare(`SELECT effective_from FROM data_metric_definition_versions
+    WHERE definition_id = ? ORDER BY effective_from DESC LIMIT 1`).bind(id).first();
+  if (latest && String(version.effectiveFrom) <= String(latest.effective_from)) {
+    throw storageError("新版本生效日期必须晚于当前最新版本。", "DATA_STANDARD_EFFECTIVE_DATE_CONFLICT");
+  }
 
   const versionStatement = db.prepare(`INSERT INTO data_metric_definition_versions
     (definition_id, version, effective_from, display_formula, formula_ast, source_fields,
@@ -282,21 +293,23 @@ export async function appendDefinitionVersion(db, id, expectedVersion, version, 
     WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
     ...versionValues(id, { ...version, version: nextVersion }), id, Number(expectedVersion)
   );
+  const auditStatement = db.prepare(`INSERT INTO data_metric_audit_logs
+    (id, definition_id, action, actor_id, actor_name, definition_version, changed_fields, range_start, range_end, created_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM data_metric_definitions
+    WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
+    ...auditValues(id, { ...audit, definitionVersion: nextVersion }), id, Number(expectedVersion)
+  );
   const updateStatement = db.prepare(`UPDATE data_metric_definitions SET current_version = ?,
     updated_at = ?, updated_by = ? WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
     nextVersion, version.createdAt, version.createdBy, id, Number(expectedVersion)
   );
-  const auditStatement = db.prepare(`INSERT INTO data_metric_audit_logs
-    (id, definition_id, action, actor_id, actor_name, definition_version, changed_fields, range_start, range_end, created_at)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM data_metric_definitions
-    WHERE id = ? AND current_version = ?`).bind(...auditValues(id, { ...audit, definitionVersion: nextVersion }), id, nextVersion);
   let batchResults;
   try {
-    batchResults = await db.batch([versionStatement, updateStatement, auditStatement]);
+    batchResults = await db.batch([versionStatement, auditStatement, updateStatement]);
   } catch (error) {
     throw mapConstraintError(error);
   }
-  if (changes(batchResults?.[1]) !== 1) {
+  if (changes(batchResults?.[2]) !== 1) {
     throw storageError("口径版本已更新，请刷新后重试。", "DATA_STANDARD_VERSION_CONFLICT");
   }
   return definitionFromRow(await db.prepare("SELECT * FROM data_metric_definitions WHERE id = ?").bind(id).first());
@@ -346,7 +359,7 @@ export async function writeCalculationBatch(db, run, results) {
   const statements = [];
   const scopes = new Map();
   for (const result of results) {
-    const dimensionsJson = JSON.stringify(result.dimensions || {});
+    const dimensionsJson = canonicalJson(result.dimensions || {});
     statements.push(db.prepare(`INSERT INTO data_metric_results
       (id, definition_id, definition_version, metric_code, period_start, period_end,
         dimensions_json, value, unit, coverage_rate, confidence, estimated, status, reason,

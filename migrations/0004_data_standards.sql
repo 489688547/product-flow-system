@@ -98,6 +98,16 @@ CREATE INDEX data_metric_audit_definition
 
 -- Retain the two old data-center definitions as v1, including their visible name
 -- and display formula. IDs and executable ASTs use the governed domain contract.
+WITH ranked_legacy AS (
+  SELECT *, ROW_NUMBER() OVER (
+    PARTITION BY json_extract(payload, '$.metricCode')
+    ORDER BY updated_at DESC, id ASC
+  ) AS legacy_rank
+  FROM data_metric_definitions_legacy
+  WHERE entity_type = 'metricDefinitions'
+    AND json_valid(payload)
+    AND json_extract(payload, '$.metricCode') IN ('sales.net_sales', 'sales.gross_profit')
+)
 INSERT INTO data_metric_definitions (
   id, metric_code, category, name, owner_department, unit, period, current_version,
   status, archived_at, archived_by, created_at, created_by, updated_at, updated_by
@@ -111,7 +121,7 @@ SELECT
   'sales',
   COALESCE(NULLIF(json_extract(payload, '$.name'), ''),
     CASE json_extract(payload, '$.metricCode') WHEN 'sales.net_sales' THEN '净销售额' ELSE '毛利' END),
-  COALESCE(NULLIF(json_extract(payload, '$.owner'), ''), '财务部'),
+  '财务部',
   'CNY',
   'day',
   1,
@@ -122,10 +132,8 @@ SELECT
   COALESCE(NULLIF(updated_by, ''), 'migration-0004'),
   updated_at,
   COALESCE(NULLIF(updated_by, ''), 'migration-0004')
-FROM data_metric_definitions_legacy
-WHERE entity_type = 'metricDefinitions'
-  AND json_valid(payload)
-  AND json_extract(payload, '$.metricCode') IN ('sales.net_sales', 'sales.gross_profit')
+FROM ranked_legacy
+WHERE legacy_rank = 1
 ON CONFLICT(metric_code) DO NOTHING;
 
 -- Fixed built-ins also make a fresh database deterministic. Existing migrated
@@ -156,6 +164,16 @@ SELECT id, metric_code, category, name, owner_department, unit, period, 1,
   '2026-07-20T00:00:00.000Z', 'migration-0004'
 FROM definitions;
 
+WITH ranked_legacy AS (
+  SELECT *, ROW_NUMBER() OVER (
+    PARTITION BY json_extract(payload, '$.metricCode')
+    ORDER BY updated_at DESC, id ASC
+  ) AS legacy_rank
+  FROM data_metric_definitions_legacy
+  WHERE entity_type = 'metricDefinitions'
+    AND json_valid(payload)
+    AND json_extract(payload, '$.metricCode') IN ('sales.net_sales', 'sales.gross_profit')
+)
 INSERT INTO data_metric_definition_versions (
   definition_id, version, effective_from, display_formula, formula_ast,
   source_fields, dependencies, executable, coverage_status, created_at, created_by
@@ -176,12 +194,10 @@ SELECT
   'COMPLETE',
   legacy.updated_at,
   COALESCE(NULLIF(legacy.updated_by, ''), 'migration-0004')
-FROM data_metric_definitions_legacy AS legacy
+FROM ranked_legacy AS legacy
 JOIN data_metric_definitions AS definition
   ON definition.metric_code = json_extract(legacy.payload, '$.metricCode')
-WHERE legacy.entity_type = 'metricDefinitions'
-  AND json_valid(legacy.payload)
-  AND json_extract(legacy.payload, '$.metricCode') IN ('sales.net_sales', 'sales.gross_profit')
+WHERE legacy.legacy_rank = 1
 ON CONFLICT(definition_id, version) DO NOTHING;
 
 WITH versions(
