@@ -94,3 +94,13 @@ test("data access catalog uses the approved responsive grid and visible focus", 
   assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.data-access-grid[\s\S]*grid-template-columns: 1fr/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.connection-loading span/);
 });
+
+test("durable product design and integration rules define the unified catalog", () => {
+  const product = read("PRODUCT.md");
+  const design = read("DESIGN.md");
+  const integrations = read("docs/platform/integrations.md");
+  assert.match(product, /数据接入[\s\S]*电商平台[\s\S]*ERP[\s\S]*公司数据/);
+  assert.match(design, /数据接入目录[\s\S]*同一平台只显示一个入口/);
+  assert.match(integrations, /同一平台只显示一个目录入口/);
+  assert.match(integrations, /连接凭据[\s\S]*同步实例[\s\S]*不可[\s\S]*混存/);
+});
