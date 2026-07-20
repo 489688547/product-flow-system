@@ -190,7 +190,8 @@ const integrationRegistry = {
         "回滚",
         "环境就绪检查",
         "生产数据网关",
-        "加密平台连接"
+        "加密平台连接",
+        "用户洞察共享 API"
       ],
       "businessQuestions": [
         "构建或部署失败",
@@ -240,6 +241,8 @@ const integrationRegistry = {
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
+        "/api/platform/v1/user-insights",
+        "/api/platform/v1/user-insights/",
         "/api/platform/v1/ai/"
       ],
       "publicDocs": [
@@ -274,7 +277,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、用户洞察、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
@@ -282,6 +285,9 @@ const integrationRegistry = {
         "销售聚合",
         "平台配置",
         "数据中心元数据",
+        "用户洞察标准事实",
+        "用户洞察部门规则",
+        "采集设备令牌哈希",
         "店铺运营记录",
         "人事核心记录",
         "绩效记录",
@@ -298,6 +304,7 @@ const integrationRegistry = {
         "跨设备状态不同步",
         "数据库绑定缺失",
         "表结构或容量问题",
+        "用户洞察采集结果未落库",
         "人事数据表是否就绪",
         "跨部门事项如何留痕",
         "测试账号如何受控写生产数据",
@@ -330,11 +337,14 @@ const integrationRegistry = {
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/v1/production-data/**",
         "functions/api/platform/v1/collaboration-items/**",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/**",
         "functions/api/platform/v1/ai/**",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
         "migrations/**",
         "migrations/0002_hr_management_core.sql",
-        "migrations/0003_platform_credentials.sql"
+        "migrations/0003_platform_credentials.sql",
+        "migrations/0005_user_insights.sql"
       ],
       "envVars": [
         "PRODUCT_FLOW_DB"
@@ -357,6 +367,8 @@ const integrationRegistry = {
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
         "/api/platform/v1/collaboration-items",
+        "/api/platform/v1/user-insights",
+        "/api/platform/v1/user-insights/",
         "/api/platform/v1/ai/"
       ],
       "publicDocs": [
@@ -386,6 +398,8 @@ const integrationRegistry = {
         "functions/api/platform/_shared/platformCredentials.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/",
         "functions/api/platform/v1/ai/",
         "migrations/0001_production_data_access.sql",
         "migrations/0002_business_data_apps.sql",
@@ -393,7 +407,8 @@ const integrationRegistry = {
         "migrations/0002_hr_management_core.sql",
         "migrations/0003_platform_credentials.sql",
         "migrations/0003_company_ai_assistant.sql",
-        "migrations/0004_company_ai_skills.sql"
+        "migrations/0004_company_ai_skills.sql",
+        "migrations/0005_user_insights.sql"
       ],
       "relations": [
         {
@@ -761,6 +776,85 @@ const integrationRegistry = {
           "platformId": "xiaohongshu-open-platform",
           "type": "cross-channel-content",
           "description": "跨渠道素材分析需要区分平台内容与投放数据口径。"
+        }
+      ]
+    },
+    {
+      "id": "browser-market-collector",
+      "name": "浏览器市场采集器",
+      "status": "connected",
+      "summary": "公司 Mac 通过 Chrome 调试协议只读采集已登记、已确认的平台市场类目页面，并写入用户洞察标准事实。",
+      "capabilities": [
+        "工作日采集",
+        "已登记页面白名单",
+        "用户市场",
+        "商品市场",
+        "视频市场",
+        "直播市场",
+        "页面结构版本",
+        "登录失效停止",
+        "幂等批次"
+      ],
+      "businessQuestions": [
+        "平台市场数据没有更新",
+        "页面要求重新登录",
+        "页面字段发生变化",
+        "类目尚未确认",
+        "采集器未连接",
+        "周末为什么未自动采集"
+      ],
+      "keywords": [
+        "用户洞察",
+        "浏览器采集",
+        "市场",
+        "类目",
+        "竞品",
+        "Chrome",
+        "CDP"
+      ],
+      "codePaths": [
+        "scripts/user-insights-collector/**",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/**",
+        "src/domain/userInsights.js",
+        "src/state/userInsightsApi.js",
+        "src/state/UserInsightsProvider.jsx",
+        "src/features/data-center/UserInsightsWorkspace.jsx",
+        "src/features/data-center/user-insights.css",
+        "docs/features/user-insights/**",
+        "docs/platform/apis/user-insights-v1.md",
+        "docs/platform/browser-market-collection.md",
+        "migrations/0005_user_insights.sql"
+      ],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [
+        "/api/platform/v1/user-insights",
+        "/api/platform/v1/user-insights/collector",
+        "/api/platform/v1/user-insights/ingest"
+      ],
+      "publicDocs": [],
+      "evidence": [
+        "scripts/user-insights-collector/",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/",
+        "src/domain/userInsights.js",
+        "src/state/userInsightsApi.js",
+        "src/state/UserInsightsProvider.jsx",
+        "src/features/data-center/UserInsightsWorkspace.jsx",
+        "docs/features/user-insights/",
+        "migrations/0005_user_insights.sql"
+      ],
+      "relations": [
+        {
+          "platformId": "cloudflare-pages",
+          "type": "writes-through",
+          "description": "采集器只能通过受限 Pages Functions ingest 契约写入，不能直连 D1。"
+        },
+        {
+          "platformId": "cloudflare-d1",
+          "type": "stores-standard-facts",
+          "description": "D1 只保存标准事实、规则、质量和审计，不保存完整页面、Cookie 或凭证。"
         }
       ]
     },

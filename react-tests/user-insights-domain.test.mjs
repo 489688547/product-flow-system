@@ -2,10 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildInsightSuggestion,
+  buildRuleSuggestions,
   comparableMetricSummary,
   confirmCategoryMapping,
   copyInsightRuleSet,
   createDefaultUserInsightsState,
+  discoverCompetitorCandidates,
   normalizeMarketSnapshot,
   transitionCompetitorCandidate
 } from "../src/domain/userInsights.js";
@@ -118,6 +120,18 @@ test("partial or stale evidence lowers confidence and keeps advice conditional",
   assert.match(suggestion.limitations.join(" "), /覆盖率|过期/);
 });
 
+test("normalizing a saved suggestion preserves its explicit confidence", () => {
+  const saved = buildInsightSuggestion({
+    id: "suggestion-saved",
+    title: "保持谨慎",
+    conclusion: "继续观察",
+    coverage: 1,
+    freshness: "fresh",
+    confidence: "low"
+  });
+  assert.equal(saved.confidence, "low");
+});
+
 test("market snapshots strip browser secrets and preserve missing values", () => {
   const snapshot = normalizeMarketSnapshot({
     id: "snapshot-1",
@@ -135,4 +149,41 @@ test("market snapshots strip browser secrets and preserve missing values", () =>
   assert.deepEqual(snapshot.requestHeaders, { accept: "application/json" });
   assert.equal(snapshot.metrics.conversionRate, null);
   assert.equal(snapshot.qualityStatus, "partial");
+});
+
+test("published app rules discover candidates without promoting them", () => {
+  const candidates = discoverCompetitorCandidates({
+    entities: [
+      { id: "entity-a", platform: "抖音", categoryId: "cat-1", dimension: "product", name: "竞品 A", metrics: { salesVolume: 1200, price: 29.9 } },
+      { id: "entity-b", platform: "抖音", categoryId: "cat-1", dimension: "product", name: "竞品 B", metrics: { salesVolume: 80, price: 69 } }
+    ],
+    ruleSets: [{
+      id: "rule-1", name: "同价格带高销量", status: "published", version: 2,
+      platform: "抖音", categoryId: "cat-1", consumerAppId: "ecommerce-operations", ownerDepartment: "运营部",
+      competitorConditions: [
+        { field: "salesVolume", operator: "gte", value: 1000 },
+        { field: "price", operator: "between", value: [20, 40] }
+      ]
+    }],
+    existing: []
+  });
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0].name, "竞品 A");
+  assert.equal(candidates[0].status, "candidate");
+  assert.equal(candidates[0].ruleVersion, 2);
+  assert.deepEqual(candidates[0].evidenceRefs, ["entity-a"]);
+});
+
+test("rule suggestion templates inherit snapshot coverage and advisory limits", () => {
+  const suggestions = buildRuleSuggestions({
+    snapshots: [{ id: "snapshot-1", platform: "抖音", categoryId: "cat-1", dimension: "audience", coverage: 0.6, qualityStatus: "partial", capturedAt: "2026-07-20T07:30:00.000Z" }],
+    ruleSets: [{
+      id: "rule-1", status: "published", version: 3, platform: "抖音", categoryId: "cat-1",
+      suggestionTemplates: [{ id: "young-portable", category: "product", title: "便携需求测试", conclusion: "可以验证便携卖点", dimension: "audience" }]
+    }]
+  });
+  assert.equal(suggestions.length, 1);
+  assert.equal(suggestions[0].confidence, "low");
+  assert.equal(suggestions[0].advisoryOnly, true);
+  assert.match(suggestions[0].conclusion, /^在当前数据覆盖范围内，/);
 });

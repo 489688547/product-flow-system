@@ -61,6 +61,7 @@ const SUPPLY_CHAIN_NAV = [
 const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , , , section]) => [screen, section]));
 const DATA_CENTER_NAV = [
   ["data-overview", "数据总览", Database, "数据中心", "overview"],
+  ["data-insights", "用户洞察", UsersRound, "数据中心", "insights"],
   ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
   ["data-connections", "平台连接", KeyRound, "数据中心", "connections"],

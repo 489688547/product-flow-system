@@ -30,6 +30,12 @@ import {
 import { syncSupplyApprovals } from "./functions/api/supply-chain/approvals/sync.js";
 import { normalizeSupplyChainState } from "./src/domain/supplyChain.js";
 import { normalizeDataCenterState } from "./src/domain/dataCenter.js";
+import {
+  confirmCategoryMapping,
+  copyInsightRuleSet,
+  normalizeUserInsightsState,
+  transitionCompetitorCandidate
+} from "./src/domain/userInsights.js";
 import { AI_DATA_DOMAINS, normalizeAiProvider } from "./src/domain/aiAssistant.js";
 import {
   applyCollaborationTransition,
@@ -48,6 +54,7 @@ const LOCAL_DATA_DIR = path.join(__dirname, ".local-data");
 const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 const LOCAL_SUPPLY_STATE_PATH = path.join(LOCAL_DATA_DIR, "supply-chain-state.json");
 const LOCAL_DATA_CENTER_STATE_PATH = path.join(LOCAL_DATA_DIR, "data-center-state.json");
+const LOCAL_USER_INSIGHTS_PATH = path.join(LOCAL_DATA_DIR, "user-insights-state.json");
 const LOCAL_COLLABORATION_PATH = path.join(LOCAL_DATA_DIR, "collaboration-items.json");
 let orgCache = null;
 let productionDataClient;
@@ -150,6 +157,117 @@ async function writeLocalDataCenterState(state, updatedBy = "") {
   await mkdir(LOCAL_DATA_DIR, { recursive: true });
   await writeFile(LOCAL_DATA_CENTER_STATE_PATH, JSON.stringify(payload, null, 2));
   return payload;
+}
+
+async function readLocalUserInsights() {
+  try {
+    const raw = JSON.parse(await readFile(LOCAL_USER_INSIGHTS_PATH, "utf8"));
+    return normalizeUserInsightsState(raw.state || raw);
+  } catch {
+    return normalizeUserInsightsState();
+  }
+}
+
+async function writeLocalUserInsights(state, updatedBy = "") {
+  const normalized = normalizeUserInsightsState(state);
+  const updatedAt = new Date().toISOString();
+  const payload = { state: { ...normalized, updatedAt }, version: normalized.version, updatedAt, updatedBy: String(updatedBy || "").slice(0, 80) };
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_USER_INSIGHTS_PATH, JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+function upsertLocalCollection(collection, record) {
+  const current = collection.find(item => item.id === record.id);
+  const version = current ? Number(current.version || 1) + 1 : Math.max(1, Number(record.version || 1));
+  const next = { ...record, version, updatedAt: new Date().toISOString(), updatedBy: "周荣庆" };
+  return { next, collection: current ? collection.map(item => item.id === next.id ? next : item) : [next, ...collection] };
+}
+
+async function handleLocalUserInsights(req, res, url) {
+  try {
+    const state = await readLocalUserInsights();
+    const basePath = "/api/platform/v1/user-insights";
+    const subpath = url.pathname.slice(basePath.length).replace(/^\//, "");
+    if (req.method === "GET" && !subpath) {
+      json(res, 200, {
+        synced: true,
+        advisoryOnly: true,
+        localPreview: true,
+        actor: { departments: ["总经办"], readonly: false },
+        data: {
+          categoryMappings: state.categoryMappings,
+          snapshots: state.snapshots,
+          entities: state.entities,
+          ruleSets: state.ruleSets,
+          ruleHistory: state.ruleHistory || [],
+          competitors: state.competitors,
+          suggestions: state.suggestions,
+          syncRuns: state.syncRuns
+        }
+      });
+      return;
+    }
+    if (req.method === "GET" && ["category-mappings", "rules", "competitors"].includes(subpath)) {
+      const key = subpath === "category-mappings" ? "categoryMappings" : subpath === "rules" ? "ruleSets" : "competitors";
+      json(res, 200, { synced: true, [subpath === "category-mappings" ? "mappings" : subpath]: state[key] });
+      return;
+    }
+    const body = await readBody(req);
+    if (!subpath && req.method === "POST" && body.action === "retry") {
+      const mapping = state.categoryMappings.find(item => item.status === "confirmed" && item.platform === body.scope?.platform && item.categoryId === body.scope?.categoryId);
+      if (!mapping) {
+        json(res, 409, { synced: false, message: "请先确认平台类目，再发起手动重试。", error: { code: "CATEGORY_CONFIRMATION_REQUIRED", retryable: false } });
+        return;
+      }
+      const run = { id: globalThis.crypto.randomUUID(), ...body.scope, status: "queued", trigger: "manual", requestedAt: new Date().toISOString(), requestedBy: "周荣庆" };
+      const saved = upsertLocalCollection(state.syncRuns, run);
+      await writeLocalUserInsights({ ...state, syncRuns: saved.collection }, "周荣庆");
+      json(res, 202, { synced: true, run: saved.next, localPreview: true });
+      return;
+    }
+    if (subpath === "category-mappings" && ["POST", "PATCH"].includes(req.method)) {
+      let mapping = body.mapping || {};
+      if (body.action === "confirm") mapping = confirmCategoryMapping(mapping, { name: "周荣庆", department: "总经办", now: new Date().toISOString() });
+      const saved = upsertLocalCollection(state.categoryMappings, mapping);
+      await writeLocalUserInsights({ ...state, categoryMappings: saved.collection }, "周荣庆");
+      json(res, 200, { synced: true, mapping: saved.next, localPreview: true, security: "不保存浏览器凭证" });
+      return;
+    }
+    if (subpath === "rules" && ["POST", "PATCH"].includes(req.method)) {
+      let rule = body.rule || {};
+      if (body.action === "copy") {
+        const source = state.ruleSets.find(item => item.id === body.sourceRuleId);
+        if (!source) { json(res, 404, { synced: false, message: "来源规则不存在。" }); return; }
+        rule = copyInsightRuleSet(source, { ...body.target, actor: "周荣庆", now: new Date().toISOString() });
+      }
+      if (body.action === "publish") rule = { ...rule, status: "published" };
+      if (body.action === "disable") rule = { ...rule, status: "disabled" };
+      const saved = upsertLocalCollection(state.ruleSets, rule);
+      const history = [{ id: globalThis.crypto.randomUUID(), action: body.action === "copy" ? "copy_rule" : body.action === "publish" ? "publish_rule" : body.action === "disable" ? "disable_rule" : "upsert_rule", name: saved.next.name, consumerAppId: saved.next.consumerAppId, ownerDepartment: saved.next.ownerDepartment, status: saved.next.status, version: saved.next.version, updatedAt: saved.next.updatedAt, updatedBy: "周荣庆" }, ...(state.ruleHistory || [])];
+      await writeLocalUserInsights({ ...state, ruleSets: saved.collection, ruleHistory: history }, "周荣庆");
+      json(res, 200, { synced: true, rule: saved.next, localPreview: true });
+      return;
+    }
+    if (subpath === "competitors" && req.method === "POST") {
+      const saved = upsertLocalCollection(state.competitors, { ...(body.competitor || {}), status: "candidate" });
+      await writeLocalUserInsights({ ...state, competitors: saved.collection }, "周荣庆");
+      json(res, 201, { synced: true, competitor: saved.next, localPreview: true });
+      return;
+    }
+    if (subpath === "competitors" && req.method === "PATCH") {
+      const current = state.competitors.find(item => item.id === body.id);
+      if (!current) { json(res, 404, { synced: false, message: "竞品候选不存在。" }); return; }
+      const next = transitionCompetitorCandidate(current, body.status, { actor: "周荣庆", department: "总经办", reason: body.reason, now: new Date().toISOString() });
+      const saved = upsertLocalCollection(state.competitors, next);
+      await writeLocalUserInsights({ ...state, competitors: saved.collection }, "周荣庆");
+      json(res, 200, { synced: true, competitor: saved.next, localPreview: true });
+      return;
+    }
+    json(res, 405, { synced: false, message: "Method not allowed" });
+  } catch (error) {
+    json(res, 400, { synced: false, message: error.message || "本地用户洞察处理失败。" });
+  }
 }
 
 async function handleLocalAiPreview(req, res, url) {
@@ -947,6 +1065,10 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/platform/v1/collaboration-items" || url.pathname.startsWith("/api/platform/v1/collaboration-items/")) {
     await handleLocalCollaboration(req, res, url);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/user-insights" || url.pathname.startsWith("/api/platform/v1/user-insights/")) {
+    await handleLocalUserInsights(req, res, url);
     return;
   }
   if ([

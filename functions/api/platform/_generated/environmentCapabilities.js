@@ -251,6 +251,35 @@ const environmentCapabilities = {
       "tables": []
     },
     {
+      "id": "user-insights-browser-collection",
+      "name": "用户洞察浏览器采集",
+      "description": "保存已确认平台类目、标准市场事实、部门规则、竞品候选、采集设备哈希和审计记录。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "user_insight_category_mappings",
+        "user_insight_rules",
+        "user_insight_snapshots",
+        "user_insight_entities",
+        "user_insight_competitors",
+        "user_insight_sync_runs",
+        "user_insight_runner_tokens",
+        "user_insight_audit_logs",
+        "user_insight_meta"
+      ]
+    },
+    {
       "id": "company-ai-assistant",
       "name": "公司 AI 总助",
       "description": "可选的公司只读总助、灵算 Responses 网关、数据外发策略和无内容审计能力。",

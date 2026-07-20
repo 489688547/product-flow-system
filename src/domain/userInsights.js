@@ -46,6 +46,7 @@ export function createDefaultUserInsightsState() {
     snapshots: [],
     entities: [],
     ruleSets: [],
+    ruleHistory: [],
     competitors: [],
     suggestions: [],
     syncRuns: [],
@@ -80,6 +81,7 @@ export function normalizeUserInsightsState(input = {}) {
     snapshots: Array.isArray(safe.snapshots) ? safe.snapshots.map(normalizeMarketSnapshot) : [],
     entities: Array.isArray(safe.entities) ? safe.entities.map(sanitize) : [],
     ruleSets: Array.isArray(safe.ruleSets) ? safe.ruleSets.map(sanitize) : [],
+    ruleHistory: Array.isArray(safe.ruleHistory) ? safe.ruleHistory.map(sanitize) : [],
     competitors: Array.isArray(safe.competitors) ? safe.competitors.map(sanitize) : [],
     suggestions: Array.isArray(safe.suggestions) ? safe.suggestions.map(item => ({ ...sanitize(item), advisoryOnly: true })) : [],
     syncRuns: Array.isArray(safe.syncRuns) ? safe.syncRuns.map(sanitize) : []
@@ -156,7 +158,8 @@ export function buildInsightSuggestion(input = {}) {
   const coverage = clamp(input.coverage);
   const freshness = input.freshness || "fresh";
   const limitations = [...(Array.isArray(input.limitations) ? input.limitations : [])];
-  let confidence = ["low", "medium", "high"].includes(input.requestedConfidence) ? input.requestedConfidence : "medium";
+  const requestedConfidence = input.requestedConfidence || input.confidence;
+  let confidence = ["low", "medium", "high"].includes(requestedConfidence) ? requestedConfidence : "medium";
   if (coverage < 0.8) {
     confidence = "low";
     limitations.push(`当前数据覆盖率为 ${Math.round(coverage * 100)}%。`);
@@ -184,6 +187,11 @@ export function buildInsightSuggestion(input = {}) {
     confidence,
     limitations: [...new Set(limitations)],
     advisoryOnly: true,
+    platform: input.platform || "",
+    shopId: input.shopId || "",
+    productId: input.productId || "",
+    skuId: input.skuId || "",
+    categoryId: input.categoryId || "",
     createdAt: input.createdAt || new Date().toISOString()
   });
 }
@@ -203,6 +211,90 @@ export function normalizeMarketSnapshot(input = {}) {
     qualityStatus,
     schemaVersion: String(snapshot.schemaVersion || "v1")
   };
+}
+
+function conditionMatches(entity, condition = {}) {
+  const actual = entity?.metrics?.[condition.field] ?? entity?.[condition.field];
+  const expected = condition.value;
+  if (condition.operator === "gte") return Number(actual) >= Number(expected);
+  if (condition.operator === "lte") return Number(actual) <= Number(expected);
+  if (condition.operator === "gt") return Number(actual) > Number(expected);
+  if (condition.operator === "lt") return Number(actual) < Number(expected);
+  if (condition.operator === "between") {
+    const [minimum, maximum] = Array.isArray(expected) ? expected : [];
+    return Number(actual) >= Number(minimum) && Number(actual) <= Number(maximum);
+  }
+  if (condition.operator === "includes") return String(actual || "").includes(String(expected || ""));
+  return String(actual ?? "") === String(expected ?? "");
+}
+
+export function discoverCompetitorCandidates({ entities = [], ruleSets = [], existing = [] } = {}) {
+  const existingKeys = new Set(existing.map(item => `${item.ruleSetId}:${item.platformEntityId || item.entityId}`));
+  const candidates = [];
+  for (const rule of ruleSets.filter(item => item.status === "published")) {
+    const conditions = Array.isArray(rule.competitorConditions) ? rule.competitorConditions : [];
+    if (!conditions.length) continue;
+    for (const entity of entities) {
+      if (entity.dimension !== "product") continue;
+      if (rule.platform && entity.platform !== rule.platform) continue;
+      if (rule.categoryId && entity.categoryId !== rule.categoryId) continue;
+      if (!conditions.every(condition => conditionMatches(entity, condition))) continue;
+      const key = `${rule.id}:${entity.platformEntityId || entity.id}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+      candidates.push(sanitize({
+        id: `candidate-${rule.id}-${entity.platformEntityId || entity.id}`,
+        name: entity.name || entity.title || "未命名平台商品",
+        platform: entity.platform,
+        shopId: entity.shopId || "",
+        productId: entity.productId || "",
+        skuId: entity.skuId || "",
+        categoryId: entity.categoryId || "",
+        platformEntityId: entity.platformEntityId || entity.id,
+        entityId: entity.id,
+        ruleSetId: rule.id,
+        ruleVersion: number(rule.version, 1),
+        consumerAppId: rule.consumerAppId,
+        ownerDepartment: rule.ownerDepartment,
+        status: "candidate",
+        matchedRules: [rule.name || rule.id],
+        evidenceRefs: [entity.id],
+        recommendationReason: `命中规则“${rule.name || rule.id}”`
+      }));
+    }
+  }
+  return candidates;
+}
+
+export function buildRuleSuggestions({ snapshots = [], ruleSets = [] } = {}) {
+  const suggestions = [];
+  for (const rule of ruleSets.filter(item => item.status === "published")) {
+    for (const template of (Array.isArray(rule.suggestionTemplates) ? rule.suggestionTemplates : [])) {
+      const snapshot = snapshots.find(item => (!rule.platform || item.platform === rule.platform)
+        && (!rule.categoryId || item.categoryId === rule.categoryId)
+        && (!template.dimension || item.dimension === template.dimension));
+      if (!snapshot) continue;
+      suggestions.push(buildInsightSuggestion({
+        id: `suggestion-${rule.id}-${template.id || template.dimension || suggestions.length + 1}-${snapshot.id}`,
+        category: template.category,
+        title: template.title,
+        conclusion: template.conclusion,
+        evidenceRefs: [snapshot.id],
+        ruleSetId: rule.id,
+        ruleVersion: rule.version,
+        coverage: snapshot.coverage,
+        freshness: snapshot.qualityStatus === "healthy" ? "fresh" : snapshot.qualityStatus,
+        requestedConfidence: template.confidence || "high",
+        platform: snapshot.platform,
+        shopId: snapshot.shopId || "",
+        productId: snapshot.productId || "",
+        skuId: snapshot.skuId || "",
+        categoryId: snapshot.categoryId || "",
+        createdAt: snapshot.capturedAt || new Date().toISOString()
+      }));
+    }
+  }
+  return suggestions;
 }
 
 export function isCollectionWorkday(value = new Date()) {
