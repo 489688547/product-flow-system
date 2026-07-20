@@ -70,7 +70,6 @@ const DATA_CENTER_NAV = [
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
   ["data-connections", "平台连接", KeyRound, "数据中心", "connections"],
   ["data-metrics", "数据口径", Ruler, "数据中心", "metrics"],
-  ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],
   ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
   ["data-services", "数据服务", Share2, "数据中心", "services"],
   ["data-settings", "设置", Settings, "数据中心", "settings"]
@@ -149,6 +148,7 @@ const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NA
 function resolveScreen(screen) {
   if (screen === "supply-chain") return "supply-overview";
   if (LEGACY_SUPPLY_SCREENS.has(screen)) return "supply-procurement";
+  if (screen === "data-quality") return "data-sync";
   const resolvedDataScreen = screen === "data-center" ? "data-overview" : screen;
   if (resolvedDataScreen === "ecommerce-operations") return "ops-dashboard";
   return resolvedDataScreen === "performance-management" ? "performance-overview" : resolvedDataScreen;
