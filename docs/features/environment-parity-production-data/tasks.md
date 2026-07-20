@@ -23,12 +23,12 @@
   - 输出：双击或 `npm start` 均运行与线上相同的 Functions 和远程 D1。
   - 验证：`node --test tests/local-online-start.test.mjs` 2/2 通过；Vite 与 Wrangler 8127 启动成功，真实 `.env` 会话验收在合并到持有本地密钥的主工作区后执行。
 
-- [ ] 真实环境可见性
+- [x] 真实环境可见性
   - 依赖：真实本地会话鉴权。
   - 文件：`react-tests/local-online-account-ui.test.mjs`、`react-tests/local-dev-login.test.mjs`、`src/state/AuthProvider.jsx`、`src/ui/LocalOnlineEnvironmentBanner.jsx`、`src/App.jsx`、全局 CSS。
   - 失败测试：不存在硬编码 LOCAL_USER；真实本地会话显示全局警示；生产会话不显示；390px 无横向溢出规则。
   - 输出：所有页面明确显示本地代码、线上真实环境、账号和立即生效。
-  - 验证：聚焦 React 测试、键盘与三档宽度检查通过。
+  - 验证：`node --test react-tests/local-online-account-ui.test.mjs` 2/2、ESLint 和生产构建通过；真实账号三档宽度浏览器验收在合并后执行。
 
 - [ ] 长期规则反写
   - 依赖：前三项。

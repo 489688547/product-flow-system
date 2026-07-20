@@ -9,6 +9,7 @@ import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
 import { featureFlagEnabled } from "./domain/featureFlags.js";
 import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
 import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
+import { LocalOnlineEnvironmentBanner } from "./ui/LocalOnlineEnvironmentBanner.jsx";
 
 const lazyNamed = (loader, exportName) => lazy(async () => {
   const module = await loader();
@@ -283,6 +284,7 @@ export default function App() {
             ) : null}
           </div>
         </header>
+        <LocalOnlineEnvironmentBanner sessionUser={sessionUser} />
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
           {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>
