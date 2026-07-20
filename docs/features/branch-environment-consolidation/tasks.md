@@ -41,31 +41,31 @@
 
 | 来源 | 唯一提交 | 决策 | 当前证据 |
 |---|---:|---|---|
-| 本机分叉 `main` | 13 | integrated 待执行 | goods flow、盘点和现金周期提交仍未进入 `origin/main` |
-| `codex/data-center-app` | 45 | integrated 待执行 | 最新提交 `6d2e514`，工作树干净 |
-| `codex/product-catalog-data-hub` | 1 | integrated 待执行 | ERP 产品目录功能 |
-| `codex/fix-dingtalk-supplier-categories` | 1 | integrated 待执行 | `.DS_Store` 排除 |
-| `codex/hotfix-supply-sync-limit` | 1 | integrated 待执行 | 审批同步批处理修复 |
-| `codex/supply-chain-management-app` | 3 | integrated 待执行 | `.impeccable/` 个人工具目录排除 |
-| `codex/sync-dingtalk-suppliers` | 2 | integrated 待执行 | `.DS_Store` 排除 |
-| `codex/company-strategy-platform` | 1 | equivalent_in_main 待核对 | D1 大状态分片修复 |
-| `codex/stale-chunk-recovery` | 2 | equivalent_in_main 待核对 | 部署旧 chunk 恢复及 CI 元数据 |
-| `codex/release-brand-content-assets` | 1 | discarded_non_product_artifact 待重建 | 仅历史发布资产 |
-| `codex/cloudflare-wrangler3-compat` 未提交内容 | patch + test | integrated 待核对 | 外部备份 SHA-256 `27d266b6ac5709bb0de26c8e5bc522e094513197bf3ebf390dff66dcd8333b7c` |
+| 本机分叉 `main` | 13 | integrated | goods flow、盘点和现金周期已在 `5b71898` 合入 |
+| `codex/data-center-app` | 46 | integrated | 数据标准、连接器、保险箱及生产部署证据已在 `73a7dd3`、`3e56b53` 合入 |
+| `codex/product-catalog-data-hub` | 1 | integrated | ERP 产品目录已在 `c2c3395` 合入 |
+| `codex/fix-dingtalk-supplier-categories` | 1 | integrated | 分类修复已在 `d882d39` 合入，`.DS_Store` 排除 |
+| `codex/hotfix-supply-sync-limit` | 1 | integrated | 审批同步批处理修复已在 `293ef40` 合入 |
+| `codex/supply-chain-management-app` | 3 | integrated | 供应链应用已在 `07b2b0a` 合入，个人工具目录排除 |
+| `codex/sync-dingtalk-suppliers` | 2 | integrated | 供应商同步已在 `5a2380a` 合入，`.DS_Store` 排除 |
+| `codex/company-strategy-platform` | 1 | integrated | D1 大状态分片修复已在 `8e07be3` 合入 |
+| `codex/stale-chunk-recovery` | 2 | integrated | 部署旧 chunk 恢复及 CI 元数据已在 `56d68c4` 合入 |
+| `codex/release-brand-content-assets` | 1 | history_integrated_artifacts_rebuilt | 历史进入合并图，旧构建产物删除并由最终源码统一重建 |
+| `codex/cloudflare-wrangler3-compat` 未提交内容 | patch + test | equivalent_integrated | 完整 Pages 构建、发布、404、缓存和重写契约已由现有实现及部署恢复测试覆盖；备份继续保留 |
 
 备份目录：`/Users/roger/Documents/product-flow-system-branch-backups/2026-07-20/`。备份不进入 Git，原工作树仍保留。
 
-- [ ] 供应链与钉钉相关分支整合
+- [x] 供应链与钉钉相关分支整合
   - 依赖：分支备份。
   - 来源：本机 main 的 goods-flow 唯一提交、`codex/fix-dingtalk-supplier-categories`、`codex/hotfix-supply-sync-limit`、`codex/supply-chain-management-app`、`codex/sync-dingtalk-suppliers`。
   - 输出：供应链、盘点、现金周期、审批批量同步、待办编辑和供应商导入统一进入当前平台边界。
 
-- [ ] 数据中心与产品目录整合
+- [x] 数据中心与产品目录整合
   - 依赖：分支备份。
   - 来源：`codex/data-center-app` 及其 dirty 备份、`codex/product-catalog-data-hub`。
   - 输出：数据标准、指标编排、结果版本、归档审计和统一产品目录。
 
-- [ ] 部署与状态修复整合
+- [x] 部署与状态修复整合
   - 依赖：业务分支整合。
   - 来源：`codex/company-strategy-platform`、`codex/stale-chunk-recovery`、`codex/release-brand-content-assets`、Cloudflare 兼容 dirty 备份。
   - 输出：缺失修复进入 main，等价实现有证据，最终发布资产由源码重建。
