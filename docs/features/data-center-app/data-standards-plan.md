@@ -211,7 +211,7 @@ git commit -m "feat(platform): persist governed metric versions"
 - Modify: `src/domain/permissions.js`
 - Modify: `react-tests/permissions.test.mjs`
 
-- [ ] 3.1 先写 API 失败测试，至少覆盖：未登录 401、无查看权 403、只读 403、运营/财务/供应链可创建本部门口径、不能指定其他部门、总经办可跨部门、重复 `metricCode` 409、版本落后 409、非法 AST 400、修改生成新版本、同日生效冲突、归档不删除、详情包含版本/依赖/最近结果。
+- [x] 3.1 先写 API 失败测试，至少覆盖：未登录 401、无查看权 403、只读 403、运营/财务/供应链可创建本部门口径、不能指定其他部门、总经办可跨部门、重复 `metricCode` 409、版本落后 409、非法 AST 400、修改生成新版本、同日生效冲突、归档不删除、详情包含版本/依赖/最近结果。
 
 运行：
 
@@ -221,7 +221,7 @@ node --test tests/data-standards-api.test.mjs react-tests/permissions.test.mjs
 
 预期：路由或权限导出缺失而失败。
 
-- [ ] 3.2 在服务端把钉钉会话规范化为不可由客户端伪造的 actor：
+- [x] 3.2 在服务端把钉钉会话规范化为不可由客户端伪造的 actor：
 
 ```js
 export function dataStandardActor(session) {
@@ -240,7 +240,7 @@ export function requireRecalculation(actor, definitions) {}
 
 部门别名 `供应链`、`供应链团队`、`采购部` 统一映射到 `供应链部`。非总经办的 `ownerDepartment` 由服务端锁定为自己的可管理部门；请求体中的 actor、createdBy、publishedAt、audit 字段全部忽略。
 
-- [ ] 3.3 实现路由方法：
+- [x] 3.3 实现路由方法：
 
   - `GET /api/platform/v1/data-standards`；
   - `POST /api/platform/v1/data-standards`，201；
@@ -268,11 +268,11 @@ export function requireRecalculation(actor, definitions) {}
 
 稳定错误代码固定为：`AUTH_SESSION_REQUIRED`、`PERMISSION_VIEW_DENIED`、`PERMISSION_WRITE_DENIED`、`DATA_STANDARD_INVALID`、`DATA_STANDARD_FIELD_UNKNOWN`、`DATA_STANDARD_CYCLE`、`DATA_STANDARD_UNIT_MISMATCH`、`DATA_STANDARD_VERSION_CONFLICT`、`DATA_STANDARD_EFFECTIVE_DATE_CONFLICT`、`DATA_STANDARD_DEPENDENCY_ARCHIVED`、`DATA_STANDARD_STORAGE_UNAVAILABLE`、`INTERNAL_UNEXPECTED`。响应统一 `Cache-Control: no-store` 并带 `requestId`、`retryable`。
 
-- [ ] 3.4 扩展 `DEFAULT_PERMISSIONS.features.dataCenter.editDepartments` 和 edit titles，使财务/供应链能够进入编辑态；具体某条口径是否可写仍由 API 按责任部门二次校验。
+- [x] 3.4 扩展 `DEFAULT_PERMISSIONS.features.dataCenter.editDepartments` 和 edit titles，使财务/供应链能够进入编辑态；具体某条口径是否可写仍由 API 按责任部门二次校验。
 
-- [ ] 3.5 完成共享契约文档，明确 auth、authorization、query/body、response、errors、idempotency、兼容、deprecation、日志、超时和不记录业务事实的审计约束；更新 API 目录。
+- [x] 3.5 完成共享契约文档，明确 auth、authorization、query/body、response、errors、idempotency、兼容、deprecation、日志、超时和不记录业务事实的审计约束；更新 API 目录。
 
-- [ ] 3.6 验证并提交：
+- [x] 3.6 验证并提交：
 
 ```bash
 node --test tests/data-standards-api.test.mjs react-tests/permissions.test.mjs
