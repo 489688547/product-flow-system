@@ -24,6 +24,11 @@ function loadLocalMetadata() {
   }
 }
 
+function persistableMetadata(state) {
+  const { metricDefinitions: _governedByDataStandards, ...metadata } = state;
+  return metadata;
+}
+
 function friendlyMessage(error, fallback) {
   const message = String(error?.message || "").trim();
   return /load failed|failed to fetch/i.test(message) ? fallback : message || fallback;
@@ -57,7 +62,7 @@ export function DataCenterProvider({ children, enabled = true }) {
       if (metadataResult.status === "fulfilled" && metadataResult.value.state) {
         const normalized = normalizeDataCenterState(metadataResult.value.state);
         setState(normalized);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableMetadata(normalized)));
       } else if (![404, 405, 501].includes(metadataResult.reason?.status)) {
         throw metadataResult.reason;
       }
@@ -103,11 +108,11 @@ export function DataCenterProvider({ children, enabled = true }) {
   }, [refreshConnections]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableMetadata(state)));
     if (!enabled || !dirty.current) return undefined;
     const timer = setTimeout(async () => {
       try {
-        await saveDataCenterState(state);
+        await saveDataCenterState(persistableMetadata(state));
         dirty.current = false;
         setError("");
       } catch (saveError) {
