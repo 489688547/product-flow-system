@@ -37,6 +37,12 @@
 
 ERP 或 Excel 导入作为销售数据和商品主数据的补充来源。销售导入必须记录来源文件、时间范围和口径，避免用导入时间替代订单时间。商品档案导入接受 XLSX、UTF-8 CSV 与 GB18030 CSV，记录文件名、行数和批次结果，不保存原始整行。产品映射不明确的数据进入异常检查，不自动分配。
 
+## 通用数据采集 provider
+
+浏览器、API 和文件采集统一使用 provider registry。共享层负责连接实例、AES-GCM 密文、设备哈希令牌、任务、一次性 grant、状态、游标、幂等、重试和审计；adapter 只负责允许域名、登录字段、任务/资源类型、页面或 API 操作和标准事实映射。未登记 provider、任务、资源或写入器必须失败关闭。
+
+抖音首期只启用 `douyin-ecommerce / douyin_login_verification / connection_identity / v1`，固定访问 `fxg.jinritemai.com`。ERP、快手、天猫和巨量后续接入订单、商品、库存、广告或素材时复用相同任务协议，并使用各自标准事实写入器；不得复制设备认证和凭证下发逻辑，也不得把所有记录塞进一个无口径的通用 JSON 表。
+
 ## Cloudflare Pages 与 D1
 
 Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状态、公司平台实体、会话、组织缓存和销售聚合。绑定、迁移和部署属于生产基础设施验证，不能用本地预览结果替代。

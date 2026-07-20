@@ -38,6 +38,8 @@
 | `USER_INSIGHTS_` | 用户洞察未预期处理错误 | `USER_INSIGHTS_UNEXPECTED` |
 | `GOODS_FLOW_` | 货流事实、库存、盘点、账期和 CCC | `GOODS_FLOW_VERSION_CONFLICT` |
 | `CREDENTIAL_` | 加密凭证、密钥、查看和采集器授权 | `CREDENTIAL_KEY_UNAVAILABLE` |
+| `DATA_CONNECTION_` | 实例级数据连接错误 | `DATA_CONNECTION_UNEXPECTED` |
+| `BROWSER_AGENT_` | 公司 Mac 采集任务错误 | `BROWSER_AGENT_TASK_FAILED` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `LOCAL_ONLINE_` | 本地线上账号配置、数据库与运行时 | `LOCAL_ONLINE_TOKEN_REQUIRED` |

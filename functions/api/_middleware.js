@@ -18,6 +18,12 @@ const ALTERNATE_AUTH_PATHS = new Set([
   "/api/platform/v1/environment-readiness"
 ]);
 
+function usesHandlerBearerAuth(path) {
+  return path === "/api/platform/v1/user-insights/collector"
+    || path === "/api/platform/v1/user-insights/ingest"
+    || path.startsWith("/api/platform/v1/browser-agent/");
+}
+
 function isLoopbackRequest(request) {
   const hostname = new URL(request.url).hostname;
   return ["localhost", "127.0.0.1", "::1"].includes(hostname);
@@ -83,7 +89,7 @@ export async function onRequest(context) {
     context.data.session = session;
     return context.next();
   }
-  if (ALTERNATE_AUTH_PATHS.has(path) || usesRouteAuthentication(path)) return context.next();
+  if (ALTERNATE_AUTH_PATHS.has(path) || usesRouteAuthentication(path) || usesHandlerBearerAuth(path)) return context.next();
 
   return jsonResponse({
     authenticated: false,

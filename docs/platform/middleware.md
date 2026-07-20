@@ -35,3 +35,5 @@
 ## 目标能力
 
 后续逐步统一请求 ID、错误结构、服务端日志、输入校验和写操作幂等。迁移按路由分批完成，不要求现有接口一次性改写。
+
+`/api/platform/v1/browser-agent/*`、用户洞察 collector 和 ingest 在会话中间件中允许进入路由，由路由使用设备 Bearer Token 完成最终认证。普通公司会话不能代替设备令牌；task credential 只接受一次性 grant。顺序固定为：解析 Bearer → SHA-256 比对 active 设备 → platform scope → 领取任务 → grant 哈希/到期/消费/credentialVersion 校验 → 解密单个连接 → no-store 响应。日志不得记录 Authorization、grant、邮箱、密码或页面内容。

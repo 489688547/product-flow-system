@@ -47,6 +47,17 @@
       "tables": ["platform_credentials", "platform_credential_audit"]
     },
     {
+      "id": "browser-data-acquisition",
+      "name": "通用浏览器数据采集",
+      "description": "统一保存 provider 连接的加密凭证、识别结果、公司 Mac 短时任务和无秘密审计；抖音是首个 adapter。",
+      "platforms": ["douyin-ecommerce", "cloudflare-pages", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": ["PLATFORM_CREDENTIAL_MASTER_KEY"],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": ["data_connections", "data_connection_shops", "browser_agent_tasks", "browser_agent_task_grants", "data_connection_audit"]
+    },
+    {
       "id": "production-data-control",
       "name": "跨环境生产数据控制",
       "description": "个人令牌、短时解锁、写前快照和审计所需的数据表。",

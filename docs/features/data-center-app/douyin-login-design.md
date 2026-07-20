@@ -3,7 +3,7 @@
 ## 状态
 
 - 日期：2026-07-20
-- 状态：已确认，待实施计划
+- 状态：已确认，实施中
 - 负责人：总经办 / 运营数据管理员
 - 关联平台：抖音电商、Cloudflare Pages、Cloudflare D1、公司 Mac 浏览器助手
 
@@ -50,6 +50,14 @@
 
 决定为“扩展现有能力”。凭证加密、版本、权限和审计复用现有平台连接保险箱及 AES-GCM 能力，不创建第二套加密协议。公司已有用户洞察浏览器采集器，证明浏览器任务、设备身份和任务回传是第二个真实消费者；因此把设备认证和任务领取抽到共享浏览器助手边界，抖音页面识别仍保留在 provider adapter 内。
 
+### 通用数据采集平台边界
+
+抖音店铺识别不是独立自动化脚本，而是共享数据采集平台的第一个 provider adapter。平台统一负责连接实例、加密凭证、设备身份、定时或人工触发任务、一次性 task grant、人工验证接管、重试、游标、结果回写和审计；每个平台 adapter 只负责登录字段定义、允许访问的固定域名、可采集资源、页面/API 操作和标准化映射。
+
+统一任务契约使用 `providerId`、`taskType`、`resourceType`、`connectionId`、`schemaVersion` 和 `cursor`。抖音首个资源类型为 `connection_identity`，结果是店铺 ID、名称和头像；后续 ERP、快手、天猫、巨量等接入订单、商品、库存、广告消耗或素材时复用相同任务和设备协议，但由各自服务端 ingestor 写入相应标准事实表，不把所有异构明细塞进一个万能 JSON 表。
+
+provider registry 默认拒绝未登记的 provider、域名、任务类型和资源类型。首期只启用 `douyin-ecommerce/connection_identity`；ERP 等平台先拥有稳定扩展接口，不在没有字段口径和真实页面验证时伪装为已接通。
+
 ## 界面设计
 
 ### 数据接入列表
@@ -81,6 +89,8 @@
 {
   "id": "connection-id",
   "platformId": "douyin-ecommerce",
+  "accountLabel": "operator@example.com",
+  "credentialSchemaId": "email-password-v1",
   "loginEmail": "operator@example.com",
   "shopId": "platform-shop-id",
   "shopName": "店铺名称",
@@ -92,7 +102,7 @@
 }
 ```
 
-密码只存在加密凭证记录中。`loginEmail` 按用户确认属于可回显的账户元数据，但不写入公开集成注册表和日志。
+底层连接表使用通用 `accountLabel` 和版本化 `credentialSchemaId`，不使用抖音专属邮箱列。密码只存在加密 JSON 凭证记录中。`loginEmail` 是抖音 API/UI 的兼容字段，按用户确认属于可回显的账户元数据，但不写入公开集成注册表和日志。
 
 ### 浏览器任务
 
@@ -102,7 +112,6 @@
 
 - `GET|POST|PUT /api/platform/v1/data-connections`：读取、创建和更新连接实例。
 - `POST /api/platform/v1/data-connections/:id/reveal`：受控查看邮箱和密码。
-- `POST /api/platform/v1/data-connections/:id/login-verification`：创建或重试登录验证任务。
 - `GET /api/platform/v1/browser-agent/tasks`：公司 Mac 领取任务。
 - `POST /api/platform/v1/browser-agent/tasks/:id/result`：回写等待人工、成功或失败结果。
 
@@ -165,4 +174,3 @@
 8. Mac 离线、人工验证、错误凭证、页面改版、AI 低置信度和版本冲突均有明确恢复路径。
 9. 匿名、只读、越权运营和伪造设备任务均被服务端拒绝。
 10. 1440、900、640、390px 以及钉钉 WebView 无页面级横向溢出，键盘、焦点、Esc 和明文清除行为通过。
-
