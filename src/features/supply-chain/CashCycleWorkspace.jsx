@@ -102,7 +102,7 @@ export function CashCycleWorkspace({
 
   const columns = [
     { key: "platform", header: "平台", render: row => <strong>{row.platform}</strong> },
-    { key: "days", header: "固定应收账期", render: row => `${row.days} 天` },
+    { key: "days", header: <span className="num">固定应收账期</span>, render: row => <span className="num">{`${row.days} 天`}</span> },
     { key: "from", header: "生效日期", render: row => row.effectiveFrom },
     { key: "to", header: "结束日期", render: row => row.effectiveTo || "长期有效" },
     { key: "reason", header: "调整原因", render: row => row.reason },

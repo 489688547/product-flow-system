@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Plus, RefreshCw, Search } from "lucide-react";
 import { useCollaboration } from "../../state/CollaborationProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
+import { FloatingMenu } from "../../ui/FloatingMenu.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { CollaborationDetailPanel } from "./CollaborationDetailPanel.jsx";
 import { CollaborationEditor } from "./CollaborationEditor.jsx";
@@ -17,8 +18,82 @@ const VIEWS = [
   ["completed", "已完成"]
 ];
 
+const APP_FILTER_OPTIONS = [
+  { value: "", label: "全部来源" },
+  { value: "product-flow", label: "产品全周期" },
+  { value: "supply-chain", label: "供应链" },
+  { value: "data-center", label: "数据中心" },
+  { value: "brand-content", label: "品牌内容" },
+  { value: "collaboration", label: "协同工作台" }
+];
+const KIND_FILTER_OPTIONS = [
+  { value: "", label: "全部类型" },
+  { value: "handoff", label: "部门交接" },
+  { value: "risk", label: "经营风险" },
+  { value: "decision", label: "待决策" },
+  { value: "data_issue", label: "数据问题" },
+  { value: "task", label: "协同任务" }
+];
+const IMPACT_FILTER_OPTIONS = [
+  { value: "", label: "全部影响" },
+  { value: "high", label: "高影响" },
+  { value: "medium", label: "中影响" },
+  { value: "low", label: "低影响" }
+];
+
+// 与 HeaderFilter 一致的浮层筛选：触发按钮复用 .org-select-trigger，
+// 选项浮层复用 .filter-menu，保持与全站下拉一致的选中态和 40px 触控目标。
+function FilterSelect({ label, value, options, onChange }) {
+  const [open, setOpen] = useState(false);
+  const anchorRef = useRef(null);
+  const selected = options.find(option => option.value === value) || options[0];
+  return (
+    <label>
+      <span>{label}</span>
+      <button
+        ref={anchorRef}
+        type="button"
+        className="org-select-trigger"
+        aria-label={`${label}筛选：${selected.label}`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen(current => !current)}
+      >
+        <strong>{selected.label}</strong>
+        <ChevronDown size={14} aria-hidden="true" />
+      </button>
+      <FloatingMenu
+        anchorRef={anchorRef}
+        open={open}
+        onClose={() => setOpen(false)}
+        className="filter-menu"
+        minWidth={180}
+        maxHeight={280}
+        role="listbox"
+        ariaLabel={`${label}筛选`}
+        focusOnOpen
+        enableArrowNavigation
+      >
+        {options.map(option => (
+          <button
+            key={option.value}
+            type="button"
+            role="option"
+            aria-selected={option.value === value}
+            className={option.value === value ? "active" : ""}
+            onClick={() => { onChange(option.value); setOpen(false); }}
+          >
+            <span>{option.label}</span>
+            {option.value === value ? <Check size={15} aria-hidden="true" /> : null}
+          </button>
+        ))}
+      </FloatingMenu>
+    </label>
+  );
+}
+
 export function CollaborationPage() {
-  const { items, loading, saving, error, conflict, loadItems } = useCollaboration();
+  const { items, loading, error, conflict, loadItems } = useCollaboration();
   const { currentUser, orgCache } = useProductFlow();
   const [view, setView] = useState("pending_acceptance");
   const [filters, setFilters] = useState({ query: "", appId: "", kind: "", impactLevel: "" });
@@ -54,9 +129,9 @@ export function CollaborationPage() {
 
       <section className="collaboration-filters" aria-label="筛选协同事项">
         <label className="collaboration-search"><span className="sr-only">搜索协同事项</span><Search size={15} aria-hidden="true" /><input value={filters.query} onChange={event => setFilters(current => ({ ...current, query: event.target.value }))} onKeyDown={event => event.key === "Enter" && apply()} placeholder="搜索事项、来源或负责人" /></label>
-        <label><span>来源 App</span><select value={filters.appId} onChange={event => setFilters(current => ({ ...current, appId: event.target.value }))}><option value="">全部来源</option><option value="product-flow">产品全周期</option><option value="supply-chain">供应链</option><option value="data-center">数据中心</option><option value="brand-content">品牌内容</option><option value="collaboration">协同工作台</option></select></label>
-        <label><span>类型</span><select value={filters.kind} onChange={event => setFilters(current => ({ ...current, kind: event.target.value }))}><option value="">全部类型</option><option value="handoff">部门交接</option><option value="risk">经营风险</option><option value="decision">待决策</option><option value="data_issue">数据问题</option><option value="task">协同任务</option></select></label>
-        <label><span>影响</span><select value={filters.impactLevel} onChange={event => setFilters(current => ({ ...current, impactLevel: event.target.value }))}><option value="">全部影响</option><option value="high">高影响</option><option value="medium">中影响</option><option value="low">低影响</option></select></label>
+        <FilterSelect label="来源 App" value={filters.appId} options={APP_FILTER_OPTIONS} onChange={appId => setFilters(current => ({ ...current, appId }))} />
+        <FilterSelect label="类型" value={filters.kind} options={KIND_FILTER_OPTIONS} onChange={kind => setFilters(current => ({ ...current, kind }))} />
+        <FilterSelect label="影响" value={filters.impactLevel} options={IMPACT_FILTER_OPTIONS} onChange={impactLevel => setFilters(current => ({ ...current, impactLevel }))} />
         <Button onClick={() => apply()} disabled={loading}>{loading ? "正在加载…" : "应用筛选"}</Button>
       </section>
 
@@ -68,7 +143,7 @@ export function CollaborationPage() {
         {selected ? <CollaborationDetailPanel item={selected} currentUser={currentUser} orgCache={orgCache} onClose={() => setSelectedId("")} onEdit={item => setEditor({ open: true, item })} /> : null}
       </div>
 
-      <CollaborationEditor open={editor.open} item={editor.item} orgCache={orgCache} onClose={() => setEditor({ open: false, item: null })} saving={saving} />
+      <CollaborationEditor open={editor.open} item={editor.item} orgCache={orgCache} onClose={() => setEditor({ open: false, item: null })} />
     </section>
   );
 }

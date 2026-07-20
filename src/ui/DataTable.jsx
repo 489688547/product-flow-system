@@ -82,7 +82,7 @@ export function DataTable({
           return (
             <tr key={rowKey(row, index)} {...rowProps}>
               {columns.map(column => (
-                <td key={column.key} data-label={column.label || (typeof column.header === "string" ? column.header : column.key)}>
+                <td key={column.key} className={column.className || undefined} data-label={column.label || (typeof column.header === "string" ? column.header : column.key)}>
                   {column.render(row)}
                 </td>
               ))}
@@ -130,7 +130,7 @@ export function DataTable({
       >
         <thead>
           <tr>
-            {columns.map(column => <th key={column.key} aria-sort={column.ariaSort}>{column.header}</th>)}
+            {columns.map(column => <th key={column.key} className={column.className || undefined} aria-sort={column.ariaSort}>{column.header}</th>)}
           </tr>
         </thead>
         <tbody>

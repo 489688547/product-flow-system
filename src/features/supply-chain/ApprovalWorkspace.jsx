@@ -64,9 +64,9 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
   const columns = [
     { key: "purchase", header: "采购申请", render: row => <span><strong>{row.reason || row.title || "未填写事由"}</strong><small className="table-secondary">{row.businessCategory || row.processInstanceId}</small></span> },
     { key: "status", header: "采购状态", render: row => <span className={`status-badge ${approved(row.status) ? "success" : "warning"}`}>{approved(row.status) ? "已通过" : row.status || "处理中"}</span> },
-    { key: "requested", header: "申请金额", render: row => money(row.requestedAmount) },
+    { key: "requested", header: <span className="num">申请金额</span>, render: row => <span className="num">{money(row.requestedAmount)}</span> },
     { key: "payment", header: "付款审批", render: row => row.payments.length ? <span><strong>{row.payments.filter(item => approved(item.status)).length} / {row.payments.length} 笔通过</strong><small className="table-secondary">{row.payments.some(item => item.amountSource === "related-purchase") ? "金额读取自关联采购单" : "金额读取自付款表单"}</small></span> : <span className="muted">尚未关联付款</span> },
-    { key: "paid", header: "审批实付", render: row => <span><strong>{money(row.actualPaid)}</strong>{row.overpaid ? <small className="table-secondary text-warning">付款超申请</small> : null}</span> },
+    { key: "paid", header: <span className="num">审批实付</span>, render: row => <span className="num"><strong>{money(row.actualPaid)}</strong>{row.overpaid ? <small className="table-secondary text-warning">付款超申请</small> : null}</span> },
     { key: "mapping", header: "映射", render: row => { const status = mappingStatus(row); return <span className={`status-badge ${status.tone}`}>{status.label}</span>; } },
     { key: "actions", header: "操作", render: row => canEditMapping && row.mappingStatus === "unmapped" ? <TableActions><Button className="compact" onClick={() => openMapping(row)}>处理映射</Button></TableActions> : "—" }
   ];

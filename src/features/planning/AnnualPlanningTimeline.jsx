@@ -8,6 +8,11 @@ import { PRODUCT_DEMAND_DRAG_TYPE } from "./PlanningDemandTray.jsx";
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => `${index + 1}月`);
 
+function formatMonthDay(value) {
+  const [month, day] = String(value || "").slice(5).split("-").map(Number);
+  return month && day ? `${month}月${day}日` : "";
+}
+
 function TimelineDropCells({ canEdit, onDropDemand }) {
   return (
     <div className="planning-month-cells" aria-hidden={!canEdit}>
@@ -44,7 +49,7 @@ function PlanningBar({ type, label, segment, onClick, canEdit }) {
       onClick={onClick}
     >
       <span>{label}</span>
-      <small>{segment.start.slice(5).replace("-", "/")} - {segment.end.slice(5).replace("-", "/")}</small>
+      <small>{formatMonthDay(segment.start)} 至 {formatMonthDay(segment.end)}</small>
     </button>
   );
 }
@@ -102,8 +107,8 @@ export function AnnualPlanningTimeline({ year, plans, demands, currentUser, canE
           })}
           {!visiblePlans.length ? (
             <div className="planning-timeline-row planning-empty-row">
-              <div className="planning-product-column">拖入需求开始安排</div>
-              <div className="planning-track"><TimelineDropCells canEdit={canEdit} onDropDemand={onDropDemand} /><p>{canEdit ? "把上方产品拖到目标月份" : "当前年份暂无规划"}</p></div>
+              <div className="planning-product-column">暂无产品规划</div>
+              <div className="planning-track"><TimelineDropCells canEdit={canEdit} onDropDemand={onDropDemand} /><p>{canEdit ? "把上方产品拖到目标月份即可开始安排" : "当前年份暂无产品规划"}</p></div>
             </div>
           ) : null}
         </div>

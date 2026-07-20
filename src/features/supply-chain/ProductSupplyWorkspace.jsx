@@ -24,8 +24,8 @@ export function ProductSupplyWorkspace({ products, canEdit }) {
     { key: "material", header: "物料", render: row => row.materialName || "—" },
     { key: "supplier", header: "供应商", render: row => supplierMap.get(row.supplierId)?.name || "待映射" },
     { key: "role", header: "供货角色", render: row => <span className={`status-badge ${row.supplyRole === "backup" ? "neutral" : "success"}`}>{row.supplyRole === "backup" ? "备选" : "主供"}</span> },
-    { key: "cost", header: "单位成本", render: row => `¥${Number(row.unitCost || 0).toFixed(2)}` },
-    { key: "usage", header: "单件用量", render: row => Number(row.consumptionPerSale || 0).toLocaleString("zh-CN") },
+    { key: "cost", header: <span className="num">单位成本</span>, render: row => <span className="num">{`¥${Number(row.unitCost || 0).toFixed(2)}`}</span> },
+    { key: "usage", header: <span className="num">单件用量</span>, render: row => <span className="num">{Number(row.consumptionPerSale || 0).toLocaleString("zh-CN")}</span> },
     { key: "actions", header: "操作", render: row => canEdit ? <TableActions><IconAction className="danger" label="删除供应关系" onClick={() => dispatch({ type: "remove", collection: "productSupplierLinks", id: row.id })}><Trash2 size={15} /></IconAction></TableActions> : "—" }
   ];
   return (

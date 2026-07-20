@@ -3,8 +3,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { groupPersonalTodos } from "../../domain/personalTodos.js";
 import { usePlatform } from "../../state/PlatformProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
-import { Button } from "../../ui/Button.jsx";
+import { Button, IconAction } from "../../ui/Button.jsx";
+import { HeaderFilter } from "../../ui/HeaderFilter.jsx";
 import { DwsTodoPreview } from "./DwsTodoPreview.jsx";
+
+// 钉钉待办状态轮询间隔：5 分钟一次，避免高频调用钉钉接口。
+const PERSONAL_TODO_STATUS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
+// priority 数值小于等于该阈值视为高优先级，用左侧色条表达。
+const HIGH_PRIORITY_THRESHOLD = 10;
 
 const GROUPS = [
   { key: "overdue", label: "已逾期", tone: "danger" },
@@ -39,17 +46,34 @@ function syncState(todo) {
   return { label: "未同步", tone: "neutral" };
 }
 
+// 同步态与平台确认态合并为单一状态徽章；待确认结论/关闭优先于普通同步态。
+function statusBadge(todo) {
+  const done = todo.status === "done";
+  if (done && todo.completedFrom === "dingtalk" && todo.sourceType === "decision") {
+    return { label: "待平台确认结论", tone: "warning", prominent: true };
+  }
+  if (done && todo.completedFrom === "dingtalk" && todo.sourceType === "risk") {
+    return { label: "待平台确认关闭", tone: "warning", prominent: true };
+  }
+  return { ...syncState(todo), prominent: false };
+}
+
 function TodoRow({ todo, busy, onOpen, onToggle, onSync }) {
   const source = SOURCE_META[todo.sourceType] || { label: "平台待办", route: "home" };
-  const sync = syncState(todo);
+  const status = statusBadge(todo);
   const done = todo.status === "done";
-  const confirmation = done && todo.completedFrom === "dingtalk" && todo.sourceType === "decision"
-    ? "待平台确认结论"
-    : done && todo.completedFrom === "dingtalk" && todo.sourceType === "risk"
-      ? "待平台确认关闭"
+  const highPriority = Number(todo.priority) <= HIGH_PRIORITY_THRESHOLD;
+  const syncLabel = todo.dingTodo?.lastError ? "重新同步" : todo.dingTodo?.id ? "同步更新" : "同步钉钉";
+  const syncDisabledReason = !todo.dueDate
+    ? "请先在原事项设置截止日期"
+    : !todo.assigneeUnionId
+      ? "缺少钉钉身份，无法同步"
       : "";
   return (
-    <article className={`personal-todo-row ${done ? "is-done" : ""}`}>
+    <article
+      className={`personal-todo-row ${done ? "is-done" : ""}`}
+      style={{ borderLeft: `3px solid ${highPriority ? "var(--danger)" : "transparent"}` }}
+    >
       <button className="personal-todo-check" type="button" onClick={onToggle} disabled={busy} aria-label={done ? `重新打开：${todo.title}` : `标记完成：${todo.title}`}>
         {done ? <Check size={15} aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />}
       </button>
@@ -57,23 +81,22 @@ function TodoRow({ todo, busy, onOpen, onToggle, onSync }) {
         <div className="personal-todo-title-line">
           <strong>{todo.title}</strong>
           <span className="personal-todo-source">{source.label}</span>
-          {Number(todo.priority) <= 10 ? <span className="personal-todo-priority">高优先级</span> : null}
         </div>
         <div className="personal-todo-meta">
           <span>{todo.projectName || "公司级事项"}</span>
           <span>截止 {todo.dueDate || "待排期"}</span>
-          <span className={`personal-todo-sync ${sync.tone}`}>{sync.label}</span>
-          {confirmation ? <span className="personal-todo-confirmation">{confirmation}</span> : null}
+          <span className={status.prominent ? "personal-todo-confirmation" : `personal-todo-sync ${status.tone}`}>{status.label}</span>
         </div>
         {todo.dingTodo?.lastError ? <p className="personal-todo-error"><AlertCircle size={13} aria-hidden="true" />{todo.dingTodo.lastError}</p> : null}
       </div>
       <div className="personal-todo-actions">
-        <button type="button" onClick={onOpen}><ExternalLink size={14} aria-hidden="true" />打开</button>
-        <button type="button" onClick={onToggle} disabled={busy}>{done ? <RotateCcw size={14} aria-hidden="true" /> : <Check size={14} aria-hidden="true" />}{done ? "重开" : "完成"}</button>
-        <button type="button" onClick={onSync} disabled={busy || !todo.dueDate || !todo.assigneeUnionId} title={!todo.dueDate ? "请先在原事项设置截止日期" : undefined}>
-          {busy ? <RefreshCw size={14} className="is-spinning" aria-hidden="true" /> : <Send size={14} aria-hidden="true" />}
-          {todo.dingTodo?.lastError ? "重新同步" : todo.dingTodo?.id ? "同步更新" : "同步钉钉"}
-        </button>
+        <IconAction label="打开来源" onClick={onOpen}><ExternalLink size={16} aria-hidden="true" /></IconAction>
+        <IconAction label={done ? "重新打开" : "标记完成"} onClick={onToggle} disabled={busy}>
+          {done ? <RotateCcw size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
+        </IconAction>
+        <IconAction label={syncLabel} onClick={onSync} disabled={busy || !todo.dueDate || !todo.assigneeUnionId} disabledReason={syncDisabledReason}>
+          {busy ? <RefreshCw size={16} className="is-spinning" aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
+        </IconAction>
       </div>
     </article>
   );
@@ -95,11 +118,19 @@ export function PersonalTodoWorkbench({ todos, onNavigate }) {
   useEffect(() => {
     if (!currentUnionId || !linkedCount) return undefined;
     refreshRef.current().catch(() => {});
-    const timer = window.setInterval(() => refreshRef.current().catch(() => {}), 5 * 60 * 1000);
+    const timer = window.setInterval(() => refreshRef.current().catch(() => {}), PERSONAL_TODO_STATUS_REFRESH_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [currentUnionId, linkedCount]);
 
   const projects = useMemo(() => [...new Map(todos.filter(todo => todo.projectName).map(todo => [todo.projectId || todo.projectName, { id: todo.projectId || todo.projectName, name: todo.projectName }])).values()], [todos]);
+  const sourceOptions = useMemo(() => [
+    { value: "all", label: "全部来源" },
+    ...Object.entries(SOURCE_META).map(([value, meta]) => ({ value, label: meta.label }))
+  ], []);
+  const projectOptions = useMemo(() => [
+    { value: "all", label: "全部项目" },
+    ...projects.map(project => ({ value: project.id, label: project.name }))
+  ], [projects]);
   const filtered = useMemo(() => todos.filter(todo => (
     (sourceFilter === "all" || todo.sourceType === sourceFilter)
     && (projectFilter === "all" || (todo.projectId || todo.projectName) === projectFilter)
@@ -139,8 +170,8 @@ export function PersonalTodoWorkbench({ todos, onNavigate }) {
           <small>只显示明确分配给你的责任事项</small>
         </div>
         <div className="personal-todo-filters">
-          <label><span>来源类型</span><select value={sourceFilter} onChange={event => setSourceFilter(event.target.value)}><option value="all">全部来源</option>{Object.entries(SOURCE_META).map(([value, meta]) => <option value={value} key={value}>{meta.label}</option>)}</select></label>
-          <label><span>关联项目</span><select value={projectFilter} onChange={event => setProjectFilter(event.target.value)}><option value="all">全部项目</option>{projects.map(project => <option value={project.id} key={project.id}>{project.name}</option>)}</select></label>
+          <HeaderFilter label="来源类型" value={sourceFilter} onChange={setSourceFilter} options={sourceOptions} />
+          <HeaderFilter label="关联项目" value={projectFilter} onChange={setProjectFilter} options={projectOptions} />
           <Button className="compact" onClick={refresh} disabled={refreshing || !currentUnionId} disabledReason={!currentUnionId ? "当前账号缺少钉钉 unionId" : ""}>
             <RefreshCw size={15} aria-hidden="true" className={refreshing ? "is-spinning" : ""} />刷新钉钉状态
           </Button>

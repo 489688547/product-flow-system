@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, ShieldCheck } from "lucide-react";
+import { Layers, Plus, RefreshCw, Rss, ShieldCheck } from "lucide-react";
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
@@ -91,7 +91,7 @@ export function SyncRunsWorkspace() {
     { key: "time", header: "执行时间", render: row => row.completedAt || row.startedAt || "—" },
     { key: "source", header: "数据源", render: row => row.sourceName || row.sourceId || "未知来源" },
     { key: "range", header: "数据范围", render: row => [row.from, row.to].filter(Boolean).join(" 至 ") || "—" },
-    { key: "rows", header: "行数", render: row => row.rowCount || 0 },
+    { key: "rows", header: "行数", className: "num", render: row => row.rowCount || 0 },
     { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : row.status === "running" ? "warning" : "danger"}`}>{statusLabel(row.status)}</span> },
     { key: "message", header: "结果", render: row => row.message || "—" }
   ]} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} /></section>;
@@ -99,7 +99,9 @@ export function SyncRunsWorkspace() {
 
 export function DataServicesWorkspace() {
   const { state } = useDataCenter();
-  return <div className="data-workspace"><AiProviderSettings /><section className="data-service-intro"><div><span>DATA SERVICE</span><h2>应用订阅</h2><p>业务 App 只读取数据库，不重复登录店铺后台，也不各自维护指标口径。</p></div><strong>{state.subscriptions.filter(item => item.enabled).length}</strong><small>个启用订阅</small></section><section className="section-panel"><DataTable minWidth={680} columns={[
+  const enabledCount = state.subscriptions.filter(item => item.enabled).length;
+  const cards = [["启用订阅", enabledCount, Rss], ["订阅总数", state.subscriptions.length, Layers]];
+  return <div className="data-workspace"><AiProviderSettings /><div className="data-quality-summary">{cards.map(([label, value, Icon]) => <article key={label}><Icon size={18} /><span>{label}</span><strong>{value}</strong></article>)}</div><section className="section-panel"><div className="section-head"><div><h2>应用订阅</h2><p>业务 App 只读取数据库，不重复登录店铺后台，也不各自维护指标口径。</p></div></div><DataTable minWidth={680} columns={[
     { key: "app", header: "消费 App", render: row => row.appId },
     { key: "dataset", header: "数据集", render: row => row.dataset },
     { key: "version", header: "接口版本", render: row => row.apiVersion },

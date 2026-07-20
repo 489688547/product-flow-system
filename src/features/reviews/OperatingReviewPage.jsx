@@ -27,6 +27,10 @@ function previousMonth() {
   return date.toISOString().slice(0, 7);
 }
 
+function isMonthValue(value) {
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value || "").trim());
+}
+
 function reportStatus(status) {
   const meta = REPORT_STATUS[status] || REPORT_STATUS.draft;
   return <span className={`execution-status ${meta[1]}`}><i />{meta[0]}</span>;
@@ -88,6 +92,7 @@ function ReportActionModal({ action, onClose, onConfirm }) {
 
 function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensureReports, saveMonthlyReport, transitionReport, appendReportCorrection, archiveMonthlyReport }) {
   const [month, setMonth] = useState(previousMonth);
+  const [monthDraft, setMonthDraft] = useState(month);
   const [editor, setEditor] = useState(null);
   const [action, setAction] = useState(null);
   const [deleting, setDeleting] = useState(null);
@@ -110,7 +115,7 @@ function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensur
   return <>
     <div className="monthly-report-toolbar">
       <div className="execution-summary-strip"><span><strong>{reports.length}</strong><small>应汇报部门</small></span><span><strong>{counts.submitted + counts.approved + counts.frozen}</strong><small>已提交</small></span><span><strong>{counts.returned}</strong><small>已退回</small></span><span><strong>{counts.frozen}</strong><small>已冻结</small></span></div>
-      <label>汇报月份<input type="month" value={month} onChange={event => setMonth(event.target.value)} /></label>
+      <label>汇报月份<input type="text" inputMode="numeric" placeholder="YYYY-MM，如 2026-07" value={monthDraft} aria-label="汇报月份" aria-invalid={!isMonthValue(monthDraft) || undefined} onChange={event => setMonthDraft(event.target.value)} onBlur={() => { if (isMonthValue(monthDraft)) setMonth(monthDraft); else setMonthDraft(month); }} onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /></label>
     </div>
     <section className="monthly-report-list" aria-label="部门月报列表">
       <div className="monthly-report-head"><span>部门</span><span>重点成果</span><span>下月重点</span><span>负责人</span><span>状态</span><span>操作</span></div>
@@ -129,7 +134,7 @@ function MonthlyReportWorkspace({ state, currentUser, orgCache, executive, ensur
         {report.meetingConclusion ? <p className="report-meeting-conclusion"><CheckCircle2 size={14} />会议结论：{report.meetingConclusion}</p> : null}
         {(report.corrections || []).map(correction => <p className="report-correction" key={correction.id}>更正：{correction.text} · {correction.actor} · {correction.createdAt?.slice(0, 16).replace("T", " ")}</p>)}
       </article>)}
-      {!visible.length ? <div className="empty-state">当前月份没有需要你处理的部门月报。</div> : null}
+      {!visible.length ? <div className="empty-state">暂无需要你处理的部门月报。</div> : null}
     </section>
     <MonthlyReportEditor open={Boolean(editor)} report={editor} onClose={() => setEditor(null)} onSave={form => { saveMonthlyReport({ ...form, owner: form.owner || currentUser?.name || "", ownerUnionId: form.ownerUnionId || currentUser?.unionId || currentUser?.unionid || "", reviewerName: form.reviewerName || "周荣庆", freezerName: form.freezerName || "周荣庆", dueDate: form.dueDate || `${month}-05` }); setEditor(null); }} />
     <ReportActionModal action={action} onClose={() => setAction(null)} onConfirm={confirmAction} />
@@ -147,7 +152,7 @@ function WeeklyReviewWorkspace({ state, currentUser, executive, saveStatusUpdate
     <section className="company-work-section">
       <div className="panel-title"><CheckCircle2 size={18} /><h2>本周确认记录</h2><Button className="compact" variant="primary" onClick={() => setEditor({ record: null })}><Plus size={15} />提交状态</Button></div>
       {updates.map(update => { const project = state.projects.find(item => item.id === update.projectId); const canEdit = executive || update.owner === currentUser?.name; return <div className="review-update-row" key={update.id}><span className="review-update-date">{update.week?.slice(5) || "本周"}</span><span><strong>{project?.name || "未关联项目"}</strong><small>{update.owner} · {update.change}</small><em>{update.largestRisk}</em></span>{update.needsDecision ? <span className="review-request">需决策</span> : update.needsCoordination ? <span className="review-request">需协调</span> : null}{canEdit ? <span className="row-actions"><button type="button" aria-label="编辑周度确认" onClick={() => setEditor({ record: update })}><Pencil size={14} /></button><button type="button" aria-label="归档周度确认" onClick={() => setDeleting(update)}><Trash2 size={14} /></button></span> : null}</div>; })}
-      {!updates.length ? <div className="empty-state">尚未提交周度状态确认。</div> : null}
+      {!updates.length ? <div className="empty-state">暂无周度状态确认。</div> : null}
     </section>
     <StatusUpdateModal open={Boolean(editor)} record={editor?.record} projects={ownedProjects} currentUser={currentUser} onClose={() => setEditor(null)} onSave={form => { saveStatusUpdate({ ...form, id: form.id || `status-${Date.now()}`, week: form.week || new Date().toISOString().slice(0, 10) }); setEditor(null); }} />
     <ConfirmDialog open={Boolean(deleting)} title="归档周度确认" message={state.projects.find(item => item.id === deleting?.projectId)?.name || "该周度确认"} description="归档后不再显示在经营检查中，历史审计记录会保留。" confirmLabel="确认归档" onClose={() => setDeleting(null)} onConfirm={() => { archiveStatusUpdate(deleting.id); setDeleting(null); }} />
@@ -157,7 +162,7 @@ function WeeklyReviewWorkspace({ state, currentUser, executive, saveStatusUpdate
 function HistoryWorkspace({ state }) {
   return <>
     <section className="company-work-section"><div className="panel-title"><History size={18} /><h2>战略健康度趋势</h2></div><Suspense fallback={<div className="strategy-trend-empty">正在加载趋势…</div>}><StrategyTrendChart snapshots={state.monthlySnapshots} /></Suspense></section>
-    <section className="company-work-section"><div className="panel-title"><History size={18} /><h2>历史快照</h2></div><div className="snapshot-history-list">{[...state.monthlySnapshots].sort((a, b) => String(b.month).localeCompare(String(a.month))).map(snapshot => <div key={snapshot.id}><span><strong>{snapshot.month}</strong><small>{snapshot.conclusion}</small></span><span className="snapshot-health-counts"><HealthBadge health={snapshot.summary?.offTrack ? "off_track" : snapshot.summary?.atRisk ? "at_risk" : "normal"} /><small>正常 {snapshot.summary?.normal || 0} · 风险 {snapshot.summary?.atRisk || 0} · 偏离 {snapshot.summary?.offTrack || 0}</small></span></div>)}{!state.monthlySnapshots.length ? <div className="empty-state">完成首次月度经营检查后，这里会保留不可覆盖的历史。</div> : null}</div></section>
+    <section className="company-work-section"><div className="panel-title"><History size={18} /><h2>历史快照</h2></div><div className="snapshot-history-list">{[...state.monthlySnapshots].sort((a, b) => String(b.month).localeCompare(String(a.month))).map(snapshot => <div key={snapshot.id}><span><strong>{snapshot.month}</strong><small>{snapshot.conclusion}</small></span><span className="snapshot-health-counts"><HealthBadge health={snapshot.summary?.offTrack ? "off_track" : snapshot.summary?.atRisk ? "at_risk" : "normal"} /><small>正常 {snapshot.summary?.normal || 0} · 风险 {snapshot.summary?.atRisk || 0} · 偏离 {snapshot.summary?.offTrack || 0}</small></span></div>)}{!state.monthlySnapshots.length ? <div className="empty-state">暂无历史快照。完成首次月度经营检查后，这里会保留不可覆盖的历史。</div> : null}</div></section>
   </>;
 }
 
