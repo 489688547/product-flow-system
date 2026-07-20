@@ -57,8 +57,9 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 - Company-wide provider credentials must be managed through the 平台连接保险箱. 浏览器、API 响应、日志和审计记录不得暴露任何明文凭据. Validate candidate credentials with a read-only provider request before switching the active version; provider adapters must resolve credentials through the shared vault resolver, with legacy environment variables used only as a fallback.
 - Company documents remain behind the existing authenticated application boundary even when all employees may view them.
 - Validate authorization on the server; hidden UI is not an authorization boundary.
-- Keep local preview, Cloudflare deployment, DingTalk embedded WebView, and external-provider verification separate.
-- Local tests may read production data only through the server-side production data gateway. Cross-environment writes require a hashed personal token, active executive identity, 15-minute unlock, version check, snapshot and audit. Database write access never implies external-provider action access.
+- Keep local code execution, Cloudflare deployment, DingTalk embedded WebView, and external-provider verification as separate verification lanes; local online mode may use the same production account and resources without implying that undeployed code was verified in production.
+- The supported full local runtime is `npm start`: Vite is proxied through Pages Functions, D1 uses the governed remote binding, and a server-only hashed personal token resolves an active executive organization identity on loopback hosts. This real session may use production data and execute DingTalk, Kuaimai, or other provider actions only through the same route authorization and adapters used online. Never fall back to a hard-coded local identity.
+- The production-data repair gateway remains a separate operational path: cross-environment gateway writes require a hashed personal token, active executive identity, 15-minute unlock, version check, snapshot and audit. Database access alone never bypasses provider-route authorization.
 - Do not publish, deploy, send DingTalk actions, or change remote repository settings without the required authorization.
 
 ## Definition of done

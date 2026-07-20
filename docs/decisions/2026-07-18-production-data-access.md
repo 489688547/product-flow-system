@@ -2,7 +2,7 @@
 
 ## 状态
 
-已接受
+已接受；本地日常开发部分由 `2026-07-20-local-online-account.md` 取代，本文继续约束生产数据运维修复网关。
 
 ## 背景
 
@@ -38,3 +38,4 @@
 - 设计书：`docs/features/environment-parity-production-data/design.md`
 - 环境能力：`docs/platform/environment-capabilities.json`
 - 平台集成：`docs/platform/integrations.md`
+- 后续决策：`docs/decisions/2026-07-20-local-online-account.md`
