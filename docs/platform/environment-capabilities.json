@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-18",
+  "updatedAt": "2026-07-20",
   "capabilities": [
     {
       "id": "shared-production-data",
@@ -70,7 +70,7 @@
     {
       "id": "business-data-apps",
       "name": "数据中心、店铺运营与绩效管理",
-      "description": "三个业务 App 的标准数据、经营闭环和绩效归档所需的 D1 持久化能力。",
+      "description": "三个业务 App 的标准数据、版本化数据口径与计算结果、经营闭环和绩效归档所需的 D1 持久化能力。",
       "platforms": ["cloudflare-pages", "cloudflare-d1"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",
@@ -83,6 +83,11 @@
         "data_source_files",
         "data_dimension_mappings",
         "data_metric_definitions",
+        "data_metric_definitions_legacy",
+        "data_metric_definition_versions",
+        "data_metric_results",
+        "data_metric_calculation_runs",
+        "data_metric_audit_logs",
         "data_quality_issues",
         "data_app_subscriptions",
         "data_audit_logs",
