@@ -361,7 +361,7 @@ git commit -m "feat: expose goods flow platform api"
 - Consumes: v1 API resources and existing `SupplyChainProvider` compatibility data.
 - Produces: `useGoodsFlow()` with `{ dashboard, inventory, terms, stocktakes, loading, stale, error, refresh, saveTerm, transitionStocktake, recalculateCcc, freezeCcc }`.
 
-- [ ] **Step 1: Write failing client tests**
+- [x] **Step 1: Write failing client tests**
 
 ```js
 const payload = await fetchGoodsFlowDashboard({ fetchImpl, url: "/api/platform/v1/goods-flow/dashboard" });
@@ -369,13 +369,13 @@ assert.equal(payload.data.metrics.cccDays, 67.4);
 await assert.rejects(() => fetchGoodsFlowDashboard({ fetchImpl: failingFetch }), /上次成功数据/);
 ```
 
-- [ ] **Step 2: Run and verify missing client failure**
+- [x] **Step 2: Run and verify missing client failure**
 
 Run: `node --test react-tests/goods-flow-state.test.mjs`
 
 Expected: FAIL because the API client does not exist.
 
-- [ ] **Step 3: Implement request helpers and provider**
+- [x] **Step 3: Implement request helpers and provider**
 
 The client converts stable API errors to Chinese messages but retains `code`, `requestId` and `retryable`. The provider keeps the most recent successful projection when refresh fails and sets `stale: true`; it does not persist financial facts in `localStorage`.
 
@@ -396,7 +396,7 @@ export function GoodsFlowProvider({ children, enabled = true }) {
 }
 ```
 
-- [ ] **Step 4: Wire the provider under authenticated supply access**
+- [x] **Step 4: Wire the provider under authenticated supply access**
 
 ```jsx
 <SupplyChainProvider enabled={hasSupplyChainAccess}>
@@ -406,7 +406,9 @@ export function GoodsFlowProvider({ children, enabled = true }) {
 </SupplyChainProvider>
 ```
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
+
+Actual verification: `node --test react-tests/goods-flow-state.test.mjs react-tests/platform-ui.test.mjs` (17 tests passed); focused ESLint and `git diff --check` passed. Financial facts remain memory-only and a failed refresh preserves the last successful projection with `stale: true`.
 
 Run: `node --test react-tests/goods-flow-state.test.mjs react-tests/platform-ui.test.mjs`
 
