@@ -34,6 +34,14 @@ const ALTERNATE_AUTH_PATHS = new Set([
   "/api/platform/v1/environment-readiness"
 ]);
 
+const SELF_AUTHENTICATING_PATH_PREFIXES = [
+  "/api/platform/v1/data-standards"
+];
+
+function usesRouteAuthentication(path) {
+  return SELF_AUTHENTICATING_PATH_PREFIXES.some(prefix => path === prefix || path.startsWith(`${prefix}/`));
+}
+
 export async function onRequest(context) {
   if (context.request.method === "OPTIONS") return optionsResponse();
   const previewSession = localLivePreviewSession(context.request, context.env);
@@ -52,7 +60,7 @@ export async function onRequest(context) {
     context.data.session = session;
     return context.next();
   }
-  if (ALTERNATE_AUTH_PATHS.has(path)) return context.next();
+  if (ALTERNATE_AUTH_PATHS.has(path) || usesRouteAuthentication(path)) return context.next();
 
   return jsonResponse({
     authenticated: false,

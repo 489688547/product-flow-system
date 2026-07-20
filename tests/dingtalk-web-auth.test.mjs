@@ -9,6 +9,8 @@ import {
 } from "../functions/api/auth/_shared/session.js";
 import { onRequest as apiMiddleware } from "../functions/api/_middleware.js";
 import { onRequest as stateRequest } from "../functions/api/state.js";
+import { onRequest as dataStandardsRequest } from "../functions/api/platform/v1/data-standards.js";
+import { onRequest as dataStandardItemRequest } from "../functions/api/platform/v1/data-standards/[id].js";
 import { onRequest as startBrowserLogin } from "../functions/api/auth/dingtalk/start.js";
 import { onRequest as finishBrowserLogin } from "../functions/api/auth/dingtalk/callback.js";
 import { onRequest as embeddedLogin } from "../functions/api/auth/dingtalk/embedded.js";
@@ -364,6 +366,59 @@ test("API middleware blocks anonymous company data", async () => {
   assert.equal(response.status, 401);
   assert.equal(continued, false);
   assert.equal(body.authenticated, false);
+});
+
+test("data standards owns its anonymous contract without changing unrelated middleware protection", async () => {
+  const cases = [
+    {
+      request: new Request("https://flow.example.com/api/platform/v1/data-standards"),
+      route: dataStandardsRequest
+    },
+    {
+      request: new Request("https://flow.example.com/api/platform/v1/data-standards/standard-1"),
+      route: context => dataStandardItemRequest({ ...context, params: { id: "standard-1" } })
+    }
+  ];
+
+  for (const entry of cases) {
+    const data = {};
+    let continued = false;
+    const response = await apiMiddleware({
+      request: entry.request,
+      env: {},
+      data,
+      next: async () => {
+        continued = true;
+        return entry.route({ request: entry.request, env: {}, data });
+      }
+    });
+    const payload = await response.json();
+
+    assert.equal(continued, true);
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    assert.equal(payload.error.code, "AUTH_SESSION_REQUIRED");
+    assert.equal(typeof payload.error.requestId, "string");
+    assert.equal(payload.error.retryable, false);
+  }
+
+  let unrelatedContinued = false;
+  const unrelated = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/state"),
+    env: { PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: {},
+    next: async () => {
+      unrelatedContinued = true;
+      return Response.json({ ok: true });
+    }
+  });
+
+  assert.equal(unrelated.status, 401);
+  assert.equal(unrelatedContinued, false);
+  assert.deepEqual(await unrelated.json(), {
+    authenticated: false,
+    message: "请先使用钉钉登录。"
+  });
 });
 
 test("API middleware attaches an authenticated session before continuing", async () => {
