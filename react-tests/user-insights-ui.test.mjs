@@ -9,7 +9,8 @@ const read = path => readFileSync(resolve(root, path), "utf8");
 test("data center registers user insights as a first-level tab", () => {
   const app = read("src/App.jsx");
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
-  assert.match(app, /data-overview[\s\S]*data-insights[\s\S]*data-analysis/);
+  assert.match(app, /data-overview[\s\S]*data-insights[\s\S]*data-products/);
+  assert.doesNotMatch(app, /"data-analysis", "数据分析"/);
   assert.match(app, /"data-insights", "用户洞察"/);
   assert.match(page, /insights: <UserInsightsProvider>[\s\S]*<UserInsightsWorkspace/);
   assert.match(page, /用户洞察/);

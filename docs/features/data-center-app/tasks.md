@@ -51,8 +51,9 @@
 
 ## 后续阶段
 
-- [ ] 公司 Mac 采集器、机器身份和短时 task grant。
-- [ ] 每日 `07:30` 调度、人工验证恢复与最近日期重拉。
+- [x] 公司 Mac 采集器、机器身份和短时 task grant 协议；生产机器已注册并用 bearer 身份成功领取任务。
+- [x] 每日 `07:30` 调度已安装到公司 Mac，首次运行成功且无待领取任务。
+- [ ] 人工验证恢复与最近日期重拉。
 - [ ] 按月历史回填、幂等覆盖和数据质量闸门。
 - [ ] 钉钉账密表 `总表` 的授权预览与一次性加密迁移。
 - [ ] 抖音、巨量、快手、淘系、拼多多、小红书、京东/京麦和快麦逐一真实验证；只有具备成功证据后从 `planned` 改为已接通。
@@ -158,13 +159,15 @@
 - [x] Cloudflare Pages 已发布至 `0651f8ca.product-flow-system.pages.dev`，正式域名已返回本次 `index-D9YC06K4.js` / `index-8kv0LHtc.css`；匿名口径接口返回预期 401，登录态显示“线上数据库”。
 - [x] Production D1 只读核验：11 个定义、11 个版本，库大小约 7.27 MB；已生成 2026-07-01 至 2026-07-19 的 5 项当前结果，因销售事实尚未补入 7 月而诚实保存为 `DATA_NOT_COVERED` / 覆盖率 0%。现有销售事实仅覆盖 2026-06-01 至 2026-06-30，共 16,501 行。
 - [x] 线上抖音连接弹窗不再显示“加密主密钥不可用”；当前凭证表仍为 0 条，因此未替用户重填或传输截图中的密码。
-- [ ] `verify:production` 的 Cloudflare D1/Pages 两项受控检查因本机缺少 `PRODUCTION_DATA_ACCESS_TOKEN` 受阻；钉钉 WebView、真实凭证保存和真实外部平台登录仍独立验收，不用浏览器或本地结果冒充完成。
+- [x] `verify:production` 已通过 Cloudflare Pages、Production D1、抖音、钉钉和浏览器采集器能力检查；匿名新接口按预期返回 401。
+- [ ] 钉钉 WebView、旧凭证迁移、抖音真实登录与店铺身份识别仍需近期重新认证及可能出现的人工验证码，不用浏览器或本地结果冒充完成。
 
 实际提交：`07c4657`、`ff3ec7d`、`8839745`、`bdb4502`、`d7fdde3`、`a5a9510`、`a5fd8e8`、`6d2e514`、`8ee15a4`。
 
 ## 通用数据连接与抖音身份识别（2026-07-20）
 
-- [ ] 复用现有数据中心凭据保险箱，完成通用 provider/credential/task/resource/result-writer 协议和抖音 `connection_identity` 首个 adapter。
+- [x] 复用现有数据中心凭据保险箱，完成通用 provider/credential/task/resource/result-writer 协议和抖音 `connection_identity` 首个 adapter。
 - [x] 失败测试覆盖通用账户与保险箱引用、一次性 grant、敏感结果拒绝、固定域名、人工验证和店铺 ID 去重。
 - [x] 抖音弹窗收敛为邮箱、密码，识别结果列表只展示店铺头像、名称和业务状态；其他 ERP/平台连接器目录继续保留。
-- [ ] 全量门禁、真实公司 Mac Chrome、Production D1 和钉钉 WebView 验收完成后勾选。
+- [x] 全量门禁、真实公司 Mac 采集器、Production D1 迁移与线上 Pages 验收完成。
+- [ ] 钉钉 WebView 与抖音真实登录/人工验证验收完成后勾选。
