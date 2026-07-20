@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DatePickerField } from "../../ui/DatePickerField.jsx";
@@ -10,10 +11,12 @@ const EMPTY = { developmentStart: "", launchDate: "" };
 export function ProductPlanModal({ open, demand, plan, initialDates, canEdit, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState("");
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   useEffect(() => {
     if (!open) return;
     setForm({ ...EMPTY, ...(plan || {}), ...(initialDates || {}) });
     setError("");
+    setConfirmingDelete(false);
   }, [initialDates, open, plan]);
   const set = patch => setForm(current => ({ ...current, ...patch }));
   const save = () => {
@@ -22,10 +25,11 @@ export function ProductPlanModal({ open, demand, plan, initialDates, canEdit, on
     onSave(form);
   };
   const remove = () => {
-    if (!plan || !window.confirm("确认删除这条产品规划？删除后不可恢复。")) return;
-    onDelete(plan.id);
+    if (!plan) return;
+    setConfirmingDelete(true);
   };
   return (
+    <>
     <Modal
       open={open}
       title={plan ? "编辑产品规划" : "安排产品规划"}
@@ -50,5 +54,17 @@ export function ProductPlanModal({ open, demand, plan, initialDates, canEdit, on
       </div>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
     </Modal>
+    <ConfirmDialog
+      open={confirmingDelete}
+      title="删除产品规划"
+      message={plan ? `确认删除“${plan.demandSnapshot?.name || demand?.name || "该产品"}”的这条产品规划？` : ""}
+      description="删除后不可恢复。"
+      onClose={() => setConfirmingDelete(false)}
+      onConfirm={() => {
+        setConfirmingDelete(false);
+        if (plan) onDelete(plan.id);
+      }}
+    />
+    </>
   );
 }

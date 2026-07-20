@@ -11,29 +11,36 @@ function userRecord(orgCache, name) {
 
 export function DecisionConfirmModal({ open, decision, accounts, orgCache, saving, onClose, dispatch }) {
   const [form, setForm] = useState({ quantity: 1, contentDirection: "", targetAccount: "", directorName: "", editorName: "", operatorName: "", dueAt: "", reviewAt: "" });
+  const [confirmError, setConfirmError] = useState("");
   useEffect(() => {
     if (!open || !decision) return;
+    setConfirmError("");
     setForm({ quantity: Math.max(1, Number(decision.quantity || 1)), contentDirection: decision.contentDirection || "", targetAccount: decision.targetAccount || accounts[0]?.name || "", directorName: "", editorName: "", operatorName: "", dueAt: "", reviewAt: decision.reviewAt || "" });
   }, [accounts, decision, open]);
   if (!decision) return null;
   const set = patch => setForm(current => ({ ...current, ...patch }));
   const missing = Number(form.quantity) < 1 || !form.contentDirection.trim() || !form.targetAccount || !form.directorName || !form.editorName || !form.operatorName || !form.dueAt || !form.reviewAt;
   const confirm = async () => {
+    setConfirmError("");
     const director = userRecord(orgCache, form.directorName);
     const editor = userRecord(orgCache, form.editorName);
     const operator = userRecord(orgCache, form.operatorName);
-    await dispatch({
-      type: "confirm_decision",
-      id: decision.id,
-      input: {
-        ...form,
-        quantity: Number(form.quantity),
-        directorId: director.id,
-        editorId: editor.id,
-        operatorId: operator.id
-      }
-    });
-    onClose();
+    try {
+      await dispatch({
+        type: "confirm_decision",
+        id: decision.id,
+        input: {
+          ...form,
+          quantity: Number(form.quantity),
+          directorId: director.id,
+          editorId: editor.id,
+          operatorId: operator.id
+        }
+      });
+      onClose();
+    } catch (event) {
+      setConfirmError(event?.message || "确认补充失败，请稍后重试。");
+    }
   };
   return (
     <Modal open={open} title={`确认补充 · ${decision.productName}`} onClose={onClose} size="wide" footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={missing || saving} disabledReason="请填写数量、内容方向、目标账户、三名主责任人、截止时间和复盘日期" onClick={confirm}>{saving ? "正在创建…" : `确认并创建 ${form.quantity} 条任务`}</Button></>}>
@@ -48,6 +55,7 @@ export function DecisionConfirmModal({ open, decision, accounts, orgCache, savin
         <label>截止时间<DatePickerField value={form.dueAt} onChange={dueAt => set({ dueAt })} ariaLabel="选择内容截止时间" /></label>
         <label>复盘日期<DatePickerField value={form.reviewAt} onChange={reviewAt => set({ reviewAt })} ariaLabel="选择内容复盘日期" /></label>
       </div>
+      {confirmError ? <p className="form-error" role="alert">{confirmError}</p> : null}
     </Modal>
   );
 }

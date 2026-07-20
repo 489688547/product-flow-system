@@ -77,6 +77,8 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const [monthlyGmvDraft, setMonthlyGmvDraft] = useState("");
   const [draggedTaskId, setDraggedTaskId] = useState("");
   const [taskToDelete, setTaskToDelete] = useState(null);
+  const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
+  const [stageChangeConfirmOpen, setStageChangeConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (loading) return;
@@ -134,17 +136,13 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     });
   };
   const handleReturnProduct = () => {
-    const message = "退回需求池会清空这个产品的进度、任务、资料包和评审记录，确认继续？";
-    if (window.confirm(message)) returnProductToDemand(selectedProduct.id);
+    setReturnConfirmOpen(true);
   };
   const handleSetCurrentStage = () => {
     if (selectedStage === selectedProduct.stage) return;
-    const movingBackward = selectedStage < Number(selectedProduct.stage || 1);
-    const message = movingBackward
-      ? `确认回退到第 ${selectedStage} 阶段？后续阶段的任务完成状态和会议纪要会被清除。`
-      : `确认将第 ${selectedStage} 阶段设为当前阶段？`;
-    if (window.confirm(message)) setProductStage(selectedProduct.id, selectedStage);
+    setStageChangeConfirmOpen(true);
   };
+  const stageMovingBackward = selectedStage < Number(selectedProduct.stage || 1);
   const openDeliverable = file => setPreviewDeliverable(file);
   const handleTaskDrop = (event, targetTaskId) => {
     event.preventDefault();
@@ -403,6 +401,30 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
         onConfirm={() => {
           deleteTask(taskToDelete.id);
           setTaskToDelete(null);
+        }}
+      />
+      <ConfirmDialog
+        open={returnConfirmOpen}
+        title="退回需求池"
+        message={`确认将“${selectedProduct.name || "该产品"}”退回需求池？`}
+        description="退回会清空这个产品的进度、任务、资料包和评审记录，删除后无法恢复。"
+        confirmLabel="退回需求池"
+        onClose={() => setReturnConfirmOpen(false)}
+        onConfirm={() => {
+          returnProductToDemand(selectedProduct.id);
+          setReturnConfirmOpen(false);
+        }}
+      />
+      <ConfirmDialog
+        open={stageChangeConfirmOpen}
+        title="设为当前阶段"
+        message={stageMovingBackward ? `确认回退到第 ${selectedStage} 阶段？` : `确认将第 ${selectedStage} 阶段设为当前阶段？`}
+        description={stageMovingBackward ? "后续阶段的任务完成状态和会议纪要会被清除。" : ""}
+        confirmLabel="设为当前阶段"
+        onClose={() => setStageChangeConfirmOpen(false)}
+        onConfirm={() => {
+          setProductStage(selectedProduct.id, selectedStage);
+          setStageChangeConfirmOpen(false);
         }}
       />
       <TodoSyncModal

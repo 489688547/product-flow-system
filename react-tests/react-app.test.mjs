@@ -148,7 +148,8 @@ test("annual product planning uses one development-to-launch period and overwrit
   assert.doesNotMatch(modal, /launchStart/);
   assert.doesNotMatch(modal, /developmentEnd/);
   assert.match(modal, /validateProductPlan/);
-  assert.match(modal, /window\.confirm\("确认删除这条产品规划/);
+  assert.match(modal, /<ConfirmDialog/);
+  assert.match(modal, /的这条产品规划/);
   assert.match(styles, /\.planning-timeline/);
   assert.match(styles, /\.planning-product-column/);
   assert.match(styles, /\.planning-bar\.period/);
@@ -223,7 +224,8 @@ test("demand pool supports rich text, status filtering, and clear project conver
   assert.match(page, /data-testid="convert-demand"/);
   assert.match(page, />立项</);
   assert.match(page, /disabled=\{!canConvertDemandToProject\(demand\)\}/);
-  assert.match(page, /window\.confirm\("确认删除这个需求机会/);
+  assert.match(page, /<ConfirmDialog/);
+  assert.match(page, /删除需求机会/);
   assert.match(page, /currentUser/);
   assert.match(page, /orgCache=\{orgCache\}/);
   assert.match(page, /key: "requester", header: "提需人"/);
@@ -316,7 +318,7 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /设为当前阶段/);
   assert.match(page, /当前阶段/);
   assert.match(page, /setProductStage/);
-  assert.match(page, /window\.confirm\(message\)/);
+  assert.match(page, /confirmLabel="设为当前阶段"/);
   assert.doesNotMatch(page, /同步默认任务/);
   assert.doesNotMatch(page, /syncDefaultTasksForProduct\(selectedProduct\.id\)/);
   assert.match(page, /该等级不涉及/);
@@ -378,7 +380,7 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(meetingModal, /orgUsers\(orgCache\)/);
   assert.match(meetingModal, /type="datetime-local"/);
   assert.match(meetingModal, /同步到钉钉日程/);
-  assert.match(meetingModal, /meeting-loading-layer/);
+  assert.match(meetingModal, /<FullScreenLoading visible=\{submitting\}/);
   assert.ok(pkg.dependencies["react-day-picker"]);
   assert.match(datePicker, /DayPicker/);
   assert.match(datePicker, /<FloatingMenu/);
@@ -467,7 +469,7 @@ test("product tasks expose configured DingTalk document templates beside deliver
   assert.match(modal, /钉钉文档模板/);
   assert.match(modal, /document\.name/);
   assert.match(modal, /window\.open\(document\.url, "_blank", "noopener,noreferrer"\)/);
-  assert.match(styles, /\.task-template-open\s*\{[^}]*height: 30px;/s);
+  assert.match(styles, /\.task-template-open\s*\{[^}]*height: 40px;/s);
   assert.match(styles, /\.task-template-document\s*\{[^}]*grid-template-columns:/s);
 });
 
@@ -662,7 +664,8 @@ test("package manager uses preview-first file cards with edit download and delet
   assert.match(packages, /addDeliverable/);
   assert.match(packages, /updateDeliverable/);
   assert.match(packages, /deleteDeliverable/);
-  assert.match(packages, /window\.confirm\("确认删除这个文件/);
+  assert.match(packages, /<ConfirmDialog/);
+  assert.match(packages, /删除文件/);
   assert.doesNotMatch(packages, /window\.open/);
   assert.match(packages, /file-card/);
   assert.match(packages, /file-card-overlay/);

@@ -1,21 +1,12 @@
 import { Send } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { orgUsers } from "../../domain/productFlow.js";
 import { normalizeTaskDueDate, todoSyncStatus } from "../../domain/taskTodo.js";
 import { initialExecutorSelection, selectedExecutorUsers } from "../../domain/dingTalkGroupSelection.js";
 import { Button } from "../../ui/Button.jsx";
+import { FullScreenLoading } from "../../ui/FullScreenLoading.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { GroupExecutorPicker } from "./GroupExecutorPicker.jsx";
-
-function TodoLoading() {
-  return createPortal(
-    <div className="meeting-loading-layer" role="status" aria-live="assertive">
-      <div className="meeting-loading-card"><span className="loading-spinner" />正在同步到钉钉待办…</div>
-    </div>,
-    document.body
-  );
-}
 
 export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }) {
   const users = useMemo(() => orgUsers(orgCache), [orgCache]);
@@ -64,7 +55,7 @@ export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }
         {!normalizedDue ? <div className="form-error" role="alert">请先关闭弹窗，为任务设置有效的截止日期。</div> : null}
         {error ? <div className="form-error" role="alert">{error}</div> : null}
       </Modal>
-      {submitting ? <TodoLoading /> : null}
+      <FullScreenLoading visible={submitting} message="正在同步到钉钉待办…" />
     </>
   );
 }

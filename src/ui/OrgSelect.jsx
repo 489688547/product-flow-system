@@ -30,10 +30,12 @@ export function OrgSelect({ type = "user", value = "", onChange, orgCache, place
   const selected = items.find(item => item.value === selectedValues[0]);
   const selectedLabel = multiple ? selectedValues.join(" / ") : selected?.value || selectedValues[0];
   const normalizedQuery = query.trim().toLowerCase();
-  const filteredItems = items
+  const matchedItems = useMemo(() => items
     .filter(item => !normalizedQuery || item.label.toLowerCase().includes(normalizedQuery))
-    .sort((left, right) => Number(selectedValues.includes(right.value)) - Number(selectedValues.includes(left.value)))
-    .slice(0, 80);
+    .sort((left, right) => Number(selectedValues.includes(right.value)) - Number(selectedValues.includes(left.value))),
+  [items, normalizedQuery, selectedValues]);
+  const filteredItems = useMemo(() => matchedItems.slice(0, 80), [matchedItems]);
+  const isTruncated = matchedItems.length > filteredItems.length;
   const inputLabel = label || placeholder || (type === "department" ? "搜索部门" : type === "title" ? "搜索岗位" : "搜索姓名、岗位、部门");
   const closeMenu = () => {
     setQuery("");
@@ -99,7 +101,7 @@ export function OrgSelect({ type = "user", value = "", onChange, orgCache, place
             name={type === "department" ? "department-search" : "organization-user-search"}
             autoComplete="off"
             value={open ? query : value}
-            onFocus={() => { setQuery(""); setActiveIndex(Math.max(0, items.findIndex(item => item.value === value))); setOpen(true); }}
+            onFocus={() => { setQuery(""); setActiveIndex(Math.max(0, filteredItems.findIndex(item => item.value === value))); setOpen(true); }}
             onClick={() => setOpen(true)}
             onChange={event => {
               setQuery(event.target.value);
@@ -156,6 +158,7 @@ export function OrgSelect({ type = "user", value = "", onChange, orgCache, place
             {selectedValues.includes(item.value) ? <Check size={14} aria-hidden="true" /> : null}
           </button>
         )) : <div className="org-select-empty">没有匹配的组织成员或部门</div>}
+        {isTruncated ? <div className="org-select-empty" role="note">仅显示前 80 条，请继续输入筛选</div> : null}
       </FloatingMenu>
       {!searchInMenu && selected?.meta ? <small>{selected.meta}</small> : null}
     </div>
