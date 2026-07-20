@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  DATA_CENTER_PERSISTED_COLLECTIONS,
   buildDataQualitySummary,
   createDefaultDataCenterState,
   defaultDataCenterRange,
@@ -9,6 +10,11 @@ import {
   reduceDataCenterState,
   summarizeDataCenterSales
 } from "../src/domain/dataCenter.js";
+
+test("data center keeps legacy metric definitions read-only and out of generic persistence", () => {
+  assert.ok(createDefaultDataCenterState().metricDefinitions.length > 0);
+  assert.ok(!DATA_CENTER_PERSISTED_COLLECTIONS.includes("metricDefinitions"));
+});
 
 test("data center defaults to the month containing yesterday in Shanghai", () => {
   assert.deepEqual(defaultDataCenterRange(new Date("2026-07-18T04:00:00.000Z")), {

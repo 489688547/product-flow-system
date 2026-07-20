@@ -10,6 +10,11 @@ export const DATA_CENTER_COLLECTIONS = [
   "auditLogs"
 ];
 
+// Shared data-standard definitions are only retained here for old readers while
+// the API migration is in progress. Generic data-center writes must not replace
+// the governed definition collection.
+export const DATA_CENTER_PERSISTED_COLLECTIONS = DATA_CENTER_COLLECTIONS.filter(collection => collection !== "metricDefinitions");
+
 export const DATA_CENTER_STATUS = [
   "healthy",
   "running",
@@ -129,7 +134,8 @@ export function createDefaultDataCenterState() {
         timezone: "Asia/Shanghai",
         excludeOther: true,
         owner: "财务部",
-        version: 1
+        version: 1,
+        readOnly: true
       },
       {
         id: "gross-profit",
@@ -140,7 +146,8 @@ export function createDefaultDataCenterState() {
         timezone: "Asia/Shanghai",
         excludeOther: true,
         owner: "财务部",
-        version: 1
+        version: 1,
+        readOnly: true
       }
     ],
     qualityIssues: [],
