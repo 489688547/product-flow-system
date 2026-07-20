@@ -117,12 +117,26 @@ test("operations save a connector as pending validation and finance can read it"
   assert.equal(savedPayload.instance.timeBasis, "create_time");
   assert.equal(savedPayload.instance.timezone, "Asia/Shanghai");
   assert.equal(savedPayload.instance.schedule, "07:30");
+  assert.equal(savedPayload.instance.createdBy, operator.name);
+  assert.equal(savedPayload.instance.updatedBy, operator.name);
 
   const listed = await onRequest({ request: request(), env: { PRODUCT_FLOW_DB: db }, data: { session: finance } });
   const payload = await listed.json();
   assert.equal(payload.connectors.length, 1);
   assert.equal(payload.connectors[0].credentialEntryId, "cred-1");
   assert.equal(JSON.stringify(payload).includes("password"), false);
+});
+
+test("connector audit actors are derived from the authenticated session", async () => {
+  const db = createD1Mock();
+  const forged = await onRequest({
+    request: request("PUT", { expectedVersion: 0, instance: { ...instance, createdBy: "伪造负责人", updatedBy: "伪造负责人" } }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: operator }
+  });
+  assert.equal(forged.status, 400);
+  assert.equal((await forged.json()).synced, false);
+  assert.equal(db.connectors.size, 0);
 });
 
 test("connector API rejects secret fields and credential URLs", async () => {
