@@ -54,7 +54,7 @@
 
 - 唯一业务数据库为 `product-flow-system`。
 - `PRODUCT_FLOW_DB` 在本地、Preview、Production 均绑定到同一个数据库 ID。
-- `wrangler.toml` 必须显式声明顶层、`env.preview` 和 `env.production` 的 D1 绑定；生成的平台清单和契约测试校验三处一致。
+- `wrangler.toml` 必须显式声明顶层、`env.preview` 和 `env.production` 的 D1 绑定；Pages 不支持在 Wrangler 文件中声明 Secret，因此必要 Secret 名称继续由环境能力清单定义，远程检查分别读取 Preview 与 Production 的加密变量名称。
 - 本地只允许通过 `npm start` 启动 Vite 和 Pages Functions，Wrangler 使用受治理的远程 D1 绑定。
 
 ### 平台连接保险箱
@@ -82,7 +82,7 @@
 
 - `quality` 必须运行 `npm run check:branch-base`、治理、集成和环境能力检查。
 - GitHub 保持“分支必须更新到最新 main”“quality 必须通过”“管理员不可绕过”。
-- 环境契约测试检查 Preview 与 Production 的 D1 ID、绑定名称和必要 Secret 声明一致。
+- 环境契约测试检查 Preview 与 Production 的 D1 ID、绑定名称一致，并以环境能力清单核对远程必要 Secret 名称。
 - PR 修改 D1、Secret 名称、平台关系或发布边界时，必须声明 `Integration-Impact` 和 `Rule-Writeback` 并更新持久规则。
 
 ### 部署与验收

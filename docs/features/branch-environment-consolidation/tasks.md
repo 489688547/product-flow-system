@@ -17,11 +17,12 @@
   - 输出：任何分支都必须包含最新 `origin/main` 才能运行完整本地环境。
   - 验证：`node --test tests/branch-base-check.test.mjs tests/local-online-start.test.mjs`，5/5 通过；本地 `main` 分叉、普通分支最新和 fetch 失败均已覆盖。
 
-- [ ] Pages 三环境契约
+- [x] Pages 三环境契约
   - 依赖：最新分支启动门禁。
   - 文件：`tests/pages-environment-parity.test.mjs`、`scripts/check-pages-environment-parity.mjs`、`wrangler.toml`、`package.json`、`tests/environment-capabilities.test.mjs`。
-  - 失败测试：D1 ID 或必要 Secret 声明漂移时失败且不输出值。
+  - 失败测试：D1 ID 漂移、环境清单遗漏必要 Secret 或远程 Secret 缺失时失败且不输出值。
   - 输出：本地、Preview、Production 同 D1 的静态与远端检查。
+  - 验证：聚焦测试 12/12 通过，静态检查通过；远程检查准确阻断并仅报告 Preview 缺少的 6 个 Secret 名称。
 
 - [ ] 共享主密钥与 Preview Secret 配置器
   - 依赖：Pages 三环境契约。

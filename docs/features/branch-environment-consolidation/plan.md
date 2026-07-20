@@ -21,9 +21,9 @@
 
 - `scripts/check-branch-base.mjs`：验证任何当前分支（包括本机名为 `main` 的分支）是否包含最新 `origin/main`，可选择先刷新远端引用。
 - `scripts/start-local-online.mjs`：启动子进程前执行最新分支基线检查。
-- `scripts/check-pages-environment-parity.mjs`：静态校验 Wrangler 三环境 D1/Secret 契约，并在 `--remote` 下核对 Cloudflare Preview/Production 的绑定和 Secret 名称。
+- `scripts/check-pages-environment-parity.mjs`：静态校验 Wrangler 三环境 D1 契约，以环境能力清单推导必要 Secret，并在 `--remote` 下核对 Cloudflare Preview/Production 的绑定和 Secret 名称。
 - `scripts/configure-pages-environment-parity.mjs`：在保险箱为空的前提下生成共享主密钥，以标准输入设置 Preview/Production Secret，不打印值，并更新被忽略的本地 `.env`。
-- `wrangler.toml`：显式声明本地、Preview、Production 的同一 D1 和必要 Secret 名称。
+- `wrangler.toml`：显式声明本地、Preview、Production 的同一 D1；Pages 不支持 Wrangler Secret 段，Secret 名称保留在环境能力清单。
 - `tests/branch-base-check.test.mjs`：覆盖主分支分叉、普通分支落后、最新分支和刷新失败。
 - `tests/pages-environment-parity.test.mjs`：覆盖 D1 ID 漂移、缺失 Secret、远端解析和敏感值不出现在结果中。
 - `tests/configure-pages-environment-parity.test.mjs`：覆盖保险箱非空中止、Secret 走 stdin、`.env` 安全更新和幂等执行。
@@ -83,9 +83,9 @@
 **Interfaces:**
 - Produces: `assertPagesEnvironmentParity`、`parsePagesSecretList`、`inspectRemotePagesParity`。
 
-- [ ] 写失败测试：顶层、Preview、Production 任一 D1 ID 不同或缺少 `PLATFORM_CREDENTIAL_MASTER_KEY`、钉钉及快麦必要 Secret 时失败；错误不得包含模拟 Secret 值。
+- [ ] 写失败测试：顶层、Preview、Production 任一 D1 ID 不同时失败；环境清单必须推导出 `PLATFORM_CREDENTIAL_MASTER_KEY`、钉钉及快麦必要 Secret；错误不得包含模拟 Secret 值。
 - [ ] 运行 `node --test tests/pages-environment-parity.test.mjs tests/environment-capabilities.test.mjs`，预期因脚本和环境段缺失失败。
-- [ ] 实现静态解析和远端 Wrangler 检查；在 `wrangler.toml` 三处声明相同 D1，在三个环境声明必要 Secret；新增 `check:pages-environment-parity`。
+- [ ] 实现静态解析和远端 Wrangler 检查；在 `wrangler.toml` 三处声明相同 D1，以环境清单作为必要 Secret 名称来源；新增 `check:pages-environment-parity`。
 - [ ] 运行聚焦测试和 `npm run check:pages-environment-parity`，预期通过；提交 `feat(platform): enforce Pages environment parity`。
 
 ## Task 3: 安全配置共享主密钥与 Preview Secret

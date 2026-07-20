@@ -12,6 +12,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 8133",
     "check:governance": "node scripts/check-project-governance.mjs",
     "check:branch-base": "node scripts/check-branch-base.mjs",
+    "check:pages-environment-parity": "node scripts/check-pages-environment-parity.mjs",
     "check:integrations": "node scripts/check-integration-impact.mjs",
     "generate:platform-manifests": "node scripts/generate-platform-manifests.mjs",
     "check:environment-capabilities": "node scripts/generate-platform-manifests.mjs --check",

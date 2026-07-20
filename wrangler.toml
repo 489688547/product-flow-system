@@ -10,3 +10,21 @@ binding = "PRODUCT_FLOW_DB"
 database_name = "product-flow-system"
 database_id = "64389843-2c2f-4781-862d-48fe27caa012"
 remote = true
+
+[env.preview.vars]
+LOCAL_ONLINE_ACCOUNT_MODE = "1"
+
+[[env.preview.d1_databases]]
+binding = "PRODUCT_FLOW_DB"
+database_name = "product-flow-system"
+database_id = "64389843-2c2f-4781-862d-48fe27caa012"
+remote = true
+
+[env.production.vars]
+LOCAL_ONLINE_ACCOUNT_MODE = "1"
+
+[[env.production.d1_databases]]
+binding = "PRODUCT_FLOW_DB"
+database_name = "product-flow-system"
+database_id = "64389843-2c2f-4781-862d-48fe27caa012"
+remote = true

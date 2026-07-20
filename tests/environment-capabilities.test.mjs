@@ -51,6 +51,15 @@ test("platform credential vault declares its root secret migration and affected 
   assert.equal(kuaimai.envVars.includes("KUAIMAI_ACCESS_TOKEN"), true);
 });
 
+test("Pages declares explicit local Preview and Production D1 environment parity", () => {
+  const wrangler = readFileSync(resolve(root, "wrangler.toml"), "utf8");
+  assert.match(wrangler, /\[\[d1_databases\]\]/);
+  assert.match(wrangler, /\[\[env\.preview\.d1_databases\]\]/);
+  assert.match(wrangler, /\[\[env\.production\.d1_databases\]\]/);
+  assert.doesNotMatch(wrangler, /\[.*secrets\]/, "Pages rejects Wrangler secret sections");
+  assert.equal(existsSync(resolve(root, "scripts/check-pages-environment-parity.mjs")), true);
+});
+
 test("company assistant declares Provider secrets and production D1 schema", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "company-ai-assistant");
