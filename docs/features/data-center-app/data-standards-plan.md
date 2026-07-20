@@ -416,9 +416,9 @@ git commit -m "feat(platform): version metric calculation results"
 - Modify: `src/main.jsx`
 - Modify: `src/state/DataCenterProvider.jsx`
 
-- [ ] 6.1 先写失败测试，覆盖 URL、过滤参数、CRUD body 白名单、错误码保留、结果轮询停止条件、卸载取消、范围变化去抖、无权限不发写请求、不会把定义/结果写入 localStorage。
+- [x] 6.1 先写失败测试，覆盖 URL、过滤参数、CRUD body 白名单、错误码保留、结果轮询停止条件、卸载取消、范围变化去抖、无权限不发写请求、不会把定义/结果写入 localStorage。
 
-- [ ] 6.2 实现客户端唯一入口：
+- [x] 6.2 实现客户端唯一入口：
 
 ```js
 export function loadDataStandards(filters, fetchImpl = fetch) {}
@@ -431,11 +431,11 @@ export function requestMetricCalculation(input, fetchImpl = fetch) {}
 export function loadMetricResults(query, fetchImpl = fetch) {}
 ```
 
-- [ ] 6.3 `DataStandardsProvider` 管理目录、筛选、详情、saving、errors、结果和 run 轮询。`ensureResults(range, SALES_OVERVIEW_METRIC_CODES)` 先 GET 当前结果；缺失或版本过期时 POST `ensure_current`，每 800ms 轮询，最大 20 次，超时后保留可重试错误。
+- [x] 6.3 `DataStandardsProvider` 管理目录、筛选、详情、saving、errors、结果和 run 轮询。`ensureResults(range, SALES_OVERVIEW_METRIC_CODES)` 先 GET 当前结果；缺失或版本过期时 POST `ensure_current`，每 800ms 轮询，最大 20 次，超时后保留可重试错误。
 
-- [ ] 6.4 把 Provider 挂在 `ProductFlowProvider` 内、Data Center 和其他业务 App 外，使多个 App 可以通过 `useDataStandards()` 读取；`DataCenterProvider` 继续负责连接器、质量和原始销售兼容数据，不再拥有口径 CRUD。
+- [x] 6.4 把 Provider 挂在 `ProductFlowProvider` 内、Data Center 和其他业务 App 外，使多个 App 可以通过 `useDataStandards()` 读取；`DataCenterProvider` 继续负责连接器、质量和原始销售兼容数据，不再拥有口径 CRUD。
 
-- [ ] 6.5 验证和提交：
+- [x] 6.5 验证和提交：
 
 ```bash
 node --test react-tests/data-standards-api-client.test.mjs react-tests/data-standards-provider.test.mjs react-tests/data-center-provider.test.mjs
