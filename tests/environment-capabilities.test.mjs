@@ -69,6 +69,28 @@ test("company assistant declares Provider secrets and production D1 schema", () 
   assert.equal(existsSync(resolve(root, "migrations/0004_company_ai_skills.sql")), true);
 });
 
+test("goods flow declares its production D1 schema without claiming Kuaimai inventory", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const capability = manifest.capabilities.find(entry => entry.id === "goods-flow-core");
+  assert.ok(capability, "goods flow capability must be declared");
+  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "dingtalk", "kuaimai", "erp-file-import"]);
+  assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
+  assert.deepEqual(capability.tables, [
+    "goods_flow_events",
+    "goods_flow_inventory_daily",
+    "goods_flow_stocktakes",
+    "goods_flow_stocktake_lines",
+    "goods_flow_receivable_terms",
+    "goods_flow_ccc_monthly",
+    "goods_flow_exceptions"
+  ]);
+  assert.equal(existsSync(resolve(root, "migrations/0005_goods_flow_core.sql")), true);
+
+  const registry = JSON.parse(readFileSync(resolve(root, "docs/platform/integration-registry.json"), "utf8"));
+  const kuaimai = registry.platforms.find(entry => entry.id === "kuaimai");
+  assert.equal(kuaimai.capabilities.includes("库存同步"), false);
+});
+
 test("environment capability validation rejects secret values and unknown platforms", async () => {
   assert.equal(existsSync(generatorPath), true, "platform manifest generator must exist");
   const { validateEnvironmentCapabilities } = await import(generatorPath);

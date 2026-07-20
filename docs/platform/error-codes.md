@@ -34,6 +34,7 @@
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
 | `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
 | `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
+| `GOODS_FLOW_` | 货流事实、库存、盘点、账期和 CCC | `GOODS_FLOW_VERSION_CONFLICT` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
@@ -77,6 +78,19 @@
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+货流平台 API 使用：
+
+- `GOODS_FLOW_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 或货流表。
+- `GOODS_FLOW_REQUEST_INVALID`：请求字段、日期、数值或业务幂等键不合法。
+- `GOODS_FLOW_ACTION_DENIED`：当前部门不能执行盘点、账期、重算或冻结动作。
+- `GOODS_FLOW_VERSION_CONFLICT`：盘点、账期或 CCC 的读取版本已过期，HTTP 409。
+- `GOODS_FLOW_IDEMPOTENCY_CONFLICT`：同一来源引用或业务幂等键指向不同内容，HTTP 409。
+- `GOODS_FLOW_SKU_MAPPING_REQUIRED`：商品、SKU 或 69 码不能确定性映射，记录进入异常队列。
+- `GOODS_FLOW_PURCHASE_LINK_REQUIRED`：付款没有可验证的采购关联，不计入货流金额。
+- `GOODS_FLOW_TERM_OVERLAP`：同一平台账期生效区间重叠，HTTP 409。
+- `GOODS_FLOW_METRIC_INCOMPLETE`：计算来源覆盖不足，指标不可冻结。
+- `GOODS_FLOW_SOURCE_PARTIAL`：导入部分成功，失败行进入异常队列，HTTP 207。
 
 公司 AI 总助 API 使用：
 

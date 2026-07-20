@@ -27,12 +27,13 @@
   - 验证：聚焦领域测试通过。
   - 实际验证：`node --test react-tests/goods-flow-domain.test.mjs`（5 项通过）；`npx eslint src/domain/goodsFlow.js react-tests/goods-flow-domain.test.mjs`。
 
-- [ ] D1 数据模型、迁移和环境能力。
+- [x] D1 数据模型、迁移和环境能力。
   - 依赖：领域契约。
   - 输入：货流事件、日库存、盘点、账期、CCC 和异常表定义。
   - 输出：可回滚迁移、环境清单、就绪检查和存储契约。
   - 失败测试：未迁移、重复迁移、缺表和权限错误。
   - 验证：迁移测试及环境能力检查通过。
+  - 实际验证：`node --test tests/goods-flow-migration.test.mjs tests/environment-capabilities.test.mjs`（8 项通过）；`npm run check:integrations`；`npm run check:environment-capabilities`。
 
 - [ ] 多来源接入与兼容投影。
   - 依赖：D1 数据模型。

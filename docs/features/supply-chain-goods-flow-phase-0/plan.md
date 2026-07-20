@@ -137,7 +137,7 @@ git commit -m "feat: add goods flow domain metrics"
 - Consumes: `PRODUCT_FLOW_DB`; existing Cloudflare Pages, D1, DingTalk, Kuaimai and ERP-file registry entries.
 - Produces: seven durable tables and the declared `goods-flow-core` environment capability.
 
-- [ ] **Step 1: Write failing migration and manifest assertions**
+- [x] **Step 1: Write failing migration and manifest assertions**
 
 ```js
 test("goods flow declares its production D1 schema", () => {
@@ -152,13 +152,13 @@ test("goods flow declares its production D1 schema", () => {
 });
 ```
 
-- [ ] **Step 2: Run the focused tests and verify failure**
+- [x] **Step 2: Run the focused tests and verify failure**
 
 Run: `node --test tests/goods-flow-migration.test.mjs tests/environment-capabilities.test.mjs`
 
 Expected: FAIL because the migration and capability do not exist.
 
-- [ ] **Step 3: Add idempotent schema**
+- [x] **Step 3: Add idempotent schema**
 
 The migration creates the seven tables with stable primary keys, source/idempotency indexes, SKU×warehouse×date unique projection keys, term effective-date indexes, stocktake status/version fields and CCC month/version unique keys. Events and frozen metric rows have no physical-delete route.
 
@@ -179,13 +179,13 @@ CREATE TABLE IF NOT EXISTS goods_flow_events (
 );
 ```
 
-- [ ] **Step 4: Update platform contract and generated modules**
+- [x] **Step 4: Update platform contract and generated modules**
 
 Add `goods-flow-core`, extend provider code paths/relations without claiming Kuaimai inventory capability, document planned v1 routes, stable `GOODS_FLOW_*` errors, timeout/retry/idempotency, migration and rollback.
 
 Run: `npm run generate:platform-manifests`
 
-- [ ] **Step 5: Run contract checks and commit**
+- [x] **Step 5: Run contract checks and commit**
 
 Run: `node --test tests/goods-flow-migration.test.mjs tests/environment-capabilities.test.mjs && npm run check:integrations && npm run check:environment-capabilities`
 
