@@ -63,6 +63,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "douyin-ecommerce",
     name: "抖音电商",
+    identityLabel: "店铺名称",
     description: "店铺订单、商品与经营数据",
     logo: "douyin",
     methods: ["browser", "export"],
@@ -77,6 +78,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "oceanengine",
     name: "巨量引擎",
+    identityLabel: "广告账户名称",
     description: "巨量引擎与巨量千川投放数据",
     logo: "oceanengine",
     methods: ["api", "browser", "export"],
@@ -94,6 +96,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "kuaishou",
     name: "快手生态",
+    identityLabel: "店铺 / 广告账户名称",
     description: "快手小店与广告经营数据",
     logo: "kuaishou",
     methods: ["browser", "export"],
@@ -107,6 +110,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "taobao",
     name: "淘系",
+    identityLabel: "店铺名称",
     description: "天猫与淘宝店铺经营数据",
     logo: "taobao",
     methods: ["browser", "export"],
@@ -120,6 +124,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "pinduoduo",
     name: "拼多多",
+    identityLabel: "店铺名称",
     description: "拼多多店铺订单与商品数据",
     logo: "pinduoduo",
     methods: ["browser", "export"],
@@ -133,6 +138,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "xiaohongshu",
     name: "小红书生态",
+    identityLabel: "店铺 / 乘风账户名称",
     description: "小红书店铺与乘风投放数据",
     logo: "xiaohongshu",
     methods: ["browser", "export"],
@@ -146,6 +152,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "jd-jingmai",
     name: "京东 / 京麦",
+    identityLabel: "店铺名称",
     description: "京东店铺与京麦后台经营数据",
     logo: "jd",
     methods: ["browser", "export"],
@@ -159,6 +166,7 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "kuaimai-erp",
     name: "快麦 ERP",
+    identityLabel: "ERP 账号名称",
     description: "订单、商品、库存与销售文件",
     logo: "kuaimai",
     methods: ["api", "browser", "export"],
@@ -232,6 +240,20 @@ export function connectorDefinition(id) {
   return found;
 }
 
+export function inferConnectorCaptureMethod(definitionInput, { secretPayload = {}, existingMethod = "" } = {}) {
+  const resolved = typeof definitionInput === "string" ? connectorDefinition(definitionInput) : definitionInput;
+  if (!resolved || !DEFINITIONS_BY_ID.has(resolved.id)) throw inputError("未知连接器定义。");
+  const hasConfiguredField = method => resolved.fields.some(item => (
+    item.methods?.includes(method) && String(secretPayload[item.key] || "").trim()
+  ));
+
+  if (hasConfiguredField("api")) return "api";
+  if (hasConfiguredField("browser")) return "browser";
+  if (resolved.methods.includes(existingMethod)) return existingMethod;
+  if (resolved.methods.includes("export")) return "export";
+  return resolved.methods[0];
+}
+
 export function splitConnectorPayload(definitionInput, input = {}) {
   const resolved = typeof definitionInput === "string" ? connectorDefinition(definitionInput) : definitionInput;
   if (!resolved || !DEFINITIONS_BY_ID.has(resolved.id)) throw inputError("未知连接器定义。");
@@ -272,12 +294,16 @@ export function normalizeConnectorInstance(input = {}, { existing = null } = {})
   const { metadata } = splitConnectorPayload(definition, input);
   const existingStatus = String(existing?.status || "");
   const status = existing && STATUS_VALUES.has(existingStatus) ? existingStatus : "pending_validation";
+  const name = cleanString(input.name, definition.identityLabel, 120);
+  if (!name) throw inputError(`${definition.identityLabel}不能为空。`);
   return {
     ...metadata,
     id: cleanString(input.id, "id", 120),
     connectorId: definition.id,
-    name: cleanString(input.name, "连接名称", 120) || definition.name,
-    captureMethod: definition.methods.includes(input.captureMethod) ? input.captureMethod : definition.methods[0],
+    name,
+    captureMethod: definition.methods.includes(input.captureMethod)
+      ? input.captureMethod
+      : inferConnectorCaptureMethod(definition, { existingMethod: existing?.captureMethod }),
     datasets: Array.isArray(input.datasets)
       ? input.datasets.filter(item => definition.datasets.includes(item))
       : [],

@@ -1,13 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
+import * as connectorDomain from "../src/domain/dataCenterConnectors.js";
+
+const {
   CONNECTOR_STATUS_PRIORITY,
   DATA_CONNECTOR_DEFINITIONS,
   INTERNAL_VAULT_TYPES,
   connectorDefinition,
   normalizeConnectorInstance,
   splitConnectorPayload
-} from "../src/domain/dataCenterConnectors.js";
+} = connectorDomain;
 
 test("catalog defines eight connectors and merges Qianchuan into Ocean Engine", () => {
   assert.deepEqual(DATA_CONNECTOR_DEFINITIONS.map(item => item.id), [
@@ -83,4 +85,21 @@ test("connector definitions expose only supported platform-specific methods", ()
   assert.deepEqual(connectorDefinition("kuaimai-erp").methods, ["api", "browser", "export"]);
   assert.deepEqual(connectorDefinition("douyin-ecommerce").methods, ["browser", "export"]);
   assert.throws(() => connectorDefinition("unknown-platform"), /未知连接器/);
+});
+
+test("connector definitions use platform shop or account names", () => {
+  assert.equal(connectorDefinition("douyin-ecommerce").identityLabel, "店铺名称");
+  assert.equal(connectorDefinition("oceanengine").identityLabel, "广告账户名称");
+  assert.equal(connectorDefinition("kuaimai-erp").identityLabel, "ERP 账号名称");
+  assert.throws(() => normalizeConnectorInstance({ connectorId: "douyin-ecommerce", name: "" }), /店铺名称不能为空/);
+});
+
+test("capture method is inferred from configured credentials", () => {
+  assert.equal(typeof connectorDomain.inferConnectorCaptureMethod, "function");
+  const { inferConnectorCaptureMethod } = connectorDomain;
+  assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { appSecret: "secret" } }), "api");
+  assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { password: "secret" } }), "browser");
+  assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { appSecret: "api", password: "web" } }), "api");
+  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {} }), "export");
+  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {}, existingMethod: "browser" }), "browser");
 });
