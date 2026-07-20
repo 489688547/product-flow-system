@@ -356,7 +356,7 @@ git commit -m "feat(platform): calculate governed sales metrics"
 - Modify: `functions/api/platform/v1/_shared/dataStandardsStorage.js`
 - Modify: `docs/platform/apis/data-standards-v1.md`
 
-- [ ] 5.1 先写失败测试，覆盖：范围最多 370 天、目标版本存在、责任部门权限、幂等键重复不新建批次、`202 pending`、成功后切 current、失败不切换、按历史日期选择版本、读取结果含 version/coverage/confidence/estimated/cutoff/status/reason、无结果返回原因而不是 0。
+- [x] 5.1 先写失败测试，覆盖：范围最多 370 天、目标版本存在、责任部门权限、幂等键重复不新建批次、`202 pending`、成功后切 current、失败不切换、按历史日期选择版本、读取结果含 version/coverage/confidence/estimated/cutoff/status/reason、无结果返回原因而不是 0。
 
 运行：
 
@@ -364,7 +364,7 @@ git commit -m "feat(platform): calculate governed sales metrics"
 node --test tests/data-standards-results-api.test.mjs
 ```
 
-- [ ] 5.2 `POST /recalculate` 请求固定为：
+- [x] 5.2 `POST /recalculate` 请求固定为：
 
 ```js
 {
@@ -379,9 +379,9 @@ node --test tests/data-standards-results-api.test.mjs
 
 `ensure_current` 允许数据中心查看者为当前查询范围创建幂等派生结果；`explicit_recalculation` 只允许总经办或所有目标口径的责任部门编辑者，并要求客户端提交确认字段 `confirmed: true`。服务端自行计算/校验幂等摘要，不信任任意客户端 key。
 
-- [ ] 5.3 Pages Function 创建 run 后调用 `context.waitUntil(executeCalculationRun(...))`，立即返回 202。测试环境向路由注入可控的 `waitUntil` 收集器并等待 promise，验证成功/失败状态。每个 run 最多 11 项指标、370 天、依赖深度 8；超限返回 `DATA_STANDARD_QUERY_RANGE_INVALID`。
+- [x] 5.3 Pages Function 创建 run 后调用 `context.waitUntil(executeCalculationRun(...))`，立即返回 202。测试环境向路由注入可控的 `waitUntil` 收集器并等待 promise，验证成功/失败状态。每个 run 最多 11 项指标、370 天、依赖深度 8；超限返回 `DATA_STANDARD_QUERY_RANGE_INVALID`。
 
-- [ ] 5.4 `GET /results` 支持 `metricCodes`、`from`、`to`、允许维度和可选 `runId`：
+- [x] 5.4 `GET /results` 支持 `metricCodes`、`from`、`to`、允许维度和可选 `runId`：
 
 ```js
 {
@@ -393,9 +393,9 @@ node --test tests/data-standards-results-api.test.mjs
 
 默认只返回 `is_current = 1`；显式指定 run 只用于重算预览/审计。读取接口不触发计算、不写库。
 
-- [ ] 5.5 更新文档的异步、轮询、幂等、超时、失败恢复和当前批次切换契约。
+- [x] 5.5 更新文档的异步、轮询、幂等、超时、失败恢复和当前批次切换契约。
 
-- [ ] 5.6 验证并提交：
+- [x] 5.6 验证并提交：
 
 ```bash
 node --test tests/data-standards-results-api.test.mjs tests/data-standards-calculation.test.mjs tests/data-standards-storage.test.mjs
