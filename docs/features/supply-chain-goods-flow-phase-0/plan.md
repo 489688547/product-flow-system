@@ -208,7 +208,7 @@ git commit -m "feat: declare goods flow platform schema"
 - Consumes: D1 binding and normalized legacy supply-chain state plus product/sales rows.
 - Produces: `goodsFlowDatabase(env)`, `appendGoodsFlowEvents(db, events)`, `listInventoryDaily(db, filters)`, `upsertReceivableTerm(db, term, actor)`, `saveStocktake(db, stocktake, lines, actor)`, `saveMonthlyMetrics(db, metrics, actor)`, `projectLegacyGoodsFlow(input)`.
 
-- [ ] **Step 1: Write failing idempotency, term-version and projection tests**
+- [x] **Step 1: Write failing idempotency, term-version and projection tests**
 
 ```js
 await appendGoodsFlowEvents(db, [event, event]);
@@ -219,13 +219,13 @@ assert.equal(projection.events.some(row => row.eventType === "purchase_paid"), t
 assert.equal(projection.exceptions.some(row => row.code === "GOODS_FLOW_SKU_MAPPING_REQUIRED"), true);
 ```
 
-- [ ] **Step 2: Run and verify missing-module failure**
+- [x] **Step 2: Run and verify missing-module failure**
 
 Run: `node --test tests/goods-flow-storage.test.mjs`
 
 Expected: FAIL because storage and projection modules do not exist.
 
-- [ ] **Step 3: Implement focused repository functions**
+- [x] **Step 3: Implement focused repository functions**
 
 Keep SQL and JSON serialization in storage. Keep provider payload mapping in `legacyProjection.js`. Never import React or browser globals. `projectLegacyGoodsFlow` must ignore unlinked payment approvals and preserve source evidence.
 
@@ -247,11 +247,13 @@ export function projectLegacyGoodsFlow({ supplyState, products, salesRows, asOf 
 }
 ```
 
-- [ ] **Step 4: Test malformed rows and partial batches**
+- [x] **Step 4: Test malformed rows and partial batches**
 
 Add tests showing one malformed payload does not hide valid rows, duplicate source references are idempotent, overlapping platform terms fail, and frozen CCC rows are inserted as new versions rather than overwritten.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
+
+Actual verification: `node --test tests/goods-flow-storage.test.mjs` (5 tests passed); focused ESLint and `git diff --check` passed.
 
 Run: `node --test tests/goods-flow-storage.test.mjs`
 
