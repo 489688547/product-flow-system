@@ -14,8 +14,8 @@ function statusLabel(status) {
   return STATUS_LABELS[status] || status || "未启用";
 }
 
-export function DataSourcesWorkspace({ canEdit, canManage }) {
-  return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} />;
+export function DataSourcesWorkspace({ canEdit, canManage, canManagePlatform, initialCategory }) {
+  return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManagePlatform} initialCategory={initialCategory} />;
 }
 
 export function SyncRunsWorkspace({ quality }) {

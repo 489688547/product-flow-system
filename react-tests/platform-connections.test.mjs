@@ -8,14 +8,16 @@ const workspacePath = "src/features/data-center/PlatformConnectionsWorkspace.jsx
 const cssPath = "src/features/data-center/platform-connections.css";
 const apiPath = "src/state/platformConnectionsApi.js";
 
-test("data center exposes a dedicated platform connection workspace", () => {
+test("data center embeds platform connections inside the unified data access workspace", () => {
   assert.equal(existsSync(workspacePath), true);
   const app = read("src/App.jsx");
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
-  assert.match(app, /data-connections/);
-  assert.match(app, /平台连接/);
-  assert.match(page, /connections: <PlatformConnectionsWorkspace/);
+  const governance = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
+  assert.match(app, /route\.screen === "data-connections"/);
+  assert.doesNotMatch(app, /\["data-connections", "平台连接"/);
+  assert.doesNotMatch(page, /connections: <PlatformConnectionsWorkspace/);
   assert.match(page, /canManagePlatformConnections/);
+  assert.match(governance, /canManagePlatform/);
   assert.match(read("src/domain/permissions.js"), /canManagePlatformConnections[\s\S]*role === "executive"[\s\S]*canManagePermissions/);
 });
 
@@ -75,10 +77,10 @@ test("connection layout is restrained responsive and keyboard visible", () => {
   assert.doesNotMatch(css, /border-radius:\s*(?:2[4-9]|[3-9]\d)px/);
 });
 
-test("environment blockers link directly to platform connection management", () => {
+test("environment blockers link directly to company data access", () => {
   const panel = read("src/features/handbook/EnvironmentReadinessPanel.jsx");
-  assert.match(panel, /前往平台连接/);
-  assert.match(panel, /#\/data-connections/);
+  assert.match(panel, /前往数据接入/);
+  assert.match(panel, /#\/data-sources\/company/);
   assert.match(panel, /钉钉应用凭证/);
   assert.match(panel, /公司数据库连接/);
 });

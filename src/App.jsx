@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, KeyRound, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -68,7 +68,6 @@ const DATA_CENTER_NAV = [
   ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
   ["data-products", "商品主数据", PackageSearch, "数据中心", "products"],
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
-  ["data-connections", "平台连接", KeyRound, "数据中心", "connections"],
   ["data-metrics", "数据口径", Ruler, "数据中心", "metrics"],
   ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
   ["data-services", "数据服务", Share2, "数据中心", "services"],
@@ -156,6 +155,9 @@ function resolveScreen(screen) {
 
 function routeFromHash() {
   const route = parseAppHash(window.location.hash);
+  if (route.screen === "data-connections") {
+    return { screen: "data-sources", detail: "company" };
+  }
   const screen = resolveScreen(route.screen);
   return {
     screen: VALID_SCREENS.has(screen) ? screen : "home",
@@ -330,7 +332,7 @@ export default function App() {
         </header>
         <LocalOnlineEnvironmentBanner sessionUser={sessionUser} />
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
-          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
+          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} dataAccessCategory={dataSection === "sources" ? routeDetail : ""} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
       <AiAssistantPanel active={activeScreen !== "ai-assistant"} triggerRef={aiTriggerRef} appHint={{ screen: activeScreen, detail: routeDetail }} />

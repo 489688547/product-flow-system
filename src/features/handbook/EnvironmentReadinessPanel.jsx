@@ -75,7 +75,7 @@ function CapabilityList({ capabilities = [] }) {
               <strong>{STATUS_LABELS[capability.status] || capability.status}</strong>
             </div>
             {capability.missing?.length ? (
-              <div className="environment-missing"><span>需要处理</span><ul>{capability.missing.map(item => <li key={item} title={item}>{missingLabel(item)}</li>)}</ul>{capability.platforms?.some(platform => ["dingtalk", "kuaimai"].includes(platform)) ? <a className="btn compact" href="#/data-connections">前往平台连接</a> : null}</div>
+              <div className="environment-missing"><span>需要处理</span><ul>{capability.missing.map(item => <li key={item} title={item}>{missingLabel(item)}</li>)}</ul>{capability.platforms?.some(platform => ["dingtalk", "kuaimai"].includes(platform)) ? <a className="btn compact" href="#/data-sources/company">前往数据接入</a> : null}</div>
             ) : <p className="environment-complete"><ShieldCheck size={15} aria-hidden="true" />必要配置与表结构完整</p>}
           </article>
         ))}
