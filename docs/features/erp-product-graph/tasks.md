@@ -33,11 +33,12 @@
   - 输出：扁平库存组成表、内部唯一码和游标进度。
   - 验证：`node --test react-tests/product-catalog-provider.test.mjs react-tests/product-catalog-ui.test.mjs`。
   - 结果：11/11 通过；客户端自动续跑游标，页面直接展示库存单位、组合比例、组合成本和同步进度。
-- [ ] 货流组合消耗
+- [x] 货流组合消耗
   - 依赖：共享目录读取。
   - 文件：货流导入、旧数据投影和货流测试。
   - 输出：套装销量组件展开、成本一次计算、库存单位匹配。
   - 验证：`node --test tests/goods-flow-storage.test.mjs tests/goods-flow-api.test.mjs tests/goods-flow-metrics-projection.test.mjs`。
+  - 结果：核心货流相关测试 24/24 通过；货流服务端读取共享商品目录，组合销量按比例展开且销售额只记录一次，内部唯一码不再被过滤。
 - [ ] 治理、回填和环境验收
   - 依赖：全部实现任务。
   - 文件：`PRODUCT.md`、平台文档、集成注册、环境能力、ADR、生成模块。

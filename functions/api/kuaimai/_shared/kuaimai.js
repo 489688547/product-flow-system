@@ -3,7 +3,6 @@ import { platformEnv } from "../../platform/_shared/platformCredentials.js";
 // 快麦ERP开放平台客户端。使用 Web Crypto（hmac-sha256 签名），
 // 同一份代码跑在 Cloudflare Pages Functions 和本地 server.mjs（Node 18+）里。
 const GATEWAY = "https://gw.superboss.cc/router";
-const CODE_PATTERN = /^69\d{10,12}$/;
 
 // 平台简码 → 与Excel导入一致的平台名称（保证两个数据源能合并统计）
 const PLATFORM_NAMES = {
@@ -133,7 +132,8 @@ function kuaimaiDate(value) {
   return Number.isNaN(date.valueOf()) ? null : date;
 }
 
-// 把订单里的子订单聚合成 69码×日×平台 的日行（与Excel导入同一个存储结构）。
+// 把订单里的子订单聚合成库存单位编码×日×平台的日行（与Excel导入同一个存储结构）。
+// ERP 中的最小库存单位既可能是标准 69 码，也可能是内部唯一码，不能按格式丢弃。
 // 口径说明：API的订单接口没有净销售额/退款金额明细，sales/netSales 先取买家已付，
 // 毛利=已付−成本；统计日固定使用快麦 created（下单时间），退款字段留0，
 // 等每月Excel重导时整月覆盖校准。
@@ -151,7 +151,7 @@ export function createOrderAggregator(shopPlatformMap = new Map()) {
         if (child?.isCancel === 1) return;
         const code = String(child?.sysOuterId || "").trim();
         const childCreatedDate = kuaimaiDate(child?.created) || orderCreatedDate;
-        if (!CODE_PATTERN.test(code) || !childCreatedDate) {
+        if (!code || code.length > 160 || !childCreatedDate) {
           skippedItems += 1;
           return;
         }

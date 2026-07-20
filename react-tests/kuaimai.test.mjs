@@ -51,7 +51,8 @@ test("order aggregator groups child orders into daily product rows", () => {
     orders: [
       { sysOuterId: "6977173969783", sysTitle: "莓果冻干主粮", num: 2, payment: "42.00", cost: 16, created, payTime },
       { sysOuterId: "6977173969783", num: 1, payment: "21.00", cost: 8, created, payTime },
-      { sysOuterId: "not-a-code", num: 1, payment: "9.9", created, payTime },
+      { sysOuterId: "1111", sysTitle: "测试库存单位", num: 1, payment: "9.9", cost: 2.5, created, payTime },
+      { sysOuterId: "", num: 1, payment: "9.9", created, payTime },
       { sysOuterId: "6978705011352", num: 1, payment: "28.00", cost: 10, created, payTime, isCancel: 1 }
     ]
   });
@@ -59,13 +60,14 @@ test("order aggregator groups child orders into daily product rows", () => {
   const result = aggregator.finish();
   assert.equal(result.orders, 2);
   assert.equal(result.skippedItems, 1);
-  assert.equal(result.rows.length, 2);
-  const tmall = result.rows.find(row => row.platform === "天猫");
+  assert.equal(result.rows.length, 3);
+  const tmall = result.rows.find(row => row.platform === "天猫" && row.code === "6977173969783");
   assert.equal(tmall.date, "2026-07-12");
   assert.equal(tmall.qty, 3);
   assert.equal(tmall.sales, 63);
   assert.equal(tmall.grossProfit, 39);
   assert.equal(result.titles["6977173969783"], "莓果冻干主粮");
+  assert.equal(result.rows.find(row => row.code === "1111").qty, 1);
 });
 
 test("pullKuaimaiDay paginates orders and reports continuation page", async () => {
