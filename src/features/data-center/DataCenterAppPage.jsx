@@ -5,7 +5,7 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
 import { canAccessCompanyPlatform, canManagePlatformConnections } from "../../domain/permissions.js";
-import { DataCenterSettingsWorkspace, DataQualityWorkspace, DataServicesWorkspace, DataSourcesWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
+import { DataCenterSettingsWorkspace, DataServicesWorkspace, DataSourcesWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
 import { PlatformConnectionsWorkspace } from "./PlatformConnectionsWorkspace.jsx";
 import { UserInsightsProvider } from "../../state/UserInsightsProvider.jsx";
 import { UserInsightsWorkspace } from "./UserInsightsWorkspace.jsx";
@@ -20,8 +20,7 @@ const SECTION_META = {
   sources: ["数据接入", "管理店铺、广告平台和 ERP 数据源。"],
   connections: ["平台连接", "统一维护公司业务平台的安全连接，保存后自动验证。"],
   metrics: ["数据口径", "维护公司统一的定义、公式、版本和责任部门。"],
-  quality: ["数据质量", "定位缺失、重复、延迟和映射异常。"],
-  sync: ["同步记录", "查看每日采集和导入结果。"],
+  sync: ["同步记录", "查看采集结果、数据质量和待处理异常。"],
   services: ["数据服务", "管理各业务 App 的数据订阅。"],
   settings: ["设置", "维护时区、截止时间和保留策略。"]
 };
@@ -51,8 +50,7 @@ export function DataCenterAppPage({ section = "overview" }) {
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} />,
     connections: <PlatformConnectionsWorkspace canManage={canManageConnections} />,
     metrics: <DataStandardsWorkspace />,
-    quality: <DataQualityWorkspace quality={quality} />,
-    sync: <SyncRunsWorkspace />,
+    sync: <SyncRunsWorkspace quality={quality} />,
     services: <DataServicesWorkspace />,
     settings: <DataCenterSettingsWorkspace canEdit={canEdit} />
   };

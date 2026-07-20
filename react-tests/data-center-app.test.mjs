@@ -27,9 +27,12 @@ test("data center has navigation and feature permission defaults", () => {
 
 test("data center navigation keeps all governed workspaces", () => {
   const app = read("src/App.jsx");
-  assert.match(app, /const DATA_CENTER_NAV = \[[\s\S]*data-overview[\s\S]*data-insights[\s\S]*data-products[\s\S]*data-sources[\s\S]*data-connections[\s\S]*data-metrics[\s\S]*data-quality[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
-  assert.doesNotMatch(app, /"data-analysis", "数据分析"/);
+  const navBlock = app.match(/const DATA_CENTER_NAV = \[([\s\S]*?)\];/)?.[1] || "";
+  assert.match(navBlock, /data-overview[\s\S]*data-insights[\s\S]*data-products[\s\S]*data-sources[\s\S]*data-connections[\s\S]*data-metrics[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
+  assert.doesNotMatch(navBlock, /data-analysis/);
+  assert.doesNotMatch(navBlock, /data-quality/);
   assert.match(app, /\["data-metrics", "数据口径"/);
+  assert.match(app, /if \(screen === "data-quality"\) return "data-sync";/);
   assert.match(app, /\["archive", "产品档案"[\s\S]*\.\.\.DATA_CENTER_NAV[\s\S]*\["handbook", "说明书"/);
   assert.match(app, /screen === "data-center" \? "data-overview"/);
   assert.match(app, /DATA_CENTER_SCREEN_TO_SECTION\.has\(screen\) \? "data-center"/);
@@ -64,14 +67,20 @@ test("overview exposes governed metrics without restoring the deleted analysis w
   assert.match(overview, /数据健康/);
 });
 
-test("governance workspaces cover safe sources metrics quality sync services and settings", () => {
+test("governance workspaces merge quality into sync while preserving services and settings", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
   const standards = read("src/features/data-center/data-standards/DataStandardsWorkspace.jsx");
   assert.match(page, /DataSourcesWorkspace/);
   assert.match(page, /DataStandardsWorkspace/);
-  assert.match(page, /DataQualityWorkspace/);
-  assert.match(page, /SyncRunsWorkspace/);
+  assert.doesNotMatch(page, /DataQualityWorkspace/);
+  assert.doesNotMatch(page, /quality:\s*</);
+  assert.match(page, /sync: <SyncRunsWorkspace quality=\{quality\} \/>/);
+  assert.match(workspaces, /export function SyncRunsWorkspace\(\{ quality \}\)/);
+  assert.match(workspaces, /待处理问题[\s\S]*执行记录[\s\S]*待处理数据问题/);
+  assert.doesNotMatch(workspaces, /<h2>同步记录<\/h2>/);
+  assert.match(workspaces, /collaborationDraftFromDataIssue/);
+  assert.match(workspaces, /refresh/);
   assert.match(page, /DataServicesWorkspace/);
   assert.match(page, /DataCenterSettingsWorkspace/);
   assert.match(workspaces, /DataConnectionsWorkspace/);
@@ -98,4 +107,6 @@ test("data center has restrained responsive layouts and visible focus states", (
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
   assert.doesNotMatch(styles, /\.data-analysis-toolbar/);
   assert.doesNotMatch(styles, /\.data-analysis-series/);
+  assert.match(styles, /\.data-sync-status-bar/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.data-sync-status-bar/);
 });

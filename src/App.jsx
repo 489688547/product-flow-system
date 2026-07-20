@@ -69,7 +69,6 @@ const DATA_CENTER_NAV = [
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
   ["data-connections", "平台连接", KeyRound, "数据中心", "connections"],
   ["data-metrics", "数据口径", Ruler, "数据中心", "metrics"],
-  ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],
   ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
   ["data-services", "数据服务", Share2, "数据中心", "services"],
   ["data-settings", "设置", Settings, "数据中心", "settings"]
@@ -112,16 +111,16 @@ const COMPANY_NAV = [
   ["reviews", "经营检查", CalendarCheck, "公司经营"],
   ["collaboration", "部门协同", Workflow, "公司经营"],
   ["apps", "业务 Apps", AppWindow, "公司经营"],
-  ...SUPPLY_CHAIN_NAV,
   ["dashboard", "产品总览", PanelsTopLeft, "产品全周期"],
   ["demands", "需求池", ClipboardList, "产品全周期"],
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
-  ...DATA_CENTER_NAV,
   ...ECOMMERCE_OPERATIONS_NAV,
-  ...PERFORMANCE_MANAGEMENT_NAV,
   ...BRAND_NAV,
+  ...SUPPLY_CHAIN_NAV,
+  ...PERFORMANCE_MANAGEMENT_NAV,
+  ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
@@ -133,11 +132,11 @@ const PRODUCT_NAV = [
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
   ["collaboration", "部门协同", Workflow, "协同执行"],
-  ...SUPPLY_CHAIN_NAV,
-  ...DATA_CENTER_NAV,
   ...ECOMMERCE_OPERATIONS_NAV,
-  ...PERFORMANCE_MANAGEMENT_NAV,
   ...BRAND_NAV,
+  ...SUPPLY_CHAIN_NAV,
+  ...PERFORMANCE_MANAGEMENT_NAV,
+  ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
@@ -148,6 +147,7 @@ const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NA
 function resolveScreen(screen) {
   if (screen === "supply-chain") return "supply-overview";
   if (LEGACY_SUPPLY_SCREENS.has(screen)) return "supply-procurement";
+  if (screen === "data-quality") return "data-sync";
   const resolvedDataScreen = screen === "data-center" ? "data-overview" : screen;
   if (resolvedDataScreen === "ecommerce-operations") return "ops-dashboard";
   return resolvedDataScreen === "performance-management" ? "performance-overview" : resolvedDataScreen;

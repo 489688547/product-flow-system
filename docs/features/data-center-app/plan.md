@@ -4,6 +4,17 @@
 
 2026-07-20 已确认的数据口径 CRUD、版本化、安全公式、计算结果和数据总览切换，按独立实施计划执行：[`data-standards-plan.md`](./data-standards-plan.md)。该扩展继续使用 `PRODUCT_FLOW_DB`，会新增 D1 表和 `/api/platform/v1/data-standards` 共享契约，因此实施前后必须执行环境能力、集成路由、迁移、回滚和完整 Definition of Done 检查。
 
+## 同步记录与数据质量合并
+
+本次只调整数据中心前端信息架构：
+
+- `src/App.jsx` 从数据中心左侧导航移除 `data-quality`，并将历史 `data-quality` 路由兼容映射到 `sync`。
+- `DataCenterAppPage.jsx` 只保留 `sync` 工作区，将现有质量摘要传入同步页面。
+- `DataGovernanceWorkspaces.jsx` 把质量摘要、同步记录和质量问题队列组合为一个单列工作区，移除独立 `DataQualityWorkspace`。
+- `react-tests/data-center-app.test.mjs` 先锁定导航、路由兼容、内容顺序和精简文案，再实现最小变更。
+
+不修改 D1、API、权限、外部平台连接或生产数据。回滚只需恢复独立导航与页面映射；`syncRuns` 和 `qualityIssues` 始终保持原数据结构，因此没有数据迁移。
+
 ## 交付策略
 
 按三个可以独立验收和回滚的阶段交付：
@@ -53,7 +64,7 @@
 
 ## 兼容与回滚
 
-- 现有 `/api/data-center`、`/api/data-center/sales`、`product_sales_daily` 和七个左侧入口保持不变。
+- 现有 `/api/data-center`、`/api/data-center/sales` 和 `product_sales_daily` 保持不变；本次只减少一个独立质量入口，历史链接仍可访问合并后的同步工作区。
 - 新页面读取失败时保留连接器目录并显示环境错误，不回退到 localStorage 保存敏感值。
 - 回滚可隐藏新连接区并停用新 API；新表与密文保留，不覆盖主密钥、不物理删除审计。
 - 旧前端继续读取 `data_sources`，新前端只写 `data_connector_instances`；阶段 2 再决定旧来源迁移。
