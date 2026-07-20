@@ -82,6 +82,16 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .sidebar nav button:hover { background: var(--surface-subtle); color: var(--text-primary); }
 .sidebar nav button.active { background: var(--primary-soft); color: var(--primary); font-weight: 650; }
 .sidebar nav button.active::before { background: var(--primary); }
+.sidebar-app-group, .sidebar-group-items { min-width: 0; display: grid; align-content: start; gap: 2px; }
+.sidebar nav .sidebar-group-toggle { width: 100%; height: 30px; justify-content: space-between; padding: 0 10px; color: var(--text-tertiary); font-size: 10px; font-weight: 750; }
+.sidebar nav .sidebar-group-toggle::before { display: none; }
+.sidebar nav .sidebar-group-toggle:hover, .sidebar-app-group.expanded .sidebar-group-toggle { color: var(--text-primary); background: var(--surface-subtle); }
+.sidebar-group-toggle span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidebar-group-toggle svg { flex: 0 0 auto; transition: transform 180ms ease; }
+.sidebar-app-group.expanded .sidebar-group-toggle svg { transform: rotate(180deg); }
+.sidebar-group-toggle:focus-visible { outline: 2px solid color-mix(in oklch, var(--accent), white 28%); outline-offset: -2px; }
+.sidebar-app-group.collapsible:not(.expanded) .sidebar-nav-item:not(:first-child) { display: none; }
+@media (prefers-reduced-motion: reduce) { .sidebar-group-toggle svg { transition: none; } }
 main { min-width: 0; overflow-x: hidden; }
 .topbar { height: 56px; display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); padding: 0 var(--space-6); border-bottom: 1px solid var(--border); background: color-mix(in oklch, var(--canvas), transparent 8%); position: sticky; top: 0; z-index: 10; }
 .topbar em { margin-right: auto; color: var(--danger); font-style: normal; font-size: 12px; }
@@ -765,6 +775,9 @@ main { min-width: 0; overflow-x: hidden; }
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { width: 100%; height: auto; min-width: 0; overflow: hidden; position: sticky; top: 0; z-index: 20; padding: 8px 10px; border-right: 0; border-bottom: 1px solid var(--border); }
   .sidebar nav { display: flex; overflow-x: auto; }
+  .sidebar-app-group, .sidebar-group-items { display: contents; }
+  .sidebar-group-toggle { display: none !important; }
+  .sidebar-app-group.collapsible:not(.expanded) .sidebar-nav-item:not(:first-child) { display: grid; }
   .sidebar-nav-item { flex: 0 0 auto; }
   .sidebar-section-label { display: none; }
   .sidebar nav button { flex: 0 0 auto; }
