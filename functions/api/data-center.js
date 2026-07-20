@@ -1,5 +1,6 @@
 import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
 import { normalizeDataCenterState } from "../../src/domain/dataCenter.js";
+import { canAccessCompanyPlatform } from "../../src/domain/permissions.js";
 import { dataCenterDatabase, readDataCenterState, writeDataCenterState } from "./data-center/_shared/storage.js";
 
 const VIEW_DEPARTMENTS = new Set(["总经办", "运营部", "财务部", "产品部", "供应链部", "供应链", "供应链团队", "采购部"]);
@@ -33,7 +34,13 @@ export async function onRequest({ request, env, data = {} }) {
     if (!body?.state || typeof body.state !== "object" || Array.isArray(body.state)) {
       return errorResponse("缺少有效的数据中心元数据。", 400, "DATA_STATE_INVALID");
     }
-    const saved = await writeDataCenterState(db, normalizeDataCenterState(body.state), String(session.name || session.userId || "unknown").slice(0, 120));
+    const normalized = normalizeDataCenterState(body.state);
+    const governed = canAccessCompanyPlatform(session) ? normalized : {
+      ...normalized,
+      aiProviders: stored.state.aiProviders,
+      aiDataPolicies: stored.state.aiDataPolicies
+    };
+    const saved = await writeDataCenterState(db, governed, String(session.name || session.userId || "unknown").slice(0, 120));
     return jsonResponse({ synced: true, ...saved });
   } catch (error) {
     return errorResponse(error.message || "数据中心元数据同步失败。", error.status || 500, "INTERNAL_UNEXPECTED", true);

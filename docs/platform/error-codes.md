@@ -37,6 +37,7 @@
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
+| `AI_` | 公司 AI 总助、数据权限、Provider 和流式响应 | `AI_PROVIDER_RATE_LIMITED` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
 内部平台资料 API 使用：
@@ -77,6 +78,34 @@
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 
+公司 AI 总助 API 使用：
+
+- `AI_DISABLED`：公司 AI 总助功能开关关闭。
+- `AI_SESSION_REQUIRED`：没有有效公司会话。
+- `AI_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+- `AI_PROVIDER_NOT_REGISTERED`：Provider 不在服务端白名单。
+- `AI_PROVIDER_SECRET_MISSING`：新的服务端 Secret 尚未配置。
+- `AI_PROVIDER_MANAGE_DENIED`：当前身份不能修改 Provider 元数据。
+- `AI_PROVIDER_TEST_DENIED`：当前身份不能执行合成连接测试。
+- `AI_PROVIDER_AUTH_FAILED`：Provider 拒绝服务端凭据。
+- `AI_PROVIDER_RATE_LIMITED`：Provider 返回 429，适合稍后手动重试。
+- `AI_PROVIDER_TIMEOUT`：Provider 在 45 秒内未响应。
+- `AI_PROVIDER_UNAVAILABLE`：Provider 网络或 5xx 故障。
+- `AI_PROVIDER_STREAM_FAILED`：流式响应失败或中断；已生成内容可保留但不得当作完整回答。
+- `AI_PROVIDER_SKILLS_UNSUPPORTED`：Provider 未完成纯合成 Function Calling 测试；状态标记原生能力不可用，总助改用受控服务端只读 Skills，未命中 Skill 的问题才使用摘要模式。
+- `AI_PROVIDER_INVALID_TOOL_ARGUMENTS`：Provider 在合成能力测试中返回无效工具参数。
+- `AI_PROVIDER_NOT_READY`：Provider 未启用或服务端 Secret 未就绪。
+- `AI_MESSAGES_INVALID`：消息数量、角色、长度或顺序不符合契约。
+- `AI_FINANCE_TRANSFER_BLOCKED`：消息包含具体财务值，当前 Provider 未通过外发审核。
+- `AI_REQUEST_IN_FLIGHT`：当前用户已有一个回答正在生成，HTTP 409。
+- `AI_CONTEXT_EMPTY`：当前身份没有可用且可外发的公司数据上下文。
+- `AI_SKILL_UNKNOWN` / `AI_SKILL_DENIED`：Provider 请求了未登记或当前会话无权使用的只读 Skill。
+- `AI_SKILL_ARGUMENTS_INVALID`：Skill 参数不符合服务端固定 Schema。
+- `AI_SKILL_TIMEOUT`：单个只读 Skill 查询超过 8 秒。
+- `AI_SKILL_DUPLICATE`：同一回答内出现相同 Skill 和参数，服务端拒绝重复读取。
+- `AI_SKILL_CALL_LIMIT` / `AI_SKILL_LOOP_LIMIT`：单次回答超过六次调用或两轮工具循环，服务端停止生成。
+- `AI_STREAM_CANCELLED`：客户端主动停止回答，租约已释放且审计标记未完成。
+- `AI_LOCAL_PREVIEW_READ_ONLY`：本地 Node 预览只展示脱敏状态，不调用 Provider 或修改配置。
 生产数据与环境 API 使用：
 
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。

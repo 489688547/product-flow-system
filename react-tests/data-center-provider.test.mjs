@@ -1,11 +1,31 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { dataCenterApiUrl, dataCenterSalesApiUrl, loadDataCenterSales } from "../src/state/dataCenterApi.js";
+import { dataCenterApiUrl, dataCenterRangeFromSearch, dataCenterSalesApiUrl, loadDataCenterSales, loadDataCenterState } from "../src/state/dataCenterApi.js";
 
 test("data center API URLs are stable and date scoped", () => {
   assert.equal(dataCenterApiUrl(), "/api/data-center");
   assert.equal(dataCenterSalesApiUrl({ from: "2026-07-01", to: "2026-07-17" }), "/api/data-center/sales?from=2026-07-01&to=2026-07-17");
+});
+
+test("data center preview accepts a valid date range from the page query", () => {
+  const fallback = { from: "2026-07-01", to: "2026-07-17" };
+  assert.deepEqual(dataCenterRangeFromSearch("?from=2026-06-01&to=2026-06-30", fallback), {
+    from: "2026-06-01",
+    to: "2026-06-30"
+  });
+  assert.deepEqual(dataCenterRangeFromSearch("?from=bad&to=2026-06-30", fallback), fallback);
+  assert.deepEqual(dataCenterRangeFromSearch("?from=2026-07-02&to=2026-07-01", fallback), fallback);
+});
+
+test("fresh remote metadata is a valid empty state even before its first save", async () => {
+  const payload = await loadDataCenterState(async () => new Response(JSON.stringify({
+    synced: false,
+    updatedAt: "",
+    state: { sources: [], metricDefinitions: [] }
+  }), { status: 200 }));
+
+  assert.deepEqual(payload.state.sources, []);
 });
 
 test("sales loader uses shared data center endpoint when available", async () => {

@@ -3,7 +3,7 @@ import { createDefaultDataCenterState, defaultDataCenterRange, normalizeDataCent
 import { normalizeSkuCodes } from "../domain/salesData.js";
 import { fetchSalesForCodes } from "./salesStore.js";
 import { useProductFlow } from "./ProductFlowProvider.jsx";
-import { loadDataCenterSales, loadDataCenterState, saveDataCenterState } from "./dataCenterApi.js";
+import { dataCenterRangeFromSearch, loadDataCenterSales, loadDataCenterState, saveDataCenterState } from "./dataCenterApi.js";
 
 const DataCenterContext = createContext(null);
 const STORAGE_KEY = "dataCenterMetadata";
@@ -25,7 +25,7 @@ function friendlyMessage(error, fallback) {
 export function DataCenterProvider({ children, enabled = true }) {
   const { state: productState, currentUser } = useProductFlow();
   const [state, setState] = useState(loadLocalMetadata);
-  const [range, setRange] = useState(() => defaultDataCenterRange());
+  const [range, setRange] = useState(() => dataCenterRangeFromSearch(window.location.search, defaultDataCenterRange()));
   const [salesRows, setSalesRows] = useState([]);
   const [salesMeta, setSalesMeta] = useState({ timeBasis: "create_time", timezone: "Asia/Shanghai", excludeOther: true });
   const [loading, setLoading] = useState(enabled);

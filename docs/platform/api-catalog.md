@@ -30,6 +30,11 @@
 | `/api/platform/v1/environment-readiness` | 读取当前或生产环境脱敏就绪状态 | 员工会话或 read 个人令牌；只返回配置名称与存在性 |
 | `/api/platform/v1/production-write-session` | 解锁、查询和锁定跨环境生产写入 | active executive + write 个人令牌；确认短语；15 分钟有效 |
 | `/api/platform/v1/production-data/state` | 本地测试实时读取、受控写入和回滚生产公司状态 | Bearer 个人令牌；写入需解锁、基线版本、快照与审计 |
+| `GET /api/platform/v1/ai/status` | 读取公司 AI 总助和当前用户数据域状态 | 钉钉会话；全员可读；只返回脱敏状态 |
+| `GET /api/platform/v1/ai/provider` | 读取 AI Provider 安全状态 | 钉钉会话；全员可读；外发策略仅总经办可见 |
+| `PUT /api/platform/v1/ai/provider` | 更新白名单内 Provider 元数据和启用状态 | 钉钉会话；仅非只读总经办；不接收 Secret、URL 或任意 Header |
+| `POST /api/platform/v1/ai/provider/test` | 使用合成内容测试 Provider 连接 | 钉钉会话；仅非只读总经办；不加载公司上下文 |
+| `POST /api/platform/v1/ai/chat` | 基于服务端可信公司数据流式生成只读分析建议 | 钉钉会话；按数据域权限与外发策略；单用户单并发；SSE |
 
 ### 数据中心契约
 
@@ -51,6 +56,24 @@
 ```
 
 兼容策略：数据中心不复制销售事实，继续复用 `product_sales_daily`。本地开发没有 D1 时，元数据写入 `.local-data/data-center-state.json`，销售读取返回 501 并由前端降级到现有浏览器销售仓库；销售行不会写入 `localStorage`。
+
+远程只读预览：`wrangler pages dev` 通过 `wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1` 且显式设置 `LOCAL_LIVE_D1_PREVIEW=1` 时，中间件才注入总经办预览身份；该模式只允许 GET，所有写请求返回 403。非本地主机即使设置同名变量也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
+
+### 公司 AI 总助契约
+
+AI 路由统一使用 `/api/platform/v1/ai/*`，沿用公司钉钉会话。状态与 Provider 响应只包含功能开关、是否就绪、是否已配置服务端 Secret、固定模型元数据、连接测试状态及当前身份可使用或被外发策略阻止的数据域；任何响应不得包含 Secret、Secret 尾号、内部 Header 或 Provider 原始错误。
+
+Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled`，实际域名、Responses 路径、`store:false` 与 Header 白名单由服务端固定。连接测试输入固定为“返回 ok”，不读取 D1 业务事实。写入安全元数据后由数据中心 D1 表持久化；密钥仍只存在 Cloudflare Secret。
+
+聊天请求只接受最多 12 条 `{ role, content }` 文本消息和弱 `appHint.screen` 路由提示；客户端提交的身份、部门、数据权限和公司状态字段全部忽略。单条用户消息最多 4,000 字符、助手历史最多 8,000 字符、总计最多 24,000 字符，最后一条必须是用户消息。包含明确财务关键词和具体金额/比例的手工粘贴内容在 Provider 调用前返回 `AI_FINANCE_TRANSFER_BLOCKED`。
+
+成功响应使用 SSE：`meta` 声明 request ID 和允许/阻止域，`text_delta` 返回正文增量，`sources` 返回 App、数据域、更新时间和记录数，`usage` 返回 token，`error` 返回稳定安全错误，`done` 声明回答是否完整。每个用户同一时间只允许一个生成请求；取消、失败和完成都会释放租约。审计只保存数据域、记录数、更新时间、token、耗时和结果码，不保存消息、回答或上下文。
+
+聊天 SSE 在原有 `meta`、`text_delta`、`sources`、`usage`、`error`、`done` 之外，增加 `skill_started`、`skill_completed`、`skill_failed`。事件只包含 request/call/Skill/App 标识、记录数、耗时和安全结果码，不返回查询参数或业务结果；旧客户端可继续忽略未知事件。
+
+兼容策略：`AI_ASSISTANT_ENABLED` 默认关闭，关闭时状态接口返回 `enabled:false`，聊天接口返回 `AI_DISABLED`，不要求 D1 或 Provider Secret。Provider 未通过 Function Calling 合成测试时，服务端从当前身份已授权的注册表按问题路由最多三个只读 Skill；命中时 `meta.skillsEnabled=true`、`meta.skillMode=server`，未命中时使用服务端摘要并标记 `summary`。原生工具模式标记为 `provider`。回滚只需关闭开关；AI 元数据、外发策略和无内容审计表保留，不影响其他业务 App。电商运营旧 AI 点评本期保持原路由和规则降级，不属于该共享 API 的调用方。
+
+本地 Node 预览只实现 AI 状态和 Provider 的 GET 安全投影，允许查看功能是否配置，不读取线上 D1，也不调用模型。Provider 更新、连接测试和聊天统一返回 `AI_LOCAL_PREVIEW_READ_ONLY`；本地环境变量值永不进入响应。真实链路必须在正式 Pages Functions 会话与 D1 边界分别验收。
 
 ### 店铺运营与绩效契约
 

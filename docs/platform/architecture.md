@@ -43,7 +43,7 @@
 - Cloudflare Pages 发布必须包含顶层 `404.html`。系统使用 Hash 路由，不依赖任意路径回退到首页；缺失的 JS/CSS 必须返回 404，不能伪装成首页 HTML。
 - 应用入口在 React 渲染前接管 Vite 的 `vite:preloadError`。旧标签页加载已被新部署替换的动态分包时，自动刷新获取当前版本。
 - 自动刷新使用会话级冷却时间防止循环；受限 WebView 无法使用会话存储时，仍允许执行一次浏览器刷新。
-- `_headers` 保持入口 HTML 不缓存；`scripts/prepare-pages-release.mjs` 负责同步构建后的入口、静态资源和 404 页面，避免手工发布遗漏。
+- `_headers` 保持入口 HTML 不缓存；`npm run build` 必须在 `dist` 内生成 `cloudflare-entry.html`、`_headers` 和 `_redirects`，确保 Cloudflare Git 自动部署与手动根目录部署同构。`scripts/prepare-pages-release.mjs` 只能从完整 `dist` 同步根目录发布包，避免两条发布路径遗漏不同文件。
 
 ## 未来平台化
 

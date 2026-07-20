@@ -51,6 +51,24 @@ test("platform credential vault declares its root secret migration and affected 
   assert.equal(kuaimai.envVars.includes("KUAIMAI_ACCESS_TOKEN"), true);
 });
 
+test("company assistant declares Provider secrets and production D1 schema", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const capability = manifest.capabilities.find(entry => entry.id === "company-ai-assistant");
+  assert.ok(capability, "company AI assistant capability must be declared");
+  assert.deepEqual(capability.platforms, ["lingsuan-ai-gateway", "cloudflare-pages", "cloudflare-d1"]);
+  assert.deepEqual(capability.envVars, ["AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"]);
+  assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
+  assert.deepEqual(capability.tables, [
+    "data_ai_providers",
+    "data_ai_policies",
+    "ai_usage_audit",
+    "ai_skill_audit",
+    "ai_request_leases"
+  ]);
+  assert.equal(existsSync(resolve(root, "migrations/0003_company_ai_assistant.sql")), true);
+  assert.equal(existsSync(resolve(root, "migrations/0004_company_ai_skills.sql")), true);
+});
+
 test("environment capability validation rejects secret values and unknown platforms", async () => {
   assert.equal(existsSync(generatorPath), true, "platform manifest generator must exist");
   const { validateEnvironmentCapabilities } = await import(generatorPath);
