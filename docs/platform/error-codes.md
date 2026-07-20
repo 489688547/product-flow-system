@@ -83,7 +83,9 @@
 
 - `GOODS_FLOW_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 或货流表。
 - `GOODS_FLOW_REQUEST_INVALID`：请求字段、日期、数值或业务幂等键不合法。
+- `GOODS_FLOW_IDEMPOTENCY_KEY_REQUIRED`：写入请求缺少 `Idempotency-Key`，HTTP 400。
 - `GOODS_FLOW_ACTION_DENIED`：当前部门不能执行盘点、账期、重算或冻结动作。
+- `GOODS_FLOW_WRITE_DENIED`：只读账号尝试执行货流写入，HTTP 403。
 - `GOODS_FLOW_VERSION_CONFLICT`：盘点、账期或 CCC 的读取版本已过期，HTTP 409。
 - `GOODS_FLOW_IDEMPOTENCY_CONFLICT`：同一来源引用或业务幂等键指向不同内容，HTTP 409。
 - `GOODS_FLOW_SKU_MAPPING_REQUIRED`：商品、SKU 或 69 码不能确定性映射，记录进入异常队列。

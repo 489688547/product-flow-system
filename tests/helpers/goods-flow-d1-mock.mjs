@@ -76,6 +76,8 @@ export function createGoodsFlowD1Mock() {
           if (normalized.includes("where platform = ?")) results = results.filter(row => row.platform === statement.values[0]);
           if (normalized.includes("where snapshot_date <= ?")) results = results.filter(row => row.snapshot_date <= statement.values[0]);
           if (normalized.includes("where month = ?")) results = results.filter(row => row.month === statement.values[0]);
+          if (normalized.includes("where id = ?")) results = results.filter(row => row.id === statement.values[0]);
+          if (normalized.includes("where stocktake_id = ?")) results = results.filter(row => row.stocktake_id === statement.values[0]);
           return { results };
         },
         async first() {

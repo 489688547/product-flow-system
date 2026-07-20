@@ -285,7 +285,7 @@ git commit -m "feat: persist goods flow facts"
 - Consumes: Task 1 domain functions and Task 3 storage functions; `data.session` from existing authentication middleware.
 - Produces: documented v1 JSON resources with `{ data, meta: { requestId, updatedAt, coverage, version } }` and stable `{ error: { code, message, requestId, retryable } }` failures.
 
-- [ ] **Step 1: Write failing authentication and permission tests**
+- [x] **Step 1: Write failing authentication and permission tests**
 
 ```js
 assert.equal((await dashboard.onRequest({ request, env, data: {} })).status, 401);
@@ -293,13 +293,13 @@ assert.equal((await terms.onRequest({ request: putRequest, env, data: { session:
 assert.equal((await terms.onRequest({ request: putRequest, env, data: { session: financeUser } })).status, 200);
 ```
 
-- [ ] **Step 2: Run and verify route failure**
+- [x] **Step 2: Run and verify route failure**
 
 Run: `node --test tests/goods-flow-api.test.mjs`
 
 Expected: FAIL because route modules do not exist.
 
-- [ ] **Step 3: Implement shared HTTP and role policies**
+- [x] **Step 3: Implement shared HTTP and role policies**
 
 Define read departments, warehouse stocktake actions, supply difference confirmation, finance terms/amount/freeze actions and executive read scope. Read permission must not imply provider synchronization permission.
 
@@ -313,7 +313,7 @@ export function authorizeGoodsFlow(session, action) {
 }
 ```
 
-- [ ] **Step 4: Implement query and command routes**
+- [x] **Step 4: Implement query and command routes**
 
 All writes validate body shape, expected version and idempotency key. Stocktake transitions allow `submit_count`, `confirm_difference`, `confirm_amount`, `correct`; CCC commands allow `recalculate` and `freeze`. Imports return success/failure counts and never clear prior successful data.
 
@@ -332,11 +332,13 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
 }
 ```
 
-- [ ] **Step 5: Add failure, timeout and compatibility tests**
+- [x] **Step 5: Add failure, timeout and compatibility tests**
 
 Cover missing D1 (501), malformed JSON (400), duplicate command (same response), version conflict (409), source partial failure (207), readonly identity (403), stale data metadata and old `/api/supply-chain` remaining unchanged.
 
-- [ ] **Step 6: Run API tests and commit**
+- [x] **Step 6: Run API tests and commit**
+
+Actual verification: `node --test tests/goods-flow-api.test.mjs tests/supply-chain-api.test.mjs` (13 tests passed); focused ESLint and `git diff --check` passed. External provider timeout behavior remains owned by the existing DingTalk/ERP adapters; these routes only consume normalized facts and return stable partial/error envelopes.
 
 Run: `node --test tests/goods-flow-api.test.mjs tests/supply-chain-api.test.mjs`
 

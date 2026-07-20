@@ -12,11 +12,14 @@
 | `/api/supply-chain` | 读取和保存供应链独立状态，并承接已清洗的钉钉供应链文件快照 | 需要公司会话；按部门裁剪金额和成本字段；写入仅允许所属部门集合；文件快照只允许供应商、库存盘点、成品库存、原辅料库存和异常库存集合 |
 | `/api/supply-chain/approvals/sync` | 分批读取钉钉采购和付款审批并写入供应链状态 | 仅总经办、供应链、采购和财务；每次只读取一个流程的一页，客户端先完成采购再完成付款 |
 | `/api/platform/v1/goods-flow/dashboard` | 读取 CCC、断货率、库存周转、库存资金和例外投影 | 公司会话；金额按部门裁剪；响应包含来源时间、覆盖率和计算版本 |
-| `/api/platform/v1/goods-flow/inventory` | 按日期、SKU 和仓库读取账面、实盘与校准库存 | 公司会话；游标分页；未盘点和过期来源必须显式标记 |
-| `/api/platform/v1/goods-flow/imports` | 幂等导入 ERP 库存和月度盘点批次 | 供应链、仓库或总经办；部分成功返回 207；浏览器不直连 ERP |
+| `/api/platform/v1/goods-flow/inventory` | 按日期、SKU 和仓库读取账面、实盘与校准库存 | 公司会话；支持截止日期过滤；未盘点和过期来源必须显式标记 |
+| `/api/platform/v1/goods-flow/imports` | 幂等导入 ERP 库存、钉钉审批、销售和兼容盘点事实 | 数据中心、供应链、财务或总经办；部分成功返回 207；浏览器不直连 ERP |
 | `/api/platform/v1/goods-flow/stocktakes` | 查询或创建月度盘点任务 | 仓库维护实存；供应链确认差异；金额调整由财务确认 |
+| `/api/platform/v1/goods-flow/stocktakes/:id/transitions` | 按乐观版本推进盘点确认或追加更正 | 仓库录数、供应链确认差异、财务确认金额；写入需要 `Idempotency-Key` |
 | `/api/platform/v1/goods-flow/receivable-terms` | 查询或版本化维护平台固定账期 | 全部货流角色可读；仅财务和总经办可写；区间不可重叠 |
 | `/api/platform/v1/goods-flow/ccc` | 查询月度 CCC 版本 | 公司会话；缺少库存、成本、账期或应付日期时返回覆盖不足 |
+| `/api/platform/v1/goods-flow/ccc/:month/recalculate` | 生成月度 CCC 新计算版本 | 财务、供应链或总经办；同一幂等键返回同一版本 |
+| `/api/platform/v1/goods-flow/ccc/:month/freeze` | 冻结覆盖完整的月度 CCC 版本 | 仅财务或总经办；覆盖不足或版本过期返回 409 |
 | `/api/sales` | 查询产品销售聚合 | 需要公司会话；时间和平台口径见产品数据定义 |
 | `/api/data-center` | 读取和保存数据中心安全元数据 | 指定部门可读；仅总经办和运营部可写；拒绝只读身份；D1 分实体表存储 |
 | `/api/data-center/sales` | 按日期读取数据中心销售事实 | 需要公司会话；最长 370 天；订单创建时间；上海时区；排除“其它” |

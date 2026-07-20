@@ -200,9 +200,13 @@ export async function saveStocktake(db, stocktake, lines = [], actor = "", now =
     (id, warehouse_id, counted_at, status, version, source, source_reference, submitted_by,
       difference_confirmed_by, amount_confirmed_by, corrected_from_id, created_at, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET status = excluded.status, version = excluded.version,
+    ON CONFLICT(id) DO UPDATE SET warehouse_id = excluded.warehouse_id,
+      counted_at = excluded.counted_at, status = excluded.status, version = excluded.version,
+      source = excluded.source, source_reference = excluded.source_reference,
+      submitted_by = excluded.submitted_by,
       difference_confirmed_by = excluded.difference_confirmed_by,
-      amount_confirmed_by = excluded.amount_confirmed_by, updated_at = excluded.updated_at`).bind(
+      amount_confirmed_by = excluded.amount_confirmed_by,
+      corrected_from_id = excluded.corrected_from_id, updated_at = excluded.updated_at`).bind(
     stocktake.id, stocktake.warehouseId, stocktake.countedAt, stocktake.status,
     Number(stocktake.version || 1), stocktake.source, stocktake.sourceReference || null,
     stocktake.submittedBy || actor || null, stocktake.differenceConfirmedBy || null,
@@ -225,6 +229,88 @@ export async function saveStocktake(db, stocktake, lines = [], actor = "", now =
     ));
   }
   return db.batch(statements);
+}
+
+export async function listStocktakes(db, { id } = {}) {
+  const stocktakeResult = await (id
+    ? db.prepare("SELECT * FROM goods_flow_stocktakes WHERE id = ?").bind(id)
+    : db.prepare("SELECT * FROM goods_flow_stocktakes ORDER BY counted_at DESC")).all();
+  const lineResult = await (id
+    ? db.prepare("SELECT * FROM goods_flow_stocktake_lines WHERE stocktake_id = ?").bind(id)
+    : db.prepare("SELECT * FROM goods_flow_stocktake_lines")).all();
+  const linesByStocktake = new Map();
+  for (const row of resultRows(lineResult)) {
+    const rows = linesByStocktake.get(row.stocktake_id) || [];
+    rows.push({
+      skuId: row.sku_id,
+      warehouseId: row.warehouse_id,
+      erpQuantity: numberOrNull(row.erp_quantity) ?? 0,
+      countedQuantity: numberOrNull(row.counted_quantity) ?? 0,
+      quantityVariance: numberOrNull(row.quantity_variance) ?? 0,
+      unitCost: numberOrNull(row.unit_cost),
+      amountVariance: numberOrNull(row.amount_variance),
+      reason: row.reason || ""
+    });
+    linesByStocktake.set(row.stocktake_id, rows);
+  }
+  return resultRows(stocktakeResult).map(row => ({
+    id: row.id,
+    warehouseId: row.warehouse_id,
+    countedAt: row.counted_at,
+    status: row.status,
+    version: Number(row.version),
+    source: row.source,
+    sourceReference: row.source_reference || null,
+    submittedBy: row.submitted_by || "",
+    differenceConfirmedBy: row.difference_confirmed_by || "",
+    amountConfirmedBy: row.amount_confirmed_by || "",
+    correctedFromId: row.corrected_from_id || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    lines: linesByStocktake.get(row.id) || []
+  }));
+}
+
+export async function saveGoodsFlowExceptions(db, exceptions = []) {
+  const statements = exceptions.filter(Boolean).map(row => db.prepare(`INSERT INTO goods_flow_exceptions
+    (id, code, severity, status, owner_department, entity_type, entity_id, source, source_reference,
+      message, details, created_at, updated_at, resolved_at, resolved_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET severity = excluded.severity, status = excluded.status,
+      owner_department = excluded.owner_department, message = excluded.message,
+      details = excluded.details, updated_at = excluded.updated_at,
+      resolved_at = excluded.resolved_at, resolved_by = excluded.resolved_by`).bind(
+    row.id, row.code, row.severity || "warning", row.status || "open", row.ownerDepartment || null,
+    row.entityType || null, row.entityId || null, row.source || null, row.sourceReference || null,
+    row.message, JSON.stringify(row.details || {}), row.createdAt, row.updatedAt || row.createdAt,
+    row.resolvedAt || null, row.resolvedBy || null
+  ));
+  return statements.length ? db.batch(statements) : [];
+}
+
+export async function listGoodsFlowExceptions(db) {
+  const result = await db.prepare("SELECT * FROM goods_flow_exceptions ORDER BY created_at DESC").all();
+  return resultRows(result).map(row => {
+    const details = parseObject(row.details);
+    return {
+      id: row.id,
+      code: row.code,
+      severity: row.severity,
+      status: row.status,
+      ownerDepartment: row.owner_department || "",
+      entityType: row.entity_type || "",
+      entityId: row.entity_id || "",
+      source: row.source || "",
+      sourceReference: row.source_reference || "",
+      message: row.message,
+      details: details.value,
+      detailsMalformed: details.malformed,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      resolvedAt: row.resolved_at || null,
+      resolvedBy: row.resolved_by || ""
+    };
+  });
 }
 
 function projectMonthlyMetric(row) {
