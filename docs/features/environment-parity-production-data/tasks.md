@@ -9,12 +9,12 @@
 
 ## 任务
 
-- [ ] 真实本地会话鉴权
+- [x] 真实本地会话鉴权
   - 依赖：无。
   - 文件：`tests/dingtalk-web-auth.test.mjs`、`tests/production-data-access.test.mjs`、`functions/api/platform/_shared/productionDataAccess.js`、`functions/api/_middleware.js`。
   - 失败测试：真实身份字段、GET read、POST write、只读令牌拒绝写、无令牌失败、非本地域名不绕过。
   - 输出：`local-online-account` 标准会话；无硬编码身份和无统一只读拦截。
-  - 验证：两个聚焦测试文件全绿。
+  - 验证：`node --test tests/production-data-access.test.mjs tests/dingtalk-web-auth.test.mjs`，34/34 通过。
 
 - [ ] 唯一完整本地启动入口
   - 依赖：真实本地会话鉴权。

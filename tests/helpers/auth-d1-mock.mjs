@@ -6,6 +6,7 @@ export function createAuthD1Mock() {
   const sessions = new Map();
   const members = new Map();
   const dingTokens = new Map();
+  const productionTokens = new Map();
   const calls = [];
 
   function memberKey(corpId, userId) {
@@ -87,6 +88,9 @@ export function createAuthD1Mock() {
             });
           } else if (normalized.startsWith("delete from product_flow_ding_user_tokens")) {
             dingTokens.delete(statement.values[0]);
+          } else if (normalized.startsWith("update production_data_access_tokens set last_used_at")) {
+            const row = productionTokens.get(statement.values[1]);
+            if (row) row.last_used_at = statement.values[0];
           }
 
           return { success: true };
@@ -97,6 +101,9 @@ export function createAuthD1Mock() {
             return sessions.get(statement.values[0]) || null;
           }
           if (normalized.includes("from product_flow_org_members")) {
+            if (normalized.includes("where user_id = ?")) {
+              return [...members.values()].find(row => row.user_id === statement.values[0]) || null;
+            }
             if (normalized.includes("where corp_id = ? and union_id = ?")) {
               return [...members.values()].find(row => row.corp_id === statement.values[0] && row.union_id === statement.values[1]) || null;
             }
@@ -104,6 +111,9 @@ export function createAuthD1Mock() {
           }
           if (normalized.includes("from product_flow_ding_user_tokens")) {
             return dingTokens.get(statement.values[0]) || null;
+          }
+          if (normalized.includes("from production_data_access_tokens")) {
+            return productionTokens.get(statement.values[0]) || null;
           }
           return null;
         },
@@ -122,6 +132,9 @@ export function createAuthD1Mock() {
     },
     dumpDingTokens() {
       return [...dingTokens.values()].map(row => ({ ...row }));
+    },
+    seedProductionAccess(row) {
+      productionTokens.set(row.token_hash, { ...row });
     },
     setDingTokenExpires(idHash, expiresAt) {
       const row = dingTokens.get(idHash);
