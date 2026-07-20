@@ -10,14 +10,21 @@ test("data center exposes product master data as a first-class route", () => {
   assert.match(app, /data-products[\s\S]*商品主数据[\s\S]*PackageSearch/);
   assert.match(page, /products:\s*\["商品主数据"/);
   assert.match(page, /products:\s*<ProductCatalogWorkspace canEdit=\{canEdit\}/);
+  assert.match(page, /快麦已落库 · 订单创建时间 · 默认不含其它/);
 });
 
-test("product catalog workspace provides dense search, filters, sync and file import", () => {
+test("product catalog workspace provides dense search, sales filters, sync and file import", () => {
   const workspace = read("src/features/data-center/ProductCatalogWorkspace.jsx");
   assert.match(workspace, /搜索商品、69 码或商家编码/);
   assert.match(workspace, /同步快麦商品/);
   assert.match(workspace, /导入 ERP 商品文件/);
-  assert.match(workspace, /全部状态/);
+  assert.match(workspace, /全部平台/);
+  assert.match(workspace, /最近 7 天/);
+  assert.match(workspace, /最近 30 天/);
+  assert.match(workspace, /本月/);
+  assert.match(workspace, /上月/);
+  assert.match(workspace, /自定义/);
+  assert.match(workspace, /type="date"/);
   assert.match(workspace, /全部分类/);
   assert.match(workspace, /已关联产品|未关联产品/);
   assert.match(workspace, /主商家编码/);
@@ -27,6 +34,8 @@ test("product catalog workspace provides dense search, filters, sync and file im
   assert.match(workspace, /确认导入/);
   assert.match(workspace, /TablePagination/);
   assert.match(workspace, /PAGE_SIZE = 50/);
+  assert.match(workspace, /header: "销量"/);
+  assert.doesNotMatch(workspace, /header: "ERP 状态"/);
 });
 
 test("catalog UI keeps actionable loading, empty, error and readonly states", () => {
@@ -40,11 +49,18 @@ test("catalog UI keeps actionable loading, empty, error and readonly states", ()
   assert.match(workspace, /disabled=\{loading\}/);
   assert.match(workspace, /onClick=\{\(\) => refresh\(\)\.catch\(\(\) => \{\}\)\}/);
   assert.match(workspace, /disabledReason="仅总经办和运营部可同步商品主数据"/);
+  assert.match(workspace, /销量更新中/);
+  assert.match(workspace, /当前范围暂无销售/);
+  assert.match(workspace, /未匹配/);
+  assert.match(workspace, /销售事实仅更新至/);
+  assert.match(workspace, /sortProductCatalogBySales/);
 });
 
 test("catalog table styles preserve readable codes and responsive table scrolling", () => {
   const styles = read("src/styles.css");
   assert.match(styles, /\.product-catalog-toolbar/);
+  assert.match(styles, /\.product-catalog-sales-cell/);
+  assert.match(styles, /\.product-catalog-date-range/);
   assert.match(styles, /\.catalog-code/);
   assert.match(styles, /white-space:\s*nowrap/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.product-catalog-toolbar/);

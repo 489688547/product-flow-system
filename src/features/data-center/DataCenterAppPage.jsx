@@ -59,7 +59,7 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
   };
   return (
     <section className="page data-center-page">
-      <PageHeader title={title} description={description} identity="统一口径 · 可追溯 · 截止昨天" />
+      <PageHeader title={title} description={description} identity={section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : "统一口径 · 可追溯 · 截止昨天"} />
       {error ? <div className="section-panel" role="status">{error}</div> : null}
       {loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}
     </section>

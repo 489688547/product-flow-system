@@ -115,9 +115,13 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 `GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是产品全周期、供应链和供应商管理共同消费的目录；采购成本仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、SKU、标准/非标准/缺失条码数量，以及最后成功同步时间、来源和方式。
 
+商品经营读取使用 `GET /api/platform/v1/product-catalog?from=YYYY-MM-DD&to=YYYY-MM-DD&platform=<平台>`。`from` 与 `to` 必须同时提交、包含边界日期且最多 370 天；`platform` 省略时排除空值、`其它`、`其他`、`未知` 和 `未知平台`。服务端在 D1 先按 `code × platform` 聚合 `product_sales_daily`，再用目录 SKU 条码/规格商家编码确定性关联商品，避免把明细或任意 SQL 暴露给浏览器。
+
+带销量范围时每个商品增加 `{ sales: { quantity, netSales, matchedCodeCount, platforms } }`；`meta.sales` 返回 `from`、`to`、`platform`、`availablePlatforms`、`totalQuantity`、`totalNetSales`、`coveredProducts`、`unmatchedRowCount`、`latestDataDate`、`timeBasis=create_time`、`timezone=Asia/Shanghai` 和销售事实最后入库时间。销量基础字段对现有商品目录读者可见，采购成本裁剪规则不变。旧客户端不带日期参数时不扫描销售表且响应保持兼容；商品 GET 只读已治理 D1 表，不在读取请求中执行建表或改表。
+
 `POST /api/platform/v1/product-catalog/import` 接收 `{ source, fileName, items, errors }`。客户端只提交已标准化商品与异常摘要，不提交原始文件内容；服务端按主商家编码和规格商家编码幂等合并。`POST /api/platform/v1/product-catalog/sync/kuaimai` 无业务参数，服务端使用密钥读取全部 `item.list.query` 分页，任何分页不完整都返回 409 且不写本批。
 
-快麦 API 与商品档案导出覆盖范围不同，自动同步不把 API 未返回的文件补齐商品标记为删除。回滚前端时保留新增 D1 表；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`、`KUAIMAI_CONFIG_MISSING`、`KUAIMAI_PRODUCT_SYNC_INCOMPLETE`、`KUAIMAI_PRODUCT_SYNC_FAILED`。
+快麦 API 与商品档案导出覆盖范围不同，自动同步不把 API 未返回的文件补齐商品标记为删除。订单日同步按快麦官方 `timeType=created` 查询并用响应 `created` 归日。回滚销量视图不删除目录或 `product_sales_daily`；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。销量查询按日期、编码和平台聚合，最大范围 370 天，不新增销售复制表。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_SALES_RANGE_INVALID`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`、`KUAIMAI_CONFIG_MISSING`、`KUAIMAI_PRODUCT_SYNC_INCOMPLETE`、`KUAIMAI_PRODUCT_SYNC_FAILED`。
 
 `GET /api/data-center/connectors` 返回 `{ connectors, vaultItems }`。财务、产品、供应链和运营只能读取连接器；内部保险箱元数据仅向总经办返回。`PUT` 使用 `{ expectedVersion, instance }` 保存连接器，或由总经办使用 `{ expectedVersion, vaultItem }` 保存内部保险箱条目。敏感值不得出现在请求中，只能提交 `credentialEntryId` 引用；新配置固定为 `pending_validation`，客户端提交 `healthy` 不生效。归档使用 `{ action: "archive", id, expectedVersion }` 且仅总经办可执行。所有修改使用乐观版本并在 `data_audit_logs` 只记录动作和变更字段名。
 

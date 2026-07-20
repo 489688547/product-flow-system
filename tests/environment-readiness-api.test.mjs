@@ -98,6 +98,8 @@ const businessDataTables = [
   "product_catalog_skus",
   "product_catalog_sync_runs",
   "product_catalog_meta",
+  "product_sales_daily",
+  "product_sales_meta",
   "ecommerce_operation_records",
   "ecommerce_operation_meta",
   "ecommerce_operation_state",
