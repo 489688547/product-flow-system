@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { pullKuaimaiProductCatalog } from "../functions/api/kuaimai/_shared/kuaimai.js";
+import { pullKuaimaiProductCatalog, pullKuaimaiProductDetails } from "../functions/api/kuaimai/_shared/kuaimai.js";
 import { onRequest } from "../functions/api/platform/v1/product-catalog/sync/kuaimai.js";
 
 function item(index) {
@@ -52,6 +52,62 @@ test("provider failure and page guard never return a complete catalog", async ()
   }, []));
   assert.equal(result.complete, false);
   assert.equal(result.nextPage, 2);
+});
+
+test("reads only bundle details in bounded cursor batches", async () => {
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    const params = new URLSearchParams(options.body);
+    calls.push(Object.fromEntries(params.entries()));
+    const sysItemId = params.get("sysItemId");
+    return new Response(JSON.stringify({
+      success: true,
+      item: {
+        sysItemId: Number(sysItemId),
+        outerId: sysItemId === "1" ? "2DGZZ" : "BYMSDHBD",
+        suitSingleList: sysItemId === "1"
+          ? [{ outerId: "1111", ratio: 2 }]
+          : [{ outerId: "6978705011727", ratio: 1 }, { outerId: "6977173969059", ratio: 1 }]
+      }
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const candidates = [
+    { sysItemId: 1, outerId: "2DGZZ", type: "2" },
+    { sysItemId: 9, outerId: "NORMAL", type: "0", typeTag: 0 },
+    { sysItemId: 2, outerId: "BYMSDHBD", type: "0", typeTag: 3 }
+  ];
+
+  const first = await pullKuaimaiProductDetails(config, candidates, { cursor: 0, maxDetails: 1 }, fetchImpl);
+  assert.equal(first.details.length, 1);
+  assert.equal(first.details[0].suitSingleList[0].ratio, 2);
+  assert.equal(first.totalCandidates, 2);
+  assert.equal(first.nextCursor, 1);
+  assert.equal(first.complete, false);
+  assert.deepEqual(calls.map(call => call.method), ["item.single.get"]);
+  assert.equal(calls[0].sysItemId, "1");
+
+  const second = await pullKuaimaiProductDetails(config, candidates, { cursor: first.nextCursor, maxDetails: 30 }, fetchImpl);
+  assert.equal(second.details.length, 1);
+  assert.equal(second.details[0].suitSingleList.length, 2);
+  assert.equal(second.nextCursor, null);
+  assert.equal(second.complete, true);
+});
+
+test("keeps detail failures safe and resumable", async () => {
+  const result = await pullKuaimaiProductDetails(config, [
+    { sysItemId: 1, outerId: "BROKEN", type: "1" },
+    { sysItemId: 2, outerId: "WORKS", type: "2" }
+  ], { maxDetails: 30 }, async (_url, options) => {
+    const params = new URLSearchParams(options.body);
+    if (params.get("sysItemId") === "1") {
+      return new Response(JSON.stringify({ success: false, code: "20103", msg: "商品权限不足" }), { status: 200 });
+    }
+    return new Response(JSON.stringify({ success: true, item: { sysItemId: 2, outerId: "WORKS", suitSingleList: [{ outerId: "1111", ratio: 2 }] } }), { status: 200 });
+  });
+
+  assert.equal(result.complete, true);
+  assert.equal(result.details.length, 1);
+  assert.deepEqual(result.failures, [{ sourceProductId: "1", merchantCode: "BROKEN", code: "20103", message: "快麦商品详情读取失败。" }]);
 });
 
 function createD1Mock() {

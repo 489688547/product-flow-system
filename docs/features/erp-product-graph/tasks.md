@@ -15,11 +15,12 @@
   - 输出：内部唯一码、组件标准化、递归展开、成本和可售库存。
   - 验证：`node --test react-tests/product-catalog-graph.test.mjs react-tests/product-catalog.test.mjs`。
   - 结果：14/14 通过；覆盖内部唯一码、双组件、比例 2、嵌套、循环和冲突编码。
-- [ ] 快麦组合详情适配
+- [x] 快麦组合详情适配
   - 依赖：领域商品关系图。
   - 文件：`functions/api/kuaimai/_shared/kuaimai.js`、`tests/product-catalog-kuaimai.test.mjs`。
   - 输出：`item.single.get` 分批详情、游标、失败摘要。
   - 验证：`node --test tests/product-catalog-kuaimai.test.mjs`。
+  - 结果：6/6 通过；仅筛选组合候选，单批最多 30 条，失败返回安全摘要并保留游标。
 - [ ] 组件 D1 存储与同步 API
   - 依赖：快麦详情适配。
   - 文件：`migrations/0006_product_catalog_components.sql`、商品目录存储/同步 API、API 测试。

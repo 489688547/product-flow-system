@@ -261,3 +261,60 @@ export async function pullKuaimaiProductCatalog(config, { pageNo = 1, pageSize =
     nextPage: complete ? null : page
   };
 }
+
+function kuaimaiProductDetail(payload = {}) {
+  if (payload.item && typeof payload.item === "object") return payload.item;
+  if (payload.body?.item && typeof payload.body.item === "object") return payload.body.item;
+  if (typeof payload.body === "string") {
+    try {
+      const body = JSON.parse(payload.body);
+      return body?.item && typeof body.item === "object" ? body.item : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function isKuaimaiBundleCandidate(item = {}) {
+  return ["1", "2"].includes(String(item.type ?? "")) || ["3", "4"].includes(String(item.typeTag ?? ""));
+}
+
+// 商品列表只给出类型；组合比例由商品详情的 suitSingleList 提供。
+// 单次最多读取 30 个详情，给 Pages Functions 留出列表、存储和认证子请求余量。
+export async function pullKuaimaiProductDetails(config, items = [], { cursor = 0, maxDetails = 30 } = {}, fetchImpl = fetch) {
+  const candidates = items.filter(isKuaimaiBundleCandidate);
+  const start = Math.min(candidates.length, Math.max(0, Number(cursor) || 0));
+  const limit = Math.min(30, Math.max(1, Number(maxDetails) || 30));
+  const selected = candidates.slice(start, start + limit);
+  const details = [];
+  const failures = [];
+  for (const candidate of selected) {
+    try {
+      const request = candidate.sysItemId
+        ? { sysItemId: candidate.sysItemId, whetherReturnPurchase: 0 }
+        : { outerId: candidate.outerId, whetherReturnPurchase: 0 };
+      const payload = await callKuaimai("item.single.get", request, config, fetchImpl);
+      const detail = kuaimaiProductDetail(payload);
+      if (!detail) throw new Error("快麦商品详情为空。");
+      details.push({ ...candidate, ...detail });
+    } catch (error) {
+      failures.push({
+        sourceProductId: String(candidate.sysItemId || ""),
+        merchantCode: String(candidate.outerId || ""),
+        code: String(error?.kuaimaiCode || "KUAIMAI_PRODUCT_DETAIL_FAILED"),
+        message: "快麦商品详情读取失败。"
+      });
+    }
+  }
+  const consumed = start + selected.length;
+  const complete = consumed >= candidates.length;
+  return {
+    details,
+    failures,
+    totalCandidates: candidates.length,
+    cursor: start,
+    nextCursor: complete ? null : consumed,
+    complete
+  };
+}
