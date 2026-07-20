@@ -74,7 +74,7 @@ export function DataConnectionsWorkspace({ canEdit = false }) {
   }
 
   return (
-    <div className="data-connections-workspace">
+    <div className="automated-connections-workspace">
       <section className="section-panel data-connection-provider">
         <div className="data-connection-provider-identity">
           <img src={douyinLogo} alt="" />

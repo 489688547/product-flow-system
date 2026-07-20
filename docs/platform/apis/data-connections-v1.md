@@ -13,7 +13,7 @@
 
 ## 连接模型
 
-数据库保存 `platform_id`、通用 `account_label`、版本化 `credential_schema_id`、AES-GCM 密文、凭据版本、业务状态、乐观锁版本和审计。抖音 adapter 将 `loginEmail` 映射为 `account_label`，将 `{ password }` 作为 `email-password-v1` 加密 JSON。
+连接表保存 `platform_id`、通用 `account_label`、版本化 `credential_schema_id`、`credential_entry_id`、凭据版本、业务状态、乐观锁版本和审计。AES-GCM 密文继续由现有 `credential_vault_entries` 唯一保存。抖音 adapter 将 `loginEmail` 映射为 `account_label`，将 `{ password }` 作为 `email-password-v1` 加密 JSON 写入共享保险箱。
 
 普通响应为了首期 UI 同时返回 `accountLabel` 和抖音兼容字段 `loginEmail`；从不返回 secret、ciphertext、IV 或 grant。
 
@@ -74,7 +74,7 @@
 ## 兼容、容量与回滚
 
 - v1 客户端忽略未知字段；新增 provider 通过 registry 和 adapter 扩展，不改变抖音请求契约。
-- `data_connections` 每个账号一行，secret 只保存一份当前加密 JSON；每次替换生成一条审计和一个任务，容量主要来自追加任务/审计而非凭据。
+- `data_connections` 每个账号一行，只引用共享保险箱；secret 只在 `credential_vault_entries` 保存一份当前加密 JSON。每次替换生成保险箱审计、连接审计和一个任务，容量主要来自追加任务/审计而非凭据。
 - 迁移 `0006_data_connections.sql` 为新增表，不改旧数据中心表。部署前运行 D1 migration；部署后先读接口再保存测试连接。
 - 回滚停止新任务并隐藏写入口，保留表和密文；旧版本不会读取新增表。不得通过删除表回滚。
 

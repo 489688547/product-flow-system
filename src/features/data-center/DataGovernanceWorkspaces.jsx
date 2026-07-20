@@ -6,7 +6,8 @@ import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapters.js";
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 import { AiProviderSettings } from "./AiProviderSettings.jsx";
-import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
+import { DataConnectionsWorkspace as ConnectorCatalogWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
+import { DataConnectionsWorkspace as AutomatedConnectionsWorkspace } from "./data-connections/DataConnectionsWorkspace.jsx";
 
 const STATUS_LABELS = { healthy: "正常", pending_validation: "待验证", waiting_verification: "等待人工验证", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", disabled: "未启用" };
 
@@ -15,7 +16,7 @@ function statusLabel(status) {
 }
 
 export function DataSourcesWorkspace({ canEdit, canManage }) {
-  return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} />;
+  return <div className="data-workspace"><AutomatedConnectionsWorkspace canEdit={canEdit} /><ConnectorCatalogWorkspace canEdit={canEdit} canManage={canManage} excludedConnectorIds={["douyin-ecommerce"]} /></div>;
 }
 
 export function DataQualityWorkspace({ quality }) {

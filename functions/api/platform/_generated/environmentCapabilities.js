@@ -97,7 +97,7 @@ const environmentCapabilities = {
     {
       "id": "browser-data-acquisition",
       "name": "通用浏览器数据采集",
-      "description": "统一保存 provider 连接的加密凭证、识别结果、公司 Mac 短时任务和无秘密审计；抖音是首个 adapter。",
+      "description": "复用数据中心凭据保险箱，统一保存 provider 连接引用、识别结果、公司 Mac 短时任务和无秘密审计；抖音是首个 adapter。",
       "platforms": [
         "douyin-ecommerce",
         "cloudflare-pages",

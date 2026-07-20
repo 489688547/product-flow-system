@@ -9,7 +9,7 @@
 ## 分层
 
 1. provider registry 声明固定域名、凭据结构、任务类型、资源类型和结构版本；未登记内容默认拒绝。
-2. `data_connections` 保存通用账户标识、凭据结构 ID 和 AES-GCM 加密 JSON，不把邮箱、API Key 等字段固化为数据库列。
+2. `data_connections` 保存通用账户标识、凭据结构 ID 和共享保险箱条目引用；AES-GCM 密文只保存在现有 `credential_vault_entries`，不创建第二套凭据存储，也不把邮箱、API Key 等字段固化为数据库列。
 3. `browser_agent_tasks` 使用 `platformId + taskType + resourceType + schemaVersion + cursor` 描述采集，不保存明文凭据。
 4. 公司 Mac 按设备 scope 领取任务，再使用一次性五分钟 grant 获取该任务的当前凭据。
 5. provider adapter 只负责固定允许域名内的登录/API/文件操作和原始结果标准化。
@@ -19,7 +19,7 @@
 
 - `account_label` 是可展示的通用账户标识；抖音映射为登录邮箱，ERP 可映射为账套或账号名称。
 - `credential_schema_id` 指向 provider registry 中的版本化结构；抖音首期为 `email-password-v1`。
-- secret fields 作为一个加密 JSON 保存，并以 `providerId:connectionId` 绑定密文附加数据。
+- secret fields 作为一个加密 JSON 写入数据中心共享凭据保险箱，并通过 `credential_entry_id` 与采集连接关联。
 - 普通列表不返回 secrets；受控 reveal 和 task credential 都使用 `no-store`，且必须服务端授权。
 - 验证码、Cookie、Token、完整 HTML、截图和原始平台响应不得作为任务结果保存。
 

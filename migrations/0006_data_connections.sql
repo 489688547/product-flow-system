@@ -3,10 +3,7 @@ CREATE TABLE IF NOT EXISTS data_connections (
   platform_id TEXT NOT NULL,
   account_label TEXT NOT NULL,
   credential_schema_id TEXT NOT NULL,
-  ciphertext TEXT NOT NULL,
-  iv TEXT NOT NULL,
-  algorithm TEXT NOT NULL,
-  key_version INTEGER NOT NULL DEFAULT 1,
+  credential_entry_id TEXT NOT NULL,
   credential_version INTEGER NOT NULL DEFAULT 1,
   status TEXT NOT NULL DEFAULT 'queued',
   version INTEGER NOT NULL DEFAULT 1,
@@ -14,7 +11,8 @@ CREATE TABLE IF NOT EXISTS data_connections (
   created_at TEXT NOT NULL,
   created_by TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  updated_by TEXT NOT NULL
+  updated_by TEXT NOT NULL,
+  FOREIGN KEY (credential_entry_id) REFERENCES credential_vault_entries(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_data_connections_platform_status ON data_connections (platform_id, status, updated_at DESC);

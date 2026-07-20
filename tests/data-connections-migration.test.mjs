@@ -33,6 +33,9 @@ test("data connection tables stay aligned with the environment capability", () =
   assert.match(migration, /cursor TEXT/i);
   assert.match(migration, /account_label TEXT NOT NULL/i);
   assert.match(migration, /credential_schema_id TEXT NOT NULL/i);
+  assert.match(migration, /credential_entry_id TEXT NOT NULL/i);
+  const connectionTable = migration.match(/CREATE TABLE IF NOT EXISTS data_connections \([\s\S]*?\n\);/i)?.[0] || "";
+  assert.doesNotMatch(connectionTable, /ciphertext|\biv\b|algorithm|key_version/i);
   assert.doesNotMatch(migration, /login_email/i);
   assert.doesNotMatch(migration, /cookie|verification_code|sms_code|raw_html/i);
 });

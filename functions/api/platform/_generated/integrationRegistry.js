@@ -249,13 +249,23 @@ const integrationRegistry = {
       "relations": [
         {
           "platformId": "cloudflare-d1",
-          "type": "stores-encrypted-connections",
-          "description": "D1 保存实例级密文、店铺识别结果、短时任务与审计。"
+          "type": "stores-acquisition-state",
+          "description": "D1 通过现有凭据保险箱保存密文，并保存店铺识别结果、短时任务与审计。"
         },
         {
           "platformId": "cloudflare-pages",
           "type": "hosts-browser-task-api",
           "description": "Pages Functions 承载用户连接与公司 Mac 任务接口。"
+        },
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "后续订单采集需区分快麦聚合订单与抖音店铺原始经营数据。"
+        },
+        {
+          "platformId": "oceanengine-qianchuan",
+          "type": "commerce-to-advertising",
+          "description": "店铺经营数据与巨量投放数据分别采集并通过标准维度关联。"
         }
       ]
     },
@@ -1079,49 +1089,6 @@ const integrationRegistry = {
           "platformId": "cloudflare-d1",
           "type": "governed-by",
           "description": "D1 保存 Provider 安全元数据、外发策略、并发租约和无内容审计。"
-        }
-      ]
-    },
-    {
-      "id": "douyin-ecommerce",
-      "name": "抖音电商",
-      "status": "planned",
-      "summary": "计划通过平台授权、网页导出或固定公司 Mac 的已登录页面采集店铺经营数据，尚未接入。",
-      "capabilities": [
-        "店铺订单",
-        "商品数据",
-        "经营报表",
-        "网页导出"
-      ],
-      "businessQuestions": [
-        "抖音店铺如何授权",
-        "邮箱或手机号登录如何处理",
-        "验证码后如何恢复同步",
-        "与快麦订单是否重复"
-      ],
-      "keywords": [
-        "抖音电商",
-        "抖店",
-        "Douyin Ecommerce",
-        "店铺后台",
-        "邮箱登录"
-      ],
-      "codePaths": [],
-      "envVars": [],
-      "domains": [],
-      "apiRoutes": [],
-      "publicDocs": [],
-      "evidence": [],
-      "relations": [
-        {
-          "platformId": "kuaimai",
-          "type": "possible-overlap",
-          "description": "接入前需区分快麦聚合订单与抖音店铺原始经营数据。"
-        },
-        {
-          "platformId": "oceanengine-qianchuan",
-          "type": "commerce-to-advertising",
-          "description": "店铺经营数据与巨量投放数据分别采集并通过标准维度关联。"
         }
       ]
     },

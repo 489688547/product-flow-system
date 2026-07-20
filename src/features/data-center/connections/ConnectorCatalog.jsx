@@ -39,10 +39,11 @@ function summaryStatus(instances) {
   return CONNECTOR_STATUS_PRIORITY.find(status => instances.some(item => item.status === status)) || "pending_validation";
 }
 
-export function ConnectorCatalog({ instances = [], canEdit = false, onAdd, onManage }) {
+export function ConnectorCatalog({ instances = [], excludedConnectorIds = [], canEdit = false, onAdd, onManage }) {
+  const excluded = new Set(excludedConnectorIds);
   return (
     <div className="connector-catalog-grid">
-      {DATA_CONNECTOR_DEFINITIONS.map(definition => {
+      {DATA_CONNECTOR_DEFINITIONS.filter(definition => !excluded.has(definition.id)).map(definition => {
         const configured = instances.filter(item => item.connectorId === definition.id);
         const status = summaryStatus(configured);
         return (

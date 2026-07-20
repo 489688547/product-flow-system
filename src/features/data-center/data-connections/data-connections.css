@@ -1,4 +1,4 @@
-.data-connections-workspace { display: grid; gap: var(--space-4); }
+.automated-connections-workspace { display: grid; gap: var(--space-4); }
 .data-connection-provider { min-height: 76px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
 .data-connection-provider-identity { min-width: 0; display: flex; align-items: center; gap: var(--space-3); }
 .data-connection-provider-identity img, .data-connection-avatar { width: 44px; height: 44px; flex: 0 0 auto; border-radius: 10px; object-fit: cover; background: var(--surface-subtle); }

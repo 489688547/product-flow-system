@@ -161,3 +161,10 @@
 - [ ] `verify:production` 的 Cloudflare D1/Pages 两项受控检查因本机缺少 `PRODUCTION_DATA_ACCESS_TOKEN` 受阻；钉钉 WebView、真实凭证保存和真实外部平台登录仍独立验收，不用浏览器或本地结果冒充完成。
 
 实际提交：`07c4657`、`ff3ec7d`、`8839745`、`bdb4502`、`d7fdde3`、`a5a9510`、`a5fd8e8`、`6d2e514`、`8ee15a4`。
+
+## 通用数据连接与抖音身份识别（2026-07-20）
+
+- [ ] 复用现有数据中心凭据保险箱，完成通用 provider/credential/task/resource/result-writer 协议和抖音 `connection_identity` 首个 adapter。
+- [x] 失败测试覆盖通用账户与保险箱引用、一次性 grant、敏感结果拒绝、固定域名、人工验证和店铺 ID 去重。
+- [x] 抖音弹窗收敛为邮箱、密码，识别结果列表只展示店铺头像、名称和业务状态；其他 ERP/平台连接器目录继续保留。
+- [ ] 全量门禁、真实公司 Mac Chrome、Production D1 和钉钉 WebView 验收完成后勾选。

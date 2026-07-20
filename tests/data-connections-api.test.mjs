@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { handleDataConnectionsRequest } from "../functions/api/platform/v1/data-connections/index.js";
 import { handleDataConnectionRevealRequest } from "../functions/api/platform/v1/data-connections/[id]/reveal.js";
+import { readFileSync } from "node:fs";
 
 const freshSession = {
   userId: "ops-1",
@@ -12,6 +13,14 @@ const freshSession = {
 };
 const readonlySession = { ...freshSession, role: "readonly" };
 const outsider = { ...freshSession, userId: "brand-1", department: "品牌部" };
+
+test("instance connections reuse the shared credential vault", () => {
+  const storage = readFileSync(new URL("../functions/api/platform/v1/data-connections/_shared/storage.js", import.meta.url), "utf8");
+  assert.match(storage, /createCredentialEntry/);
+  assert.match(storage, /replaceCredentialEntry/);
+  assert.match(storage, /revealCredentialEntry/);
+  assert.doesNotMatch(storage, /encryptPlatformCredentials|decryptPlatformCredentials/);
+});
 
 function request(method = "GET", body) {
   return new Request("https://flow.example.com/api/platform/v1/data-connections", {

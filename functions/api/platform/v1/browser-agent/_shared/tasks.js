@@ -1,5 +1,5 @@
 import { dataAcquisitionContract, registeredDataAcquisitionProviders } from "../../../../../../src/domain/dataAcquisition.js";
-import { decryptPlatformCredentials } from "../../../_shared/credentialCrypto.js";
+import { revealCredentialEntry } from "../../../_shared/credentialVaultStorage.js";
 import { sha256 } from "../../user-insights/_shared/storage.js";
 import { DataConnectionHttpError } from "../../data-connections/_shared/http.js";
 import { writeAcquisitionResult } from "./providerResultWriters.js";
@@ -12,10 +12,6 @@ function createGrant() {
   const bytes = new Uint8Array(24);
   globalThis.crypto.getRandomValues(bytes);
   return `bat_${[...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("")}`;
-}
-
-function cryptoPlatformId(providerId, connectionId) {
-  return `${providerId}:${connectionId}`;
 }
 
 function taskMetadata(row, grant, grantExpiresAt) {
@@ -70,30 +66,36 @@ export function createBrowserAgentTaskStore(db, { masterKey, runner, now = () =>
           g.credential_version AS grant_credential_version, g.expires_at AS grant_expires_at, g.consumed_at,
           t.credential_version AS task_credential_version, t.status AS task_status, t.claimed_by,
           t.platform_id, t.task_type, t.resource_type,
-          c.account_label, c.credential_schema_id, c.ciphertext, c.iv, c.algorithm, c.key_version, c.credential_version
+          c.account_label, c.credential_schema_id, c.credential_entry_id, c.credential_version,
+          e.version AS vault_credential_version
         FROM browser_agent_task_grants g
         JOIN browser_agent_tasks t ON t.id = g.task_id
         JOIN data_connections c ON c.id = g.connection_id
+        JOIN credential_vault_entries e ON e.id = c.credential_entry_id AND e.archived_at IS NULL
         WHERE g.task_id = ?1 AND g.grant_hash = ?2`).bind(taskId, grantHash).first();
       const valid = row && !row.consumed_at && row.grant_expires_at > timestamp && row.task_status === "claimed"
         && row.runner_id === row.claimed_by
         && Number(row.grant_credential_version) === Number(row.task_credential_version)
-        && Number(row.credential_version) === Number(row.task_credential_version);
+        && Number(row.credential_version) === Number(row.task_credential_version)
+        && Number(row.vault_credential_version) === Number(row.task_credential_version);
       if (!valid) throw new DataConnectionHttpError(401, "BROWSER_AGENT_GRANT_INVALID", "任务凭证无效、已过期或已使用。");
       const consume = await db.prepare("UPDATE browser_agent_task_grants SET consumed_at = ?1 WHERE id = ?2 AND consumed_at IS NULL")
         .bind(timestamp, row.grant_id).run();
       if (Number(consume?.meta?.changes ?? 0) !== 1) throw new DataConnectionHttpError(401, "BROWSER_AGENT_GRANT_INVALID", "任务凭证无效、已过期或已使用。");
-      const credentials = await decryptPlatformCredentials(row, {
+      const revealed = await revealCredentialEntry(db, row.credential_entry_id, {
         masterKey,
-        platformId: cryptoPlatformId(row.platform_id || "douyin-ecommerce", row.connection_id),
-        keyVersion: Number(row.key_version || 1)
+        actorType: "runner",
+        actorId: runner.id,
+        actorName: runner.name || runner.id,
+        purpose: `浏览器采集任务 ${taskId}`,
+        requestId: taskId
       });
       const contract = dataAcquisitionContract(row.platform_id || "douyin-ecommerce", row.task_type || "douyin_login_verification", row.resource_type || "connection_identity");
       return {
         platformId: row.platform_id,
         accountLabel: row.account_label,
         credentialSchemaId: row.credential_schema_id,
-        credentials,
+        credentials: revealed.secretPayload,
         loginUrl: contract.loginUrl
       };
     },
@@ -123,4 +125,4 @@ export function createBrowserAgentTaskStore(db, { masterKey, runner, now = () =>
   };
 }
 
-export const browserAgentTaskInternals = { createGrant, cryptoPlatformId, taskMetadata };
+export const browserAgentTaskInternals = { createGrant, taskMetadata };

@@ -6,7 +6,7 @@ import { ConnectorCatalog } from "./ConnectorCatalog.jsx";
 import { ConnectorConfigDialog } from "./ConnectorConfigDialog.jsx";
 import { InternalVaultWorkspace } from "./InternalVaultWorkspace.jsx";
 
-export function DataConnectionsWorkspace({ canEdit = false, canManage = false }) {
+export function DataConnectionsWorkspace({ canEdit = false, canManage = false, excludedConnectorIds = [] }) {
   const {
     connections,
     vaultItems,
@@ -39,6 +39,7 @@ export function DataConnectionsWorkspace({ canEdit = false, canManage = false })
       {connectionsLoading ? <div className="connection-loading" aria-label="正在加载连接器"><span /><span /><span /></div> : tab === "connectors" ? (
         <ConnectorCatalog
           instances={connections}
+          excludedConnectorIds={excludedConnectorIds}
           canEdit={canEdit}
           onAdd={definition => setSelection({ definition, instance: null })}
           onManage={(definition, instance) => setSelection({ definition, instance })}

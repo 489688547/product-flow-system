@@ -47,7 +47,7 @@ node --test react-tests/data-connections.test.mjs tests/data-connections-migrati
 ### GREEN
 
 1. 实现 `DOUYIN_ECOMMERCE` 固定平台定义、连接/店铺状态标准化和店铺 ID 去重。
-2. 新增迁移；连接表保存通用账户标识、凭据结构 ID 和加密 JSON，店铺表按 `(platform_id, shop_id)` 唯一，任务只保存引用和结果摘要，grant 只保存哈希。
+2. 新增迁移；连接表保存通用账户标识、凭据结构 ID 和现有保险箱条目引用，加密 JSON 继续只存于共享 `credential_vault_entries`；店铺表按 `(platform_id, shop_id)` 唯一，任务只保存引用和结果摘要，grant 只保存哈希。
 3. 在集成注册表新增 `douyin-ecommerce`，标记为 `integrating`；在环境能力表登记 D1 表和复用的主密钥。
 4. 运行 `npm run generate:platform-manifests`，再运行 RED 命令直到通过。
 
