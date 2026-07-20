@@ -1,5 +1,9 @@
 # 数据中心连接器与加密保险箱实施计划
 
+## 数据口径扩展
+
+2026-07-20 已确认的数据口径 CRUD、版本化、安全公式、计算结果和数据总览切换，按独立实施计划执行：[`data-standards-plan.md`](./data-standards-plan.md)。该扩展继续使用 `PRODUCT_FLOW_DB`，会新增 D1 表和 `/api/platform/v1/data-standards` 共享契约，因此实施前后必须执行环境能力、集成路由、迁移、回滚和完整 Definition of Done 检查。
+
 ## 交付策略
 
 按三个可以独立验收和回滚的阶段交付：
