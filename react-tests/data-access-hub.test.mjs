@@ -5,7 +5,9 @@ import test from "node:test";
 import {
   DATA_ACCESS_CATEGORIES,
   dataAccessCategoryFor,
-  dataAccessSourceIds
+  dataAccessSourceIds,
+  summarizeErpAccessHealth,
+  summarizePlatformConnectionHealth
 } from "../src/domain/dataAccessCatalog.js";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
@@ -30,6 +32,21 @@ test("data access has the approved categories and stable membership", () => {
   ]);
 });
 
+test("catalog health keeps sync failures and stale platform reads visible", () => {
+  assert.deepEqual(summarizeErpAccessHealth({
+    connection: { status: "connected" },
+    instances: [{ status: "failed" }]
+  }), ["需处理", "danger"]);
+  assert.deepEqual(summarizeErpAccessHealth({
+    connection: { status: "connected" },
+    instances: [{ status: "running" }]
+  }), ["同步中", "warning"]);
+  assert.deepEqual(summarizePlatformConnectionHealth({
+    connection: { status: "connected" },
+    error: "读取失败"
+  }), ["状态暂不可用", "danger"]);
+});
+
 test("the visible navigation has one data access entry and no platform connection entry", () => {
   const app = read("src/App.jsx");
   assert.match(app, /\["data-sources", "数据接入"/);
@@ -43,6 +60,9 @@ test("the workspace exposes the three approved categories and no old tabs", () =
   assert.match(workspace, /ErpAccessWorkspace/);
   assert.match(workspace, /CompanyDataWorkspace/);
   assert.match(workspace, /\["erp", "company"\]\.includes\(category\)[\s\S]*platformController\.error[\s\S]*platformController\.refresh/);
+  assert.match(workspace, /setCategory\(validCategory\(initialCategory\) \? initialCategory : "ecommerce"\)/);
+  assert.match(workspace, /!detailActive[\s\S]*<DataAccessTabs/);
+  assert.match(workspace, /role="tabpanel"/);
   assert.doesNotMatch(workspace, /经营数据连接器|内部系统保险箱/);
 });
 
@@ -53,6 +73,7 @@ test("legacy and readiness links open company data inside data access", () => {
   assert.match(app, /screen: "data-sources"/);
   assert.match(app, /detail: "company"/);
   assert.match(readiness, /#\/data-sources\/company/);
+  assert.match(readiness, /#\/data-sources\/erp/);
   assert.match(readiness, /前往数据接入/);
   assert.doesNotMatch(readiness, /前往平台连接/);
 });
@@ -66,11 +87,13 @@ test("platform orchestration lives in state and the catalog primitives are acces
   assert.match(hook, /disablePlatformConnection/);
   assert.match(tabs, /role="tablist"/);
   assert.match(tabs, /aria-selected/);
+  assert.match(tabs, /aria-controls/);
   assert.match(tabs, /ArrowRight/);
   assert.match(tabs, /ArrowLeft/);
   assert.match(card, /<article/);
   assert.match(card, /disabledReason/);
   assert.match(card, /aria-label/);
+  assert.match(card, /StatusIcon/);
 });
 
 test("Kuaimai is one ERP card and company data owns DingTalk Aliyun and NAS", () => {
@@ -84,6 +107,7 @@ test("Kuaimai is one ERP card and company data owns DingTalk Aliyun and NAS", ()
   assert.match(company, /dingtalk/);
   assert.match(company, /aliyun/);
   assert.match(company, /nas/);
+  assert.match(company, /条目数量仅授权人员可见/);
   assert.doesNotMatch(company, /KUAIMAI_APP_KEY|DINGTALK_APP_SECRET/);
 });
 

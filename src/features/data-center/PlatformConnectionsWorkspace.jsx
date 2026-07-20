@@ -149,6 +149,7 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
   }
 
   function handleBack() {
+    if (busy) return;
     if (changed) {
       setConfirmBack(true);
       return;
@@ -175,11 +176,11 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
 
   return (
     <div className="platform-connection-detail">
-      <button type="button" className="platform-connection-back" onClick={handleBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</button>
+      <button type="button" className="platform-connection-back" disabled={busy} onClick={handleBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</button>
       {confirmBack ? (
         <div className="platform-connection-disable-confirm" role="alert">
           <div><strong>放弃本次填写？</strong><p>尚未保存的连接信息会被清空。</p></div>
-          <span><Button type="button" onClick={() => setConfirmBack(false)}>继续填写</Button><Button type="button" variant="danger" onClick={onBack}>放弃并返回</Button></span>
+          <span><Button type="button" onClick={() => setConfirmBack(false)} disabled={busy}>继续填写</Button><Button type="button" variant="danger" onClick={onBack} disabled={busy}>放弃并返回</Button></span>
         </div>
       ) : null}
       <header className="platform-connection-detail-head">
@@ -246,6 +247,7 @@ export function PlatformConnectionsWorkspace({
   const [selectedId, setSelectedId] = useState(initialPlatformId);
   const [returnFocusId, setReturnFocusId] = useState("");
   const platformButtonRefs = useRef(new Map());
+  const platformIdKey = platformIds.join("|");
   const definitions = PLATFORM_CONNECTION_DEFINITIONS.filter(item => platformIds.includes(item.id));
   const connections = controller?.connections || [];
   const loading = Boolean(controller?.loading);
@@ -253,6 +255,13 @@ export function PlatformConnectionsWorkspace({
   const refresh = controller?.refresh;
   const save = controller?.save;
   const disable = controller?.disable;
+  useEffect(() => {
+    const allowed = new Set(platformIdKey.split("|").filter(Boolean));
+    setSelectedId(current => {
+      if (current && allowed.has(current)) return current;
+      return initialPlatformId && allowed.has(initialPlatformId) ? initialPlatformId : "";
+    });
+  }, [initialPlatformId, platformIdKey]);
   useEffect(() => {
     if (selectedId || !returnFocusId) return;
     requestAnimationFrame(() => platformButtonRefs.current.get(returnFocusId)?.focus());

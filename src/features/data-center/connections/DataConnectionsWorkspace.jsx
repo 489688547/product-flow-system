@@ -38,10 +38,13 @@ export function DataConnectionsWorkspace({
   } = useDataCenter();
   const [category, setCategory] = useState(validCategory(initialCategory) ? initialCategory : "ecommerce");
   const [selection, setSelection] = useState(null);
+  const [detailActive, setDetailActive] = useState(false);
   const platformController = usePlatformConnections();
 
   useEffect(() => {
-    if (validCategory(initialCategory)) setCategory(initialCategory);
+    setSelection(null);
+    setDetailActive(false);
+    setCategory(validCategory(initialCategory) ? initialCategory : "ecommerce");
   }, [initialCategory]);
 
   const credentialMetadata = selection?.instance?.credentialEntryId
@@ -61,40 +64,44 @@ export function DataConnectionsWorkspace({
         <div><Database size={21} aria-hidden="true" /><span><strong>数据接入</strong><small>统一管理电商平台、ERP 与公司数据。</small></span></div>
         <div><LockKeyhole size={17} aria-hidden="true" /><span>敏感信息加密保存</span><Button onClick={refreshAll} disabled={connectionsLoading || platformController.loading}><RefreshCw size={15} aria-hidden="true" />刷新</Button></div>
       </section>
-      <DataAccessTabs value={category} onChange={nextCategory => { setSelection(null); setCategory(nextCategory); }} />
+      {!detailActive ? <DataAccessTabs value={category} onChange={nextCategory => { setSelection(null); setDetailActive(false); setCategory(nextCategory); }} /> : null}
       {connectionsError ? <div className="connector-form-error" role="alert"><span>{connectionsError}</span><button type="button" onClick={refreshConnections}>重试</button></div> : null}
       {["erp", "company"].includes(category) && platformController.error ? <div className="connector-form-error" role="alert"><span>{platformController.error}</span><button type="button" onClick={() => platformController.refresh().catch(() => {})}>重试平台连接</button></div> : null}
-      {connectionsLoading ? <div className="connection-loading" aria-label="正在加载数据接入"><span /><span /><span /></div> : null}
-      {!connectionsLoading && category === "ecommerce" ? (
-        <ConnectorCatalog
-          definitions={ECOMMERCE_CONNECTOR_DEFINITIONS}
-          instances={connections}
-          canEdit={canEdit}
-          onAdd={openNew}
-          onManage={openExisting}
-        />
-      ) : null}
-      {!connectionsLoading && category === "erp" ? (
-        <ErpAccessWorkspace
-          connectorInstances={connections}
-          platformController={platformController}
-          canEdit={canEdit}
-          canManagePlatform={canManagePlatform}
-          onAdd={openNew}
-          onManage={openExisting}
-        />
-      ) : null}
-      {!connectionsLoading && category === "company" ? (
-        <CompanyDataWorkspace
-          vaultItems={vaultItems}
-          vaultEntries={vaultEntries}
-          platformController={platformController}
-          canManage={canManage}
-          canManagePlatform={canManagePlatform}
-          onSaveVault={saveVaultItem}
-          onReveal={revealConnectionCredential}
-        />
-      ) : null}
+      <div id={`data-access-panel-${category}`} role="tabpanel" aria-labelledby={`data-access-tab-${category}`}>
+        {connectionsLoading ? <div className="connection-loading" aria-label="正在加载数据接入"><span /><span /><span /></div> : null}
+        {!connectionsLoading && category === "ecommerce" ? (
+          <ConnectorCatalog
+            definitions={ECOMMERCE_CONNECTOR_DEFINITIONS}
+            instances={connections}
+            canEdit={canEdit}
+            onAdd={openNew}
+            onManage={openExisting}
+          />
+        ) : null}
+        {!connectionsLoading && category === "erp" ? (
+          <ErpAccessWorkspace
+            connectorInstances={connections}
+            platformController={platformController}
+            canEdit={canEdit}
+            canManagePlatform={canManagePlatform}
+            onAdd={openNew}
+            onManage={openExisting}
+            onDetailChange={setDetailActive}
+          />
+        ) : null}
+        {!connectionsLoading && category === "company" ? (
+          <CompanyDataWorkspace
+            vaultItems={vaultItems}
+            vaultEntries={vaultEntries}
+            platformController={platformController}
+            canManage={canManage}
+            canManagePlatform={canManagePlatform}
+            onSaveVault={saveVaultItem}
+            onReveal={revealConnectionCredential}
+            onDetailChange={setDetailActive}
+          />
+        ) : null}
+      </div>
       {selection ? (
         <ConnectorConfigDialog
           definition={selection.definition}

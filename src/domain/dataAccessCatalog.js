@@ -40,3 +40,22 @@ export function dataAccessSourceIds(categoryId, sourceKind) {
     .filter(([, category]) => category === categoryId)
     .map(([sourceId]) => sourceId);
 }
+
+export function summarizePlatformConnectionHealth({ connection, loading = false, error = "", available = true } = {}) {
+  if (!available) return ["准备接入", "neutral"];
+  if (error) return ["状态暂不可用", "danger"];
+  if (loading && !connection) return ["正在读取", "neutral"];
+  if (connection?.status === "connected") return ["已接通", "success"];
+  if (["needs_attention", "incomplete"].includes(connection?.status)) return ["需处理", "danger"];
+  if (connection?.status === "configured") return ["已配置", "warning"];
+  return ["尚未连接", "neutral"];
+}
+
+export function summarizeErpAccessHealth({ connection, instances = [], loading = false, error = "" } = {}) {
+  if (error) return ["状态暂不可用", "danger"];
+  const needsAttention = new Set(["waiting_verification", "schema_changed", "failed", "login_required", "stale"]);
+  if (instances.some(instance => needsAttention.has(instance.status))) return ["需处理", "danger"];
+  if (instances.some(instance => instance.status === "running")) return ["同步中", "warning"];
+  if (instances.some(instance => instance.status === "pending_validation")) return ["需处理", "warning"];
+  return summarizePlatformConnectionHealth({ connection, loading });
+}

@@ -1,6 +1,7 @@
 import { Plus, Settings2 } from "lucide-react";
 import { useState } from "react";
 import kuaimaiLogo from "../../../assets/connectors/kuaimai.svg";
+import { summarizeErpAccessHealth } from "../../../domain/dataAccessCatalog.js";
 import { DATA_CONNECTOR_DEFINITIONS } from "../../../domain/dataCenterConnectors.js";
 import { Button } from "../../../ui/Button.jsx";
 import { PlatformConnectionsWorkspace } from "../PlatformConnectionsWorkspace.jsx";
@@ -21,27 +22,29 @@ const SYNC_STATUS_LABELS = {
   disabled: "已停用"
 };
 
-function platformStatus(controller, connection) {
-  if (controller.loading && !controller.connections.length) return ["正在读取", "neutral"];
-  if (controller.error && !connection) return ["状态暂不可用", "danger"];
-  if (connection?.status === "connected") return ["已接通", "success"];
-  if (["needs_attention", "incomplete"].includes(connection?.status)) return ["需处理", "danger"];
-  if (connection?.status === "configured") return ["已配置", "warning"];
-  return ["尚未连接", "neutral"];
-}
-
 export function ErpAccessWorkspace({
   connectorInstances = [],
   platformController,
   canEdit = false,
   canManagePlatform = false,
   onAdd,
-  onManage
+  onManage,
+  onDetailChange
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const instances = connectorInstances.filter(item => item.connectorId === "kuaimai-erp");
   const connection = platformController.connections.find(item => item.platformId === "kuaimai");
-  const [status, statusTone] = platformStatus(platformController, connection);
+  const [status, statusTone] = summarizeErpAccessHealth({
+    connection,
+    instances,
+    loading: platformController.loading,
+    error: platformController.error
+  });
+
+  const setDetail = open => {
+    setDetailOpen(open);
+    onDetailChange?.(open);
+  };
 
   if (!detailOpen) {
     return (
@@ -54,7 +57,7 @@ export function ErpAccessWorkspace({
           status={status}
           statusTone={statusTone}
           meta={[`${instances.length} 个同步连接`, connection?.verifiedAt ? "平台连接已验证" : "平台连接待验证"]}
-          onOpen={() => setDetailOpen(true)}
+          onOpen={() => setDetail(true)}
           actionLabel="管理"
         >
           <p>统一维护公司 API 连接和业务数据同步，不再分散到两个入口。</p>
@@ -71,7 +74,7 @@ export function ErpAccessWorkspace({
         initialPlatformId="kuaimai"
         embedded
         controller={platformController}
-        onBack={() => setDetailOpen(false)}
+        onBack={() => setDetail(false)}
       />
       <section className="data-access-sync-section">
         <header>

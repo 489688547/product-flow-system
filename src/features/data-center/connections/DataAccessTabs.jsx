@@ -19,6 +19,7 @@ export function DataAccessTabs({ value, onChange }) {
       {DATA_ACCESS_CATEGORIES.map((category, index) => (
         <button
           key={category.id}
+          id={`data-access-tab-${category.id}`}
           ref={node => {
             if (node) buttonRefs.current.set(category.id, node);
             else buttonRefs.current.delete(category.id);
@@ -26,6 +27,7 @@ export function DataAccessTabs({ value, onChange }) {
           type="button"
           role="tab"
           aria-selected={value === category.id}
+          aria-controls={`data-access-panel-${category.id}`}
           tabIndex={value === category.id ? 0 : -1}
           onKeyDown={event => moveFocus(event, index)}
           onClick={() => onChange(category.id)}

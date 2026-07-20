@@ -1,5 +1,6 @@
 import { Building2, Cloud, FileKey2, HardDrive, Landmark, Mail, Server } from "lucide-react";
 import { useState } from "react";
+import { summarizePlatformConnectionHealth } from "../../../domain/dataAccessCatalog.js";
 import { INTERNAL_VAULT_TYPES } from "../../../domain/dataCenterConnectors.js";
 import { PLATFORM_CONNECTION_DEFINITIONS } from "../../../domain/platformConnections.js";
 import { PlatformConnectionsWorkspace } from "../PlatformConnectionsWorkspace.jsx";
@@ -15,16 +16,6 @@ const VAULT_MARKS = {
   custom: <Server size={22} aria-hidden="true" />
 };
 
-function connectionStatus(controller, definition, connection) {
-  if (!definition.available) return ["准备接入", "neutral"];
-  if (controller.loading && !controller.connections.length) return ["正在读取", "neutral"];
-  if (controller.error && !connection) return ["状态暂不可用", "danger"];
-  if (connection?.status === "connected") return ["已接通", "success"];
-  if (["needs_attention", "incomplete"].includes(connection?.status)) return ["需处理", "danger"];
-  if (connection?.status === "configured") return ["已配置", "warning"];
-  return ["尚未连接", "neutral"];
-}
-
 export function CompanyDataWorkspace({
   vaultItems = [],
   vaultEntries = [],
@@ -32,9 +23,14 @@ export function CompanyDataWorkspace({
   canManage = false,
   canManagePlatform = false,
   onSaveVault,
-  onReveal
+  onReveal,
+  onDetailChange
 }) {
   const [selection, setSelection] = useState(null);
+  const select = next => {
+    setSelection(next);
+    onDetailChange?.(Boolean(next));
+  };
 
   if (selection?.kind === "platform") {
     return (
@@ -44,7 +40,7 @@ export function CompanyDataWorkspace({
         initialPlatformId={selection.id}
         embedded
         controller={platformController}
-        onBack={() => setSelection(null)}
+        onBack={() => select(null)}
       />
     );
   }
@@ -59,7 +55,7 @@ export function CompanyDataWorkspace({
         onReveal={onReveal}
         initialType={selection.id}
         visibleTypes={[selection.id]}
-        onBack={() => setSelection(null)}
+        onBack={() => select(null)}
       />
     );
   }
@@ -68,7 +64,12 @@ export function CompanyDataWorkspace({
     <div className="data-access-grid">
       {PLATFORM_CONNECTION_DEFINITIONS.filter(item => COMPANY_PLATFORM_IDS.includes(item.id)).map(definition => {
         const connection = platformController.connections.find(item => item.platformId === definition.id);
-        const [status, statusTone] = connectionStatus(platformController, definition, connection);
+        const [status, statusTone] = summarizePlatformConnectionHealth({
+          connection,
+          loading: platformController.loading,
+          error: platformController.error,
+          available: definition.available
+        });
         const unavailable = !definition.available;
         return (
           <DataAccessCard
@@ -82,7 +83,7 @@ export function CompanyDataWorkspace({
             meta={[connection?.verifiedAt ? "最近已验证" : unavailable ? definition.disabledReason : "等待首次验证"]}
             disabled={unavailable}
             disabledReason={unavailable ? "准备接入" : ""}
-            onOpen={() => setSelection({ kind: "platform", id: definition.id })}
+            onOpen={() => select({ kind: "platform", id: definition.id })}
             actionLabel="管理连接"
           >
             <p>{unavailable ? "适配器完成后可在这里配置，当前不提供虚假表单。" : "公司级连接由最高权限管理员维护，已保存信息不会回显。"}</p>
@@ -92,6 +93,7 @@ export function CompanyDataWorkspace({
       {INTERNAL_VAULT_TYPES.map(type => {
         const itemCount = vaultItems.filter(item => item.itemType === type.id).length;
         const credentialCount = vaultItems.filter(item => item.itemType === type.id && vaultEntries.some(entry => entry.id === item.credentialEntryId && entry.hasSecret)).length;
+        const restricted = !canManage;
         return (
           <DataAccessCard
             key={type.id}
@@ -99,10 +101,12 @@ export function CompanyDataWorkspace({
             markClassName={type.id}
             title={type.name}
             description={type.description}
-            status={`${itemCount} 个条目`}
-            statusTone={credentialCount ? "success" : "neutral"}
-            meta={[credentialCount ? `${credentialCount} 个凭据已加密` : "尚无加密凭据"]}
-            onOpen={() => setSelection({ kind: "vault", id: type.id })}
+            status={restricted ? "只读" : `${itemCount} 个条目`}
+            statusTone={credentialCount && !restricted ? "success" : "neutral"}
+            meta={[restricted ? "条目数量仅授权人员可见" : credentialCount ? `${credentialCount} 个凭据已加密` : "尚无加密凭据"]}
+            disabled={restricted}
+            disabledReason={restricted ? "仅授权人员可查看条目" : ""}
+            onOpen={() => select({ kind: "vault", id: type.id })}
             actionLabel="查看详情"
           >
             <p>只展示非敏感资料；凭据查看需要授权、填写用途并记录审计。</p>

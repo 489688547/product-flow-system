@@ -50,6 +50,7 @@ test("connection UI covers loading errors permissions disabled actions and inlin
   assert.match(workspace, /PLATFORM_CONNECTION_VERSION_CONFLICT/);
   assert.match(workspace, /本次填写仍保留/);
   assert.match(workspace, /放弃本次填写/);
+  assert.match(workspace, /className="platform-connection-back"[\s\S]*disabled=\{busy\}/);
   assert.match(workspace, /platformButtonRefs[\s\S]*\.focus\(\)/);
   assert.match(workspace, /重新加载/);
   assert.match(workspace, /available/);
@@ -73,6 +74,7 @@ test("platform connection UI accepts controlled state and a filtered embedded de
   assert.match(workspace, /controller/);
   assert.match(workspace, /controller\?\.save/);
   assert.match(workspace, /controller\?\.disable/);
+  assert.match(workspace, /platformIdKey/);
   assert.doesNotMatch(workspace, /import \{[\s\S]*loadPlatformConnections[\s\S]*\} from "\.\.\/\.\.\/state\/platformConnectionsApi\.js"/);
 });
 
@@ -88,10 +90,11 @@ test("connection layout is restrained responsive and keyboard visible", () => {
   assert.doesNotMatch(css, /border-radius:\s*(?:2[4-9]|[3-9]\d)px/);
 });
 
-test("environment blockers link directly to company data access", () => {
+test("environment blockers link to the matching data access category", () => {
   const panel = read("src/features/handbook/EnvironmentReadinessPanel.jsx");
   assert.match(panel, /前往数据接入/);
   assert.match(panel, /#\/data-sources\/company/);
+  assert.match(panel, /#\/data-sources\/erp/);
   assert.match(panel, /钉钉应用凭证/);
   assert.match(panel, /公司数据库连接/);
 });
