@@ -19,12 +19,13 @@
 
 ## 后续实施任务组
 
-- [ ] 货流领域公式与契约测试。
+- [x] 货流领域公式与契约测试。
   - 依赖：书面设计复核通过。
   - 输入：本目录 PRD 与设计书。
   - 输出：库存校准、CCC、覆盖率和异常的纯领域契约。
   - 失败测试：覆盖盘点锚点、缺失来源、账期版本和冻结重算。
   - 验证：聚焦领域测试通过。
+  - 实际验证：`node --test react-tests/goods-flow-domain.test.mjs`（5 项通过）；`npx eslint src/domain/goodsFlow.js react-tests/goods-flow-domain.test.mjs`。
 
 - [ ] D1 数据模型、迁移和环境能力。
   - 依赖：领域契约。

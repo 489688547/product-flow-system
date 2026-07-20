@@ -35,7 +35,7 @@
 - Consumes: normalized dates, SKU/warehouse snapshots, stocktakes, sales, purchases, payments and receivable-term rows.
 - Produces: `calibrateInventoryQuantity(input) -> number`, `resolveReceivableTerm(terms, platform, date) -> object|null`, `buildInventoryDailyRows(input) -> InventoryDailyRow[]`, `calculateGoodsFlowMetrics(input) -> GoodsFlowMetrics`.
 
-- [ ] **Step 1: Write failing calibration and term-version tests**
+- [x] **Step 1: Write failing calibration and term-version tests**
 
 ```js
 import { calibrateInventoryQuantity, resolveReceivableTerm } from "../src/domain/goodsFlow.js";
@@ -53,13 +53,13 @@ test("receivable terms use the version effective on the metric date", () => {
 });
 ```
 
-- [ ] **Step 2: Run the domain test and verify missing exports fail**
+- [x] **Step 2: Run the domain test and verify missing exports fail**
 
 Run: `node --test react-tests/goods-flow-domain.test.mjs`
 
 Expected: FAIL because `src/domain/goodsFlow.js` does not exist.
 
-- [ ] **Step 3: Implement normalization, calibration and term selection**
+- [x] **Step 3: Implement normalization, calibration and term selection**
 
 ```js
 export function calibrateInventoryQuantity({ currentErpQuantity, anchorErpQuantity, anchorCountedQuantity }) {
@@ -74,7 +74,7 @@ export function resolveReceivableTerm(terms, platform, date) {
 }
 ```
 
-- [ ] **Step 4: Add failing daily projection and metric tests**
+- [x] **Step 4: Add failing daily projection and metric tests**
 
 The test must cover: latest ERP snapshot per SKU×warehouse, latest confirmed stocktake anchor, inventory-days null when COGS is missing, net-sales-weighted receivable days, paid plus unpaid payable days, core-SKU stockout rate, CCC coverage and inventory cash formula.
 
@@ -94,7 +94,7 @@ assert.equal(metrics.inventoryCashTied, 800);
 assert.equal(metrics.coverage.receivableTerms, 1);
 ```
 
-- [ ] **Step 5: Implement daily projection, metric components and confidence projection**
+- [x] **Step 5: Implement daily projection, metric components and confidence projection**
 
 `calculateGoodsFlowMetrics` returns:
 
@@ -108,7 +108,7 @@ assert.equal(metrics.coverage.receivableTerms, 1);
 }
 ```
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 Run: `node --test react-tests/goods-flow-domain.test.mjs`
 
