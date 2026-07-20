@@ -32,6 +32,10 @@ export function validateDefinitionInput(body, actor, { existing = null, definiti
   if (existing && submitted.metricCode && submitted.metricCode !== existing.metricCode) {
     invalid("已发布口径的 metricCode 不能修改。", "DATA_STANDARD_INVALID", { fields: ["metricCode"] });
   }
+  if (existing && !actor.executive && Object.hasOwn(submitted, "ownerDepartment")
+    && normalizeDepartmentName(submitted.ownerDepartment) !== normalizeDepartmentName(existing.ownerDepartment)) {
+    throw new DataStandardsHttpError(403, "PERMISSION_WRITE_DENIED", "只有总经办可以调整数据口径的责任部门。");
+  }
   const currentVersion = existing?.versions?.find(version => version.version === existing.currentVersion)
     || existing?.versions?.[0]
     || {};
@@ -48,15 +52,16 @@ export function validateDefinitionInput(body, actor, { existing = null, definiti
     ...submitted
   } : submitted;
   input.ownerDepartment = lockOwnerDepartment(actor, input.ownerDepartment);
-  if (existing && (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 1)) {
-    invalid("更新数据口径必须提交有效的 expectedVersion。");
-  }
+  if (existing) validateExpectedVersion(body);
   if (!String(input.name || "").trim() || !String(input.displayFormula || "").trim() || !isDateOnly(input.effectiveFrom)) {
     invalid("名称、展示公式和有效生效日期为必填项。");
   }
   const contextDefinitions = definitions.map(definition => ({ ...definition }));
   const index = contextDefinitions.findIndex(definition => definition.metricCode === input.metricCode);
-  const validationContext = { definitions: contextDefinitions };
+  const validationContext = {
+    definitions: contextDefinitions,
+    allowUncoveredSourceCoverage: input.category === "goods_flow" && input.formulaAst == null
+  };
   const draft = normalizeDataStandardDraft(input, validationContext);
   if (!draft.validation.ok) invalid("数据口径公式或字段不符合契约。", draft.validation.code);
   const graphDefinition = { ...(existing || {}), ...draft, status: "active" };
@@ -69,6 +74,13 @@ export function validateDefinitionInput(body, actor, { existing = null, definiti
     throw error;
   }
   return draft;
+}
+
+export function validateExpectedVersion(body) {
+  if (!Number.isInteger(body.expectedVersion) || body.expectedVersion < 1) {
+    invalid("更新数据口径必须提交有效的 expectedVersion。");
+  }
+  return body.expectedVersion;
 }
 
 export function validateArchiveInput(body) {
@@ -84,12 +96,15 @@ export function validateListQuery(request) {
   const allowed = new Set(["category", "ownerDepartment", "status"]);
   const unknown = [...params.keys()].filter(key => !allowed.has(key));
   const status = String(params.get("status") || "");
-  if (unknown.length || status && !["active", "archived"].includes(status)) {
+  const category = String(params.get("category") || "");
+  const ownerDepartment = String(params.get("ownerDepartment") || "");
+  if (unknown.length || category.length > 40 || ownerDepartment.length > 40
+    || status && !["active", "archived"].includes(status)) {
     invalid("数据口径筛选条件无效。", "DATA_STANDARD_INVALID", unknown.length ? { fields: unknown } : undefined);
   }
   return {
-    category: String(params.get("category") || "").slice(0, 40),
-    ownerDepartment: normalizeDepartmentName(String(params.get("ownerDepartment") || "").slice(0, 40)),
+    category,
+    ownerDepartment: normalizeDepartmentName(ownerDepartment),
     status
   };
 }

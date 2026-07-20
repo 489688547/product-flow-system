@@ -551,3 +551,127 @@ test("PUT merges every omitted unchanged field from the current version", async 
   assert.deepEqual(detail.versions[0].formulaAst, definitionDraft().formulaAst);
   assert.deepEqual(detail.versions[0].sourceFields, ["sales.net_sales"]);
 });
+
+test("multi-department non-executives cannot transfer a definition between their departments", async () => {
+  const db = createD1Mock();
+  const multiDepartment = {
+    userId: "multi-1",
+    name: "多部门员工",
+    departments: ["运营部", "财务部"]
+  };
+  const created = await createDefinition(db, multiDepartment, { metricCode: "sales.multi_department" });
+  const id = created.definition.id;
+  const response = await call(itemRequest, {
+    db,
+    session: multiDepartment,
+    id,
+    path: `/${id}`,
+    method: "PUT",
+    body: { expectedVersion: 1, ownerDepartment: "财务部", effectiveFrom: "2026-07-22" }
+  });
+  assert.equal(response.status, 403);
+  assert.equal((await body(response)).error.code, "PERMISSION_WRITE_DENIED");
+  assert.equal(db.definitions.get(id).owner_department, "运营部");
+});
+
+test("server-trusted goods-flow drafts publish null formulas as uncovered while client flags and sales null formulas fail", async () => {
+  const db = createD1Mock();
+  const goodsFlowDraft = definitionDraft({
+    metricCode: "goods_flow.manual_balance",
+    name: "人工校准余额",
+    category: "goods_flow",
+    ownerDepartment: "供应链部",
+    unit: "DAY",
+    period: "month",
+    displayFormula: "等待货流事实接入",
+    formulaAst: null,
+    sourceFields: []
+  });
+  const created = await call(collectionRequest, {
+    db,
+    session: sessions.supply,
+    method: "POST",
+    body: goodsFlowDraft
+  });
+  assert.equal(created.status, 201, JSON.stringify(await created.clone().json()));
+  const createdDefinition = (await body(created)).definition;
+  assert.equal(createdDefinition.versions[0].executable, false);
+  assert.equal(createdDefinition.versions[0].coverageStatus, "DATA_NOT_COVERED");
+
+  const updated = await call(itemRequest, {
+    db,
+    session: sessions.supply,
+    id: createdDefinition.id,
+    path: `/${createdDefinition.id}`,
+    method: "PUT",
+    body: { expectedVersion: 1, name: "人工校准余额新版", effectiveFrom: "2026-08-01" }
+  });
+  assert.equal(updated.status, 200, JSON.stringify(await updated.clone().json()));
+  const updatedDefinition = (await body(updated)).definition;
+  assert.equal(updatedDefinition.versions[0].formulaAst, null);
+  assert.equal(updatedDefinition.versions[0].executable, false);
+  assert.equal(updatedDefinition.versions[0].coverageStatus, "DATA_NOT_COVERED");
+
+  const clientFlag = await call(collectionRequest, {
+    db: createD1Mock(),
+    session: sessions.supply,
+    method: "POST",
+    body: { ...goodsFlowDraft, allowUncoveredSourceCoverage: true }
+  });
+  assert.equal(clientFlag.status, 400);
+  assert.equal((await body(clientFlag)).error.code, "DATA_STANDARD_INVALID");
+
+  const salesNull = await call(collectionRequest, {
+    db: createD1Mock(),
+    session: sessions.operations,
+    method: "POST",
+    body: definitionDraft({ metricCode: "sales.null_formula", formulaAst: null, sourceFields: [] })
+  });
+  assert.equal(salesNull.status, 400);
+  assert.equal((await body(salesNull)).error.code, "DATA_STANDARD_INVALID");
+});
+
+test("PUT rejects malformed expectedVersion before checking staleness", async () => {
+  for (const expectedVersion of [undefined, null, 0, 1.5, "1"]) {
+    const db = createD1Mock();
+    const created = await createDefinition(db, sessions.operations, { metricCode: `sales.version_${String(expectedVersion).replace(".", "_")}` });
+    const id = created.definition.id;
+    const response = await call(itemRequest, {
+      db,
+      session: sessions.operations,
+      id,
+      path: `/${id}`,
+      method: "PUT",
+      body: { expectedVersion, effectiveFrom: "2026-07-22" }
+    });
+    assert.equal(response.status, 400, String(expectedVersion));
+    assert.equal((await body(response)).error.code, "DATA_STANDARD_INVALID");
+    assert.equal(db.definitions.get(id).current_version, 1);
+  }
+
+  const db = createD1Mock();
+  const created = await createDefinition(db, sessions.operations, { metricCode: "sales.valid_stale" });
+  const id = created.definition.id;
+  const stale = await call(itemRequest, {
+    db,
+    session: sessions.operations,
+    id,
+    path: `/${id}`,
+    method: "PUT",
+    body: { expectedVersion: 2, effectiveFrom: "2026-07-22" }
+  });
+  assert.equal(stale.status, 409);
+  assert.equal((await body(stale)).error.code, "DATA_STANDARD_VERSION_CONFLICT");
+});
+
+test("list rejects category and ownerDepartment filters longer than forty characters", async () => {
+  for (const key of ["category", "ownerDepartment"]) {
+    const response = await call(collectionRequest, {
+      db: createD1Mock(),
+      session: sessions.operations,
+      path: `?${key}=${"a".repeat(41)}`
+    });
+    assert.equal(response.status, 400, key);
+    assert.equal((await body(response)).error.code, "DATA_STANDARD_INVALID");
+  }
+});

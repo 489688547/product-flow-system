@@ -1,7 +1,7 @@
 import { dataStandardActor, requireDefinitionView, requireDefinitionWrite } from "../_shared/dataStandardsAuthorization.js";
 import { DataStandardsHttpError, errorResponse, jsonResponse, methodNotAllowed, optionsResponse, readJson, requireDatabase, requireSession } from "../_shared/dataStandardsHttp.js";
 import { appendDefinitionVersion, dataStandardsDatabase, ensureDataStandardsTables, getDefinitionDetail, listCurrentResults, listDefinitions } from "../_shared/dataStandardsStorage.js";
-import { validateDefinitionInput } from "../_shared/dataStandardsValidation.js";
+import { validateDefinitionInput, validateExpectedVersion } from "../_shared/dataStandardsValidation.js";
 
 function id(prefix) {
   return `${prefix}_${globalThis.crypto?.randomUUID?.() || Date.now().toString(36)}`;
@@ -41,7 +41,8 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
 
     requireDefinitionWrite(actor, existing.ownerDepartment);
     const body = await readJson(request);
-    if (Number(body.expectedVersion) !== existing.currentVersion) {
+    const expectedVersion = validateExpectedVersion(body);
+    if (expectedVersion !== existing.currentVersion) {
       throw new DataStandardsHttpError(409, "DATA_STANDARD_VERSION_CONFLICT", "口径版本已更新，请刷新后重试。", { currentVersion: existing.currentVersion });
     }
     const definitions = await definitionContext(db);
