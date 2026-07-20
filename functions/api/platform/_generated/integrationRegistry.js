@@ -24,6 +24,7 @@ const integrationRegistry = {
         "登录或免登失败",
         "找不到人员或部门",
         "待办未创建或未同步",
+        "本地如何执行真实待办与日历动作",
         "群成员选择异常",
         "供应链文件快照未导入",
         "钉钉 WebView 行为异常"
@@ -115,6 +116,7 @@ const integrationRegistry = {
         "快麦连接失败",
         "订单同步缺失",
         "销售数据未落库",
+        "本地如何触发真实同步",
         "刷新令牌失败",
         "月度数据校准"
       ],
@@ -188,6 +190,7 @@ const integrationRegistry = {
         "Pages Functions",
         "生产部署",
         "预览环境",
+        "本地线上账号运行",
         "回滚",
         "环境就绪检查",
         "生产数据网关",
@@ -199,7 +202,7 @@ const integrationRegistry = {
         "Functions 路由异常",
         "预览环境配置缺失",
         "测试环境与生产配置漂移",
-        "本地如何受控读取生产数据"
+        "本地如何使用真实线上账号、数据与外部动作"
       ],
       "keywords": [
         "Cloudflare",
@@ -225,7 +228,8 @@ const integrationRegistry = {
       ],
       "envVars": [
         "PLATFORM_CREDENTIAL_MASTER_KEY",
-        "LOCAL_LIVE_D1_PREVIEW",
+        "LOCAL_ONLINE_ACCOUNT_MODE",
+        "PRODUCTION_DATA_ACCESS_TOKEN",
         "AI_ASSISTANT_ENABLED",
         "LINGSUAN_API_KEY",
         "LINGSUAN_ACTOR_AUTHORIZATION"

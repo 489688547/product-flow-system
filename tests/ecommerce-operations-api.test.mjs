@@ -143,3 +143,13 @@ test("executive office can read the global operations loop but cannot write it",
   const write = await onActionsRequest({ request: new Request("https://example.com/api/ecommerce-operations/actions", { method: "POST", body: JSON.stringify({ action: { type: "create_cycle", record: { ownerId: "o-1", product: "砂", month: "2026-07" } } }) }), env: { PRODUCT_FLOW_DB: db }, data: { session: executive } });
   assert.equal(write.status, 403);
 });
+
+test("executive role can read the global operations loop with multi-department organization data", async () => {
+  const db = createD1Mock();
+  const response = await onOperationsRequest({
+    request: new Request("https://example.com/api/ecommerce-operations"),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { userId: "exec-1", name: "总经理", role: "executive", department: "总经办 / 运营部 / 品牌部", title: "总经理" } }
+  });
+  assert.equal(response.status, 200);
+});

@@ -3,20 +3,6 @@ import { fetchAuthSession, logoutAuthSession } from "../domain/authSession.js";
 import { detectDingTalkEnvironment, loginWithDingTalkRuntime } from "../domain/dingTalkLogin.js";
 
 const AuthContext = createContext(null);
-const LOCAL_USER = {
-  corpId: "local-preview",
-  userId: "u-zhou",
-  unionId: "union-zhou",
-  name: "周荣庆",
-  role: "executive",
-  department: "总经办",
-  title: "总经理",
-  loginMode: "local-dev"
-};
-
-function isLocalPreview() {
-  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
-}
 
 export function AuthProvider({ children }) {
   const [auth, setAuth] = useState({ status: "checking", user: null, error: "" });
@@ -46,10 +32,6 @@ export function AuthProvider({ children }) {
       }
       setAuth({ status: "anonymous", user: null, error: "" });
     } catch (error) {
-      if (isLocalPreview()) {
-        setAuth({ status: "authenticated", user: LOCAL_USER, error: "" });
-        return;
-      }
       setAuth({
         status: "error",
         user: null,

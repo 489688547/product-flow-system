@@ -43,6 +43,32 @@ const environmentCapabilities = {
       "tables": []
     },
     {
+      "id": "local-online-account",
+      "name": "本地线上真实账号",
+      "description": "本地 Pages Functions 使用个人令牌还原真实最高权限身份，并复用生产 D1 与外部平台路由。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1",
+        "dingtalk",
+        "kuaimai"
+      ],
+      "requiredIn": [
+        "development"
+      ],
+      "level": "blocking",
+      "envVars": [
+        "LOCAL_ONLINE_ACCOUNT_MODE",
+        "PRODUCTION_DATA_ACCESS_TOKEN"
+      ],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "production_data_access_tokens",
+        "product_flow_org_members"
+      ]
+    },
+    {
       "id": "platform-credential-vault",
       "name": "平台连接安全存储",
       "description": "公司级钉钉、快麦连接的加密存储、审计和统一读取。",

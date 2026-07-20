@@ -585,9 +585,7 @@ git commit -m "feat: add stocktake and cash cycle workspaces"
 - Create: `tests/goods-flow-migration-preview.test.mjs`
 - Create: `functions/api/platform/v1/goods-flow/_shared/metricsProjection.js`
 - Create: `server/goodsFlowLocalDatabase.mjs`
-- Create: `server/goodsFlowLocalPreview.mjs`
 - Create: `tests/goods-flow-metrics-projection.test.mjs`
-- Create: `tests/local-goods-flow-server.test.mjs`
 - Modify: `docs/product/data-definitions.md`
 - Modify: `docs/product/roles-and-permissions.md`
 - Modify: `DESIGN.md`
@@ -658,7 +656,7 @@ Actual verification: `npm run lint`、`npm run check:governance`、`npm run chec
 
 Verify keyboard/focus, normal, loading, empty, stale, partial-success, error, no-permission, disabled and version-conflict states at 1440px, 1180px and a narrow 钉钉 WebView. Record local verification separately from Preview and Production; do not deploy without explicit release authorization.
 
-Actual local verification: 1440/1180/768 无整页横向溢出或竖排表头；10 个供应链导航项、3 个驾驶舱指标、库存/盘点空状态、财务冻结禁用原因、供应商直表和采购 Tab 切换通过。Preview 与 Production 未部署、未验收。
+Actual local verification: 1440/1180/768 无整页横向溢出或竖排表头；10 个供应链导航项、3 个驾驶舱指标、库存/盘点空状态、财务冻结禁用原因、供应商直表和采购 Tab 切换通过。合并后统一使用正式 `npm start` 本地线上账号运行边界；Preview 与 Production 未部署、未验收。
 
 - [x] **Step 7: Commit final evidence**
 

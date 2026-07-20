@@ -71,7 +71,7 @@ npx wrangler d1 execute product-flow-system --remote --file migrations/0003_plat
 npm run verify:production
 ```
 
-本地测试如需实时读取生产数据，在被忽略的 `.env` 中配置 `PRODUCTION_DATA_API_URL` 与个人 `PRODUCTION_DATA_ACCESS_TOKEN`。个人令牌由平台管理员受控签发，仓库和浏览器都不能保存原始值。
+本地完整开发在被忽略的 `.env` 中配置个人 `PRODUCTION_DATA_ACCESS_TOKEN`；Wrangler 自动将 `.env` 作为本机 Pages Functions 的服务端变量加载。个人令牌由平台管理员受控签发，仓库、浏览器、响应和日志都不能保存原始值。`PRODUCTION_DATA_API_URL` 仅供独立生产数据运维修复网关兼容使用，不是标准本地业务链路。
 
 旧版共享状态表仍可由 `/api/state` 首次访问时兼容创建；平台连接保险箱等受治理能力必须先执行清单中的迁移，不能依赖页面请求临时建表。
 
@@ -105,7 +105,7 @@ https://product-flow-system.pages.dev/?corpId=$CORPID$
 
 ## 本地调试
 
-本地仍然可以运行：
+标准本地开发运行：
 
 ```bash
 npm start
@@ -117,7 +117,9 @@ npm start
 http://127.0.0.1:8127/
 ```
 
-本地调试需要 `.env` 里有：
+该命令同时启动 Vite 热更新和 Pages Functions，浏览器只打开 8127。它使用真实线上账号、生产 D1、钉钉和快麦适配器，页面上的所有操作都会立即在线上生效。
+
+本地 `.env` 至少需要个人令牌；提供商密钥可继续由生产 D1 平台连接保险箱读取，环境变量仅作为兼容回退：
 
 ```text
 DINGTALK_APP_KEY=...
@@ -126,3 +128,5 @@ DINGTALK_PORT=8127
 PRODUCTION_DATA_API_URL=https://product-flow-system.pages.dev
 PRODUCTION_DATA_ACCESS_TOKEN=仅属于当前授权账号的个人令牌
 ```
+
+缺少或撤销个人令牌时，本地会话直接失败，不会降级为硬编码最高权限账号。正式生产域名即使误配本地开关和令牌也不会启用本地账号模式。

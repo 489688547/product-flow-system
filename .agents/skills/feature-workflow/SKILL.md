@@ -13,7 +13,7 @@ Use the repository contract as the source of truth and leave a resumable product
 
 ## Required workflow
 
-1. Read root `AGENTS.md`, relevant durable docs, current code, and tests. Invoke every required repository Skill before planning the affected boundary.
+1. Before research or edits, run `git fetch origin main` and require `git merge-base --is-ancestor origin/main HEAD`. If the branch is behind, update it from `origin/main` before continuing; never overwrite unrelated or dirty user changes. Then read root `AGENTS.md`, relevant durable docs, current code, and tests, and invoke every required repository Skill before planning the affected boundary.
 2. Decide whether the change is truly small under the exception in `AGENTS.md`. Otherwise create `docs/features/<feature-slug>/` by copying all four repository templates:
    - `docs/templates/prd.md` → `prd.md`
    - `docs/templates/design.md` → `design.md`

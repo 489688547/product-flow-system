@@ -5,7 +5,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isLoopbackAddress, readDwsTodoPreview } from "./server/dwsTodoPreview.mjs";
 import { createProductionDataClient } from "./server/productionDataClient.mjs";
-import { createGoodsFlowLocalPreview } from "./server/goodsFlowLocalPreview.mjs";
 import {
   buildConfigResponse,
   createDingCalendarEvent,
@@ -50,8 +49,6 @@ const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 const LOCAL_SUPPLY_STATE_PATH = path.join(LOCAL_DATA_DIR, "supply-chain-state.json");
 const LOCAL_DATA_CENTER_STATE_PATH = path.join(LOCAL_DATA_DIR, "data-center-state.json");
 const LOCAL_COLLABORATION_PATH = path.join(LOCAL_DATA_DIR, "collaboration-items.json");
-const LOCAL_GOODS_FLOW_PATH = path.join(LOCAL_DATA_DIR, "goods-flow-preview.json");
-const handleGoodsFlowLocalPreview = createGoodsFlowLocalPreview({ storagePath: LOCAL_GOODS_FLOW_PATH });
 let orgCache = null;
 let productionDataClient;
 
@@ -644,11 +641,11 @@ async function handleProductionRollback(req, res) {
   }
 }
 
-function blockExternalAction(res) {
-  json(res, 409, {
+function requireLocalOnlineRuntime(res) {
+  json(res, 501, {
     synced: false,
-    message: "测试环境只允许修改数据库，不能执行真实外部平台操作。",
-    error: { code: "EXTERNAL_ACTION_DISABLED_IN_TEST" }
+    message: "旧 Node 预览不提供真实外部操作，请通过 npm start 运行完整 Pages Functions。",
+    error: { code: "LOCAL_ONLINE_RUNTIME_REQUIRED" }
   });
 }
 
@@ -952,9 +949,6 @@ const server = http.createServer(async (req, res) => {
     await handleLocalCollaboration(req, res, url);
     return;
   }
-  if (url.pathname.startsWith("/api/platform/v1/goods-flow/")) {
-    if (await handleGoodsFlowLocalPreview(req, res, url)) return;
-  }
   if ([
     "/api/platform/v1/ai/status",
     "/api/platform/v1/ai/provider",
@@ -1005,7 +999,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/kuaimai/refresh" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/kuaimai/pull" && req.method === "GET") {
@@ -1029,15 +1023,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/create" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/sync" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/create" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/events" && req.method === "POST") {

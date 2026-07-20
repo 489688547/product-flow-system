@@ -74,11 +74,12 @@ test("locked local clients never attempt production writes", async () => {
   assert.equal(calls, 0);
 });
 
-test("local server wires the production proxy and blocks real external writes by default", () => {
+test("legacy local server directs external writes to the complete Pages runtime", () => {
   const server = readFileSync(resolve("server.mjs"), "utf8");
   const stateApi = readFileSync(resolve("src/state/stateApi.js"), "utf8");
   assert.match(server, /createProductionDataClient/);
-  assert.match(server, /EXTERNAL_ACTION_DISABLED_IN_TEST/);
+  assert.match(server, /LOCAL_ONLINE_RUNTIME_REQUIRED/);
+  assert.doesNotMatch(server, /EXTERNAL_ACTION_DISABLED_IN_TEST/);
   assert.match(server, /\/api\/platform\/v1\/production-write-session/);
   assert.doesNotMatch(stateApi, /https:\/\/product-flow-system\.pages\.dev\/api\/state/);
   assert.match(stateApi, /return "\/api\/state"/);

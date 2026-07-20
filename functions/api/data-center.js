@@ -10,6 +10,10 @@ function department(session = {}) {
   return String(session.department || session.departmentName || "").trim();
 }
 
+function isExecutive(session = {}) {
+  return session.role === "executive" || department(session).split("/").map(value => value.trim()).includes("总经办");
+}
+
 function errorResponse(message, status, code, retryable = false) {
   const requestId = globalThis.crypto?.randomUUID?.() || `req_${Date.now().toString(36)}`;
   return jsonResponse({ synced: false, message, error: { code, message, requestId, retryable } }, status);
@@ -20,8 +24,8 @@ export async function onRequest({ request, env, data = {} }) {
   if (!["GET", "POST"].includes(request.method)) return errorResponse("Method not allowed", 405, "VALIDATION_METHOD_NOT_ALLOWED");
   const session = data.session;
   if (!session) return errorResponse("请先使用钉钉登录。", 401, "AUTH_SESSION_REQUIRED");
-  if (!VIEW_DEPARTMENTS.has(department(session))) return errorResponse("当前部门无权访问数据中心。", 403, "PERMISSION_VIEW_DENIED");
-  if (request.method === "POST" && (session.role === "readonly" || !EDIT_DEPARTMENTS.has(department(session)))) {
+  if (!isExecutive(session) && !VIEW_DEPARTMENTS.has(department(session))) return errorResponse("当前部门无权访问数据中心。", 403, "PERMISSION_VIEW_DENIED");
+  if (request.method === "POST" && (session.role === "readonly" || (!isExecutive(session) && !EDIT_DEPARTMENTS.has(department(session))))) {
     return errorResponse("仅总经办和运营部可维护数据中心元数据。", 403, "PERMISSION_WRITE_DENIED");
   }
   const db = dataCenterDatabase(env);

@@ -15,6 +15,7 @@ import { onRequest as embeddedLogin } from "../functions/api/auth/dingtalk/embed
 import { onRequest as legacyEmbeddedLogin } from "../functions/api/dingtalk/login.js";
 import { onRequest as getCurrentSession } from "../functions/api/auth/session.js";
 import { onRequest as logout } from "../functions/api/auth/logout.js";
+import { hashSecret } from "../functions/api/platform/_shared/productionDataAccess.js";
 
 const identity = {
   corpId: "ding-company",
@@ -423,25 +424,67 @@ test("API middleware allows bearer-token routes to authorize inside their handle
   assert.equal(continued, true);
 });
 
-test("explicit localhost live preview attaches an executive session for read requests", async () => {
+async function localOnlineEnv({ capabilities = ["read", "write"] } = {}) {
+  const db = createAuthD1Mock();
+  await upsertOrgMembers(db, {
+    corpId: identity.corpId,
+    users: [{ ...identity, departmentNames: [identity.department] }]
+  });
+  db.seedProductionAccess({
+    token_hash: await hashSecret("personal-token"),
+    user_id: identity.userId,
+    union_id: identity.unionId,
+    name: "令牌签发时姓名",
+    capabilities: JSON.stringify(capabilities),
+    expires_at: "2099-01-01T00:00:00.000Z",
+    revoked_at: null
+  });
+  return {
+    LOCAL_ONLINE_ACCOUNT_MODE: "1",
+    PRODUCTION_DATA_ACCESS_TOKEN: "personal-token",
+    PRODUCT_FLOW_DB: db
+  };
+}
+
+test("localhost online mode attaches the real production identity for reads", async () => {
   const context = {
     request: new Request("http://127.0.0.1:8141/api/state"),
-    env: { LOCAL_LIVE_D1_PREVIEW: "1" },
+    env: await localOnlineEnv(),
     data: {},
     next: async () => Response.json({ ok: true })
   };
 
   const response = await apiMiddleware(context);
   assert.equal(response.status, 200);
+  assert.equal(context.data.session.corpId, "ding-company");
+  assert.equal(context.data.session.userId, "user-1");
+  assert.equal(context.data.session.unionId, "union-1");
+  assert.equal(context.data.session.name, "周荣庆");
   assert.equal(context.data.session.department, "总经办");
-  assert.equal(context.data.session.loginMode, "local-live-d1-preview");
+  assert.equal(context.data.session.title, "总经理");
+  assert.equal(context.data.session.loginMode, "local-online-account");
 });
 
-test("localhost live preview rejects writes to the remote database", async () => {
+test("localhost online mode allows writes for the authorized account", async () => {
   let continued = false;
   const response = await apiMiddleware({
     request: new Request("http://localhost:8141/api/state", { method: "POST" }),
-    env: { LOCAL_LIVE_D1_PREVIEW: "1" },
+    env: await localOnlineEnv(),
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.equal(continued, true);
+});
+
+test("localhost online mode rejects mutations when the token is read-only", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("http://localhost:8141/api/dingtalk/todo/create", { method: "POST" }),
+    env: await localOnlineEnv({ capabilities: ["read"] }),
     data: {},
     next: async () => {
       continued = true;
@@ -452,13 +495,25 @@ test("localhost live preview rejects writes to the remote database", async () =>
 
   assert.equal(response.status, 403);
   assert.equal(continued, false);
-  assert.match(body.message, /只读/);
+  assert.equal(body.error.code, "PRODUCTION_CAPABILITY_REQUIRED");
 });
 
-test("live preview flag never bypasses authentication on non-local hosts", async () => {
+test("localhost online mode requires a server-only personal token", async () => {
+  const response = await apiMiddleware({
+    request: new Request("http://localhost:8141/api/state"),
+    env: { LOCAL_ONLINE_ACCOUNT_MODE: "1", PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: {},
+    next: async () => Response.json({ ok: true })
+  });
+
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error.code, "LOCAL_ONLINE_TOKEN_REQUIRED");
+});
+
+test("local online mode never bypasses authentication on non-local hosts", async () => {
   const response = await apiMiddleware({
     request: new Request("https://flow.example.com/api/state"),
-    env: { LOCAL_LIVE_D1_PREVIEW: "1" },
+    env: await localOnlineEnv(),
     data: {},
     next: async () => Response.json({ ok: true })
   });
@@ -511,5 +566,43 @@ test("organization sync persists the active employee cache", async () => {
 
   assert.equal(db.dumpMembers().length, 1);
   assert.equal(db.dumpMembers()[0].department, "总经办");
+  assert.equal(db.dumpMembers()[0].active, 1);
+  assert.equal(db.calls.filter(call => call.type === "batch").length, 1);
+});
+
+test("organization sync never downgrades an explicitly elevated executive account", async () => {
+  const db = createAuthD1Mock();
+  const baseUser = {
+    userId: "user-1",
+    unionId: "union-1",
+    name: "周荣庆",
+    title: "总经理",
+    departmentNames: ["总经办"],
+    active: true
+  };
+
+  await upsertOrgMembers(db, { users: [{ ...baseUser, role: "executive" }] }, "ding-company");
+  await upsertOrgMembers(db, { users: [{ ...baseUser, role: "ops" }] }, "ding-company");
+
+  assert.equal(db.dumpMembers()[0].role, "executive");
+});
+
+test("a partial organization snapshot never deactivates an explicitly elevated executive account", async () => {
+  const db = createAuthD1Mock();
+  await upsertOrgMembers(db, {
+    users: [{
+      userId: "user-1",
+      unionId: "union-1",
+      name: "周荣庆",
+      departmentNames: ["总经办"],
+      role: "executive",
+      active: true
+    }]
+  }, "ding-company");
+
+  await upsertOrgMembers(db, { users: [] }, "ding-company");
+  const deactivation = db.calls.filter(call => call.type === "run" && /UPDATE product_flow_org_members SET active = 0/i.test(call.sql)).at(-1);
+
+  assert.match(deactivation.sql, /role <> 'executive'/);
   assert.equal(db.dumpMembers()[0].active, 1);
 });

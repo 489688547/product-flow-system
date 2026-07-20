@@ -37,7 +37,7 @@
 | `GOODS_FLOW_` | 货流事实、库存、盘点、账期和 CCC | `GOODS_FLOW_VERSION_CONFLICT` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
-| `EXTERNAL_` | 测试环境外部副作用隔离 | `EXTERNAL_ACTION_DISABLED_IN_TEST` |
+| `LOCAL_ONLINE_` | 本地线上账号配置、数据库与运行时 | `LOCAL_ONLINE_TOKEN_REQUIRED` |
 | `AI_` | 公司 AI 总助、数据权限、Provider 和流式响应 | `AI_PROVIDER_RATE_LIMITED` |
 | `INTERNAL_` | 未预期服务端错误 | `INTERNAL_UNEXPECTED` |
 
@@ -136,7 +136,10 @@
 - `PRODUCTION_DATA_VERSION_CONFLICT`：基线版本落后于线上数据，HTTP 409。
 - `PRODUCTION_SNAPSHOT_NOT_FOUND` / `PRODUCTION_ROLLBACK_NOT_AVAILABLE`：写前快照不存在或不可回滚。
 - `ENVIRONMENT_READINESS_FAILED`：环境能力检查失败。
-- `EXTERNAL_ACTION_DISABLED_IN_TEST`：本地测试试图执行真实外部平台写操作。
+- `LOCAL_ONLINE_TOKEN_REQUIRED`：本地线上账号模式缺少服务端个人令牌。
+- `LOCAL_ONLINE_DATABASE_REQUIRED`：本地线上账号模式缺少生产 D1 绑定。
+- `LOCAL_ONLINE_AUTH_FAILED`：本地线上账号验证出现未预期错误。
+- `LOCAL_ONLINE_RUNTIME_REQUIRED`：使用了旧的不完整 Node 预览接口，应通过标准 `npm start` 运行 Pages Functions。
 
 ## HTTP 状态
 
