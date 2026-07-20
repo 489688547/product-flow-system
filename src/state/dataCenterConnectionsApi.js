@@ -1,3 +1,5 @@
+import { inferConnectorCaptureMethod } from "../domain/dataCenterConnectors.js";
+
 const CONNECTIONS_URL = "/api/data-center/connectors";
 const CREDENTIALS_URL = "/api/platform/v1/credential-vault";
 
@@ -71,9 +73,16 @@ export async function revealCredential(id, purpose, confirmation, fetchImpl = fe
 
 export async function persistConnectorConnection({ instance, secretPayload = {}, vaultEntries = [] }, fetchImpl = fetch) {
   const sensitive = { ...secretPayload };
-  const isNew = !instance?.id;
+  const preparedInstance = {
+    ...instance,
+    captureMethod: inferConnectorCaptureMethod(instance.connectorId, {
+      secretPayload: sensitive,
+      existingMethod: instance.captureMethod
+    })
+  };
+  const isNew = !preparedInstance.id;
   try {
-    let saved = isNew ? await saveConnectorInstance(instance, 0, fetchImpl) : { ...instance };
+    let saved = isNew ? await saveConnectorInstance(preparedInstance, 0, fetchImpl) : { ...preparedInstance };
     let credentialEntryId = saved.credentialEntryId || "";
     if (Object.keys(sensitive).length) {
       const existingCredential = vaultEntries.find(entry => entry.id === credentialEntryId);
@@ -90,7 +99,11 @@ export async function persistConnectorConnection({ instance, secretPayload = {},
       credentialEntryId = credential.id;
     }
     if (!isNew || credentialEntryId !== saved.credentialEntryId) {
-      saved = await saveConnectorInstance({ ...saved, ...instance, id: saved.id, credentialEntryId }, saved.version || instance.version || 0, fetchImpl);
+      saved = await saveConnectorInstance(
+        { ...saved, ...preparedInstance, id: saved.id, credentialEntryId },
+        saved.version || preparedInstance.version || 0,
+        fetchImpl
+      );
     }
     return saved;
   } finally {

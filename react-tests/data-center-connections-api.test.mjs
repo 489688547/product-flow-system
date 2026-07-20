@@ -86,14 +86,41 @@ test("existing connector metadata is saved even when no secret changes", async (
     return jsonResponse({ synced: true, instance: { ...JSON.parse(options.body).instance, version: 3 } });
   };
   const saved = await persistConnectorConnection({
-    instance: { id: "shop-1", connectorId: "douyin-ecommerce", name: "新名称", version: 2 },
+    instance: { id: "shop-1", connectorId: "douyin-ecommerce", name: "新名称", captureMethod: "browser", version: 2 },
     secretPayload: {},
     vaultEntries: []
   }, fetchImpl);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "/api/data-center/connectors");
   assert.equal(calls[0].body.expectedVersion, 2);
+  assert.equal(calls[0].body.instance.captureMethod, "browser");
   assert.equal(saved.version, 3);
+});
+
+test("connector persistence infers API access before any metadata write", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    const body = JSON.parse(options.body);
+    calls.push({ url, body });
+    if (url === "/api/platform/v1/credential-vault") {
+      return jsonResponse({ synced: true, entry: { id: "cred-1", version: 1, hasSecret: true } });
+    }
+    const instance = body.instance;
+    return jsonResponse({ synced: true, instance: { ...instance, id: instance.id || "ocean-1", version: (instance.version || 0) + 1 } });
+  };
+
+  await persistConnectorConnection({
+    instance: { connectorId: "oceanengine", name: "千川官旗" },
+    secretPayload: { appSecret: "api-secret", password: "browser-secret" },
+    vaultEntries: []
+  }, fetchImpl);
+
+  const connectorWrites = calls.filter(call => call.url === "/api/data-center/connectors");
+  assert.equal(connectorWrites.length, 2);
+  assert.equal(connectorWrites[0].body.instance.captureMethod, "api");
+  assert.equal(connectorWrites[1].body.instance.captureMethod, "api");
+  assert.equal(JSON.stringify(connectorWrites).includes("api-secret"), false);
+  assert.equal(JSON.stringify(connectorWrites).includes("browser-secret"), false);
 });
 
 test("connection client and provider never persist or expose plaintext secrets", () => {
