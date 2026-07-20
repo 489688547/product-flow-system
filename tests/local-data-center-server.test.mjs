@@ -13,6 +13,9 @@ test("local helper persists data center metadata without pretending local sales 
   assert.match(server, /url\.pathname === "\/api\/data-center\/sales"/);
   assert.match(server, /json\(res, 200, \{ synced: true, state, version: state\.version/);
   assert.match(server, /本地测试模式没有 D1 数据库/);
+  assert.match(server, /url\.pathname === "\/api\/platform\/v1\/data-standards"/);
+  assert.match(server, /DATA_STANDARD_STORAGE_UNAVAILABLE/);
+  assert.match(server, /本地测试模式没有 D1，共享数据口径只读目录可用，但不能计算或保存/);
 });
 
 test("local helper exposes only safe read-only AI preview routes", () => {

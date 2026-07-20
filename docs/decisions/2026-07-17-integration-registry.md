@@ -33,6 +33,8 @@
 
 ## 关联与替代
 
+本文关于公开注册表和 `integration_private_profiles` 禁止保存敏感值的结论继续有效。2026-07-19 新增的加密凭证保险箱是独立存储与权限边界，不属于公开注册表或内部平台资料，见 `docs/decisions/2026-07-19-encrypted-credential-vault.md`。
+
 - PRD：`docs/features/integration-routing/prd.md`
 - 交互设计：`docs/features/integration-routing/design.md`
 - API 目录：`docs/platform/api-catalog.md`

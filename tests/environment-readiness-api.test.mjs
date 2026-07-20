@@ -14,7 +14,12 @@ const REQUIRED_PRODUCTION_TABLES = [
   "collaboration_participants",
   "collaboration_activities",
   "platform_credentials",
-  "platform_credential_audit"
+  "platform_credential_audit",
+  "data_connector_instances",
+  "credential_vault_entries",
+  "credential_vault_permissions",
+  "credential_vault_audit",
+  "internal_vault_items"
 ];
 const TEST_PLATFORM_MASTER_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const HR_CORE_TABLES = [
@@ -80,6 +85,11 @@ const businessDataTables = [
   "data_source_files",
   "data_dimension_mappings",
   "data_metric_definitions",
+  "data_metric_definitions_legacy",
+  "data_metric_definition_versions",
+  "data_metric_results",
+  "data_metric_calculation_runs",
+  "data_metric_audit_logs",
   "data_quality_issues",
   "data_app_subscriptions",
   "data_audit_logs",

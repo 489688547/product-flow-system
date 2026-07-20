@@ -37,6 +37,7 @@
 | `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
 | `USER_INSIGHTS_` | 用户洞察未预期处理错误 | `USER_INSIGHTS_UNEXPECTED` |
 | `GOODS_FLOW_` | 货流事实、库存、盘点、账期和 CCC | `GOODS_FLOW_VERSION_CONFLICT` |
+| `CREDENTIAL_` | 加密凭证、密钥、查看和采集器授权 | `CREDENTIAL_KEY_UNAVAILABLE` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `LOCAL_ONLINE_` | 本地线上账号配置、数据库与运行时 | `LOCAL_ONLINE_TOKEN_REQUIRED` |
@@ -80,6 +81,39 @@
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+- `DATA_CONNECTOR_INVALID`：连接器 ID、字段、URL、保险箱类型或敏感字段边界不合法。
+- `DATA_CONNECTOR_NOT_FOUND`：连接实例不存在、已归档或对当前身份不可见。
+- `DATA_CONNECTOR_VERSION_CONFLICT`：连接实例或保险箱条目版本已经更新，HTTP 409。
+
+共享数据口径 API 使用：
+
+- `DATA_STANDARD_INVALID`：请求字段、日期、公式结构或不可变 `metricCode` 不合法。
+- `DATA_STANDARD_FIELD_UNKNOWN`：公式或来源引用未登记事实字段。
+- `DATA_STANDARD_CYCLE`：指标依赖形成循环。
+- `DATA_STANDARD_UNIT_MISMATCH`：声明单位与公式推导单位不一致。
+- `DATA_STANDARD_VERSION_CONFLICT`：提交版本落后或 `metricCode` 已存在，HTTP 409。
+- `DATA_STANDARD_EFFECTIVE_DATE_CONFLICT`：新版本生效日期未严格递增或同日重复，HTTP 409。
+- `DATA_STANDARD_DEPENDENCY_ARCHIVED`：新版本依赖已归档口径。
+- `DATA_STANDARD_QUERY_RANGE_INVALID`：指标数量、依赖深度、自然日期或计算范围超过契约限制。
+- `DATA_STANDARD_CALCULATION_FAILED`：后台口径计算失败；旧的当前结果继续有效。
+- `DATA_STANDARD_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+数据口径的稳定错误、责任部门授权、版本快照和重试语义见 `docs/platform/apis/data-standards-v1.md`。
+
+加密凭证 API 使用：
+
+- `CREDENTIAL_ENTRY_INVALID`：凭证类型、字段 schema、范围或敏感 payload 不合法。
+- `CREDENTIAL_ENTRY_NOT_FOUND`：条目不存在或对当前身份不可见。
+- `CREDENTIAL_VERSION_CONFLICT`：提交的凭证版本已经过期，HTTP 409，刷新后重新操作。
+- `CREDENTIAL_RATE_LIMITED`：同一条目短时间明文查看次数过多，HTTP 429。
+- `CREDENTIAL_ENCRYPT_FAILED`：服务端未能完成加密；响应不包含输入值或底层异常。
+- `CREDENTIAL_KEY_UNAVAILABLE`：加密主密钥或对应密钥版本未配置，不能保存或取用凭证。
+- `CREDENTIAL_DECRYPT_FAILED`：密文校验或解密失败；响应不包含密文、字段值或底层异常。
+- `CREDENTIAL_REAUTH_REQUIRED`：查看或复制明文需要近期重新认证。
+- `CREDENTIAL_REVEAL_DENIED`：当前身份没有该条目的明文查看权限。
+- `CREDENTIAL_TASK_GRANT_INVALID`：采集器、任务、字段范围或授权状态不合法。
+- `CREDENTIAL_TASK_GRANT_EXPIRED`：短时授权已过期、已消费或已吊销。
+- `CREDENTIAL_STORAGE_UNAVAILABLE`：D1 绑定或凭证表不可用。
 
 用户洞察共享 API 使用：
 

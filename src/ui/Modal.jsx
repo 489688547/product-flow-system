@@ -2,7 +2,7 @@ import { X } from "lucide-react";
 import { useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 
-export function Modal({ title, open, onClose, children, footer, size = "default" }) {
+export function Modal({ title, open, onClose, children, footer, size = "default", className = "", initialFocusRef }) {
   const titleId = useId();
   const sheetRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -14,10 +14,11 @@ export function Modal({ title, open, onClose, children, footer, size = "default"
     if (!open) return undefined;
     const previousOverflow = document.body.style.overflow;
     previousFocusRef.current = document.activeElement;
+    const focusableSelector = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const onKeyDown = event => {
       if (event.key === "Escape") onCloseRef.current();
       if (event.key === "Tab") {
-        const focusable = [...(sheetRef.current?.querySelectorAll('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') || [])]
+        const focusable = [...(sheetRef.current?.querySelectorAll(focusableSelector) || [])]
           .filter(element => !element.hasAttribute("hidden"));
         if (!focusable.length) {
           event.preventDefault();
@@ -33,22 +34,24 @@ export function Modal({ title, open, onClose, children, footer, size = "default"
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKeyDown);
-    window.requestAnimationFrame(() => {
-      const target = sheetRef.current?.querySelector("[data-autofocus]")
+    const frame = window.requestAnimationFrame(() => {
+      const target = initialFocusRef?.current
+        || sheetRef.current?.querySelector("[data-autofocus]")
         || sheetRef.current?.querySelector("input:not([disabled]), button:not([disabled])");
       (target || sheetRef.current)?.focus();
     });
     return () => {
+      cancelAnimationFrame(frame);
       document.body.style.overflow = previousOverflow;
       window.removeEventListener("keydown", onKeyDown);
       window.requestAnimationFrame(() => previousFocusRef.current?.focus());
     };
-  }, [open]);
+  }, [initialFocusRef, open]);
 
   if (!open) return null;
   return createPortal(
     <div className="modal-layer" role="presentation" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-      <section ref={sheetRef} tabIndex={-1} className={`modal-sheet ${size}`} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <section ref={sheetRef} tabIndex={-1} className={`modal-sheet ${size} ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <header className="modal-header">
           <h2 id={titleId}>{title}</h2>
           <button className="modal-close" type="button" onClick={onClose} aria-label="关闭"><X size={20} /></button>

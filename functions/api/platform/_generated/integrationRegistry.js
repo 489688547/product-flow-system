@@ -208,8 +208,10 @@ const integrationRegistry = {
         "回滚",
         "环境就绪检查",
         "生产数据网关",
+        "凭证加密服务",
         "加密平台连接",
-        "用户洞察共享 API"
+        "用户洞察共享 API",
+        "共享数据口径"
       ],
       "businessQuestions": [
         "构建或部署失败",
@@ -230,6 +232,8 @@ const integrationRegistry = {
         "functions/**",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/v1/data-standards/**",
+        "functions/api/platform/v1/_shared/dataStandards*.js",
         "src/state/deploymentRecovery.js",
         "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
@@ -247,7 +251,8 @@ const integrationRegistry = {
         "PRODUCTION_DATA_ACCESS_TOKEN",
         "AI_ASSISTANT_ENABLED",
         "LINGSUAN_API_KEY",
-        "LINGSUAN_ACTOR_AUTHORIZATION"
+        "LINGSUAN_ACTOR_AUTHORIZATION",
+        "VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK"
       ],
       "domains": [
         "pages.dev",
@@ -257,6 +262,8 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/platform-connections",
+        "/api/platform/v1/credential-vault",
+        "/api/platform/v1/data-standards",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
         "/api/platform/v1/user-insights",
@@ -277,6 +284,7 @@ const integrationRegistry = {
         "functions/",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/v1/_shared/dataStandardsStorage.js",
         "src/state/deploymentRecovery.js",
         "docs/platform/architecture.md",
         "scripts/prepare-pages-build.mjs",
@@ -295,7 +303,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、共享商品目录、用户洞察、货流事实、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、共享商品目录、用户洞察、货流事实、数据中心、加密凭证、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
         "登录会话",
@@ -308,6 +316,8 @@ const integrationRegistry = {
         "货流事件与指标",
         "平台配置",
         "数据中心元数据",
+        "版本化数据口径与计算结果",
+        "加密凭证密文与审计",
         "店铺运营记录",
         "人事核心记录",
         "绩效记录",
@@ -358,7 +368,12 @@ const integrationRegistry = {
         "functions/api/dingtalk/org/**",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/_shared/credential*.js",
         "functions/api/platform/v1/platform-connections.js",
+        "functions/api/platform/v1/credential-vault.js",
+        "functions/api/platform/v1/credential-vault/**",
+        "functions/api/platform/v1/data-standards/**",
+        "functions/api/platform/v1/_shared/dataStandards*.js",
         "functions/api/platform/v1/production-data/**",
         "functions/api/platform/v1/collaboration-items/**",
         "functions/api/platform/v1/user-insights.js",
@@ -369,6 +384,8 @@ const integrationRegistry = {
         "migrations/0002_hr_management_core.sql",
         "migrations/0003_product_catalog.sql",
         "migrations/0003_platform_credentials.sql",
+        "migrations/0003_data_center_credentials.sql",
+        "migrations/0004_data_standards.sql",
         "migrations/0005_user_insights.sql",
         "migrations/0005_goods_flow_core.sql"
       ],
@@ -394,6 +411,8 @@ const integrationRegistry = {
         "/api/hr-management",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/platform-connections",
+        "/api/platform/v1/credential-vault",
+        "/api/platform/v1/data-standards",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
         "/api/platform/v1/collaboration-items",
@@ -429,8 +448,12 @@ const integrationRegistry = {
         "functions/api/hr-management/",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/_shared/credentialVaultStorage.js",
+        "functions/api/platform/_shared/credentialCrypto.js",
         "functions/api/platform/v1/platform-connections.js",
+        "functions/api/platform/v1/credential-vault/",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
+        "functions/api/platform/v1/_shared/dataStandardsStorage.js",
         "functions/api/platform/v1/user-insights.js",
         "functions/api/platform/v1/user-insights/",
         "functions/api/platform/v1/ai/",
@@ -440,7 +463,9 @@ const integrationRegistry = {
         "migrations/0002_hr_management_core.sql",
         "migrations/0003_product_catalog.sql",
         "migrations/0003_platform_credentials.sql",
+        "migrations/0003_data_center_credentials.sql",
         "migrations/0003_company_ai_assistant.sql",
+        "migrations/0004_data_standards.sql",
         "migrations/0004_company_ai_skills.sql",
         "migrations/0005_user_insights.sql",
         "migrations/0005_goods_flow_core.sql"
@@ -989,6 +1014,124 @@ const integrationRegistry = {
           "platformId": "cloudflare-d1",
           "type": "governed-by",
           "description": "D1 保存 Provider 安全元数据、外发策略、并发租约和无内容审计。"
+        }
+      ]
+    },
+    {
+      "id": "douyin-ecommerce",
+      "name": "抖音电商",
+      "status": "planned",
+      "summary": "计划通过平台授权、网页导出或固定公司 Mac 的已登录页面采集店铺经营数据，尚未接入。",
+      "capabilities": [
+        "店铺订单",
+        "商品数据",
+        "经营报表",
+        "网页导出"
+      ],
+      "businessQuestions": [
+        "抖音店铺如何授权",
+        "邮箱或手机号登录如何处理",
+        "验证码后如何恢复同步",
+        "与快麦订单是否重复"
+      ],
+      "keywords": [
+        "抖音电商",
+        "抖店",
+        "Douyin Ecommerce",
+        "店铺后台",
+        "邮箱登录"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [],
+      "publicDocs": [],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "接入前需区分快麦聚合订单与抖音店铺原始经营数据。"
+        },
+        {
+          "platformId": "oceanengine-qianchuan",
+          "type": "commerce-to-advertising",
+          "description": "店铺经营数据与巨量投放数据分别采集并通过标准维度关联。"
+        }
+      ]
+    },
+    {
+      "id": "kuaishou-ecosystem",
+      "name": "快手生态",
+      "status": "planned",
+      "summary": "计划接入快手小店和广告账户的经营与投放数据，尚未接入。",
+      "capabilities": [
+        "店铺订单",
+        "商品数据",
+        "经营报表",
+        "广告数据",
+        "网页导出"
+      ],
+      "businessQuestions": [
+        "快手小店与广告账户如何区分",
+        "登录验证如何处理",
+        "经营和投放口径如何关联"
+      ],
+      "keywords": [
+        "快手",
+        "快手小店",
+        "磁力引擎",
+        "Kuaishou",
+        "店铺后台"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [],
+      "publicDocs": [],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "接入前需确认快手订单是否已由快麦覆盖。"
+        }
+      ]
+    },
+    {
+      "id": "jd-jingmai",
+      "name": "京东 / 京麦",
+      "status": "planned",
+      "summary": "计划接入京东店铺和京麦后台的订单、商品与经营数据，尚未接入。",
+      "capabilities": [
+        "店铺订单",
+        "商品数据",
+        "经营报表",
+        "网页导出"
+      ],
+      "businessQuestions": [
+        "京麦账号如何授权",
+        "扫码或设备验证如何处理",
+        "与快麦订单是否重复"
+      ],
+      "keywords": [
+        "京东",
+        "京麦",
+        "JD",
+        "Jingmai",
+        "店铺后台"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [],
+      "publicDocs": [],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "接入前需确认京东订单是否已由快麦覆盖。"
         }
       ]
     },
