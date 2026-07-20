@@ -7,9 +7,10 @@
 - [x] 先更新数据中心导航契约测试：左侧不再出现 `data-quality`，旧链接仍映射到 `sync`。
 - [x] 将质量摘要、执行记录、待处理质量问题按单列顺序合并进“同步记录”，删除独立质量页面组合和重复标题。
 - [x] 保留 `syncRuns`、`qualityIssues`、权限、协同按钮与刷新行为，不修改 API、D1 或外部平台。
-- [ ] 验证键盘焦点、空状态、表格横向滚动、1440/900/640/390px 和钉钉 WebView 布局，并执行完整 Definition of Done。
+- [x] 验证键盘焦点、空状态、表格横向滚动和 1440/900/640/390px 布局，并执行完整 Definition of Done。
+- [ ] 钉钉 WebView 实机验收；本次未部署，不能用本地 390px 浏览器结果替代。
 
-定向验证：`node --test react-tests/data-center-app.test.mjs react-tests/data-center.test.mjs`，14/14 通过。
+定向验证：`node --test react-tests/data-center-app.test.mjs react-tests/data-center.test.mjs`，14/14 通过。完整 Lint、治理、集成、环境能力、测试和构建通过；API 397/397、货流投影 2/2，生产分块均小于 500 KB。实页在四个宽度均无页面级横向溢出，390px 两张表分别在 760px 和 680px 最小宽度内横向滚动；旧 `#/data-quality` 显示“同步记录”。本地远程 D1 曾返回一次网络连接丢失，页面保留错误态与内容结构，未把该结果视为生产数据正常。
 
 ## 2026-07-20 数据口径治理与计算
 
