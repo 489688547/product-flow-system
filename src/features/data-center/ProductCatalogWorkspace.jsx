@@ -237,7 +237,7 @@ export function ProductCatalogWorkspace({ canEdit }) {
     </section>
 
     {rangeError ? <p className="supply-message error" role="alert">{rangeError}</p> : null}
-    {error ? <div className="product-catalog-error supply-message error" role="alert"><span>{error}</span><Button onClick={() => refresh().catch(() => {})}>重试</Button></div> : null}
+    {error ? <div className="supply-message error product-catalog-error" role="alert"><span>{error}</span><Button disabled={loading} onClick={() => refresh().catch(() => {})}><RefreshCw size={15} className={loading ? "is-spinning" : ""} />{loading ? "正在重新加载…" : "重新加载"}</Button></div> : null}
     {parseError ? <p className="supply-message error" role="alert">{parseError}</p> : null}
     {notice ? <p className="supply-message success" role="status">{notice}</p> : null}
     {pending ? <section className="supply-import-preview product-catalog-preview"><FileSpreadsheet size={20} /><div><strong>{pending.fileName}</strong><span>识别 {pending.items.length} 个商品、{pending.counts.skus} 个 SKU · 异常 {pending.errors.length} 行</span>{pending.errors.slice(0, 3).map(item => <small key={`${item.rowNumber}-${item.field}`}>第 {item.rowNumber} 行：{item.message}</small>)}</div><div className="supply-import-actions"><Button onClick={() => setPending(null)}>取消</Button><Button variant="primary" disabled={!pending.items.length || Boolean(busy)} onClick={confirmImport}>确认导入</Button></div></section> : null}

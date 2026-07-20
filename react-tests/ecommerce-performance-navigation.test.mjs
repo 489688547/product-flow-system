@@ -8,9 +8,10 @@ const main = fs.readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8"
 const registry = fs.readFileSync(new URL("../src/domain/strategyExecution.js", import.meta.url), "utf8");
 const permissions = fs.readFileSync(new URL("../src/domain/permissions.js", import.meta.url), "utf8");
 
-test("ecommerce operations follows data center and performance follows operations", () => {
-  assert.ok(app.indexOf('...DATA_CENTER_NAV') < app.indexOf('...ECOMMERCE_OPERATIONS_NAV'));
+test("ecommerce operations follows product lifecycle while data center stays last", () => {
+  assert.ok(app.indexOf('["archive", "产品档案"') < app.indexOf('...ECOMMERCE_OPERATIONS_NAV'));
   assert.ok(app.indexOf('...ECOMMERCE_OPERATIONS_NAV') < app.indexOf('...PERFORMANCE_MANAGEMENT_NAV'));
+  assert.ok(app.indexOf('...PERFORMANCE_MANAGEMENT_NAV') < app.indexOf('...DATA_CENTER_NAV'));
   assert.match(app, /重点产品经营/);
   assert.match(app, /我的绩效/);
 });
