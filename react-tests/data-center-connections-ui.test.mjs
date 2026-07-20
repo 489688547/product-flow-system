@@ -7,8 +7,21 @@ const root = resolve(new URL("..", import.meta.url).pathname);
 const read = path => readFileSync(resolve(root, path), "utf8");
 
 test("connector catalog uses eight local logo assets and one Ocean Engine entry", () => {
-  for (const name of ["douyin", "oceanengine", "kuaishou", "taobao", "pinduoduo", "xiaohongshu", "jd", "kuaimai"]) {
+  const officialProducts = {
+    douyin: "抖店-抖音电商商家版",
+    oceanengine: "巨量引擎",
+    kuaishou: "快手小店商家版",
+    taobao: "千牛",
+    pinduoduo: "拼多多商家版",
+    xiaohongshu: "小红书千帆",
+    jd: "京麦-京东商家版",
+    kuaimai: "快麦ERP",
+  };
+  for (const [name, product] of Object.entries(officialProducts)) {
     assert.equal(existsSync(resolve(root, `src/assets/connectors/${name}.svg`)), true, `${name}.svg must exist`);
+    const logo = read(`src/assets/connectors/${name}.svg`);
+    assert.match(logo, /data:image\/jpeg;base64,/, `${name}.svg must embed the official product artwork`);
+    assert.match(logo, new RegExp(product), `${name}.svg must identify its official product source`);
   }
   const catalog = read("src/features/data-center/connections/ConnectorCatalog.jsx");
   assert.match(catalog, /DATA_CONNECTOR_DEFINITIONS/);
