@@ -32,6 +32,25 @@ test("catalog client loads, imports and synchronizes through one boundary", asyn
   assert.equal(calls[2].options.method, "POST");
 });
 
+test("catalog client treats an unsynced successful read as an empty catalog", async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({
+    synced: false,
+    items: [],
+    runs: [],
+    meta: { products: 0, lastSuccessfulSyncAt: "" }
+  }), { status: 200 });
+  const payload = await loadProductCatalog(fetchImpl);
+  assert.equal(payload.synced, false);
+  assert.deepEqual(payload.items, []);
+});
+
+test("catalog client rejects an invalid successful read payload", async () => {
+  await assert.rejects(
+    () => loadProductCatalog(async () => new Response(JSON.stringify({}), { status: 200 })),
+    /商品主数据加载失败/
+  );
+});
+
 test("catalog client preserves server error code and retryability", async () => {
   const fetchImpl = async () => new Response(JSON.stringify({ message: "快麦权限不足", error: { code: "KUAIMAI_PRODUCT_SYNC_FAILED", retryable: true } }), { status: 502 });
   await assert.rejects(async () => {
