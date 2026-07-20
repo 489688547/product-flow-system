@@ -9,11 +9,12 @@
 
 ## 任务
 
-- [ ] 领域商品关系图与库存单位口径
+- [x] 领域商品关系图与库存单位口径
   - 依赖：无。
   - 文件：`src/domain/productCatalog.js`、`src/domain/productCatalogGraph.js`、`react-tests/product-catalog-graph.test.mjs`。
   - 输出：内部唯一码、组件标准化、递归展开、成本和可售库存。
   - 验证：`node --test react-tests/product-catalog-graph.test.mjs react-tests/product-catalog.test.mjs`。
+  - 结果：14/14 通过；覆盖内部唯一码、双组件、比例 2、嵌套、循环和冲突编码。
 - [ ] 快麦组合详情适配
   - 依赖：领域商品关系图。
   - 文件：`functions/api/kuaimai/_shared/kuaimai.js`、`tests/product-catalog-kuaimai.test.mjs`。
