@@ -7,6 +7,7 @@ import { useAuth } from "./state/AuthProvider.jsx";
 import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
 import { featureFlagEnabled } from "./domain/featureFlags.js";
+import { expandedGroupForScreen, groupSidebarNavigation } from "./domain/sidebarNavigation.js";
 import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
 import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
 import { LocalOnlineEnvironmentBanner } from "./ui/LocalOnlineEnvironmentBanner.jsx";
@@ -189,8 +190,13 @@ export default function App() {
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
   const screenAllowed = visibleScreenKeys.has(screen) || screen === "ai-assistant" || (screen === "packages" && visibleScreenKeys.has("archive"));
   const activeScreen = screenAllowed ? screen : defaultScreen;
+  const [expandedAppGroup, setExpandedAppGroup] = useState(() => expandedGroupForScreen(visibleNavigation, activeScreen));
+  const sidebarNavigationGroups = useMemo(() => groupSidebarNavigation(visibleNavigation), [visibleNavigation]);
   const accountMeta = [currentUser?.department, currentUser?.title].filter(Boolean).join(" / ") || "组织信息待同步";
   const accountName = currentUser?.name || "未登录";
+  useEffect(() => {
+    setExpandedAppGroup(expandedGroupForScreen(visibleNavigation, activeScreen));
+  }, [activeScreen, visibleNavigation]);
   useEffect(() => {
     if (!accountMenuOpen) return undefined;
     const close = event => {
@@ -269,7 +275,39 @@ export default function App() {
       <a className="skip-link" href="#main-content">跳到主要内容</a>
       <aside className="sidebar">
         <div className="brand"><span>{hasCompanyAccess ? "企" : "P"}</span><div><strong>{hasCompanyAccess ? "经营执行平台" : "产品全周期"}</strong><small>{hasCompanyAccess ? "战略与业务协同" : "流程协同系统"}</small></div></div>
-        <nav aria-label="主导航">{visibleNavigation.map(([key, label, Icon, group], index) => <div className="sidebar-nav-item" key={key}>{index === 0 || visibleNavigation[index - 1]?.[3] !== group ? <span className="sidebar-section-label">{group}</span> : null}<button className={activeScreen === key ? "active" : ""} aria-current={activeScreen === key ? "page" : undefined} onClick={() => navigate(key)}><Icon size={18} aria-hidden="true" /><span>{label}</span></button></div>)}</nav>
+        <nav aria-label="主导航">
+          {sidebarNavigationGroups.map((group, groupIndex) => {
+            const isExpanded = expandedAppGroup === group.label;
+            const groupId = `sidebar-group-${groupIndex}`;
+            return (
+              <div className={`sidebar-app-group${group.collapsible ? " collapsible" : ""}${isExpanded ? " expanded" : ""}`} key={group.label}>
+                {group.collapsible ? (
+                  <button
+                    className="sidebar-group-toggle"
+                    type="button"
+                    aria-expanded={isExpanded}
+                    aria-controls={groupId}
+                    aria-label={`${isExpanded ? "收起" : "展开"}${group.label}`}
+                    onClick={() => setExpandedAppGroup(current => current === group.label ? "" : group.label)}
+                  >
+                    <span>{group.label}</span>
+                    <ChevronDown size={15} aria-hidden="true" />
+                  </button>
+                ) : <span className="sidebar-section-label">{group.label}</span>}
+                <div className="sidebar-group-items" id={groupId}>
+                  {group.items.map(([key, label, Icon]) => (
+                    <div className="sidebar-nav-item" key={key}>
+                      <button className={activeScreen === key ? "active" : ""} aria-current={activeScreen === key ? "page" : undefined} onClick={() => navigate(key)}>
+                        <Icon size={18} aria-hidden="true" />
+                        <span>{label}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </nav>
       </aside>
       <main id="main-content">
         <header className="topbar">
