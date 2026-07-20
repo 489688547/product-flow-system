@@ -51,7 +51,7 @@ function Trend({ rows }) {
   );
 }
 
-export function DataOverview({ factViews, quality, range, setRange, salesMeta, metricResults = [], metricRun, metricLoading, metricError, retryMetricResults }) {
+export function DataOverview({ factViews, quality, range, setRange, salesMeta, metricResults = [], metricRun, metricLoading, metricError, retryMetricResults, compatibilityRollback = false }) {
   const rangeResults = metricResults.filter(result => result.from === range.from && result.to === range.to);
   const byMetricCode = new Map(rangeResults.map(result => [result.metricCode, result]));
   const runForRange = metricRun?.from === range.from && metricRun?.to === range.to ? metricRun : null;
@@ -65,7 +65,7 @@ export function DataOverview({ factViews, quality, range, setRange, salesMeta, m
         <div><strong>订单创建时间</strong><span>Asia/Shanghai · 默认当月至截止昨天 · 日常口径排除“其它”</span></div>
         <DateRange range={range} setRange={setRange} />
       </section>
-      {updating || failed || metricError || missingCount ? <section className={`data-metric-state ${failed || metricError ? "danger" : updating ? "updating" : "neutral"}`} role={failed || metricError ? "alert" : "status"}>
+      {compatibilityRollback ? <section className="data-metric-state updating" role="alert"><AlertCircle size={17} /><span><strong>兼容回滚口径</strong><small>当前仅临时读取旧销售事实摘要；共享口径定义、结果、版本和审计均未删除。</small></span><span className="status-badge warning">临时模式</span></section> : updating || failed || metricError || missingCount ? <section className={`data-metric-state ${failed || metricError ? "danger" : updating ? "updating" : "neutral"}`} role={failed || metricError ? "alert" : "status"}>
         <AlertCircle size={17} /><span><strong>{updating ? "统一口径正在更新" : failed || metricError ? "统一口径结果读取失败" : `还有 ${missingCount} 项口径暂无结果`}</strong><small>{updating ? "旧批次结果继续保留；新批次完整成功后才会切换。" : resultReason(metricError?.code || runForRange?.errorCode || "RESULT_NOT_AVAILABLE")}</small></span>
         {!updating ? <Button type="button" onClick={retryMetricResults}>重新计算</Button> : <span className="status-badge warning">正在更新 {runForRange?.progress || 0}%</span>}
       </section> : null}

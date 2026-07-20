@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { canEditFeature } from "../domain/permissions.js";
-import { canManageDataStandard, DATA_STANDARD_OWNER_DEPARTMENTS } from "../domain/dataStandards.js";
+import { canManageDataStandard, collectFormulaDependencies, CORE_DATA_STANDARDS, DATA_STANDARD_OWNER_DEPARTMENTS } from "../domain/dataStandards.js";
 import { useProductFlow } from "./ProductFlowProvider.jsx";
 import {
   archiveDataStandard,
@@ -17,6 +17,34 @@ import {
 } from "./dataStandardsApi.js";
 
 const DataStandardsContext = createContext(null);
+const LOCAL_STORAGE_MESSAGE = "本地测试模式没有 D1，共享数据口径只读目录可用，但不能计算或保存。";
+const BUILTIN_DEFINITIONS = CORE_DATA_STANDARDS.map(definition => {
+  const effectiveFrom = "2026-07-01";
+  const dependencies = collectFormulaDependencies(definition.formulaAst);
+  const version = {
+    ...definition,
+    definitionId: definition.id,
+    version: 1,
+    effectiveFrom,
+    sourceFields: [],
+    dependencies
+  };
+  return {
+    ...definition,
+    currentVersion: 1,
+    effectiveFrom,
+    dependencies,
+    versions: [version]
+  };
+});
+
+function builtinDefinitions(filters = {}) {
+  return BUILTIN_DEFINITIONS.filter(definition => (
+    (!filters.category || definition.category === filters.category)
+    && (!filters.ownerDepartment || definition.ownerDepartment === filters.ownerDepartment)
+    && (!filters.status || definition.status === filters.status)
+  ));
+}
 
 function errorState(error, fallback = "数据口径暂不可用。") {
   return {
@@ -39,6 +67,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
   const [resultLoading, setResultLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
   const definitionRequest = useRef(null);
   const resultRequest = useRef(null);
   const resultDebounce = useRef(null);
@@ -54,7 +83,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
       readonly: currentUser?.role === "readonly" || currentUser?.readonly === true
     };
   }, [currentUser]);
-  const canWrite = enabled && !actor.readonly && canEditFeature(productState.permissions, currentUser, "dataCenter")
+  const canWrite = enabled && !storageUnavailable && !actor.readonly && canEditFeature(productState.permissions, currentUser, "dataCenter")
     && (actor.executive || actor.departments.some(department => DATA_STANDARD_OWNER_DEPARTMENTS.includes(department)));
   const canManageDefinition = useCallback(definition => canWrite && canManageDataStandard(actor, definition), [actor, canWrite]);
   const ownerDepartments = actor.executive
@@ -71,9 +100,18 @@ export function DataStandardsProvider({ children, enabled = true }) {
       const payload = await loadDataStandards(nextFilters, fetch, controller.signal);
       setDefinitions(payload.definitions || []);
       setFilters(nextFilters);
+      setStorageUnavailable(false);
       setError(null);
       return payload;
     } catch (loadError) {
+      if (loadError?.status === 501) {
+        const fallback = builtinDefinitions(nextFilters);
+        setDefinitions(fallback);
+        setFilters(nextFilters);
+        setStorageUnavailable(true);
+        setError(errorState({ ...loadError, message: LOCAL_STORAGE_MESSAGE }, LOCAL_STORAGE_MESSAGE));
+        return { definitions: fallback, local: true };
+      }
       if (loadError?.name !== "AbortError") setError(errorState(loadError, "数据口径目录加载失败。"));
       throw loadError;
     } finally {
@@ -94,10 +132,24 @@ export function DataStandardsProvider({ children, enabled = true }) {
   }, [enabled]);
 
   const loadDefinition = useCallback(async id => {
-    const payload = await loadDataStandard(id);
-    setDetail(payload.definition || null);
-    return payload.definition || null;
-  }, []);
+    if (storageUnavailable) {
+      const fallback = BUILTIN_DEFINITIONS.find(definition => definition.id === id) || null;
+      setDetail(fallback);
+      return fallback;
+    }
+    try {
+      const payload = await loadDataStandard(id);
+      setDetail(payload.definition || null);
+      return payload.definition || null;
+    } catch (loadError) {
+      if (loadError?.status !== 501) throw loadError;
+      const fallback = BUILTIN_DEFINITIONS.find(definition => definition.id === id) || null;
+      setStorageUnavailable(true);
+      setError(errorState({ ...loadError, message: LOCAL_STORAGE_MESSAGE }, LOCAL_STORAGE_MESSAGE));
+      setDetail(fallback);
+      return fallback;
+    }
+  }, [storageUnavailable]);
 
   const runWrite = useCallback(async operation => {
     setSaving(true);
@@ -202,6 +254,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     loading,
     saving,
     error,
+    storageUnavailable,
     canWrite,
     canTransferOwner: actor.executive,
     ownerDepartments,
@@ -217,7 +270,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     ensureResults,
     scheduleEnsureResults,
     clearError: () => setError(null)
-  }), [actor.executive, archiveDefinition, canManageDefinition, canWrite, createDefinition, definitions, detail, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, ownerDepartments, previewDefinition, publishVersion, recalculate, resultLoading, results, run, saving, scheduleEnsureResults]);
+  }), [actor.executive, archiveDefinition, canManageDefinition, canWrite, createDefinition, definitions, detail, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, ownerDepartments, previewDefinition, publishVersion, recalculate, resultLoading, results, run, saving, scheduleEnsureResults, storageUnavailable]);
 
   return <DataStandardsContext.Provider value={value}>{children}</DataStandardsContext.Provider>;
 }

@@ -1,6 +1,6 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { useEffect, useMemo } from "react";
-import { buildDataCenterSalesFactViews, buildDataQualitySummary, DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
+import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
@@ -20,6 +20,7 @@ const SECTION_META = {
 };
 
 const overviewMetricCodes = DATA_CENTER_OVERVIEW_METRICS.map(metric => metric.metricCode);
+const legacyOverviewRollback = import.meta.env.VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK === "1";
 
 export function DataCenterAppPage({ section = "overview" }) {
   const { user } = useAuth();
@@ -27,15 +28,16 @@ export function DataCenterAppPage({ section = "overview" }) {
   const { results, run, resultLoading, error: metricError, ensureResults, scheduleEnsureResults } = useDataStandards();
   const [title, description] = SECTION_META[section] || SECTION_META.overview;
   const factViews = useMemo(() => buildDataCenterSalesFactViews(salesRows, range), [range, salesRows]);
+  const legacyMetricResults = useMemo(() => legacyOverviewRollback ? buildLegacyDataCenterMetricResults(salesRows, range) : [], [range, salesRows]);
   const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
   useEffect(() => {
-    if (section === "overview") scheduleEnsureResults(range, overviewMetricCodes);
+    if (section === "overview" && !legacyOverviewRollback) scheduleEnsureResults(range, overviewMetricCodes);
   }, [range.from, range.to, scheduleEnsureResults, section]);
   const retryMetricResults = () => ensureResults(range, overviewMetricCodes).catch(() => {});
   const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
   const canManage = user?.role !== "readonly" && canAccessCompanyPlatform(user);
   const content = {
-    overview: <DataOverview factViews={factViews} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} metricResults={results} metricRun={run} metricLoading={resultLoading} metricError={metricError} retryMetricResults={retryMetricResults} />,
+    overview: <DataOverview factViews={factViews} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} />,
     metrics: <DataStandardsWorkspace />,
     quality: <DataQualityWorkspace quality={quality} />,

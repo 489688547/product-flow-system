@@ -538,15 +538,15 @@ git commit -m "feat(data): drive overview from governed metrics"
 - Modify: `docs/features/data-center-app/prd.md`
 - Modify: `docs/features/data-center-app/design.md`
 
-- [ ] 9.1 先写失败测试，覆盖：旧 `/api/data-center` 不再写口径表；旧 metadata JSON 带 `metricDefinitions` 时不会覆盖共享定义；缺少 D1 时共享 API 返回 501；本地 Node 服务不伪装为线上共享结果；旧 `#data-metrics` 链接仍可进入“数据口径”。
+- [x] 9.1 先写失败测试，覆盖：旧 `/api/data-center` 不再写口径表；旧 metadata JSON 带 `metricDefinitions` 时不会覆盖共享定义；缺少 D1 时共享 API 返回 501；本地 Node 服务不伪装为线上共享结果；旧 `#data-metrics` 链接仍可进入“数据口径”。
 
-- [ ] 9.2 在 `server.mjs` 为 `/api/platform/v1/data-standards*` 返回结构化 `DATA_STANDARD_STORAGE_UNAVAILABLE` 501。目录页可以展示内置只读定义，但新增/编辑/计算必须明确提示“本地测试模式没有 D1”；不把本地 JSON 伪装为公司共享口径或共享结果。
+- [x] 9.2 在 `server.mjs` 为 `/api/platform/v1/data-standards*` 返回结构化 `DATA_STANDARD_STORAGE_UNAVAILABLE` 501。目录页可以展示内置只读定义，但新增/编辑/计算必须明确提示“本地测试模式没有 D1”；不把本地 JSON 伪装为公司共享口径或共享结果。
 
-- [ ] 9.3 兼容迁移读取旧两项定义，但所有新写入只走共享 API。回滚开关只允许把总览临时切回旧事实摘要，默认关闭，并在页面显著标记“兼容回滚口径”；不得删除新版本、结果和审计。
+- [x] 9.3 兼容迁移读取旧两项定义，但所有新写入只走共享 API。回滚开关只允许把总览临时切回旧事实摘要，默认关闭，并在页面显著标记“兼容回滚口径”；不得删除新版本、结果和审计。
 
-- [ ] 9.4 更新 PRD 状态为“实施中”，补充本地 501、旧表保留、结果读取切换和生产迁移授权边界。
+- [x] 9.4 更新 PRD 状态为“实施中”，补充本地 501、旧表保留、结果读取切换和生产迁移授权边界。
 
-- [ ] 9.5 验证和提交：
+- [x] 9.5 验证和提交：
 
 ```bash
 node --test tests/local-data-center-server.test.mjs tests/data-standards-compatibility.test.mjs tests/data-center-api.test.mjs

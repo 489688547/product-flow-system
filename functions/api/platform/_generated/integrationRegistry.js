@@ -198,7 +198,8 @@ const integrationRegistry = {
       ],
       "envVars": [
         "LOCAL_LIVE_D1_PREVIEW",
-        "PLATFORM_CREDENTIAL_MASTER_KEY"
+        "PLATFORM_CREDENTIAL_MASTER_KEY",
+        "VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK"
       ],
       "domains": [
         "pages.dev",

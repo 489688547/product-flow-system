@@ -19,7 +19,7 @@ test("overview KPI cards use the five governed metric codes without a legacy sum
   assert.doesNotMatch(page, /summarizeDataCenterSales/);
   assert.match(page, /useDataStandards/);
   assert.match(page, /scheduleEnsureResults\(range, overviewMetricCodes\)/);
-  assert.match(page, /metricResults=\{results\}/);
+  assert.match(page, /metricResults=\{legacyOverviewRollback \? legacyMetricResults : results\}/);
   assert.match(page, /retryMetricResults/);
 });
 
@@ -34,7 +34,7 @@ test("governed cards preserve missing values and show result provenance and calc
   assert.match(overview, /RESULT_NOT_AVAILABLE/);
   assert.match(overview, /DIVISION_BY_ZERO/);
   assert.doesNotMatch(overview, /value \|\| 0/);
-  assert.doesNotMatch(overview, /硬编码|兼容回滚口径/);
+  assert.doesNotMatch(overview, /硬编码/);
 });
 
 test("trend and platform contribution remain explicitly labelled sales fact views", () => {

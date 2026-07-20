@@ -255,6 +255,29 @@ export function summarizeDataCenterSales(rows = [], options = {}) {
   };
 }
 
+export function buildLegacyDataCenterMetricResults(rows = [], options = {}) {
+  const summary = summarizeDataCenterSales(rows, options);
+  const values = {
+    "sales.net_sales": summary.totals.netSales,
+    "sales.quantity": summary.totals.qty,
+    "sales.gross_profit": summary.totals.grossProfit,
+    "sales.refund_rate": summary.totals.refundRate,
+    "sales.gross_margin_rate": summary.totals.grossMarginRate
+  };
+  const cutoffAt = summary.byDay.at(-1)?.date || "";
+  return DATA_CENTER_OVERVIEW_METRICS.map(metric => ({
+    metricCode: metric.metricCode,
+    value: values[metric.metricCode],
+    version: 0,
+    from: options.from || "",
+    to: options.to || "",
+    cutoffAt,
+    coverageRate: summary.rowCount ? 1 : 0,
+    status: summary.rowCount ? "complete" : "incomplete",
+    reasonCode: summary.rowCount ? "LEGACY_ROLLBACK" : "RESULT_NOT_AVAILABLE"
+  }));
+}
+
 export function buildDataCenterSalesFactViews(rows = [], options = {}) {
   const operational = filterOperationalSales(rows);
   const filtered = operational.filter(row => (

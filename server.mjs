@@ -934,6 +934,20 @@ const server = http.createServer(async (req, res) => {
     await handleEnvironmentReadiness(res);
     return;
   }
+  if (url.pathname === "/api/platform/v1/data-standards" || url.pathname.startsWith("/api/platform/v1/data-standards/")) {
+    const message = "本地测试模式没有 D1，共享数据口径只读目录可用，但不能计算或保存。";
+    json(res, 501, {
+      synced: false,
+      message,
+      error: {
+        code: "DATA_STANDARD_STORAGE_UNAVAILABLE",
+        message,
+        requestId: `local-${Date.now().toString(36)}`,
+        retryable: true
+      }
+    });
+    return;
+  }
   if (url.pathname === "/api/platform/v1/production-data/rollback") {
     await handleProductionRollback(req, res);
     return;
