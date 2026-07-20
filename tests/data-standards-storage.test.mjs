@@ -46,6 +46,11 @@ function definitionInput(overrides = {}) {
 function versionInput(overrides = {}) {
   return {
     version: 1,
+    name: "净销售额",
+    category: "sales",
+    ownerDepartment: "财务部",
+    unit: "CNY",
+    period: "day",
     effectiveFrom: "2026-07-01",
     displayFormula: "净销售额按订单创建日汇总",
     formulaAst: { type: "aggregate", operation: "sum", input: { type: "field", field: "sales.net_sales" }, filters: [] },
@@ -117,10 +122,14 @@ function createD1Mock() {
   }
 
   function versionRow(values, offset = 0) {
-    const [definitionId, version, effectiveFrom, displayFormula, formulaAst, sourceFields,
-      dependencies, executable, coverageStatus, createdAt, createdBy] = values.slice(offset);
+    const source = values.slice(offset);
+    const expanded = source.length >= 16;
+    const [definitionId, version, name, category, ownerDepartment, unit, period, effectiveFrom,
+      displayFormula, formulaAst, sourceFields, dependencies, executable, coverageStatus, createdAt, createdBy] = expanded
+      ? source
+      : [source[0], source[1], undefined, undefined, undefined, undefined, undefined, ...source.slice(2)];
     return {
-      definition_id: definitionId, version, effective_from: effectiveFrom,
+      definition_id: definitionId, version, name, category, owner_department: ownerDepartment, unit, period, effective_from: effectiveFrom,
       display_formula: displayFormula, formula_ast: formulaAst, source_fields: sourceFields,
       dependencies, executable, coverage_status: coverageStatus, created_at: createdAt,
       created_by: createdBy
@@ -177,11 +186,21 @@ function createD1Mock() {
             versions.set(`${row.definition_id}:${row.version}`, row);
             return { success: true, meta: { changes: 1 } };
           }
-          if (normalized.startsWith("update data_metric_definitions set current_version")) {
-            const [nextVersion, updatedAt, updatedBy, id, expectedVersion] = statement.values;
+          if (normalized.startsWith("update data_metric_definitions set current_version")
+            || normalized.startsWith("update data_metric_definitions set name")) {
+            const expanded = statement.values.length >= 10;
+            const [name, category, ownerDepartment, unit, period, nextVersion, updatedAt, updatedBy, id, expectedVersion] = expanded
+              ? statement.values
+              : [undefined, undefined, undefined, undefined, undefined, ...statement.values];
             const current = definitions.get(id);
             if (!current || current.current_version !== expectedVersion || current.status !== "active") return { success: true, meta: { changes: 0 } };
-            definitions.set(id, { ...current, current_version: nextVersion, updated_at: updatedAt, updated_by: updatedBy });
+            definitions.set(id, {
+              ...current,
+              ...(expanded ? { name, category, owner_department: ownerDepartment, unit, period } : {}),
+              current_version: nextVersion,
+              updated_at: updatedAt,
+              updated_by: updatedBy
+            });
             return { success: true, meta: { changes: 1 } };
           }
           if (normalized.startsWith("update data_metric_definitions set status")) {
@@ -338,6 +357,7 @@ test("migration preserves the legacy payload table and seeds 11 versioned defini
     assert.match(sql, new RegExp(`CREATE TABLE(?: IF NOT EXISTS)? ${table}`, "i"));
   }
   assert.match(sql, /UNIQUE\s*\(definition_id,\s*effective_from\)/i);
+  assert.match(sql, /CREATE TABLE data_metric_definition_versions \([\s\S]*name TEXT NOT NULL[\s\S]*owner_department TEXT NOT NULL[\s\S]*period TEXT NOT NULL/i);
   assert.match(sql, /ON CONFLICT[^;]*DO NOTHING/is);
   assert.doesNotMatch(sql, /DROP TABLE\s+data_metric_definitions_legacy/i);
 
@@ -390,9 +410,10 @@ test("environment and integration manifests declare versioned data-standard pers
   }
 });
 
-test("the default API test command includes data-standard storage regressions", () => {
+test("the default API test command includes data-standard storage and route regressions", () => {
   const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
   assert.match(packageJson.scripts["test:api"], /tests\/data-standards-storage\.test\.mjs/);
+  assert.match(packageJson.scripts["test:api"], /tests\/data-standards-api\.test\.mjs/);
 });
 
 test("storage uses the governed D1 binding and creates all normalized tables", async () => {
@@ -444,6 +465,41 @@ test("definition versions append and reject stale or non-increasing effective da
   assert.equal(listed.length, 1);
   assert.equal(detail.versions.length, 2);
   assert.equal(detail.auditLogs.length, 2);
+});
+
+test("definition version snapshots preserve historical metadata while current metadata advances atomically", async () => {
+  const db = createD1Mock();
+  await insertDefinitionWithVersion(db, definitionInput(), versionInput(), auditInput());
+  await appendDefinitionVersion(
+    db,
+    "sales-net-sales",
+    1,
+    versionInput({
+      version: 2,
+      name: "净销售额新版",
+      category: "goods_flow",
+      ownerDepartment: "运营部",
+      unit: "COUNT",
+      period: "month",
+      effectiveFrom: "2026-08-01",
+      createdAt: "2026-07-20T02:00:00.000Z"
+    }),
+    auditInput({ id: "audit-2", action: "publish", definitionVersion: 2 })
+  );
+  const detail = await getDefinitionDetail(db, "sales-net-sales");
+  assert.equal(detail.name, "净销售额新版");
+  assert.equal(detail.ownerDepartment, "运营部");
+  assert.deepEqual(detail.versions.map(item => ({
+    version: item.version,
+    name: item.name,
+    category: item.category,
+    ownerDepartment: item.ownerDepartment,
+    unit: item.unit,
+    period: item.period
+  })), [
+    { version: 2, name: "净销售额新版", category: "goods_flow", ownerDepartment: "运营部", unit: "COUNT", period: "month" },
+    { version: 1, name: "净销售额", category: "sales", ownerDepartment: "财务部", unit: "CNY", period: "day" }
+  ]);
 });
 
 test("a concurrent losing append never writes an audit for the winner's version", async () => {

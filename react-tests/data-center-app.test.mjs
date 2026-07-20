@@ -19,7 +19,7 @@ test("data center remains registered alongside every independently delivered bus
 test("data center has navigation and feature permission defaults", () => {
   assert.ok(NAV_PERMISSION_ITEMS.some(item => item.key === "data-center"));
   assert.ok(FEATURE_PERMISSION_ITEMS.some(item => item.key === "dataCenter"));
-  assert.deepEqual(DEFAULT_PERMISSIONS.features.dataCenter.editDepartments, ["总经办", "运营部"]);
+  assert.deepEqual(DEFAULT_PERMISSIONS.features.dataCenter.editDepartments, ["总经办", "运营部", "财务部", "供应链部", "供应链", "供应链团队", "采购部"]);
   assert.equal(canAccessDataCenter({ department: "运营部" }), true);
   assert.equal(canAccessDataCenter({ department: "财务部" }), true);
   assert.equal(canAccessDataCenter({ department: "品牌部" }), false);

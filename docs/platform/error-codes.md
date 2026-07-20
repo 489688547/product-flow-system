@@ -71,6 +71,19 @@
 - `DATA_CONNECTOR_NOT_FOUND`：连接实例不存在、已归档或对当前身份不可见。
 - `DATA_CONNECTOR_VERSION_CONFLICT`：连接实例或保险箱条目版本已经更新，HTTP 409。
 
+共享数据口径 API 使用：
+
+- `DATA_STANDARD_INVALID`：请求字段、日期、公式结构或不可变 `metricCode` 不合法。
+- `DATA_STANDARD_FIELD_UNKNOWN`：公式或来源引用未登记事实字段。
+- `DATA_STANDARD_CYCLE`：指标依赖形成循环。
+- `DATA_STANDARD_UNIT_MISMATCH`：声明单位与公式推导单位不一致。
+- `DATA_STANDARD_VERSION_CONFLICT`：提交版本落后或 `metricCode` 已存在，HTTP 409。
+- `DATA_STANDARD_EFFECTIVE_DATE_CONFLICT`：新版本生效日期未严格递增或同日重复，HTTP 409。
+- `DATA_STANDARD_DEPENDENCY_ARCHIVED`：新版本依赖已归档口径。
+- `DATA_STANDARD_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+数据口径的稳定错误、责任部门授权、版本快照和重试语义见 `docs/platform/apis/data-standards-v1.md`。
+
 加密凭证 API 使用：
 
 - `CREDENTIAL_ENTRY_INVALID`：凭证类型、字段 schema、范围或敏感 payload 不合法。

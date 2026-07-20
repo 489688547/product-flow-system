@@ -23,6 +23,11 @@ CREATE TABLE data_metric_definitions (
 CREATE TABLE data_metric_definition_versions (
   definition_id TEXT NOT NULL,
   version INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  category TEXT NOT NULL,
+  owner_department TEXT NOT NULL,
+  unit TEXT NOT NULL,
+  period TEXT NOT NULL,
   effective_from TEXT NOT NULL,
   display_formula TEXT NOT NULL,
   formula_ast TEXT,
@@ -175,12 +180,18 @@ WITH ranked_legacy AS (
     AND json_extract(payload, '$.metricCode') IN ('sales.net_sales', 'sales.gross_profit')
 )
 INSERT INTO data_metric_definition_versions (
-  definition_id, version, effective_from, display_formula, formula_ast,
+  definition_id, version, name, category, owner_department, unit, period,
+  effective_from, display_formula, formula_ast,
   source_fields, dependencies, executable, coverage_status, created_at, created_by
 )
 SELECT
   definition.id,
   1,
+  definition.name,
+  definition.category,
+  definition.owner_department,
+  definition.unit,
+  definition.period,
   COALESCE(NULLIF(json_extract(legacy.payload, '$.effectiveFrom'), ''), '2026-07-01'),
   COALESCE(NULLIF(json_extract(legacy.payload, '$.formula'), ''),
     CASE definition.metric_code WHEN 'sales.net_sales' THEN '净销售额按订单创建日汇总' ELSE '毛利按订单创建日汇总' END),
@@ -229,10 +240,12 @@ WITH versions(
     ('goods_flow.stockout_rate', '核心 SKU 断货天数 ÷ 核心 SKU 应售天数', NULL, '[]', '[]', 0, 'DATA_NOT_COVERED')
 )
 INSERT OR IGNORE INTO data_metric_definition_versions (
-  definition_id, version, effective_from, display_formula, formula_ast,
+  definition_id, version, name, category, owner_department, unit, period,
+  effective_from, display_formula, formula_ast,
   source_fields, dependencies, executable, coverage_status, created_at, created_by
 )
-SELECT definition.id, 1, '2026-07-01', versions.display_formula, versions.formula_ast,
+SELECT definition.id, 1, definition.name, definition.category, definition.owner_department,
+  definition.unit, definition.period, '2026-07-01', versions.display_formula, versions.formula_ast,
   versions.source_fields, versions.dependencies, versions.executable, versions.coverage_status,
   '2026-07-20T00:00:00.000Z', 'migration-0004'
 FROM versions

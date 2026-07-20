@@ -53,6 +53,11 @@ function versionFromRow(row) {
   return {
     definitionId: row.definition_id,
     version: Number(row.version),
+    name: row.name,
+    category: row.category,
+    ownerDepartment: row.owner_department,
+    unit: row.unit,
+    period: row.period,
     effectiveFrom: row.effective_from,
     displayFormula: row.display_formula,
     formulaAst: parseJson(row.formula_ast, null),
@@ -128,6 +133,11 @@ function versionValues(definitionId, version) {
   return [
     definitionId,
     Number(version.version),
+    version.name,
+    version.category,
+    version.ownerDepartment,
+    version.unit,
+    version.period,
     version.effectiveFrom,
     version.displayFormula,
     JSON.stringify(version.formulaAst ?? null),
@@ -187,6 +197,8 @@ export async function ensureDataStandardsTables(db) {
   )`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS data_metric_definition_versions (
     definition_id TEXT NOT NULL, version INTEGER NOT NULL, effective_from TEXT NOT NULL,
+    name TEXT NOT NULL, category TEXT NOT NULL, owner_department TEXT NOT NULL,
+    unit TEXT NOT NULL, period TEXT NOT NULL,
     display_formula TEXT NOT NULL, formula_ast TEXT, source_fields TEXT NOT NULL,
     dependencies TEXT NOT NULL, executable INTEGER NOT NULL DEFAULT 1, coverage_status TEXT NOT NULL,
     created_at TEXT NOT NULL, created_by TEXT NOT NULL,
@@ -260,9 +272,17 @@ export async function insertDefinitionWithVersion(db, definition, version, audit
     definition.createdAt, definition.createdBy, definition.updatedAt, definition.updatedBy
   );
   const versionStatement = db.prepare(`INSERT INTO data_metric_definition_versions
-    (definition_id, version, effective_from, display_formula, formula_ast, source_fields,
+    (definition_id, version, name, category, owner_department, unit, period,
+      effective_from, display_formula, formula_ast, source_fields,
       dependencies, executable, coverage_status, created_at, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(...versionValues(definition.id, version));
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(...versionValues(definition.id, {
+      name: definition.name,
+      category: definition.category,
+      ownerDepartment: definition.ownerDepartment,
+      unit: definition.unit,
+      period: definition.period,
+      ...version
+    }));
   try {
     await db.batch([definitionStatement, versionStatement, auditInsert(db, definition.id, audit)]);
   } catch (error) {
@@ -287,9 +307,10 @@ export async function appendDefinitionVersion(db, id, expectedVersion, version, 
   }
 
   const versionStatement = db.prepare(`INSERT INTO data_metric_definition_versions
-    (definition_id, version, effective_from, display_formula, formula_ast, source_fields,
+    (definition_id, version, name, category, owner_department, unit, period,
+      effective_from, display_formula, formula_ast, source_fields,
       dependencies, executable, coverage_status, created_at, created_by)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM data_metric_definitions
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM data_metric_definitions
     WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
     ...versionValues(id, { ...version, version: nextVersion }), id, Number(expectedVersion)
   );
@@ -299,8 +320,10 @@ export async function appendDefinitionVersion(db, id, expectedVersion, version, 
     WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
     ...auditValues(id, { ...audit, definitionVersion: nextVersion }), id, Number(expectedVersion)
   );
-  const updateStatement = db.prepare(`UPDATE data_metric_definitions SET current_version = ?,
-    updated_at = ?, updated_by = ? WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
+  const updateStatement = db.prepare(`UPDATE data_metric_definitions SET name = ?, category = ?,
+    owner_department = ?, unit = ?, period = ?, current_version = ?, updated_at = ?, updated_by = ?
+    WHERE id = ? AND current_version = ? AND status = 'active'`).bind(
+    version.name, version.category, version.ownerDepartment, version.unit, version.period,
     nextVersion, version.createdAt, version.createdBy, id, Number(expectedVersion)
   );
   let batchResults;

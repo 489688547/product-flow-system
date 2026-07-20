@@ -89,8 +89,8 @@ export const DEFAULT_PERMISSIONS = {
     dataCenter: {
       viewDepartments: ["总经办", "运营部", "财务部", "产品部", "供应链部", "供应链", "供应链团队", "采购部"],
       viewTitles: ["总经理", "运营负责人", "财务负责人", "产品负责人", "供应链负责人"],
-      editDepartments: ["总经办", "运营部"],
-      editTitles: ["总经理", "运营负责人"]
+      editDepartments: ["总经办", "运营部", "财务部", "供应链部", "供应链", "供应链团队", "采购部"],
+      editTitles: ["总经理", "运营负责人", "财务负责人", "供应链负责人", "采购负责人"]
     },
     ecommerceOperations: {
       viewDepartments: ["总经办", "运营部", "财务部", "产品部", "品牌部", "供应链部", "供应链", "供应链团队", "采购部"],
