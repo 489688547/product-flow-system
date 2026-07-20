@@ -11,7 +11,7 @@ async function executeTask(task, { api, browser, wait, maxHumanPolls }) {
   const provider = providerForTask(task);
   provider.validateTask(task);
   const credentials = await api.credential(task.id, task.grant);
-  let page = await provider.openAndFill(browser, credentials);
+  let page = await provider.openAndFill(browser, credentials, { wait });
   let pageState = provider.classify(page);
   let waitedForHuman = false;
   if (pageState.status === "waiting_human_verification") {
