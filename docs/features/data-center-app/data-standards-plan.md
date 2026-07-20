@@ -108,7 +108,7 @@ git commit -m "feat(data): define governed metric contracts"
 - Modify: `docs/platform/integration-registry.json`
 - Modify generated manifests under `src/platform/_generated/` and `functions/api/platform/_generated/`
 
-- [ ] 2.1 先写存储失败测试，覆盖：迁移表名、内置口径幂等初始化、旧净销售额/毛利兼容迁移、追加版本、同日版本冲突、归档不删除、计算批次幂等、批次成功后原子切换当前结果、失败批次保留旧结果。
+- [x] 2.1 先写存储失败测试，覆盖：迁移表名、内置口径幂等初始化、旧净销售额/毛利兼容迁移、追加版本、同日版本冲突、归档不删除、计算批次幂等、批次成功后原子切换当前结果、失败批次保留旧结果。
 
 运行：
 
@@ -118,7 +118,7 @@ node --test tests/data-standards-storage.test.mjs tests/data-center-api.test.mjs
 
 预期：失败，因为迁移和存储模块尚不存在。
 
-- [ ] 2.2 在迁移中先把旧通用 payload 表改名为 `data_metric_definitions_legacy`，再建立规范化表：
+- [x] 2.2 在迁移中先把旧通用 payload 表改名为 `data_metric_definitions_legacy`，再建立规范化表：
 
 ```sql
 ALTER TABLE data_metric_definitions RENAME TO data_metric_definitions_legacy;
@@ -151,7 +151,7 @@ CREATE TABLE data_metric_definitions (
 
 把旧 payload 中 `sales.net_sales` 和 `sales.gross_profit` 迁成 `v1`；其余 9 项由同一 SQL 使用固定 ID 和固定 JSON AST 幂等插入。迁移不得删除 `data_metric_definitions_legacy`。
 
-- [ ] 2.3 实现以下存储边界，所有 SQL 和 D1 批处理只出现在该模块：
+- [x] 2.3 实现以下存储边界，所有 SQL 和 D1 批处理只出现在该模块：
 
 ```js
 export function dataStandardsDatabase(env = {}) {}
@@ -169,9 +169,9 @@ export async function listCurrentResults(db, query) {}
 
 `appendDefinitionVersion` 和 `archiveDefinition` 必须以 `WHERE current_version = ?` 实现乐观锁；受影响行数为 0 时返回版本冲突。`writeCalculationBatch` 使用 D1 `batch()`：先写新结果，再取消同范围旧结果的 current，最后激活新批次并把 run 标记成功。
 
-- [ ] 2.4 修改旧通用存储只遍历 `DATA_CENTER_PERSISTED_COLLECTIONS`；旧 `data_metric_definitions_legacy` 只读保留，不再由通用 POST 删除或覆盖。
+- [x] 2.4 修改旧通用存储只遍历 `DATA_CENTER_PERSISTED_COLLECTIONS`；旧 `data_metric_definitions_legacy` 只读保留，不再由通用 POST 删除或覆盖。
 
-- [ ] 2.5 更新环境与集成契约：
+- [x] 2.5 更新环境与集成契约：
 
   - 在 `business-data-apps.tables` 增加四张新表和 `data_metric_definitions_legacy`；
   - 把 `/api/platform/v1/data-standards` 加到 Cloudflare D1/Pages 相关 `apiRoutes`、`codePaths` 和 `evidence`；
@@ -186,7 +186,7 @@ npm run check:environment-capabilities
 node --test tests/data-standards-storage.test.mjs tests/data-center-api.test.mjs tests/environment-readiness-api.test.mjs
 ```
 
-- [ ] 2.6 提交：
+- [x] 2.6 提交：
 
 ```bash
 git add migrations/0004_data_standards.sql functions/api/platform/v1/_shared/dataStandardsStorage.js functions/api/data-center/_shared/storage.js tests/data-standards-storage.test.mjs tests/data-center-api.test.mjs docs/platform/environment-capabilities.json docs/platform/integration-registry.json src/platform/_generated functions/api/platform/_generated
