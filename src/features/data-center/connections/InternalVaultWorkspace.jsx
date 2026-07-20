@@ -90,7 +90,7 @@ export function InternalVaultWorkspace({
   };
 
   return (
-    <div className="internal-vault">
+    <div className={`internal-vault${allowedTypes.length === 1 ? " single-type" : ""}`}>
       {onBack ? <button type="button" className="platform-connection-back" onClick={onBack}><ArrowLeft size={16} aria-hidden="true" />返回公司数据</button> : null}
       <section className="internal-vault-hero">
         <div><LockKeyhole size={20} /><span><strong>公司数据</strong><small>敏感信息加密保存，查看与复制全程留痕。</small></span></div>

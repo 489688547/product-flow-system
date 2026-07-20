@@ -85,3 +85,12 @@ test("Kuaimai is one ERP card and company data owns DingTalk Aliyun and NAS", ()
   assert.match(company, /nas/);
   assert.doesNotMatch(company, /KUAIMAI_APP_KEY|DINGTALK_APP_SECRET/);
 });
+
+test("data access catalog uses the approved responsive grid and visible focus", () => {
+  const css = read("src/styles.css");
+  assert.match(css, /\.data-access-grid[\s\S]*repeat\(3, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.data-access-tabs button:focus-visible/);
+  assert.match(css, /@media \(max-width: 1179px\)[\s\S]*repeat\(2, minmax\(0, 1fr\)\)/);
+  assert.match(css, /@media \(max-width: 640px\)[\s\S]*\.data-access-grid[\s\S]*grid-template-columns: 1fr/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.connection-loading span/);
+});
