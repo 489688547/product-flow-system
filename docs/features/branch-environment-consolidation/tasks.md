@@ -24,11 +24,12 @@
   - 输出：本地、Preview、Production 同 D1 的静态与远端检查。
   - 验证：聚焦测试 12/12 通过，静态检查通过；远程检查准确阻断并仅报告 Preview 缺少的 6 个 Secret 名称。
 
-- [ ] 共享主密钥与 Preview Secret 配置器
+- [x] 共享主密钥与 Preview Secret 配置器
   - 依赖：Pages 三环境契约。
-  - 文件：`tests/configure-pages-environment-parity.test.mjs`、`scripts/configure-pages-environment-parity.mjs`、`.env.example`、`package.json`。
+  - 文件：`tests/configure-pages-environment-parity.test.mjs`、`scripts/configure-pages-environment-parity.mjs`、`scripts/shared-local-env.mjs`、`scripts/start-local-online.mjs`、`.env.example`、`package.json`。
   - 失败测试：保险箱非空中止、值只经 stdin、日志无 Secret、`.env` 幂等。
   - 输出：安全的一次性统一配置和后续复核入口。
+  - 验证：保险箱远程查询 0 行；聚焦测试 6/6 通过；本地、Preview、Production 已设置同一主密钥，Preview 已补齐钉钉和快麦 Secret；远程一致性检查通过。
 
 - [ ] 分支和未提交内容清单及备份
   - 依赖：无。

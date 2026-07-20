@@ -60,6 +60,7 @@
 ### 平台连接保险箱
 
 - `PLATFORM_CREDENTIAL_MASTER_KEY` 使用同一个 32 字节随机密钥，分别保存于本地忽略文件、Cloudflare Preview Secret 和 Production Secret。
+- Git worktree 优先读取自身 `.env`；没有时从 Git common directory 定位主项目的共享 `.env`，避免为每个工作树复制或软链接 Secret。
 - 只有在生产 D1 的 `platform_credentials` 表没有现存密文时，才允许直接统一主密钥；如未来存在密文，必须走专门的密钥轮换迁移，禁止直接覆盖。
 - 钉钉和快麦凭据作为 Cloudflare Secret 分别配置到 Preview 与 Production；浏览器和 API 只读取脱敏元数据。
 - Preview 和 Production 继续共用 D1 中的平台连接记录，因此在数据中心保存一次连接后，两个环境读取同一版本。

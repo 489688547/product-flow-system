@@ -23,6 +23,7 @@
 - `scripts/start-local-online.mjs`：启动子进程前执行最新分支基线检查。
 - `scripts/check-pages-environment-parity.mjs`：静态校验 Wrangler 三环境 D1 契约，以环境能力清单推导必要 Secret，并在 `--remote` 下核对 Cloudflare Preview/Production 的绑定和 Secret 名称。
 - `scripts/configure-pages-environment-parity.mjs`：在保险箱为空的前提下生成共享主密钥，以标准输入设置 Preview/Production Secret，不打印值，并更新被忽略的本地 `.env`。
+- `scripts/shared-local-env.mjs`：让所有工作树安全定位主项目共享 `.env` 并解析服务端变量。
 - `wrangler.toml`：显式声明本地、Preview、Production 的同一 D1；Pages 不支持 Wrangler Secret 段，Secret 名称保留在环境能力清单。
 - `tests/branch-base-check.test.mjs`：覆盖主分支分叉、普通分支落后、最新分支和刷新失败。
 - `tests/pages-environment-parity.test.mjs`：覆盖 D1 ID 漂移、缺失 Secret、远端解析和敏感值不出现在结果中。
@@ -93,6 +94,9 @@
 **Files:**
 - Create: `tests/configure-pages-environment-parity.test.mjs`
 - Create: `scripts/configure-pages-environment-parity.mjs`
+- Create: `scripts/shared-local-env.mjs`
+- Modify: `scripts/start-local-online.mjs`
+- Modify: `tests/local-online-start.test.mjs`
 - Modify: `.env.example`
 - Modify: `package.json`
 
@@ -102,6 +106,7 @@
 - [ ] 写失败测试：保险箱计数非零时零写入；计数为零时主密钥恰为 32 字节、所有 Secret 只经 stdin、返回与日志不含值、本地 `.env` 重复执行不产生重复键。
 - [ ] 运行 `node --test tests/configure-pages-environment-parity.test.mjs`，预期脚本缺失失败。
 - [ ] 实现最小配置器；Production 仅设置新共享主密钥，Preview 设置共享主密钥和本地已有的钉钉、快麦 Secret；缺少必要本地值时整次中止。
+- [ ] 本地启动器优先使用当前工作树 `.env`，缺少时从 Git common directory 读取主项目共享 `.env`，并仅把这些值传给 Wrangler 服务端进程。
 - [ ] 聚焦测试通过后，远程只读检查保险箱行数；为 0 才执行配置器，再运行 `npm run check:pages-environment-parity -- --remote`。
 - [ ] 提交 `feat(platform): configure shared Preview secrets`，提交中不包含 `.env`。
 
