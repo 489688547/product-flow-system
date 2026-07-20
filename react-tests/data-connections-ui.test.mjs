@@ -10,10 +10,10 @@ const catalogWorkspace = readFileSync(new URL("../src/features/data-center/conne
 const domain = readFileSync(new URL("../src/domain/dataConnections.js", import.meta.url), "utf8");
 
 test("data access page uses the dedicated connection workspace", () => {
-  assert.match(governance, /AutomatedConnectionsWorkspace/);
-  assert.match(governance, /ConnectorCatalogWorkspace/);
-  assert.match(governance, /excludedConnectorIds=\{\["douyin-ecommerce"\]\}/);
-  assert.match(catalogWorkspace, /excludedConnectorIds/);
+  assert.match(governance, /DataConnectionsWorkspace/);
+  assert.match(catalogWorkspace, /AutomatedConnectionsWorkspace/);
+  assert.match(catalogWorkspace, /item\.id !== "douyin-ecommerce"/);
+  assert.match(catalogWorkspace, /category === "ecommerce"/);
   assert.match(workspace, /抖音电商/);
   assert.match(workspace, /添加店铺/);
   assert.match(workspace, /shopAvatarUrl/);
