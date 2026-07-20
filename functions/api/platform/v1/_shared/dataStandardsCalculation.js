@@ -1,5 +1,6 @@
 import { orderMetricDependencies, resolveEffectiveVersion } from "../../../../../src/domain/dataStandards.js";
 import { compileDataStandard } from "./dataStandardsCompiler.js";
+import { failCalculationRun, writeCalculationBatch } from "./dataStandardsStorage.js";
 
 function resultMeta(value, rowCount = 0, dataCutoffAt = "", reasonCode = "") {
   const complete = value != null && rowCount > 0;
@@ -105,9 +106,12 @@ export async function calculateMetricRange({ db, definition, version, from, to, 
   return { ...base, ...await executePlan(db, plan, from, to, dependencyResults) };
 }
 
-export async function calculateMetricSet({ db, definitions = [], from, to }) {
+export async function calculateMetricSet({ db, definitions = [], from, to, targetVersions = {} }) {
   const selected = definitions.map(definition => {
-    const version = resolveEffectiveVersion(definition.versions || [], to);
+    const requestedVersion = targetVersions?.[definition.metricCode];
+    const version = requestedVersion == null
+      ? resolveEffectiveVersion(definition.versions || [], to)
+      : (definition.versions || []).find(item => Number(item.version) === Number(requestedVersion)) || null;
     return { definition, version };
   }).filter(item => item.version);
   const graphDefinitions = selected.map(({ definition, version }) => ({ ...definition, formulaAst: version.formulaAst }));
@@ -121,4 +125,34 @@ export async function calculateMetricSet({ db, definitions = [], from, to }) {
     dependencyResults.set(metricCode, result);
   }
   return [...dependencyResults.values()];
+}
+
+export async function executeCalculationRun({ db, run, definitions, from, to, targetVersions = {} }) {
+  try {
+    const calculated = await calculateMetricSet({ db, definitions, from, to, targetVersions });
+    const createdAt = new Date().toISOString();
+    const results = calculated.map(result => ({
+      id: `${run.id}:${result.definitionId}:${result.definitionVersion}`,
+      definitionId: result.definitionId,
+      definitionVersion: result.definitionVersion,
+      metricCode: result.metricCode,
+      periodStart: from,
+      periodEnd: to,
+      dimensions: result.dimensions || {},
+      value: result.value,
+      unit: result.unit,
+      coverageRate: result.coverageRate,
+      confidence: result.confidence,
+      estimated: result.estimated,
+      status: result.status,
+      reason: result.reasonCode || "",
+      dataCutoffAt: result.dataCutoffAt,
+      createdAt
+    }));
+    await writeCalculationBatch(db, { ...run, completedAt: createdAt }, results);
+    return { ...run, status: "succeeded", progress: 100, results };
+  } catch (error) {
+    await failCalculationRun(db, run.id, error?.code || "DATA_STANDARD_CALCULATION_FAILED");
+    return { ...run, status: "failed", errorCode: error?.code || "DATA_STANDARD_CALCULATION_FAILED" };
+  }
 }

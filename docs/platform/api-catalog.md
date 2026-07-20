@@ -34,6 +34,8 @@
 | `/api/platform/v1/data-standards/:id` | 读取详情或追加口径版本 | 详情含版本、依赖和最近结果；`metricCode` 不可变；元数据随版本快照 |
 | `/api/platform/v1/data-standards/:id/archive` | 归档共享数据口径 | 责任部门或总经办；版本检查；保留定义、版本、结果和审计 |
 | `/api/platform/v1/data-standards/preview` | 预览受控公式结果 | 与发布相同的责任部门权限；最多 31 天；与正式计算共用编译器和执行器；不持久化业务结果 |
+| `/api/platform/v1/data-standards/recalculate` | 建立共享口径计算或显式历史重算批次 | 最多 11 项（含依赖）和 370 天；服务端幂等；202 后台执行；失败不切 current |
+| `/api/platform/v1/data-standards/results` | 读取带版本和可信度的口径结果 | 默认只读当前批次；可按 run 轮询；无结果返回原因且不补 0 |
 | `/api/platform/v1/environment-readiness` | 读取当前或生产环境脱敏就绪状态 | 员工会话或 read 个人令牌；只返回配置名称与存在性 |
 | `/api/platform/v1/production-write-session` | 解锁、查询和锁定跨环境生产写入 | active executive + write 个人令牌；确认短语；15 分钟有效 |
 | `/api/platform/v1/production-data/state` | 本地测试实时读取、受控写入和回滚生产公司状态 | Bearer 个人令牌；写入需解锁、基线版本、快照与审计 |

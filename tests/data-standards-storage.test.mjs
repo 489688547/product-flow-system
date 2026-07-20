@@ -414,6 +414,8 @@ test("the default API test command includes data-standard storage and route regr
   const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
   assert.match(packageJson.scripts["test:api"], /tests\/data-standards-storage\.test\.mjs/);
   assert.match(packageJson.scripts["test:api"], /tests\/data-standards-api\.test\.mjs/);
+  assert.match(packageJson.scripts["test:api"], /tests\/data-standards-calculation\.test\.mjs/);
+  assert.match(packageJson.scripts["test:api"], /tests\/data-standards-results-api\.test\.mjs/);
 });
 
 test("storage uses the governed D1 binding and creates all normalized tables", async () => {

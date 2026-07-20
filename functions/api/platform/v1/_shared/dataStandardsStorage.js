@@ -381,6 +381,10 @@ export async function createCalculationRun(db, input) {
   return runFromRow(row);
 }
 
+export async function getCalculationRun(db, id) {
+  return runFromRow(await db.prepare("SELECT * FROM data_metric_calculation_runs WHERE id = ?").bind(id).first());
+}
+
 export async function writeCalculationBatch(db, run, results) {
   const runId = run.id;
   const statements = [];
@@ -429,13 +433,17 @@ export async function failCalculationRun(db, runId, errorCode) {
 }
 
 export async function listCurrentResults(db, query = {}) {
-  const conditions = ["is_current = 1"];
+  const conditions = query.calculationRunId ? [] : ["is_current = 1"];
   const bindings = [];
+  if (Array.isArray(query.metricCodes) && query.metricCodes.length) {
+    conditions.push(`metric_code IN (${query.metricCodes.map(() => "?").join(", ")})`);
+    bindings.push(...query.metricCodes);
+  }
   for (const [condition, value] of [
     ["definition_id = ?", query.definitionId],
     ["metric_code = ?", query.metricCode],
-    ["period_start >= ?", query.from],
-    ["period_end <= ?", query.to],
+    ["period_start = ?", query.from],
+    ["period_end = ?", query.to],
     ["calculation_run_id = ?", query.calculationRunId]
   ]) {
     if (value) {
@@ -443,7 +451,7 @@ export async function listCurrentResults(db, query = {}) {
       bindings.push(value);
     }
   }
-  const result = await db.prepare(`SELECT * FROM data_metric_results WHERE ${conditions.join(" AND ")}
+  const result = await db.prepare(`SELECT * FROM data_metric_results${conditions.length ? ` WHERE ${conditions.join(" AND ")}` : ""}
     ORDER BY period_start, metric_code, dimensions_json`).bind(...bindings).all();
   return (result?.results || []).map(resultFromRow);
 }

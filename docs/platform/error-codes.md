@@ -80,6 +80,8 @@
 - `DATA_STANDARD_VERSION_CONFLICT`：提交版本落后或 `metricCode` 已存在，HTTP 409。
 - `DATA_STANDARD_EFFECTIVE_DATE_CONFLICT`：新版本生效日期未严格递增或同日重复，HTTP 409。
 - `DATA_STANDARD_DEPENDENCY_ARCHIVED`：新版本依赖已归档口径。
+- `DATA_STANDARD_QUERY_RANGE_INVALID`：指标数量、依赖深度、自然日期或计算范围超过契约限制。
+- `DATA_STANDARD_CALCULATION_FAILED`：后台口径计算失败；旧的当前结果继续有效。
 - `DATA_STANDARD_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 
 数据口径的稳定错误、责任部门授权、版本快照和重试语义见 `docs/platform/apis/data-standards-v1.md`。
