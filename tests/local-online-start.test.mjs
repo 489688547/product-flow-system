@@ -10,6 +10,7 @@ function source(path) {
 test("the standard local launcher supervises Vite and Pages Functions behind one URL", () => {
   const packageJson = JSON.parse(source("package.json"));
   const launcher = source("scripts/start-local-online.mjs");
+  const sharedEnv = source("scripts/shared-local-env.mjs");
   const finderLauncher = source("启动服务.command");
 
   assert.equal(packageJson.scripts.start, "node scripts/start-local-online.mjs");
@@ -21,8 +22,13 @@ test("the standard local launcher supervises Vite and Pages Functions behind one
   assert.match(launcher, /VITE_API_TARGET.*PAGES_PORT/s);
   assert.match(launcher, /"--port", String\(PAGES_PORT\)/);
   assert.doesNotMatch(launcher, /"--proxy"/);
-  assert.match(launcher, /resolve\(ROOT, "\.env"\)/);
-  assert.match(launcher, /existsSync\(ENV_FILE\)/);
+  assert.match(launcher, /resolveSharedEnvPath/);
+  assert.match(launcher, /CLOUDFLARE_INCLUDE_PROCESS_ENV/);
+  assert.match(sharedEnv, /resolve\(root, "\.env"\)/);
+  assert.match(sharedEnv, /--git-common-dir/);
+  assert.match(launcher, /checkBranchBase/);
+  assert.match(launcher, /refresh:\s*true/);
+  assert.ok(launcher.indexOf("checkBranchBase(ROOT") < launcher.indexOf("loadSharedEnv(ROOT"));
   assert.match(launcher, /SIGINT/);
   assert.match(launcher, /SIGTERM/);
   assert.match(launcher, /killChild/);

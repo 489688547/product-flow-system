@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, Building2, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, KeyRound, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, KeyRound, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -49,23 +49,27 @@ const CollaborationPage = lazyNamed(() => import("./features/collaboration/Colla
 const AiAssistantWorkspace = lazyNamed(() => import("./features/ai-assistant/AiAssistantWorkspace.jsx"), "AiAssistantWorkspace");
 
 const SUPPLY_CHAIN_NAV = [
-  ["supply-overview", "供应链总览", LayoutDashboard, "供应链管理", "overview"],
-  ["supply-suppliers", "供应商管理", Building2, "供应链管理", "suppliers"],
-  ["supply-approvals", "采购与付款", ClipboardCheck, "供应链管理", "approvals"],
-  ["supply-products", "产品供应链", PackageSearch, "供应链管理", "products"],
-  ["supply-inventory", "库存盘点", Boxes, "供应链管理", "inventory"],
-  ["supply-quality", "质量管理", ShieldCheck, "供应链管理", "quality"],
-  ["supply-records", "同步记录", FileClock, "供应链管理", "records"],
-  ["supply-settings", "设置", Settings, "供应链管理", "settings"]
+  ["supply-overview", "货流驾驶舱", LayoutDashboard, "供应链管理", "overview"],
+  ["supply-demand", "需求计划", ClipboardList, "供应链管理", "demand"],
+  ["supply-procurement", "采购与供应商", ClipboardCheck, "供应链管理", "procurement"],
+  ["supply-transit", "生产与在途", Workflow, "供应链管理", "transit"],
+  ["supply-inventory", "库存管理", Boxes, "供应链管理", "inventory"],
+  ["supply-fulfillment", "履约物流", PackageSearch, "供应链管理", "fulfillment"],
+  ["supply-quality", "逆向与质量", ShieldCheck, "供应链管理", "quality"],
+  ["supply-cash", "现金循环", BadgeDollarSign, "供应链管理", "cash"],
+  ["supply-records", "同步与覆盖", FileClock, "供应链管理", "records"],
+  ["supply-settings", "规则设置", Settings, "供应链管理", "settings"]
 ];
 const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , , , section]) => [screen, section]));
+const LEGACY_SUPPLY_SCREENS = new Set(["supply-suppliers", "supply-approvals", "supply-products"]);
 const DATA_CENTER_NAV = [
   ["data-overview", "数据总览", Database, "数据中心", "overview"],
   ["data-insights", "用户洞察", UsersRound, "数据中心", "insights"],
   ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
+  ["data-products", "商品主数据", PackageSearch, "数据中心", "products"],
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
   ["data-connections", "平台连接", KeyRound, "数据中心", "connections"],
-  ["data-metrics", "指标管理", Ruler, "数据中心", "metrics"],
+  ["data-metrics", "数据口径", Ruler, "数据中心", "metrics"],
   ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],
   ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
   ["data-services", "数据服务", Share2, "数据中心", "services"],
@@ -144,6 +148,7 @@ const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NA
 
 function resolveScreen(screen) {
   if (screen === "supply-chain") return "supply-overview";
+  if (LEGACY_SUPPLY_SCREENS.has(screen)) return "supply-procurement";
   const resolvedDataScreen = screen === "data-center" ? "data-overview" : screen;
   if (resolvedDataScreen === "ecommerce-operations") return "ops-dashboard";
   return resolvedDataScreen === "performance-management" ? "performance-overview" : resolvedDataScreen;

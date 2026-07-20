@@ -7,12 +7,15 @@ import { Button, IconAction } from "../../ui/Button.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { RichTextEditor } from "../../ui/RichTextEditor.jsx";
+import { mergeProductCatalogLink } from "../../domain/productCatalog.js";
+import { ProductCatalogSelect } from "../product-catalog/ProductCatalogSelect.jsx";
 
-export function ProductModal({ open, product, orgCache, onClose, onSave }) {
+export function ProductModal({ open, product, orgCache, catalogItems = [], onClose, onSave }) {
   const [form, setForm] = useState(product || {});
   useEffect(() => setForm(product || {}), [product, open]);
   if (!product) return null;
   const set = patch => setForm(current => ({ ...current, ...patch }));
+  const catalogItem = catalogItems.find(item => item.id === form.catalogProductId);
   const readCover = file => {
     if (!file) return;
     const reader = new FileReader();
@@ -44,6 +47,14 @@ export function ProductModal({ open, product, orgCache, onClose, onSave }) {
           <label>产品经理<OrgSelect type="user" value={form.productManager || ""} onChange={productManager => set(productManagerAssignment(productManager, orgCache))} orgCache={orgCache} departmentFilter="产品" placeholder="选择产品经理…" /></label>
           <label>来源部门<OrgSelect type="department" value={form.source || ""} onChange={source => set({ source })} orgCache={orgCache} /></label>
         </div>
+      </div>
+      <div className="full-field product-catalog-link-field">
+        <span>ERP 商品关联<small>商品、SKU 和 69 码来自数据中心；产品阶段、负责人和资料仍由产品全周期维护。</small></span>
+        <ProductCatalogSelect items={catalogItems} value={form.catalogProductId || ""} onChange={catalogProductId => {
+          if (!catalogProductId) set({ catalogProductId: "" });
+          else set(mergeProductCatalogLink(form, catalogItems.find(item => item.id === catalogProductId)));
+        }} />
+        {catalogItem ? <p className="product-catalog-link-summary">主商家编码 <b>{catalogItem.merchantCode || "—"}</b> · {(catalogItem.skus || []).length} 个 SKU · {(catalogItem.skus || []).filter(sku => sku.barcodeType === "sales_barcode").length} 个标准 69 码</p> : null}
       </div>
       <div className="full-field sku-code-field">
         <span>SKU 69码与定价<small>填写69码后，产品档案里可点击查看销售数据；定价用于计算营销费用（定价×净销量−净销售额）。</small></span>

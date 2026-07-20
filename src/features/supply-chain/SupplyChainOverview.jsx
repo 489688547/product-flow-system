@@ -2,18 +2,32 @@ import { AlertTriangle, Banknote, Boxes, CircleDollarSign, Database, ShieldAlert
 import { DataTable } from "../../ui/DataTable.jsx";
 
 const money = value => `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const evidencedMoney = (value, available) => available ? money(value) : "—";
 const quantity = (value, available) => available ? Number(value || 0).toLocaleString("zh-CN") : "—";
 
-export function SupplyChainOverview({ summary }) {
+export function SupplyChainProductFundsTable({
+  summary,
+  title = "产品资金与库存核对",
+  description = "审批实付回答钱花了多少；ERP库存与实盘库存回答货还剩多少。"
+}) {
   const productColumns = [
-    { key: "product", header: "产品", render: row => <span><strong>{row.productName}</strong><small className="table-secondary">BOM {money(row.bomUnitCost)} / 件</small></span> },
-    { key: "paid", header: "审批实付", render: row => money(row.actualPaid) },
-    { key: "cost", header: "销量消耗成本", render: row => money(row.consumedSalesCost) },
-    { key: "funds", header: "库存资金", render: row => <strong>{money(row.adjustedInventoryFunds)}</strong> },
+    { key: "product", header: "产品", render: row => <span><strong>{row.productName}</strong><small className="table-secondary">{row.hasBomCostEvidence ? `BOM ${money(row.bomUnitCost)} / 件` : "BOM 尚无来源"}</small></span> },
+    { key: "paid", header: "审批实付", render: row => evidencedMoney(row.actualPaid, row.hasPaymentEvidence) },
+    { key: "cost", header: "销量消耗成本", render: row => evidencedMoney(row.consumedSalesCost, row.hasSalesCostEvidence) },
+    { key: "funds", header: "库存资金", render: row => <strong>{evidencedMoney(row.adjustedInventoryFunds, row.hasInventoryFundsEvidence)}</strong> },
     { key: "erp", header: "ERP库存", render: row => <span><strong>{quantity(row.erpInventoryQuantity, row.hasErpSnapshot)}</strong><small className="table-secondary">{row.hasErpSnapshot ? money(row.erpInventoryValue) : "暂无快照"}</small></span> },
     { key: "physical", header: "实盘库存", render: row => <span><strong>{quantity(row.physicalInventoryQuantity, row.hasPhysicalSnapshot)}</strong><small className="table-secondary">{row.hasPhysicalSnapshot ? money(row.physicalInventoryValue) : "尚未盘点"}</small></span> },
     { key: "variance", header: "盘点差异", render: row => row.hasErpSnapshot && row.hasPhysicalSnapshot ? <strong className={row.quantityVariance ? "text-warning" : ""}>{row.quantityVariance > 0 ? "+" : ""}{row.quantityVariance}</strong> : "—" }
   ];
+  return (
+    <section className="section-panel supply-overview-table">
+      <div className="section-head"><div><h2>{title}</h2><p>{description}</p></div></div>
+      <DataTable minWidth={1040} columns={productColumns} rows={summary.byProduct} empty={<div className="empty-state compact-empty">还没有可计算的产品数据，请先同步审批并导入快麦销售和库存快照。</div>} />
+    </section>
+  );
+}
+
+export function SupplyChainOverview({ summary }) {
   const alerts = [
     { label: "待映射采购", value: summary.exceptions.unmappedApprovals, Icon: AlertTriangle },
     { label: "未关联付款", value: summary.exceptions.unmappedPayments, Icon: Banknote },
@@ -41,10 +55,7 @@ export function SupplyChainOverview({ summary }) {
           {alerts.map(({ label, value, Icon }) => <div key={label} className={value ? "has-alert" : ""}><Icon size={17} /><span>{label}</span><strong>{value}</strong></div>)}
         </div>
       </section>
-      <section className="section-panel supply-overview-table">
-        <div className="section-head"><div><h2>产品资金与库存核对</h2><p>审批实付回答钱花了多少；ERP库存与实盘库存回答货还剩多少。</p></div></div>
-        <DataTable minWidth={1040} columns={productColumns} rows={summary.byProduct} empty={<div className="empty-state compact-empty">还没有可计算的产品数据，请先同步审批并导入快麦销售和库存快照。</div>} />
-      </section>
+      <SupplyChainProductFundsTable summary={summary} />
     </div>
   );
 }

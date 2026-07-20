@@ -299,7 +299,7 @@ test("archive and settings wire the sales feature into the UI", () => {
 });
 
 test("xlsxLite streams rows out of a real zip container and parses csv", async () => {
-  const { streamXlsxRows, streamCsvRows } = await import("../src/domain/xlsxLite.js");
+  const { decodeCsvBuffer, streamXlsxRows, streamCsvRows } = await import("../src/domain/xlsxLite.js");
   const { deflateRawSync } = await import("node:zlib");
   const encoder = new TextEncoder();
   const crcTable = [...Array(256)].map((unused, n) => {
@@ -372,4 +372,5 @@ test("xlsxLite streams rows out of a real zip container and parses csv", async (
   const csvRows = [];
   streamCsvRows('编码,数量\n"69771,73969783",5\n', row => csvRows.push(row));
   assert.deepEqual(csvRows[1], ["69771,73969783", "5"]);
+  assert.equal(decodeCsvBuffer(new Uint8Array([0xd6, 0xf7, 0xc9, 0xcc, 0xbc, 0xd2, 0xb1, 0xe0, 0xc2, 0xeb]).buffer), "主商家编码");
 });

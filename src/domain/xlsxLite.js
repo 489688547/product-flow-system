@@ -206,11 +206,19 @@ export function streamCsvRows(text, onRow) {
   }
 }
 
+export function decodeCsvBuffer(buffer) {
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    return new TextDecoder("gb18030").decode(buffer);
+  }
+}
+
 export async function streamSpreadsheetRows(file, onRow) {
   const name = String(file.name || "").toLowerCase();
   if (name.endsWith(".csv")) {
     const buffer = await file.arrayBuffer();
-    streamCsvRows(new TextDecoder("utf-8").decode(buffer), onRow);
+    streamCsvRows(decodeCsvBuffer(buffer), onRow);
     return;
   }
   if (name.endsWith(".xls") && !name.endsWith(".xlsx")) {

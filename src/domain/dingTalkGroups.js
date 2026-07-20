@@ -24,6 +24,10 @@ export function searchDingTalkGroups(query, cursor = "", fetchImpl = fetch) {
   return jsonRequest(`/api/dingtalk/groups/search?${params.toString()}`, fetchImpl);
 }
 
+export function loadMyDingTalkGroups(fetchImpl = fetch) {
+  return jsonRequest("/api/dingtalk/groups", fetchImpl);
+}
+
 export function loadDingTalkGroupMembers(groupId, fetchImpl = fetch) {
   return jsonRequest(`/api/dingtalk/groups/${encodeURIComponent(groupId)}/members`, fetchImpl);
 }

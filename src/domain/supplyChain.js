@@ -207,14 +207,32 @@ function emptyDimensionRow({ product, supplierId = "" }) {
     erpInventoryValue: 0,
     physicalInventoryValue: 0,
     hasErpSnapshot: false,
-    hasPhysicalSnapshot: false
+    hasPhysicalSnapshot: false,
+    hasPaymentEvidence: false,
+    hasSalesCostEvidence: false,
+    hasAdjustmentEvidence: false,
+    hasInventoryFundsEvidence: false,
+    hasBomCostEvidence: false
   };
 }
 
-function activePrimarySupplyLinks(links = []) {
+export function resolveSupplyLinkProductId(link = {}, products = []) {
+  const direct = cleanText(link.productId);
+  if (direct && products.some(product => product.id === direct)) return direct;
+  const catalogProductId = cleanText(link.catalogProductId);
+  if (catalogProductId) {
+    const lifecycle = products.find(product => product.catalogProductId === catalogProductId);
+    return lifecycle?.id || catalogProductId;
+  }
+  return direct;
+}
+
+function activePrimarySupplyLinks(links = [], products = []) {
   const groups = new Map();
-  for (const link of links) {
-    if (!link?.productId || cleanText(link.status).toLowerCase() === "inactive") continue;
+  for (const original of links) {
+    const productId = resolveSupplyLinkProductId(original, products);
+    if (!productId || cleanText(original.status).toLowerCase() === "inactive") continue;
+    const link = { ...original, productId };
     const materialKey = cleanText(link.materialName) || cleanText(link.category) || link.id;
     const key = `${link.productId}::${cleanText(link.category)}::${materialKey}`;
     groups.set(key, [...(groups.get(key) || []), link]);
@@ -273,6 +291,7 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
       const product = productMap.get(allocation.productId);
       const productRow = productRows.get(allocation.productId) || emptyDimensionRow({ product: product || { id: allocation.productId } });
       productRow.actualPaid += amount;
+      productRow.hasPaymentEvidence = true;
       productRows.set(allocation.productId, productRow);
 
       const supplierId = cleanText(purchase.supplierId) || "unmapped";
@@ -298,12 +317,13 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     if (!product) continue;
     const productRow = productRows.get(product.id) || emptyDimensionRow({ product });
     productRow.consumedSalesCost += finiteNumber(salesRow.cost ?? salesRow.salesCost);
+    productRow.hasSalesCostEvidence = true;
     productRows.set(product.id, productRow);
     soldQuantityByProduct.set(product.id, (soldQuantityByProduct.get(product.id) || 0) + finiteNumber(salesRow.qty ?? salesRow.quantity));
   }
 
   const linkedCostProducts = new Set();
-  const primarySupplyLinks = activePrimarySupplyLinks(state.productSupplierLinks);
+  const primarySupplyLinks = activePrimarySupplyLinks(state.productSupplierLinks, products);
   const bomUnitCostByProduct = new Map();
   for (const link of primarySupplyLinks) {
     if (!link.productId || !link.supplierId) continue;
@@ -372,6 +392,7 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     const product = productMap.get(adjustment.productId);
     const productRow = productRows.get(adjustment.productId) || emptyDimensionRow({ product: product || { id: adjustment.productId } });
     productRow.adjustmentAmount += finiteNumber(adjustment.adjustmentAmount);
+    productRow.hasAdjustmentEvidence = true;
     productRows.set(adjustment.productId, productRow);
     if (adjustment.supplierId) {
       const supplier = state.suppliers.find(item => item.id === adjustment.supplierId);
@@ -401,7 +422,9 @@ export function buildSupplyChainSummary({ supplyState, products = [], salesRows 
     }
     productRow.rawInventoryFunds = productRow.actualPaid - productRow.consumedSalesCost;
     productRow.adjustedInventoryFunds = productRow.rawInventoryFunds + productRow.adjustmentAmount;
+    productRow.hasInventoryFundsEvidence = productRow.hasPaymentEvidence || productRow.hasSalesCostEvidence || productRow.hasAdjustmentEvidence;
     productRow.bomUnitCost = bomUnitCostByProduct.get(productRow.productId) || 0;
+    productRow.hasBomCostEvidence = bomUnitCostByProduct.has(productRow.productId);
     productRow.quantityVariance = productRow.hasPhysicalSnapshot && productRow.hasErpSnapshot
       ? productRow.physicalInventoryQuantity - productRow.erpInventoryQuantity
       : 0;

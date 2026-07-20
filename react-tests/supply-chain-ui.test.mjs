@@ -4,14 +4,15 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("primary sidebar exposes every supply chain workspace in its own group", () => {
+test("primary sidebar exposes the merged goods-flow workspaces in the supply-chain group", () => {
   const app = read("src/App.jsx");
-  for (const label of ["供应链总览", "供应商管理", "采购与付款", "产品供应链", "库存盘点", "质量管理", "同步记录", "设置"]) {
+  for (const label of ["货流驾驶舱", "需求计划", "采购与供应商", "生产与在途", "库存管理", "履约物流", "逆向与质量", "现金循环", "同步与覆盖", "规则设置"]) {
     assert.match(app, new RegExp(label));
   }
-  for (const key of ["supply-overview", "supply-suppliers", "supply-approvals", "supply-products", "supply-inventory", "supply-quality", "supply-records", "supply-settings"]) {
+  for (const key of ["supply-overview", "supply-demand", "supply-procurement", "supply-transit", "supply-inventory", "supply-fulfillment", "supply-quality", "supply-cash", "supply-records", "supply-settings"]) {
     assert.match(app, new RegExp(`"${key}"`));
   }
+  assert.doesNotMatch(app, /\["supply-suppliers", "供应商管理"/);
   assert.match(app, /"供应链管理"/);
   assert.doesNotMatch(app, /\["supply-chain", "供应链管理", Truck, "业务 Apps"\]/);
   assert.match(app, /navigationPermissionKey/);
@@ -37,13 +38,15 @@ test("supply chain page is controlled by the primary route and has no internal n
 
 test("inventory and quality imports preview before saving", () => {
   const inventory = read("src/features/supply-chain/InventoryWorkspace.jsx");
+  const inventoryImport = read("src/features/supply-chain/inventoryImportRows.js");
+  const stocktake = read("src/features/supply-chain/StocktakeWorkspace.jsx");
   const quality = read("src/features/supply-chain/QualityWorkspace.jsx");
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
-  assert.match(inventory, /streamSpreadsheetRows/);
+  assert.match(inventoryImport, /streamSpreadsheetRows/);
   assert.match(inventory, /确认导入/);
   assert.match(inventory, /ERP库存/);
   assert.match(inventory, /ERP 快照/);
-  assert.match(inventory, /盘点核对/);
+  assert.match(stocktake, /月度线下盘点/);
   assert.match(inventory, /异常库存与到货风险/);
   assert.match(inventory, /原辅料库存明细/);
   assert.match(inventory, /materialInventorySnapshots/);
@@ -77,8 +80,29 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
   assert.match(supplier, /供货范围/);
   assert.doesNotMatch(supplier, /来自钉钉供应链文件夹/);
   assert.match(product, /collection: "productSupplierLinks"/);
+  assert.match(product, /catalogProductId/);
+  assert.match(product, /catalogSkuId/);
+  assert.match(product, /搜索商品、69 码或商家编码/);
+  assert.match(product, /全部 ERP 商品/);
+  assert.match(product, /主商家编码/);
+  assert.match(product, /规格商家编码/);
+  assert.match(product, /未关联供应商/);
+  assert.match(product, /TablePagination/);
+  assert.match(product, /PAGE_SIZE = 50/);
+  assert.match(supplier, /已关联.*个商品/);
   assert.match(quality, /collection: "qualityIssues"/);
   assert.match(quality, /关闭问题/);
+});
+
+test("supply chain consumes the platform catalog instead of a private product copy", () => {
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  const product = read("src/features/supply-chain/ProductSupplyWorkspace.jsx");
+  assert.match(page, /useProductCatalog/);
+  assert.match(page, /catalogBackedProduct/);
+  assert.match(page, /catalogItems=\{catalogItems\}/);
+  assert.match(page, /lifecycleProducts=\{lifecycleProducts\}/);
+  assert.match(product, /ProductCatalogSelect/);
+  assert.doesNotMatch(product, /还没有产品供应关系。可按现有成本表逐条导入或维护。/);
 });
 
 test("single-purpose supply workspaces render their primary content without a nested title card", () => {

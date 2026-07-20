@@ -774,6 +774,7 @@ export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fe
     dueTime: Number(input.dueTime) || 0,
     executorIds: input.executorUnionIds.filter(Boolean),
     participantIds: (input.participantUnionIds || []).filter(Boolean),
+    priority: Number(input.priority) || 20,
     done: Boolean(input.done)
   };
   const result = await requestDingOpenApi(

@@ -7,15 +7,20 @@ import { fetchSalesForCodes } from "../../state/salesStore.js";
 import { useAuth } from "../../state/AuthProvider.jsx";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { useSupplyChain } from "../../state/SupplyChainProvider.jsx";
+import { useGoodsFlow } from "../../state/GoodsFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { ApprovalWorkspace } from "./ApprovalWorkspace.jsx";
+import { CashCycleWorkspace } from "./CashCycleWorkspace.jsx";
+import { ComingPhaseWorkspace } from "./ComingPhaseWorkspace.jsx";
+import { GoodsFlowOverview } from "./GoodsFlowOverview.jsx";
 import { InventoryWorkspace } from "./InventoryWorkspace.jsx";
 import { ProductSupplyWorkspace } from "./ProductSupplyWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
-import { SupplyChainOverview } from "./SupplyChainOverview.jsx";
+import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
+import { catalogBackedProduct } from "../../domain/productCatalog.js";
 
 function departmentOf(user) {
   return String(user?.department || "").trim();
@@ -90,34 +95,71 @@ function SupplySettingsWorkspace({ canEdit }) {
   return <section className="supply-flat-workspace">{canEdit ? <div className="supply-workspace-toolbar"><Button variant="primary" onClick={() => dispatch({ type: "settings", settings: draft })}>保存设置</Button></div> : null}<div className="supply-settings-matrix"><fieldset disabled={!canEdit}><legend>采购申请单</legend><label>processCode<input value={draft.purchaseProcessCode || ""} onChange={event => setDraft(current => ({ ...current, purchaseProcessCode: event.target.value }))} /></label><label>金额字段<input value={draft.fieldMappings?.purchase?.amountFieldId || ""} onChange={event => updateMapping("purchase", "amountFieldId", event.target.value)} /></label><label>事由字段<input value={draft.fieldMappings?.purchase?.purposeFieldId || ""} onChange={event => updateMapping("purchase", "purposeFieldId", event.target.value)} /></label><label>业务分类字段<input value={draft.fieldMappings?.purchase?.businessCategoryFieldId || ""} onChange={event => updateMapping("purchase", "businessCategoryFieldId", event.target.value)} /></label><label>供应商字段（可选）<input value={draft.fieldMappings?.purchase?.supplierFieldId || ""} onChange={event => updateMapping("purchase", "supplierFieldId", event.target.value)} /></label><label>产品字段（可选）<input value={draft.fieldMappings?.purchase?.productFieldId || ""} onChange={event => updateMapping("purchase", "productFieldId", event.target.value)} /></label></fieldset><fieldset disabled={!canEdit}><legend>付款审批</legend><label>processCode<input value={draft.paymentProcessCode || ""} onChange={event => setDraft(current => ({ ...current, paymentProcessCode: event.target.value }))} /></label><label>付款金额字段（无则读取关联采购）<input value={draft.fieldMappings?.payment?.amountFieldId || ""} onChange={event => updateMapping("payment", "amountFieldId", event.target.value)} /></label><label>关联采购审批字段<input value={draft.fieldMappings?.payment?.relatedPurchaseFieldId || ""} onChange={event => updateMapping("payment", "relatedPurchaseFieldId", event.target.value)} /></label><p className="supply-settings-note">安全规则：不保存收款账号、身份证、详细地址或完整审批原文；只保留金额、事由、分类、状态和关联实例 ID。</p></fieldset></div></section>;
 }
 
+function ProcurementWorkspace({ summary, products, catalogItems, lifecycleProducts, supplyEditor, financeEditor }) {
+  const [view, setView] = useState("suppliers");
+  const views = [
+    ["suppliers", "供应商档案"],
+    ["approvals", "采购与付款"],
+    ["products", "产品供应关系"]
+  ];
+  return (
+    <div className="supply-flat-workspace">
+      <div className="supply-procurement-switcher" role="tablist" aria-label="采购与供应商功能">
+        {views.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => setView(key)}>{label}</button>
+        ))}
+      </div>
+      {view === "suppliers" ? <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} /> : null}
+      {view === "approvals" ? <ApprovalWorkspace canSync={financeEditor} canEditMapping={supplyEditor} products={products} /> : null}
+      {view === "products" ? <ProductSupplyWorkspace catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} canEdit={supplyEditor} /> : null}
+    </div>
+  );
+}
+
 export function SupplyChainAppPage({ section = "overview" }) {
   const [salesRows, setSalesRows] = useState([]);
   const { user } = useAuth();
   const { state: productState } = useProductFlow();
+  const { items: catalogItems } = useProductCatalog();
   const { state, loading, error } = useSupplyChain();
-  const products = productState.products || [];
+  const goodsFlow = useGoodsFlow();
+  const lifecycleProducts = useMemo(() => (productState.products || []).map(product => catalogBackedProduct(product, catalogItems)), [catalogItems, productState.products]);
+  const linkedCatalogIds = useMemo(() => new Set(lifecycleProducts.map(product => product.catalogProductId).filter(Boolean)), [lifecycleProducts]);
+  const catalogProducts = useMemo(() => catalogItems.filter(item => !linkedCatalogIds.has(item.id)).map(item => ({ id: item.id, catalogProductId: item.id, name: item.name, stage: 1, status: item.active ? "ERP 启用" : "ERP 停用", skuCodes: (item.skus || []).filter(sku => sku.barcodeType === "sales_barcode").map(sku => ({ code: sku.barcode, price: sku.salePrice ?? "" })) })), [catalogItems, linkedCatalogIds]);
+  const products = useMemo(() => [...lifecycleProducts, ...catalogProducts], [catalogProducts, lifecycleProducts]);
   const codes = useMemo(() => [...new Set(products.flatMap(product => (product.skuCodes || []).map(value => typeof value === "object" ? value.code : value).filter(Boolean)))], [products]);
   useEffect(() => { let active = true; fetchSalesForCodes(codes).then(rows => { if (active) setSalesRows(rows); }).catch(() => { if (active) setSalesRows([]); }); return () => { active = false; }; }, [codes]);
   const summary = useMemo(() => buildSupplyChainSummary({ supplyState: state, products, salesRows }), [products, salesRows, state]);
   const dept = departmentOf(user);
   const executive = canAccessCompanyPlatform(user);
   const supplyEditor = executive || ["供应链", "供应链部", "供应链团队", "采购部"].includes(dept);
-  const financeEditor = executive || supplyEditor || dept === "财务部";
+  const financeRole = executive || ["财务", "财务部"].includes(dept);
+  const financeEditor = financeRole || supplyEditor;
+  const warehouseEditor = ["仓库", "仓储部"].includes(dept);
+  const canSubmitCount = executive || supplyEditor || warehouseEditor;
+  const canConfirmDifference = executive || supplyEditor;
+  const canConfirmAmount = financeRole;
+  const canEditTerms = financeRole;
+  const canRecalculateCcc = executive || supplyEditor || financeRole;
+  const canFreezeCcc = financeRole;
   const qualityEditor = executive || dept === "质量管理部";
   const content = {
-    overview: <SupplyChainOverview summary={summary} />,
-    suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} />,
-    approvals: <ApprovalWorkspace canSync={financeEditor} canEditMapping={supplyEditor} products={products} />,
-    products: <ProductSupplyWorkspace products={products} canEdit={supplyEditor} />,
-    inventory: <InventoryWorkspace products={products} summary={summary} canEdit={supplyEditor} />,
+    overview: <GoodsFlowOverview dashboard={goodsFlow.dashboard} legacySummary={summary} stale={goodsFlow.stale} loading={goodsFlow.loading} error={goodsFlow.error} onRefresh={goodsFlow.refresh} />,
+    demand: <ComingPhaseWorkspace title="需求计划" phase="Phase 1" description="形成 SKU × 周的 13 周滚动预测，先从核心 SKU 开始。" availableEvidence={[`${products.length} 个商品主档`, `${salesRows.length} 条销售成本记录`]} requiredSources={["近 104 周 SKU 销量", "投放计划与大促日历", "内容排期和新品首单判断"]} />,
+    procurement: <ProcurementWorkspace summary={summary} products={products} catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} supplyEditor={supplyEditor} financeEditor={financeEditor} />,
+    transit: <ComingPhaseWorkspace title="生产与在途" phase="Phase 2" description="把采购单从下单、排产、产完、发运到到仓串成可跟催的节点链。" availableEvidence={[`${state.purchaseApprovals.length} 张采购申请`, `${state.suppliers.length} 家供应商`]} requiredSources={["每笔 PO 的承诺交期", "五个节点的实际时间", "延误后的可售天数影响"]} />,
+    inventory: <InventoryWorkspace products={products} summary={summary} canEdit={supplyEditor} projectionRows={goodsFlow.inventory} stocktakes={goodsFlow.stocktakes} stocktakePermissions={{ canSubmitCount, canConfirmDifference, canConfirmAmount }} createStocktake={goodsFlow.createStocktake} transitionStocktake={goodsFlow.transitionStocktake} />,
+    fulfillment: <ComingPhaseWorkspace title="履约物流" phase="Phase 2" description="核对 48 小时发货、快递费用和破损对包装的影响。" availableEvidence={[`${products.length} 个商品主档`, `${state.inventorySnapshots.length} 条库存快照`]} requiredSources={["仓配发货时间", "快递账单与运单", "破损和包装复审记录"]} />,
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,
+    cash: <CashCycleWorkspace dashboard={goodsFlow.dashboard} terms={goodsFlow.terms} canEditTerms={canEditTerms} canRecalculateCcc={canRecalculateCcc} canFreezeCcc={canFreezeCcc} onSaveTerm={goodsFlow.saveTerm} onRecalculate={goodsFlow.recalculateCcc} onFreeze={goodsFlow.freezeCcc} />,
     records: <SyncRecordsWorkspace salesRows={salesRows} canEdit={supplyEditor} />,
     settings: <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
   };
   return (
     <section className="page supply-chain-app">
-      <PageHeader title="供应链管理" description="供应商、采购付款、库存资金与质量问题的统一工作台。" />
+      <PageHeader title="供应链管理" description="用现金循环连接需求、采购、库存、履约与质量判断。" />
       {error ? <p className="supply-message error" role="alert">{error}</p> : null}
+      {section !== "overview" && goodsFlow.error ? <p className="supply-message warning" role="status">{goodsFlow.error}</p> : null}
       {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[section]}
     </section>
   );

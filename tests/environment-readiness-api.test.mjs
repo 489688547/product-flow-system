@@ -14,7 +14,12 @@ const REQUIRED_PRODUCTION_TABLES = [
   "collaboration_participants",
   "collaboration_activities",
   "platform_credentials",
-  "platform_credential_audit"
+  "platform_credential_audit",
+  "data_connector_instances",
+  "credential_vault_entries",
+  "credential_vault_permissions",
+  "credential_vault_audit",
+  "internal_vault_items"
 ];
 const TEST_PLATFORM_MASTER_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const HR_CORE_TABLES = [
@@ -39,6 +44,15 @@ const USER_INSIGHT_TABLES = [
   "user_insight_runner_tokens",
   "user_insight_audit_logs",
   "user_insight_meta"
+];
+const GOODS_FLOW_TABLES = [
+  "goods_flow_events",
+  "goods_flow_inventory_daily",
+  "goods_flow_stocktakes",
+  "goods_flow_stocktake_lines",
+  "goods_flow_receivable_terms",
+  "goods_flow_ccc_monthly",
+  "goods_flow_exceptions"
 ];
 
 async function loadRoute() {
@@ -71,10 +85,19 @@ const businessDataTables = [
   "data_source_files",
   "data_dimension_mappings",
   "data_metric_definitions",
+  "data_metric_definitions_legacy",
+  "data_metric_definition_versions",
+  "data_metric_results",
+  "data_metric_calculation_runs",
+  "data_metric_audit_logs",
   "data_quality_issues",
   "data_app_subscriptions",
   "data_audit_logs",
   "data_center_meta",
+  "product_catalog_items",
+  "product_catalog_skus",
+  "product_catalog_sync_runs",
+  "product_catalog_meta",
   "ecommerce_operation_records",
   "ecommerce_operation_meta",
   "ecommerce_operation_state",
@@ -108,7 +131,7 @@ test("environment readiness reports missing production bindings and variables wi
 
 test("warning capabilities do not block an otherwise ready production environment", async () => {
   const { onRequest } = await loadRoute();
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES];
   const response = await onRequest({
     request: request(),
     env: {
@@ -143,7 +166,7 @@ test("a server-only production data token can read readiness without an employee
   const bytes = new TextEncoder().encode(rawToken);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const tokenHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES];
   const db = {
     prepare(sql) {
       const statement = {

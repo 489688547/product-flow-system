@@ -5,6 +5,7 @@ import {
   normalizeGroupSearch,
   resolveGroupMembers
 } from "../functions/api/dingtalk/_shared/groups.js";
+import * as groupProvider from "../functions/api/dingtalk/_shared/groups.js";
 import { onRequest as searchGroupsRoute } from "../functions/api/dingtalk/groups/search.js";
 import { onRequest as groupMembersRoute } from "../functions/api/dingtalk/groups/[groupId]/members.js";
 import { saveDingUserToken } from "../functions/api/auth/_shared/ding-user-token.js";
@@ -30,6 +31,22 @@ test("group search unwraps text content from a JSON-RPC tool result", () => {
     } })
   }] } });
   assert.deepEqual(result, { groups: [{ id: "g2", name: "运营群", memberCount: 16 }], nextCursor: "", hasMore: false });
+});
+
+test("my groups use the current-user MCP tool and normalize ownership", async () => {
+  assert.equal(typeof groupProvider.listOwnedDingGroups, "function");
+  let calledTool = "";
+  const result = await groupProvider.listOwnedDingGroups("user-token", async (_url, options) => {
+    calledTool = JSON.parse(options.body).params.name;
+    return Response.json({ result: { structuredContent: { result: { groups: [{
+      openConversationId: "g-owned",
+      title: "产品研发群",
+      memberCount: 10,
+      myRole: "OWNER"
+    }] } } } });
+  });
+  assert.equal(calledTool, "list_owned_or_admin_groups");
+  assert.deepEqual(result.groups, [{ id: "g-owned", name: "产品研发群", memberCount: 10, myRole: "OWNER" }]);
 });
 
 test("group members normalize identity fields without guessing union ids", () => {
@@ -62,6 +79,7 @@ test("group members resolve through exact openDingTalkId and cached organization
   assert.deepEqual(result.members, [{ unionId: "union-1", userId: "user-1", name: "张真", department: "运营部", title: "运营主管" }]);
   assert.equal(result.skippedCount, 1);
   assert.deepEqual(result.skippedReasons, ["1 人不在当前企业组织架构或身份无法确认"]);
+  assert.deepEqual(result.skippedMembers, [{ name: "外部成员", reason: "不在当前企业组织架构或身份无法确认" }]);
 });
 
 test("session-protected routes search a group and return resolvable members", async () => {
@@ -91,6 +109,30 @@ test("session-protected routes search a group and return resolvable members", as
     const memberBody = await memberResponse.json();
     assert.equal(memberResponse.status, 200);
     assert.equal(memberBody.members[0].unionId, "union-1");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("session-protected route lists the current user's groups", async () => {
+  const { onRequest: myGroupsRoute } = await import("../functions/api/dingtalk/groups/index.js");
+  const db = createAuthD1Mock();
+  const created = await createSession({ corpId: "corp-1", userId: "owner", unionId: "owner-union", name: "负责人" }, "browser", { PRODUCT_FLOW_DB: db });
+  const env = { PRODUCT_FLOW_DB: db, DINGTALK_TOKEN_ENCRYPTION_KEY: TOKEN_KEY };
+  await saveDingUserToken(db, created.sessionIdHash, { accessToken: "user-token", expireIn: 7200 }, env);
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    assert.equal(JSON.parse(options.body).params.name, "list_owned_or_admin_groups");
+    return Response.json({ result: { structuredContent: { result: { groups: [{ openConversationId: "g1", title: "产品群", memberCount: 8, myRole: "OWNER" }] } } } });
+  };
+  try {
+    const response = await myGroupsRoute({
+      request: new Request("https://flow.example.com/api/dingtalk/groups", { headers: { cookie: created.cookie } }),
+      env
+    });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.groups[0].name, "产品群");
   } finally {
     globalThis.fetch = originalFetch;
   }

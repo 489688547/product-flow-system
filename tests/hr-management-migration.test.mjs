@@ -43,5 +43,6 @@ test("integration registry routes HR storage without claiming DingTalk attendanc
 
   assert.ok(d1.codePaths.includes("functions/api/hr-management/**"));
   assert.ok(d1.codePaths.includes("migrations/0002_hr_management_core.sql"));
-  assert.doesNotMatch(dingtalk.capabilities.join(" "), /考勤|请假|加班|审批/);
+  assert.doesNotMatch(dingtalk.capabilities.join(" "), /考勤|请假|加班/);
+  assert.match(dingtalk.capabilities.join(" "), /采购与付款审批同步/);
 });

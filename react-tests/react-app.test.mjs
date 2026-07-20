@@ -344,8 +344,9 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /data-testid="sync-task-todo"/);
   assert.match(page, /<TodoSyncModal/);
   assert.match(page, /todoSyncStatus\(task\)/);
-  assert.match(page, /normalizeTaskDueDate\(task\.due\)/);
-  assert.match(page, /disabled=\{!hasValidDue\}/);
+  assert.doesNotMatch(page, /disabled=\{!hasValidDue\}/);
+  assert.doesNotMatch(page, /updateTask\(todoTask\.id, \{ due: draft\.dueDate \}\)/);
+  assert.match(page, /const effectiveTask = \{ \.\.\.todoTask, due: draft\.dueDate \}/);
   assert.doesNotMatch(page, /markTodoSynced/);
   assert.match(page, /stagePolicyTone/);
   assert.match(page, /policy-\$\{stagePolicyTone\(policy\.mode\)\}/);
@@ -700,6 +701,7 @@ test("issue feedback and settings pages persist company-wide operational data", 
   assert.match(floating, /disabled=\{!desc\.trim\(\) \|\| !screenshot\}/);
   assert.match(floating, /addFeedbackIssue/);
   assert.match(styles, /\.floating-issue-button\s*\{[\s\S]*position: fixed;[\s\S]*right: 22px;[\s\S]*bottom: 22px;/);
+  assert.match(styles, /\.page\s*\{[^}]*padding-bottom:\s*calc\(80px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(settings, /PermissionSettings/);
   assert.match(settings, /总经办/);
   assert.match(settings, /updateSettings/);

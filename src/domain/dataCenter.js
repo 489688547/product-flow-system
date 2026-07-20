@@ -19,6 +19,11 @@ export const DATA_CENTER_COLLECTIONS = [
   "aiDataPolicies"
 ];
 
+// Shared data-standard definitions are only retained here for old readers while
+// the API migration is in progress. Generic data-center writes must not replace
+// the governed definition collection.
+export const DATA_CENTER_PERSISTED_COLLECTIONS = DATA_CENTER_COLLECTIONS.filter(collection => collection !== "metricDefinitions");
+
 export const DATA_CENTER_STATUS = [
   "healthy",
   "running",
@@ -29,6 +34,8 @@ export const DATA_CENTER_STATUS = [
   "disabled"
 ];
 
+// Legacy data_sources remains metadata-only. New encrypted values belong in the
+// shared credential vault and are referenced by ID from connector instances.
 const BLOCKED_SOURCE_KEY = /(?:password|passwd|cookie|token|secret|verificationcode|smscode|session)/i;
 const COLLECTION_LIMITS = {
   sources: 200,
@@ -45,6 +52,14 @@ const COLLECTION_LIMITS = {
 };
 const EXCLUDED_PLATFORMS = new Set(["", "其它", "其他", "未知", "未知平台"]);
 const SALES_METRICS = ["qty", "sales", "netSales", "grossProfit", "refund", "cost"];
+
+export const DATA_CENTER_OVERVIEW_METRICS = Object.freeze([
+  { metricCode: "sales.net_sales", label: "净销售额", format: "money" },
+  { metricCode: "sales.quantity", label: "销售数量", format: "number" },
+  { metricCode: "sales.gross_profit", label: "毛利", format: "money" },
+  { metricCode: "sales.refund_rate", label: "退款率", format: "percent" },
+  { metricCode: "sales.gross_margin_rate", label: "毛利率", format: "percent" }
+]);
 
 function shanghaiDate(value) {
   const parts = new Intl.DateTimeFormat("en", {
@@ -138,7 +153,8 @@ export function createDefaultDataCenterState() {
         timezone: "Asia/Shanghai",
         excludeOther: true,
         owner: "财务部",
-        version: 1
+        version: 1,
+        readOnly: true
       },
       {
         id: "gross-profit",
@@ -149,7 +165,8 @@ export function createDefaultDataCenterState() {
         timezone: "Asia/Shanghai",
         excludeOther: true,
         owner: "财务部",
-        version: 1
+        version: 1,
+        readOnly: true
       }
     ],
     qualityIssues: [],
@@ -232,10 +249,8 @@ export function reduceDataCenterState(state, action = {}) {
 }
 
 export function summarizeDataCenterSales(rows = [], options = {}) {
-  const operational = filterOperationalSales(rows);
-  const filtered = operational.filter(row => (
-    (!options.from || row.date >= options.from) && (!options.to || row.date <= options.to)
-  ));
+  const factViews = buildDataCenterSalesFactViews(rows, options);
+  const filtered = factViews.filteredRows;
   const totals = filtered.reduce((sum, row) => {
     for (const metric of SALES_METRICS) sum[metric] += number(row?.[metric]);
     return sum;
@@ -247,11 +262,48 @@ export function summarizeDataCenterSales(rows = [], options = {}) {
       refundRate: totals.sales ? round(totals.refund / totals.sales * 100) : 0,
       grossMarginRate: totals.netSales ? round(totals.grossProfit / totals.netSales * 100) : 0
     },
+    byDay: factViews.byDay,
+    byPlatform: factViews.byPlatform,
+    byProduct: groupSales(filtered, "code").sort((a, b) => b.netSales - a.netSales),
+    excludedRows: factViews.excludedRows,
+    rowCount: factViews.rowCount
+  };
+}
+
+export function buildLegacyDataCenterMetricResults(rows = [], options = {}) {
+  const summary = summarizeDataCenterSales(rows, options);
+  const values = {
+    "sales.net_sales": summary.totals.netSales,
+    "sales.quantity": summary.totals.qty,
+    "sales.gross_profit": summary.totals.grossProfit,
+    "sales.refund_rate": summary.totals.refundRate,
+    "sales.gross_margin_rate": summary.totals.grossMarginRate
+  };
+  const cutoffAt = summary.byDay.at(-1)?.date || "";
+  return DATA_CENTER_OVERVIEW_METRICS.map(metric => ({
+    metricCode: metric.metricCode,
+    value: values[metric.metricCode],
+    version: 0,
+    from: options.from || "",
+    to: options.to || "",
+    cutoffAt,
+    coverageRate: summary.rowCount ? 1 : 0,
+    status: summary.rowCount ? "complete" : "incomplete",
+    reasonCode: summary.rowCount ? "LEGACY_ROLLBACK" : "RESULT_NOT_AVAILABLE"
+  }));
+}
+
+export function buildDataCenterSalesFactViews(rows = [], options = {}) {
+  const operational = filterOperationalSales(rows);
+  const filtered = operational.filter(row => (
+    (!options.from || row.date >= options.from) && (!options.to || row.date <= options.to)
+  ));
+  return {
     byDay: groupSales(filtered, "date").sort((a, b) => a.date.localeCompare(b.date)),
     byPlatform: groupSales(filtered, "platform").sort((a, b) => b.netSales - a.netSales),
-    byProduct: groupSales(filtered, "code").sort((a, b) => b.netSales - a.netSales),
     excludedRows: rows.length - operational.length,
-    rowCount: filtered.length
+    rowCount: filtered.length,
+    filteredRows: filtered
   };
 }
 

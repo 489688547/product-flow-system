@@ -16,10 +16,13 @@
 
 `functions/api/auth/_shared/session.js` 管理 Cookie 会话、令牌哈希、员工身份和有效期。原始会话令牌不能持久化或写入日志。
 
+`functions/api/platform/_shared/credentialVaultAuthorization.js` 只判断凭证动作、业务范围和 reveal 的 15 分钟近期登录要求；不读取密文、不执行加解密、不写审计。`credentialVaultHttp.js` 只构造禁止缓存的安全响应和稳定错误结构，不记录请求体。
+
 ## 外部平台共享适配
 
 - `functions/api/dingtalk/_shared/dingtalk.js`：钉钉 Token、组织、待办、日历、文档和会议数据的共同请求与响应处理。
-- `functions/api/kuaimai/_shared/kuaimai.js`：快麦签名、分页、订单标准化和日聚合。
+- `functions/api/kuaimai/_shared/kuaimai.js`：快麦签名、订单与商品分页、订单标准化和日聚合。商品分页最多 200 条/页，调用方设置总页保护；任一页失败时不返回完整标记，平台目录不得提交半批。
+- `functions/api/platform/v1/product-catalog/_shared/http.js`：商品目录会话、维护权限、成本字段裁剪和统一错误响应。执行顺序为公司会话 → 维护权限（写请求）→ D1 能力 → 输入/提供商读取 → 幂等写入；只记录安全错误码，不记录文件原行或快麦原始响应。
 - `functions/api/platform/_shared/environmentReadiness.js`：环境识别、变量/绑定/表存在性检查和脱敏响应；无外部副作用，不重试。
 - `functions/api/platform/_shared/productionDataAccess.js`：共享个人令牌哈希、能力与组织身份校验，并为运维修复网关提供短时解锁、快照和审计；写入前置于业务状态写入，失败时业务写入不得继续。
 

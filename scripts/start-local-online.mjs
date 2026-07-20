@@ -1,14 +1,14 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import { connect } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkBranchBase } from "./check-branch-base.mjs";
+import { loadSharedEnv, resolveSharedEnvPath } from "./shared-local-env.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HOST = "127.0.0.1";
 const VITE_PORT = 8127;
 const PAGES_PORT = 8132;
-const ENV_FILE = resolve(ROOT, ".env");
 const children = new Set();
 let stopping = false;
 
@@ -73,16 +73,24 @@ process.once("SIGTERM", shutdown);
 process.once("exit", shutdown);
 
 async function main() {
-  if (!existsSync(ENV_FILE)) {
-    throw new Error("缺少本地 .env，请先配置个人令牌和平台连接。");
+  const branchBase = checkBranchBase(ROOT, process.env, { refresh: true });
+  if (!branchBase.current) {
+    throw new Error(`本地环境启动已阻止：${branchBase.reason}`);
   }
+  const sharedEnvPath = resolveSharedEnvPath(ROOT);
+  const sharedEnv = loadSharedEnv(ROOT, { envPath: sharedEnvPath });
+  const wranglerEnv = {
+    ...process.env,
+    ...sharedEnv.values,
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: "true"
+  };
   console.log("正在启动本地代码 · 线上真实环境...");
   startChild("Wrangler", executable("wrangler"), [
     "pages", "dev",
     "--port", String(PAGES_PORT),
     "--ip", HOST,
     "--live-reload"
-  ]);
+  ], wranglerEnv);
   await waitForPort(PAGES_PORT);
   startChild("Vite", executable("vite"), ["--host", HOST, "--port", String(VITE_PORT)], {
     ...process.env,

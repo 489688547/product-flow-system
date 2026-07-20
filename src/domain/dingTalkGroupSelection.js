@@ -4,12 +4,17 @@ function normalizedUser(user = {}) {
 }
 
 export function initialExecutorSelection(users = [], selectedUnionIds = []) {
+  return hydrateSavedExecutors({ people: {}, groups: {}, excludedUnionIds: [] }, users, selectedUnionIds);
+}
+
+export function hydrateSavedExecutors(state, users = [], selectedUnionIds = []) {
   const selected = new Set(selectedUnionIds.map(String));
-  const people = {};
-  users.map(normalizedUser).filter(user => user.unionid && selected.has(user.unionid)).forEach(user => {
-    people[user.unionid] = { user, manual: true, groupIds: [] };
+  const excluded = new Set(state.excludedUnionIds.map(String));
+  const people = { ...state.people };
+  users.map(normalizedUser).filter(user => user.unionid && selected.has(user.unionid) && !excluded.has(user.unionid)).forEach(user => {
+    if (!people[user.unionid]) people[user.unionid] = { user, manual: true, groupIds: [] };
   });
-  return { people, groups: {}, excludedUnionIds: [] };
+  return { ...state, people };
 }
 
 export function toggleManualExecutor(state, rawUser) {

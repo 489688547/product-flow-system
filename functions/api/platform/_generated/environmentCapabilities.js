@@ -198,9 +198,62 @@ const environmentCapabilities = {
       ]
     },
     {
+      "id": "product-catalog-storage",
+      "name": "共享商品主数据",
+      "description": "数据中心、产品全周期和供应链共用的 ERP 商品、SKU、69 码与同步批次存储。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1",
+        "erp-file-import"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "product_catalog_items",
+        "product_catalog_skus",
+        "product_catalog_sync_runs",
+        "product_catalog_meta"
+      ]
+    },
+    {
+      "id": "kuaimai-product-sync",
+      "name": "快麦商品目录同步",
+      "description": "从快麦开放平台分页读取 ERP 商品并合并共享商品目录；缺少配置时仍可使用文件导入。",
+      "platforms": [
+        "kuaimai",
+        "cloudflare-d1"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "warning",
+      "envVars": [
+        "KUAIMAI_APP_KEY",
+        "KUAIMAI_APP_SECRET",
+        "KUAIMAI_ACCESS_TOKEN"
+      ],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "product_catalog_items",
+        "product_catalog_skus",
+        "product_catalog_sync_runs",
+        "product_catalog_meta"
+      ]
+    },
+    {
       "id": "business-data-apps",
       "name": "数据中心、店铺运营与人事管理",
-      "description": "三个业务 App 的标准数据、经营闭环和人事绩效归档所需的 D1 持久化能力。",
+      "description": "三个业务 App 的标准数据、版本化数据口径与计算结果、经营闭环和绩效归档所需的 D1 持久化能力。",
       "platforms": [
         "cloudflare-pages",
         "cloudflare-d1"
@@ -221,6 +274,11 @@ const environmentCapabilities = {
         "data_source_files",
         "data_dimension_mappings",
         "data_metric_definitions",
+        "data_metric_definitions_legacy",
+        "data_metric_definition_versions",
+        "data_metric_results",
+        "data_metric_calculation_runs",
+        "data_metric_audit_logs",
         "data_quality_issues",
         "data_app_subscriptions",
         "data_audit_logs",
@@ -231,6 +289,63 @@ const environmentCapabilities = {
         "performance_management_records",
         "performance_management_meta",
         "performance_management_state"
+      ]
+    },
+    {
+      "id": "goods-flow-core",
+      "name": "供应链货流核心数据",
+      "description": "货流事件、每日库存、月度线下盘点、平台账期、CCC 版本和异常队列所需的生产能力。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1",
+        "dingtalk",
+        "kuaimai",
+        "erp-file-import"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "goods_flow_events",
+        "goods_flow_inventory_daily",
+        "goods_flow_stocktakes",
+        "goods_flow_stocktake_lines",
+        "goods_flow_receivable_terms",
+        "goods_flow_ccc_monthly",
+        "goods_flow_exceptions"
+      ]
+    },
+    {
+      "id": "data-credential-vault",
+      "name": "数据中心加密凭证保险箱",
+      "description": "连接器和内部系统凭证的版本化加密、权限与审计所需生产能力。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [
+        "PLATFORM_CREDENTIAL_MASTER_KEY"
+      ],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "data_connector_instances",
+        "credential_vault_entries",
+        "credential_vault_permissions",
+        "credential_vault_audit",
+        "internal_vault_items"
       ]
     },
     {
