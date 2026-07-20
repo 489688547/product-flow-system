@@ -88,7 +88,6 @@ test("自动 Pages 构建包含兼容入口和缓存重写契约", () => {
   assert.match(buildPreparationSource, /_headers/);
   assert.match(buildPreparationSource, /_redirects/);
 });
-
 test("钉钉受限 WebView 禁用会话存储时也不会连续刷新", async () => {
   assert.equal(existsSync(recoveryPath), true);
   const { installDeploymentRecovery } = await import(pathToFileURL(recoveryPath.pathname));
