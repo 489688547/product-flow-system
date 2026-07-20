@@ -1,9 +1,10 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
-import { useMemo } from "react";
-import { buildDataQualitySummary, summarizeDataCenterSales } from "../../domain/dataCenter.js";
+import { useEffect, useMemo } from "react";
+import { buildDataCenterSalesFactViews, buildDataQualitySummary, DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
+import { useDataStandards } from "../../state/DataStandardsProvider.jsx";
 import { canAccessCompanyPlatform } from "../../domain/permissions.js";
 import { DataCenterSettingsWorkspace, DataQualityWorkspace, DataServicesWorkspace, DataSourcesWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
 import { DataStandardsWorkspace } from "./data-standards/DataStandardsWorkspace.jsx";
@@ -18,16 +19,23 @@ const SECTION_META = {
   settings: ["设置", "维护时区、截止时间和保留策略。"]
 };
 
+const overviewMetricCodes = DATA_CENTER_OVERVIEW_METRICS.map(metric => metric.metricCode);
+
 export function DataCenterAppPage({ section = "overview" }) {
   const { user } = useAuth();
   const { state, range, setRange, salesRows, salesMeta, loading, error } = useDataCenter();
+  const { results, run, resultLoading, error: metricError, ensureResults, scheduleEnsureResults } = useDataStandards();
   const [title, description] = SECTION_META[section] || SECTION_META.overview;
-  const summary = useMemo(() => summarizeDataCenterSales(salesRows, range), [range, salesRows]);
+  const factViews = useMemo(() => buildDataCenterSalesFactViews(salesRows, range), [range, salesRows]);
   const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
+  useEffect(() => {
+    if (section === "overview") scheduleEnsureResults(range, overviewMetricCodes);
+  }, [range.from, range.to, scheduleEnsureResults, section]);
+  const retryMetricResults = () => ensureResults(range, overviewMetricCodes).catch(() => {});
   const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
   const canManage = user?.role !== "readonly" && canAccessCompanyPlatform(user);
   const content = {
-    overview: <DataOverview summary={summary} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} />,
+    overview: <DataOverview factViews={factViews} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} metricResults={results} metricRun={run} metricLoading={resultLoading} metricError={metricError} retryMetricResults={retryMetricResults} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} />,
     metrics: <DataStandardsWorkspace />,
     quality: <DataQualityWorkspace quality={quality} />,

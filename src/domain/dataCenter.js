@@ -42,6 +42,14 @@ const COLLECTION_LIMITS = {
 const EXCLUDED_PLATFORMS = new Set(["", "其它", "其他", "未知", "未知平台"]);
 const SALES_METRICS = ["qty", "sales", "netSales", "grossProfit", "refund", "cost"];
 
+export const DATA_CENTER_OVERVIEW_METRICS = Object.freeze([
+  { metricCode: "sales.net_sales", label: "净销售额", format: "money" },
+  { metricCode: "sales.quantity", label: "销售数量", format: "number" },
+  { metricCode: "sales.gross_profit", label: "毛利", format: "money" },
+  { metricCode: "sales.refund_rate", label: "退款率", format: "percent" },
+  { metricCode: "sales.gross_margin_rate", label: "毛利率", format: "percent" }
+]);
+
 function shanghaiDate(value) {
   const parts = new Intl.DateTimeFormat("en", {
     timeZone: "Asia/Shanghai",
@@ -226,10 +234,8 @@ export function reduceDataCenterState(state, action = {}) {
 }
 
 export function summarizeDataCenterSales(rows = [], options = {}) {
-  const operational = filterOperationalSales(rows);
-  const filtered = operational.filter(row => (
-    (!options.from || row.date >= options.from) && (!options.to || row.date <= options.to)
-  ));
+  const factViews = buildDataCenterSalesFactViews(rows, options);
+  const filtered = factViews.filteredRows;
   const totals = filtered.reduce((sum, row) => {
     for (const metric of SALES_METRICS) sum[metric] += number(row?.[metric]);
     return sum;
@@ -241,11 +247,25 @@ export function summarizeDataCenterSales(rows = [], options = {}) {
       refundRate: totals.sales ? round(totals.refund / totals.sales * 100) : 0,
       grossMarginRate: totals.netSales ? round(totals.grossProfit / totals.netSales * 100) : 0
     },
+    byDay: factViews.byDay,
+    byPlatform: factViews.byPlatform,
+    byProduct: groupSales(filtered, "code").sort((a, b) => b.netSales - a.netSales),
+    excludedRows: factViews.excludedRows,
+    rowCount: factViews.rowCount
+  };
+}
+
+export function buildDataCenterSalesFactViews(rows = [], options = {}) {
+  const operational = filterOperationalSales(rows);
+  const filtered = operational.filter(row => (
+    (!options.from || row.date >= options.from) && (!options.to || row.date <= options.to)
+  ));
+  return {
     byDay: groupSales(filtered, "date").sort((a, b) => a.date.localeCompare(b.date)),
     byPlatform: groupSales(filtered, "platform").sort((a, b) => b.netSales - a.netSales),
-    byProduct: groupSales(filtered, "code").sort((a, b) => b.netSales - a.netSales),
     excludedRows: rows.length - operational.length,
-    rowCount: filtered.length
+    rowCount: filtered.length,
+    filteredRows: filtered
   };
 }
 

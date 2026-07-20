@@ -48,7 +48,9 @@ test("main mounts data center provider inside product state with access gating",
 test("overview exposes the operating time basis without a separate analysis workspace", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   const overview = read("src/features/data-center/DataOverview.jsx");
-  assert.match(page, /summarizeDataCenterSales/);
+  const domain = read("src/domain/dataCenter.js");
+  assert.doesNotMatch(page, /summarizeDataCenterSales/);
+  assert.match(page, /useDataStandards/);
   assert.match(page, /buildDataQualitySummary/);
   assert.match(page, /overview: <DataOverview/);
   assert.doesNotMatch(page, /DataAnalysis|analysis:/);
@@ -56,8 +58,8 @@ test("overview exposes the operating time basis without a separate analysis work
   assert.match(overview, /净销售额/);
   assert.match(overview, /订单创建时间/);
   assert.match(overview, /截止昨天/);
-  assert.match(overview, /退款率/);
-  assert.match(overview, /毛利率/);
+  assert.match(domain, /退款率/);
+  assert.match(domain, /毛利率/);
   assert.match(overview, /平台贡献/);
   assert.match(overview, /数据健康/);
 });

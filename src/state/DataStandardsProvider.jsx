@@ -36,6 +36,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
   const [results, setResults] = useState([]);
   const [run, setRun] = useState(null);
   const [loading, setLoading] = useState(enabled);
+  const [resultLoading, setResultLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const definitionRequest = useRef(null);
@@ -147,6 +148,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     const controller = new AbortController();
     resultRequest.current = controller;
     const query = { metricCodes, from: range.from, to: range.to };
+    setResultLoading(true);
     try {
       const current = await loadMetricResults(query, fetch, controller.signal);
       const availableCodes = new Set((current.results || []).map(result => result.metricCode));
@@ -173,6 +175,8 @@ export function DataStandardsProvider({ children, enabled = true }) {
     } catch (resultError) {
       if (resultError?.name !== "AbortError") setError(errorState(resultError, "数据口径结果加载失败。"));
       throw resultError;
+    } finally {
+      if (resultRequest.current === controller) setResultLoading(false);
     }
   }, [enabled]);
 
@@ -194,6 +198,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     detail,
     results,
     run,
+    resultLoading,
     loading,
     saving,
     error,
@@ -212,7 +217,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     ensureResults,
     scheduleEnsureResults,
     clearError: () => setError(null)
-  }), [actor.executive, archiveDefinition, canManageDefinition, canWrite, createDefinition, definitions, detail, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, ownerDepartments, previewDefinition, publishVersion, recalculate, results, run, saving, scheduleEnsureResults]);
+  }), [actor.executive, archiveDefinition, canManageDefinition, canWrite, createDefinition, definitions, detail, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, ownerDepartments, previewDefinition, publishVersion, recalculate, resultLoading, results, run, saving, scheduleEnsureResults]);
 
   return <DataStandardsContext.Provider value={value}>{children}</DataStandardsContext.Provider>;
 }

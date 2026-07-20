@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { CORE_DATA_STANDARDS } from "../src/domain/dataStandards.js";
+import { summarizeDataCenterSales } from "../src/domain/dataCenter.js";
 import { compileDataStandard } from "../functions/api/platform/v1/_shared/dataStandardsCompiler.js";
 import { calculateMetricRange, calculateMetricSet } from "../functions/api/platform/v1/_shared/dataStandardsCalculation.js";
 import { onRequest as previewRequest } from "../functions/api/platform/v1/data-standards/preview.js";
@@ -142,6 +143,32 @@ test("the five governed sales metrics calculate from create-time daily facts", a
   assert.equal(results.find(result => result.metricCode === "sales.net_sales").coverageRate, 1);
   assert.ok(db.queries.every(query => query.values.slice(0, 2).join("|") === "2026-07-01|2026-07-19"));
   assert.ok(db.queries.every(query => query.sql.includes("not in ('', '其它', '其他', '未知', '未知平台')")));
+});
+
+test("governed sales results reconcile with the legacy fact summary except intentional null ratios", async () => {
+  const rows = [
+    { date: "2026-07-01", platform: "抖音", qty: 7, sales: 700, netSales: 600, grossProfit: 180, refund: 100, cost: 420 },
+    { date: "2026-07-02", platform: "天猫", qty: 3, sales: 300, netSales: 200, grossProfit: 60, refund: 100, cost: 140 },
+    { date: "2026-07-02", platform: "其它", qty: 99, sales: 9999, netSales: 9999, grossProfit: 9999, refund: 0, cost: 0 }
+  ];
+  const legacy = summarizeDataCenterSales(rows, { from: "2026-07-01", to: "2026-07-02" });
+  const governed = await calculateMetricSet({
+    db: calculationDb({ net_sales: 800, gross_profit: 240, qty: 10, refund: 200, sales: 1000 }),
+    definitions: governedDefinitions(),
+    from: "2026-07-01",
+    to: "2026-07-02"
+  });
+  const values = Object.fromEntries(governed.map(result => [result.metricCode, result.value]));
+  assert.equal(values["sales.net_sales"], legacy.totals.netSales);
+  assert.equal(values["sales.quantity"], legacy.totals.qty);
+  assert.equal(values["sales.gross_profit"], legacy.totals.grossProfit);
+  assert.equal(values["sales.refund_rate"], legacy.totals.refundRate);
+  assert.equal(values["sales.gross_margin_rate"], legacy.totals.grossMarginRate);
+
+  const legacyZero = summarizeDataCenterSales([{ date: "2026-07-01", platform: "抖音", sales: 0, netSales: 0, refund: 10, grossProfit: 10 }], { from: "2026-07-01", to: "2026-07-01" });
+  const governedZero = await calculateMetricSet({ db: calculationDb({ sales: 0, net_sales: 0, refund: 10, gross_profit: 10 }), definitions: governedDefinitions(), from: "2026-07-01", to: "2026-07-01" });
+  assert.equal(legacyZero.totals.refundRate, 0, "legacy summary collapsed a zero denominator to zero");
+  assert.equal(governedZero.find(result => result.metricCode === "sales.refund_rate").value, null, "governed result preserves an invalid ratio as missing");
 });
 
 test("zero denominators and missing rows stay null instead of becoming zero", async () => {

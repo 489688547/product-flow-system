@@ -493,9 +493,9 @@ git commit -m "feat(data): add data standards workspace"
 - Create: `react-tests/data-center-governed-overview.test.mjs`
 - Modify: `react-tests/data-center-app.test.mjs`
 
-- [ ] 8.1 先写失败测试：页面源码不再调用 `summarizeDataCenterSales` 生成 KPI；5 张 KPI 卡按 metricCode 读取结果；空值显示“暂无结果”和原因；覆盖不足显示覆盖率；计算中、失败、重试、版本和截止时间可见；绝不回退到硬编码金额。
+- [x] 8.1 先写失败测试：页面源码不再调用 `summarizeDataCenterSales` 生成 KPI；5 张 KPI 卡按 metricCode 读取结果；空值显示“暂无结果”和原因；覆盖不足显示覆盖率；计算中、失败、重试、版本和截止时间可见；绝不回退到硬编码金额。
 
-- [ ] 8.2 定义固定映射，不在组件内写公式：
+- [x] 8.2 定义固定映射，不在组件内写公式：
 
 ```js
 const OVERVIEW_METRICS = [
@@ -509,15 +509,15 @@ const OVERVIEW_METRICS = [
 
 `DataOverview` 接收 `metricResults`、`metricRun` 和 `retryMetricResults`。金额/百分比格式化必须保留 `null`，不能用 `value || 0`。
 
-- [ ] 8.3 日期范围变化后调用 `ensureResults`；有当前结果立即展示，有运行中的新批次时标注“正在更新”但不拿部分结果替换旧批次。结果无覆盖时显示 `reasonCode` 对应中文说明。
+- [x] 8.3 日期范围变化后调用 `ensureResults`；有当前结果立即展示，有运行中的新批次时标注“正在更新”但不拿部分结果替换旧批次。结果无覆盖时显示 `reasonCode` 对应中文说明。
 
-- [ ] 8.4 经营趋势和平台贡献暂时继续读取事实数据，标题明确它们是“销售事实视图”；五张 KPI 完成共享口径切换。后续要治理趋势/平台维度时复用同一结果 API 的 dimension 参数，不在本任务扩展。
+- [x] 8.4 经营趋势和平台贡献暂时继续读取事实数据，标题明确它们是“销售事实视图”；五张 KPI 完成共享口径切换。后续要治理趋势/平台维度时复用同一结果 API 的 dimension 参数，不在本任务扩展。
 
-- [ ] 8.5 删除生产界面对 `summarizeDataCenterSales` 的 KPI 依赖；该函数若仍被产品详情等真实消费者使用则保留，否则连同过时测试删除。更新 durable docs，明确本次只切 5 个 KPI、趋势/贡献仍是事实维度视图。
+- [x] 8.5 删除生产界面对 `summarizeDataCenterSales` 的 KPI 依赖；该函数若仍被产品详情等真实消费者使用则保留，否则连同过时测试删除。更新 durable docs，明确本次只切 5 个 KPI、趋势/贡献仍是事实维度视图。
 
-- [ ] 8.6 运行对账夹具：相同输入下旧摘要与新引擎 5 项值一致；零分母场景允许差异，旧值 0 必须被新值 `null` 取代并在测试中解释。
+- [x] 8.6 运行对账夹具：相同输入下旧摘要与新引擎 5 项值一致；零分母场景允许差异，旧值 0 必须被新值 `null` 取代并在测试中解释。
 
-- [ ] 8.7 验证和提交：
+- [x] 8.7 验证和提交：
 
 ```bash
 node --test react-tests/data-center-governed-overview.test.mjs react-tests/data-center-app.test.mjs tests/data-standards-calculation.test.mjs
