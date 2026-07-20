@@ -10,14 +10,15 @@ export function productCatalogSyncUrl() {
   return "/api/platform/v1/product-catalog/sync/kuaimai";
 }
 
-async function payloadFor(response, fallback) {
+async function payloadFor(response, fallback, { allowUnsynced = false } = {}) {
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok || payload.synced === false) {
-    const error = new Error(payload.message || fallback);
+  const invalidReadPayload = allowUnsynced && !Array.isArray(payload?.items);
+  if (!response.ok || invalidReadPayload || (!allowUnsynced && payload?.synced === false)) {
+    const error = new Error(payload?.message || fallback);
     error.status = response.status;
-    error.code = payload.error?.code || "PRODUCT_CATALOG_REQUEST_FAILED";
-    error.retryable = Boolean(payload.error?.retryable);
-    error.requestId = payload.error?.requestId || "";
+    error.code = payload?.error?.code || "PRODUCT_CATALOG_REQUEST_FAILED";
+    error.retryable = Boolean(payload?.error?.retryable);
+    error.requestId = payload?.error?.requestId || "";
     throw error;
   }
   return payload;
@@ -25,7 +26,7 @@ async function payloadFor(response, fallback) {
 
 export async function loadProductCatalog(fetchImpl = fetch) {
   const response = await fetchImpl(productCatalogApiUrl());
-  return payloadFor(response, "商品主数据加载失败。");
+  return payloadFor(response, "商品主数据加载失败。", { allowUnsynced: true });
 }
 
 export async function importProductCatalog(input, fetchImpl = fetch) {

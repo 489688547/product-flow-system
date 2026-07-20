@@ -35,6 +35,10 @@ test("catalog UI keeps actionable loading, empty, error and readonly states", ()
   assert.match(workspace, /还没有商品主数据/);
   assert.match(workspace, /没有符合当前筛选条件的商品/);
   assert.match(workspace, /role="alert"/);
+  assert.match(workspace, /const \{[\s\S]*refresh[\s\S]*\} = useProductCatalog\(\)/);
+  assert.match(workspace, /重新加载/);
+  assert.match(workspace, /disabled=\{loading\}/);
+  assert.match(workspace, /onClick=\{\(\) => refresh\(\)\.catch\(\(\) => \{\}\)\}/);
   assert.match(workspace, /disabledReason="仅总经办和运营部可同步商品主数据"/);
 });
 
