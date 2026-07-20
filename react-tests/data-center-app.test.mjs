@@ -67,14 +67,20 @@ test("overview exposes governed metrics while preserving the analysis workspace"
   assert.match(overview, /数据健康/);
 });
 
-test("governance workspaces cover safe sources metrics quality sync services and settings", () => {
+test("governance workspaces merge quality into sync while preserving services and settings", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
   const standards = read("src/features/data-center/data-standards/DataStandardsWorkspace.jsx");
   assert.match(page, /DataSourcesWorkspace/);
   assert.match(page, /DataStandardsWorkspace/);
-  assert.match(page, /DataQualityWorkspace/);
-  assert.match(page, /SyncRunsWorkspace/);
+  assert.doesNotMatch(page, /DataQualityWorkspace/);
+  assert.doesNotMatch(page, /quality:\s*</);
+  assert.match(page, /sync: <SyncRunsWorkspace quality=\{quality\} \/>/);
+  assert.match(workspaces, /export function SyncRunsWorkspace\(\{ quality \}\)/);
+  assert.match(workspaces, /待处理问题[\s\S]*执行记录[\s\S]*待处理数据问题/);
+  assert.doesNotMatch(workspaces, /<h2>同步记录<\/h2>/);
+  assert.match(workspaces, /collaborationDraftFromDataIssue/);
+  assert.match(workspaces, /refresh/);
   assert.match(page, /DataServicesWorkspace/);
   assert.match(page, /DataCenterSettingsWorkspace/);
   assert.match(workspaces, /DataConnectionsWorkspace/);
@@ -101,4 +107,6 @@ test("data center has restrained responsive layouts and visible focus states", (
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
   assert.match(styles, /\.data-analysis-toolbar/);
   assert.match(styles, /\.data-analysis-series/);
+  assert.match(styles, /\.data-sync-status-bar/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.data-sync-status-bar/);
 });

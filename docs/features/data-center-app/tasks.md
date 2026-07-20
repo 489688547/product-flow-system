@@ -4,10 +4,12 @@
 
 ## 2026-07-20 同步记录与数据质量合并
 
-- [ ] 先更新数据中心导航契约测试：左侧不再出现 `data-quality`，旧链接仍映射到 `sync`。
-- [ ] 将质量摘要、执行记录、待处理质量问题按单列顺序合并进“同步记录”，删除独立质量页面组合和重复标题。
-- [ ] 保留 `syncRuns`、`qualityIssues`、权限、协同按钮与刷新行为，不修改 API、D1 或外部平台。
+- [x] 先更新数据中心导航契约测试：左侧不再出现 `data-quality`，旧链接仍映射到 `sync`。
+- [x] 将质量摘要、执行记录、待处理质量问题按单列顺序合并进“同步记录”，删除独立质量页面组合和重复标题。
+- [x] 保留 `syncRuns`、`qualityIssues`、权限、协同按钮与刷新行为，不修改 API、D1 或外部平台。
 - [ ] 验证键盘焦点、空状态、表格横向滚动、1440/900/640/390px 和钉钉 WebView 布局，并执行完整 Definition of Done。
+
+定向验证：`node --test react-tests/data-center-app.test.mjs react-tests/data-center.test.mjs`，14/14 通过。
 
 ## 2026-07-20 数据口径治理与计算
 
