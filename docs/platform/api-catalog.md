@@ -57,7 +57,7 @@
 
 兼容策略：数据中心不复制销售事实，继续复用 `product_sales_daily`。本地开发没有 D1 时，元数据写入 `.local-data/data-center-state.json`，销售读取返回 501 并由前端降级到现有浏览器销售仓库；销售行不会写入 `localStorage`。
 
-本地线上账号：`npm start` 使用 Vite 热更新，并由 `wrangler pages dev` 代理全部 `/api/*`；`wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程生产 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1`、`LOCAL_ONLINE_ACCOUNT_MODE=1`、服务端个人令牌有效且对应 active executive 时，中间件才注入真实组织会话。GET/HEAD 要求 `read`，其他方法要求 `write`；通过后所有业务数据和钉钉、快麦动作继续执行各自正式路由权限。非本地主机即使误配开关和令牌也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
+本地线上账号：`npm start` 使用 8127 Vite 热更新，并把全部 `/api/*` 代理给 8132 `wrangler pages dev`；`wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程生产 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1`、`LOCAL_ONLINE_ACCOUNT_MODE=1`、服务端个人令牌有效且对应 active executive 时，中间件才注入真实组织会话。GET/HEAD 要求 `read`，其他方法要求 `write`；通过后所有业务数据和钉钉、快麦动作继续执行各自正式路由权限。非本地主机即使误配开关和令牌也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
 
 ### 公司 AI 总助契约
 

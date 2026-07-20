@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HOST = "127.0.0.1";
-const VITE_PORT = 8132;
-const APP_PORT = 8127;
+const VITE_PORT = 8127;
+const PAGES_PORT = 8132;
 const ENV_FILE = resolve(ROOT, ".env");
 const children = new Set();
 let stopping = false;
@@ -16,8 +16,8 @@ function executable(name) {
   return resolve(ROOT, "node_modules", ".bin", process.platform === "win32" ? `${name}.cmd` : name);
 }
 
-function startChild(name, command, args) {
-  const child = spawn(command, args, { cwd: ROOT, env: process.env, stdio: "inherit" });
+function startChild(name, command, args, env = process.env) {
+  const child = spawn(command, args, { cwd: ROOT, env, stdio: "inherit" });
   children.add(child);
   child.once("exit", (code, signal) => {
     children.delete(child);
@@ -77,16 +77,19 @@ async function main() {
     throw new Error("缺少本地 .env，请先配置个人令牌和平台连接。");
   }
   console.log("正在启动本地代码 · 线上真实环境...");
-  startChild("Vite", executable("vite"), ["--host", HOST, "--port", String(VITE_PORT)]);
-  await waitForPort(VITE_PORT);
   startChild("Wrangler", executable("wrangler"), [
     "pages", "dev",
-    "--proxy", String(VITE_PORT),
-    "--port", String(APP_PORT),
+    "--port", String(PAGES_PORT),
     "--ip", HOST,
     "--live-reload"
   ]);
-  console.log(`请打开 http://${HOST}:${APP_PORT}/`);
+  await waitForPort(PAGES_PORT);
+  startChild("Vite", executable("vite"), ["--host", HOST, "--port", String(VITE_PORT)], {
+    ...process.env,
+    VITE_API_TARGET: `http://${HOST}:${PAGES_PORT}`
+  });
+  await waitForPort(VITE_PORT);
+  console.log(`请打开 http://${HOST}:${VITE_PORT}/`);
   console.log("当前使用线上真实账号、生产数据和外部平台，所有操作立即生效。");
 }
 

@@ -12,7 +12,7 @@
 
 ## 决策
 
-- `npm start` 是唯一支持的完整本地业务运行时，同时启动 Vite 与 Wrangler Pages Functions，并由 8127 提供单一访问地址。
+- `npm start` 是唯一支持的完整本地业务运行时，同时启动 Vite 与 Wrangler Pages Functions；8127 的 Vite 提供单一浏览器入口和热更新，`/api` 代理到内部 8132 Wrangler。
 - Wrangler 远程绑定生产 D1，并从被忽略的 `.env` 加载个人令牌；原始令牌不得进入浏览器、仓库、响应或日志。
 - API 中间件只在回环主机和 `LOCAL_ONLINE_ACCOUNT_MODE=1` 时校验令牌哈希、read/write 能力及 `product_flow_org_members` 中的 active executive 稳定身份。
 - 校验成功后注入真实组织会话，所有数据和钉钉、快麦动作继续走部署后相同的业务路由、角色、版本、幂等、审计和提供商权限。

@@ -567,4 +567,42 @@ test("organization sync persists the active employee cache", async () => {
   assert.equal(db.dumpMembers().length, 1);
   assert.equal(db.dumpMembers()[0].department, "总经办");
   assert.equal(db.dumpMembers()[0].active, 1);
+  assert.equal(db.calls.filter(call => call.type === "batch").length, 1);
+});
+
+test("organization sync never downgrades an explicitly elevated executive account", async () => {
+  const db = createAuthD1Mock();
+  const baseUser = {
+    userId: "user-1",
+    unionId: "union-1",
+    name: "周荣庆",
+    title: "总经理",
+    departmentNames: ["总经办"],
+    active: true
+  };
+
+  await upsertOrgMembers(db, { users: [{ ...baseUser, role: "executive" }] }, "ding-company");
+  await upsertOrgMembers(db, { users: [{ ...baseUser, role: "ops" }] }, "ding-company");
+
+  assert.equal(db.dumpMembers()[0].role, "executive");
+});
+
+test("a partial organization snapshot never deactivates an explicitly elevated executive account", async () => {
+  const db = createAuthD1Mock();
+  await upsertOrgMembers(db, {
+    users: [{
+      userId: "user-1",
+      unionId: "union-1",
+      name: "周荣庆",
+      departmentNames: ["总经办"],
+      role: "executive",
+      active: true
+    }]
+  }, "ding-company");
+
+  await upsertOrgMembers(db, { users: [] }, "ding-company");
+  const deactivation = db.calls.filter(call => call.type === "run" && /UPDATE product_flow_org_members SET active = 0/i.test(call.sql)).at(-1);
+
+  assert.match(deactivation.sql, /role <> 'executive'/);
+  assert.equal(db.dumpMembers()[0].active, 1);
 });

@@ -15,10 +15,12 @@ test("the standard local launcher supervises Vite and Pages Functions behind one
   assert.equal(packageJson.scripts.start, "node scripts/start-local-online.mjs");
   assert.match(launcher, /spawn/);
   assert.match(launcher, /waitForPort/);
-  assert.match(launcher, /8132/);
+  assert.match(launcher, /const VITE_PORT = 8127/);
+  assert.match(launcher, /const PAGES_PORT = 8132/);
   assert.match(launcher, /pages[",\s]+"dev/);
-  assert.match(launcher, /"--proxy", String\(VITE_PORT\)/);
-  assert.match(launcher, /"--port", String\(APP_PORT\)/);
+  assert.match(launcher, /VITE_API_TARGET.*PAGES_PORT/s);
+  assert.match(launcher, /"--port", String\(PAGES_PORT\)/);
+  assert.doesNotMatch(launcher, /"--proxy"/);
   assert.match(launcher, /resolve\(ROOT, "\.env"\)/);
   assert.match(launcher, /existsSync\(ENV_FILE\)/);
   assert.match(launcher, /SIGINT/);

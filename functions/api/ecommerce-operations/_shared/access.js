@@ -4,8 +4,12 @@ export function department(session = {}) {
   return String(session.department || session.departmentName || "").trim();
 }
 
+function isExecutive(session = {}) {
+  return session.role === "executive" || department(session).split("/").map(value => value.trim()).includes("总经办");
+}
+
 export function canViewOperations(session) {
-  return VIEW_DEPARTMENTS.has(department(session));
+  return isExecutive(session) || VIEW_DEPARTMENTS.has(department(session));
 }
 
 export function canViewOperationsEvidence(session) {
@@ -21,7 +25,7 @@ export function isOperationsMember(session) {
 }
 
 export function isDepartmentManager(session) {
-  return department(session) === "总经办" || /主管|经理|总监|负责人/.test(String(session?.title || ""));
+  return isExecutive(session) || /主管|经理|总监|负责人/.test(String(session?.title || ""));
 }
 
 export function actor(session = {}) {
@@ -29,7 +33,7 @@ export function actor(session = {}) {
 }
 
 export function filterOperationsStateForSession(state, session = {}) {
-  if (department(session) === "总经办") return state;
+  if (isExecutive(session)) return state;
   if (isOperationsManager(session)) return state;
   const user = actor(session); const dept = department(session);
   if (dept === "运营部") {

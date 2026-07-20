@@ -9,6 +9,10 @@ function department(session = {}) {
   return String(session.department || session.departmentName || "").trim();
 }
 
+function isExecutive(session = {}) {
+  return session.role === "executive" || department(session).split("/").map(value => value.trim()).includes("总经办");
+}
+
 function errorResponse(message, status, code, retryable = false) {
   const requestId = globalThis.crypto?.randomUUID?.() || `req_${Date.now().toString(36)}`;
   return jsonResponse({ synced: false, message, error: { code, message, requestId, retryable } }, status);
@@ -50,7 +54,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (request.method !== "GET") return errorResponse("Method not allowed", 405, "VALIDATION_METHOD_NOT_ALLOWED");
   if (!data.session) return errorResponse("请先使用钉钉登录。", 401, "AUTH_SESSION_REQUIRED");
-  if (!VIEW_DEPARTMENTS.has(department(data.session))) return errorResponse("当前部门无权读取销售数据。", 403, "PERMISSION_VIEW_DENIED");
+  if (!isExecutive(data.session) && !VIEW_DEPARTMENTS.has(department(data.session))) return errorResponse("当前部门无权读取销售数据。", 403, "PERMISSION_VIEW_DENIED");
 
   const url = new URL(request.url);
   const from = String(url.searchParams.get("from") || "");

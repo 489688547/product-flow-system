@@ -11,6 +11,7 @@
 - Require status checks to pass before merging。
 - 必需检查选择 `quality`。
 - Require branches to be up to date before merging。
+- `quality` 内的 `npm run check:branch-base` 也必须通过，旧分支没有包含最新 `origin/main` 时直接失败。
 - Require review from Code Owners。
 - Block force pushes。
 - Block branch deletion。
@@ -26,4 +27,3 @@
 ## 规则变更
 
 降低保护强度、移除检查或更改 CODEOWNERS 都必须通过 PR 说明原因、影响和恢复方式。远程规则变化同时更新本文件，避免仓库设置与代码约定漂移。
-

@@ -115,7 +115,10 @@ test("pull requests run required repository quality gates", () => {
   const pkg = JSON.parse(read("package.json"));
   const workflow = read(".github/workflows/quality.yml");
   assert.equal(pkg.scripts["audit:dependencies"], "npm audit --audit-level=low");
+  assert.equal(pkg.scripts["check:branch-base"], "node scripts/check-branch-base.mjs");
+  assert.equal(existsSync(resolve(root, "scripts/check-branch-base.mjs")), true);
   assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /npm run check:branch-base/);
   assert.match(workflow, /npm ci/);
   assert.match(workflow, /npm run audit:dependencies/);
   assert.match(workflow, /npm run lint/);
@@ -125,4 +128,5 @@ test("pull requests run required repository quality gates", () => {
   assert.match(read(".github/pull_request_template.md"), /PRD/);
   assert.match(read(".github/CODEOWNERS"), /AGENTS\.md/);
   assert.match(read(".github/BRANCH_PROTECTION.md"), /Require branches to be up to date/);
+  assert.match(read(".agents/skills/feature-workflow/SKILL.md"), /git fetch origin main/);
 });

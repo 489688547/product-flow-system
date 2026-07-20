@@ -15,6 +15,12 @@ export function createAuthD1Mock() {
 
   return {
     calls,
+    async batch(statements) {
+      calls.push({ type: "batch", size: statements.length });
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
     prepare(sql) {
       const normalized = normalizeSql(sql);
       const statement = {
@@ -64,8 +70,17 @@ export function createAuthD1Mock() {
             const [lastSeenAt, idHash] = statement.values;
             const row = sessions.get(idHash);
             if (row) row.last_seen_at = lastSeenAt;
+          } else if (normalized.startsWith("update product_flow_org_members set active = 0")) {
+            const [syncedAt, corpId] = statement.values;
+            for (const row of members.values()) {
+              if (row.corp_id !== corpId) continue;
+              if (row.role === "executive" && normalized.includes("role <> 'executive'")) continue;
+              row.active = 0;
+              row.synced_at = syncedAt;
+            }
           } else if (normalized.startsWith("insert into product_flow_org_members")) {
             const [corpId, userId, unionId, name, department, title, role, active, syncedAt] = statement.values;
+            const current = members.get(memberKey(corpId, userId));
             members.set(memberKey(corpId, userId), {
               corp_id: corpId,
               user_id: userId,
@@ -73,7 +88,7 @@ export function createAuthD1Mock() {
               name,
               department,
               title,
-              role,
+              role: current?.role === "executive" && normalized.includes("product_flow_org_members.role = 'executive'") ? "executive" : role,
               active,
               synced_at: syncedAt
             });

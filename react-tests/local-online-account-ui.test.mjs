@@ -30,5 +30,6 @@ test("every app shows the real account when local code is operating online", () 
   assert.match(styles, /\.local-online-environment/);
   assert.match(styles, /@media \(max-width: 760px\)/);
   assert.match(styles, /overflow-wrap:\s*anywhere/);
+  assert.match(styles, /@media \(max-width: 900px\)[\s\S]*?\.topbar\s*\{[^}]*position:\s*static/);
   assert.doesNotMatch(styles, /\.local-online-environment[^}]*position:\s*fixed/s);
 });

@@ -4,7 +4,7 @@
 
 **Goal:** Run local code with the product owner's real production identity, data, and external-provider permissions while keeping the personal token server-only and localhost-only.
 
-**Architecture:** Wrangler Pages Dev is the complete local backend and proxies Vite for hot frontend updates. API middleware validates the ignored local personal token against remote production D1, injects the real organization member as a normal session, then lets every existing API route apply the same business and provider rules used after deployment.
+**Architecture:** Wrangler Pages Dev is the complete local backend while Vite is the single browser entry and proxies `/api` to Wrangler for hot frontend updates. API middleware validates the ignored local personal token against remote production D1, injects the real organization member as a normal session, then lets every existing API route apply the same business and provider rules used after deployment.
 
 **Tech Stack:** React 19, Vite, Cloudflare Pages Functions, Wrangler, Cloudflare D1, Node test runner.
 
@@ -93,11 +93,11 @@ Commit: `feat(auth): use real account in local online mode`
 
 **Interfaces:**
 - Produces: `npm start` and the Finder launcher at `http://127.0.0.1:8127`.
-- Consumes: local `.env`, Vite port 8132, Wrangler proxy port 8127.
+- Consumes: local `.env`, Vite browser port 8127, Wrangler Pages Functions port 8132.
 
 - [ ] **Step 1: Write the failing launcher contract**
 
-Assert the parent script starts Vite on 8132, waits for that port, starts `wrangler pages dev --proxy 8132 --port 8127`, requires the ignored root `.env` that Wrangler loads into Pages Functions, forwards termination, and that `npm start` points to the script.
+Assert the parent script starts Wrangler Pages Dev on 8132, waits for that port, starts Vite on 8127 with `VITE_API_TARGET` pointing to Wrangler, requires the ignored root `.env` that Wrangler loads into Pages Functions, forwards termination, and that `npm start` points to the script.
 
 - [ ] **Step 2: Run the launcher test and confirm RED**
 
