@@ -31,7 +31,7 @@
   - 提交：`fix(deploy): keep Pages releases version-consistent`。
   - 证据：聚焦测试 4/4；`npm run build` 后入口内容一致，`dist/_headers` 与 `dist/_redirects` 存在且规则正确。
 
-- [ ] 任务 3：生产验证与规则写回
+- [x] 任务 3：生产验证与规则写回
   - 依赖：任务 2。
   - 文件：`docs/platform/architecture.md`、任务证据。
   - 输入：完整分支和生产部署。
@@ -40,4 +40,4 @@
   - 实现步骤：全量门禁 → 生成发布包 → 部署 → HTTP/浏览器/控制台验证。
   - 验证：仓库 Definition of Done 与生产读验证。
   - 提交：随事故修复提交记录。
-  - 当前证据：旧分支完整门禁已通过；最终证据必须在最新 `main` 基线部署后补齐。
+  - 证据：在最新 `main` 基线上整合 AI 总助后，lint、治理、集成、环境检查、完整前端/API 测试和构建均通过；生产部署 `3093d9ee` 的入口、主 JS/CSS 与三个受保护 API 均返回预期状态。Chrome 登录态确认 AI 总助服务可用、11 个数据域、Enter 发送成功、数据 Skill 返回带来源答案且控制台 0 错误。
