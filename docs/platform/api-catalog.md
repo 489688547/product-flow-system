@@ -57,7 +57,7 @@
 
 兼容策略：数据中心不复制销售事实，继续复用 `product_sales_daily`。本地开发没有 D1 时，元数据写入 `.local-data/data-center-state.json`，销售读取返回 501 并由前端降级到现有浏览器销售仓库；销售行不会写入 `localStorage`。
 
-远程只读预览：`wrangler pages dev` 通过 `wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1` 且显式设置 `LOCAL_LIVE_D1_PREVIEW=1` 时，中间件才注入总经办预览身份；该模式只允许 GET，所有写请求返回 403。非本地主机即使设置同名变量也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
+本地线上账号：`npm start` 使用 8127 Vite 热更新，并把全部 `/api/*` 代理给 8132 `wrangler pages dev`；`wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程生产 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1`、`LOCAL_ONLINE_ACCOUNT_MODE=1`、服务端个人令牌有效且对应 active executive 时，中间件才注入真实组织会话。GET/HEAD 要求 `read`，其他方法要求 `write`；通过后所有业务数据和钉钉、快麦动作继续执行各自正式路由权限。非本地主机即使误配开关和令牌也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
 
 ### 公司 AI 总助契约
 
@@ -73,7 +73,7 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 兼容策略：`AI_ASSISTANT_ENABLED` 默认关闭，关闭时状态接口返回 `enabled:false`，聊天接口返回 `AI_DISABLED`，不要求 D1 或 Provider Secret。Provider 未通过 Function Calling 合成测试时，服务端从当前身份已授权的注册表按问题路由最多三个只读 Skill；命中时 `meta.skillsEnabled=true`、`meta.skillMode=server`，未命中时使用服务端摘要并标记 `summary`。原生工具模式标记为 `provider`。回滚只需关闭开关；AI 元数据、外发策略和无内容审计表保留，不影响其他业务 App。电商运营旧 AI 点评本期保持原路由和规则降级，不属于该共享 API 的调用方。
 
-本地 Node 预览只实现 AI 状态和 Provider 的 GET 安全投影，允许查看功能是否配置，不读取线上 D1，也不调用模型。Provider 更新、连接测试和聊天统一返回 `AI_LOCAL_PREVIEW_READ_ONLY`；本地环境变量值永不进入响应。真实链路必须在正式 Pages Functions 会话与 D1 边界分别验收。
+旧 Node 预览只保留为非完整兼容工具，不属于支持的业务开发入口。标准 `npm start` 运行 Pages Functions，因此 AI 状态、Provider 和聊天按真实线上会话与现有功能开关执行；本地环境变量值仍不得进入响应。部署后的生产链路必须另行验收，不能用本地成功替代。
 
 ### 店铺运营与绩效契约
 

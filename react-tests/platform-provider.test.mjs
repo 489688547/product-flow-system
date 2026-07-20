@@ -72,9 +72,10 @@ test("product task assignment survives a DingTalk sync failure", () => {
   assert.match(catchBlock, /executorNames/);
 });
 
-test("local executive preview has a stable demo union id", () => {
+test("authenticated identity always comes from the server session", () => {
   const auth = read("src/state/AuthProvider.jsx");
-  assert.match(auth, /userId: "u-zhou"/);
-  assert.match(auth, /unionId: "union-zhou"/);
-  assert.match(auth, /name: "周荣庆"/);
+  assert.match(auth, /user: result\.user/);
+  assert.doesNotMatch(auth, /userId:\s*"u-/);
+  assert.doesNotMatch(auth, /unionId:\s*"union-/);
+  assert.doesNotMatch(auth, /name:\s*"周荣庆"/);
 });

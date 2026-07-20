@@ -3,7 +3,7 @@ pages_build_output_dir = "./dist"
 compatibility_date = "2026-07-18"
 
 [vars]
-LOCAL_LIVE_D1_PREVIEW = "1"
+LOCAL_ONLINE_ACCOUNT_MODE = "1"
 
 [[d1_databases]]
 binding = "PRODUCT_FLOW_DB"

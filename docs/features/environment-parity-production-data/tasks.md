@@ -1,70 +1,44 @@
-# 环境一致性与生产数据访问执行任务
+# 本地线上账号一致性执行任务
 
 ## 执行规则
 
 - 每项任务只交付一个可独立验证的结果。
 - 先写失败测试并确认失败原因，再写实现。
 - 完成后记录实际验证命令和结果。
-- 每次提交只包含当前任务文件。
+- 不以自动化验收名义创建无业务意义的真实钉钉或快麦动作。
 
 ## 任务
 
-- [x] 环境能力清单与兼容生成模块
+- [x] 真实本地会话鉴权
   - 依赖：无。
-  - 文件：`docs/platform/environment-capabilities.json`、`scripts/generate-platform-manifests.mjs`、`functions/api/platform/_generated/`、`tests/environment-capabilities.test.mjs`、`package.json`。
-  - 输入：集成注册表平台 ID 与已确认环境需求。
-  - 输出：`validateEnvironmentCapabilities`、Wrangler 兼容 JS 模块和 `check:environment-capabilities`。
-  - 失败测试：`node --test tests/environment-capabilities.test.mjs`，预期缺少模块或校验函数。
-  - 实现步骤：先验证 schema 与平台引用，再生成确定性模块，最后把漂移检查加入质量脚本。
-  - 验证：`node --test tests/environment-capabilities.test.mjs` 2/2 通过；`npm run check:environment-capabilities` 通过且重复生成无 diff。
-  - 提交：`feat: define environment capability contract`。
+  - 文件：`tests/dingtalk-web-auth.test.mjs`、`tests/production-data-access.test.mjs`、`functions/api/platform/_shared/productionDataAccess.js`、`functions/api/_middleware.js`。
+  - 失败测试：真实身份字段、GET read、POST write、只读令牌拒绝写、无令牌失败、非本地域名不绕过。
+  - 输出：`local-online-account` 标准会话；无硬编码身份和无统一只读拦截。
+  - 验证：`node --test tests/production-data-access.test.mjs tests/dingtalk-web-auth.test.mjs`，34/34 通过。
 
-- [x] 脱敏环境就绪 API
-  - 依赖：环境能力清单。
-  - 文件：`functions/api/platform/_shared/environmentReadiness.js`、`functions/api/platform/v1/environment-readiness.js`、`tests/environment-readiness-api.test.mjs`。
-  - 输入：生成的能力清单、当前 `env` 与员工会话。
-  - 输出：标准 `environment readiness` 响应。
-  - 失败测试：未登录、缺失变量、D1 表缺失和完全就绪场景先失败。
-  - 实现步骤：实现环境识别、变量/绑定/表检查、脱敏响应和错误码。
-  - 验证：环境清单与就绪 API 聚焦测试 6/6 通过；ESLint 静默通过。
-  - 提交：`feat: expose environment readiness`。
+- [x] 唯一完整本地启动入口
+  - 依赖：真实本地会话鉴权。
+  - 文件：`tests/local-online-start.test.mjs`、`scripts/start-local-online.mjs`、`package.json`、`启动服务.command`、`.env.example`、`wrangler.toml`。
+  - 失败测试：标准命令必须同时包含 8127 Vite 用户入口、8132 Pages Functions 后端、`/api` 代理、`.env` 服务端加载和进程清理。
+  - 输出：双击或 `npm start` 均运行与线上相同的 Functions 和远程 D1。
+  - 验证：`node --test tests/local-online-start.test.mjs` 2/2 通过；Vite 8127 与 Wrangler 8132 启动成功，8127 页面使用 Vite 热更新并通过 Wrangler 取得真实 `.env` 会话。
 
-- [x] 生产数据受控网关
-  - 依赖：就绪 API。
-  - 文件：`functions/api/platform/_shared/productionDataAccess.js`、`functions/api/platform/v1/production-write-session.js`、`functions/api/platform/v1/production-data/state.js`、`functions/api/state.js`、`functions/api/_middleware.js`、`tests/production-data-access.test.mjs`。
-  - 输入：个人访问令牌、最高权限身份、写入原因、确认短语和基线版本。
-  - 输出：实时读取、15 分钟解锁、冲突保护、快照、审计和回滚。
-  - 失败测试：原始令牌不落库、错误账号/无解锁/过期/冲突被拒绝，有效写入和回滚成功。
-  - 实现步骤：先建表和鉴权，再实现解锁，最后接入状态快照、审计和回滚。
-  - 验证：受控网关与共享状态聚焦测试 10/10 通过；完整 API 测试 115/115 通过；ESLint 静默通过。
-  - 提交：`feat: guard production data writes`。
+- [x] 真实环境可见性
+  - 依赖：真实本地会话鉴权。
+  - 文件：`react-tests/local-online-account-ui.test.mjs`、`react-tests/local-dev-login.test.mjs`、`src/state/AuthProvider.jsx`、`src/ui/LocalOnlineEnvironmentBanner.jsx`、`src/App.jsx`、全局 CSS。
+  - 失败测试：不存在硬编码 LOCAL_USER；真实本地会话显示全局警示；生产会话不显示；390px 无横向溢出规则。
+  - 输出：所有页面明确显示本地代码、线上真实环境、账号和立即生效。
+  - 验证：`node --test react-tests/local-online-account-ui.test.mjs` 2/2、ESLint 和生产构建通过；真实账号在 1440、1024、390px 均无横向溢出，移动端账号按钮不再遮挡环境提示。
 
-- [x] 本地生产数据代理与外部动作隔离
-  - 依赖：生产数据网关。
-  - 文件：`server/productionDataClient.mjs`、`server.mjs`、`src/state/stateApi.js`、`tests/local-production-data-client.test.mjs`。
-  - 输入：被忽略 `.env` 中的生产 API URL 和个人访问令牌。
-  - 输出：本地同源 `/api/state` 真实读写及本地解锁代理；外部写操作默认阻断。
-  - 失败测试：读取转发、解锁令牌不下发浏览器、写入携带解锁、无配置降级、外部动作阻断。
-  - 实现步骤：实现 Node 客户端，再接入本地路由，最后移除浏览器直连生产 API。
-  - 验证：本地代理与生产网关聚焦测试 11/11 通过；ESLint 静默通过。
-  - 提交：`feat: connect local tests to production data`。
+- [x] 长期规则反写
+  - 依赖：前三项。
+  - 文件：`AGENTS.md`、`.agents/skills/environment-parity/SKILL.md`、`docs/platform/environment-capabilities.json`、`docs/platform/integration-registry.json`、`docs/platform/architecture.md`、`docs/platform/api-catalog.md`、`docs/platform/middleware.md`、`docs/platform/integrations.md`、`docs/platform/environment-readiness.md`、`docs/platform/error-codes.md`、`docs/decisions/2026-07-20-local-online-account.md`、生成模块。
+  - 失败测试：环境变量漂移、旧只读规则、旧外部动作阻断或缺少路由声明时门禁失败。
+  - 输出：所有分支可执行地继承同一环境、集成和 Skill 规则；旧分支未包含最新 `origin/main` 时 CI 直接失败。
+  - 验证：生成模块、环境能力、治理、集成和 `check:branch-base` 全绿；环境与治理聚焦测试通过，受支持运行时的旧只读与外部动作阻断规则 0 命中。
 
-- [x] 说明书环境状态界面
-  - 依赖：就绪 API、本地代理。
-  - 文件：`docs/platform/environment-readiness.md`、`src/state/environmentReadinessApi.js`、`src/features/handbook/EnvironmentReadinessPanel.jsx`、`src/features/handbook/environment-readiness.css`、`src/features/handbook/HandbookPage.jsx`、`react-tests/environment-readiness-ui.test.mjs`。
-  - 输入：标准就绪、解锁和审计响应。
-  - 输出：中文状态卡、红色解锁提示、回滚入口和完整页面状态。
-  - 失败测试：专用文档路由、加载/错误/阻断/解锁/无权限文案和响应式规则先失败。
-  - 实现步骤：先 API 客户端和纯展示，再解锁/回滚交互，最后响应式与无障碍。
-  - 验证：UI/API/本地代理聚焦测试 14/14 通过；ESLint 与生产构建通过；视觉宽度检查在发布任务执行。
-  - 提交：`feat: show environment readiness in handbook`。
-
-- [x] 治理、发布与生产验收
+- [ ] 完整验收、合并与部署
   - 依赖：全部功能任务。
-  - 文件：`AGENTS.md`、`docs/platform/*.md`、`docs/decisions/2026-07-18-production-data-access.md`、`.github/workflows/quality.yml`、`CLOUDFLARE_PAGES.md`、`scripts/check-deployed-readiness.mjs`。
-  - 输入：环境契约、平台能力、生产部署地址和当前指定账号。
-  - 输出：跨分支门禁、生产令牌签发、部署与可验证运行状态。
-  - 失败测试：治理检查发现共享能力未登记、部署检查发现生产阻断项时失败。
-  - 实现步骤：更新 durable docs 和 CI，执行完整门禁，生成并签发令牌，合并 `main`，部署后检查与可回滚写入验收。
-  - 验证：Definition of Done 全绿；PR #9 质量门禁与 Cloudflare Pages 部署通过；生产就绪接口 4/4 能力就绪；真实写入与回滚各生成 1 条成功审计且验证标记已移除；1440px 与 390px 页面无横向溢出。
-  - 提交：`docs: govern environment parity releases`。
+  - 文件：仅当前功能与发布产物。
+  - 验证：合并前 Definition of Done 全绿（React 446/446、API 275/275）；本地真实 executive 身份、生产 D1、钉钉待办读取、快麦连接与四个核心业务 API 已通过，生产域名与部署就绪证据在 main 合并部署后补充。
+  - 输出：合并到 `main` 并部署，生产现有登录行为不变。

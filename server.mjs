@@ -641,11 +641,11 @@ async function handleProductionRollback(req, res) {
   }
 }
 
-function blockExternalAction(res) {
-  json(res, 409, {
+function requireLocalOnlineRuntime(res) {
+  json(res, 501, {
     synced: false,
-    message: "测试环境只允许修改数据库，不能执行真实外部平台操作。",
-    error: { code: "EXTERNAL_ACTION_DISABLED_IN_TEST" }
+    message: "旧 Node 预览不提供真实外部操作，请通过 npm start 运行完整 Pages Functions。",
+    error: { code: "LOCAL_ONLINE_RUNTIME_REQUIRED" }
   });
 }
 
@@ -999,7 +999,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/kuaimai/refresh" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/kuaimai/pull" && req.method === "GET") {
@@ -1023,15 +1023,15 @@ const server = http.createServer(async (req, res) => {
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/create" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/todo/sync" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/create" && req.method === "POST") {
-    blockExternalAction(res);
+    requireLocalOnlineRuntime(res);
     return;
   }
   if (url.pathname === "/api/dingtalk/calendar/events" && req.method === "POST") {

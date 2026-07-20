@@ -94,12 +94,11 @@ export async function upsertOrgMembers(db, org = {}, corpId = "") {
   await ensureAuthTables(db);
   const normalizedCorpId = String(corpId || org.corpId || "");
   const syncedAt = String(org.syncedAt || new Date().toISOString());
-  await db.prepare("UPDATE product_flow_org_members SET active = 0, synced_at = ? WHERE corp_id = ?")
-    .bind(syncedAt, normalizedCorpId)
-    .run();
+  const statements = [db.prepare("UPDATE product_flow_org_members SET active = 0, synced_at = ? WHERE corp_id = ? AND role <> 'executive'")
+    .bind(syncedAt, normalizedCorpId)];
   for (const user of Array.isArray(org.users) ? org.users : []) {
     if (!user.userId) continue;
-    await db.prepare(`INSERT INTO product_flow_org_members (
+    statements.push(db.prepare(`INSERT INTO product_flow_org_members (
       corp_id, user_id, union_id, name, department, title, role, active, synced_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(corp_id, user_id) DO UPDATE SET
@@ -107,7 +106,10 @@ export async function upsertOrgMembers(db, org = {}, corpId = "") {
       name = excluded.name,
       department = excluded.department,
       title = excluded.title,
-      role = excluded.role,
+      role = CASE
+        WHEN product_flow_org_members.role = 'executive' THEN 'executive'
+        ELSE excluded.role
+      END,
       active = excluded.active,
       synced_at = excluded.synced_at`).bind(
       normalizedCorpId,
@@ -119,8 +121,13 @@ export async function upsertOrgMembers(db, org = {}, corpId = "") {
       String(user.role || "readonly"),
       user.active === false ? 0 : 1,
       syncedAt
-    ).run();
+    ));
   }
+  if (typeof db.batch === "function") {
+    await db.batch(statements);
+    return;
+  }
+  for (const statement of statements) await statement.run();
 }
 
 export function sessionCookie(token) {

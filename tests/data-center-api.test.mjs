@@ -79,6 +79,24 @@ function createD1Mock() {
 
 const executive = { name: "周总", userId: "u-1", role: "executive", department: "总经办" };
 
+test("executive role can view data center with multi-department organization data", async () => {
+  const response = await onDataCenterRequest({
+    request: new Request("https://flow.example.com/api/data-center"),
+    env: { PRODUCT_FLOW_DB: createD1Mock() },
+    data: { session: { ...executive, department: "总经办 / 运营部 / 品牌部" } }
+  });
+  assert.equal(response.status, 200);
+});
+
+test("executive role can read sales with multi-department organization data", async () => {
+  const response = await onSalesRequest({
+    request: new Request("https://flow.example.com/api/data-center/sales?from=2026-07-01&to=2026-07-20"),
+    env: { PRODUCT_FLOW_DB: createD1Mock() },
+    data: { session: { ...executive, department: "总经办 / 运营部 / 品牌部" } }
+  });
+  assert.equal(response.status, 200);
+});
+
 test("data center API requires a session, allowed department and D1", async () => {
   const missingSession = await onDataCenterRequest({ request: new Request("https://flow.example.com/api/data-center"), env: {}, data: {} });
   assert.equal(missingSession.status, 401);

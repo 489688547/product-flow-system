@@ -70,9 +70,8 @@ function parseCapabilities(value) {
   }
 }
 
-export async function authorizeProductionAccess(request, db, { capability = "read", now = new Date() } = {}) {
+export async function authorizeProductionToken(rawToken, db, { capability = "read", now = new Date() } = {}) {
   await ensureProductionAccessTables(db);
-  const rawToken = bearerToken(request);
   if (!rawToken) throw productionAccessError("缺少生产数据个人令牌。", 401, "PRODUCTION_TOKEN_REQUIRED");
   const tokenHash = await hashSecret(rawToken);
   const row = await db.prepare(`SELECT token_hash, user_id, union_id, name, capabilities, expires_at, revoked_at
@@ -84,7 +83,7 @@ export async function authorizeProductionAccess(request, db, { capability = "rea
   if (!capabilities.includes(capability)) {
     throw productionAccessError("当前个人令牌没有所需的生产数据能力。", 403, "PRODUCTION_CAPABILITY_REQUIRED");
   }
-  const identity = await db.prepare(`SELECT user_id, union_id, name, role, active
+  const identity = await db.prepare(`SELECT corp_id, user_id, union_id, name, department, title, role, active
     FROM product_flow_org_members WHERE user_id = ?`).bind(row.user_id).first();
   if (!identity || !identity.active || identity.union_id !== row.union_id || identity.role !== "executive") {
     throw productionAccessError("当前钉钉身份不再具备生产数据最高权限。", 403, "PRODUCTION_ROLE_REQUIRED");
@@ -95,10 +94,18 @@ export async function authorizeProductionAccess(request, db, { capability = "rea
   return {
     tokenHash,
     capabilities,
+    corpId: identity.corp_id || "",
     userId: row.user_id,
     unionId: row.union_id,
-    name: row.name || identity.name || row.user_id
+    name: identity.name || row.name || row.user_id,
+    department: identity.department || "",
+    title: identity.title || "",
+    role: identity.role
   };
+}
+
+export async function authorizeProductionAccess(request, db, options = {}) {
+  return authorizeProductionToken(bearerToken(request), db, options);
 }
 
 export function validateUnlockInput(input = {}) {

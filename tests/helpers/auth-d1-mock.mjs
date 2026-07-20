@@ -6,6 +6,7 @@ export function createAuthD1Mock() {
   const sessions = new Map();
   const members = new Map();
   const dingTokens = new Map();
+  const productionTokens = new Map();
   const calls = [];
 
   function memberKey(corpId, userId) {
@@ -14,6 +15,12 @@ export function createAuthD1Mock() {
 
   return {
     calls,
+    async batch(statements) {
+      calls.push({ type: "batch", size: statements.length });
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    },
     prepare(sql) {
       const normalized = normalizeSql(sql);
       const statement = {
@@ -63,8 +70,17 @@ export function createAuthD1Mock() {
             const [lastSeenAt, idHash] = statement.values;
             const row = sessions.get(idHash);
             if (row) row.last_seen_at = lastSeenAt;
+          } else if (normalized.startsWith("update product_flow_org_members set active = 0")) {
+            const [syncedAt, corpId] = statement.values;
+            for (const row of members.values()) {
+              if (row.corp_id !== corpId) continue;
+              if (row.role === "executive" && normalized.includes("role <> 'executive'")) continue;
+              row.active = 0;
+              row.synced_at = syncedAt;
+            }
           } else if (normalized.startsWith("insert into product_flow_org_members")) {
             const [corpId, userId, unionId, name, department, title, role, active, syncedAt] = statement.values;
+            const current = members.get(memberKey(corpId, userId));
             members.set(memberKey(corpId, userId), {
               corp_id: corpId,
               user_id: userId,
@@ -72,7 +88,7 @@ export function createAuthD1Mock() {
               name,
               department,
               title,
-              role,
+              role: current?.role === "executive" && normalized.includes("product_flow_org_members.role = 'executive'") ? "executive" : role,
               active,
               synced_at: syncedAt
             });
@@ -87,6 +103,9 @@ export function createAuthD1Mock() {
             });
           } else if (normalized.startsWith("delete from product_flow_ding_user_tokens")) {
             dingTokens.delete(statement.values[0]);
+          } else if (normalized.startsWith("update production_data_access_tokens set last_used_at")) {
+            const row = productionTokens.get(statement.values[1]);
+            if (row) row.last_used_at = statement.values[0];
           }
 
           return { success: true };
@@ -97,6 +116,9 @@ export function createAuthD1Mock() {
             return sessions.get(statement.values[0]) || null;
           }
           if (normalized.includes("from product_flow_org_members")) {
+            if (normalized.includes("where user_id = ?")) {
+              return [...members.values()].find(row => row.user_id === statement.values[0]) || null;
+            }
             if (normalized.includes("where corp_id = ? and union_id = ?")) {
               return [...members.values()].find(row => row.corp_id === statement.values[0] && row.union_id === statement.values[1]) || null;
             }
@@ -104,6 +126,9 @@ export function createAuthD1Mock() {
           }
           if (normalized.includes("from product_flow_ding_user_tokens")) {
             return dingTokens.get(statement.values[0]) || null;
+          }
+          if (normalized.includes("from production_data_access_tokens")) {
+            return productionTokens.get(statement.values[0]) || null;
           }
           return null;
         },
@@ -122,6 +147,9 @@ export function createAuthD1Mock() {
     },
     dumpDingTokens() {
       return [...dingTokens.values()].map(row => ({ ...row }));
+    },
+    seedProductionAccess(row) {
+      productionTokens.set(row.token_hash, { ...row });
     },
     setDingTokenExpires(idHash, expiresAt) {
       const row = dingTokens.get(idHash);
