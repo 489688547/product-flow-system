@@ -31,10 +31,29 @@
   - 输出：安全的一次性统一配置和后续复核入口。
   - 验证：保险箱远程查询 0 行；聚焦测试 6/6 通过；本地、Preview、Production 已设置同一主密钥，Preview 已补齐钉钉和快麦 Secret；远程一致性检查通过。
 
-- [ ] 分支和未提交内容清单及备份
+- [x] 分支和未提交内容清单及备份
   - 依赖：无。
   - 范围：全部本地分支、工作树、唯一提交和 dirty 文件。
   - 输出：外部备份与逐项整合结论；原工作树保持可恢复。
+  - 验证：Cloudflare 兼容工作树的 tracked patch 已在提交 `6f324a7` 的干净临时工作树通过 `git apply --check`；未跟踪测试归档可列出。数据中心原 dirty 内容已由其工作树提交到 `6d2e514`，原工作树现为干净，额外归档保留为恢复副本。
+
+## 整合清单
+
+| 来源 | 唯一提交 | 决策 | 当前证据 |
+|---|---:|---|---|
+| 本机分叉 `main` | 13 | integrated 待执行 | goods flow、盘点和现金周期提交仍未进入 `origin/main` |
+| `codex/data-center-app` | 45 | integrated 待执行 | 最新提交 `6d2e514`，工作树干净 |
+| `codex/product-catalog-data-hub` | 1 | integrated 待执行 | ERP 产品目录功能 |
+| `codex/fix-dingtalk-supplier-categories` | 1 | integrated 待执行 | `.DS_Store` 排除 |
+| `codex/hotfix-supply-sync-limit` | 1 | integrated 待执行 | 审批同步批处理修复 |
+| `codex/supply-chain-management-app` | 3 | integrated 待执行 | `.impeccable/` 个人工具目录排除 |
+| `codex/sync-dingtalk-suppliers` | 2 | integrated 待执行 | `.DS_Store` 排除 |
+| `codex/company-strategy-platform` | 1 | equivalent_in_main 待核对 | D1 大状态分片修复 |
+| `codex/stale-chunk-recovery` | 2 | equivalent_in_main 待核对 | 部署旧 chunk 恢复及 CI 元数据 |
+| `codex/release-brand-content-assets` | 1 | discarded_non_product_artifact 待重建 | 仅历史发布资产 |
+| `codex/cloudflare-wrangler3-compat` 未提交内容 | patch + test | integrated 待核对 | 外部备份 SHA-256 `27d266b6ac5709bb0de26c8e5bc522e094513197bf3ebf390dff66dcd8333b7c` |
+
+备份目录：`/Users/roger/Documents/product-flow-system-branch-backups/2026-07-20/`。备份不进入 Git，原工作树仍保留。
 
 - [ ] 供应链与钉钉相关分支整合
   - 依赖：分支备份。
