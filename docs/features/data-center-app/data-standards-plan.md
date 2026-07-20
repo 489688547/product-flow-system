@@ -564,15 +564,15 @@ git commit -m "fix(data): preserve metric migration boundaries"
 - Modify: `docs/features/data-center-app/prd.md`
 - Modify only files required by verification findings
 
-- [ ] 10.1 逐项核对 11 条验收标准、API 错误、权限矩阵、迁移、容量和回滚。更新 `tasks.md` 的实际提交、测试数和未执行边界；把 PRD 状态改为“已实现，待生产发布”仅限全部本地门禁通过后。
+- [x] 10.1 逐项核对 11 条验收标准、API 错误、权限矩阵、迁移、容量和回滚。更新 `tasks.md` 的实际提交、测试数和未执行边界；把 PRD 状态改为“已实现，待生产发布”仅限全部本地门禁通过后。
 
-- [ ] 10.2 运行新功能定向测试：
+- [x] 10.2 运行新功能定向测试：
 
 ```bash
 node --test react-tests/data-standards-domain.test.mjs react-tests/data-standards-api-client.test.mjs react-tests/data-standards-provider.test.mjs react-tests/data-standards-ui.test.mjs react-tests/data-center-governed-overview.test.mjs tests/data-standards-storage.test.mjs tests/data-standards-api.test.mjs tests/data-standards-calculation.test.mjs tests/data-standards-results-api.test.mjs tests/data-standards-compatibility.test.mjs
 ```
 
-- [ ] 10.3 运行项目 Definition of Done，任何失败都先修复再重跑完整命令：
+- [x] 10.3 运行项目 Definition of Done，任何失败都先修复再重跑完整命令：
 
 ```bash
 npm run lint
@@ -583,7 +583,7 @@ npm test
 npm run build
 ```
 
-- [ ] 10.4 运行文本和差异检查：
+- [x] 10.4 运行文本和差异检查：
 
 ```bash
 git diff --check
@@ -593,7 +593,7 @@ git status --short
 
 `指标管理` 和 `MetricDefinitionsWorkspace` 在生产 UI 中应为 0 命中；测试迁移说明中的历史词可以保留，但必须可解释。计划不得残留 `TODO`、`TBD` 或占位实现。
 
-- [ ] 10.5 启动本地页面，分别检查 1440、900、640、390px：层级、间距、对齐、卡片/表格切换、弹窗、键盘、焦点、Esc、空/错/禁用/无权限/版本冲突/计算中/数据未覆盖/重算失败状态、控制台错误和页面横向溢出。记录本地没有 D1 时的 501 是边界，不把它写成生产已接通。
+- [x] 10.5 启动本地页面，分别检查 1440、900、640、390px：层级、间距、对齐、卡片/表格切换、弹窗、键盘、焦点、Esc、空/错/禁用/无权限/版本冲突/计算中/数据未覆盖/重算失败状态、控制台错误和页面横向溢出。记录本地没有 D1 时的 501 是边界，不把它写成生产已接通。
 
 - [ ] 10.6 在有授权的独立发布窗口执行迁移前备份、Preview 迁移、只读对账、Production 迁移、结果生成和读取切换。部署后分别运行：
 
