@@ -9,10 +9,10 @@
 
 ## 任务
 
-- [ ] 领域模型
+- [x] 领域模型
   - 文件：`src/domain/userInsights.js`、`react-tests/user-insights-domain.test.mjs`。
   - 输出：状态标准化、平台可比性、覆盖率、类目确认、规则复制、竞品转换、建议降级。
-  - 验证：领域测试覆盖正常、缺失、越界和版本场景。
+  - 验证：`node --test react-tests/user-insights-domain.test.mjs`，7/7 通过；覆盖正常、缺失、越界和版本场景。
 
 - [ ] D1 迁移与存储
   - 文件：`migrations/0005_user_insights.sql`、`functions/api/platform/v1/user-insights/_shared/*`、迁移/API 测试。
