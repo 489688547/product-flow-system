@@ -6,11 +6,13 @@ import { onRequest as onImportRequest } from "../functions/api/platform/v1/produ
 function createD1Mock() {
   const items = new Map();
   const skus = new Map();
+  const components = new Map();
   const runs = new Map();
   const meta = new Map();
   return {
     items,
     skus,
+    components,
     runs,
     meta,
     prepare(sql) {
@@ -24,6 +26,11 @@ function createD1Mock() {
           } else if (/insert into product_catalog_skus/i.test(sql)) {
             const [id, itemId, source, sourceSkuId, merchantSkuCode, barcode, payload, active, syncedAt, updatedAt, updatedBy] = statement.values;
             skus.set(id, { id, item_id: itemId, source, source_sku_id: sourceSkuId, merchant_sku_code: merchantSkuCode, barcode, payload, active, synced_at: syncedAt, updated_at: updatedAt, updated_by: updatedBy });
+          } else if (/insert into product_catalog_components/i.test(sql)) {
+            const [id, parentItemId, source, componentCode, ratio, payload, syncedAt, updatedAt, updatedBy] = statement.values;
+            components.set(id, { id, parent_item_id: parentItemId, source, component_code: componentCode, ratio, payload, synced_at: syncedAt, updated_at: updatedAt, updated_by: updatedBy });
+          } else if (/delete from product_catalog_components where parent_item_id/i.test(sql)) {
+            for (const [id, row] of components) if (row.parent_item_id === statement.values[0]) components.delete(id);
           } else if (/insert into product_catalog_sync_runs/i.test(sql)) {
             const [id, source, mode, status, payload, startedAt, completedAt, updatedBy] = statement.values;
             runs.set(id, { id, source, mode, status, payload, started_at: startedAt, completed_at: completedAt, updated_by: updatedBy });
@@ -38,6 +45,7 @@ function createD1Mock() {
         async all() {
           if (/from product_catalog_items/i.test(sql)) return { results: [...items.values()] };
           if (/from product_catalog_skus/i.test(sql)) return { results: [...skus.values()] };
+          if (/from product_catalog_components/i.test(sql)) return { results: [...components.values()] };
           if (/from product_catalog_sync_runs/i.test(sql)) return { results: [...runs.values()] };
           return { results: [] };
         },
@@ -73,6 +81,17 @@ const importPayload = {
     name: "发财毛毡",
     brand: "提野星",
     skus: [{ sourceSkuId: "2001", merchantSkuCode: "FCMZ-01", barcode: "6978705011208", purchasePrice: 9.5, salePrice: 19.9 }]
+  }]
+};
+
+const bundlePayload = {
+  source: "kuaimai",
+  items: [{
+    sourceProductId: "2001",
+    merchantCode: "2DGZZ",
+    name: "单个慕斯粽子*2",
+    type: "2",
+    components: [{ outerId: "1111", inventoryUnitCode: "1111", ratio: 2, purchasePrice: 2.5 }]
   }]
 };
 
@@ -120,6 +139,25 @@ test("purchase cost is visible only to finance, supply and executives", async ()
 
   const financeResponse = await onCatalogRequest({ request: request("/api/platform/v1/product-catalog"), env: { PRODUCT_FLOW_DB: db }, data: { session: finance } });
   assert.equal((await financeResponse.json()).items[0].skus[0].purchasePrice, 9.5);
+});
+
+test("component relationships replace by parent and redact component costs", async () => {
+  const db = createD1Mock();
+  await onImportRequest({ request: request("/api/platform/v1/product-catalog/import", "POST", bundlePayload), env: { PRODUCT_FLOW_DB: db }, data: { session: admin } });
+  assert.equal(db.components.size, 1);
+
+  const updated = structuredClone(bundlePayload);
+  updated.items[0].components[0].ratio = 3;
+  await onImportRequest({ request: request("/api/platform/v1/product-catalog/import", "POST", updated), env: { PRODUCT_FLOW_DB: db }, data: { session: admin } });
+  assert.equal(db.components.size, 1);
+
+  const productResponse = await onCatalogRequest({ request: request("/api/platform/v1/product-catalog"), env: { PRODUCT_FLOW_DB: db }, data: { session: productUser } });
+  const productPayload = await productResponse.json();
+  assert.equal(productPayload.items[0].components[0].ratio, 3);
+  assert.equal(productPayload.items[0].components[0].purchasePrice, undefined);
+
+  const financeResponse = await onCatalogRequest({ request: request("/api/platform/v1/product-catalog"), env: { PRODUCT_FLOW_DB: db }, data: { session: finance } });
+  assert.equal((await financeResponse.json()).items[0].components[0].purchasePrice, 2.5);
 });
 
 test("invalid imports do not replace the last valid catalog", async () => {

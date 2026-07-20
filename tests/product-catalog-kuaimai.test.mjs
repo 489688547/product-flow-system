@@ -113,22 +113,47 @@ test("keeps detail failures safe and resumable", async () => {
 function createD1Mock() {
   const items = new Map();
   const skus = new Map();
+  const components = new Map();
+  const runs = new Map();
   const meta = new Map();
   return {
     items,
+    components,
     meta,
     prepare(sql) {
       const statement = {
         values: [],
         bind(...values) { statement.values = values; return statement; },
         async run() {
-          if (/insert into product_catalog_items/i.test(sql)) items.set(statement.values[0], { id: statement.values[0] });
-          else if (/insert into product_catalog_skus/i.test(sql)) skus.set(statement.values[0], { id: statement.values[0] });
+          if (/insert into product_catalog_items/i.test(sql)) {
+            const [id, source, sourceProductId, merchantCode, name, payload, active, present, syncedAt, updatedAt, updatedBy] = statement.values;
+            items.set(id, { id, source, source_product_id: sourceProductId, merchant_code: merchantCode, name, payload, active, present_in_source: present, synced_at: syncedAt, updated_at: updatedAt, updated_by: updatedBy });
+          } else if (/insert into product_catalog_skus/i.test(sql)) {
+            const [id, itemId, source, sourceSkuId, merchantSkuCode, barcode, payload, active, syncedAt, updatedAt, updatedBy] = statement.values;
+            skus.set(id, { id, item_id: itemId, source, source_sku_id: sourceSkuId, merchant_sku_code: merchantSkuCode, barcode, payload, active, synced_at: syncedAt, updated_at: updatedAt, updated_by: updatedBy });
+          } else if (/insert into product_catalog_components/i.test(sql)) {
+            const [id, parentItemId, source, componentCode, ratio, payload, syncedAt, updatedAt, updatedBy] = statement.values;
+            components.set(id, { id, parent_item_id: parentItemId, source, component_code: componentCode, ratio, payload, synced_at: syncedAt, updated_at: updatedAt, updated_by: updatedBy });
+          } else if (/delete from product_catalog_components where parent_item_id/i.test(sql)) {
+            for (const [id, row] of components) if (row.parent_item_id === statement.values[0]) components.delete(id);
+          } else if (/insert into product_catalog_sync_runs/i.test(sql)) {
+            const [id, source, mode, status, payload, startedAt, completedAt, updatedBy] = statement.values;
+            runs.set(id, { id, source, mode, status, payload, started_at: startedAt, completed_at: completedAt, updated_by: updatedBy });
+          }
           else if (/insert into product_catalog_meta/i.test(sql)) meta.set(statement.values[0], statement.values[1]);
           return { success: true };
         },
-        async all() { return { results: [] }; },
-        async first() { return null; }
+        async all() {
+          if (/from product_catalog_items/i.test(sql)) return { results: [...items.values()] };
+          if (/from product_catalog_skus/i.test(sql)) return { results: [...skus.values()] };
+          if (/from product_catalog_components/i.test(sql)) return { results: [...components.values()] };
+          if (/from product_catalog_sync_runs/i.test(sql)) return { results: [...runs.values()] };
+          return { results: [] };
+        },
+        async first() {
+          if (/from product_catalog_meta/i.test(sql)) return meta.has(statement.values[0]) ? { value: meta.get(statement.values[0]) } : null;
+          return null;
+        }
       };
       return statement;
     },
@@ -151,6 +176,56 @@ test("sync endpoint validates editor and only commits a complete pull", async ()
     assert.equal(payload.counts.products, 1);
     assert.equal(db.items.size, 1);
     assert.ok(db.meta.get("lastSuccessfulSyncAt"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("sync endpoint reads and persists bundle component ratios", async () => {
+  const db = createD1Mock();
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (_url, options) => {
+      const params = new URLSearchParams(options.body);
+      calls.push(Object.fromEntries(params.entries()));
+      if (params.get("method") === "item.list.query") {
+        return new Response(JSON.stringify({
+          success: true,
+          total: 1,
+          items: [{ sysItemId: 2, outerId: "2DGZZ", title: "单个慕斯粽子*2", type: "2", items: [] }]
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      return new Response(JSON.stringify({
+        success: true,
+        item: {
+          sysItemId: 2,
+          outerId: "2DGZZ",
+          title: "单个慕斯粽子*2",
+          type: "2",
+          suitSingleList: [{ outerId: "1111", ratio: 2, purchasePrice: 2.5 }]
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const response = await onRequest({
+      request: new Request("https://flow.example.com/api/platform/v1/product-catalog/sync/kuaimai", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cursor: 0 })
+      }),
+      env: { PRODUCT_FLOW_DB: db, KUAIMAI_APP_KEY: "app", KUAIMAI_APP_SECRET: "secret", KUAIMAI_ACCESS_TOKEN: "token" },
+      data: { session: { name: "数据管理员", role: "executive", department: "总经办" } }
+    });
+    const payload = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(payload.complete, true);
+    assert.equal(payload.nextCursor, null);
+    assert.equal(payload.progress.totalCandidates, 1);
+    assert.equal(payload.progress.components, 1);
+    assert.equal(db.components.size, 1);
+    assert.equal(JSON.parse([...db.components.values()][0].payload).inventoryUnitCode, "1111");
+    assert.deepEqual(calls.map(call => call.method), ["item.list.query", "item.single.get"]);
   } finally {
     globalThis.fetch = originalFetch;
   }

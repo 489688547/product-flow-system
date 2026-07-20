@@ -21,11 +21,12 @@
   - 输出：`item.single.get` 分批详情、游标、失败摘要。
   - 验证：`node --test tests/product-catalog-kuaimai.test.mjs`。
   - 结果：6/6 通过；仅筛选组合候选，单批最多 30 条，失败返回安全摘要并保留游标。
-- [ ] 组件 D1 存储与同步 API
+- [x] 组件 D1 存储与同步 API
   - 依赖：快麦详情适配。
   - 文件：`migrations/0006_product_catalog_components.sql`、商品目录存储/同步 API、API 测试。
   - 输出：组件关系持久化、覆盖率、部分成功兼容。
   - 验证：`node --test tests/product-catalog-api.test.mjs tests/product-catalog-kuaimai.test.mjs`。
+  - 结果：13/13 通过；组合详情按父商品替换，成本按角色脱敏，同步接口返回游标、进度和失败摘要。
 - [ ] 商品主数据 UI 与同步进度
   - 依赖：同步 API。
   - 文件：商品目录客户端、Provider、工作区和 React 测试。

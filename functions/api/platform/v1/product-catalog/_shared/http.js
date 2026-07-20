@@ -39,7 +39,8 @@ export function filterCatalogCosts(items = [], session = {}) {
   if (canViewCatalogCost(session)) return items;
   return items.map(item => ({
     ...item,
-    skus: (item.skus || []).map(({ purchasePrice: _purchasePrice, wholesalePrice: _wholesalePrice, ...sku }) => sku)
+    skus: (item.skus || []).map(({ purchasePrice: _purchasePrice, wholesalePrice: _wholesalePrice, ...sku }) => sku),
+    components: (item.components || []).map(({ purchasePrice: _purchasePrice, ...component }) => component)
   }));
 }
 

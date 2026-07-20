@@ -241,7 +241,10 @@ export function normalizeCatalogPayload(input = {}) {
       salesBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "sales_barcode").length,
       internalUniqueCodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "internal_unique").length,
       nonStandardBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "internal_unique").length,
-      missingBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "missing").length
+      missingBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "missing").length,
+      bundles: normalized.filter(item => item.productKind === "bundle").length,
+      components: normalized.reduce((sum, item) => sum + (item.components || []).length, 0),
+      componentCoveredItems: normalized.filter(item => item.productKind === "bundle" && item.components?.length).length
     }
   };
 }
