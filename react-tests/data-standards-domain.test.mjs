@@ -264,3 +264,35 @@ test("only trusted unavailable-source normalization can preserve data-not-covere
   assert.equal(uncovered.coverageStatus, "DATA_NOT_COVERED");
   assert.equal(uncovered.executable, false);
 });
+
+test("field validation ignores inherited registry entries", () => {
+  assert.deepEqual(validateFormulaAst({ type: "field", field: "toString" }), {
+    ok: false,
+    code: "DATA_STANDARD_FIELD_UNKNOWN"
+  });
+});
+
+test("filter validation ignores inherited registry entries", () => {
+  assert.deepEqual(validateFormulaAst({
+    type: "aggregate",
+    operation: "sum",
+    input: { type: "field", field: "sales.net_sales" },
+    filters: [{ field: "toString", operation: "equals", value: "injected" }]
+  }), {
+    ok: false,
+    code: "DATA_STANDARD_FIELD_UNKNOWN"
+  });
+});
+
+test("arithmetic rejects onZero outside division", () => {
+  assert.deepEqual(validateFormulaAst({
+    type: "arithmetic",
+    operation: "add",
+    left: { type: "field", field: "sales.net_sales" },
+    right: { type: "field", field: "sales.net_sales" },
+    onZero: "return arbitraryCode()"
+  }), {
+    ok: false,
+    code: "DATA_STANDARD_INVALID"
+  });
+});

@@ -130,12 +130,19 @@ function fieldRegistry(context = {}) {
   return context.factFieldRegistry || FACT_FIELD_REGISTRY;
 }
 
+function registeredFactField(registry, field) {
+  if (registry instanceof Map) return registry.get(field) || null;
+  if (!registry || typeof registry !== "object" || !Object.hasOwn(registry, field)) return null;
+  const definition = registry[field];
+  return definition && typeof definition === "object" ? definition : null;
+}
+
 function validateFilters(filters, context) {
   if (!Array.isArray(filters)) return validationFailure("DATA_STANDARD_INVALID");
   const registry = fieldRegistry(context);
   for (const filter of filters) {
     if (!filter || typeof filter !== "object" || !hasOnlyKeys(filter, ["field", "operation", "value"])
-      || typeof filter.field !== "string" || !registry[filter.field]) {
+      || typeof filter.field !== "string" || !registeredFactField(registry, filter.field)) {
       return validationFailure("DATA_STANDARD_FIELD_UNKNOWN");
     }
     if (!FILTER_OPERATIONS.has(filter.operation)) return validationFailure("DATA_STANDARD_INVALID");
@@ -161,7 +168,7 @@ function validateNode(ast, context) {
   if (!ast || typeof ast !== "object" || Array.isArray(ast)) return validationFailure("DATA_STANDARD_INVALID");
   if (ast.type === "field") {
     if (!hasOnlyKeys(ast, ["type", "field"])) return validationFailure("DATA_STANDARD_INVALID");
-    const field = fieldRegistry(context)[ast.field];
+    const field = registeredFactField(fieldRegistry(context), ast.field);
     return field ? result(true, { unit: field.unit, executable: true }) : validationFailure("DATA_STANDARD_FIELD_UNKNOWN");
   }
   if (ast.type === "metric") {
@@ -202,7 +209,8 @@ function validateNode(ast, context) {
     if (!left.ok) return left;
     const right = validateNode(ast.right, context);
     if (!right.ok) return right;
-    if (ast.operation === "divide" && ast.onZero !== "null") return validationFailure("DATA_STANDARD_INVALID");
+    if (ast.operation === "divide" && (!Object.hasOwn(ast, "onZero") || ast.onZero !== "null")) return validationFailure("DATA_STANDARD_INVALID");
+    if (ast.operation !== "divide" && Object.hasOwn(ast, "onZero")) return validationFailure("DATA_STANDARD_INVALID");
     const combined = combineUnits(ast.operation, left.unit, right.unit);
     return combined.ok ? result(true, { ...combined, executable: left.executable && right.executable }) : combined;
   }
@@ -296,7 +304,7 @@ export function normalizeDataStandardDraft(input = {}, trustedContext = {}) {
   const period = cleanText(safeInput.period, 20);
   const category = cleanText(safeInput.category, 40);
   const sourceFields = Array.isArray(safeInput.sourceFields) ? safeInput.sourceFields.map(field => cleanText(field, 120)).filter(Boolean) : [];
-  const sourceFieldValidation = sourceFields.every(field => fieldRegistry(trustedContext)[field])
+  const sourceFieldValidation = sourceFields.every(field => registeredFactField(fieldRegistry(trustedContext), field))
     ? null
     : validationFailure("DATA_STANDARD_FIELD_UNKNOWN");
   const allowsUncoveredSourceCoverage = trustedContext.allowUncoveredSourceCoverage === true && category === "goods_flow";
