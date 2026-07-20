@@ -203,7 +203,7 @@ const environmentCapabilities = {
     {
       "id": "kuaimai-sales-sync",
       "name": "快麦销售同步",
-      "description": "快麦订单拉取、会话刷新和销售聚合所需配置。",
+      "description": "按订单创建时间拉取快麦订单、刷新会话并保存销售日聚合所需配置。",
       "platforms": [
         "kuaimai",
         "cloudflare-d1"
@@ -222,13 +222,14 @@ const environmentCapabilities = {
         "PRODUCT_FLOW_DB"
       ],
       "tables": [
-        "product_sales_daily"
+        "product_sales_daily",
+        "product_sales_meta"
       ]
     },
     {
       "id": "product-catalog-storage",
       "name": "共享商品主数据",
-      "description": "数据中心、产品全周期和供应链共用的 ERP 商品、SKU、69 码与同步批次存储。",
+      "description": "数据中心、产品全周期和供应链共用的 ERP 商品、SKU、69 码与同步批次存储；商品经营视图读取已落库销售日聚合。",
       "platforms": [
         "cloudflare-pages",
         "cloudflare-d1",
@@ -247,7 +248,9 @@ const environmentCapabilities = {
         "product_catalog_items",
         "product_catalog_skus",
         "product_catalog_sync_runs",
-        "product_catalog_meta"
+        "product_catalog_meta",
+        "product_sales_daily",
+        "product_sales_meta"
       ]
     },
     {

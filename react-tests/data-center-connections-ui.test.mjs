@@ -59,21 +59,35 @@ test("connector dialog is schema driven and treats OTP as instructions", () => {
   assert.doesNotMatch(dialog, /localStorage|sessionStorage|indexedDB/);
 });
 
-test("data connections workspace separates business connectors from internal vault", () => {
+test("data connections workspace organizes ecommerce ERP and company data", () => {
   const workspace = read("src/features/data-center/connections/DataConnectionsWorkspace.jsx");
+  const tabs = read("src/features/data-center/connections/DataAccessTabs.jsx");
+  const erp = read("src/features/data-center/connections/ErpAccessWorkspace.jsx");
+  const company = read("src/features/data-center/connections/CompanyDataWorkspace.jsx");
   const vault = read("src/features/data-center/connections/InternalVaultWorkspace.jsx");
-  assert.match(workspace, /经营数据连接器/);
-  assert.match(workspace, /内部系统保险箱/);
+  assert.match(workspace, /DataAccessTabs/);
+  assert.match(workspace, /ErpAccessWorkspace/);
+  assert.match(workspace, /CompanyDataWorkspace/);
+  assert.match(tabs, /DATA_ACCESS_CATEGORIES/);
   assert.match(workspace, /ConnectorCatalog/);
   assert.match(workspace, /ConnectorConfigDialog/);
-  assert.match(workspace, /InternalVaultWorkspace/);
   assert.match(workspace, /saveConnection/);
   assert.match(workspace, /saveVaultItem/);
+  assert.match(erp, /kuaimai-erp/);
+  assert.match(company, /InternalVaultWorkspace/);
+  assert.match(company, /PlatformConnectionsWorkspace/);
   assert.match(vault, /INTERNAL_VAULT_TYPES/);
   for (const text of ["NAS", "邮箱", "财务系统", "政务 / SaaS", "自定义内部系统"]) assert.match(vault, new RegExp(text));
   assert.match(vault, /查看与复制全程留痕/);
   assert.match(vault, /查看加密凭证/);
   assert.match(vault, /setTimeout[\s\S]*60000/);
+});
+
+test("read-only users cannot open connector or ERP sync editors", () => {
+  const catalog = read("src/features/data-center/connections/ConnectorCatalog.jsx");
+  const erp = read("src/features/data-center/connections/ErpAccessWorkspace.jsx");
+  assert.match(catalog, /<button[^>]*aria-label=\{`管理\$\{instance\.name\}`\}[^>]*disabled=\{!canEdit\}[^>]*>/);
+  assert.match(erp, /<button[^>]*key=\{instance\.id\}[^>]*disabled=\{!canEdit\}[^>]*>[\s\S]*管理同步/);
 });
 
 test("legacy generic source form is removed and security copy is updated", () => {

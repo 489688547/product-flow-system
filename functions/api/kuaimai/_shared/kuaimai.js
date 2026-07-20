@@ -122,9 +122,21 @@ function round2(value) {
   return Math.round(value * 100) / 100;
 }
 
+function kuaimaiDate(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = typeof value === "number" || /^\d{11,}$/.test(String(value)) ? Number(value) : NaN;
+  const date = Number.isFinite(numeric)
+    ? new Date(numeric)
+    : /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(value))
+      ? new Date(`${String(value).replace(" ", "T")}+08:00`)
+      : new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+}
+
 // 把订单里的子订单聚合成 69码×日×平台 的日行（与Excel导入同一个存储结构）。
 // 口径说明：API的订单接口没有净销售额/退款金额明细，sales/netSales 先取买家已付，
-// 毛利=已付−成本；退款字段留0，等每月Excel重导时整月覆盖校准。
+// 毛利=已付−成本；统计日固定使用快麦 created（下单时间），退款字段留0，
+// 等每月Excel重导时整月覆盖校准。
 export function createOrderAggregator(shopPlatformMap = new Map()) {
   const buckets = new Map();
   const titles = {};
@@ -133,17 +145,17 @@ export function createOrderAggregator(shopPlatformMap = new Map()) {
   return {
     addOrder(order) {
       orders += 1;
-      const payDate = order?.payTime ? new Date(order.payTime) : null;
+      const orderCreatedDate = kuaimaiDate(order?.created);
       const platform = shopPlatformMap.get(String(order?.userId ?? "")) || "其它";
       (order?.orders || []).forEach(child => {
         if (child?.isCancel === 1) return;
         const code = String(child?.sysOuterId || "").trim();
-        const childPayDate = child?.payTime ? new Date(child.payTime) : payDate;
-        if (!CODE_PATTERN.test(code) || !childPayDate || Number.isNaN(childPayDate.valueOf())) {
+        const childCreatedDate = kuaimaiDate(child?.created) || orderCreatedDate;
+        if (!CODE_PATTERN.test(code) || !childCreatedDate) {
           skippedItems += 1;
           return;
         }
-        const date = gmt8Timestamp(childPayDate).slice(0, 10);
+        const date = gmt8Timestamp(childCreatedDate).slice(0, 10);
         const key = `${code}|${date}|${platform}`;
         const bucket = buckets.get(key) || { code, date, platform, qty: 0, sales: 0, netSales: 0, grossProfit: 0, refund: 0, cost: 0, preShipRefund: 0, postShipRefund: 0 };
         const payment = toAmount(child.payment);
@@ -181,7 +193,7 @@ export async function pullKuaimaiDay(config, { date, pageNo = 1, maxPages = 8 },
   let hasNext = false;
   while (pagesFetched < maxPages) {
     const payload = await callKuaimai("erp.trade.list.query", {
-      timeType: "pay_time",
+      timeType: "created",
       startTime: `${date} 00:00:00`,
       endTime: `${date} 23:59:59`,
       pageNo: page,

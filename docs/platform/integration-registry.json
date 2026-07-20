@@ -27,18 +27,18 @@
       "id": "kuaimai",
       "name": "快麦开放平台",
       "status": "connected",
-      "summary": "按天拉取订单并聚合销售，同时分页读取 ERP 商品主数据并与商品档案文件互补合并。",
+      "summary": "按订单创建时间逐日拉取订单并聚合销售，同时分页读取 ERP 商品主数据并与商品档案文件互补合并；商品视图按平台和日期关联两类已落库事实。",
       "capabilities": ["订单拉取", "商品目录同步", "会话刷新", "销售日聚合", "连接状态检查", "平台连接配置"],
       "businessQuestions": ["快麦连接失败", "订单同步缺失", "ERP 商品或 69 码未同步", "销售数据未落库", "本地如何触发真实同步", "刷新令牌失败", "月度数据校准", "API 与商品档案覆盖不同"],
       "keywords": ["快麦", "Kuaimai", "订单同步", "销售数据", "ERP", "开放平台"],
-      "codePaths": ["functions/api/kuaimai/**", "functions/api/platform/v1/product-catalog.js", "functions/api/platform/v1/product-catalog/**", "functions/api/sales.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/domain/productCatalog.js", "src/state/ProductCatalogProvider.jsx", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "src/features/settings/KuaimaiSyncSettings.jsx", "src/state/salesStore.js", "server.mjs"],
+      "codePaths": ["functions/api/kuaimai/**", "functions/api/platform/v1/product-catalog.js", "functions/api/platform/v1/product-catalog/**", "functions/api/sales.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/domain/productCatalog.js", "src/domain/productCatalogSales.js", "src/state/ProductCatalogProvider.jsx", "src/state/productCatalogApi.js", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "src/features/settings/KuaimaiSyncSettings.jsx", "src/state/salesStore.js", "server.mjs"],
       "envVars": ["KUAIMAI_APP_KEY", "KUAIMAI_APP_SECRET", "KUAIMAI_ACCESS_TOKEN", "KUAIMAI_REFRESH_TOKEN"],
       "domains": ["open.kuaimai.com", "api.kuaimai.com", "scm.superboss.cc"],
       "apiRoutes": ["/api/kuaimai/", "/api/sales", "/api/platform/v1/platform-connections", "/api/platform/v1/product-catalog", "/api/platform/v1/product-catalog/import", "/api/platform/v1/product-catalog/sync/kuaimai"],
       "publicDocs": [
         { "label": "快麦开放平台 API 文档", "url": "https://open.kuaimai.com/docs/" }
       ],
-      "evidence": ["functions/api/kuaimai/", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/product-catalog/sync/kuaimai.js", "src/domain/productCatalog.js", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "src/features/settings/KuaimaiSyncSettings.jsx"],
+      "evidence": ["functions/api/kuaimai/", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/product-catalog/sync/kuaimai.js", "functions/api/platform/v1/product-catalog/_shared/sales.js", "src/domain/productCatalog.js", "src/domain/productCatalogSales.js", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "src/features/settings/KuaimaiSyncSettings.jsx"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "stores-sales-and-product-catalog", "description": "快麦订单日聚合与共享商品目录分别写入 D1。" },
         { "platformId": "erp-file-import", "type": "reconciled-by", "description": "销售文件校准月度事实，商品档案文件补齐 API 未返回的规格、69 码和供应商字段。" }

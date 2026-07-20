@@ -42,18 +42,20 @@ test("gmt8 timestamp is formatted as yyyy-MM-dd HH:mm:ss in Asia/Shanghai", () =
 test("order aggregator groups child orders into daily product rows", () => {
   const shopMap = new Map([["101", "天猫"], ["102", "拼多多"]]);
   const aggregator = createOrderAggregator(shopMap);
-  const payTime = new Date("2026-07-12T04:00:00Z").getTime(); // 上海时间 7-12 12:00
+  const created = new Date("2026-07-12T04:00:00Z").getTime(); // 上海时间 7-12 12:00
+  const payTime = new Date("2026-07-13T04:00:00Z").getTime();
   aggregator.addOrder({
     userId: 101,
+    created,
     payTime,
     orders: [
-      { sysOuterId: "6977173969783", sysTitle: "莓果冻干主粮", num: 2, payment: "42.00", cost: 16, payTime },
-      { sysOuterId: "6977173969783", num: 1, payment: "21.00", cost: 8, payTime },
-      { sysOuterId: "not-a-code", num: 1, payment: "9.9", payTime },
-      { sysOuterId: "6978705011352", num: 1, payment: "28.00", cost: 10, payTime, isCancel: 1 }
+      { sysOuterId: "6977173969783", sysTitle: "莓果冻干主粮", num: 2, payment: "42.00", cost: 16, created, payTime },
+      { sysOuterId: "6977173969783", num: 1, payment: "21.00", cost: 8, created, payTime },
+      { sysOuterId: "not-a-code", num: 1, payment: "9.9", created, payTime },
+      { sysOuterId: "6978705011352", num: 1, payment: "28.00", cost: 10, created, payTime, isCancel: 1 }
     ]
   });
-  aggregator.addOrder({ userId: 102, payTime, orders: [{ sysOuterId: "6977173969783", num: 3, payment: "51.00", cost: 24, payTime }] });
+  aggregator.addOrder({ userId: 102, created, payTime, orders: [{ sysOuterId: "6977173969783", num: 3, payment: "51.00", cost: 24, created, payTime }] });
   const result = aggregator.finish();
   assert.equal(result.orders, 2);
   assert.equal(result.skippedItems, 1);
@@ -77,11 +79,11 @@ test("pullKuaimaiDay paginates orders and reports continuation page", async () =
       return respond({ list: [{ userId: 101, source: "tm", name: "旗舰店" }] });
     }
     const pageNo = Number(params.get("pageNo"));
-    assert.equal(params.get("timeType"), "pay_time");
+    assert.equal(params.get("timeType"), "created");
     assert.equal(params.get("startTime"), "2026-07-12 00:00:00");
     return respond({
       hasNext: pageNo < 3,
-      list: [{ userId: 101, payTime: new Date("2026-07-12T04:00:00Z").getTime(), orders: [{ sysOuterId: "6977173969783", num: 1, payment: "20.00", cost: 8 }] }]
+      list: [{ userId: 101, created: new Date("2026-07-12T04:00:00Z").getTime(), payTime: new Date("2026-07-13T04:00:00Z").getTime(), orders: [{ sysOuterId: "6977173969783", num: 1, payment: "20.00", cost: 8 }] }]
     });
   };
   const partial = await pullKuaimaiDay(config, { date: "2026-07-12", pageNo: 1, maxPages: 2 }, fetchMock);

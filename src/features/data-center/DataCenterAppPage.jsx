@@ -6,7 +6,6 @@ import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
 import { canAccessCompanyPlatform, canManagePlatformConnections } from "../../domain/permissions.js";
 import { DataCenterSettingsWorkspace, DataServicesWorkspace, DataSourcesWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
-import { PlatformConnectionsWorkspace } from "./PlatformConnectionsWorkspace.jsx";
 import { UserInsightsProvider } from "../../state/UserInsightsProvider.jsx";
 import { UserInsightsWorkspace } from "./UserInsightsWorkspace.jsx";
 import { ProductCatalogWorkspace } from "./ProductCatalogWorkspace.jsx";
@@ -17,8 +16,7 @@ const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据和数据健康状态。"],
   insights: ["用户洞察", "按平台、店铺和产品查看用户市场与竞品参考。"],
   products: ["商品主数据", "统一维护 ERP 商品、SKU、69 码及跨 App 关联。"],
-  sources: ["数据接入", "管理店铺、广告平台和 ERP 数据源。"],
-  connections: ["平台连接", "统一维护公司业务平台的安全连接，保存后自动验证。"],
+  sources: ["数据接入", "统一管理电商平台、ERP 与公司数据。"],
   metrics: ["数据口径", "维护公司统一的定义、公式、版本和责任部门。"],
   sync: ["同步记录", "查看采集结果、数据质量和待处理异常。"],
   services: ["数据服务", "管理各业务 App 的数据订阅。"],
@@ -28,7 +26,7 @@ const SECTION_META = {
 const overviewMetricCodes = DATA_CENTER_OVERVIEW_METRICS.map(metric => metric.metricCode);
 const legacyOverviewRollback = import.meta.env.VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK === "1";
 
-export function DataCenterAppPage({ section = "overview" }) {
+export function DataCenterAppPage({ section = "overview", dataAccessCategory = "" }) {
   const { user } = useAuth();
   const { state, range, setRange, salesRows, salesMeta, loading, error } = useDataCenter();
   const { results, run, resultLoading, error: metricError, ensureResults, scheduleEnsureResults } = useDataStandards();
@@ -47,8 +45,7 @@ export function DataCenterAppPage({ section = "overview" }) {
     overview: <DataOverview factViews={factViews} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} />,
     insights: <UserInsightsProvider><UserInsightsWorkspace /></UserInsightsProvider>,
     products: <ProductCatalogWorkspace canEdit={canEdit} />,
-    sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} />,
-    connections: <PlatformConnectionsWorkspace canManage={canManageConnections} />,
+    sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManageConnections} initialCategory={dataAccessCategory} />,
     metrics: <DataStandardsWorkspace />,
     sync: <SyncRunsWorkspace quality={quality} />,
     services: <DataServicesWorkspace />,
@@ -56,7 +53,7 @@ export function DataCenterAppPage({ section = "overview" }) {
   };
   return (
     <section className="page data-center-page">
-      <PageHeader title={title} description={description} identity="统一口径 · 可追溯 · 截止昨天" />
+      <PageHeader title={title} description={description} identity={section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : "统一口径 · 可追溯 · 截止昨天"} />
       {error ? <div className="section-panel" role="status">{error}</div> : null}
       {loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}
     </section>

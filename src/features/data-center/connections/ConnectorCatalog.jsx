@@ -39,11 +39,10 @@ function summaryStatus(instances) {
   return CONNECTOR_STATUS_PRIORITY.find(status => instances.some(item => item.status === status)) || "pending_validation";
 }
 
-export function ConnectorCatalog({ instances = [], excludedConnectorIds = [], canEdit = false, onAdd, onManage }) {
-  const excluded = new Set(excludedConnectorIds);
+export function ConnectorCatalog({ definitions = DATA_CONNECTOR_DEFINITIONS, instances = [], canEdit = false, onAdd, onManage }) {
   return (
-    <div className="connector-catalog-grid">
-      {DATA_CONNECTOR_DEFINITIONS.filter(definition => !excluded.has(definition.id)).map(definition => {
+    <div className="data-access-grid connector-catalog-grid">
+      {definitions.map(definition => {
         const configured = instances.filter(item => item.connectorId === definition.id);
         const status = summaryStatus(configured);
         return (
@@ -61,7 +60,13 @@ export function ConnectorCatalog({ instances = [], excludedConnectorIds = [], ca
                 {configured.slice(0, 3).map(instance => (
                   <li key={instance.id}>
                     <span><b>{instance.name}</b><small>{STATUS_LABELS[instance.status] || instance.status}</small></span>
-                    <button type="button" onClick={() => onManage(definition, instance)} aria-label={`管理${instance.name}`}><Settings2 size={14} />管理连接</button>
+                    <button
+                      type="button"
+                      aria-label={`管理${instance.name}`}
+                      disabled={!canEdit}
+                      title={!canEdit ? "当前账号没有数据接入编辑权限" : undefined}
+                      onClick={() => onManage(definition, instance)}
+                    ><Settings2 size={14} />管理连接</button>
                   </li>
                 ))}
               </ul>
