@@ -9,13 +9,8 @@ import {
   RefreshCw,
   ShieldCheck
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PLATFORM_CONNECTION_DEFINITIONS } from "../../domain/platformConnections.js";
-import {
-  disablePlatformConnection,
-  loadPlatformConnections,
-  savePlatformConnection
-} from "../../state/platformConnectionsApi.js";
 import { Button } from "../../ui/Button.jsx";
 import "./platform-connections.css";
 
@@ -76,11 +71,11 @@ function statusText(connection, definition) {
   return STATUS_LABELS[connection?.status] || STATUS_LABELS.unconfigured;
 }
 
-function PlatformConnectionList({ connections, onSelect, buttonRefs }) {
+function PlatformConnectionList({ definitions, connections, onSelect, buttonRefs }) {
   const byId = new Map(connections.map(item => [item.platformId, item]));
   return (
     <div className="platform-connection-list" aria-label="公司平台连接">
-      {PLATFORM_CONNECTION_DEFINITIONS.map(definition => {
+      {definitions.map(definition => {
         const connection = byId.get(definition.id);
         const unavailable = !definition.available;
         return (
@@ -113,7 +108,7 @@ function PlatformConnectionList({ connections, onSelect, buttonRefs }) {
   );
 }
 
-function PlatformConnectionForm({ definition, connection, canManage, onBack, onConflict, onSaved, onDisabled }) {
+function PlatformConnectionForm({ definition, connection, canManage, onBack, onConflict, onSave, onDisable, backLabel = "返回数据接入" }) {
   const [draft, setDraft] = useState(() => Object.fromEntries(definition.fields.map(field => [field.key, ""])));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -135,10 +130,9 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
     setRequestId("");
     setNotice("");
     try {
-      const saved = await savePlatformConnection({ platformId: definition.id, expectedVersion: connection?.version || 0, fields: changedFields });
+      await onSave({ platformId: definition.id, expectedVersion: connection?.version || 0, fields: changedFields });
       setDraft(Object.fromEntries(definition.fields.map(field => [field.key, ""])));
       setNotice("连接已验证并启用。");
-      onSaved(saved);
       requestAnimationFrame(() => resultRef.current?.focus());
     } catch (nextError) {
       if (nextError?.code === "PLATFORM_CONNECTION_VERSION_CONFLICT") {
@@ -167,10 +161,9 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
     setError("");
     setNotice("");
     try {
-      const disabled = await disablePlatformConnection({ platformId: definition.id, expectedVersion: connection?.version || 0 });
+      await onDisable({ platformId: definition.id, expectedVersion: connection?.version || 0 });
       setConfirmDisable(false);
       setNotice("连接已停用，系统将使用原有回退配置（如有）。");
-      onDisabled(disabled);
       requestAnimationFrame(() => resultRef.current?.focus());
     } catch (nextError) {
       setError(nextError?.message || "停用失败，请重试。");
@@ -182,7 +175,7 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
 
   return (
     <div className="platform-connection-detail">
-      <button type="button" className="platform-connection-back" onClick={handleBack}><ArrowLeft size={16} aria-hidden="true" />返回平台连接</button>
+      <button type="button" className="platform-connection-back" onClick={handleBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</button>
       {confirmBack ? (
         <div className="platform-connection-disable-confirm" role="alert">
           <div><strong>放弃本次填写？</strong><p>尚未保存的连接信息会被清空。</p></div>
@@ -242,50 +235,48 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
   );
 }
 
-export function PlatformConnectionsWorkspace({ canManage = false }) {
-  const [connections, setConnections] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [loadState, setLoadState] = useState("loading");
-  const [error, setError] = useState("");
+export function PlatformConnectionsWorkspace({
+  canManage = false,
+  platformIds = PLATFORM_CONNECTION_DEFINITIONS.map(item => item.id),
+  initialPlatformId = "",
+  embedded = false,
+  controller,
+  onBack
+}) {
+  const [selectedId, setSelectedId] = useState(initialPlatformId);
   const [returnFocusId, setReturnFocusId] = useState("");
   const platformButtonRefs = useRef(new Map());
-
-  const load = useCallback(async () => {
-    setLoadState("loading");
-    setError("");
-    try {
-      const payload = await loadPlatformConnections();
-      setConnections(payload.connections || []);
-      setLoadState("ready");
-    } catch (nextError) {
-      setError(nextError?.message || "平台连接暂时无法读取。");
-      setLoadState("error");
-    }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const definitions = PLATFORM_CONNECTION_DEFINITIONS.filter(item => platformIds.includes(item.id));
+  const connections = controller?.connections || [];
+  const loading = Boolean(controller?.loading);
+  const error = controller?.error || "";
+  const refresh = controller?.refresh;
+  const save = controller?.save;
+  const disable = controller?.disable;
   useEffect(() => {
     if (selectedId || !returnFocusId) return;
     requestAnimationFrame(() => platformButtonRefs.current.get(returnFocusId)?.focus());
   }, [returnFocusId, selectedId]);
 
-  const definition = PLATFORM_CONNECTION_DEFINITIONS.find(item => item.id === selectedId);
+  const definition = definitions.find(item => item.id === selectedId);
   const connection = connections.find(item => item.platformId === selectedId);
-  const updateConnection = next => setConnections(current => current.map(item => item.platformId === next.platformId ? next : item));
 
-  if (loadState === "loading" && !connections.length) return <LoadingState />;
-  if (loadState === "error" && !connections.length) {
-    return <div className="platform-connections-error" role="alert"><AlertTriangle size={20} aria-hidden="true" /><div><strong>平台连接暂不可用</strong><p>{error}</p><Button onClick={load}><RefreshCw size={16} />重新加载</Button></div></div>;
+  if (loading && !connections.length) return <LoadingState />;
+  if (error && !connections.length) {
+    return <div className="platform-connections-error" role="alert"><AlertTriangle size={20} aria-hidden="true" /><div><strong>平台连接暂不可用</strong><p>{error}</p><Button onClick={() => refresh?.().catch(() => {})}><RefreshCw size={16} />重新加载</Button></div></div>;
   }
   if (definition?.available) {
     return <PlatformConnectionForm
       definition={definition}
       connection={connection}
       canManage={canManage}
-      onBack={() => { setReturnFocusId(definition.id); setSelectedId(""); }}
-      onConflict={load}
-      onSaved={updateConnection}
-      onDisabled={updateConnection}
+      onBack={() => {
+        if (embedded) onBack?.();
+        else { setReturnFocusId(definition.id); setSelectedId(""); }
+      }}
+      onConflict={() => refresh?.()}
+      onSave={save}
+      onDisable={disable}
     />;
   }
   return (
@@ -293,6 +284,7 @@ export function PlatformConnectionsWorkspace({ canManage = false }) {
       <div className="platform-connections-intro"><div><h2>公司平台连接</h2><p>选择平台并完成安全连接；保存后系统会自动验证。</p></div><span><ShieldCheck size={15} aria-hidden="true" />已保存内容不会回显</span></div>
       {error ? <p className="platform-connection-message error" role="alert">{error}</p> : null}
       <PlatformConnectionList
+        definitions={definitions}
         connections={connections}
         onSelect={setSelectedId}
         buttonRefs={platformButtonRefs}

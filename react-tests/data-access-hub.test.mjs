@@ -55,3 +55,19 @@ test("legacy and readiness links open company data inside data access", () => {
   assert.match(readiness, /前往数据接入/);
   assert.doesNotMatch(readiness, /前往平台连接/);
 });
+
+test("platform orchestration lives in state and the catalog primitives are accessible", () => {
+  const hook = read("src/state/usePlatformConnections.js");
+  const tabs = read("src/features/data-center/connections/DataAccessTabs.jsx");
+  const card = read("src/features/data-center/connections/DataAccessCard.jsx");
+  assert.match(hook, /loadPlatformConnections/);
+  assert.match(hook, /savePlatformConnection/);
+  assert.match(hook, /disablePlatformConnection/);
+  assert.match(tabs, /role="tablist"/);
+  assert.match(tabs, /aria-selected/);
+  assert.match(tabs, /ArrowRight/);
+  assert.match(tabs, /ArrowLeft/);
+  assert.match(card, /<article/);
+  assert.match(card, /disabledReason/);
+  assert.match(card, /aria-label/);
+});

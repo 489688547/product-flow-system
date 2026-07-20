@@ -65,6 +65,17 @@ test("platform connection API client never caches credential fields", () => {
   assert.doesNotMatch(api, /localStorage|sessionStorage/);
 });
 
+test("platform connection UI accepts controlled state and a filtered embedded detail", () => {
+  const workspace = read(workspacePath);
+  assert.match(workspace, /platformIds/);
+  assert.match(workspace, /initialPlatformId/);
+  assert.match(workspace, /embedded/);
+  assert.match(workspace, /controller/);
+  assert.match(workspace, /controller\?\.save/);
+  assert.match(workspace, /controller\?\.disable/);
+  assert.doesNotMatch(workspace, /import \{[\s\S]*loadPlatformConnections[\s\S]*\} from "\.\.\/\.\.\/state\/platformConnectionsApi\.js"/);
+});
+
 test("connection layout is restrained responsive and keyboard visible", () => {
   assert.equal(existsSync(cssPath), true);
   const css = read(cssPath);
