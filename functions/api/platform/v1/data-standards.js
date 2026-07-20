@@ -27,7 +27,20 @@ export async function onRequest({ request, env, data = {} }) {
     await ensureDataStandardsTables(db);
     if (request.method === "GET") {
       const definitions = await listDefinitions(db, validateListQuery(request));
-      return jsonResponse({ synced: true, definitions });
+      const summaries = await Promise.all(definitions.map(async definition => {
+        const detail = await getDefinitionDetail(db, definition.id);
+        const current = detail?.versions?.find(version => version.version === definition.currentVersion) || detail?.versions?.[0];
+        return {
+          ...definition,
+          effectiveFrom: current?.effectiveFrom || "",
+          displayFormula: current?.displayFormula || "",
+          sourceFields: current?.sourceFields || [],
+          dependencies: current?.dependencies || [],
+          executable: current?.executable !== false,
+          coverageStatus: current?.coverageStatus || "DATA_NOT_COVERED"
+        };
+      }));
+      return jsonResponse({ synced: true, definitions: summaries });
     }
 
     const body = await readJson(request);

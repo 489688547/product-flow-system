@@ -5,12 +5,13 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
 import { canAccessCompanyPlatform } from "../../domain/permissions.js";
-import { DataCenterSettingsWorkspace, DataQualityWorkspace, DataServicesWorkspace, DataSourcesWorkspace, MetricDefinitionsWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
+import { DataCenterSettingsWorkspace, DataQualityWorkspace, DataServicesWorkspace, DataSourcesWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
+import { DataStandardsWorkspace } from "./data-standards/DataStandardsWorkspace.jsx";
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据和数据健康状态。"],
   sources: ["数据接入", "管理店铺、广告平台和 ERP 数据源。"],
-  metrics: ["指标管理", "维护指标口径、负责人和版本。"],
+  metrics: ["数据口径", "维护公司统一的定义、公式、版本和责任部门。"],
   quality: ["数据质量", "定位缺失、重复、延迟和映射异常。"],
   sync: ["同步记录", "查看每日采集和导入结果。"],
   services: ["数据服务", "管理各业务 App 的数据订阅。"],
@@ -28,7 +29,7 @@ export function DataCenterAppPage({ section = "overview" }) {
   const content = {
     overview: <DataOverview summary={summary} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} />,
-    metrics: <MetricDefinitionsWorkspace />,
+    metrics: <DataStandardsWorkspace />,
     quality: <DataQualityWorkspace quality={quality} />,
     sync: <SyncRunsWorkspace />,
     services: <DataServicesWorkspace />,

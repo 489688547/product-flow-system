@@ -28,6 +28,7 @@ test("data center has navigation and feature permission defaults", () => {
 test("data center navigation sits after product lifecycle with seven routes and no analysis tab", () => {
   const app = read("src/App.jsx");
   assert.match(app, /const DATA_CENTER_NAV = \[[\s\S]*data-overview[\s\S]*data-sources[\s\S]*data-metrics[\s\S]*data-quality[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
+  assert.match(app, /\["data-metrics", "数据口径"/);
   assert.doesNotMatch(app, /data-analysis|"数据分析"/);
   assert.match(app, /\["archive", "产品档案"[\s\S]*\.\.\.DATA_CENTER_NAV[\s\S]*\["handbook", "说明书"/);
   assert.match(app, /screen === "data-center" \? "data-overview"/);
@@ -64,8 +65,9 @@ test("overview exposes the operating time basis without a separate analysis work
 test("governance workspaces cover safe sources metrics quality sync services and settings", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
+  const standards = read("src/features/data-center/data-standards/DataStandardsWorkspace.jsx");
   assert.match(page, /DataSourcesWorkspace/);
-  assert.match(page, /MetricDefinitionsWorkspace/);
+  assert.match(page, /DataStandardsWorkspace/);
   assert.match(page, /DataQualityWorkspace/);
   assert.match(page, /SyncRunsWorkspace/);
   assert.match(page, /DataServicesWorkspace/);
@@ -73,7 +75,7 @@ test("governance workspaces cover safe sources metrics quality sync services and
   assert.match(workspaces, /DataConnectionsWorkspace/);
   assert.match(workspaces, /敏感信息加密保存/);
   assert.doesNotMatch(workspaces, /function SourceForm/);
-  assert.match(workspaces, /订单创建时间/);
+  assert.match(standards, /订单创建时间/);
   assert.match(workspaces, /Asia\/Shanghai/);
   assert.match(workspaces, /应用订阅/);
   assert.match(workspaces, /原始数据保留天数/);

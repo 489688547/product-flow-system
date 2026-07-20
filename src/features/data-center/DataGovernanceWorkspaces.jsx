@@ -17,18 +17,6 @@ export function DataSourcesWorkspace({ canEdit, canManage }) {
   return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} />;
 }
 
-export function MetricDefinitionsWorkspace() {
-  const { state } = useDataCenter();
-  return <section className="section-panel"><div className="section-head"><div><h2>指标口径</h2><p>所有业务 App 读取同一份定义，变更需要版本化并保留审计。</p></div><span className="status-badge success">订单创建时间 · Asia/Shanghai</span></div><DataTable minWidth={760} columns={[
-    { key: "name", header: "指标", render: row => <span className="data-product-cell"><strong>{row.name}</strong><small>{row.metricCode}</small></span> },
-    { key: "formula", header: "定义", render: row => row.formula },
-    { key: "basis", header: "时间口径", render: row => row.timeBasis === "create_time" ? "订单创建时间" : row.timeBasis },
-    { key: "scope", header: "日常排除", render: row => row.excludeOther ? "其它 / 未知" : "不排除" },
-    { key: "owner", header: "负责人", render: row => row.owner || "待指定" },
-    { key: "version", header: "版本", render: row => `v${row.version || 1}` }
-  ]} rows={state.metricDefinitions} empty={<div className="empty-state compact-empty">暂无指标定义。</div>} /></section>;
-}
-
 export function DataQualityWorkspace({ quality }) {
   const { state } = useDataCenter();
   const cards = [["待处理问题", quality.openIssues], ["待确认商品映射", quality.unmappedProducts], ["本期口径排除", quality.excludedRows]];

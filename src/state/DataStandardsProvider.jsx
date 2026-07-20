@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { canEditFeature } from "../domain/permissions.js";
+import { canManageDataStandard, DATA_STANDARD_OWNER_DEPARTMENTS } from "../domain/dataStandards.js";
 import { useProductFlow } from "./ProductFlowProvider.jsx";
 import {
   archiveDataStandard,
@@ -40,8 +41,24 @@ export function DataStandardsProvider({ children, enabled = true }) {
   const definitionRequest = useRef(null);
   const resultRequest = useRef(null);
   const resultDebounce = useRef(null);
-  const canWrite = enabled && currentUser?.role !== "readonly" && currentUser?.readonly !== true
-    && canEditFeature(productState.permissions, currentUser, "dataCenter");
+  const actor = useMemo(() => {
+    const departments = [...new Set([
+      currentUser?.department,
+      ...(currentUser?.departments || []),
+      ...(currentUser?.departmentNames || [])
+    ].map(value => String(value || "").replace("供应链团队", "供应链部").replace("采购部", "供应链部")).filter(Boolean))];
+    return {
+      departments,
+      executive: departments.includes("总经办"),
+      readonly: currentUser?.role === "readonly" || currentUser?.readonly === true
+    };
+  }, [currentUser]);
+  const canWrite = enabled && !actor.readonly && canEditFeature(productState.permissions, currentUser, "dataCenter")
+    && (actor.executive || actor.departments.some(department => DATA_STANDARD_OWNER_DEPARTMENTS.includes(department)));
+  const canManageDefinition = useCallback(definition => canWrite && canManageDataStandard(actor, definition), [actor, canWrite]);
+  const ownerDepartments = actor.executive
+    ? DATA_STANDARD_OWNER_DEPARTMENTS
+    : actor.departments.filter(department => DATA_STANDARD_OWNER_DEPARTMENTS.includes(department));
 
   const loadDefinitions = useCallback(async (nextFilters = filters) => {
     if (!enabled) return { definitions: [] };
@@ -181,6 +198,9 @@ export function DataStandardsProvider({ children, enabled = true }) {
     saving,
     error,
     canWrite,
+    canTransferOwner: actor.executive,
+    ownerDepartments,
+    canManageDefinition,
     setFilters,
     loadDefinitions,
     loadDefinition,
@@ -192,7 +212,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     ensureResults,
     scheduleEnsureResults,
     clearError: () => setError(null)
-  }), [archiveDefinition, canWrite, createDefinition, definitions, detail, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, previewDefinition, publishVersion, recalculate, results, run, saving, scheduleEnsureResults]);
+  }), [actor.executive, archiveDefinition, canManageDefinition, canWrite, createDefinition, definitions, detail, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, ownerDepartments, previewDefinition, publishVersion, recalculate, results, run, saving, scheduleEnsureResults]);
 
   return <DataStandardsContext.Provider value={value}>{children}</DataStandardsContext.Provider>;
 }
