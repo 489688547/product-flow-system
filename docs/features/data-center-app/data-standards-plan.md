@@ -33,7 +33,7 @@
 - Modify: `src/domain/dataCenter.js`
 - Modify: `react-tests/data-center.test.mjs`
 
-- [ ] 1.1 先写领域失败测试，覆盖：11 个唯一 `metricCode`、责任部门、单位、周期、销售时间口径、货流未覆盖状态、AST 未知节点、未知字段、单位冲突、除零保护、循环依赖、版本生效选择、归档不可被新公式引用。
+- [x] 1.1 先写领域失败测试，覆盖：11 个唯一 `metricCode`、责任部门、单位、周期、销售时间口径、货流未覆盖状态、AST 未知节点、未知字段、单位冲突、除零保护、循环依赖、版本生效选择、归档不可被新公式引用。
 
 运行：
 
@@ -43,7 +43,7 @@ node --test react-tests/data-standards-domain.test.mjs
 
 预期：失败，报 `ERR_MODULE_NOT_FOUND` 或缺少导出。
 
-- [ ] 1.2 创建不依赖 React、浏览器或网络的领域 API：
+- [x] 1.2 创建不依赖 React、浏览器或网络的领域 API：
 
 ```js
 export const CORE_DATA_STANDARDS = [/* exactly 11 immutable definitions */];
@@ -76,9 +76,9 @@ AST 首版节点固定为：
 
 `sum`、`average`、`weighted_average`、`count`、`count_distinct` 和日期节点进入 schema 白名单；首轮执行器只对销售所需节点标记 `executable: true`。货流节点可以被验证和发布，但在缺少事实源时返回 `DATA_NOT_COVERED`。
 
-- [ ] 1.3 将旧数据中心状态中的 `metricDefinitions` 改成兼容只读字段，不再作为通用整份状态的持久化集合。导出 `DATA_CENTER_PERSISTED_COLLECTIONS`，明确排除 `metricDefinitions`，避免 `/api/data-center` 覆盖共享口径表。
+- [x] 1.3 将旧数据中心状态中的 `metricDefinitions` 改成兼容只读字段，不再作为通用整份状态的持久化集合。导出 `DATA_CENTER_PERSISTED_COLLECTIONS`，明确排除 `metricDefinitions`，避免 `/api/data-center` 覆盖共享口径表。
 
-- [ ] 1.4 运行领域回归：
+- [x] 1.4 运行领域回归：
 
 ```bash
 node --test react-tests/data-standards-domain.test.mjs react-tests/data-center.test.mjs
@@ -86,7 +86,7 @@ node --test react-tests/data-standards-domain.test.mjs react-tests/data-center.t
 
 预期：全部通过，且 `summarizeDataCenterSales` 暂时保留，只作为下一阶段只读对账函数。
 
-- [ ] 1.5 提交：
+- [x] 1.5 提交：
 
 ```bash
 git add src/domain/dataStandards.js src/domain/dataCenter.js react-tests/data-standards-domain.test.mjs react-tests/data-center.test.mjs
@@ -618,4 +618,3 @@ git commit -m "docs(data): record data standards verification"
 3. Task 6–7 完成后检查点：授权用户可以在页面完成 CRUD、版本发布、归档和显式重算。
 4. Task 8 完成后检查点：总览五项 KPI 才允许切换；对账未通过则保持读取开关关闭。
 5. Task 9–10 完成后检查点：本地、Preview、Production 和钉钉 WebView 分栏报告，不扩大授权范围。
-
