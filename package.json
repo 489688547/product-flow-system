@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 8132",
     "audit:dependencies": "npm audit --audit-level=low",
-    "build": "npm run check:environment-capabilities && vite build && node scripts/check-build-chunks.mjs",
+    "build": "npm run check:environment-capabilities && vite build && node scripts/prepare-pages-build.mjs && node scripts/check-build-chunks.mjs",
     "lint": "eslint src functions server scripts tests react-tests",
     "release:pages": "npm run build && node scripts/prepare-pages-release.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 8133",

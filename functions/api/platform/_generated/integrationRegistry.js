@@ -190,6 +190,7 @@ const integrationRegistry = {
       "codePaths": [
         "functions/**",
         "src/state/deploymentRecovery.js",
+        "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
         "scripts/check-deployed-readiness.mjs",
         "cloudflare-entry.html",
@@ -230,6 +231,7 @@ const integrationRegistry = {
         "functions/",
         "src/state/deploymentRecovery.js",
         "docs/platform/architecture.md",
+        "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
         "wrangler.toml"
       ],
