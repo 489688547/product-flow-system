@@ -101,16 +101,18 @@ test("sales aggregation supports Kuaimai sales-topic exports with derived net me
   const detection = detectSalesColumns(header);
   assert.equal(detection.complete, true);
   assert.equal(detection.mapping.code, 0);
+  assert.equal(detection.mapping.fallbackCode, 1);
   assert.equal(detection.mapping.platform, 3);
-  const result = aggregateSalesRows([[
-    "6977173969783", "6977173969000", "TIYES 莓果冻干主粮", "抖音", "TIYES旗舰店", "2026-07-01 08:00:00",
-    10, 2, 200, 190, 30, 80, 16, 110
-  ]], detection.mapping);
-  assert.deepEqual(result.rows, [{
+  const result = aggregateSalesRows([
+    ["6977173969783", "6977173969000", "TIYES 莓果冻干主粮", "抖音", "TIYES旗舰店", "2026-07-01 08:00:00", 10, 2, 200, 190, 30, 80, 16, 110],
+    ["", "6977173969000", "TIYES 主品", "抖音", "TIYES旗舰店", "2026-07-01 09:00:00", 2, 0, 40, 38, 0, 16, 0, 22]
+  ], detection.mapping);
+  assert.deepEqual(result.rows.find(row => row.code === "6977173969783"), {
     code: "6977173969783", date: "2026-07-01", platform: "抖音",
     qty: 8, sales: 200, netSales: 160, grossProfit: 96, refund: 30, cost: 64,
     preShipRefund: 0, postShipRefund: 0
-  }]);
+  });
+  assert.equal(result.rows.find(row => row.code === "6977173969000").netSales, 38);
 });
 
 test("sales date and barcode normalization handle excel serials and bad values", () => {

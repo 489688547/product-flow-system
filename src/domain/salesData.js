@@ -2,6 +2,7 @@ const CODE_PATTERN = /^69\d{10,12}$/;
 
 export const SALES_COLUMN_RULES = [
   { key: "code", label: "69码", required: true, synonyms: ["系统商品编码", "规格商家编码", "主商家编码", "商品编码", "69码", "条码", "条形码", "商品条码", "barcode"] },
+  { key: "fallbackCode", label: "主商家编码", required: false, synonyms: ["主商家编码"] },
   { key: "title", label: "商品标题", required: false, synonyms: ["系统商品标题", "商品标题", "商品名称", "标题"] },
   { key: "platform", label: "平台", required: false, synonyms: ["店铺平台", "所属平台", "平台", "渠道"] },
   { key: "shop", label: "店铺", required: false, synonyms: ["店铺名称", "店铺"] },
@@ -118,7 +119,9 @@ export function createSalesAggregator(mapping) {
   return {
     add(row) {
       sourceRows += 1;
-      const code = cellText(cell(row, "code"));
+      const primaryCode = cellText(cell(row, "code"));
+      const fallbackCode = cellText(cell(row, "fallbackCode"));
+      const code = isSalesBarcode(primaryCode) ? primaryCode : fallbackCode;
       if (!isSalesBarcode(code)) {
         skipped += 1;
         return;
