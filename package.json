@@ -18,6 +18,7 @@
     "generate:platform-manifests": "node scripts/generate-platform-manifests.mjs",
     "check:environment-capabilities": "node scripts/generate-platform-manifests.mjs --check",
     "collect:user-insights": "node scripts/user-insights-collector/index.mjs",
+    "collect:kuaimai": "node scripts/kuaimai-erp-collector/index.mjs",
     "agent:data-connections": "node scripts/data-connection-agent/index.mjs",
     "verify:production": "node scripts/check-deployed-readiness.mjs --url https://product-flow-system.pages.dev",
     "test:react": "node --test react-tests/*.test.mjs",
