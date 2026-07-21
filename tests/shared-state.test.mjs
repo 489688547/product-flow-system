@@ -4,9 +4,9 @@ import { readFileSync, readdirSync } from "node:fs";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 
-async function loadStateRequest() {
+async function loadStateModule() {
   try {
-    return (await import("../functions/api/state.js")).onRequest;
+    return await import("../functions/api/state.js");
   } catch {
     return null;
   }
@@ -58,6 +58,7 @@ function createD1Mock({ maxTextBytes = Infinity } = {}) {
         },
         async all() {
           calls.push({ type: "all", sql, values: statement.values });
+          if (/from production_data_snapshots/i.test(sql)) return { results: [] };
           const prefix = `${statement.values[0] || "company"}:`;
           return {
             results: [...parts.entries()]
@@ -77,7 +78,7 @@ function createD1Mock({ maxTextBytes = Infinity } = {}) {
 }
 
 test("state API requires a D1 database binding", async () => {
-  const stateRequest = await loadStateRequest();
+  const stateRequest = (await loadStateModule())?.onRequest;
   assert.ok(stateRequest, "functions/api/state.js should export onRequest");
   const response = await stateRequest({
     request: new Request("https://flow.example.com/api/state"),
@@ -90,7 +91,8 @@ test("state API requires a D1 database binding", async () => {
 });
 
 test("state API persists company data including demand pool and issue submissions", async () => {
-  const stateRequest = await loadStateRequest();
+  const stateModule = await loadStateModule();
+  const stateRequest = stateModule?.onRequest;
   assert.ok(stateRequest, "functions/api/state.js should export onRequest");
   const db = createD1Mock();
   const payload = {
@@ -107,12 +109,14 @@ test("state API persists company data including demand pool and issue submission
     config: { stages: [] }
   };
 
+  const seeded = await stateModule.writeCompanyState(db, payload, "初始状态");
   const post = await stateRequest({
     request: new Request("https://flow.example.com/api/state", {
       method: "POST",
-      body: JSON.stringify({ state: payload, updatedBy: "周总" })
+      body: JSON.stringify({ state: payload, baseUpdatedAt: seeded.updatedAt })
     }),
-    env: { PRODUCT_FLOW_DB: db }
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { userId: "u1", unionId: "union1", name: "周总", role: "executive" } }
   });
   const posted = await post.json();
   assert.equal(post.status, 200);
@@ -132,7 +136,8 @@ test("state API persists company data including demand pool and issue submission
 });
 
 test("state API shards payloads that exceed the D1 row limit and reconstructs them", async () => {
-  const stateRequest = await loadStateRequest();
+  const stateModule = await loadStateModule();
+  const stateRequest = stateModule?.onRequest;
   const db = createD1Mock({ maxTextBytes: 2_000_000 });
   const image = `data:image/png;base64,${"a".repeat(2_100_000)}`;
   const payload = {
@@ -149,12 +154,14 @@ test("state API shards payloads that exceed the D1 row limit and reconstructs th
     config: { stages: [] }
   };
 
+  const seeded = await stateModule.writeCompanyState(db, { ...payload, deliverables: [] }, "初始状态");
   const post = await stateRequest({
     request: new Request("https://flow.example.com/api/state", {
       method: "POST",
-      body: JSON.stringify({ state: payload, updatedBy: "周总" })
+      body: JSON.stringify({ state: payload, baseUpdatedAt: seeded.updatedAt })
     }),
-    env: { PRODUCT_FLOW_DB: db }
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { userId: "u1", unionId: "union1", name: "周总", role: "executive" } }
   });
   const posted = await post.json();
 
