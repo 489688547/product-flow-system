@@ -2,12 +2,41 @@ import {
   jsonResponse,
   optionsResponse
 } from "./dingtalk/_shared/dingtalk.js";
+import {
+  ensureProductionAccessTables,
+  finishProductionAudit,
+  saveProductionSnapshot,
+  startProductionAudit
+} from "./platform/_shared/productionDataAccess.js";
 
 const STATE_ID = "company";
 const MAX_PART_BYTES = 1_000_000;
 
 function stateDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+}
+
+function stateError(message, status, code, retryable = false) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  error.retryable = retryable;
+  return error;
+}
+
+function stateErrorResponse(error) {
+  const message = error?.message || "公司共享数据同步失败。";
+  const requestId = crypto.randomUUID?.() || `req_${Date.now().toString(36)}`;
+  return jsonResponse({
+    synced: false,
+    message,
+    error: {
+      code: error?.code || "SHARED_STATE_WRITE_FAILED",
+      message,
+      requestId,
+      retryable: Boolean(error?.retryable)
+    }
+  }, error?.status || 500);
 }
 
 async function ensureStateTable(db) {
@@ -153,12 +182,44 @@ export async function onRequest({ request, env, data = {} }) {
       return jsonResponse(stored ? { synced: true, ...stored } : { synced: false, state: null });
     }
     const body = await request.json().catch(() => ({}));
-    const saved = await writeCompanyState(db, body.state, data.session?.name || body.updatedBy || "");
-    return jsonResponse({ synced: true, ...saved });
+    const before = await readCompanyState(db);
+    if (!before) {
+      throw stateError("线上共享数据尚未初始化，已阻止默认数据自动写入。", 409, "SHARED_STATE_NOT_INITIALIZED");
+    }
+    if (!body.baseUpdatedAt) {
+      throw stateError("缺少线上数据基线，请先刷新后再操作。", 409, "SHARED_STATE_BASE_REQUIRED", true);
+    }
+    if (body.baseUpdatedAt !== before.updatedAt) {
+      throw stateError("线上数据已被其他页面更新，本次修改未覆盖线上数据，请刷新后重新操作。", 409, "SHARED_STATE_VERSION_CONFLICT", true);
+    }
+
+    await ensureProductionAccessTables(db);
+    const snapshotId = await saveProductionSnapshot(db, before);
+    const session = data.session || {};
+    const audit = await startProductionAudit({
+      db,
+      action: "shared-state-write",
+      access: {
+        userId: session.userId || "company-session",
+        unionId: session.unionId || "",
+        name: session.name || "公司会话"
+      },
+      unlock: { reason: "产品全周期共享状态保存" },
+      snapshotId,
+      before,
+      sourceEnvironment: ["localhost", "127.0.0.1", "::1"].includes(new URL(request.url).hostname)
+        ? "development"
+        : "production"
+    });
+    try {
+      const saved = await writeCompanyState(db, body.state, session.name || "公司会话");
+      await finishProductionAudit(db, audit.id, saved);
+      return jsonResponse({ synced: true, ...saved, auditId: audit.id });
+    } catch (error) {
+      await finishProductionAudit(db, audit.id, before, "failed").catch(() => {});
+      throw error;
+    }
   } catch (error) {
-    return jsonResponse({
-      synced: false,
-      message: error.message || "公司共享数据同步失败。"
-    }, error.status || 500);
+    return stateErrorResponse(error);
   }
 }

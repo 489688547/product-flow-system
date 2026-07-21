@@ -22,10 +22,12 @@ import { createDemandRecord } from "../domain/demandDate.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { normalizeProductPlans, validateProductPlan } from "../domain/productPlanning.js";
 import { createDingTalkTodoRefreshController } from "./dingTalkTodoRefresh.js";
+import { createSharedStateSyncSession } from "./sharedStateSync.js";
 
 const ProductFlowContext = createContext(null);
 const STORAGE_KEY = "productFlowState";
 const DIRTY_STORAGE_KEY = "productFlowStateDirty";
+const RECOVERY_STORAGE_KEY = "productFlowStateRecoveryBackup";
 
 function isLocalPreview() {
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
@@ -45,13 +47,28 @@ function loadLocalState() {
   }
 }
 
+function preserveLocalRecoveryCopy() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    localStorage.setItem(RECOVERY_STORAGE_KEY, JSON.stringify({
+      savedAt: new Date().toISOString(),
+      state: JSON.parse(raw)
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function ProductFlowProvider({ children }) {
   const { user: authUser } = useAuth();
   const [state, setState] = useState(loadLocalState);
   const [sharedError, setSharedError] = useState("");
   const [loading, setLoading] = useState(true);
   const stateApiUrl = sharedStateApiUrl(window.location.hostname);
-  const firstSave = useRef(true);
+  const sharedSyncSession = useRef(createSharedStateSyncSession());
+  const skipNextSharedSave = useRef(true);
   const orgSyncAttempted = useRef(false);
   const sessionAccount = useMemo(() => authUser ? ({
     role: authUser.role,
@@ -87,35 +104,22 @@ export function ProductFlowProvider({ children }) {
     let alive = true;
     async function loadSharedState() {
       try {
-        if (localStorage.getItem(DIRTY_STORAGE_KEY) === "1" && !isLocalPreview()) {
-          const pendingState = loadLocalState();
-          const pendingSerializedState = JSON.stringify(pendingState);
-          const saveResponse = await fetch(stateApiUrl, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ state: pendingState, updatedBy: currentUser?.name || "react-v2-recovery" })
-          });
-          const saved = await saveResponse.json().catch(() => ({}));
-          if (!saveResponse.ok || saved.synced === false) throw new Error(saved.message || "本地修改恢复失败。");
-          if (localStorage.getItem(STORAGE_KEY) === pendingSerializedState) {
-            localStorage.removeItem(DIRTY_STORAGE_KEY);
-          }
-          if (alive && localStorage.getItem(STORAGE_KEY) === pendingSerializedState) setState(pendingState);
-          return;
-        }
-        if (isLocalPreview()) localStorage.removeItem(DIRTY_STORAGE_KEY);
         const response = await fetch(stateApiUrl);
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok || payload.synced === false || !payload.state) return;
-        if (localStorage.getItem(DIRTY_STORAGE_KEY) === "1") return;
+        if (!response.ok) throw new Error(payload.message || "共享数据加载失败。");
+        const remoteState = sharedSyncSession.current.acceptRemote(payload);
         if (alive) {
-          const normalized = normalizeClientState(payload.state);
+          const hadLocalChanges = localStorage.getItem(DIRTY_STORAGE_KEY) === "1";
+          const preserved = hadLocalChanges && preserveLocalRecoveryCopy();
+          const normalized = normalizeClientState(remoteState);
+          skipNextSharedSave.current = true;
           setState(normalized);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-          setSharedError("");
+          localStorage.removeItem(DIRTY_STORAGE_KEY);
+          setSharedError(preserved ? "发现本机未同步修改，已保留恢复副本并加载线上最新数据。" : "");
         }
       } catch (error) {
-        if (alive) setSharedError(sharedErrorMessage(error, "共享数据加载失败，请刷新重试。"));
+        if (alive) setSharedError(sharedErrorMessage(error, "共享数据加载失败，已暂停自动保存，请刷新重试。"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -170,20 +174,23 @@ export function ProductFlowProvider({ children }) {
   useEffect(() => {
     const serializedState = JSON.stringify(state);
     localStorage.setItem(STORAGE_KEY, serializedState);
-    if (firstSave.current) {
-      firstSave.current = false;
-      return;
+    if (loading || !sharedSyncSession.current.canSave()) return undefined;
+    if (skipNextSharedSave.current) {
+      skipNextSharedSave.current = false;
+      return undefined;
     }
     localStorage.setItem(DIRTY_STORAGE_KEY, "1");
     const timer = setTimeout(async () => {
       try {
+        const writeRequest = sharedSyncSession.current.buildWrite(state);
         const response = await fetch(stateApiUrl, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ state, updatedBy: currentUser?.name || "react-v2" })
+          body: JSON.stringify(writeRequest)
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.synced === false) throw new Error(payload.message || "共享数据保存失败。");
+        sharedSyncSession.current.acceptSaved(payload);
         if (localStorage.getItem(STORAGE_KEY) === serializedState) {
           localStorage.removeItem(DIRTY_STORAGE_KEY);
         }
@@ -193,7 +200,7 @@ export function ProductFlowProvider({ children }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [currentUser?.name, state, stateApiUrl]);
+  }, [loading, state, stateApiUrl]);
 
   const updateDemand = useCallback((id, patch) => {
     commitState(current => updateDemandRecord(current, id, patch));
