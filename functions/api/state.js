@@ -56,6 +56,14 @@ async function ensureStateTable(db) {
     updated_by TEXT,
     PRIMARY KEY (state_id, part_key, part_index)
   )`).run();
+  await db.prepare(`INSERT OR IGNORE INTO product_flow_state (id, version, payload, updated_at, updated_by)
+    SELECT ?, ?, ?, updated_at, updated_by
+    FROM product_flow_state_parts
+    WHERE state_id = ?
+    ORDER BY part_key, part_index
+    LIMIT 1`)
+    .bind(STATE_ID, "unknown", "{}", STATE_ID)
+    .run();
 }
 
 export function splitUtf8(value, maxBytes = MAX_PART_BYTES) {
@@ -142,22 +150,52 @@ export async function readCompanyState(db) {
   };
 }
 
-export async function writeCompanyState(db, state, updatedBy = "") {
+function nextStateTimestamp(baseUpdatedAt = "") {
+  const baseTime = Date.parse(baseUpdatedAt);
+  const nextTime = Number.isFinite(baseTime) ? Math.max(Date.now(), baseTime + 1) : Date.now();
+  return new Date(nextTime).toISOString();
+}
+
+export async function writeCompanyState(db, state, updatedBy = "", { baseUpdatedAt = "" } = {}) {
   validateStatePayload(state);
   await ensureStateTable(db);
-  const updatedAt = new Date().toISOString();
+  const updatedAt = nextStateTimestamp(baseUpdatedAt);
   const version = String(state.version || "unknown");
   const actor = String(updatedBy || "").slice(0, 80);
   const parts = serializeStateParts(state);
-  const statements = [
-    db.prepare("DELETE FROM product_flow_state_parts WHERE state_id = ?").bind(STATE_ID),
+  const manifestPayload = JSON.stringify({ writeToken: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}` });
+  if (!baseUpdatedAt) {
+    await db.batch([
+      db.prepare("DELETE FROM product_flow_state_parts WHERE state_id = ?").bind(STATE_ID),
+      ...parts.map(part => db.prepare(`INSERT INTO product_flow_state_parts
+        (state_id, part_key, part_index, payload, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?, ?)`)
+        .bind(STATE_ID, part.key, part.index, part.payload, updatedAt, actor)),
+      db.prepare(`INSERT INTO product_flow_state (id, version, payload, updated_at, updated_by)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET version = excluded.version, payload = excluded.payload,
+          updated_at = excluded.updated_at, updated_by = excluded.updated_by`)
+        .bind(STATE_ID, version, manifestPayload, updatedAt, actor)
+    ]);
+    return { version, updatedAt };
+  }
+
+  const guardSql = `EXISTS (SELECT 1 FROM product_flow_state
+    WHERE id = ? AND updated_at = ? AND payload = ?)`;
+  const results = await db.batch([
+    db.prepare(`UPDATE product_flow_state SET version = ?, payload = ?, updated_at = ?, updated_by = ?
+      WHERE id = ? AND updated_at = ?`)
+      .bind(version, manifestPayload, updatedAt, actor, STATE_ID, baseUpdatedAt),
+    db.prepare(`DELETE FROM product_flow_state_parts WHERE state_id = ? AND ${guardSql}`)
+      .bind(STATE_ID, STATE_ID, updatedAt, manifestPayload),
     ...parts.map(part => db.prepare(`INSERT INTO product_flow_state_parts
       (state_id, part_key, part_index, payload, updated_at, updated_by)
-      VALUES (?, ?, ?, ?, ?, ?)`)
-      .bind(STATE_ID, part.key, part.index, part.payload, updatedAt, actor)),
-    db.prepare("DELETE FROM product_flow_state WHERE id = ?").bind(STATE_ID)
-  ];
-  await db.batch(statements);
+      SELECT ?, ?, ?, ?, ?, ? WHERE ${guardSql}`)
+      .bind(STATE_ID, part.key, part.index, part.payload, updatedAt, actor, STATE_ID, updatedAt, manifestPayload))
+  ]);
+  if (Number(results?.[0]?.meta?.changes || 0) !== 1) {
+    throw stateError("线上数据已被其他页面更新，本次修改未覆盖线上数据，请刷新后重新操作。", 409, "SHARED_STATE_VERSION_CONFLICT", true);
+  }
   return { version, updatedAt };
 }
 
@@ -212,7 +250,7 @@ export async function onRequest({ request, env, data = {} }) {
         : "production"
     });
     try {
-      const saved = await writeCompanyState(db, body.state, session.name || "公司会话");
+      const saved = await writeCompanyState(db, body.state, session.name || "公司会话", { baseUpdatedAt: body.baseUpdatedAt });
       await finishProductionAudit(db, audit.id, saved);
       return jsonResponse({ synced: true, ...saved, auditId: audit.id });
     } catch (error) {

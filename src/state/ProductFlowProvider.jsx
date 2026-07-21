@@ -23,6 +23,7 @@ import { useAuth } from "./AuthProvider.jsx";
 import { normalizeProductPlans, validateProductPlan } from "../domain/productPlanning.js";
 import { createDingTalkTodoRefreshController } from "./dingTalkTodoRefresh.js";
 import { createSharedStateSyncSession } from "./sharedStateSync.js";
+import { productFlowStateFingerprint } from "./productFlowStateFingerprint.js";
 
 const ProductFlowContext = createContext(null);
 const STORAGE_KEY = "productFlowState";
@@ -67,8 +68,7 @@ export function ProductFlowProvider({ children }) {
   const [sharedError, setSharedError] = useState("");
   const [loading, setLoading] = useState(true);
   const stateApiUrl = sharedStateApiUrl(window.location.hostname);
-  const sharedSyncSession = useRef(createSharedStateSyncSession());
-  const skipNextSharedSave = useRef(true);
+  const sharedSyncSession = useRef(createSharedStateSyncSession({ fingerprint: productFlowStateFingerprint }));
   const orgSyncAttempted = useRef(false);
   const sessionAccount = useMemo(() => authUser ? ({
     role: authUser.role,
@@ -107,14 +107,13 @@ export function ProductFlowProvider({ children }) {
         const response = await fetch(stateApiUrl);
         const payload = await response.json().catch(() => ({}));
         if (!response.ok) throw new Error(payload.message || "共享数据加载失败。");
-        const remoteState = sharedSyncSession.current.acceptRemote(payload);
+        const normalized = normalizeClientState(payload.state);
+        const remoteState = sharedSyncSession.current.acceptRemote({ ...payload, state: normalized });
         if (alive) {
           const hadLocalChanges = localStorage.getItem(DIRTY_STORAGE_KEY) === "1";
           const preserved = hadLocalChanges && preserveLocalRecoveryCopy();
-          const normalized = normalizeClientState(remoteState);
-          skipNextSharedSave.current = true;
-          setState(normalized);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          setState(remoteState);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteState));
           localStorage.removeItem(DIRTY_STORAGE_KEY);
           setSharedError(preserved ? "发现本机未同步修改，已保留恢复副本并加载线上最新数据。" : "");
         }
@@ -175,14 +174,14 @@ export function ProductFlowProvider({ children }) {
     const serializedState = JSON.stringify(state);
     localStorage.setItem(STORAGE_KEY, serializedState);
     if (loading || !sharedSyncSession.current.canSave()) return undefined;
-    if (skipNextSharedSave.current) {
-      skipNextSharedSave.current = false;
+    const writeRequest = sharedSyncSession.current.buildWrite(state);
+    if (!writeRequest) {
+      localStorage.removeItem(DIRTY_STORAGE_KEY);
       return undefined;
     }
     localStorage.setItem(DIRTY_STORAGE_KEY, "1");
     const timer = setTimeout(async () => {
       try {
-        const writeRequest = sharedSyncSession.current.buildWrite(state);
         const response = await fetch(stateApiUrl, {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -190,7 +189,7 @@ export function ProductFlowProvider({ children }) {
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.synced === false) throw new Error(payload.message || "共享数据保存失败。");
-        sharedSyncSession.current.acceptSaved(payload);
+        sharedSyncSession.current.acceptSaved(payload, state);
         if (localStorage.getItem(STORAGE_KEY) === serializedState) {
           localStorage.removeItem(DIRTY_STORAGE_KEY);
         }

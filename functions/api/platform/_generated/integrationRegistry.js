@@ -380,7 +380,7 @@ const integrationRegistry = {
       "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、共享商品目录、用户洞察、货流事实、数据中心、加密凭证、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
-        "共享状态乐观版本控制",
+        "共享状态原子比较并写入",
         "共享状态写前快照与审计",
         "登录会话",
         "组织数据",
@@ -545,7 +545,8 @@ const integrationRegistry = {
         "migrations/0004_data_standards.sql",
         "migrations/0004_company_ai_skills.sql",
         "migrations/0005_user_insights.sql",
-        "migrations/0005_goods_flow_core.sql"
+        "migrations/0005_goods_flow_core.sql",
+        "migrations/0006_shared_state_revision.sql"
       ],
       "relations": [
         {
