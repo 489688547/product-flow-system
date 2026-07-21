@@ -7,9 +7,9 @@ import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../src/domain/s
 import { canEditFeature, canEditProductPlanning, canViewFeature, canViewNavigation, DEFAULT_PERMISSIONS } from "../src/domain/permissions.js";
 import { createDemandRecord, formatDemandCreatedAt } from "../src/domain/demandDate.js";
 
-async function loadStateRequest() {
+async function loadStateModule() {
   try {
-    return (await import("../functions/api/state.js")).onRequest;
+    return await import("../functions/api/state.js");
   } catch {
     return null;
   }
@@ -59,6 +59,7 @@ function createD1Mock() {
         },
         async all() {
           calls.push({ type: "all", sql, values: statement.values });
+          if (/from production_data_snapshots/i.test(sql)) return { results: [] };
           const prefix = `${statement.values[0] || "company"}:`;
           return {
             results: [...parts.entries()]
@@ -78,7 +79,8 @@ function createD1Mock() {
 }
 
 test("React app ships a Cloudflare Pages state API backed by sharded company D1 rows", async () => {
-  const stateRequest = await loadStateRequest();
+  const stateModule = await loadStateModule();
+  const stateRequest = stateModule?.onRequest;
   assert.ok(stateRequest, "functions/api/state.js should export onRequest");
 
   const noDb = await stateRequest({
@@ -107,14 +109,45 @@ test("React app ships a Cloudflare Pages state API backed by sharded company D1 
     settings: { settingsDepts: ["总经办"] }
   };
 
-  const post = await stateRequest({
+  const seeded = await stateModule.writeCompanyState(db, payload, "周总");
+
+  const missingBase = await stateRequest({
     request: new Request("https://flow.example.com/api/state", {
       method: "POST",
       body: JSON.stringify({ state: payload, updatedBy: "周总" })
     }),
-    env: { PRODUCT_FLOW_DB: db }
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { userId: "u1", unionId: "union1", name: "周总", role: "executive" } }
+  });
+  const missingBaseBody = await missingBase.json();
+  assert.equal(missingBase.status, 409);
+  assert.equal(missingBaseBody.error.code, "SHARED_STATE_BASE_REQUIRED");
+
+  const stale = await stateRequest({
+    request: new Request("https://flow.example.com/api/state", {
+      method: "POST",
+      body: JSON.stringify({ state: payload, baseUpdatedAt: "2026-07-01T00:00:00.000Z" })
+    }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { userId: "u1", unionId: "union1", name: "周总", role: "executive" } }
+  });
+  const staleBody = await stale.json();
+  assert.equal(stale.status, 409);
+  assert.equal(staleBody.error.code, "SHARED_STATE_VERSION_CONFLICT");
+
+  const post = await stateRequest({
+    request: new Request("https://flow.example.com/api/state", {
+      method: "POST",
+      body: JSON.stringify({ state: payload, baseUpdatedAt: seeded.updatedAt })
+    }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { userId: "u1", unionId: "union1", name: "周总", role: "executive" } }
   });
   assert.equal(post.status, 200);
+  const postBody = await post.clone().json();
+  assert.match(postBody.auditId, /^audit_/);
+  assert.ok(db.calls.some(call => /insert into production_data_snapshots/i.test(call.sql)));
+  assert.ok(db.calls.some(call => /insert into production_data_audit/i.test(call.sql)));
 
   const get = await stateRequest({
     request: new Request("https://flow.example.com/api/state"),
