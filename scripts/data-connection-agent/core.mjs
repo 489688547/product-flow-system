@@ -1,6 +1,7 @@
 import { providerForTask } from "./providers/index.mjs";
 
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const HUMAN_PENDING_STATES = new Set(["waiting_human_verification", "login_form", "loading"]);
 
 function safeFailure(error) {
   const message = String(error?.message || "采集任务执行失败。");
@@ -17,7 +18,7 @@ async function executeTask(task, { api, browser, wait, maxHumanPolls }) {
   if (pageState.status === "waiting_human_verification") {
     waitedForHuman = true;
     await api.result(task.id, { status: "waiting_human_verification" });
-    for (let index = 0; index < maxHumanPolls && pageState.status === "waiting_human_verification"; index += 1) {
+    for (let index = 0; index < maxHumanPolls && HUMAN_PENDING_STATES.has(pageState.status); index += 1) {
       await wait(2000);
       page = await provider.inspect(browser, page?.id);
       pageState = provider.classify(page);
@@ -28,8 +29,9 @@ async function executeTask(task, { api, browser, wait, maxHumanPolls }) {
     await api.result(task.id, { status: "succeeded", shops: pageState.shops });
     return { completed: true, waitedForHuman };
   }
-  const error = new Error(pageState.status === "waiting_human_verification" ? "等待人工验证超时。" : "抖音页面结构已变化，未识别到店铺身份。");
-  error.code = pageState.status === "waiting_human_verification" ? "HUMAN_VERIFICATION_TIMEOUT" : "PROVIDER_SCHEMA_CHANGED";
+  const humanTimeout = HUMAN_PENDING_STATES.has(pageState.status);
+  const error = new Error(humanTimeout ? "等待人工验证超时。" : "抖音页面结构已变化，未识别到店铺身份。");
+  error.code = humanTimeout ? "HUMAN_VERIFICATION_TIMEOUT" : "PROVIDER_SCHEMA_CHANGED";
   throw error;
 }
 

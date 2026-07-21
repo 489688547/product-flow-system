@@ -2,7 +2,7 @@ import { normalizeRecognizedShops } from "../../../src/domain/dataConnections.js
 
 export const DOUYIN_LOGIN_URL = "https://fxg.jinritemai.com/login/common?channel=zhaoshang";
 const DOUYIN_ORIGIN = "https://fxg.jinritemai.com";
-const HUMAN_VERIFICATION = /(?:请输入(?:图形|短信)?验证码|拖动.{0,12}滑块|扫码登录|请.{0,12}扫码|短信验证|设备确认|安全验证|风险验证)/i;
+const HUMAN_VERIFICATION = /(?:请输入(?:图形|短信|邮箱|邮件)?验证码|(?:邮箱|邮件)验证码|验证码.{0,4}(?:已发送至|发送到)(?:邮箱|邮件)|拖动.{0,12}滑块|扫码登录|请.{0,12}扫码|短信验证|设备确认|安全验证|风险验证)/i;
 const delay = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
 function validOrigin(value) {
@@ -16,7 +16,7 @@ export function normalizeDouyinShopCandidates(value) {
 export function classifyDouyinLoginPage(page = {}) {
   if (!validOrigin(page.url)) return { status: "invalid_origin", shops: [] };
   if (page.readyState && page.readyState !== "complete") return { status: "loading", shops: [] };
-  if (page.requiresAgreement) return { status: "waiting_human_verification", shops: [] };
+  if (page.requiresAgreement || page.requiresHumanLogin) return { status: "waiting_human_verification", shops: [] };
   if (HUMAN_VERIFICATION.test(String(page.text || ""))) return { status: "waiting_human_verification", shops: [] };
   const shops = normalizeDouyinShopCandidates(page.shops);
   if (shops.length) return { status: "authenticated", shops };
@@ -64,7 +64,7 @@ const SWITCH_TO_EMAIL_EXPRESSION = `(() => {
 })()`;
 
 function fillExpression(loginEmail, password) {
-  return `(async () => {
+  return `(() => {
     const setValue = (input, value) => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
       if (setter) setter.call(input, value); else input.value = value;
@@ -75,20 +75,9 @@ function fillExpression(loginEmail, password) {
     const secret = document.querySelector('input[type="password"], input[placeholder*="密码"], input[autocomplete="current-password"]');
     if (email) setValue(email, ${JSON.stringify(loginEmail)});
     if (secret) setValue(secret, ${JSON.stringify(password)});
-    const agreement = document.querySelector('input[type="checkbox"]');
-    for (let frame = 0; frame < 20; frame += 1) {
-      const ready = document.querySelector('button[type="submit"]:not(:disabled), [role="button"][data-e2e*="login"]:not([aria-disabled="true"])')
-        || Array.from(document.querySelectorAll('button,[role="button"]')).find(node => /^(?:登录|立即登录|确认登录)$/.test((node.textContent || '').trim()) && !node.disabled);
-      if (ready) break;
-      await new Promise(resolve => requestAnimationFrame(resolve));
-    }
-    const submit = document.querySelector('button[type="submit"], [role="button"][data-e2e*="login"]')
-      || Array.from(document.querySelectorAll('button,[role="button"]')).find(node => /^(?:登录|立即登录|确认登录)$/.test((node.textContent || '').trim()));
-    if (email && secret && submit && !submit.disabled) submit.click();
     return {
       filled: Boolean(email && secret),
-      submitted: Boolean(email && secret && submit && !submit.disabled),
-      agreementRequired: Boolean(agreement && !agreement.checked)
+      requiresHumanLogin: true
     };
   })()`;
 }
@@ -121,7 +110,6 @@ export async function openAndFillDouyin(browser, credentials, options = {}) {
   if (typeof browser.openAndFill === "function") return browser.openAndFill(DOUYIN_LOGIN_URL, login);
   const wait = options.wait || delay;
   const maxLoadPolls = Number.isFinite(options.maxLoadPolls) ? options.maxLoadPolls : 40;
-  const maxTransitionPolls = Number.isFinite(options.maxTransitionPolls) ? options.maxTransitionPolls : 120;
   const page = await browser.open(DOUYIN_LOGIN_URL);
   let snapshot = await waitForPage(browser, page.id, current => classifyDouyinLoginPage(current).status !== "loading", {
     wait, maxPolls: maxLoadPolls, intervalMs: 250
@@ -140,17 +128,12 @@ export async function openAndFillDouyin(browser, credentials, options = {}) {
     throw error;
   }
   const fill = await browser.evaluate(page.id, fillExpression(login.loginEmail, login.password));
-  if (fill?.filled && fill?.agreementRequired) return { ...snapshot, requiresAgreement: true };
-  if (!fill?.filled || !fill?.submitted) {
-    const error = new Error("抖音登录表单未能提交。");
+  if (!fill?.filled) {
+    const error = new Error("抖音邮箱登录表单未能填写。");
     error.code = "PROVIDER_LOGIN_FORM_CHANGED";
     throw error;
   }
-  snapshot = await waitForPage(browser, page.id, current => {
-    const status = classifyDouyinLoginPage(current).status;
-    return !["loading", "login_form"].includes(status);
-  }, { wait, maxPolls: maxTransitionPolls, intervalMs: 500 });
-  return snapshot;
+  return { ...snapshot, requiresHumanLogin: true };
 }
 
 export async function inspectDouyin(browser, pageId) {
