@@ -67,6 +67,7 @@
 | `/api/platform/v1/environment-readiness` | 读取当前或生产环境脱敏就绪状态 | 员工会话或 read 个人令牌；只返回配置名称与存在性 |
 | `/api/platform/v1/production-write-session` | 解锁、查询和锁定跨环境生产写入 | active executive + write 个人令牌；确认短语；15 分钟有效 |
 | `/api/platform/v1/production-data/state` | 本地测试实时读取、受控写入和回滚生产公司状态 | Bearer 个人令牌；写入需解锁、基线版本、快照与审计 |
+| `/api/platform/v1/production-data/store-connections` | 读取并不可恢复清理已退役店铺网页登录记录 | Bearer 个人令牌；仅 active executive；写入需 15 分钟解锁、精确确认、清理前计数快照与审计；不返回凭据值 |
 | `GET /api/platform/v1/ai/status` | 读取公司 AI 总助和当前用户数据域状态 | 钉钉会话；全员可读；只返回脱敏状态 |
 | `GET /api/platform/v1/ai/provider` | 读取 AI Provider 安全状态 | 钉钉会话；全员可读；外发策略仅总经办可见 |
 | `PUT /api/platform/v1/ai/provider` | 更新白名单内 Provider 元数据和启用状态 | 钉钉会话；仅非只读总经办；不接收 Secret、URL 或任意 Header |

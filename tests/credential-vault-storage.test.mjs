@@ -65,7 +65,7 @@ function createD1Mock() {
         },
         async all() {
           if (/from credential_vault_entries/i.test(sql)) {
-            return { results: [...entries.values()].filter(row => row.archived_at == null) };
+            return { results: [...entries.values()].filter(row => !/where archived_at is null/i.test(sql) || row.archived_at == null) };
           }
           return { results: [] };
         },
@@ -178,4 +178,21 @@ test("destroy irreversibly removes ciphertext and keeps a value-free audit", asy
     () => revealCredentialEntry(db, "cred-1", { ...actor, masterKey: key }),
     error => error.code === "CREDENTIAL_ENTRY_NOT_FOUND"
   );
+});
+
+test("destroy also clears ciphertext retained by a previously archived entry", async () => {
+  const db = createD1Mock();
+  const key = masterKey();
+  await createCredentialEntry(db, {
+    id: "cred-1", scopeType: "connector", scopeId: "shop-1", category: "douyin-ecommerce",
+    name: "旧店铺登录", schemaVersion: 1, secretPayload: { password: "archived-secret" }
+  }, { ...actor, masterKey: key });
+  await archiveCredentialEntry(db, "cred-1", { expectedVersion: 1 }, actor);
+
+  const destroyed = await destroyCredentialEntry(db, "cred-1", { expectedVersion: 2 }, actor);
+
+  assert.equal(destroyed.hasSecret, false);
+  assert.equal(db.entries.get("cred-1").ciphertext, "");
+  assert.equal(db.entries.get("cred-1").iv, "");
+  assert.ok(db.auditRows.some(row => row.action === "destroy"));
 });

@@ -24,6 +24,7 @@
 - `destroyCredentialEntry(db, id, { expectedVersion }, context)`：校验当前版本；清空密文/IV；归档；追加 `destroy` 审计；成功后不能 reveal。
 - `DELETE /api/platform/v1/data-connections`：仅最高权限管理员和新鲜会话；请求 `{ id, expectedVersion, confirmation: "销毁店铺凭证" }`。
 - `PUT /api/data-center/connectors` 的 `destroy` 动作：仅总经办；归档通用店铺实例并销毁关联凭证。
+- `POST /api/platform/v1/production-data/store-connections`：生产个人令牌与 15 分钟解锁保护的批量退役动作，清理专属连接、通用实例、孤立或已归档的店铺密文及活动任务，并保留无秘密快照和审计。
 
 ## 数据迁移
 

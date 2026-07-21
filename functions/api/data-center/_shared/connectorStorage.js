@@ -297,7 +297,7 @@ export async function destroyConnectorRecord(db, id, input = {}, context = {}) {
   if (Number(input.expectedVersion) !== existing.version) throw connectorError("连接实例版本已更新，请刷新后重试。", "DATA_CONNECTOR_VERSION_CONFLICT", 409);
 
   if (existing.credentialEntryId) {
-    const credentials = await listCredentialMetadata(db, { scopeType: "connector" });
+    const credentials = await listCredentialMetadata(db, { scopeType: "connector", includeArchived: true });
     const credential = credentials.find(item => item.id === existing.credentialEntryId);
     if (credential) {
       await destroyCredentialEntry(db, credential.id, { expectedVersion: credential.version }, {
