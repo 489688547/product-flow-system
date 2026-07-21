@@ -153,7 +153,7 @@ export async function listCredentialMetadata(db, filter = {}) {
   await ensureCredentialVaultTables(db);
   const result = await db.prepare(`SELECT id, scope_type, scope_id, category, name, schema_version,
     ciphertext, key_version, version, created_at, created_by, updated_at, updated_by, archived_at
-    FROM credential_vault_entries WHERE archived_at IS NULL ORDER BY updated_at DESC`).all();
+    FROM credential_vault_entries ${filter.includeArchived ? "" : "WHERE archived_at IS NULL"} ORDER BY updated_at DESC`).all();
   return (result?.results || [])
     .filter(row => !filter.scopeType || row.scope_type === filter.scopeType)
     .filter(row => !filter.scopeId || row.scope_id === filter.scopeId)
@@ -235,6 +235,34 @@ export async function archiveCredentialEntry(db, id, input = {}, context = {}) {
   if (Number(result?.meta?.changes || 0) !== 1) throw storageError("凭证版本已更新，请刷新后重试。", "CREDENTIAL_VERSION_CONFLICT", 409);
   await audit(db, id, "archive", ["status"], context);
   return { ...metadataFromRow(current), version: nextVersion, archivedAt: now };
+}
+
+export async function destroyCredentialEntry(db, id, input = {}, context = {}) {
+  const current = await entryRow(db, id);
+  if (!current) throw storageError("凭证条目不存在。", "CREDENTIAL_ENTRY_NOT_FOUND", 404);
+  const expectedVersion = Number(input.expectedVersion);
+  if (expectedVersion !== Number(current.version)) throw storageError("凭证版本已更新，请刷新后重试。", "CREDENTIAL_VERSION_CONFLICT", 409);
+  if (!current.ciphertext && !current.iv) return metadataFromRow(current);
+  const nextVersion = Number(current.version) + 1;
+  const now = new Date().toISOString();
+  const actor = cleanString(context.actorName || context.actorId || "unknown", "actor", 160);
+  const result = await db.prepare(`UPDATE credential_vault_entries SET ciphertext = ?, iv = ?,
+    archived_at = ?, archived_by = ?, version = ?, updated_at = ?, updated_by = ?
+    WHERE id = ? AND version = ?`)
+    .bind("", "", now, actor, nextVersion, now, actor, id, expectedVersion)
+    .run();
+  if (Number(result?.meta?.changes || 0) !== 1) throw storageError("凭证版本已更新，请刷新后重试。", "CREDENTIAL_VERSION_CONFLICT", 409);
+  await audit(db, id, "destroy", ["secret", "status"], context);
+  return metadataFromRow({
+    ...current,
+    ciphertext: "",
+    iv: "",
+    version: nextVersion,
+    updated_at: now,
+    updated_by: actor,
+    archived_at: now,
+    archived_by: actor
+  });
 }
 
 export async function revealCredentialEntry(db, id, context = {}) {

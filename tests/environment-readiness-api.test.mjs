@@ -21,7 +21,12 @@ const REQUIRED_PRODUCTION_TABLES = [
   "credential_vault_entries",
   "credential_vault_permissions",
   "credential_vault_audit",
-  "internal_vault_items"
+  "internal_vault_items",
+  "data_connections",
+  "data_connection_shops",
+  "browser_agent_tasks",
+  "browser_agent_task_grants",
+  "data_connection_audit"
 ];
 const TEST_PLATFORM_MASTER_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const HR_CORE_TABLES = [

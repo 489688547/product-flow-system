@@ -28,7 +28,8 @@ test("data center has navigation and feature permission defaults", () => {
 test("data center navigation keeps all governed workspaces", () => {
   const app = read("src/App.jsx");
   const navBlock = app.match(/const DATA_CENTER_NAV = \[([\s\S]*?)\];/)?.[1] || "";
-  assert.match(navBlock, /data-overview[\s\S]*data-insights[\s\S]*data-analysis[\s\S]*data-products[\s\S]*data-sources[\s\S]*data-metrics[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
+  assert.match(navBlock, /data-overview[\s\S]*data-insights[\s\S]*data-products[\s\S]*data-sources[\s\S]*data-metrics[\s\S]*data-sync[\s\S]*data-services[\s\S]*data-settings/);
+  assert.doesNotMatch(navBlock, /data-analysis/);
   assert.doesNotMatch(navBlock, /data-quality/);
   assert.doesNotMatch(navBlock, /data-connections/);
   assert.match(app, /\["data-metrics", "数据口径"/);
@@ -48,7 +49,7 @@ test("main mounts data center provider inside product state with access gating",
   assert.match(main, /<ProductFlowProvider>[\s\S]*<DataCenterProvider enabled=\{hasDataCenterAccess\}>[\s\S]*<SupplyChainProvider/);
 });
 
-test("overview exposes governed metrics while preserving the analysis workspace", () => {
+test("overview exposes governed metrics without restoring the deleted analysis workspace", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   const overview = read("src/features/data-center/DataOverview.jsx");
   const domain = read("src/domain/dataCenter.js");
@@ -56,9 +57,8 @@ test("overview exposes governed metrics while preserving the analysis workspace"
   assert.match(page, /useDataStandards/);
   assert.match(page, /buildDataQualitySummary/);
   assert.match(page, /overview: <DataOverview/);
-  assert.match(page, /DataAnalysis/);
-  assert.match(page, /analysis: <DataAnalysis/);
-  assert.match(read("src/features/data-center/DataAnalysis.jsx"), /summarizeDataCenterSales/);
+  assert.doesNotMatch(page, /DataAnalysis/);
+  assert.doesNotMatch(page, /analysis: <DataAnalysis/);
   assert.match(overview, /净销售额/);
   assert.match(overview, /订单创建时间/);
   assert.match(overview, /截止昨天/);
@@ -106,8 +106,8 @@ test("data center has restrained responsive layouts and visible focus states", (
   assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.data-overview-grid/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.data-range-controls/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
-  assert.match(styles, /\.data-analysis-toolbar/);
-  assert.match(styles, /\.data-analysis-series/);
+  assert.doesNotMatch(styles, /\.data-analysis-toolbar/);
+  assert.doesNotMatch(styles, /\.data-analysis-series/);
   assert.match(styles, /\.data-sync-status-bar/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.data-sync-status-bar/);
 });

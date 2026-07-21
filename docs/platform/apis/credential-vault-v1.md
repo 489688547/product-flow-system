@@ -116,6 +116,8 @@
 
 归档是逻辑删除；默认列表不返回归档条目，密文和审计继续保留。
 
+已退役店铺连接使用共享存储层的受控 `destroyCredentialEntry` 动作：仅由对应管理员清理 API 调用，校验当前版本后清空密文和 IV、归档条目并追加不含值的 `destroy` 审计。该动作不可回滚，也不作为通用前端保险箱动作开放。
+
 ## POST `/api/platform/v1/credential-vault/:id/reveal`
 
 请求：

@@ -199,6 +199,76 @@ const integrationRegistry = {
       ]
     },
     {
+      "id": "douyin-ecommerce",
+      "name": "抖音电商罗盘",
+      "status": "retired",
+      "summary": "店铺网页登录采集已退役；抖音店铺经营改为平台原始文件方向，当前等待真实文件样例。",
+      "capabilities": [
+        "原始文件方向",
+        "等待文件样例",
+        "旧凭证不可恢复销毁",
+        "历史审计保留"
+      ],
+      "businessQuestions": [
+        "抖音原始文件样例",
+        "订单创建时间口径",
+        "文件字段识别",
+        "历史连接清理"
+      ],
+      "keywords": [
+        "抖音电商",
+        "抖店",
+        "Douyin",
+        "原始文件",
+        "文件导入"
+      ],
+      "codePaths": [
+        "src/domain/dataCenterConnectors.js",
+        "src/features/data-center/connections/**",
+        "functions/api/platform/v1/data-connections/**",
+        "functions/api/platform/_shared/credentialVaultStorage.js",
+        "migrations/0006_data_connections.sql"
+      ],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [
+        "/api/platform/v1/data-connections"
+      ],
+      "publicDocs": [],
+      "evidence": [
+        "docs/features/store-file-import-transition/prd.md",
+        "docs/features/store-file-import-transition/design.md",
+        "migrations/0006_data_connections.sql"
+      ],
+      "relations": [
+        {
+          "platformId": "cloudflare-d1",
+          "type": "stores-cleanup-audit",
+          "description": "D1 保留无秘密审计和历史经营事实；旧店铺凭证密文与 IV 被清空。"
+        },
+        {
+          "platformId": "cloudflare-pages",
+          "type": "hosts-retirement-api",
+          "description": "Pages Functions 承载旧连接只读与受控销毁接口。"
+        },
+        {
+          "platformId": "erp-file-import",
+          "type": "planned-file-pattern",
+          "description": "店铺原始文件后续复用已验证的预览、确认和标准事实写入原则，但必须先取得真实样例。"
+        },
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "文件导入需区分快麦聚合订单与抖音店铺原始经营数据。"
+        },
+        {
+          "platformId": "oceanengine-qianchuan",
+          "type": "commerce-to-advertising",
+          "description": "店铺经营数据与巨量投放数据分别采集并通过标准维度关联。"
+        }
+      ]
+    },
+    {
       "id": "cloudflare-pages",
       "name": "Cloudflare Pages",
       "status": "connected",
@@ -1022,49 +1092,6 @@ const integrationRegistry = {
           "platformId": "cloudflare-d1",
           "type": "governed-by",
           "description": "D1 保存 Provider 安全元数据、外发策略、并发租约和无内容审计。"
-        }
-      ]
-    },
-    {
-      "id": "douyin-ecommerce",
-      "name": "抖音电商",
-      "status": "planned",
-      "summary": "计划通过平台授权、网页导出或固定公司 Mac 的已登录页面采集店铺经营数据，尚未接入。",
-      "capabilities": [
-        "店铺订单",
-        "商品数据",
-        "经营报表",
-        "网页导出"
-      ],
-      "businessQuestions": [
-        "抖音店铺如何授权",
-        "邮箱或手机号登录如何处理",
-        "验证码后如何恢复同步",
-        "与快麦订单是否重复"
-      ],
-      "keywords": [
-        "抖音电商",
-        "抖店",
-        "Douyin Ecommerce",
-        "店铺后台",
-        "邮箱登录"
-      ],
-      "codePaths": [],
-      "envVars": [],
-      "domains": [],
-      "apiRoutes": [],
-      "publicDocs": [],
-      "evidence": [],
-      "relations": [
-        {
-          "platformId": "kuaimai",
-          "type": "possible-overlap",
-          "description": "接入前需区分快麦聚合订单与抖音店铺原始经营数据。"
-        },
-        {
-          "platformId": "oceanengine-qianchuan",
-          "type": "commerce-to-advertising",
-          "description": "店铺经营数据与巨量投放数据分别采集并通过标准维度关联。"
         }
       ]
     },

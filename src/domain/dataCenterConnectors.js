@@ -59,6 +59,21 @@ function definition(input) {
   });
 }
 
+export const STORE_FILE_IMPORT_CONNECTOR_IDS = Object.freeze([
+  "douyin-ecommerce",
+  "kuaishou",
+  "taobao",
+  "pinduoduo",
+  "xiaohongshu",
+  "jd-jingmai"
+]);
+
+const STORE_FILE_IMPORT_CONNECTORS = new Set(STORE_FILE_IMPORT_CONNECTOR_IDS);
+
+export function storeFileImportPending(connectorId) {
+  return STORE_FILE_IMPORT_CONNECTORS.has(String(connectorId || ""));
+}
+
 export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
   definition({
     id: "douyin-ecommerce",
@@ -66,14 +81,10 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     identityLabel: "店铺名称",
     description: "店铺订单、商品与经营数据",
     logo: "douyin",
-    methods: ["browser", "export"],
+    methods: ["export"],
     accountTypes: ["shop"],
     datasets: ["orders", "products", "shop-performance"],
-    fields: [
-      field("loginEmail", "登录邮箱", "email", { sensitive: true, methods: ["browser"] }),
-      field("loginPhone", "登录手机号", "text", { sensitive: true, methods: ["browser"] }),
-      field("password", "密码", "password", { sensitive: true, methods: ["browser"] })
-    ]
+    fields: []
   }),
   definition({
     id: "oceanengine",
@@ -99,13 +110,10 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     identityLabel: "店铺 / 广告账户名称",
     description: "快手小店与广告经营数据",
     logo: "kuaishou",
-    methods: ["browser", "export"],
+    methods: ["export"],
     accountTypes: ["shop", "advertiser"],
     datasets: ["orders", "products", "advertising-performance"],
-    fields: [
-      field("loginAccount", "登录账号", "text", { sensitive: true, methods: ["browser"] }),
-      field("password", "密码", "password", { sensitive: true, methods: ["browser"] })
-    ]
+    fields: []
   }),
   definition({
     id: "taobao",
@@ -113,13 +121,10 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     identityLabel: "店铺名称",
     description: "天猫与淘宝店铺经营数据",
     logo: "taobao",
-    methods: ["browser", "export"],
+    methods: ["export"],
     accountTypes: ["tmall", "taobao"],
     datasets: ["orders", "products", "shop-performance"],
-    fields: [
-      field("loginAccount", "登录账号", "text", { sensitive: true, methods: ["browser"] }),
-      field("password", "密码", "password", { sensitive: true, methods: ["browser"] })
-    ]
+    fields: []
   }),
   definition({
     id: "pinduoduo",
@@ -127,13 +132,10 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     identityLabel: "店铺名称",
     description: "拼多多店铺订单与商品数据",
     logo: "pinduoduo",
-    methods: ["browser", "export"],
+    methods: ["export"],
     accountTypes: ["shop"],
     datasets: ["orders", "products", "shop-performance"],
-    fields: [
-      field("loginAccount", "登录账号", "text", { sensitive: true, methods: ["browser"] }),
-      field("password", "密码", "password", { sensitive: true, methods: ["browser"] })
-    ]
+    fields: []
   }),
   definition({
     id: "xiaohongshu",
@@ -141,13 +143,10 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     identityLabel: "店铺 / 乘风账户名称",
     description: "小红书店铺与乘风投放数据",
     logo: "xiaohongshu",
-    methods: ["browser", "export"],
+    methods: ["export"],
     accountTypes: ["shop", "chengfeng"],
     datasets: ["orders", "products", "advertising-performance"],
-    fields: [
-      field("loginAccount", "登录账号", "text", { sensitive: true, methods: ["browser"] }),
-      field("password", "密码", "password", { sensitive: true, methods: ["browser"] })
-    ]
+    fields: []
   }),
   definition({
     id: "jd-jingmai",
@@ -155,13 +154,10 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     identityLabel: "店铺名称",
     description: "京东店铺与京麦后台经营数据",
     logo: "jd",
-    methods: ["browser", "export"],
+    methods: ["export"],
     accountTypes: ["shop"],
     datasets: ["orders", "products", "shop-performance"],
-    fields: [
-      field("loginAccount", "京麦账号", "text", { sensitive: true, methods: ["browser"] }),
-      field("password", "密码", "password", { sensitive: true, methods: ["browser"] })
-    ]
+    fields: []
   }),
   definition({
     id: "kuaimai-erp",
@@ -209,6 +205,7 @@ const DEFINITIONS_BY_ID = new Map(DATA_CONNECTOR_DEFINITIONS.map(item => [item.i
 function inputError(message) {
   const error = new Error(message);
   error.status = 400;
+  error.code = "DATA_CONNECTOR_INVALID";
   return error;
 }
 

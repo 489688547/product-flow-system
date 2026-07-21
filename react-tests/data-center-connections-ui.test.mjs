@@ -98,7 +98,7 @@ test("legacy generic source form is removed and security copy is updated", () =>
   assert.doesNotMatch(workspaces, /新增数据源/);
   assert.match(workspaces, /敏感信息加密保存/);
   assert.match(page, /canManage/);
-  assert.match(page, /analysis: <DataAnalysis/);
+  assert.doesNotMatch(page, /analysis: <DataAnalysis/);
 });
 
 test("connector UI has responsive dialog and visible focus rules", () => {

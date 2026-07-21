@@ -3,13 +3,14 @@ import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
 import {
   archiveConnectorRecord,
   connectorDatabase,
+  destroyConnectorRecord,
   listConnectorRecords,
   upsertConnectorRecord,
   upsertVaultItemRecord
 } from "./_shared/connectorStorage.js";
 
 const VIEW_DEPARTMENTS = new Set(["总经办", "运营部", "财务部", "产品部", "供应链部", "供应链", "供应链团队", "采购部"]);
-const BODY_FIELDS = new Set(["expectedVersion", "instance", "vaultItem", "action", "id"]);
+const BODY_FIELDS = new Set(["expectedVersion", "instance", "vaultItem", "action", "id", "confirmation"]);
 
 function department(session = {}) {
   return String(session.department || session.departmentName || "").trim();
@@ -58,7 +59,19 @@ export async function onRequest({ request, env, data = {} }) {
     if (!canEditConnectors(session)) throw routeError("当前身份不能维护数据中心连接器。", "PERMISSION_WRITE_DENIED", 403);
     const body = await request.json().catch(() => null);
     assertBody(body);
-    const context = { expectedVersion: body.expectedVersion, actor: String(session.name || session.userId || "unknown") };
+    const context = {
+      expectedVersion: body.expectedVersion,
+      actor: String(session.name || session.userId || "unknown"),
+      actorId: String(session.userId || "unknown"),
+      requestId: request.headers.get("cf-ray") || crypto.randomUUID?.() || ""
+    };
+    if (body.action === "destroy") {
+      if (!admin) throw routeError("仅总经办平台管理员可以销毁店铺凭证。", "PERMISSION_WRITE_DENIED", 403);
+      if (body.confirmation !== "销毁店铺凭证") throw routeError("请输入完整确认文案：销毁店铺凭证。", "DATA_CONNECTOR_DESTROY_CONFIRMATION_REQUIRED", 400);
+      if (!body.id) throw routeError("缺少连接实例 ID。", "DATA_CONNECTOR_INVALID", 400);
+      const instance = await destroyConnectorRecord(db, String(body.id), body, context);
+      return jsonResponse({ synced: true, instance });
+    }
     if (body.action === "archive") {
       if (!admin) throw routeError("仅总经办平台管理员可以归档连接器。", "PERMISSION_WRITE_DENIED", 403);
       if (!body.id) throw routeError("缺少连接实例 ID。", "DATA_CONNECTOR_INVALID", 400);

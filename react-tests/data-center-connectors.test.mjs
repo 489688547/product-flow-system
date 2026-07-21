@@ -42,20 +42,20 @@ test("catalog covers internal vault types and the full status priority", () => {
   ]);
 });
 
-test("configuration splits metadata from allowed encrypted secrets", () => {
-  const definition = connectorDefinition("douyin-ecommerce");
+test("configuration splits advertising metadata from allowed encrypted secrets", () => {
+  const definition = connectorDefinition("oceanengine");
   const split = splitConnectorPayload(definition, {
-    name: "抖音官旗",
+    name: "千川官旗",
     companySubject: "测试公司",
     consoleUrl: "https://example.com/console",
     captureMethod: "browser",
-    loginEmail: "ops@example.com",
+    loginAccount: "ops@example.com",
     password: "secret"
   });
-  assert.deepEqual(split.secretPayload, { loginEmail: "ops@example.com", password: "secret" });
-  assert.equal(split.metadata.name, "抖音官旗");
+  assert.deepEqual(split.secretPayload, { loginAccount: "ops@example.com", password: "secret" });
+  assert.equal(split.metadata.name, "千川官旗");
   assert.equal(split.metadata.consoleUrl, "https://example.com/console");
-  assert.equal(split.metadata.loginEmail, undefined);
+  assert.equal(split.metadata.loginAccount, undefined);
   assert.equal(split.metadata.password, undefined);
 });
 
@@ -83,7 +83,7 @@ test("new connector instances cannot forge a healthy connection", () => {
 
 test("connector definitions expose only supported platform-specific methods", () => {
   assert.deepEqual(connectorDefinition("kuaimai-erp").methods, ["api", "browser", "export"]);
-  assert.deepEqual(connectorDefinition("douyin-ecommerce").methods, ["browser", "export"]);
+  assert.deepEqual(connectorDefinition("douyin-ecommerce").methods, ["export"]);
   assert.throws(() => connectorDefinition("unknown-platform"), /未知连接器/);
 });
 
@@ -101,5 +101,5 @@ test("capture method is inferred from configured credentials", () => {
   assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { password: "secret" } }), "browser");
   assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { appSecret: "api", password: "web" } }), "api");
   assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {} }), "export");
-  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {}, existingMethod: "browser" }), "browser");
+  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {}, existingMethod: "browser" }), "export");
 });
