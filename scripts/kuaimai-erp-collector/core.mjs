@@ -16,7 +16,7 @@ const RESOURCE_SCHEMAS = {
     identities: [
       ["订单明细ID", "明细ID", "子订单号"],
       ["系统订单号", "系统单号", "订单编号", "订单号"],
-      ["系统规格ID", "规格ID", "SKU ID", "商家编码", "规格编码", "SKU编码"]
+      ["系统规格ID", "规格ID", "SKU ID", "规格商家编码", "商家编码", "规格编码", "SKU编码"]
     ],
     occurredAt: ["订单创建时间", "创建时间", "下单时间", "交易创建时间"],
     modifiedAt: ["订单修改时间", "修改时间", "更新时间"],
@@ -204,6 +204,7 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
   }
 
   const recordsByKey = new Map();
+  const duplicateOrdinals = new Map();
   const issues = [];
   for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex];
@@ -219,9 +220,14 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
       continue;
     }
     const payload = rowPayload(headers, row);
-    const sourceKey = identity.join("::");
-    if (recordsByKey.has(sourceKey)) {
-      issues.push({ sourceKey, code: "DUPLICATE_SOURCE_KEY", severity: "warning", message: `文件中来源键 ${sourceKey} 重复，保留最后一行。`, details: { rowNumber: rowIndex + 1 } });
+    const baseSourceKey = identity.join("::");
+    let sourceKey = baseSourceKey;
+    if (recordsByKey.has(baseSourceKey) && resourceType === "order_items") {
+      const ordinal = (duplicateOrdinals.get(baseSourceKey) || 1) + 1;
+      duplicateOrdinals.set(baseSourceKey, ordinal);
+      sourceKey = `${baseSourceKey}::line:${ordinal}`;
+    } else if (recordsByKey.has(baseSourceKey)) {
+      issues.push({ sourceKey: baseSourceKey, code: "DUPLICATE_SOURCE_KEY", severity: "warning", message: `文件中来源键 ${baseSourceKey} 重复，保留最后一行。`, details: { rowNumber: rowIndex + 1 } });
     }
     recordsByKey.set(sourceKey, {
       sourceKey,

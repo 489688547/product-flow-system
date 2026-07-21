@@ -23,7 +23,7 @@
 
 ## 数据迁移
 
-只新增 `erp_collection_batches`、`erp_source_records`、`erp_collection_issues` 及索引。估算容量时使用样例文件平均 JSON 字节数乘历史行数；超过 D1 可接受容量前停止全量写入并改为 NAS 原文件加标准事实。
+只新增 `erp_collection_batches`、`erp_source_records`、`erp_collection_issues` 及索引。真实 15 日订单商品明细样本为 157,217 行、序列化记录约 339.84 MiB，已证明全历史原始 JSON 不适合直接放入 D1；订单原始文件进入 NAS/R2 前不得继续全量原始明细写入，D1 改存标准事实和聚合。
 
 ## 风险与回滚
 

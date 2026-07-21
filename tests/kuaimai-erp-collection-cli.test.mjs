@@ -23,6 +23,30 @@ test("collector rejects an order file without creation time instead of guessing"
   await assert.rejects(() => readKuaimaiExport(file, { resourceType: "orders" }), error => error.code === "KUAIMAI_EXPORT_REQUIRED_COLUMNS_MISSING");
 });
 
+test("collector keeps separate Kuaimai order item rows by specification merchant code", async () => {
+  const file = new File([
+    "系统订单号,规格商家编码,主商家编码,下单时间,店铺名称,销售数量\n",
+    "KM1001,SKU-A,SPU-1,2026-07-01 10:20:30,抖音官方旗舰店,1\n",
+    "KM1001,SKU-B,SPU-1,2026-07-01 10:20:30,抖音官方旗舰店,2\n"
+  ], "kuaimai-order-items.csv");
+  const result = await readKuaimaiExport(file, { resourceType: "order_items" });
+  assert.equal(result.batch.rowCount, 2);
+  assert.deepEqual(result.records.map(record => record.sourceKey), ["KM1001::SKU-A", "KM1001::SKU-B"]);
+  assert.equal(result.issues.length, 0);
+});
+
+test("collector preserves repeated lines for the same order and specification", async () => {
+  const file = new File([
+    "系统订单号,规格商家编码,下单时间,店铺名称,销售数量,实发金额\n",
+    "KM1001,SKU-A,2026-07-01 10:20:30,抖音官方旗舰店,1,19.9\n",
+    "KM1001,SKU-A,2026-07-01 10:20:30,抖音官方旗舰店,2,39.8\n"
+  ], "kuaimai-repeated-order-items.csv");
+  const result = await readKuaimaiExport(file, { resourceType: "order_items" });
+  assert.equal(result.batch.rowCount, 2);
+  assert.deepEqual(result.records.map(record => record.sourceKey), ["KM1001::SKU-A", "KM1001::SKU-A::line:2"]);
+  assert.equal(result.issues.length, 0);
+});
+
 test("uploader chunks records and marks only the final request completed", async () => {
   const parsed = await readKuaimaiExport(fixture, { resourceType: "orders" });
   parsed.records = Array.from({ length: 501 }, (_, index) => ({ ...parsed.records[index % 2], sourceKey: `KM${index}` }));

@@ -38,7 +38,7 @@
       "publicDocs": [
         { "label": "快麦开放平台 API 文档", "url": "https://open.kuaimai.com/docs/" }
       ],
-      "evidence": ["functions/api/kuaimai/", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/product-catalog/sync/kuaimai.js", "functions/api/platform/v1/product-catalog/_shared/sales.js", "src/domain/productCatalog.js", "src/domain/productCatalogSales.js", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "src/features/settings/KuaimaiSyncSettings.jsx", "docs/features/kuaimai-erp-history/prd.md", "migrations/0007_kuaimai_erp_collection.sql"],
+      "evidence": ["functions/api/kuaimai/", "functions/api/platform/v1/erp-collection/ingest.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/product-catalog/sync/kuaimai.js", "functions/api/platform/v1/product-catalog/_shared/sales.js", "src/domain/kuaimaiErpCollection.js", "src/domain/productCatalog.js", "src/domain/productCatalogSales.js", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "src/features/settings/KuaimaiSyncSettings.jsx", "scripts/kuaimai-erp-collector/core.mjs", ".agents/skills/kuaimai-erp-data-collection/SKILL.md", "docs/platform/apis/erp-collection-v1.md", "docs/features/kuaimai-erp-history/prd.md", "migrations/0007_kuaimai_erp_collection.sql"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "stores-erp-source-records", "description": "快麦官方导出文件的批次、标准索引、原始行和异常审计写入 D1；既有销售聚合与商品目录继续作为消费模型。" },
         { "platformId": "erp-file-import", "type": "primary-history-channel", "description": "官方文件是当前快麦全历史补数的主通道，开放平台接口仅作为有限补充。" }
@@ -144,7 +144,7 @@
       "domains": [],
       "apiRoutes": ["/api/sales", "/api/platform/v1/erp-collection/ingest", "/api/platform/v1/product-catalog/import", "/api/platform/v1/goods-flow/imports"],
       "publicDocs": [],
-      "evidence": ["src/features/settings/SalesDataSettings.jsx", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/supply-chain/InventoryWorkspace.jsx", "src/domain/salesData.js", "src/domain/productCatalog.js", "src/domain/xlsxLite.js", "src/domain/supplyChain.js", "docs/features/kuaimai-erp-history/prd.md", "migrations/0007_kuaimai_erp_collection.sql"],
+      "evidence": ["src/features/settings/SalesDataSettings.jsx", "src/features/data-center/ProductCatalogWorkspace.jsx", "src/features/supply-chain/InventoryWorkspace.jsx", "src/domain/kuaimaiErpCollection.js", "src/domain/salesData.js", "src/domain/productCatalog.js", "src/domain/xlsxLite.js", "src/domain/supplyChain.js", "functions/api/platform/v1/erp-collection/ingest.js", "scripts/kuaimai-erp-collector/core.mjs", ".agents/skills/kuaimai-erp-data-collection/SKILL.md", "docs/platform/apis/erp-collection-v1.md", "docs/features/kuaimai-erp-history/prd.md", "migrations/0007_kuaimai_erp_collection.sql"],
       "relations": [
         { "platformId": "kuaimai", "type": "primary-history-channel-for", "description": "官方导出文件承接快麦开放平台无法完整覆盖的历史数据。" },
         { "platformId": "cloudflare-d1", "type": "stores-imports", "description": "导入批次、原始记录、异常、聚合销售结果和标准化商品目录通过内部 API 写入 D1。" }
