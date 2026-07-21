@@ -63,13 +63,13 @@ test("platform provider exposes governed execution commands", () => {
   assert.match(provider, /state\.monthlyReports/);
 });
 
-test("product task assignment survives a DingTalk sync failure", () => {
+test("product todo keeps the last successful assignment when DingTalk sync fails", () => {
   const provider = read("src/state/ProductFlowProvider.jsx");
-  assert.match(provider, /executorUnionIds: payload\.executorUnionIds/);
-  assert.match(provider, /executorNames: executors\.map/);
+  assert.match(provider, /applyTaskTodoSyncSuccess/);
+  assert.match(provider, /applyTaskTodoSyncFailure/);
   const catchBlock = provider.slice(provider.indexOf("} catch (error)"), provider.indexOf("const scheduleTaskMeeting"));
-  assert.match(catchBlock, /executorUnionIds/);
-  assert.match(catchBlock, /executorNames/);
+  assert.doesNotMatch(catchBlock, /executorUnionIds: payload\.executorUnionIds/);
+  assert.doesNotMatch(catchBlock, /executorNames: executors\.map/);
 });
 
 test("authenticated identity always comes from the server session", () => {

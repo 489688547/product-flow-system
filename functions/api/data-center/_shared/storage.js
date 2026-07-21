@@ -1,4 +1,4 @@
-import { DATA_CENTER_COLLECTIONS, normalizeDataCenterState } from "../../../../src/domain/dataCenter.js";
+import { DATA_CENTER_PERSISTED_COLLECTIONS, normalizeDataCenterState } from "../../../../src/domain/dataCenter.js";
 
 const TABLES = {
   sources: "data_sources",
@@ -6,7 +6,6 @@ const TABLES = {
   syncRuns: "data_sync_runs",
   sourceFiles: "data_source_files",
   mappings: "data_dimension_mappings",
-  metricDefinitions: "data_metric_definitions",
   qualityIssues: "data_quality_issues",
   subscriptions: "data_app_subscriptions",
   auditLogs: "data_audit_logs",
@@ -51,7 +50,7 @@ export async function writeDataCenterState(db, input, actor = "") {
   await ensureDataCenterTables(db);
   const updatedAt = new Date().toISOString();
   const statements = [];
-  for (const collection of DATA_CENTER_COLLECTIONS) {
+  for (const collection of DATA_CENTER_PERSISTED_COLLECTIONS) {
     const table = TABLES[collection];
     statements.push(db.prepare(`DELETE FROM ${table} WHERE entity_type = ?`).bind(collection));
     for (const record of state[collection]) {
@@ -84,7 +83,7 @@ async function readMeta(db, key) {
 export async function readDataCenterState(db) {
   await ensureDataCenterTables(db);
   const state = normalizeDataCenterState();
-  for (const collection of DATA_CENTER_COLLECTIONS) {
+  for (const collection of DATA_CENTER_PERSISTED_COLLECTIONS) {
     const table = TABLES[collection];
     const result = await db.prepare(`SELECT entity_type, id, payload, updated_at, updated_by FROM ${table}`).all();
     const records = [];
@@ -96,6 +95,21 @@ export async function readDataCenterState(db) {
       }
     }
     if (records.length || !state[collection].length) state[collection] = records;
+  }
+  try {
+    const legacy = await db.prepare(`SELECT entity_type, id, payload, updated_at, updated_by
+      FROM data_metric_definitions_legacy`).all();
+    const records = [];
+    for (const row of legacy?.results || []) {
+      try {
+        records.push(JSON.parse(row.payload));
+      } catch {
+        // Preserve the remaining legacy definitions when one payload is malformed.
+      }
+    }
+    if (records.length) state.metricDefinitions = records;
+  } catch {
+    // Before migration 0004, keep the built-in compatibility definitions.
   }
   const settings = await readMeta(db, "settings");
   if (settings) {

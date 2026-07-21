@@ -45,13 +45,17 @@ test("domain model keeps product-flow rules independent from React components", 
 
 test("shared state layer uses the same-origin production data proxy during local preview", async () => {
   const store = read("src/state/ProductFlowProvider.jsx");
+  const sync = read("src/state/sharedStateSync.js");
   const api = await import("../src/state/stateApi.js");
   assert.equal(api.sharedStateApiUrl("127.0.0.1"), "/api/state");
   assert.equal(api.sharedStateApiUrl("localhost"), "/api/state");
   assert.equal(api.sharedStateApiUrl("product-flow-system.pages.dev"), "/api/state");
   assert.match(store, /sharedStateApiUrl\(window\.location\.hostname\)/);
   assert.doesNotMatch(store, /fetch\("\/api\/state"\)/);
-  assert.match(store, /if \(localStorage\.getItem\(DIRTY_STORAGE_KEY\) === "1" && !isLocalPreview\(\)\)/);
+  assert.doesNotMatch(store, /if \(localStorage\.getItem\(DIRTY_STORAGE_KEY\) === "1" && !isLocalPreview\(\)\)/);
+  assert.match(store, /createSharedStateSyncSession/);
+  assert.match(sync, /baseUpdatedAt/);
+  assert.match(store, /productFlowStateRecoveryBackup/);
   assert.match(store, /localStorage\.removeItem\(DIRTY_STORAGE_KEY\)/);
   assert.match(store, /method: "POST"/);
   assert.match(store, /localStorage\.getItem\(STORAGE_KEY\)/);
@@ -59,13 +63,13 @@ test("shared state layer uses the same-origin production data proxy during local
   assert.match(store, /sharedError/);
   assert.match(store, /productFlowStateDirty/);
   assert.doesNotMatch(store, /keepalive: true/);
-  assert.match(store, /共享数据加载失败，请刷新重试/);
+  assert.match(store, /共享数据加载失败，已暂停自动保存，请刷新重试/);
   assert.match(store, /localStorage\.getItem\(DIRTY_STORAGE_KEY\)/);
   assert.match(store, /const commitState = useCallback/);
   assert.match(store, /localStorage\.setItem\(STORAGE_KEY, JSON\.stringify\(nextState\)\)/);
   assert.match(store, /const updateTask = useCallback[\s\S]*commitState\(current/);
   assert.match(store, /localStorage\.getItem\(STORAGE_KEY\) === serializedState/);
-  assert.match(store, /if \(localStorage\.getItem\(DIRTY_STORAGE_KEY\) === "1"\) return;/);
+  assert.doesNotMatch(store, /if \(localStorage\.getItem\(DIRTY_STORAGE_KEY\) === "1"\) return;/);
   assert.match(store, /fetch\("\/api\/dingtalk\/org\/sync"/);
   assert.match(store, /orgSyncAttempted/);
   assert.match(store, /orgCache: payload\.org/);
@@ -346,8 +350,9 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /data-testid="sync-task-todo"/);
   assert.match(page, /<TodoSyncModal/);
   assert.match(page, /todoSyncStatus\(task\)/);
-  assert.match(page, /normalizeTaskDueDate\(task\.due\)/);
-  assert.match(page, /disabled=\{!hasValidDue\}/);
+  assert.doesNotMatch(page, /disabled=\{!hasValidDue\}/);
+  assert.doesNotMatch(page, /updateTask\(todoTask\.id, \{ due: draft\.dueDate \}\)/);
+  assert.match(page, /const effectiveTask = \{ \.\.\.todoTask, due: draft\.dueDate \}/);
   assert.doesNotMatch(page, /markTodoSynced/);
   assert.match(page, /stagePolicyTone/);
   assert.match(page, /policy-\$\{stagePolicyTone\(policy\.mode\)\}/);
@@ -703,6 +708,7 @@ test("issue feedback and settings pages persist company-wide operational data", 
   assert.match(floating, /disabled=\{!desc\.trim\(\) \|\| !screenshot\}/);
   assert.match(floating, /addFeedbackIssue/);
   assert.match(styles, /\.floating-issue-button\s*\{[\s\S]*position: fixed;[\s\S]*right: 22px;[\s\S]*bottom: 22px;/);
+  assert.match(styles, /\.page\s*\{[^}]*padding-bottom:\s*calc\(80px \+ env\(safe-area-inset-bottom\)\)/);
   assert.match(settings, /PermissionSettings/);
   assert.match(settings, /总经办/);
   assert.match(settings, /updateSettings/);

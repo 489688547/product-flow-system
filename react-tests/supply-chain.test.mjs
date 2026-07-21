@@ -6,8 +6,15 @@ import {
   normalizeSupplyChainState,
   parseInventoryImportRows,
   parseQualityImportRows,
-  reduceSupplyChainState
+  reduceSupplyChainState,
+  resolveSupplyLinkProductId
 } from "../src/domain/supplyChain.js";
+
+test("catalog supplier links resolve to the lifecycle product when available", () => {
+  const products = [{ id: "p1", catalogProductId: "kuaimai:item:1001" }, { id: "kuaimai:item:1002" }];
+  assert.equal(resolveSupplyLinkProductId({ catalogProductId: "kuaimai:item:1001" }, products), "p1");
+  assert.equal(resolveSupplyLinkProductId({ productId: "kuaimai:item:1002" }, products), "kuaimai:item:1002");
+});
 
 test("approved payments aggregate one purchase without counting running or rejected payments", () => {
   const state = normalizeSupplyChainState({

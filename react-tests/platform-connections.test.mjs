@@ -8,14 +8,16 @@ const workspacePath = "src/features/data-center/PlatformConnectionsWorkspace.jsx
 const cssPath = "src/features/data-center/platform-connections.css";
 const apiPath = "src/state/platformConnectionsApi.js";
 
-test("data center exposes a dedicated platform connection workspace", () => {
+test("data center embeds platform connections inside the unified data access workspace", () => {
   assert.equal(existsSync(workspacePath), true);
   const app = read("src/App.jsx");
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
-  assert.match(app, /data-connections/);
-  assert.match(app, /平台连接/);
-  assert.match(page, /connections: <PlatformConnectionsWorkspace/);
+  const governance = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
+  assert.match(app, /route\.screen === "data-connections"/);
+  assert.doesNotMatch(app, /\["data-connections", "平台连接"/);
+  assert.doesNotMatch(page, /connections: <PlatformConnectionsWorkspace/);
   assert.match(page, /canManagePlatformConnections/);
+  assert.match(governance, /canManagePlatform/);
   assert.match(read("src/domain/permissions.js"), /canManagePlatformConnections[\s\S]*role === "executive"[\s\S]*canManagePermissions/);
 });
 
@@ -48,6 +50,7 @@ test("connection UI covers loading errors permissions disabled actions and inlin
   assert.match(workspace, /PLATFORM_CONNECTION_VERSION_CONFLICT/);
   assert.match(workspace, /本次填写仍保留/);
   assert.match(workspace, /放弃本次填写/);
+  assert.match(workspace, /className="platform-connection-back"[\s\S]*disabled=\{busy\}/);
   assert.match(workspace, /platformButtonRefs[\s\S]*\.focus\(\)/);
   assert.match(workspace, /重新加载/);
   assert.match(workspace, /available/);
@@ -63,6 +66,18 @@ test("platform connection API client never caches credential fields", () => {
   assert.doesNotMatch(api, /localStorage|sessionStorage/);
 });
 
+test("platform connection UI accepts controlled state and a filtered embedded detail", () => {
+  const workspace = read(workspacePath);
+  assert.match(workspace, /platformIds/);
+  assert.match(workspace, /initialPlatformId/);
+  assert.match(workspace, /embedded/);
+  assert.match(workspace, /controller/);
+  assert.match(workspace, /controller\?\.save/);
+  assert.match(workspace, /controller\?\.disable/);
+  assert.match(workspace, /platformIdKey/);
+  assert.doesNotMatch(workspace, /import \{[\s\S]*loadPlatformConnections[\s\S]*\} from "\.\.\/\.\.\/state\/platformConnectionsApi\.js"/);
+});
+
 test("connection layout is restrained responsive and keyboard visible", () => {
   assert.equal(existsSync(cssPath), true);
   const css = read(cssPath);
@@ -75,10 +90,11 @@ test("connection layout is restrained responsive and keyboard visible", () => {
   assert.doesNotMatch(css, /border-radius:\s*(?:2[4-9]|[3-9]\d)px/);
 });
 
-test("environment blockers link directly to platform connection management", () => {
+test("environment blockers link to the matching data access category", () => {
   const panel = read("src/features/handbook/EnvironmentReadinessPanel.jsx");
-  assert.match(panel, /前往平台连接/);
-  assert.match(panel, /#\/data-connections/);
+  assert.match(panel, /前往数据接入/);
+  assert.match(panel, /#\/data-sources\/company/);
+  assert.match(panel, /#\/data-sources\/erp/);
   assert.match(panel, /钉钉应用凭证/);
   assert.match(panel, /公司数据库连接/);
 });

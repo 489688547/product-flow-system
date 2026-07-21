@@ -3,12 +3,13 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkBranchBase } from "./check-branch-base.mjs";
+import { loadSharedEnv, resolveSharedEnvPath } from "./shared-local-env.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HOST = "127.0.0.1";
 const VITE_PORT = 8127;
 const PAGES_PORT = 8132;
-const ENV_FILE = resolve(ROOT, ".env");
 const WRANGLER_CONFIG = resolve(ROOT, "wrangler.toml");
 const WRANGLER_SANDBOX_CONFIG = resolve(ROOT, "wrangler.local.toml");
 const WRANGLER_BACKUP = resolve(ROOT, ".wrangler-toml.online-backup");
@@ -100,8 +101,9 @@ process.once("SIGTERM", shutdown);
 process.once("exit", shutdown);
 
 async function main() {
-  if (!existsSync(ENV_FILE)) {
-    throw new Error("缺少本地 .env，请先配置个人令牌和平台连接。");
+  const branchBase = checkBranchBase(ROOT, process.env, { refresh: true });
+  if (!branchBase.current) {
+    throw new Error(`本地环境启动已阻止：${branchBase.reason}`);
   }
   const useLocalD1 = process.argv.includes("--local-d1") || process.env.LOCAL_D1_SANDBOX === "1";
   // 上次沙箱运行若被强杀，先恢复线上配置再启动。
@@ -111,13 +113,20 @@ async function main() {
     // 换入 wrangler.toml，退出时在 shutdown() 中恢复原配置。
     swapToSandboxConfig();
   }
+  const sharedEnvPath = resolveSharedEnvPath(ROOT);
+  const sharedEnv = loadSharedEnv(ROOT, { envPath: sharedEnvPath });
+  const wranglerEnv = {
+    ...process.env,
+    ...sharedEnv.values,
+    CLOUDFLARE_INCLUDE_PROCESS_ENV: "true"
+  };
   console.log(useLocalD1 ? "正在启动本地代码 · 本地沙箱环境（本地 D1，不连生产库）..." : "正在启动本地代码 · 线上真实环境...");
   startChild("Wrangler", executable("wrangler"), [
     "pages", "dev",
     "--port", String(PAGES_PORT),
     "--ip", HOST,
     "--live-reload"
-  ]);
+  ], wranglerEnv);
   await waitForPort(PAGES_PORT);
   startChild("Vite", executable("vite"), ["--host", HOST, "--port", String(VITE_PORT)], {
     ...process.env,

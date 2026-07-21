@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, KeyRound, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -64,11 +64,11 @@ const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , 
 const LEGACY_SUPPLY_SCREENS = new Set(["supply-suppliers", "supply-approvals", "supply-products"]);
 const DATA_CENTER_NAV = [
   ["data-overview", "数据总览", Database, "数据中心", "overview"],
+  ["data-insights", "用户洞察", UsersRound, "数据中心", "insights"],
   ["data-analysis", "数据分析", BarChart3, "数据中心", "analysis"],
+  ["data-products", "商品主数据", PackageSearch, "数据中心", "products"],
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
-  ["data-connections", "平台连接", KeyRound, "数据中心", "connections"],
-  ["data-metrics", "指标管理", Ruler, "数据中心", "metrics"],
-  ["data-quality", "数据质量", ShieldCheck, "数据中心", "quality"],
+  ["data-metrics", "数据口径", Ruler, "数据中心", "metrics"],
   ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
   ["data-services", "数据服务", Share2, "数据中心", "services"],
   ["data-settings", "设置", Settings, "数据中心", "settings"]
@@ -111,16 +111,16 @@ const COMPANY_NAV = [
   ["reviews", "经营检查", CalendarCheck, "公司经营"],
   ["collaboration", "部门协同", Workflow, "公司经营"],
   ["apps", "业务 Apps", AppWindow, "公司经营"],
-  ...SUPPLY_CHAIN_NAV,
   ["dashboard", "产品总览", PanelsTopLeft, "产品全周期"],
   ["demands", "需求池", ClipboardList, "产品全周期"],
   ["planning", "产品规划", CalendarRange, "产品全周期"],
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
-  ...DATA_CENTER_NAV,
   ...ECOMMERCE_OPERATIONS_NAV,
-  ...PERFORMANCE_MANAGEMENT_NAV,
   ...BRAND_NAV,
+  ...SUPPLY_CHAIN_NAV,
+  ...PERFORMANCE_MANAGEMENT_NAV,
+  ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
@@ -132,11 +132,11 @@ const PRODUCT_NAV = [
   ["progress", "产品进度", GitBranch, "产品全周期"],
   ["archive", "产品档案", Archive, "产品全周期"],
   ["collaboration", "部门协同", Workflow, "协同执行"],
-  ...SUPPLY_CHAIN_NAV,
-  ...DATA_CENTER_NAV,
   ...ECOMMERCE_OPERATIONS_NAV,
-  ...PERFORMANCE_MANAGEMENT_NAV,
   ...BRAND_NAV,
+  ...SUPPLY_CHAIN_NAV,
+  ...PERFORMANCE_MANAGEMENT_NAV,
+  ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
@@ -147,6 +147,7 @@ const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NA
 function resolveScreen(screen) {
   if (screen === "supply-chain") return "supply-overview";
   if (LEGACY_SUPPLY_SCREENS.has(screen)) return "supply-procurement";
+  if (screen === "data-quality") return "data-sync";
   const resolvedDataScreen = screen === "data-center" ? "data-overview" : screen;
   if (resolvedDataScreen === "ecommerce-operations") return "ops-dashboard";
   return resolvedDataScreen === "performance-management" ? "performance-overview" : resolvedDataScreen;
@@ -154,6 +155,9 @@ function resolveScreen(screen) {
 
 function routeFromHash() {
   const route = parseAppHash(window.location.hash);
+  if (route.screen === "data-connections") {
+    return { screen: "data-sources", detail: "company" };
+  }
   const screen = resolveScreen(route.screen);
   return {
     screen: VALID_SCREENS.has(screen) ? screen : "home",
@@ -328,7 +332,7 @@ export default function App() {
         </header>
         <LocalOnlineEnvironmentBanner sessionUser={sessionUser} />
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
-          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
+          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} dataAccessCategory={dataSection === "sources" ? routeDetail : ""} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
       <AiAssistantPanel active={activeScreen !== "ai-assistant"} triggerRef={aiTriggerRef} appHint={{ screen: activeScreen, detail: routeDetail }} />

@@ -104,9 +104,10 @@ const integrationRegistry = {
       "id": "kuaimai",
       "name": "快麦开放平台",
       "status": "connected",
-      "summary": "按天拉取订单并聚合为产品销售数据，同时保留文件导入校准通道。",
+      "summary": "按订单创建时间逐日拉取订单并聚合销售，同时分页读取 ERP 商品主数据并与商品档案文件互补合并；商品视图按平台和日期关联两类已落库事实。",
       "capabilities": [
         "订单拉取",
+        "商品目录同步",
         "会话刷新",
         "销售日聚合",
         "连接状态检查",
@@ -115,10 +116,12 @@ const integrationRegistry = {
       "businessQuestions": [
         "快麦连接失败",
         "订单同步缺失",
+        "ERP 商品或 69 码未同步",
         "销售数据未落库",
         "本地如何触发真实同步",
         "刷新令牌失败",
-        "月度数据校准"
+        "月度数据校准",
+        "API 与商品档案覆盖不同"
       ],
       "keywords": [
         "快麦",
@@ -130,11 +133,18 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/api/kuaimai/**",
+        "functions/api/platform/v1/product-catalog.js",
+        "functions/api/platform/v1/product-catalog/**",
         "functions/api/sales.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
-        "src/features/settings/KuaimaiSyncSettings.jsx",
+        "src/domain/productCatalog.js",
+        "src/domain/productCatalogSales.js",
+        "src/state/ProductCatalogProvider.jsx",
+        "src/state/productCatalogApi.js",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/data-center/PlatformConnectionsWorkspace.jsx",
+        "src/features/settings/KuaimaiSyncSettings.jsx",
         "src/state/salesStore.js",
         "server.mjs"
       ],
@@ -152,7 +162,10 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/kuaimai/",
         "/api/sales",
-        "/api/platform/v1/platform-connections"
+        "/api/platform/v1/platform-connections",
+        "/api/platform/v1/product-catalog",
+        "/api/platform/v1/product-catalog/import",
+        "/api/platform/v1/product-catalog/sync/kuaimai"
       ],
       "publicDocs": [
         {
@@ -164,19 +177,24 @@ const integrationRegistry = {
         "functions/api/kuaimai/",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
-        "src/features/settings/KuaimaiSyncSettings.jsx",
-        "src/features/data-center/PlatformConnectionsWorkspace.jsx"
+        "functions/api/platform/v1/product-catalog/sync/kuaimai.js",
+        "functions/api/platform/v1/product-catalog/_shared/sales.js",
+        "src/domain/productCatalog.js",
+        "src/domain/productCatalogSales.js",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
+        "src/features/data-center/PlatformConnectionsWorkspace.jsx",
+        "src/features/settings/KuaimaiSyncSettings.jsx"
       ],
       "relations": [
         {
           "platformId": "cloudflare-d1",
-          "type": "stores-sales-aggregates",
-          "description": "快麦订单按日聚合后写入销售数据表。"
+          "type": "stores-sales-and-product-catalog",
+          "description": "快麦订单日聚合与共享商品目录分别写入 D1。"
         },
         {
           "platformId": "erp-file-import",
           "type": "reconciled-by",
-          "description": "月底可用 ERP 文件整月重导校准退款和缺失数据。"
+          "description": "销售文件校准月度事实，商品档案文件补齐 API 未返回的规格、69 码和供应商字段。"
         }
       ]
     },
@@ -194,7 +212,10 @@ const integrationRegistry = {
         "回滚",
         "环境就绪检查",
         "生产数据网关",
-        "加密平台连接"
+        "凭证加密服务",
+        "加密平台连接",
+        "用户洞察共享 API",
+        "共享数据口径"
       ],
       "businessQuestions": [
         "构建或部署失败",
@@ -215,6 +236,8 @@ const integrationRegistry = {
         "functions/**",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/v1/data-standards/**",
+        "functions/api/platform/v1/_shared/dataStandards*.js",
         "src/state/deploymentRecovery.js",
         "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
@@ -232,7 +255,8 @@ const integrationRegistry = {
         "PRODUCTION_DATA_ACCESS_TOKEN",
         "AI_ASSISTANT_ENABLED",
         "LINGSUAN_API_KEY",
-        "LINGSUAN_ACTOR_AUTHORIZATION"
+        "LINGSUAN_ACTOR_AUTHORIZATION",
+        "VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK"
       ],
       "domains": [
         "pages.dev",
@@ -242,8 +266,12 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/platform-connections",
+        "/api/platform/v1/credential-vault",
+        "/api/platform/v1/data-standards",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
+        "/api/platform/v1/user-insights",
+        "/api/platform/v1/user-insights/",
         "/api/platform/v1/ai/"
       ],
       "publicDocs": [
@@ -260,6 +288,7 @@ const integrationRegistry = {
         "functions/",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/v1/_shared/dataStandardsStorage.js",
         "src/state/deploymentRecovery.js",
         "docs/platform/architecture.md",
         "scripts/prepare-pages-build.mjs",
@@ -278,15 +307,23 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、货流事实、数据中心、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、共享商品目录、用户洞察、货流事实、数据中心、加密凭证、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
+        "共享状态原子比较并写入",
+        "共享状态写前快照与审计",
         "登录会话",
         "组织数据",
         "销售聚合",
+        "共享商品目录",
+        "用户洞察标准事实",
+        "用户洞察部门规则",
+        "采集设备令牌哈希",
         "货流事件与指标",
         "平台配置",
         "数据中心元数据",
+        "版本化数据口径与计算结果",
+        "加密凭证密文与审计",
         "店铺运营记录",
         "人事核心记录",
         "绩效记录",
@@ -301,8 +338,11 @@ const integrationRegistry = {
       "businessQuestions": [
         "数据只在本地可见",
         "跨设备状态不同步",
+        "旧页面或旧分支覆盖产品进度",
         "数据库绑定缺失",
         "表结构或容量问题",
+        "用户洞察采集结果未落库",
+        "货流事实或指标未落库",
         "人事数据表是否就绪",
         "跨部门事项如何留痕",
         "测试账号如何受控写生产数据",
@@ -324,6 +364,8 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/**",
+        "functions/api/platform/v1/product-catalog.js",
+        "functions/api/platform/v1/product-catalog/**",
         "functions/api/ecommerce-operations.js",
         "functions/api/ecommerce-operations/**",
         "functions/api/performance-management.js",
@@ -333,14 +375,25 @@ const integrationRegistry = {
         "functions/api/dingtalk/org/**",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/_shared/credential*.js",
         "functions/api/platform/v1/platform-connections.js",
+        "functions/api/platform/v1/credential-vault.js",
+        "functions/api/platform/v1/credential-vault/**",
+        "functions/api/platform/v1/data-standards/**",
+        "functions/api/platform/v1/_shared/dataStandards*.js",
         "functions/api/platform/v1/production-data/**",
         "functions/api/platform/v1/collaboration-items/**",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/**",
         "functions/api/platform/v1/ai/**",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
         "migrations/**",
         "migrations/0002_hr_management_core.sql",
+        "migrations/0003_product_catalog.sql",
         "migrations/0003_platform_credentials.sql",
+        "migrations/0003_data_center_credentials.sql",
+        "migrations/0004_data_standards.sql",
+        "migrations/0005_user_insights.sql",
         "migrations/0005_goods_flow_core.sql"
       ],
       "envVars": [
@@ -357,14 +410,21 @@ const integrationRegistry = {
         "/api/platform/v1/goods-flow/",
         "/api/sales",
         "/api/data-center",
+        "/api/platform/v1/product-catalog",
+        "/api/platform/v1/product-catalog/import",
+        "/api/platform/v1/product-catalog/sync/kuaimai",
         "/api/ecommerce-operations",
         "/api/performance-management",
         "/api/hr-management",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/platform-connections",
+        "/api/platform/v1/credential-vault",
+        "/api/platform/v1/data-standards",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
         "/api/platform/v1/collaboration-items",
+        "/api/platform/v1/user-insights",
+        "/api/platform/v1/user-insights/",
         "/api/platform/v1/ai/"
       ],
       "publicDocs": [
@@ -386,6 +446,8 @@ const integrationRegistry = {
         "functions/api/sales.js",
         "functions/api/data-center.js",
         "functions/api/data-center/",
+        "functions/api/platform/v1/product-catalog.js",
+        "functions/api/platform/v1/product-catalog/",
         "functions/api/ecommerce-operations.js",
         "functions/api/ecommerce-operations/",
         "functions/api/performance-management.js",
@@ -393,17 +455,28 @@ const integrationRegistry = {
         "functions/api/hr-management/",
         "functions/api/platform/_shared/productionDataAccess.js",
         "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/_shared/credentialVaultStorage.js",
+        "functions/api/platform/_shared/credentialCrypto.js",
         "functions/api/platform/v1/platform-connections.js",
+        "functions/api/platform/v1/credential-vault/",
         "functions/api/platform/v1/_shared/collaborationStorage.js",
+        "functions/api/platform/v1/_shared/dataStandardsStorage.js",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/",
         "functions/api/platform/v1/ai/",
         "migrations/0001_production_data_access.sql",
         "migrations/0002_business_data_apps.sql",
         "migrations/0002_collaboration_execution.sql",
         "migrations/0002_hr_management_core.sql",
+        "migrations/0003_product_catalog.sql",
         "migrations/0003_platform_credentials.sql",
+        "migrations/0003_data_center_credentials.sql",
         "migrations/0003_company_ai_assistant.sql",
+        "migrations/0004_data_standards.sql",
         "migrations/0004_company_ai_skills.sql",
-        "migrations/0005_goods_flow_core.sql"
+        "migrations/0005_user_insights.sql",
+        "migrations/0005_goods_flow_core.sql",
+        "migrations/0006_shared_state_revision.sql"
       ],
       "relations": [
         {
@@ -419,7 +492,7 @@ const integrationRegistry = {
         {
           "platformId": "kuaimai",
           "type": "stores-data-for",
-          "description": "保存快麦同步后的销售聚合数据。"
+          "description": "保存快麦同步后的销售聚合与共享商品目录。"
         }
       ]
     },
@@ -485,17 +558,20 @@ const integrationRegistry = {
       "id": "erp-file-import",
       "name": "ERP / 文件导入",
       "status": "integrating",
-      "summary": "承接销售明细、ERP 库存快照和月度盘点文件，并作为 API 同步的校准和兼容通道。",
+      "summary": "承接销售明细、ERP 商品档案、库存快照和月度盘点文件，作为 API 同步的校准、补齐和兼容通道。",
       "capabilities": [
         "销售明细导入",
+        "商品档案导入",
         "ERP 库存快照导入",
         "月度盘点导入",
+        "GB18030 CSV",
         "字段映射",
         "整月重导",
         "数据校准"
       ],
       "businessQuestions": [
-        "Excel 导入失败",
+        "Excel 或 CSV 导入失败",
+        "商品 69 码或供应商字段缺失",
         "库存或盘点字段口径不一致",
         "历史数据补录",
         "API 与文件结果不同"
@@ -509,36 +585,44 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "src/features/settings/SalesDataSettings.jsx",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/supply-chain/InventoryWorkspace.jsx",
         "src/domain/salesData.js",
+        "src/domain/productCatalog.js",
+        "src/domain/xlsxLite.js",
         "src/domain/supplyChain.js",
         "src/state/salesStore.js",
         "functions/api/sales.js",
+        "functions/api/platform/v1/product-catalog/import.js",
         "functions/api/platform/v1/goods-flow/imports.js"
       ],
       "envVars": [],
       "domains": [],
       "apiRoutes": [
         "/api/sales",
+        "/api/platform/v1/product-catalog/import",
         "/api/platform/v1/goods-flow/imports"
       ],
       "publicDocs": [],
       "evidence": [
         "src/features/settings/SalesDataSettings.jsx",
+        "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/supply-chain/InventoryWorkspace.jsx",
         "src/domain/salesData.js",
+        "src/domain/productCatalog.js",
+        "src/domain/xlsxLite.js",
         "src/domain/supplyChain.js"
       ],
       "relations": [
         {
           "platformId": "kuaimai",
           "type": "reconciles",
-          "description": "文件导入用于校准快麦 API 的月度销售结果。"
+          "description": "销售文件校准月度事实，商品档案文件补齐快麦 API 缺少的规格字段。"
         },
         {
           "platformId": "cloudflare-d1",
           "type": "stores-imports",
-          "description": "聚合后的导入结果通过销售 API 写入 D1。"
+          "description": "聚合销售结果和标准化商品目录分别通过内部 API 写入 D1。"
         }
       ]
     },
@@ -783,6 +867,85 @@ const integrationRegistry = {
       ]
     },
     {
+      "id": "browser-market-collector",
+      "name": "浏览器市场采集器",
+      "status": "connected",
+      "summary": "公司 Mac 通过 Chrome 调试协议只读采集已登记、已确认的平台市场类目页面，并写入用户洞察标准事实。",
+      "capabilities": [
+        "工作日采集",
+        "已登记页面白名单",
+        "用户市场",
+        "商品市场",
+        "视频市场",
+        "直播市场",
+        "页面结构版本",
+        "登录失效停止",
+        "幂等批次"
+      ],
+      "businessQuestions": [
+        "平台市场数据没有更新",
+        "页面要求重新登录",
+        "页面字段发生变化",
+        "类目尚未确认",
+        "采集器未连接",
+        "周末为什么未自动采集"
+      ],
+      "keywords": [
+        "用户洞察",
+        "浏览器采集",
+        "市场",
+        "类目",
+        "竞品",
+        "Chrome",
+        "CDP"
+      ],
+      "codePaths": [
+        "scripts/user-insights-collector/**",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/**",
+        "src/domain/userInsights.js",
+        "src/state/userInsightsApi.js",
+        "src/state/UserInsightsProvider.jsx",
+        "src/features/data-center/UserInsightsWorkspace.jsx",
+        "src/features/data-center/user-insights.css",
+        "docs/features/user-insights/**",
+        "docs/platform/apis/user-insights-v1.md",
+        "docs/platform/browser-market-collection.md",
+        "migrations/0005_user_insights.sql"
+      ],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [
+        "/api/platform/v1/user-insights",
+        "/api/platform/v1/user-insights/collector",
+        "/api/platform/v1/user-insights/ingest"
+      ],
+      "publicDocs": [],
+      "evidence": [
+        "scripts/user-insights-collector/",
+        "functions/api/platform/v1/user-insights.js",
+        "functions/api/platform/v1/user-insights/",
+        "src/domain/userInsights.js",
+        "src/state/userInsightsApi.js",
+        "src/state/UserInsightsProvider.jsx",
+        "src/features/data-center/UserInsightsWorkspace.jsx",
+        "docs/features/user-insights/",
+        "migrations/0005_user_insights.sql"
+      ],
+      "relations": [
+        {
+          "platformId": "cloudflare-pages",
+          "type": "writes-through",
+          "description": "采集器只能通过受限 Pages Functions ingest 契约写入，不能直连 D1。"
+        },
+        {
+          "platformId": "cloudflare-d1",
+          "type": "stores-standard-facts",
+          "description": "D1 只保存标准事实、规则、质量和审计，不保存完整页面、Cookie 或凭证。"
+        }
+      ]
+    },
+    {
       "id": "lingsuan-ai-gateway",
       "name": "灵算 AI 网关",
       "status": "connected",
@@ -859,6 +1022,124 @@ const integrationRegistry = {
           "platformId": "cloudflare-d1",
           "type": "governed-by",
           "description": "D1 保存 Provider 安全元数据、外发策略、并发租约和无内容审计。"
+        }
+      ]
+    },
+    {
+      "id": "douyin-ecommerce",
+      "name": "抖音电商",
+      "status": "planned",
+      "summary": "计划通过平台授权、网页导出或固定公司 Mac 的已登录页面采集店铺经营数据，尚未接入。",
+      "capabilities": [
+        "店铺订单",
+        "商品数据",
+        "经营报表",
+        "网页导出"
+      ],
+      "businessQuestions": [
+        "抖音店铺如何授权",
+        "邮箱或手机号登录如何处理",
+        "验证码后如何恢复同步",
+        "与快麦订单是否重复"
+      ],
+      "keywords": [
+        "抖音电商",
+        "抖店",
+        "Douyin Ecommerce",
+        "店铺后台",
+        "邮箱登录"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [],
+      "publicDocs": [],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "接入前需区分快麦聚合订单与抖音店铺原始经营数据。"
+        },
+        {
+          "platformId": "oceanengine-qianchuan",
+          "type": "commerce-to-advertising",
+          "description": "店铺经营数据与巨量投放数据分别采集并通过标准维度关联。"
+        }
+      ]
+    },
+    {
+      "id": "kuaishou-ecosystem",
+      "name": "快手生态",
+      "status": "planned",
+      "summary": "计划接入快手小店和广告账户的经营与投放数据，尚未接入。",
+      "capabilities": [
+        "店铺订单",
+        "商品数据",
+        "经营报表",
+        "广告数据",
+        "网页导出"
+      ],
+      "businessQuestions": [
+        "快手小店与广告账户如何区分",
+        "登录验证如何处理",
+        "经营和投放口径如何关联"
+      ],
+      "keywords": [
+        "快手",
+        "快手小店",
+        "磁力引擎",
+        "Kuaishou",
+        "店铺后台"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [],
+      "publicDocs": [],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "接入前需确认快手订单是否已由快麦覆盖。"
+        }
+      ]
+    },
+    {
+      "id": "jd-jingmai",
+      "name": "京东 / 京麦",
+      "status": "planned",
+      "summary": "计划接入京东店铺和京麦后台的订单、商品与经营数据，尚未接入。",
+      "capabilities": [
+        "店铺订单",
+        "商品数据",
+        "经营报表",
+        "网页导出"
+      ],
+      "businessQuestions": [
+        "京麦账号如何授权",
+        "扫码或设备验证如何处理",
+        "与快麦订单是否重复"
+      ],
+      "keywords": [
+        "京东",
+        "京麦",
+        "JD",
+        "Jingmai",
+        "店铺后台"
+      ],
+      "codePaths": [],
+      "envVars": [],
+      "domains": [],
+      "apiRoutes": [],
+      "publicDocs": [],
+      "evidence": [],
+      "relations": [
+        {
+          "platformId": "kuaimai",
+          "type": "possible-overlap",
+          "description": "接入前需确认京东订单是否已由快麦覆盖。"
         }
       ]
     },

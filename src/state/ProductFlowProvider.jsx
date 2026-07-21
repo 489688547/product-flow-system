@@ -15,16 +15,20 @@ import {
 } from "../domain/productFlow.js";
 import { normalizeClientState } from "./stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../domain/sessionUser.js";
-import { createTaskMeetingRecord } from "../domain/dingTalk.js";
-import { buildTaskTodoSnapshot } from "../domain/taskTodo.js";
+import { createTaskMeetingRecord, reconcileTaskTodosFromDingTalk } from "../domain/dingTalk.js";
+import { applyTaskTodoSyncFailure, applyTaskTodoSyncSuccess } from "../domain/taskTodo.js";
 import { sharedStateApiUrl } from "./stateApi.js";
 import { createDemandRecord } from "../domain/demandDate.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { normalizeProductPlans, validateProductPlan } from "../domain/productPlanning.js";
+import { createDingTalkTodoRefreshController } from "./dingTalkTodoRefresh.js";
+import { createSharedStateSyncSession } from "./sharedStateSync.js";
+import { productFlowStateFingerprint } from "./productFlowStateFingerprint.js";
 
 const ProductFlowContext = createContext(null);
 const STORAGE_KEY = "productFlowState";
 const DIRTY_STORAGE_KEY = "productFlowStateDirty";
+const RECOVERY_STORAGE_KEY = "productFlowStateRecoveryBackup";
 
 function isLocalPreview() {
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
@@ -44,13 +48,27 @@ function loadLocalState() {
   }
 }
 
+function preserveLocalRecoveryCopy() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return false;
+    localStorage.setItem(RECOVERY_STORAGE_KEY, JSON.stringify({
+      savedAt: new Date().toISOString(),
+      state: JSON.parse(raw)
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function ProductFlowProvider({ children }) {
   const { user: authUser } = useAuth();
   const [state, setState] = useState(loadLocalState);
   const [sharedError, setSharedError] = useState("");
   const [loading, setLoading] = useState(true);
   const stateApiUrl = sharedStateApiUrl(window.location.hostname);
-  const firstSave = useRef(true);
+  const sharedSyncSession = useRef(createSharedStateSyncSession({ fingerprint: productFlowStateFingerprint }));
   const orgSyncAttempted = useRef(false);
   const sessionAccount = useMemo(() => authUser ? ({
     role: authUser.role,
@@ -74,40 +92,33 @@ export function ProductFlowProvider({ children }) {
       return nextState;
     });
   }, []);
+  const todoRefreshController = useMemo(() => createDingTalkTodoRefreshController({
+    fetchImpl: (...args) => fetch(...args),
+    onTodos: todos => commitState(current => {
+      const tasks = reconcileTaskTodosFromDingTalk(current.tasks || [], todos);
+      return tasks === current.tasks ? current : { ...current, tasks };
+    })
+  }), [commitState]);
 
   useEffect(() => {
     let alive = true;
     async function loadSharedState() {
       try {
-        if (localStorage.getItem(DIRTY_STORAGE_KEY) === "1" && !isLocalPreview()) {
-          const pendingState = loadLocalState();
-          const pendingSerializedState = JSON.stringify(pendingState);
-          const saveResponse = await fetch(stateApiUrl, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ state: pendingState, updatedBy: currentUser?.name || "react-v2-recovery" })
-          });
-          const saved = await saveResponse.json().catch(() => ({}));
-          if (!saveResponse.ok || saved.synced === false) throw new Error(saved.message || "本地修改恢复失败。");
-          if (localStorage.getItem(STORAGE_KEY) === pendingSerializedState) {
-            localStorage.removeItem(DIRTY_STORAGE_KEY);
-          }
-          if (alive && localStorage.getItem(STORAGE_KEY) === pendingSerializedState) setState(pendingState);
-          return;
-        }
-        if (isLocalPreview()) localStorage.removeItem(DIRTY_STORAGE_KEY);
         const response = await fetch(stateApiUrl);
         const payload = await response.json().catch(() => ({}));
-        if (!response.ok || payload.synced === false || !payload.state) return;
-        if (localStorage.getItem(DIRTY_STORAGE_KEY) === "1") return;
+        if (!response.ok) throw new Error(payload.message || "共享数据加载失败。");
+        const normalized = normalizeClientState(payload.state);
+        const remoteState = sharedSyncSession.current.acceptRemote({ ...payload, state: normalized });
         if (alive) {
-          const normalized = normalizeClientState(payload.state);
-          setState(normalized);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-          setSharedError("");
+          const hadLocalChanges = localStorage.getItem(DIRTY_STORAGE_KEY) === "1";
+          const preserved = hadLocalChanges && preserveLocalRecoveryCopy();
+          setState(remoteState);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(remoteState));
+          localStorage.removeItem(DIRTY_STORAGE_KEY);
+          setSharedError(preserved ? "发现本机未同步修改，已保留恢复副本并加载线上最新数据。" : "");
         }
       } catch (error) {
-        if (alive) setSharedError(sharedErrorMessage(error, "共享数据加载失败，请刷新重试。"));
+        if (alive) setSharedError(sharedErrorMessage(error, "共享数据加载失败，已暂停自动保存，请刷新重试。"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -134,12 +145,39 @@ export function ProductFlowProvider({ children }) {
     return () => { alive = false; };
   }, [loading]);
 
+  const refreshTaskTodoStatuses = useCallback(
+    () => todoRefreshController.refresh(),
+    [todoRefreshController]
+  );
+
+  useEffect(() => {
+    if (loading || !authUser?.unionId) return undefined;
+    let active = true;
+    const refresh = () => {
+      if (!active) return;
+      refreshTaskTodoStatuses().catch(() => {
+        // A temporary read failure must not overwrite the last successful local snapshot.
+      });
+    };
+    refresh();
+    const interval = window.setInterval(refresh, 60_000);
+    window.addEventListener("focus", refresh);
+    return () => {
+      active = false;
+      todoRefreshController.invalidate();
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+    };
+  }, [authUser?.unionId, loading, refreshTaskTodoStatuses, todoRefreshController]);
+
   useEffect(() => {
     const serializedState = JSON.stringify(state);
     localStorage.setItem(STORAGE_KEY, serializedState);
-    if (firstSave.current) {
-      firstSave.current = false;
-      return;
+    if (loading || !sharedSyncSession.current.canSave()) return undefined;
+    const writeRequest = sharedSyncSession.current.buildWrite(state);
+    if (!writeRequest) {
+      localStorage.removeItem(DIRTY_STORAGE_KEY);
+      return undefined;
     }
     localStorage.setItem(DIRTY_STORAGE_KEY, "1");
     const timer = setTimeout(async () => {
@@ -147,10 +185,11 @@ export function ProductFlowProvider({ children }) {
         const response = await fetch(stateApiUrl, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ state, updatedBy: currentUser?.name || "react-v2" })
+          body: JSON.stringify(writeRequest)
         });
         const payload = await response.json().catch(() => ({}));
         if (!response.ok || payload.synced === false) throw new Error(payload.message || "共享数据保存失败。");
+        sharedSyncSession.current.acceptSaved(payload, state);
         if (localStorage.getItem(STORAGE_KEY) === serializedState) {
           localStorage.removeItem(DIRTY_STORAGE_KEY);
         }
@@ -160,7 +199,7 @@ export function ProductFlowProvider({ children }) {
       }
     }, 500);
     return () => clearTimeout(timer);
-  }, [currentUser?.name, state, stateApiUrl]);
+  }, [loading, state, stateApiUrl]);
 
   const updateDemand = useCallback((id, patch) => {
     commitState(current => updateDemandRecord(current, id, patch));
@@ -278,34 +317,20 @@ export function ProductFlowProvider({ children }) {
         throw new Error([result.message || "钉钉待办同步失败。", detail].filter(Boolean).join(" "));
       }
       const syncedAt = new Date().toISOString();
+      todoRefreshController.invalidate();
       commitState(current => ({
         ...current,
-        tasks: (current.tasks || []).map(item => item.id === taskId ? {
-          ...item,
-          dingTodo: {
-            id: result.todo?.id || result.todo?.taskId || payload.todoId,
-            syncedAt,
-            executorUnionIds: payload.executorUnionIds,
-            executorNames: executors.map(user => user.name).filter(Boolean),
-            snapshot: snapshot || buildTaskTodoSnapshot(item, payload.executorUnionIds),
-            lastError: ""
-          }
-        } : item)
+        tasks: (current.tasks || []).map(item => item.id === taskId
+          ? applyTaskTodoSyncSuccess(item, { payload, executors, snapshot, todo: result.todo, syncedAt })
+          : item)
       }));
       return result.todo;
     } catch (error) {
       commitState(current => ({
         ...current,
-        tasks: (current.tasks || []).map(item => item.id === taskId ? {
-          ...item,
-          dingTodo: {
-            ...(item.dingTodo || {}),
-            executorUnionIds: payload.executorUnionIds,
-            executorNames: executors.map(user => user.name).filter(Boolean),
-            lastError: error.message || "钉钉待办同步失败。",
-            failedAt: new Date().toISOString()
-          }
-        } : item)
+        tasks: (current.tasks || []).map(item => item.id === taskId
+          ? applyTaskTodoSyncFailure(item, error)
+          : item)
       }));
       throw error;
     }

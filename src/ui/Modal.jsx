@@ -34,7 +34,7 @@ function visibleFocusables(panel) {
   return Array.from(panel.querySelectorAll(FOCUSABLE_SELECTOR)).filter(element => !element.hasAttribute("hidden") && element.getClientRects().length > 0);
 }
 
-export function Modal({ title, open, onClose, children, footer, size = "default" }) {
+export function Modal({ title, open, onClose, children, footer, size = "default", className = "", initialFocusRef }) {
   const titleId = useId();
   const panelRef = useRef(null);
   // Keep the latest onClose without re-running the open/close effect when the
@@ -53,7 +53,7 @@ export function Modal({ title, open, onClose, children, footer, size = "default"
     if (panel) {
       entry.panel = panel;
       if (!panel.contains(document.activeElement)) {
-        const target = panel.querySelector("[data-autofocus]") || visibleFocusables(panel)[0] || panel;
+        const target = initialFocusRef?.current || panel.querySelector("[data-autofocus]") || visibleFocusables(panel)[0] || panel;
         target.focus();
       }
     }
@@ -118,7 +118,7 @@ export function Modal({ title, open, onClose, children, footer, size = "default"
         if (event.target === event.currentTarget && top?.panel === panelRef.current) onCloseRef.current?.();
       }}
     >
-      <section ref={panelRef} className={`modal-sheet ${size}`} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
+      <section ref={panelRef} className={`modal-sheet ${size} ${className}`.trim()} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1}>
         <header className="modal-header">
           <h2 id={titleId}>{title}</h2>
           <button className="modal-close" type="button" onClick={() => onCloseRef.current?.()} aria-label="关闭"><X size={20} /></button>

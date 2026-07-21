@@ -31,10 +31,13 @@
 | `DINGTALK_` | 钉钉授权和接口调用 | `DINGTALK_PERMISSION_MISSING` |
 | `KUAIMAI_` | 快麦配置、签名和拉取 | `KUAIMAI_SYNC_FAILED` |
 | `PLATFORM_` | 公司级平台连接、验证、版本和安全存储 | `PLATFORM_CONNECTION_VALIDATION_FAILED` |
+| `PRODUCT_CATALOG_` | 商品目录校验、权限和存储 | `PRODUCT_CATALOG_STORAGE_UNAVAILABLE` |
 | `INTEGRATION_` | 平台注册表、内部资料和存储 | `INTEGRATION_PROFILE_INVALID` |
 | `COLLABORATION_` | 跨 App 部门协同、状态、版本和存储 | `COLLABORATION_VERSION_CONFLICT` |
 | `DATA_` | 数据中心日期、元数据和存储 | `DATA_DATE_RANGE_INVALID` |
+| `USER_INSIGHTS_` | 用户洞察未预期处理错误 | `USER_INSIGHTS_UNEXPECTED` |
 | `GOODS_FLOW_` | 货流事实、库存、盘点、账期和 CCC | `GOODS_FLOW_VERSION_CONFLICT` |
+| `CREDENTIAL_` | 加密凭证、密钥、查看和采集器授权 | `CREDENTIAL_KEY_UNAVAILABLE` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `LOCAL_ONLINE_` | 本地线上账号配置、数据库与运行时 | `LOCAL_ONLINE_TOKEN_REQUIRED` |
@@ -78,6 +81,51 @@
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+- `DATA_CONNECTOR_INVALID`：连接器 ID、字段、URL、保险箱类型或敏感字段边界不合法。
+- `DATA_CONNECTOR_NOT_FOUND`：连接实例不存在、已归档或对当前身份不可见。
+- `DATA_CONNECTOR_VERSION_CONFLICT`：连接实例或保险箱条目版本已经更新，HTTP 409。
+
+共享数据口径 API 使用：
+
+- `DATA_STANDARD_INVALID`：请求字段、日期、公式结构或不可变 `metricCode` 不合法。
+- `DATA_STANDARD_FIELD_UNKNOWN`：公式或来源引用未登记事实字段。
+- `DATA_STANDARD_CYCLE`：指标依赖形成循环。
+- `DATA_STANDARD_UNIT_MISMATCH`：声明单位与公式推导单位不一致。
+- `DATA_STANDARD_VERSION_CONFLICT`：提交版本落后或 `metricCode` 已存在，HTTP 409。
+- `DATA_STANDARD_EFFECTIVE_DATE_CONFLICT`：新版本生效日期未严格递增或同日重复，HTTP 409。
+- `DATA_STANDARD_DEPENDENCY_ARCHIVED`：新版本依赖已归档口径。
+- `DATA_STANDARD_QUERY_RANGE_INVALID`：指标数量、依赖深度、自然日期或计算范围超过契约限制。
+- `DATA_STANDARD_CALCULATION_FAILED`：后台口径计算失败；旧的当前结果继续有效。
+- `DATA_STANDARD_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+
+数据口径的稳定错误、责任部门授权、版本快照和重试语义见 `docs/platform/apis/data-standards-v1.md`。
+
+加密凭证 API 使用：
+
+- `CREDENTIAL_ENTRY_INVALID`：凭证类型、字段 schema、范围或敏感 payload 不合法。
+- `CREDENTIAL_ENTRY_NOT_FOUND`：条目不存在或对当前身份不可见。
+- `CREDENTIAL_VERSION_CONFLICT`：提交的凭证版本已经过期，HTTP 409，刷新后重新操作。
+- `CREDENTIAL_RATE_LIMITED`：同一条目短时间明文查看次数过多，HTTP 429。
+- `CREDENTIAL_ENCRYPT_FAILED`：服务端未能完成加密；响应不包含输入值或底层异常。
+- `CREDENTIAL_KEY_UNAVAILABLE`：加密主密钥或对应密钥版本未配置，不能保存或取用凭证。
+- `CREDENTIAL_DECRYPT_FAILED`：密文校验或解密失败；响应不包含密文、字段值或底层异常。
+- `CREDENTIAL_REAUTH_REQUIRED`：查看或复制明文需要近期重新认证。
+- `CREDENTIAL_REVEAL_DENIED`：当前身份没有该条目的明文查看权限。
+- `CREDENTIAL_TASK_GRANT_INVALID`：采集器、任务、字段范围或授权状态不合法。
+- `CREDENTIAL_TASK_GRANT_EXPIRED`：短时授权已过期、已消费或已吊销。
+- `CREDENTIAL_STORAGE_UNAVAILABLE`：D1 绑定或凭证表不可用。
+
+用户洞察共享 API 使用：
+
+- `AUTH_RUNNER_TOKEN_REQUIRED` / `AUTH_RUNNER_TOKEN_INVALID`：采集设备令牌缺失、无效或已停用。
+- `PERMISSION_RULE_WRITE_DENIED`：当前部门不能修改目标 App 的规则。
+- `PERMISSION_CATEGORY_UNCONFIRMED`：平台类目尚未人工确认，采集批次被拒绝。
+- `PERMISSION_RUNNER_SCOPE_DENIED`：批次平台或店铺超出设备授权范围。
+- `VALIDATION_RULE_INVALID` / `VALIDATION_INGEST_INVALID`：规则或采集批次字段不完整。
+- `VALIDATION_COMPETITOR_TRANSITION`：候选确认、驳回或停用缺少原因或状态无效。
+- `CATEGORY_CONFIRMATION_REQUIRED`：手动重试前尚未确认当前平台类目。
+- `VERSION_CONFLICT`：规则、类目或竞品版本已变化，HTTP 409。
+- `STORAGE_D1_UNAVAILABLE`：当前部署缺少用户洞察所需的 D1 绑定或表。
 
 货流平台 API 使用：
 
@@ -127,6 +175,15 @@
 - `AI_SKILL_CALL_LIMIT` / `AI_SKILL_LOOP_LIMIT`：单次回答超过六次调用或两轮工具循环，服务端停止生成。
 - `AI_STREAM_CANCELLED`：客户端主动停止回答，租约已释放且审计标记未完成。
 - `AI_LOCAL_PREVIEW_READ_ONLY`：本地 Node 预览只展示脱敏状态，不调用 Provider 或修改配置。
+
+商品主数据 API 使用：
+
+- `PRODUCT_CATALOG_STORAGE_UNAVAILABLE`：缺少 `PRODUCT_FLOW_DB` 或商品目录表不可用。
+- `PRODUCT_CATALOG_IMPORT_INVALID` / `PRODUCT_CATALOG_IMPORT_EMPTY`：导入内容缺少有效商品身份或为空。
+- `PRODUCT_CATALOG_WRITE_DENIED`：当前身份不是总经办或运营部维护人，或账号为只读。
+- `KUAIMAI_CONFIG_MISSING`：部署缺少快麦商品读取配置。
+- `KUAIMAI_PRODUCT_SYNC_INCOMPLETE`：分页保护触发，本批没有写入。
+- `KUAIMAI_PRODUCT_SYNC_FAILED`：快麦拒绝、超时或返回失败，可按 `retryable` 判断重试。
 生产数据与环境 API 使用：
 
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。

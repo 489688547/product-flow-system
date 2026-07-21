@@ -88,7 +88,7 @@ export function normalizeClientState(input) {
     const levelConfirmed = Boolean(product.levelConfirmed && gradingResult.complete);
     const level = levelConfirmed ? gradingResult.level : normalizeProductLevel(product.level);
     const { referenceLevel: _legacyReferenceLevel, ...record } = product;
-    return { ...record, expectedLaunchMonth: normalizeExpectedLaunchMonth(product.expectedLaunchMonth || matchedDemand?.expectedLaunchMonth), image: product.image || generateProductCover(product.name), level, stage, levelConfirmed, requester, productManager, owner: productManager, skuCodes: normalizeSkuCodes(product.skuCodes), monthlyGmvTarget: normalizeMonthlyGmvTarget(product.monthlyGmvTarget) };
+    return { ...record, expectedLaunchMonth: normalizeExpectedLaunchMonth(product.expectedLaunchMonth || matchedDemand?.expectedLaunchMonth), image: product.image || generateProductCover(product.name), level, stage, levelConfirmed, requester, productManager, owner: productManager, catalogProductId: String(product.catalogProductId || "").trim(), skuCodes: normalizeSkuCodes(product.skuCodes), monthlyGmvTarget: normalizeMonthlyGmvTarget(product.monthlyGmvTarget) };
   });
   state.tasks = (Array.isArray(state.tasks) ? state.tasks : defaults.tasks)
     .filter(task => Number(task.stage) > 0)

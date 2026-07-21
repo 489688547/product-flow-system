@@ -80,8 +80,29 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
   assert.match(supplier, /供货范围/);
   assert.doesNotMatch(supplier, /来自钉钉供应链文件夹/);
   assert.match(product, /collection: "productSupplierLinks"/);
+  assert.match(product, /catalogProductId/);
+  assert.match(product, /catalogSkuId/);
+  assert.match(product, /搜索商品、69 码或商家编码/);
+  assert.match(product, /全部 ERP 商品/);
+  assert.match(product, /主商家编码/);
+  assert.match(product, /规格商家编码/);
+  assert.match(product, /未关联供应商/);
+  assert.match(product, /TablePagination/);
+  assert.match(product, /PAGE_SIZE = 50/);
+  assert.match(supplier, /已关联.*个商品/);
   assert.match(quality, /collection: "qualityIssues"/);
   assert.match(quality, /关闭问题/);
+});
+
+test("supply chain consumes the platform catalog instead of a private product copy", () => {
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  const product = read("src/features/supply-chain/ProductSupplyWorkspace.jsx");
+  assert.match(page, /useProductCatalog/);
+  assert.match(page, /catalogBackedProduct/);
+  assert.match(page, /catalogItems=\{catalogItems\}/);
+  assert.match(page, /lifecycleProducts=\{lifecycleProducts\}/);
+  assert.match(product, /ProductCatalogSelect/);
+  assert.doesNotMatch(product, /还没有产品供应关系。可按现有成本表逐条导入或维护。/);
 });
 
 test("single-purpose supply workspaces render their primary content without a nested title card", () => {

@@ -122,9 +122,21 @@ function round2(value) {
   return Math.round(value * 100) / 100;
 }
 
+function kuaimaiDate(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const numeric = typeof value === "number" || /^\d{11,}$/.test(String(value)) ? Number(value) : NaN;
+  const date = Number.isFinite(numeric)
+    ? new Date(numeric)
+    : /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(value))
+      ? new Date(`${String(value).replace(" ", "T")}+08:00`)
+      : new Date(value);
+  return Number.isNaN(date.valueOf()) ? null : date;
+}
+
 // 把订单里的子订单聚合成 69码×日×平台 的日行（与Excel导入同一个存储结构）。
 // 口径说明：API的订单接口没有净销售额/退款金额明细，sales/netSales 先取买家已付，
-// 毛利=已付−成本；退款字段留0，等每月Excel重导时整月覆盖校准。
+// 毛利=已付−成本；统计日固定使用快麦 created（下单时间），退款字段留0，
+// 等每月Excel重导时整月覆盖校准。
 export function createOrderAggregator(shopPlatformMap = new Map()) {
   const buckets = new Map();
   const titles = {};
@@ -133,17 +145,17 @@ export function createOrderAggregator(shopPlatformMap = new Map()) {
   return {
     addOrder(order) {
       orders += 1;
-      const payDate = order?.payTime ? new Date(order.payTime) : null;
+      const orderCreatedDate = kuaimaiDate(order?.created);
       const platform = shopPlatformMap.get(String(order?.userId ?? "")) || "其它";
       (order?.orders || []).forEach(child => {
         if (child?.isCancel === 1) return;
         const code = String(child?.sysOuterId || "").trim();
-        const childPayDate = child?.payTime ? new Date(child.payTime) : payDate;
-        if (!CODE_PATTERN.test(code) || !childPayDate || Number.isNaN(childPayDate.valueOf())) {
+        const childCreatedDate = kuaimaiDate(child?.created) || orderCreatedDate;
+        if (!CODE_PATTERN.test(code) || !childCreatedDate) {
           skippedItems += 1;
           return;
         }
-        const date = gmt8Timestamp(childPayDate).slice(0, 10);
+        const date = gmt8Timestamp(childCreatedDate).slice(0, 10);
         const key = `${code}|${date}|${platform}`;
         const bucket = buckets.get(key) || { code, date, platform, qty: 0, sales: 0, netSales: 0, grossProfit: 0, refund: 0, cost: 0, preShipRefund: 0, postShipRefund: 0 };
         const payment = toAmount(child.payment);
@@ -181,7 +193,7 @@ export async function pullKuaimaiDay(config, { date, pageNo = 1, maxPages = 8 },
   let hasNext = false;
   while (pagesFetched < maxPages) {
     const payload = await callKuaimai("erp.trade.list.query", {
-      timeType: "pay_time",
+      timeType: "created",
       startTime: `${date} 00:00:00`,
       endTime: `${date} 23:59:59`,
       pageNo: page,
@@ -197,4 +209,55 @@ export async function pullKuaimaiDay(config, { date, pageNo = 1, maxPages = 8 },
   const result = aggregator.finish();
   // 退出循环时 page 已指向下一个未拉取的页码
   return { ...result, date, nextPage: hasNext ? page : null, hasNext };
+}
+
+function kuaimaiProductItems(payload = {}) {
+  if (Array.isArray(payload.items)) return payload.items;
+  if (Array.isArray(payload.body?.items)) return payload.body.items;
+  if (typeof payload.body === "string") {
+    try {
+      const body = JSON.parse(payload.body);
+      return Array.isArray(body?.items) ? body.items : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+// 商品档案是平台共享主数据。一次同步只返回完整或明确未完成的分页结果，
+// 调用方必须在 complete=true 时才写入目录，避免提供商中途失败覆盖旧数据。
+export async function pullKuaimaiProductCatalog(config, { pageNo = 1, pageSize = 200, maxPages = 8 } = {}, fetchImpl = fetch) {
+  const size = Math.min(200, Math.max(1, Number(pageSize) || 200));
+  const pageLimit = Math.min(20, Math.max(1, Number(maxPages) || 8));
+  let page = Math.max(1, Number(pageNo) || 1);
+  let pagesFetched = 0;
+  let total = null;
+  const items = [];
+  let complete = false;
+  while (pagesFetched < pageLimit) {
+    const payload = await callKuaimai("item.list.query", {
+      pageNo: page,
+      pageSize: size,
+      orderBy: "modified:asc",
+      whetherReturnPurchase: 0
+    }, config, fetchImpl);
+    const pageItems = kuaimaiProductItems(payload);
+    const reportedTotal = Number(payload.total ?? payload.body?.total);
+    if (Number.isFinite(reportedTotal) && reportedTotal >= 0) total = reportedTotal;
+    items.push(...pageItems);
+    pagesFetched += 1;
+    if ((total !== null && items.length >= total) || pageItems.length < size) {
+      complete = true;
+      break;
+    }
+    page += 1;
+  }
+  return {
+    items,
+    total: total ?? items.length,
+    pagesFetched,
+    complete,
+    nextPage: complete ? null : page
+  };
 }

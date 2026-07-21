@@ -8,6 +8,7 @@ function createD1Mock() {
   const records = new Map();
   const meta = new Map();
   const batchSizes = [];
+  const sqlLog = [];
   const sales = [
     { code: "690000000001", date: "2026-07-16", platform: "抖音", qty: 2, sales: 120, net_sales: 110, gross_profit: 55, refund: 10, cost: 55, pre_ship_refund: 4, post_ship_refund: 6 },
     { code: "690000000002", date: "2026-07-17", platform: "天猫", qty: 1, sales: 80, net_sales: 75, gross_profit: 30, refund: 5, cost: 45, pre_ship_refund: 0, post_ship_refund: 5 },
@@ -17,7 +18,9 @@ function createD1Mock() {
     records,
     meta,
     batchSizes,
+    sqlLog,
     prepare(sql) {
+      sqlLog.push(sql.replace(/\s+/g, " ").trim());
       const statement = {
         values: [],
         bind(...values) {
@@ -45,7 +48,7 @@ function createD1Mock() {
               data_sync_runs: "syncRuns",
               data_source_files: "sourceFiles",
               data_dimension_mappings: "mappings",
-              data_metric_definitions: "metricDefinitions",
+              data_metric_definitions_legacy: "metricDefinitions",
               data_quality_issues: "qualityIssues",
               data_app_subscriptions: "subscriptions",
               data_audit_logs: "auditLogs",
@@ -158,6 +161,32 @@ test("fresh data center storage keeps default metrics and chunks metadata writes
   });
   assert.equal(post.status, 200);
   assert.ok(Math.max(...db.batchSizes) <= 50);
+});
+
+test("generic data center writes never delete or overwrite governed or legacy metric definitions", async () => {
+  const db = createD1Mock();
+  db.records.set("metricDefinitions:legacy-net-sales", {
+    entity_type: "metricDefinitions",
+    id: "legacy-net-sales",
+    payload: JSON.stringify({ id: "legacy-net-sales", metricCode: "sales.net_sales", name: "迁移前净销售额" }),
+    updated_at: "2026-07-18T00:00:00.000Z",
+    updated_by: "legacy-user"
+  });
+  const state = normalizeDataCenterState({
+    metricDefinitions: [{ id: "attacker", metricCode: "sales.replaced", name: "不应落库" }]
+  });
+  const post = await onDataCenterRequest({
+    request: new Request("https://flow.example.com/api/data-center", { method: "POST", body: JSON.stringify({ state }) }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: executive }
+  });
+  assert.equal(post.status, 200);
+  assert.equal(db.records.has("metricDefinitions:legacy-net-sales"), true);
+  assert.equal(db.records.has("metricDefinitions:attacker"), false);
+  assert.equal(db.sqlLog.some(sql => /(?:delete from|insert into) data_metric_definitions(?:_legacy)?/i.test(sql)), false);
+
+  const get = await onDataCenterRequest({ request: new Request("https://flow.example.com/api/data-center"), env: { PRODUCT_FLOW_DB: db }, data: { session: executive } });
+  assert.equal((await get.json()).state.metricDefinitions[0].name, "迁移前净销售额");
 });
 
 test("data center sales uses creation-date range and excludes Other", async () => {

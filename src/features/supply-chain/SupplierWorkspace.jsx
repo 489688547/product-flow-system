@@ -8,12 +8,17 @@ import { useSupplyChain } from "../../state/SupplyChainProvider.jsx";
 const money = value => `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const EMPTY_FORM = { name: "", code: "", category: "原料", supplyScope: "", contactName: "", contactPhone: "", paymentTerms: "", status: "active" };
 
-export function SupplierWorkspace({ summary, canEdit }) {
+export function SupplierWorkspace({ summary, canEdit, catalogItems = [] }) {
   const { state, dispatch } = useSupplyChain();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const summaryBySupplier = new Map(summary.bySupplier.map(item => [item.supplierId, item]));
+  const catalogIds = new Set(catalogItems.map(item => item.id));
+  const productCounts = new Map(state.suppliers.map(supplier => [supplier.id, new Set(state.productSupplierLinks
+    .filter(link => link.supplierId === supplier.id)
+    .map(link => link.catalogProductId || (catalogIds.has(link.productId) ? link.productId : link.productId ? `legacy:${link.productId}` : ""))
+    .filter(Boolean))]));
   function open(record = null) {
     setModalOpen(true);
     setEditing(record);
@@ -25,7 +30,7 @@ export function SupplierWorkspace({ summary, canEdit }) {
     setEditing(null); setModalOpen(false); setForm(EMPTY_FORM);
   }
   const columns = [
-    { key: "name", header: "供应商", render: row => <span><strong>{row.name}</strong><small className="table-secondary">{row.code || "未设置编码"}</small></span> },
+    { key: "name", header: "供应商", render: row => <span><strong>{row.name}</strong><small className="table-secondary">{row.code || "未设置编码"}</small><small className="table-secondary">已关联 {productCounts.get(row.id)?.size || 0} 个商品</small></span> },
     { key: "category", header: "类别", render: row => <span className="supplier-category">{row.category || "—"}</span> },
     { key: "scope", header: "供货范围", render: row => row.supplyScope || "—" },
     { key: "contact", header: "联系人", render: row => [row.contactName, row.contactPhone].filter(Boolean).join(" · ") || "—" },

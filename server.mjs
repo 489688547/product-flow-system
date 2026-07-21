@@ -24,12 +24,20 @@ import {
 import {
   callKuaimai,
   kuaimaiConfigFromEnv,
+  pullKuaimaiProductCatalog,
   pullKuaimaiDay,
   refreshKuaimaiSession
 } from "./functions/api/kuaimai/_shared/kuaimai.js";
 import { syncSupplyApprovals } from "./functions/api/supply-chain/approvals/sync.js";
+import { mergeCatalogRecords, normalizeCatalogPayload } from "./src/domain/productCatalog.js";
 import { normalizeSupplyChainState } from "./src/domain/supplyChain.js";
 import { normalizeDataCenterState } from "./src/domain/dataCenter.js";
+import {
+  confirmCategoryMapping,
+  copyInsightRuleSet,
+  normalizeUserInsightsState,
+  transitionCompetitorCandidate
+} from "./src/domain/userInsights.js";
 import { AI_DATA_DOMAINS, normalizeAiProvider } from "./src/domain/aiAssistant.js";
 import {
   applyCollaborationTransition,
@@ -48,6 +56,8 @@ const LOCAL_DATA_DIR = path.join(__dirname, ".local-data");
 const LOCAL_STATE_PATH = path.join(LOCAL_DATA_DIR, "product-flow-state.json");
 const LOCAL_SUPPLY_STATE_PATH = path.join(LOCAL_DATA_DIR, "supply-chain-state.json");
 const LOCAL_DATA_CENTER_STATE_PATH = path.join(LOCAL_DATA_DIR, "data-center-state.json");
+const LOCAL_USER_INSIGHTS_PATH = path.join(LOCAL_DATA_DIR, "user-insights-state.json");
+const LOCAL_PRODUCT_CATALOG_PATH = path.join(LOCAL_DATA_DIR, "product-catalog.json");
 const LOCAL_COLLABORATION_PATH = path.join(LOCAL_DATA_DIR, "collaboration-items.json");
 let orgCache = null;
 let productionDataClient;
@@ -90,12 +100,12 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
-function readBody(req) {
+function readBody(req, maxBytes = 1024 * 1024) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", chunk => {
       body += chunk;
-      if (body.length > 1024 * 1024) reject(new Error("request body too large"));
+      if (body.length > maxBytes) reject(new Error("request body too large"));
     });
     req.on("end", () => {
       try {
@@ -152,6 +162,117 @@ async function writeLocalDataCenterState(state, updatedBy = "") {
   return payload;
 }
 
+async function readLocalUserInsights() {
+  try {
+    const raw = JSON.parse(await readFile(LOCAL_USER_INSIGHTS_PATH, "utf8"));
+    return normalizeUserInsightsState(raw.state || raw);
+  } catch {
+    return normalizeUserInsightsState();
+  }
+}
+
+async function writeLocalUserInsights(state, updatedBy = "") {
+  const normalized = normalizeUserInsightsState(state);
+  const updatedAt = new Date().toISOString();
+  const payload = { state: { ...normalized, updatedAt }, version: normalized.version, updatedAt, updatedBy: String(updatedBy || "").slice(0, 80) };
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_USER_INSIGHTS_PATH, JSON.stringify(payload, null, 2));
+  return payload;
+}
+
+function upsertLocalCollection(collection, record) {
+  const current = collection.find(item => item.id === record.id);
+  const version = current ? Number(current.version || 1) + 1 : Math.max(1, Number(record.version || 1));
+  const next = { ...record, version, updatedAt: new Date().toISOString(), updatedBy: "周荣庆" };
+  return { next, collection: current ? collection.map(item => item.id === next.id ? next : item) : [next, ...collection] };
+}
+
+async function handleLocalUserInsights(req, res, url) {
+  try {
+    const state = await readLocalUserInsights();
+    const basePath = "/api/platform/v1/user-insights";
+    const subpath = url.pathname.slice(basePath.length).replace(/^\//, "");
+    if (req.method === "GET" && !subpath) {
+      json(res, 200, {
+        synced: true,
+        advisoryOnly: true,
+        localPreview: true,
+        actor: { departments: ["总经办"], readonly: false },
+        data: {
+          categoryMappings: state.categoryMappings,
+          snapshots: state.snapshots,
+          entities: state.entities,
+          ruleSets: state.ruleSets,
+          ruleHistory: state.ruleHistory || [],
+          competitors: state.competitors,
+          suggestions: state.suggestions,
+          syncRuns: state.syncRuns
+        }
+      });
+      return;
+    }
+    if (req.method === "GET" && ["category-mappings", "rules", "competitors"].includes(subpath)) {
+      const key = subpath === "category-mappings" ? "categoryMappings" : subpath === "rules" ? "ruleSets" : "competitors";
+      json(res, 200, { synced: true, [subpath === "category-mappings" ? "mappings" : subpath]: state[key] });
+      return;
+    }
+    const body = await readBody(req);
+    if (!subpath && req.method === "POST" && body.action === "retry") {
+      const mapping = state.categoryMappings.find(item => item.status === "confirmed" && item.platform === body.scope?.platform && item.categoryId === body.scope?.categoryId);
+      if (!mapping) {
+        json(res, 409, { synced: false, message: "请先确认平台类目，再发起手动重试。", error: { code: "CATEGORY_CONFIRMATION_REQUIRED", retryable: false } });
+        return;
+      }
+      const run = { id: globalThis.crypto.randomUUID(), ...body.scope, status: "queued", trigger: "manual", requestedAt: new Date().toISOString(), requestedBy: "周荣庆" };
+      const saved = upsertLocalCollection(state.syncRuns, run);
+      await writeLocalUserInsights({ ...state, syncRuns: saved.collection }, "周荣庆");
+      json(res, 202, { synced: true, run: saved.next, localPreview: true });
+      return;
+    }
+    if (subpath === "category-mappings" && ["POST", "PATCH"].includes(req.method)) {
+      let mapping = body.mapping || {};
+      if (body.action === "confirm") mapping = confirmCategoryMapping(mapping, { name: "周荣庆", department: "总经办", now: new Date().toISOString() });
+      const saved = upsertLocalCollection(state.categoryMappings, mapping);
+      await writeLocalUserInsights({ ...state, categoryMappings: saved.collection }, "周荣庆");
+      json(res, 200, { synced: true, mapping: saved.next, localPreview: true, security: "不保存浏览器凭证" });
+      return;
+    }
+    if (subpath === "rules" && ["POST", "PATCH"].includes(req.method)) {
+      let rule = body.rule || {};
+      if (body.action === "copy") {
+        const source = state.ruleSets.find(item => item.id === body.sourceRuleId);
+        if (!source) { json(res, 404, { synced: false, message: "来源规则不存在。" }); return; }
+        rule = copyInsightRuleSet(source, { ...body.target, actor: "周荣庆", now: new Date().toISOString() });
+      }
+      if (body.action === "publish") rule = { ...rule, status: "published" };
+      if (body.action === "disable") rule = { ...rule, status: "disabled" };
+      const saved = upsertLocalCollection(state.ruleSets, rule);
+      const history = [{ id: globalThis.crypto.randomUUID(), action: body.action === "copy" ? "copy_rule" : body.action === "publish" ? "publish_rule" : body.action === "disable" ? "disable_rule" : "upsert_rule", name: saved.next.name, consumerAppId: saved.next.consumerAppId, ownerDepartment: saved.next.ownerDepartment, status: saved.next.status, version: saved.next.version, updatedAt: saved.next.updatedAt, updatedBy: "周荣庆" }, ...(state.ruleHistory || [])];
+      await writeLocalUserInsights({ ...state, ruleSets: saved.collection, ruleHistory: history }, "周荣庆");
+      json(res, 200, { synced: true, rule: saved.next, localPreview: true });
+      return;
+    }
+    if (subpath === "competitors" && req.method === "POST") {
+      const saved = upsertLocalCollection(state.competitors, { ...(body.competitor || {}), status: "candidate" });
+      await writeLocalUserInsights({ ...state, competitors: saved.collection }, "周荣庆");
+      json(res, 201, { synced: true, competitor: saved.next, localPreview: true });
+      return;
+    }
+    if (subpath === "competitors" && req.method === "PATCH") {
+      const current = state.competitors.find(item => item.id === body.id);
+      if (!current) { json(res, 404, { synced: false, message: "竞品候选不存在。" }); return; }
+      const next = transitionCompetitorCandidate(current, body.status, { actor: "周荣庆", department: "总经办", reason: body.reason, now: new Date().toISOString() });
+      const saved = upsertLocalCollection(state.competitors, next);
+      await writeLocalUserInsights({ ...state, competitors: saved.collection }, "周荣庆");
+      json(res, 200, { synced: true, competitor: saved.next, localPreview: true });
+      return;
+    }
+    json(res, 405, { synced: false, message: "Method not allowed" });
+  } catch (error) {
+    json(res, 400, { synced: false, message: error.message || "本地用户洞察处理失败。" });
+  }
+}
+
 async function handleLocalAiPreview(req, res, url) {
   const state = await readLocalDataCenterState();
   const provider = normalizeAiProvider(state.aiProviders?.[0]);
@@ -176,6 +297,64 @@ async function handleLocalAiPreview(req, res, url) {
     message: "本地 AI 预览为只读模式，不调用外部模型或修改 Provider。",
     error: { code: "AI_LOCAL_PREVIEW_READ_ONLY", retryable: false }
   });
+}
+
+function productCatalogCounts(items = []) {
+  const skus = items.flatMap(item => item.skus || []);
+  return {
+    products: items.length,
+    skus: skus.length,
+    salesBarcodes: skus.filter(sku => sku.barcodeType === "sales_barcode").length,
+    nonStandardBarcodes: skus.filter(sku => sku.barcodeType === "non_standard").length,
+    missingBarcodes: skus.filter(sku => sku.barcodeType === "missing").length
+  };
+}
+
+async function readLocalProductCatalog() {
+  try {
+    const payload = JSON.parse(await readFile(LOCAL_PRODUCT_CATALOG_PATH, "utf8"));
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    return {
+      items,
+      runs: Array.isArray(payload.runs) ? payload.runs : [],
+      meta: { ...productCatalogCounts(items), ...(payload.meta || {}), version: "product-catalog-v1" }
+    };
+  } catch {
+    return { items: [], runs: [], meta: { ...productCatalogCounts([]), lastSuccessfulSyncAt: "", lastSource: "", lastMode: "", version: "product-catalog-v1" } };
+  }
+}
+
+async function writeLocalProductCatalog(input, { mode, fileName = "", replaceSource = false } = {}) {
+  const previous = await readLocalProductCatalog();
+  const completedAt = new Date().toISOString();
+  const normalized = normalizeCatalogPayload({ ...input, syncedAt: input.syncedAt || completedAt });
+  const byId = new Map(previous.items.map(item => [item.id, item]));
+  if (replaceSource) {
+    for (const [id, item] of byId) {
+      if (item.source === normalized.source) byId.set(id, { ...item, presentInSource: false });
+    }
+  }
+  for (const item of normalized.items) byId.set(item.id, { ...mergeCatalogRecords(byId.get(item.id), item), presentInSource: true, syncedAt: completedAt });
+  const items = [...byId.values()].sort((left, right) => Number(right.active) - Number(left.active) || left.name.localeCompare(right.name, "zh-CN"));
+  const run = {
+    id: `product-catalog-${mode}-${Date.now()}`,
+    source: normalized.source,
+    mode,
+    status: "success",
+    fileName: String(fileName || "").slice(0, 240),
+    counts: normalized.counts,
+    startedAt: input.startedAt || completedAt,
+    completedAt,
+    updatedBy: LOCAL_COLLABORATION_ACTOR.name
+  };
+  const payload = {
+    items,
+    runs: [run, ...previous.runs].slice(0, 20),
+    meta: { ...productCatalogCounts(items), lastSuccessfulSyncAt: completedAt, lastSource: normalized.source, lastMode: mode, version: "product-catalog-v1" }
+  };
+  await mkdir(LOCAL_DATA_DIR, { recursive: true });
+  await writeFile(LOCAL_PRODUCT_CATALOG_PATH, JSON.stringify(payload, null, 2));
+  return { ...payload, counts: normalized.counts, run };
 }
 
 function relativeIso(days, hour = 18) {
@@ -521,6 +700,44 @@ async function handleKuaimaiPull(res, url) {
   }
 }
 
+async function handleLocalProductCatalog(req, res, url) {
+  try {
+    if (url.pathname === "/api/platform/v1/product-catalog" && req.method === "GET") {
+      json(res, 200, await readLocalProductCatalog());
+      return;
+    }
+    if (url.pathname === "/api/platform/v1/product-catalog/import" && req.method === "POST") {
+      const body = await readBody(req, 12 * 1024 * 1024);
+      if (!Array.isArray(body.items) || !body.items.length) {
+        json(res, 400, { synced: false, message: "导入内容中没有有效商品。", error: { code: "PRODUCT_CATALOG_IMPORT_INVALID", retryable: false } });
+        return;
+      }
+      const saved = await writeLocalProductCatalog({ source: body.source || "erp-file", items: body.items }, { mode: "file", fileName: body.fileName });
+      json(res, 200, { synced: true, counts: saved.counts, run: saved.run, meta: saved.meta });
+      return;
+    }
+    if (url.pathname === "/api/platform/v1/product-catalog/sync/kuaimai" && req.method === "POST") {
+      const config = kuaimaiConfigFromEnv(process.env);
+      if (!config.ready) {
+        json(res, 400, { synced: false, message: "缺少快麦商品同步配置。", error: { code: "KUAIMAI_CONFIG_MISSING", retryable: false } });
+        return;
+      }
+      const startedAt = new Date().toISOString();
+      const pulled = await pullKuaimaiProductCatalog(config, { pageSize: 200, maxPages: 20 });
+      if (!pulled.complete) {
+        json(res, 409, { synced: false, message: `快麦商品分页未完整读取，已读取 ${pulled.items.length} 条，本次没有写入。`, error: { code: "KUAIMAI_PRODUCT_SYNC_INCOMPLETE", retryable: true } });
+        return;
+      }
+      const saved = await writeLocalProductCatalog({ source: "kuaimai", items: pulled.items, startedAt }, { mode: "kuaimai_api" });
+      json(res, 200, { synced: true, providerTotal: pulled.total, pagesFetched: pulled.pagesFetched, counts: saved.counts, run: saved.run, meta: saved.meta });
+      return;
+    }
+    json(res, 405, { synced: false, message: "Method not allowed" });
+  } catch (error) {
+    json(res, 502, { synced: false, message: error.message || "商品主数据处理失败。", error: { code: "PRODUCT_CATALOG_LOCAL_FAILED", retryable: true } });
+  }
+}
+
 async function handleState(req, res) {
   try {
     if (productionDataClient.configured) {
@@ -676,7 +893,7 @@ async function handleDataCenterState(req, res) {
   try {
     if (req.method === "GET") {
       const state = await readLocalDataCenterState();
-      json(res, 200, { synced: Boolean(state.updatedAt), state, version: state.version, updatedAt: state.updatedAt || "" });
+      json(res, 200, { synced: true, state, version: state.version, updatedAt: state.updatedAt || "" });
       return;
     }
     if (req.method !== "POST") {
@@ -949,6 +1166,10 @@ const server = http.createServer(async (req, res) => {
     await handleLocalCollaboration(req, res, url);
     return;
   }
+  if (url.pathname === "/api/platform/v1/user-insights" || url.pathname.startsWith("/api/platform/v1/user-insights/")) {
+    await handleLocalUserInsights(req, res, url);
+    return;
+  }
   if ([
     "/api/platform/v1/ai/status",
     "/api/platform/v1/ai/provider",
@@ -956,6 +1177,10 @@ const server = http.createServer(async (req, res) => {
     "/api/platform/v1/ai/chat"
   ].includes(url.pathname)) {
     await handleLocalAiPreview(req, res, url);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/product-catalog" || url.pathname === "/api/platform/v1/product-catalog/import" || url.pathname === "/api/platform/v1/product-catalog/sync/kuaimai") {
+    await handleLocalProductCatalog(req, res, url);
     return;
   }
   if (url.pathname === "/api/state") {
@@ -968,6 +1193,20 @@ const server = http.createServer(async (req, res) => {
   }
   if (url.pathname === "/api/platform/v1/environment-readiness" && req.method === "GET") {
     await handleEnvironmentReadiness(res);
+    return;
+  }
+  if (url.pathname === "/api/platform/v1/data-standards" || url.pathname.startsWith("/api/platform/v1/data-standards/")) {
+    const message = "本地测试模式没有 D1，共享数据口径只读目录可用，但不能计算或保存。";
+    json(res, 501, {
+      synced: false,
+      message,
+      error: {
+        code: "DATA_STANDARD_STORAGE_UNAVAILABLE",
+        message,
+        requestId: `local-${Date.now().toString(36)}`,
+        retryable: true
+      }
+    });
     return;
   }
   if (url.pathname === "/api/platform/v1/production-data/rollback") {

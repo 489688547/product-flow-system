@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-20",
+  "updatedAt": "2026-07-21",
   "capabilities": [
     {
       "id": "shared-production-data",
@@ -11,7 +11,7 @@
       "level": "blocking",
       "envVars": [],
       "bindings": ["PRODUCT_FLOW_DB"],
-      "tables": []
+      "tables": ["product_flow_state", "product_flow_state_parts"]
     },
     {
       "id": "dingtalk-core",
@@ -103,18 +103,52 @@
     {
       "id": "kuaimai-sales-sync",
       "name": "快麦销售同步",
-      "description": "快麦订单拉取、会话刷新和销售聚合所需配置。",
+      "description": "按订单创建时间拉取快麦订单、刷新会话并保存销售日聚合所需配置。",
       "platforms": ["kuaimai", "cloudflare-d1"],
       "requiredIn": ["preview", "production"],
       "level": "warning",
       "envVars": ["KUAIMAI_APP_KEY", "KUAIMAI_APP_SECRET", "KUAIMAI_ACCESS_TOKEN"],
       "bindings": ["PRODUCT_FLOW_DB"],
-      "tables": ["product_sales_daily"]
+      "tables": ["product_sales_daily", "product_sales_meta"]
+    },
+    {
+      "id": "product-catalog-storage",
+      "name": "共享商品主数据",
+      "description": "数据中心、产品全周期和供应链共用的 ERP 商品、SKU、69 码与同步批次存储；商品经营视图读取已落库销售日聚合。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1", "erp-file-import"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "product_catalog_items",
+        "product_catalog_skus",
+        "product_catalog_sync_runs",
+        "product_catalog_meta",
+        "product_sales_daily",
+        "product_sales_meta"
+      ]
+    },
+    {
+      "id": "kuaimai-product-sync",
+      "name": "快麦商品目录同步",
+      "description": "从快麦开放平台分页读取 ERP 商品并合并共享商品目录；缺少配置时仍可使用文件导入。",
+      "platforms": ["kuaimai", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "warning",
+      "envVars": ["KUAIMAI_APP_KEY", "KUAIMAI_APP_SECRET", "KUAIMAI_ACCESS_TOKEN"],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "product_catalog_items",
+        "product_catalog_skus",
+        "product_catalog_sync_runs",
+        "product_catalog_meta"
+      ]
     },
     {
       "id": "business-data-apps",
       "name": "数据中心、店铺运营与人事管理",
-      "description": "三个业务 App 的标准数据、经营闭环和人事绩效归档所需的 D1 持久化能力。",
+      "description": "三个业务 App 的标准数据、版本化数据口径与计算结果、经营闭环和绩效归档所需的 D1 持久化能力。",
       "platforms": ["cloudflare-pages", "cloudflare-d1"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",
@@ -127,6 +161,11 @@
         "data_source_files",
         "data_dimension_mappings",
         "data_metric_definitions",
+        "data_metric_definitions_legacy",
+        "data_metric_definition_versions",
+        "data_metric_results",
+        "data_metric_calculation_runs",
+        "data_metric_audit_logs",
         "data_quality_issues",
         "data_app_subscriptions",
         "data_audit_logs",
@@ -159,6 +198,23 @@
       ]
     },
     {
+      "id": "data-credential-vault",
+      "name": "数据中心加密凭证保险箱",
+      "description": "连接器和内部系统凭证的版本化加密、权限与审计所需生产能力。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": ["PLATFORM_CREDENTIAL_MASTER_KEY"],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "data_connector_instances",
+        "credential_vault_entries",
+        "credential_vault_permissions",
+        "credential_vault_audit",
+        "internal_vault_items"
+      ]
+    },
+    {
       "id": "operations-ai-review",
       "name": "经营方案 AI 点评",
       "description": "可选的 OpenAI Responses API 点评；未配置时使用本地规则检查，不阻断经营流程。",
@@ -168,6 +224,27 @@
       "envVars": ["OPENAI_API_KEY", "OPENAI_MODEL"],
       "bindings": [],
       "tables": []
+    },
+    {
+      "id": "user-insights-browser-collection",
+      "name": "用户洞察浏览器采集",
+      "description": "保存已确认平台类目、标准市场事实、部门规则、竞品候选、采集设备哈希和审计记录。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": [
+        "user_insight_category_mappings",
+        "user_insight_rules",
+        "user_insight_snapshots",
+        "user_insight_entities",
+        "user_insight_competitors",
+        "user_insight_sync_runs",
+        "user_insight_runner_tokens",
+        "user_insight_audit_logs",
+        "user_insight_meta"
+      ]
     },
     {
       "id": "company-ai-assistant",

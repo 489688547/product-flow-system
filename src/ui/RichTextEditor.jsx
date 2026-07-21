@@ -5,7 +5,7 @@ const IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 单图大小上限 2MB
 const IMAGE_ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 const IMAGE_ACCEPT = IMAGE_ALLOWED_TYPES.join(",");
 
-export function RichTextEditor({ value, onChange, placeholder }) {
+export function RichTextEditor({ value, onChange, placeholder, disabled = false, allowImages = true, compact = false }) {
   const hostRef = useRef(null);
   const quillRef = useRef(null);
   const fileRef = useRef(null);
@@ -26,12 +26,14 @@ export function RichTextEditor({ value, onChange, placeholder }) {
         theme: "snow",
         placeholder,
         modules: {
-          toolbar: [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], ["link", "image"], ["clean"]]
+          toolbar: [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], allowImages ? ["link", "image"] : ["link"], ["clean"]]
         }
       });
       const toolbar = editor.getModule("toolbar");
-      toolbar.addHandler("image", () => fileRef.current?.click());
+      if (allowImages) toolbar.addHandler("image", () => fileRef.current?.click());
       editor.root.innerHTML = value || "";
+      editor.enable(!disabled);
+      toolbar.container.querySelectorAll("button, select").forEach(control => { control.disabled = disabled; });
       editor.on("text-change", () => onChangeRef.current(editor.root.innerHTML));
       quillRef.current = editor;
       setStatus("ready");
@@ -39,13 +41,20 @@ export function RichTextEditor({ value, onChange, placeholder }) {
       if (!cancelled) setStatus("error");
     });
     return () => { cancelled = true; };
-  }, [placeholder]);
+  }, [allowImages, disabled, placeholder, value]);
 
   useEffect(() => {
     const editor = quillRef.current;
     if (!editor) return;
     if ((value || "") !== editor.root.innerHTML) editor.root.innerHTML = value || "";
   }, [value]);
+
+  useEffect(() => {
+    const editor = quillRef.current;
+    if (!editor) return;
+    editor.enable(!disabled);
+    editor.getModule("toolbar").container.querySelectorAll("button, select").forEach(control => { control.disabled = disabled; });
+  }, [disabled]);
 
   function insertImages(files) {
     const editor = quillRef.current;
@@ -87,7 +96,7 @@ export function RichTextEditor({ value, onChange, placeholder }) {
   }
 
   return (
-    <div className="rich-field">
+    <div className={`rich-field ${compact ? "compact" : ""}`}>
       {status === "loading" ? (
         <div role="status" style={{ minHeight: 150, border: "1px solid var(--border-strong)", borderRadius: "var(--radius-control)", background: "var(--surface-subtle)", display: "grid", placeItems: "center", color: "var(--text-tertiary)", fontSize: 13 }}>
           编辑器加载中…
@@ -95,7 +104,7 @@ export function RichTextEditor({ value, onChange, placeholder }) {
       ) : null}
       <div ref={hostRef} className="rich-editor" aria-hidden={status === "loading"} style={status === "loading" ? { position: "absolute", visibility: "hidden", height: 0, overflow: "hidden" } : undefined} />
       {imageError ? <small role="alert" style={{ color: "var(--danger)", fontSize: 12 }}>{imageError}</small> : null}
-      <input ref={fileRef} className="hidden" type="file" accept={IMAGE_ACCEPT} multiple aria-label="插入图片" onChange={event => insertImages(event.target.files)} />
+      {allowImages ? <input ref={fileRef} className="hidden" type="file" accept={IMAGE_ACCEPT} multiple aria-label="插入图片" onChange={event => insertImages(event.target.files)} /> : null}
     </div>
   );
 }

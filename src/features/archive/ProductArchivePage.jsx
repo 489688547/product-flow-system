@@ -16,29 +16,33 @@ import { ProductPackageModal } from "./ProductPackageModal.jsx";
 import { ProductSalesModal } from "./ProductSalesModal.jsx";
 import { ProductGmvSummary } from "../sales/ProductGmvSummary.jsx";
 import { useProductSalesRows } from "../sales/useProductSalesRows.js";
+import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
+import { catalogBackedProduct } from "../../domain/productCatalog.js";
 
 export function ProductArchivePage({ onNavigate, onOpenProgress }) {
   const { state, currentUser, orgCache, setCurrentProduct, updateProduct } = useProductFlow();
+  const { items: catalogItems } = useProductCatalog();
   const [editing, setEditing] = useState(null);
   const [salesProduct, setSalesProduct] = useState(null);
   const [packageProduct, setPackageProduct] = useState(null);
   const [statusFilter, setStatusFilter] = useState("all");
   const [levelFilter, setLevelFilter] = useState("all");
   const [stageFilter, setStageFilter] = useState("all");
-  const productSales = useProductSalesRows(state.products);
-  const gmvSummaries = useMemo(() => new Map(state.products.map(product => {
+  const catalogProducts = useMemo(() => state.products.map(product => catalogBackedProduct(product, catalogItems)), [catalogItems, state.products]);
+  const productSales = useProductSalesRows(catalogProducts);
+  const gmvSummaries = useMemo(() => new Map(catalogProducts.map(product => {
     const schedule = buildProductScheduleSummary(product, state.productPlans, state.demands).schedule;
     return [product.id, buildProductGmvProgress({ product, dailyRows: productSales.rows, launchDate: schedule.launchDate })];
-  })), [state.products, state.productPlans, state.demands, productSales.rows]);
+  })), [catalogProducts, state.productPlans, state.demands, productSales.rows]);
   const statusOptions = useMemo(() => [
     { value: "all", label: "全部状态" },
-    ...Array.from(new Set(state.products.map(product => product.status).filter(Boolean)))
+    ...Array.from(new Set(catalogProducts.map(product => product.status).filter(Boolean)))
       .map(status => ({ value: status, label: status }))
-  ], [state.products]);
-  const products = useMemo(() => state.products
+  ], [catalogProducts]);
+  const products = useMemo(() => catalogProducts
     .filter(product => statusFilter === "all" || product.status === statusFilter)
     .filter(product => levelFilter === "all" || (product.levelConfirmed && product.level === levelFilter))
-    .filter(product => stageFilter === "all" || String(product.stage) === stageFilter), [state.products, statusFilter, levelFilter, stageFilter]);
+    .filter(product => stageFilter === "all" || String(product.stage) === stageFilter), [catalogProducts, statusFilter, levelFilter, stageFilter]);
   function jump(product, screen) {
     if (screen === "progress") {
       onOpenProgress?.(product.id);
@@ -92,6 +96,7 @@ export function ProductArchivePage({ onNavigate, onOpenProgress }) {
         open={Boolean(editing)}
         product={editing}
         orgCache={orgCache}
+        catalogItems={catalogItems}
         onClose={() => setEditing(null)}
         onSave={form => {
           updateProduct(editing.id, { ...form, skuCodes: normalizeSkuCodes(form.skuCodes) });

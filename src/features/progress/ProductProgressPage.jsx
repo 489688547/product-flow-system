@@ -23,7 +23,7 @@ import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { buildProductGmvProgress, normalizeMonthlyGmvTarget } from "../../domain/productGmv.js";
 import { preferredProgressProductId, productManagerAssignment } from "../../domain/productOwnership.js";
-import { buildTaskTodoSnapshot, normalizeTaskDueDate, todoSyncStatus } from "../../domain/taskTodo.js";
+import { buildTaskTodoSnapshot, todoSyncStatus } from "../../domain/taskTodo.js";
 import { MeetingScheduleModal } from "./MeetingScheduleModal.jsx";
 import { ProductGradingModal } from "./ProductGradingModal.jsx";
 import { ProductScheduleSummary } from "./ProductScheduleSummary.jsx";
@@ -194,7 +194,6 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
       const completionBlocked = Boolean(task.required && !deliverablesForTask(state, task.id).length && !task.done);
       const hasMeeting = Boolean(task.dingMeeting?.eventId);
       const syncStatus = todoSyncStatus(task);
-      const hasValidDue = Boolean(normalizeTaskDueDate(task.due));
       return <TableActions>
         <label className={`task-check ${task.done ? "checked" : ""} ${completionBlocked ? "blocked" : ""}`} title={completionBlocked ? "请先添加交付物，再完成必需任务" : undefined}>
           <input aria-label={`${task.title}完成状态`} type="checkbox" disabled={completionBlocked} checked={Boolean(task.done)} onChange={event => updateTask(task.id, { done: event.target.checked })} />
@@ -205,8 +204,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             className="compact todo-sync-action"
             data-status={syncStatus}
             data-testid="sync-task-todo"
-            disabled={!hasValidDue}
-            title={!hasValidDue ? "请先设置有效的截止日期，再同步到钉钉" : `${syncStatus}，点击${task.dingTodo?.id ? "更新" : "发送"}钉钉待办`}
+            title={`${syncStatus}，点击${task.dingTodo?.id ? "更新" : "编辑并发送"}钉钉待办`}
             onClick={() => setTodoTask(task)}
           ><Send size={16} />{syncStatus}</Button>
         ) : null}
@@ -433,14 +431,15 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
         product={selectedProduct}
         orgCache={orgCache}
         onClose={() => setTodoTask(null)}
-        onSync={async ({ executors }) => {
+        onSync={async ({ executors, draft }) => {
+          const effectiveTask = { ...todoTask, due: draft.dueDate };
           const detailUrl = new URL(window.location.href);
           detailUrl.searchParams.set("productId", selectedProduct.id);
           detailUrl.searchParams.set("taskId", todoTask.id);
           detailUrl.hash = "progress";
           const recoveryUsers = orgUsers(orgCache).filter(user => user.name === selectedProduct.productManager);
-          const payload = buildTaskTodoPayload({ product: selectedProduct, task: todoTask, creator: currentUser, executors, recoveryUsers, detailUrl: detailUrl.toString() });
-          const snapshot = buildTaskTodoSnapshot(todoTask, payload.executorUnionIds);
+          const payload = buildTaskTodoPayload({ product: selectedProduct, task: effectiveTask, creator: currentUser, executors, recoveryUsers, detailUrl: detailUrl.toString(), draft });
+          const snapshot = buildTaskTodoSnapshot(effectiveTask, payload.executorUnionIds, payload.draft);
           return syncTaskTodo({ taskId: todoTask.id, payload, executors, snapshot });
         }}
       />
