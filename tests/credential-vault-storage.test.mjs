@@ -4,6 +4,7 @@ import { credentialCryptoInternals } from "../functions/api/platform/_shared/cre
 import {
   archiveCredentialEntry,
   createCredentialEntry,
+  destroyCredentialEntry,
   listCredentialMetadata,
   replaceCredentialEntry,
   revealCredentialEntry
@@ -43,6 +44,12 @@ function createD1Mock() {
             const current = entries.get(id);
             if (!current || current.version !== expectedVersion) return { success: true, meta: { changes: 0 } };
             entries.set(id, { ...current, name, schema_version: schemaVersion, ciphertext, iv, algorithm, key_version: keyVersion, version, updated_at: updatedAt, updated_by: updatedBy });
+            return { success: true, meta: { changes: 1 } };
+          } else if (/update credential_vault_entries\s+set ciphertext/i.test(sql)) {
+            const [ciphertext, iv, archivedAt, archivedBy, version, updatedAt, updatedBy, id, expectedVersion] = statement.values;
+            const current = entries.get(id);
+            if (!current || current.version !== expectedVersion) return { success: true, meta: { changes: 0 } };
+            entries.set(id, { ...current, ciphertext, iv, archived_at: archivedAt, archived_by: archivedBy, version, updated_at: updatedAt, updated_by: updatedBy });
             return { success: true, meta: { changes: 1 } };
           } else if (/update credential_vault_entries\s+set archived_at/i.test(sql)) {
             const [archivedAt, archivedBy, version, id, expectedVersion] = statement.values;
@@ -149,4 +156,26 @@ test("archive hides an entry without deleting its audit history", async () => {
   assert.deepEqual(await listCredentialMetadata(db, {}), []);
   assert.equal(db.entries.has("cred-1"), true);
   assert.ok(db.auditRows.some(row => row.action === "archive"));
+});
+
+test("destroy irreversibly removes ciphertext and keeps a value-free audit", async () => {
+  const db = createD1Mock();
+  const key = masterKey();
+  await createCredentialEntry(db, {
+    id: "cred-1", scopeType: "connector", scopeId: "shop-1", category: "douyin-ecommerce",
+    name: "店铺登录", schemaVersion: 1, secretPayload: { password: "must-disappear" }
+  }, { ...actor, masterKey: key });
+
+  const destroyed = await destroyCredentialEntry(db, "cred-1", { expectedVersion: 1 }, actor);
+
+  assert.equal(destroyed.hasSecret, false);
+  assert.equal(db.entries.get("cred-1").ciphertext, "");
+  assert.equal(db.entries.get("cred-1").iv, "");
+  assert.ok(db.entries.get("cred-1").archived_at);
+  assert.ok(db.auditRows.some(row => row.action === "destroy"));
+  assert.doesNotMatch(JSON.stringify(db.auditRows), /must-disappear/);
+  await assert.rejects(
+    () => revealCredentialEntry(db, "cred-1", { ...actor, masterKey: key }),
+    error => error.code === "CREDENTIAL_ENTRY_NOT_FOUND"
+  );
 });

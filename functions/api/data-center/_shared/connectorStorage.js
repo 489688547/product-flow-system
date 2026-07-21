@@ -4,6 +4,8 @@ import {
   normalizeConnectorInstance,
   splitConnectorPayload
 } from "../../../../src/domain/dataCenterConnectors.js";
+import { storeFileImportPending } from "../../../../src/domain/dataCenterConnectors.js";
+import { destroyCredentialEntry, listCredentialMetadata } from "../../platform/_shared/credentialVaultStorage.js";
 
 const VAULT_TYPE_IDS = new Set(INTERNAL_VAULT_TYPES.map(item => item.id));
 const VAULT_FIELDS = new Set([
@@ -285,4 +287,29 @@ export async function archiveConnectorRecord(db, id, input = {}, context = {}) {
   if (Number(result?.meta?.changes || 0) !== 1) throw connectorError("连接实例版本已更新，请刷新后重试。", "DATA_CONNECTOR_VERSION_CONFLICT", 409);
   await writeConnectorAudit(db, "archive_connector", ["status"], actor);
   return { ...existing, version: nextVersion, archivedAt: now };
+}
+
+export async function destroyConnectorRecord(db, id, input = {}, context = {}) {
+  const existingRow = await connectorRow(db, id);
+  const existing = connectorFromRow(existingRow);
+  if (!existing || existingRow.archived_at) throw connectorError("连接实例不存在。", "DATA_CONNECTOR_NOT_FOUND", 404);
+  if (!storeFileImportPending(existing.connectorId)) throw connectorError("只有已停用网页登录的店铺连接器可以销毁。", "DATA_CONNECTOR_DESTROY_NOT_ALLOWED", 400);
+  if (Number(input.expectedVersion) !== existing.version) throw connectorError("连接实例版本已更新，请刷新后重试。", "DATA_CONNECTOR_VERSION_CONFLICT", 409);
+
+  if (existing.credentialEntryId) {
+    const credentials = await listCredentialMetadata(db, { scopeType: "connector" });
+    const credential = credentials.find(item => item.id === existing.credentialEntryId);
+    if (credential) {
+      await destroyCredentialEntry(db, credential.id, { expectedVersion: credential.version }, {
+        actorType: "employee",
+        actorId: context.actorId || "unknown",
+        actorName: context.actor || "unknown",
+        requestId: context.requestId || "",
+        purpose: "销毁已停用的店铺网页登录凭证"
+      });
+    }
+  }
+  const archived = await archiveConnectorRecord(db, id, input, context);
+  await writeConnectorAudit(db, "destroy_connector", ["credential", "status"], cleanString(context.actor || "unknown", "actor", 160));
+  return archived;
 }

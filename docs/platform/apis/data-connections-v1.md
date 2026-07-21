@@ -2,13 +2,14 @@
 
 ## 用途与消费者
 
-`/api/platform/v1/data-connections` 管理实例级 provider 连接。数据中心是当前消费者；连接元数据和加密凭据供通用采集平台使用。首期 UI 只开放抖音电商。
+`/api/platform/v1/data-connections` 仅用于读取和清理已退役的抖音实例级 provider 连接。数据中心 UI 不再调用创建、替换或 reveal；店铺经营改为平台原始文件方向。
 
 ## 认证与授权
 
 - GET：有效公司会话，且属于总经办或运营部。
-- POST、PUT：上述会话、非只读。
-- reveal：上述管理权限，且会话创建不超过 15 分钟。
+- POST、PUT：已退役，统一返回 `410 DATA_CONNECTION_LOGIN_RETIRED`。
+- DELETE：仅 `executive`，且会话创建不超过 15 分钟，必须提供当前版本和精确确认文案。
+- reveal：仅为清理前兼容保留，不再有 UI 消费者；凭证销毁后不可读取。
 - 所有权限在服务端校验；页面隐藏不是权限边界。
 
 ## 连接模型
@@ -21,19 +22,13 @@
 
 `GET /api/platform/v1/data-connections` 无请求体。
 
-抖音首期创建：
+销毁旧连接：
 
 ```json
-{ "loginEmail": "operator@example.com", "password": "secret" }
+{ "id": "connection-id", "expectedVersion": 1, "confirmation": "销毁店铺凭证" }
 ```
 
-替换凭据：
-
-```json
-{ "id": "connection-id", "loginEmail": "operator@example.com", "password": "new-secret", "expectedVersion": 1 }
-```
-
-固定后台地址、店铺名称、负责人、账号类型、接入方式和同步数据均不接受客户端输入。PUT 的空密码表示保留旧密码；POST 必须提供密码。
+成功后共享保险箱密文与 IV 清空，旧连接脱敏为“已销毁”并停用，店铺识别记录删除，活动任务以 `PROVIDER_RETIRED` 结束，一次性 grant 删除。无秘密审计和历史经营事实保留。
 
 ## 响应
 
@@ -55,7 +50,7 @@
 }
 ```
 
-创建或替换凭据会递增凭据版本，并以 `connectionId + credentialVersion + taskType` 创建幂等验证任务。
+普通响应不返回 secret、ciphertext、IV 或 grant；已销毁连接不返回原登录邮箱。
 
 ## 受控 reveal
 
@@ -63,8 +58,8 @@
 
 ## 错误
 
-- `AUTH_SESSION_REQUIRED`、`DATA_CONNECTION_READ_DENIED`、`DATA_CONNECTION_WRITE_DENIED`
-- `DATA_CONNECTION_FIELDS_INVALID`、`DATA_CONNECTION_EMAIL_INVALID`、`DATA_CONNECTION_PASSWORD_REQUIRED`
+- `AUTH_SESSION_REQUIRED`、`DATA_CONNECTION_READ_DENIED`、`DATA_CONNECTION_DESTROY_DENIED`
+- `DATA_CONNECTION_LOGIN_RETIRED`、`DATA_CONNECTION_DESTROY_CONFIRMATION_REQUIRED`
 - `DATA_CONNECTION_VERSION_CONFLICT`、`DATA_CONNECTION_NOT_FOUND`
 - `DATA_CONNECTION_FRESH_SESSION_REQUIRED`、`DATA_CONNECTION_REVEAL_RATE_LIMITED`
 - `PLATFORM_CREDENTIAL_KEY_UNAVAILABLE`、`DATA_CONNECTION_STORAGE_UNAVAILABLE`
@@ -73,11 +68,10 @@
 
 ## 兼容、容量与回滚
 
-- v1 客户端忽略未知字段；新增 provider 通过 registry 和 adapter 扩展，不改变抖音请求契约。
-- `data_connections` 每个账号一行，只引用共享保险箱；secret 只在 `credential_vault_entries` 保存一份当前加密 JSON。每次替换生成保险箱审计、连接审计和一个任务，容量主要来自追加任务/审计而非凭据。
-- 迁移 `0006_data_connections.sql` 为新增表，不改旧数据中心表。部署前运行 D1 migration；部署后先读接口再保存测试连接。
-- 回滚停止新任务并隐藏写入口，保留表和密文；旧版本不会读取新增表。不得通过删除表回滚。
+- v1 客户端忽略未知字段；旧客户端尝试保存会收到 410，不能再创建店铺网页登录任务。
+- 销毁不可逆；代码回滚不能恢复密文，若未来重新启用必须重新评审并重新取得授权。
+- 现有表继续保留无秘密审计与兼容读取，不通过删表掩盖历史。
 
 ## 契约测试
 
-覆盖匿名、部门越权、只读写入、字段白名单、邮箱归一化、普通响应无 secret、会话新鲜度、no-store、reveal 限流、版本冲突和加密能力缺失。
+覆盖匿名、部门越权、旧写入 410、销毁权限、精确确认、会话新鲜度、密文/IV 清空、任务终止、普通响应无 secret 和版本冲突。

@@ -37,6 +37,12 @@ export function requireDataConnectionManager(actor) {
   }
 }
 
+export function requireDataConnectionDestroyer(actor) {
+  if (actor.readonly || actor.role !== "executive") {
+    throw new DataConnectionHttpError(403, "DATA_CONNECTION_DESTROY_DENIED", "仅总经办负责人可以销毁店铺凭证。");
+  }
+}
+
 export function requireFreshSession(actor, now = new Date()) {
   const createdAt = Date.parse(actor.createdAt);
   if (!Number.isFinite(createdAt) || now.getTime() - createdAt > 15 * 60 * 1000 || createdAt > now.getTime() + 60 * 1000) {

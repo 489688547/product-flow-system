@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Database, LockKeyhole, RefreshCw } from "lucide-react";
 import { DATA_ACCESS_CATEGORIES, dataAccessCategoryFor } from "../../../domain/dataAccessCatalog.js";
-import { DATA_CONNECTOR_DEFINITIONS } from "../../../domain/dataCenterConnectors.js";
+import { DATA_CONNECTOR_DEFINITIONS, storeFileImportPending } from "../../../domain/dataCenterConnectors.js";
 import { useDataCenter } from "../../../state/DataCenterProvider.jsx";
 import { usePlatformConnections } from "../../../state/usePlatformConnections.js";
 import { Button } from "../../../ui/Button.jsx";
-import { DataConnectionsWorkspace as AutomatedConnectionsWorkspace } from "../data-connections/DataConnectionsWorkspace.jsx";
 import { CompanyDataWorkspace } from "./CompanyDataWorkspace.jsx";
 import { ConnectorCatalog } from "./ConnectorCatalog.jsx";
 import { ConnectorConfigDialog } from "./ConnectorConfigDialog.jsx";
@@ -13,7 +12,7 @@ import { DataAccessTabs } from "./DataAccessTabs.jsx";
 import { ErpAccessWorkspace } from "./ErpAccessWorkspace.jsx";
 
 const ECOMMERCE_CONNECTOR_DEFINITIONS = DATA_CONNECTOR_DEFINITIONS.filter(
-  item => dataAccessCategoryFor("connector", item.id) === "ecommerce" && item.id !== "douyin-ecommerce"
+  item => dataAccessCategoryFor("connector", item.id) === "ecommerce"
 );
 
 function validCategory(category) {
@@ -69,7 +68,6 @@ export function DataConnectionsWorkspace({
       {connectionsError ? <div className="connector-form-error" role="alert"><span>{connectionsError}</span><button type="button" onClick={refreshConnections}>重试</button></div> : null}
       {["erp", "company"].includes(category) && platformController.error ? <div className="connector-form-error" role="alert"><span>{platformController.error}</span><button type="button" onClick={() => platformController.refresh().catch(() => {})}>重试平台连接</button></div> : null}
       <div id={`data-access-panel-${category}`} role="tabpanel" aria-labelledby={`data-access-tab-${category}`}>
-        {category === "ecommerce" ? <AutomatedConnectionsWorkspace canEdit={canEdit} /> : null}
         {connectionsLoading ? <div className="connection-loading" aria-label="正在加载数据接入"><span /><span /><span /></div> : null}
         {!connectionsLoading && category === "ecommerce" ? (
           <ConnectorCatalog
@@ -78,6 +76,9 @@ export function DataConnectionsWorkspace({
             canEdit={canEdit}
             onAdd={openNew}
             onManage={openExisting}
+            waitingForSamples={storeFileImportPending}
+            pendingMessage="请先提供平台后台原始 XLSX / CSV；识别规则验证后再开放导入。"
+            pendingActionLabel="等待文件样例"
           />
         ) : null}
         {!connectionsLoading && category === "erp" ? (
@@ -104,7 +105,7 @@ export function DataConnectionsWorkspace({
           />
         ) : null}
       </div>
-      {selection ? (
+      {selection && category !== "ecommerce" ? (
         <ConnectorConfigDialog
           definition={selection.definition}
           instance={selection.instance}

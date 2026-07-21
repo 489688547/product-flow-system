@@ -2,6 +2,7 @@ import { DOUYIN_ECOMMERCE } from "../../../../../../src/domain/dataConnections.j
 import {
   assertCredentialRevealRateLimit,
   createCredentialEntry,
+  destroyCredentialEntry,
   replaceCredentialEntry,
   revealCredentialEntry
 } from "../../../_shared/credentialVaultStorage.js";
@@ -148,6 +149,48 @@ export function createDataConnectionStore(db, { masterKey, actor, requestId = ""
         credential_version: credentialVersion,
         last_verified_at: current?.last_verified_at || "",
         version,
+        updated_at: timestamp
+      }, []);
+    },
+
+    async destroy(input) {
+      const timestamp = now().toISOString();
+      const id = clean(input.id, 100);
+      const current = await db.prepare("SELECT * FROM data_connections WHERE id = ?1 AND platform_id = ?2").bind(id, DOUYIN_ECOMMERCE.id).first();
+      if (!current) throw new DataConnectionHttpError(404, "DATA_CONNECTION_NOT_FOUND", "数据连接不存在。");
+      const expectedVersion = Number(input.expectedVersion || 0);
+      if (Number(current.version || 0) !== expectedVersion) {
+        throw new DataConnectionHttpError(409, "DATA_CONNECTION_VERSION_CONFLICT", "连接已被其他人更新，请刷新后重试。", { currentVersion: Number(current.version || 0) });
+      }
+
+      const destroyedCredential = await destroyCredentialEntry(db, current.credential_entry_id, {
+        expectedVersion: Number(current.credential_version || 0)
+      }, vaultContext({ masterKey, actor, requestId, purpose: "销毁已停用的店铺网页登录凭证" }));
+
+      await db.prepare(`DELETE FROM browser_agent_task_grants WHERE task_id IN (
+        SELECT id FROM browser_agent_tasks WHERE connection_id = ?1
+      )`).bind(id).run();
+      await db.prepare(`UPDATE browser_agent_tasks SET status = 'failed', error_code = 'PROVIDER_RETIRED',
+        claimed_by = NULL, claim_expires_at = NULL, updated_at = ?1
+        WHERE connection_id = ?2 AND status IN ('queued', 'claimed', 'waiting_human_verification', 'recognizing')`)
+        .bind(timestamp, id).run();
+      await db.prepare("DELETE FROM data_connection_shops WHERE connection_id = ?1").bind(id).run();
+
+      const nextVersion = expectedVersion + 1;
+      const result = await db.prepare(`UPDATE data_connections SET account_label = '已销毁',
+        credential_schema_id = 'destroyed-v1', credential_version = ?1, status = 'disabled',
+        version = ?2, updated_at = ?3, updated_by = ?4
+        WHERE id = ?5 AND platform_id = ?6 AND version = ?7`)
+        .bind(destroyedCredential.version, nextVersion, timestamp, actor.name, id, DOUYIN_ECOMMERCE.id, expectedVersion).run();
+      if (Number(result?.meta?.changes ?? 0) !== 1) throw new DataConnectionHttpError(409, "DATA_CONNECTION_VERSION_CONFLICT", "凭证已销毁，但连接元数据发生冲突，请刷新后重试。");
+      await writeAudit(db, { connectionId: id, action: "destroy", requestId, actor, details: { credentialDestroyed: true, tasksRetired: true }, now: timestamp });
+      return metadata({
+        ...current,
+        account_label: "已销毁",
+        credential_schema_id: "destroyed-v1",
+        credential_version: destroyedCredential.version,
+        status: "disabled",
+        version: nextVersion,
         updated_at: timestamp
       }, []);
     },

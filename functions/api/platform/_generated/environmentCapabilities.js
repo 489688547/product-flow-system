@@ -96,18 +96,15 @@ const environmentCapabilities = {
     },
     {
       "id": "browser-data-acquisition",
-      "name": "通用浏览器数据采集",
-      "description": "复用数据中心凭据保险箱，统一保存 provider 连接引用、识别结果、公司 Mac 短时任务和无秘密审计；抖音是首个 adapter。",
+      "name": "旧店铺浏览器采集清理",
+      "description": "抖音店铺浏览器 adapter 已退役；保留旧表与服务端清理接口用于销毁凭证、终止任务和读取无秘密审计。",
       "platforms": [
         "douyin-ecommerce",
         "cloudflare-pages",
         "cloudflare-d1"
       ],
-      "requiredIn": [
-        "preview",
-        "production"
-      ],
-      "level": "blocking",
+      "requiredIn": [],
+      "level": "warning",
       "envVars": [
         "PLATFORM_CREDENTIAL_MASTER_KEY"
       ],

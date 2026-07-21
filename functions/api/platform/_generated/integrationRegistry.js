@@ -201,70 +201,65 @@ const integrationRegistry = {
     {
       "id": "douyin-ecommerce",
       "name": "抖音电商罗盘",
-      "status": "integrating",
-      "summary": "由公司 Mac 浏览器助手完成抖音店铺登录验证、店铺识别，并承接后续页面数据采集。",
+      "status": "retired",
+      "summary": "店铺网页登录采集已退役；抖音店铺经营改为平台原始文件方向，当前等待真实文件样例。",
       "capabilities": [
-        "加密店铺账号",
-        "浏览器登录验证",
-        "人工验证码接管",
-        "店铺名称与头像识别",
-        "平台数据采集"
+        "原始文件方向",
+        "等待文件样例",
+        "旧凭证不可恢复销毁",
+        "历史审计保留"
       ],
       "businessQuestions": [
-        "抖音店铺登录失败",
-        "公司 Mac 未领取任务",
-        "验证码等待处理",
-        "店铺名称或头像未识别",
-        "抖音页面结构变化"
+        "抖音原始文件样例",
+        "订单创建时间口径",
+        "文件字段识别",
+        "历史连接清理"
       ],
       "keywords": [
         "抖音电商",
         "抖店",
         "Douyin",
-        "今日头条店铺",
-        "公司 Mac",
-        "浏览器助手"
+        "原始文件",
+        "文件导入"
       ],
       "codePaths": [
+        "src/domain/dataCenterConnectors.js",
+        "src/features/data-center/connections/**",
         "functions/api/platform/v1/data-connections/**",
-        "functions/api/platform/v1/browser-agent/**",
-        "src/domain/dataConnections.js",
-        "src/state/dataConnectionsApi.js",
-        "src/features/data-center/data-connections/**",
-        "scripts/data-connection-agent/**",
+        "functions/api/platform/_shared/credentialVaultStorage.js",
         "migrations/0006_data_connections.sql"
       ],
-      "envVars": [
-        "PLATFORM_CREDENTIAL_MASTER_KEY"
-      ],
-      "domains": [
-        "fxg.jinritemai.com"
-      ],
+      "envVars": [],
+      "domains": [],
       "apiRoutes": [
-        "/api/platform/v1/data-connections",
-        "/api/platform/v1/data-connections/",
-        "/api/platform/v1/browser-agent/"
+        "/api/platform/v1/data-connections"
       ],
       "publicDocs": [],
       "evidence": [
-        "docs/features/data-center-app/douyin-login-design.md",
+        "docs/features/store-file-import-transition/prd.md",
+        "docs/features/store-file-import-transition/design.md",
         "migrations/0006_data_connections.sql"
       ],
       "relations": [
         {
           "platformId": "cloudflare-d1",
-          "type": "stores-acquisition-state",
-          "description": "D1 通过现有凭据保险箱保存密文，并保存店铺识别结果、短时任务与审计。"
+          "type": "stores-cleanup-audit",
+          "description": "D1 保留无秘密审计和历史经营事实；旧店铺凭证密文与 IV 被清空。"
         },
         {
           "platformId": "cloudflare-pages",
-          "type": "hosts-browser-task-api",
-          "description": "Pages Functions 承载用户连接与公司 Mac 任务接口。"
+          "type": "hosts-retirement-api",
+          "description": "Pages Functions 承载旧连接只读与受控销毁接口。"
+        },
+        {
+          "platformId": "erp-file-import",
+          "type": "planned-file-pattern",
+          "description": "店铺原始文件后续复用已验证的预览、确认和标准事实写入原则，但必须先取得真实样例。"
         },
         {
           "platformId": "kuaimai",
           "type": "possible-overlap",
-          "description": "后续订单采集需区分快麦聚合订单与抖音店铺原始经营数据。"
+          "description": "文件导入需区分快麦聚合订单与抖音店铺原始经营数据。"
         },
         {
           "platformId": "oceanengine-qianchuan",

@@ -7,8 +7,8 @@ export const DOUYIN_ECOMMERCE = Object.freeze({
 });
 
 const DISPLAY_STATES = Object.freeze({
-  queued: { label: "正在等待公司 Mac", tone: "pending" },
-  claimed: { label: "正在等待公司 Mac", tone: "pending" },
+  queued: { label: "网页登录已停用", tone: "muted" },
+  claimed: { label: "网页登录已停用", tone: "muted" },
   waiting_human_verification: { label: "请在抖音页面完成人工验证", tone: "warning" },
   recognizing: { label: "正在识别店铺", tone: "pending" },
   connected: { label: "已连接", tone: "success" },

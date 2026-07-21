@@ -27,7 +27,7 @@
 | `/api/sales` | 查询产品销售聚合 | 需要公司会话；时间和平台口径见产品数据定义 |
 | `/api/data-center` | 读取和保存数据中心安全元数据 | 指定部门可读；仅总经办和运营部可写；拒绝只读身份；D1 分实体表存储 |
 | `/api/data-center/sales` | 按日期读取数据中心销售事实 | 需要公司会话；最长 370 天；订单创建时间；上海时区；排除“其它” |
-| `/api/data-center/connectors` | 读取和维护连接器实例与内部保险箱非敏感元数据 | 数据中心授权部门可读；运营可维护连接器；仅总经办维护内部保险箱和归档 |
+| `/api/data-center/connectors` | 读取和维护连接器实例与内部保险箱非敏感元数据 | 数据中心授权部门可读；运营可维护非店铺连接器；仅总经办维护内部保险箱、归档并销毁已退役店铺凭证 |
 | `/api/ecommerce-operations` | 读取可见的店铺经营状态 | 需要公司会话和授权部门；D1 分实体存储 |
 | `/api/ecommerce-operations/actions` | 提交重点产品、方案、执行、协同和复盘动作 | 服务端校验角色、状态与版本；拒绝只读身份 |
 | `/api/ecommerce-operations/ai-review` | 对当前方案给出优化建议 | 服务端字段白名单；AI 不改变审批；无密钥时明确降级为规则检查 |
@@ -36,8 +36,8 @@
 | `/api/performance-management/actions` | 自评、终评、复核、冻结和更正 | 角色动作白名单、版本冲突、一次复核、冻结后追加更正 |
 | `/api/platform/v1/integrations` | 读取和维护内部平台资料 | 全员可读；仅总经办非只读身份可写；字段白名单；D1 审计只记录字段名 |
 | `/api/platform/v1/platform-connections` | 读取脱敏连接状态，验证、保存或停用公司级平台连接 | 全员登录后可读；仅最高权限管理员可写；只读验证成功后切换；不返回密钥；版本冲突返回 409 |
-| `/api/platform/v1/data-connections` | 读取、创建或替换实例级 provider 连接 | 授权部门会话；抖音首期只接受邮箱和密码；普通响应不返回秘密；版本锁 |
-| `/api/platform/v1/data-connections/:id/reveal` | 短时查看实例级登录密码 | 管理权限；15 分钟内会话；POST；15 分钟五次；no-store；追加审计 |
+| `/api/platform/v1/data-connections` | 读取或销毁旧抖音 provider 连接 | 旧连接只读；POST/PUT 返回 410；DELETE 仅最高权限管理员、15 分钟内会话、精确确认和版本锁；销毁密文并结束任务 |
+| `/api/platform/v1/data-connections/:id/reveal` | 兼容读取尚未销毁的旧连接凭证 | 不再由 UI 调用；清理后返回不存在；不得用于新建店铺网页登录 |
 | `/api/platform/v1/browser-agent/tasks` | 公司 Mac 领取通用 provider 采集任务 | 设备 Bearer 令牌；明确 platform scope；返回一次性五分钟 grant，不返回凭证 |
 | `/api/platform/v1/browser-agent/tasks/:id/credential` | 领取单个任务所需登录凭证 | task/device/credentialVersion 绑定的一次性 grant；消费后失效；no-store |
 | `/api/platform/v1/browser-agent/tasks/:id/result` | 回写等待人工、识别、成功或失败结果 | 设备 Bearer；provider/resource writer 白名单；拒绝密码、验证码、Cookie、HTML 和截图 |

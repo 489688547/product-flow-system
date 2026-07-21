@@ -43,7 +43,7 @@ test("recognized shops deduplicate by platform shop id instead of name", () => {
 });
 
 test("connection display state uses business language", () => {
-  assert.equal(connectionDisplayState({ status: "queued" }).label, "正在等待公司 Mac");
+  assert.equal(connectionDisplayState({ status: "queued" }).label, "网页登录已停用");
   assert.equal(connectionDisplayState({ status: "waiting_human_verification" }).label, "请在抖音页面完成人工验证");
   assert.equal(connectionDisplayState({ status: "recognizing" }).label, "正在识别店铺");
   assert.equal(connectionDisplayState({ status: "connected" }).label, "已连接");
