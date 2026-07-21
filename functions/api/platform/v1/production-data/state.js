@@ -45,9 +45,17 @@ async function rollbackState({ db, body, access, unlock }) {
     before,
     sourceEnvironment: "development"
   });
-  const saved = await writeCompanyState(db, rollbackTarget.state, access.name);
-  await finishProductionAudit(db, audit.id, saved);
-  return { synced: true, ...saved, auditId: audit.id, rolledBackAuditId: sourceAudit.id };
+  try {
+    const saved = await writeCompanyState(db, rollbackTarget.state, access.name, { baseUpdatedAt: before.updatedAt });
+    await finishProductionAudit(db, audit.id, saved);
+    return { synced: true, ...saved, auditId: audit.id, rolledBackAuditId: sourceAudit.id };
+  } catch (error) {
+    await finishProductionAudit(db, audit.id, before, "failed").catch(() => {});
+    if (error?.code === "SHARED_STATE_VERSION_CONFLICT") {
+      throw productionAccessError("线上数据已被其他人更新，请刷新后重新操作。", 409, "PRODUCTION_DATA_VERSION_CONFLICT", true);
+    }
+    throw error;
+  }
 }
 
 export async function onRequest({ request, env }) {
@@ -75,9 +83,17 @@ export async function onRequest({ request, env }) {
     }
     const snapshotId = await saveProductionSnapshot(db, before);
     const audit = await startProductionAudit({ db, action: "write", access, unlock, snapshotId, before, sourceEnvironment: "development" });
-    const saved = await writeCompanyState(db, body.state, access.name);
-    await finishProductionAudit(db, audit.id, saved);
-    return jsonResponse({ synced: true, ...saved, auditId: audit.id });
+    try {
+      const saved = await writeCompanyState(db, body.state, access.name, { baseUpdatedAt: body.baseUpdatedAt });
+      await finishProductionAudit(db, audit.id, saved);
+      return jsonResponse({ synced: true, ...saved, auditId: audit.id });
+    } catch (error) {
+      await finishProductionAudit(db, audit.id, before, "failed").catch(() => {});
+      if (error?.code === "SHARED_STATE_VERSION_CONFLICT") {
+        throw productionAccessError("线上数据已被其他人更新，请刷新后重新操作。", 409, "PRODUCTION_DATA_VERSION_CONFLICT", true);
+      }
+      throw error;
+    }
   } catch (error) {
     return errorResponse(error);
   }

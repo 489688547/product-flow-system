@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-20",
+  "updatedAt": "2026-07-21",
   "capabilities": [
     {
       "id": "shared-production-data",
@@ -11,7 +11,7 @@
       "level": "blocking",
       "envVars": [],
       "bindings": ["PRODUCT_FLOW_DB"],
-      "tables": []
+      "tables": ["product_flow_state", "product_flow_state_parts"]
     },
     {
       "id": "dingtalk-core",

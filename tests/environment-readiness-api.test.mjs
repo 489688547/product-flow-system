@@ -5,6 +5,8 @@ import test from "node:test";
 
 const routePath = resolve("functions/api/platform/v1/environment-readiness.js");
 const REQUIRED_PRODUCTION_TABLES = [
+  "product_flow_state",
+  "product_flow_state_parts",
   "production_data_access_tokens",
   "production_write_unlocks",
   "production_data_snapshots",

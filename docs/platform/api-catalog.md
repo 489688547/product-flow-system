@@ -6,11 +6,11 @@
 
 `GET /api/state` 返回 `{ synced, state, version, updatedAt, updatedBy }`。客户端只有在成功读取带 `updatedAt` 的共享状态后才允许保存；浏览器脏缓存和代码默认状态不得在启动时自动上传。若本机存在未同步缓存，客户端只能保留本机恢复副本，并以线上状态为当前事实源。
 
-`POST /api/state` 接收 `{ state, baseUpdatedAt }`，操作者由当前公司会话确定，客户端提交的 `updatedBy` 不可信。缺少基线返回 `409 SHARED_STATE_BASE_REQUIRED`，基线落后返回 `409 SHARED_STATE_VERSION_CONFLICT`，线上尚未初始化返回 `409 SHARED_STATE_NOT_INITIALIZED`；三种情况均不得修改状态。成功写入前保存完整写前快照并创建待完成审计，写入后完成审计，响应增加 `auditId` 和新的 `updatedAt`。旧客户端因为不携带基线而只能读取，刷新到新版本后恢复写入。
+`POST /api/state` 接收 `{ state, baseUpdatedAt }`，操作者由当前公司会话确定，客户端提交的 `updatedBy` 不可信。缺少基线返回 `409 SHARED_STATE_BASE_REQUIRED`，基线落后或在写入期间被并发推进返回 `409 SHARED_STATE_VERSION_CONFLICT`，线上尚未初始化返回 `409 SHARED_STATE_NOT_INITIALIZED`；三种情况均不得修改状态。版本比较与推进、旧分片删除和新分片插入在同一个 D1 原子批次完成。成功写入前保存完整写前快照并创建待完成审计，写入后完成审计，响应增加 `auditId` 和新的 `updatedAt`。客户端规范化业务状态没有变化时不得 POST。旧客户端因为不携带基线而只能读取，刷新到新版本后恢复写入。
 
 | 路径 | 用途 | 主要约束 |
 | --- | --- | --- |
-| `/api/state` | 读取和保存产品全周期共享状态 | 需要公司会话；写操作拒绝只读身份；先读后写并校验 `baseUpdatedAt`；写前快照与审计；大状态按 D1 行限制分片 |
+| `/api/state` | 读取和保存产品全周期共享状态 | 需要公司会话；写操作拒绝只读身份；先读后写；原子比较并推进 `baseUpdatedAt`；无变化不写；写前快照与审计；大状态按 D1 行限制分片 |
 | `/api/platform` | 读取和保存公司战略执行实体 | 仅总经办范围；实体分记录存储；写操作需要非只读身份 |
 | `/api/brand-content` | 读取品牌内容状态并应用单个领域动作 | 全员登录后可读；品牌、运营和总经办按动作权限写入；独立 D1 状态表；乐观版本冲突返回 409 |
 | `/api/supply-chain` | 读取和保存供应链独立状态，并承接已清洗的钉钉供应链文件快照 | 需要公司会话；按部门裁剪金额和成本字段；写入仅允许所属部门集合；文件快照只允许供应商、库存盘点、成品库存、原辅料库存和异常库存集合 |
