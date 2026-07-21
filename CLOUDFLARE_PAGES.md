@@ -130,3 +130,16 @@ PRODUCTION_DATA_ACCESS_TOKEN=仅属于当前授权账号的个人令牌
 ```
 
 缺少或撤销个人令牌时，本地会话直接失败，不会降级为硬编码最高权限账号。正式生产域名即使误配本地开关和令牌也不会启用本地账号模式。
+
+## 本地沙箱模式（本地 D1）
+
+当远程 D1 绑定故障（dev 代理报 `D1_ERROR: Failed to parse body as JSON ... internal error`）或只想安全地点开界面验证时，可以使用本地沙箱：D1 改走本机 SQLite 持久化，写入只影响本机，不触达生产库。
+
+```bash
+node scripts/seed-local-sandbox.mjs   # 首次或 .wrangler/state 清空后执行：迁移 + 播种身份
+npm run start:sandbox                  # 等价于 npm start -- --local-d1
+```
+
+- 播种脚本应用全部迁移，并从生产库**只读**复制当前个人令牌对应的身份行与令牌哈希行（不读取 .env 明文令牌）。
+- 沙箱模式启动时会临时把 `wrangler.local.toml` 换入 `wrangler.toml`（Pages 不支持自定义配置路径），退出时自动恢复线上配置；备份写入 `.wrangler-toml.online-backup`，进程被强杀后下次启动也会自愈。
+- 沙箱仍走同一份 Pages Functions 路由与鉴权中间件，身份由同一个服务器端哈希令牌解析，只是数据库落在本机。

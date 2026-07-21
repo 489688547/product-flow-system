@@ -1,0 +1,15 @@
+name = "product-flow-system"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-07-18"
+
+# 本地沙箱模式：D1 使用本地 SQLite 持久化（.wrangler/state），不连生产远程库。
+# 用于远程绑定故障时的本地完整功能预览；数据由 scripts/seed-local-sandbox.mjs 播种。
+
+[vars]
+LOCAL_ONLINE_ACCOUNT_MODE = "1"
+
+[[d1_databases]]
+binding = "PRODUCT_FLOW_DB"
+database_name = "product-flow-system"
+database_id = "64389843-2c2f-4781-862d-48fe27caa012"
+remote = false
