@@ -1,4 +1,4 @@
-# Kuaimai ERP History Collection Implementation Plan
+# 快麦历史数据采集实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. The user requires inline execution without subagents.
 
