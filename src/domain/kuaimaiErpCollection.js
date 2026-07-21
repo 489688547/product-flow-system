@@ -17,6 +17,7 @@ const RESOURCE_TYPES = new Set(KUAIMAI_ERP_RESOURCE_TYPES);
 const EVENT_TIME_REQUIRED = new Set(["orders", "order_items", "inventory_movements", "purchase_orders", "aftersales", "finance"]);
 const HASH_PATTERN = /^[a-f0-9]{64}$/i;
 const SECRET_KEY_PATTERN = /^(password|passwd|pwd|cookie|cookies|access_?token|refresh_?token|verification_?code|raw_?html)$/i;
+const PERSONAL_DATA_KEY_PATTERN = /^(收件人|收件姓名|收货人|收货姓名|手机号|手机号码|联系电话|联系手机|电话|收件地址|收货地址|详细地址|街道地址|快递单号|物流单号|退回快递单号|买家旺旺|买家昵称|买家姓名|买家ID|买家留言|系统备注|卖家备注|买家备注|身份证|身份证号|证件号)$/i;
 const MAX_CHUNK_SIZE = 500;
 
 export class ErpCollectionValidationError extends Error {
@@ -62,6 +63,7 @@ function assertNoSecrets(value, path = "payload") {
   if (!value || typeof value !== "object") return;
   for (const [key, child] of Object.entries(value)) {
     if (SECRET_KEY_PATTERN.test(key)) fail("ERP_COLLECTION_SECRET_FIELD", `原始记录不允许包含秘密字段：${path}.${key}`);
+    if (PERSONAL_DATA_KEY_PATTERN.test(key)) fail("ERP_COLLECTION_PERSONAL_DATA_FIELD", `原始记录不允许包含个人信息字段：${path}.${key}`);
     assertNoSecrets(child, `${path}.${key}`);
   }
 }

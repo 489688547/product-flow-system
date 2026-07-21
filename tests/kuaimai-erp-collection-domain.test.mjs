@@ -51,6 +51,7 @@ test("normalization rejects unknown resources, oversized chunks and secret field
   assert.throws(() => normalizeErpCollectionPayload(payload({ batch: { ...payload().batch, resourceType: "mystery" } }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_RESOURCE_INVALID");
   assert.throws(() => normalizeErpCollectionPayload(payload({ records: Array.from({ length: 501 }, (_, index) => ({ sourceKey: String(index), contentHash: hash, payload: {} })) }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_CHUNK_TOO_LARGE");
   assert.throws(() => normalizeErpCollectionPayload(payload({ records: [{ sourceKey: "order-1", contentHash: hash, payload: { cookie: "secret" } }] }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_SECRET_FIELD");
+  assert.throws(() => normalizeErpCollectionPayload(payload({ records: [{ sourceKey: "order-1", contentHash: hash, payload: { 手机号: "13800000000" } }] }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_PERSONAL_DATA_FIELD");
 });
 
 test("order records require a source key, creation timestamp and valid hashes", () => {

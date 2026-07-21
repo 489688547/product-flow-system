@@ -23,7 +23,7 @@ import { onRequest as salesRequest } from "../functions/api/sales.js";
 const root = resolve(new URL("..", import.meta.url).pathname);
 const read = path => readFileSync(resolve(root, path), "utf8");
 
-const ERP_HEADER = ["序号", "订单商品明细ID", "系统订单号", "平台订单号", "系统商品编码(订单)", "系统商品标题(订单)", "付款时间", "发货时间", "完成时间", "店铺平台", "店铺名称", "订单商品数", "净销量", "订单买家已付金额", "净销售额", "净毛利", "退款金额", "销售成本", "发货前退款率", "发货后退款率"];
+const ERP_HEADER = ["序号", "订单商品明细ID", "系统订单号", "平台订单号", "系统商品编码(订单)", "系统商品标题(订单)", "下单时间", "付款时间", "发货时间", "完成时间", "店铺平台", "店铺名称", "订单商品数", "净销量", "订单买家已付金额", "净销售额", "净毛利", "退款金额", "销售成本", "发货前退款率", "发货后退款率"];
 
 function erpRow(overrides = {}) {
   const base = {
@@ -31,6 +31,7 @@ function erpRow(overrides = {}) {
     "平台订单号": "3311032692420011684",
     "系统商品编码(订单)": "6977173969783",
     "系统商品标题(订单)": "TIYES 莓果冻干主粮",
+    "下单时间": "2026-06-14 09:00:00",
     "付款时间": "2026-06-15 10:00:00",
     "店铺平台": "天猫",
     "净销量": 2,
@@ -54,11 +55,11 @@ test("sales header detection finds the ERP export header below the title row", (
   assert.equal(detection.complete, true);
   assert.equal(detection.mapping.code, 4);
   // "平台订单号" (index 3) must not shadow the exact "店铺平台" column.
-  assert.equal(detection.mapping.platform, 9);
-  assert.equal(detection.mapping.qty, 12);
-  assert.equal(detection.mapping.netSales, 14);
-  assert.equal(detection.mapping.preShipRate, 18);
-  assert.equal(detection.mapping.postShipRate, 19);
+  assert.equal(detection.mapping.platform, 10);
+  assert.equal(detection.mapping.qty, 13);
+  assert.equal(detection.mapping.netSales, 15);
+  assert.equal(detection.mapping.preShipRate, 19);
+  assert.equal(detection.mapping.postShipRate, 20);
 });
 
 test("sales aggregation groups by code, day and platform, skipping summary rows", () => {
@@ -67,21 +68,49 @@ test("sales aggregation groups by code, day and platform, skipping summary rows"
     erpRow(),
     erpRow({ "净销量": 1, "订单买家已付金额": 20, "净销售额": 18, "净毛利": 10, "退款金额": 0 }),
     erpRow({ "店铺平台": "拼多多", "净销量": 3 }),
-    erpRow({ "付款时间": "", "发货时间": "2026-06-16 08:00:00" }),
+    erpRow({ "下单时间": "2026-06-16 07:00:00", "付款时间": "", "发货时间": "2026-06-17 08:00:00" }),
     erpRow({ "系统商品编码(订单)": "", "系统商品标题(订单)": "汇总" }),
-    erpRow({ "付款时间": "2000-11-30 00:00:00", "发货时间": "", "完成时间": "" })
+    erpRow({ "下单时间": "2000-11-30 00:00:00", "付款时间": "2000-11-30 00:00:00", "发货时间": "", "完成时间": "" })
   ];
   const result = aggregateSalesRows(rows, mapping);
   assert.equal(result.rows.length, 3);
   assert.equal(result.skipped, 2);
   assert.deepEqual(result.months, ["2026-06"]);
   assert.equal(result.titles["6977173969783"], "TIYES 莓果冻干主粮");
-  const tmall15 = result.rows.find(row => row.platform === "天猫" && row.date === "2026-06-15");
+  const tmall15 = result.rows.find(row => row.platform === "天猫" && row.date === "2026-06-14");
   assert.equal(tmall15.qty, 3);
   assert.equal(tmall15.netSales, 54);
   // 40×10% + 20×10% = 6 pre-ship, 40×5% + 20×5% = 3 post-ship
   assert.equal(tmall15.preShipRefund, 6);
   assert.equal(tmall15.postShipRefund, 3);
+});
+
+test("sales aggregation uses order creation time before payment or shipment time", () => {
+  const mapping = detectSalesColumns(ERP_HEADER).mapping;
+  const result = aggregateSalesRows([
+    erpRow({ "下单时间": "2026-06-10 23:59:59", "付款时间": "2026-06-11 00:00:05", "发货时间": "2026-06-12 08:00:00" })
+  ], mapping);
+  assert.equal(result.rows[0].date, "2026-06-10");
+});
+
+test("sales aggregation supports Kuaimai sales-topic exports with derived net metrics", () => {
+  const header = [
+    "规格商家编码", "主商家编码", "商品名称", "所属平台", "店铺名称", "下单时间",
+    "销售数量", "退货数量", "商品买家已付金额", "销售金额", "退款金额", "销售成本", "退货成本", "销售毛利"
+  ];
+  const detection = detectSalesColumns(header);
+  assert.equal(detection.complete, true);
+  assert.equal(detection.mapping.code, 0);
+  assert.equal(detection.mapping.platform, 3);
+  const result = aggregateSalesRows([[
+    "6977173969783", "6977173969000", "TIYES 莓果冻干主粮", "抖音", "TIYES旗舰店", "2026-07-01 08:00:00",
+    10, 2, 200, 190, 30, 80, 16, 110
+  ]], detection.mapping);
+  assert.deepEqual(result.rows, [{
+    code: "6977173969783", date: "2026-07-01", platform: "抖音",
+    qty: 8, sales: 200, netSales: 160, grossProfit: 96, refund: 30, cost: 64,
+    preShipRefund: 0, postShipRefund: 0
+  }]);
 });
 
 test("sales date and barcode normalization handle excel serials and bad values", () => {
@@ -279,6 +308,7 @@ test("archive and settings wire the sales feature into the UI", () => {
   const importer = read("src/features/settings/SalesDataSettings.jsx");
   assert.match(importer, /streamSpreadsheetRows/);
   assert.match(importer, /dropEdgeMonths/);
+  assert.match(importer, /销售主题分析-按订单商品明细/);
   const salesModal = read("src/features/archive/ProductSalesModal.jsx");
   assert.match(salesModal, /SALES_PERIOD_PRESETS/);
   assert.match(salesModal, /SalesTrendChart/);

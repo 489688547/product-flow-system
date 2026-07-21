@@ -156,7 +156,24 @@ function shanghaiTimestamp(value) {
 }
 
 function rowPayload(headers, row) {
-  return Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""]));
+  return Object.fromEntries(headers
+    .map((header, index) => [header, row[index] ?? ""])
+    .filter(([header]) => !isSensitiveHeader(header)));
+}
+
+const SENSITIVE_HEADER_PATTERNS = [
+  /^(收件人|收件姓名|收货人|收货姓名)$/,
+  /^(手机号|手机号码|联系电话|联系手机|电话)$/,
+  /^(收件地址|收货地址|详细地址|街道地址)$/,
+  /^(快递单号|物流单号|退回快递单号)$/,
+  /^买家(旺旺|昵称|姓名|ID|留言)$/i,
+  /^(系统备注|卖家备注|买家备注|买家留言)$/,
+  /^(身份证|身份证号|证件号)$/
+];
+
+function isSensitiveHeader(header) {
+  const normalized = cleanHeader(header);
+  return SENSITIVE_HEADER_PATTERNS.some(pattern => pattern.test(normalized));
 }
 
 function rowHash(payload) {
@@ -195,6 +212,7 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
     }
   }
   const headers = rows[headerIndex].map(displayHeader);
+  const redactedHeaders = headers.filter(isSensitiveHeader);
   const columns = resolveColumns(headers, schema);
   const missing = [];
   if (!columns.identityColumns.length) missing.push("稳定来源编号");
@@ -205,7 +223,12 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
 
   const recordsByKey = new Map();
   const duplicateOrdinals = new Map();
-  const issues = [];
+  const issues = redactedHeaders.length ? [{
+    code: "SENSITIVE_FIELDS_REDACTED",
+    severity: "info",
+    message: `已在本机剔除 ${redactedHeaders.length} 个个人信息字段，未进入上传内容。`,
+    details: { fields: redactedHeaders }
+  }] : [];
   for (let rowIndex = headerIndex + 1; rowIndex < rows.length; rowIndex += 1) {
     const row = rows[rowIndex];
     if (!row.some(value => valueText(value))) continue;

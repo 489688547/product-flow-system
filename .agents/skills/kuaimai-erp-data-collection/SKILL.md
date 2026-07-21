@@ -14,7 +14,7 @@ description: Use when exporting, validating, backfilling, incrementally importin
 - 销售与订单覆盖按订单创建时间、Asia/Shanghai 统计，不得改用付款、发货或完成时间。
 - 首次历史订单必须同时覆盖“三个月内订单”和“归档订单”，两处时间段拼成无缺口区间。
 - 原始记录可保留平台返回的“其它/未知”；正常运营判断继续排除“其它/其他”。
-- 只保存快麦官方导出中已有的脱敏客户值，不恢复姓名、电话或地址。
+- 收件人、买家身份、电话、地址、快递单号和自由文本备注即使已脱敏也必须在本机剔除，不进入请求或 D1。
 - 不得保存、打印或提交密码、Cookie、验证码、令牌和浏览器会话。
 
 ## 开始前
@@ -37,7 +37,7 @@ description: Use when exporting, validating, backfilling, incrementally importin
 npm run collect:kuaimai -- preflight "/absolute/path/to/export.xlsx" --resource orders
 ```
 
-核对资源类型、文件哈希、表头、有效行数、最早/最晚业务时间、店铺预览和异常。缺列、无稳定来源键、日期无法解析或表头变化时停止；先用真实脱敏样例补失败测试和字段别名，不得猜列。
+核对资源类型、文件哈希、表头、有效行数、最早/最晚业务时间、店铺预览、已剔除个人信息字段和异常。缺列、无稳定来源键、日期无法解析或表头变化时停止；先用真实脱敏样例补失败测试和字段别名，不得猜列。
 
 ### 3. 写入
 

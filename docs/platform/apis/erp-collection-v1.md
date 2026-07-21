@@ -16,10 +16,10 @@
 JSON object with:
 
 - `batch`: provider, registered resource type, source filename, SHA-256 file hash, schema version, source range, source row count, status and collection time.
-- `records`: at most 500 normalized records with stable source key, source timestamps, shop/warehouse references, row SHA-256 and original field object.
+- `records`: at most 500 normalized records with stable source key, source timestamps, shop/warehouse references, row SHA-256 and the allowed provider field object.
 - `issues`: at most 500 preflight quality issues.
 
-Orders and order items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. Secret-like payload keys are rejected.
+Orders and order items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values.
 
 ## Response
 
@@ -35,7 +35,7 @@ HTTP `201` returns `data.batchId`, normalized batch status and `counts` for inse
 
 ## Compatibility and deprecation
 
-The route is additive under `/api/platform/v1`. Resource types and payload validation are registry controlled. New provider fields remain inside `payload`; breaking standard-field changes require a new schema version or route version. No legacy Kuaimai API route is removed.
+The route is additive under `/api/platform/v1`. Resource types and payload validation are registry controlled. New allowed provider fields remain inside `payload`; personal or secret fields never do. Breaking standard-field changes require a new schema version or route version. No legacy Kuaimai API route is removed.
 
 ## Capacity and retention
 
@@ -51,4 +51,3 @@ Audit by batch ID, provider, resource type, file hash, range, row count, status,
 - `tests/kuaimai-erp-collection-api.test.mjs`
 - `tests/kuaimai-erp-collection-cli.test.mjs`
 - `tests/kuaimai-erp-collection-migration.test.mjs`
-
