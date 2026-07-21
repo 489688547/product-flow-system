@@ -31,27 +31,58 @@ function createD1Mock() {
         },
         async run() {
           calls.push({ type: "run", sql, values: statement.values });
-          if (/insert into product_flow_state\s*\(/i.test(sql)) {
+          let changes = 0;
+          if (/insert or ignore into product_flow_state\s*\(/i.test(sql)) {
+            const [id, version, payload, stateId] = statement.values;
+            const firstPart = [...parts.values()]
+              .filter(row => row.state_id === stateId)
+              .sort((a, b) => a.part_key.localeCompare(b.part_key) || a.part_index - b.part_index)[0];
+            if (!store.has(id) && firstPart) {
+              store.set(id, { id, version, payload, updated_at: firstPart.updated_at, updated_by: firstPart.updated_by });
+              changes = 1;
+            }
+          } else if (/update product_flow_state set/i.test(sql)) {
+            const [version, payload, updatedAt, updatedBy, id, baseUpdatedAt] = statement.values;
+            const current = store.get(id);
+            if (current?.updated_at === baseUpdatedAt) {
+              store.set(id, { id, version, payload, updated_at: updatedAt, updated_by: updatedBy });
+              changes = 1;
+            }
+          } else if (/insert into product_flow_state\s*\(/i.test(sql)) {
             const [id, version, payload, updatedAt, updatedBy] = statement.values;
             store.set(id, { id, version, payload, updated_at: updatedAt, updated_by: updatedBy });
+            changes = 1;
           }
           if (/delete from product_flow_state_parts/i.test(sql)) {
-            const prefix = `${statement.values[0]}:`;
-            [...parts.keys()].filter(key => key.startsWith(prefix)).forEach(key => parts.delete(key));
+            const [stateId, manifestId, updatedAt, manifestPayload] = statement.values;
+            const manifest = store.get(manifestId);
+            const allowed = !/and\s+exists/i.test(sql)
+              || (manifest?.updated_at === updatedAt && manifest?.payload === manifestPayload);
+            if (allowed) {
+              const matching = [...parts.keys()].filter(key => key.startsWith(`${stateId}:`));
+              matching.forEach(key => parts.delete(key));
+              changes = matching.length;
+            }
           }
           if (/insert into product_flow_state_parts/i.test(sql)) {
-            const [stateId, partKey, partIndex, payload, updatedAt, updatedBy] = statement.values;
-            parts.set(`${stateId}:${partKey}:${partIndex}`, {
-              state_id: stateId,
-              part_key: partKey,
-              part_index: partIndex,
-              payload,
-              updated_at: updatedAt,
-              updated_by: updatedBy
-            });
+            const [stateId, partKey, partIndex, payload, updatedAt, updatedBy, manifestId, manifestUpdatedAt, manifestPayload] = statement.values;
+            const manifest = store.get(manifestId);
+            const allowed = !/select\s+\?/i.test(sql)
+              || (manifest?.updated_at === manifestUpdatedAt && manifest?.payload === manifestPayload);
+            if (allowed) {
+              parts.set(`${stateId}:${partKey}:${partIndex}`, {
+                state_id: stateId,
+                part_key: partKey,
+                part_index: partIndex,
+                payload,
+                updated_at: updatedAt,
+                updated_by: updatedBy
+              });
+              changes = 1;
+            }
           }
           if (/delete from product_flow_state where/i.test(sql)) store.delete(statement.values[0]);
-          return { success: true };
+          return { success: true, meta: { changes } };
         },
         async first() {
           calls.push({ type: "first", sql, values: statement.values });
@@ -72,7 +103,9 @@ function createD1Mock() {
       return statement;
     },
     async batch(statements) {
-      return Promise.all(statements.map(statement => statement.run()));
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
     }
   };
   return db;

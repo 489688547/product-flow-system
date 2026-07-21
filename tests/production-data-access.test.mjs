@@ -32,6 +32,13 @@ function createProductionDb() {
     snapshotParts: new Map(),
     audits: new Map(),
     stateParts: new Map(),
+    stateManifest: {
+      id: "company",
+      version: state.version,
+      payload: "{}",
+      updated_at: state.updatedAt,
+      updated_by: state.updatedBy
+    },
     state
   };
 
@@ -55,6 +62,7 @@ function createProductionDb() {
         bind(...values) { statement.values = values; return statement; },
         async run() {
           const values = statement.values;
+          let changes = 0;
           if (normalized.startsWith("insert into production_write_unlocks")) {
             const [unlockHash, accessHash, reason, createdAt, expiresAt] = values;
             data.unlocks.set(unlockHash, { unlock_hash: unlockHash, access_token_hash: accessHash, reason, created_at: createdAt, expires_at: expiresAt, revoked_at: null });
@@ -78,13 +86,43 @@ function createProductionDb() {
           } else if (normalized.startsWith("update production_data_audit set after_version")) {
             const row = data.audits.get(values[3]);
             Object.assign(row, { after_version: values[0], after_updated_at: values[1], status: values[2] });
+          } else if (normalized.startsWith("insert or ignore into product_flow_state")) {
+            if (!data.stateManifest && data.stateParts.size) {
+              const firstPart = [...data.stateParts.values()][0];
+              data.stateManifest = { id: values[0], version: values[1], payload: values[2], updated_at: firstPart.updated_at, updated_by: firstPart.updated_by };
+              changes = 1;
+            }
+          } else if (normalized.startsWith("update product_flow_state set")) {
+            const [version, payload, updatedAt, updatedBy, id, baseUpdatedAt] = values;
+            if (data.stateManifest?.id === id && data.stateManifest.updated_at === baseUpdatedAt) {
+              data.stateManifest = { id, version, payload, updated_at: updatedAt, updated_by: updatedBy };
+              changes = 1;
+            }
+          } else if (normalized.startsWith("delete from product_flow_state_parts") && normalized.includes("and exists")) {
+            const [stateId, manifestId, updatedAt, manifestPayload] = values;
+            if (data.stateManifest?.id === manifestId && data.stateManifest.updated_at === updatedAt && data.stateManifest.payload === manifestPayload) {
+              for (const [key, row] of data.stateParts) if (row.state_id === stateId) data.stateParts.delete(key);
+              changes = 1;
+            }
           } else if (normalized.startsWith("delete from product_flow_state_parts")) {
             data.stateParts.clear();
+            changes = 1;
+          } else if (normalized.startsWith("insert into product_flow_state_parts") && normalized.includes("select")) {
+            const [stateId, partKey, partIndex, payload, updatedAt, updatedBy, manifestId, manifestUpdatedAt, manifestPayload] = values;
+            if (data.stateManifest?.id === manifestId && data.stateManifest.updated_at === manifestUpdatedAt && data.stateManifest.payload === manifestPayload) {
+              data.stateParts.set(`${stateId}:${partKey}:${partIndex}`, { state_id: stateId, part_key: partKey, part_index: partIndex, payload, updated_at: updatedAt, updated_by: updatedBy });
+              changes = 1;
+            }
           } else if (normalized.startsWith("insert into product_flow_state_parts")) {
             const [stateId, partKey, partIndex, payload, updatedAt, updatedBy] = values;
             data.stateParts.set(`${stateId}:${partKey}:${partIndex}`, { state_id: stateId, part_key: partKey, part_index: partIndex, payload, updated_at: updatedAt, updated_by: updatedBy });
+            changes = 1;
+          } else if (normalized.startsWith("insert into product_flow_state")) {
+            const [id, version, payload, updatedAt, updatedBy] = values;
+            data.stateManifest = { id, version, payload, updated_at: updatedAt, updated_by: updatedBy };
+            changes = 1;
           }
-          return { success: true };
+          return { success: true, meta: { changes } };
         },
         async first() {
           const values = statement.values;
@@ -93,7 +131,7 @@ function createProductionDb() {
           if (normalized.includes("from production_write_unlocks")) return data.unlocks.get(values[0]) || null;
           if (normalized.includes("from production_data_audit")) return data.audits.get(values[0]) || null;
           if (normalized.includes("from production_data_snapshots")) return data.snapshots.get(values[0]) || null;
-          if (normalized.includes("from product_flow_state where")) return null;
+          if (normalized.includes("from product_flow_state where")) return data.stateManifest;
           return null;
         },
         async all() {
@@ -115,7 +153,11 @@ function createProductionDb() {
       };
       return statement;
     },
-    async batch(statements) { return Promise.all(statements.map(statement => statement.run())); }
+    async batch(statements) {
+      const results = [];
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    }
   };
   return db;
 }
