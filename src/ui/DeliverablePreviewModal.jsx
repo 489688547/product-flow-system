@@ -22,7 +22,7 @@ export function DeliverablePreviewModal({ file, onClose, onEdit, onDelete }) {
       {broken ? (
         <div className="deliverable-broken-preview"><FileWarning size={38} /><strong>文件为空或已损坏</strong><span>该记录无法预览，可以关闭后删除或重新上传。</span></div>
       ) : kind === "richtext" ? (
-        <iframe className="deliverable-rich-preview" title={file.name} sandbox="" srcDoc={`<!doctype html><meta charset="utf-8"><style>body{font:14px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#172033;margin:24px}img{max-width:100%;height:auto}a{color:#1769e0}</style>${file.content || ""}`} />
+        <iframe className="deliverable-rich-preview" title={file.name} sandbox="" srcDoc={`<!doctype html><meta charset="utf-8"><style>body{font:14px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#2b2620;margin:24px}img{max-width:100%;height:auto}a{color:#8a4b1f}</style>${file.content || ""}`} />
       ) : kind === "image" ? (
         <img className="deliverable-image-preview" src={file.url} alt={file.name} />
       ) : kind === "video" ? (

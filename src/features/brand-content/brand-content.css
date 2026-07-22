@@ -1,7 +1,7 @@
 .brand-content-page {
-  --brand-blue: oklch(52% 0.17 250);
-  --brand-blue-soft: oklch(96% 0.025 250);
-  --brand-violet: oklch(55% 0.13 295);
+  --brand-blue: var(--accent);
+  --brand-blue-soft: var(--accent-soft);
+  --brand-violet: oklch(52% 0.09 30);
   display: grid;
   align-content: start;
   gap: var(--space-4);
