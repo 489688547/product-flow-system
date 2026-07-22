@@ -11,7 +11,7 @@
 
 ## 任务
 
-- [ ] 任务 1：建立 AI 功能注册表与可归属审计结构
+- [x] 任务 1：建立 AI 功能注册表与可归属审计结构
   - 依赖：无。
   - 文件：`migrations/0009_ai_model_governance.sql`、`functions/api/platform/v1/ai/_shared/feature-registry.js`、`functions/api/platform/v1/ai/_shared/audit.js`、`tests/helpers/ai-d1-mock.mjs`、`tests/ai-feature-invocation.test.mjs`、`tests/ai-api.test.mjs`。
   - 输入：现有 `ai_usage_audit`、`ai_skill_audit` 和公司总助审计写入。
@@ -19,6 +19,7 @@
   - 失败测试：`node --test tests/ai-feature-invocation.test.mjs tests/ai-api.test.mjs`；预期因注册表、新列和归属写入不存在而失败。
   - 实现步骤：先定义两个首期功能；再增加迁移与新装表结构；最后让公司总助写固定归属并保持 SSE 合同。
   - 验证：同一命令全部通过；迁移前后审计行数相等，旧行默认归入公司总助。
+  - 实际结果：`node --test tests/ai-feature-invocation.test.mjs tests/ai-api.test.mjs` 通过，14 项测试、0 失败。
   - 提交：只提交注册表、迁移、审计和对应测试，信息 `feat(ai): register governed feature usage`。
 
 - [ ] 任务 2：提供无个人维度的 AI 用量聚合 API
