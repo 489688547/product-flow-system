@@ -35,10 +35,11 @@ export async function disablePlatformConnection({ platformId, expectedVersion })
   return payload.connection;
 }
 
-export async function revealPlatformConnection({ platformId, purpose, confirmation }) {
+export async function revealPlatformConnection({ platformId, purpose, confirmation, signal }) {
   return requestJson({
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ purpose, confirmation })
+    body: JSON.stringify({ purpose, confirmation }),
+    signal
   }, `/${encodeURIComponent(platformId)}/reveal`);
 }

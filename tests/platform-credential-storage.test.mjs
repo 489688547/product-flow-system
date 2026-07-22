@@ -76,6 +76,13 @@ function createD1Mock({ failAudit = false } = {}) {
           }
           if (normalized.startsWith("insert into platform_credential_audit")) {
             if (failAudit) throw new Error("audit unavailable");
+            if (normalized.includes("count(*) from platform_credential_audit")) {
+              const [id, platformId, requestId, actorId, actorName, purpose, createdAt, ratePlatformId, since, limit] = statement.values;
+              const count = audits.filter(row => row.platform_id === ratePlatformId && row.action === "reveal" && row.result === "success" && row.created_at >= since).length;
+              if (count >= Number(limit)) return { success: true, meta: { changes: 0 } };
+              audits.push({ id, platform_id: platformId, action: "reveal", changed_fields: "[]", result: "success", request_id: requestId, actor_id: actorId, actor_name: actorName, purpose, created_at: createdAt });
+              return { success: true, meta: { changes: 1 } };
+            }
             const platformId = statement.values[1];
             const current = rows.get(platformId);
             if (normalized.includes("where not exists") && current) return { success: true, meta: { changes: 0 } };

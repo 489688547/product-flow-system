@@ -66,6 +66,7 @@ test("platform connection API client never caches credential fields", () => {
   assert.match(api, /encodeURIComponent\(platformId\)/);
   assert.match(api, /method: "POST"/);
   assert.match(api, /purpose, confirmation/);
+  assert.match(api, /signal/);
   assert.match(api, /credentials: "include"/);
   assert.doesNotMatch(api, /localStorage|sessionStorage/);
 });
@@ -97,6 +98,8 @@ test("saved Lingsuan values require explicit confirmation and remain transient",
   assert.match(workspace, /document\.hidden/);
   assert.match(workspace, /revealActive/);
   assert.match(workspace, /clearRevealed/);
+  assert.match(workspace, /revealGateRef\.current\.invalidate/);
+  assert.match(workspace, /revealGateRef\.current\.accepts/);
   assert.doesNotMatch(workspace, /className="platform-connection-revealed" role="status"/);
   assert.match(workspace, /role="status">仅当前页面暂时可见/);
   assert.doesNotMatch(workspace, /localStorage|sessionStorage/);

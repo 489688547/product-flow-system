@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PLATFORM_CONNECTION_DEFINITIONS } from "../../domain/platformConnections.js";
+import { createTransientRevealGate } from "../../state/transientRevealGate.js";
 import { Button } from "../../ui/Button.jsx";
 import "./platform-connections.css";
 
@@ -151,12 +152,16 @@ function PlatformConnectionForm({
   const [revealError, setRevealError] = useState("");
   const [revealed, setRevealed] = useState(null);
   const resultRef = useRef(null);
+  const revealGateRef = useRef(null);
+  if (!revealGateRef.current) revealGateRef.current = createTransientRevealGate();
   const changedFields = useMemo(() => Object.fromEntries(Object.entries(draft).filter(([, value]) => value.trim())), [draft]);
   const changed = Object.keys(changedFields).length > 0;
   const configured = new Set(connection?.configuredFields || []);
   const canDisable = canManage && connection?.source === "vault" && connection?.enabled;
   const canReveal = canDisable && typeof onReveal === "function";
   const clearRevealed = useCallback(() => {
+    revealGateRef.current.invalidate();
+    setRevealBusy(false);
     setRevealed(null);
     setRevealPurpose("");
     setRevealConfirmation("");
@@ -182,6 +187,8 @@ function PlatformConnectionForm({
   useEffect(() => {
     if (!revealActive) clearRevealed();
   }, [clearRevealed, revealActive]);
+
+  useEffect(() => () => revealGateRef.current.invalidate(), []);
 
   async function handleSave(event) {
     event.preventDefault();
@@ -241,23 +248,27 @@ function PlatformConnectionForm({
 
   async function handleReveal() {
     if (!canReveal || revealBusy) return;
+    const revealRequest = revealGateRef.current.begin();
     setRevealBusy(true);
     setRevealError("");
     try {
       const result = await onReveal({
         platformId: definition.id,
         purpose: revealPurpose,
-        confirmation: revealConfirmation
+        confirmation: revealConfirmation,
+        signal: revealRequest.signal
       });
+      if (!revealGateRef.current.accepts(revealRequest, { active: revealActive, hidden: document.hidden })) return;
       setRevealed(result);
       setConfirmReveal(false);
       setRevealPurpose("");
       setRevealConfirmation("");
     } catch (nextError) {
+      if (nextError?.name === "AbortError" || !revealGateRef.current.accepts(revealRequest, { active: revealActive, hidden: document.hidden })) return;
       setRevealError(nextError?.message || "已保存内容查看失败。");
       setRequestId(nextError?.requestId || "");
     } finally {
-      setRevealBusy(false);
+      if (revealGateRef.current.accepts(revealRequest, { active: revealActive, hidden: document.hidden })) setRevealBusy(false);
     }
   }
 

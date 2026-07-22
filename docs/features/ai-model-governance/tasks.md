@@ -92,7 +92,7 @@
   - 文件：`functions/api/platform/_shared/platformCredentials.js`、`functions/api/platform/v1/platform-connections/[platformId]/reveal.js`、`migrations/0010_platform_credential_reveal.sql`、`src/state/platformConnectionsApi.js`、`src/state/usePlatformConnections.js`、`src/features/data-center/PlatformConnectionsWorkspace.jsx`、`src/features/data-center/AiProviderSettings.jsx`、`src/features/data-center/AiModelWorkspace.jsx`、平台长期文档和对应测试。
   - 输入：现有灵算平台连接保险箱、最高权限真实会话和 AI Provider 设置。
   - 输出：AI 设置内直接保存、替换、停用和查看当前启用的灵算保险箱值；不再显示已取消的数据接入链接。
-  - 安全边界：最高权限且会话不超过 15 分钟；用途与确认语必填；15 分钟最多 5 次；环境变量不回显；响应 no-store；明文只在 React 内存并在 5 分钟、折叠、页面隐藏、保存、停用或卸载时清除。
+  - 安全边界：最高权限且会话不超过 15 分钟；用途与确认语必填；15 分钟最多 5 次且并发请求不能突破；环境变量不回显；成功与错误响应 no-store；只返回登记字段；明文只在 React 内存并在 5 分钟、折叠、页面隐藏、保存、停用或卸载时清除，进行中请求同步中止或失效。
   - 失败测试：存储和路由因 reveal 导出/路由不存在而失败；UI 因仍保留数据接入链接且没有暂态查看状态而失败；环境与集成测试因未登记迁移和 reveal 路由而失败。
   - 验证：`node --test tests/platform-credential-storage.test.mjs tests/platform-connections-reveal-api.test.mjs tests/platform-connections-api.test.mjs react-tests/platform-connections.test.mjs react-tests/ai-provider-settings.test.mjs react-tests/ai-model-governance.test.mjs tests/environment-capabilities.test.mjs tests/integration-registry.test.mjs`。
   - 本地结果：分支合入最新 `origin/main` 后，`npm run lint`、`npm run check:branch-base`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm test`、`npm run build` 全部通过；发布与生产验收完成后再勾选本任务。

@@ -75,6 +75,7 @@ test("reveal rejects non-executive stale session invalid confirmation and unsupp
       params: { platformId: item.platformId }
     });
     assert.equal(response.status, item.status);
+    assert.match(response.headers.get("cache-control") || "", /no-store/);
     assert.equal((await response.json()).error.code, item.code);
   }
 });
@@ -111,5 +112,29 @@ test("sixth successful reveal in fifteen minutes is rate limited", async () => {
     params: { platformId: "lingsuan-ai-gateway" }
   });
   assert.equal(limited.status, 429);
+  assert.match(limited.headers.get("cache-control") || "", /no-store/);
   assert.equal((await limited.json()).error.code, "PLATFORM_CREDENTIAL_REVEAL_RATE_LIMITED");
+});
+
+test("concurrent reveals atomically honor the fifth-success limit", async () => {
+  const { db, env } = await setup();
+  const now = new Date().toISOString();
+  for (let index = 0; index < 4; index += 1) {
+    db.audits.push({
+      platform_id: "lingsuan-ai-gateway",
+      action: "reveal",
+      result: "success",
+      created_at: now
+    });
+  }
+
+  const responses = await Promise.all([1, 2].map(index => revealRequest({
+    request: request("lingsuan-ai-gateway", { purpose: `并发确认 ${index}`, confirmation: "查看灵算凭据" }),
+    env,
+    data: { session: executive },
+    params: { platformId: "lingsuan-ai-gateway" }
+  })));
+
+  assert.deepEqual(responses.map(response => response.status).sort(), [200, 429]);
+  assert.equal(db.audits.filter(row => row.action === "reveal" && row.result === "success").length, 5);
 });

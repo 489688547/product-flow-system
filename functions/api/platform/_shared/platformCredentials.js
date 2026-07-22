@@ -223,6 +223,25 @@ export async function assertPlatformCredentialRevealRateLimit(db, platformId, { 
   }
 }
 
+async function writeRevealAuditWithinRateLimit(db, platformId, context, { limit = 5, windowMs = 15 * 60 * 1000 } = {}) {
+  const now = new Date();
+  const since = new Date(now.getTime() - windowMs).toISOString();
+  const result = await db.prepare(`INSERT INTO platform_credential_audit
+    (id, platform_id, action, changed_fields, result, request_id, actor_id, actor_name, purpose, created_at)
+    SELECT ?, ?, 'reveal', '[]', 'success', ?, ?, ?, ?, ?
+    WHERE (SELECT COUNT(*) FROM platform_credential_audit
+      WHERE platform_id = ? AND action = 'reveal' AND result = 'success' AND created_at >= ?) < ?`).bind(
+    crypto.randomUUID(), platformId,
+    cleanString(context.requestId || "", "requestId", 120),
+    cleanString(context.actorId || "unknown", "actorId", 160),
+    actorName(context), cleanString(context.purpose || "", "用途", 200), now.toISOString(),
+    platformId, since, limit
+  ).run();
+  if (Number(result?.meta?.changes || 0) !== 1) {
+    throw platformError("凭据查看过于频繁，请稍后再试。", "PLATFORM_CREDENTIAL_REVEAL_RATE_LIMITED", 429);
+  }
+}
+
 export async function revealPlatformCredentials(db, platformIdInput, context = {}) {
   const platformId = cleanString(platformIdInput, "平台", 80);
   const purpose = cleanString(context.purpose, "查看用途", 200);
@@ -235,12 +254,16 @@ export async function revealPlatformCredentials(db, platformIdInput, context = {
   if (!platformCredentialCryptoInternals.validMasterKey(masterKey)) {
     throw platformError("平台连接的解密能力暂不可用。", "PLATFORM_CREDENTIAL_KEY_UNAVAILABLE", 503);
   }
-  const fields = await decryptPlatformCredentials(row, {
+  const decrypted = await decryptPlatformCredentials(row, {
     masterKey,
     platformId,
     keyVersion: Number(row.key_version)
   });
-  await writeAudit(db, { platformId, action: "reveal", changedFields: [] }, { ...context, purpose });
+  const definition = platformConnectionDefinition(platformId);
+  const fields = Object.fromEntries((definition?.fields || []).flatMap(field => (
+    Object.hasOwn(decrypted, field.key) ? [[field.key, decrypted[field.key]]] : []
+  )));
+  await writeRevealAuditWithinRateLimit(db, platformId, { ...context, purpose }, context.rateLimit);
   return { platformId, fields };
 }
 

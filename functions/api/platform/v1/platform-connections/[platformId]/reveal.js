@@ -1,7 +1,6 @@
 import { authorizeCredentialAction } from "../../../_shared/credentialVaultAuthorization.js";
 import { canManagePlatformConnections } from "../../../../../../src/domain/permissions.js";
 import {
-  assertPlatformCredentialRevealRateLimit,
   platformCredentialDatabase,
   revealPlatformCredentials
 } from "../../../_shared/platformCredentials.js";
@@ -47,7 +46,6 @@ export async function onRequest({ request, env = {}, data = {}, params = {} }) {
     if (body.confirmation !== "查看灵算凭据") throw revealError("确认短语不正确。", "PLATFORM_CREDENTIAL_REVEAL_INVALID", 400);
     const db = platformCredentialDatabase(env);
     if (!db) throw revealError("平台连接存储暂不可用。", "PLATFORM_CONNECTION_STORAGE_UNAVAILABLE", 501);
-    await assertPlatformCredentialRevealRateLimit(db, platformId);
     const revealed = await revealPlatformCredentials(db, platformId, {
       masterKey: env.PLATFORM_CREDENTIAL_MASTER_KEY,
       actorId: data.session.userId || data.session.unionId || "unknown",
@@ -66,7 +64,10 @@ export async function onRequest({ request, env = {}, data = {}, params = {} }) {
       pragma: "no-cache"
     });
   } catch (error) {
-    return credentialErrorResponse(error, requestId);
+    return credentialErrorResponse(error, requestId, {
+      "cache-control": "private, no-store",
+      pragma: "no-cache"
+    });
   }
 }
 
