@@ -8,12 +8,18 @@ export function BrandContentSettingsPage() {
   const { state, saving, dispatch } = useBrandContent();
   const [form, setForm] = useState(state.settings);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   useEffect(() => setForm(state.settings), [state.settings]);
   const updatePlatform = (key, field, value) => setForm(current => ({ ...current, [field]: { ...current[field], [key]: Number(value) } }));
   const save = async () => {
-    await dispatch({ type: "update_settings", patch: form });
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2200);
+    setSaveError("");
+    try {
+      await dispatch({ type: "update_settings", patch: form });
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2200);
+    } catch (event) {
+      setSaveError(event?.message || "设置保存失败，请稍后重试。");
+    }
   };
   return (
     <section className="page brand-content-page brand-content-settings-page">
@@ -21,6 +27,7 @@ export function BrandContentSettingsPage() {
         <Button variant="primary" onClick={save} disabled={saving} disabledReason="正在同步上一项设置"><Save size={16} aria-hidden="true" />{saving ? "正在保存…" : "保存设置"}</Button>
       </PageHeader>
       {saved ? <div className="brand-settings-saved" role="status"><CheckCircle2 size={16} aria-hidden="true" />设置已保存，新判断将使用更新后的阈值。</div> : null}
+      {saveError ? <p className="inline-alert" role="alert">{saveError}</p> : null}
       <section className="brand-settings-matrix" aria-label="平台判断阈值">
         <header><strong>平台</strong><strong>学习期（完整日）</strong><strong>有效测试阈值（元）</strong><strong>数据接入</strong></header>
         {[["douyin", "抖音"], ["kuaishou", "快手"], ["xiaohongshu", "小红书"]].map(([key, label]) => <div key={key}><strong>{label}</strong><label><span className="sr-only">{label}学习期</span><input type="number" min="0" max="30" value={form.learningDays[key]} onChange={event => updatePlatform(key, "learningDays", event.target.value)} /></label><label><span className="sr-only">{label}有效测试阈值</span><input type="number" min="0" value={form.effectiveSpend[key]} onChange={event => updatePlatform(key, "effectiveSpend", event.target.value)} /></label><span>{key === "douyin" ? "等待数据中心契约" : "标准导入"}</span></div>)}

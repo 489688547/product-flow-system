@@ -10,6 +10,7 @@ import {
 } from "../../domain/productFlow.js";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button, IconAction } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { FloatingMenu } from "../../ui/FloatingMenu.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
@@ -107,12 +108,13 @@ export function DemandPoolPage({ onProjectCreated }) {
   const [status, setStatus] = useState("all");
   const [editing, setEditing] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [demandToDelete, setDemandToDelete] = useState(null);
 
   const pool = visibleDemandPool(state.demands);
   const rows = useMemo(() => pool
     .filter(demand => status === "all" || demand.status === status), [pool, status]);
   const confirmDeleteDemand = demand => {
-    if (window.confirm("确认删除这个需求机会？删除后不可恢复。")) deleteDemand(demand.id);
+    setDemandToDelete(demand);
   };
 
   const columns = [
@@ -152,6 +154,17 @@ export function DemandPoolPage({ onProjectCreated }) {
       <StatusStrip demands={pool} value={status} onChange={setStatus} />
       <DataTable className="demand-table" minWidth={940} columns={columns} rows={rows} empty={<div className="empty-state">暂无需求机会</div>} />
       <DemandModal open={modalOpen} demand={editing} currentUser={currentUser} orgCache={orgCache} onClose={() => setModalOpen(false)} onSave={saveDemand} />
+      <ConfirmDialog
+        open={Boolean(demandToDelete)}
+        title="删除需求机会"
+        message={demandToDelete ? `确定删除“${demandToDelete.name}”？` : ""}
+        description="删除后不可恢复。"
+        onClose={() => setDemandToDelete(null)}
+        onConfirm={() => {
+          deleteDemand(demandToDelete.id);
+          setDemandToDelete(null);
+        }}
+      />
     </section>
   );
 }

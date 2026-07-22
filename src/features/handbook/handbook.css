@@ -27,7 +27,7 @@
 
 .handbook-search:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent), transparent 82%);
+  box-shadow: 0 0 0 2px var(--focus-ring);
 }
 
 .handbook-search input {
@@ -68,7 +68,7 @@
 }
 
 .handbook-filters button {
-  min-height: 32px;
+  min-height: 40px;
   padding: 0 10px;
   border: 1px solid transparent;
   border-radius: var(--radius-control);

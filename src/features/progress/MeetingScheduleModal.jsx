@@ -1,8 +1,8 @@
 import { CalendarPlus, Check, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { createPortal } from "react-dom";
 import { orgUsers } from "../../domain/productFlow.js";
 import { Button } from "../../ui/Button.jsx";
+import { FullScreenLoading } from "../../ui/FullScreenLoading.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 
 function localDateTime(date) {
@@ -17,15 +17,6 @@ function defaultMeetingTimes() {
   start.setHours(start.getHours() + 1);
   const end = new Date(start.getTime() + 60 * 60_000);
   return { startTime: localDateTime(start), endTime: localDateTime(end) };
-}
-
-function MeetingLoading() {
-  return createPortal(
-    <div className="meeting-loading-layer" role="status" aria-live="assertive">
-      <div className="meeting-loading-card"><span className="loading-spinner" />正在同步到钉钉日程…</div>
-    </div>,
-    document.body
-  );
 }
 
 export function MeetingScheduleModal({ open, task, product, currentUser, orgCache, onClose, onSchedule }) {
@@ -104,7 +95,7 @@ export function MeetingScheduleModal({ open, task, product, currentUser, orgCach
         </div>
         {error ? <div className="form-error" role="alert">{error}</div> : null}
       </Modal>
-      {submitting ? <MeetingLoading /> : null}
+      <FullScreenLoading visible={submitting} message="正在同步到钉钉日程…" />
     </>
   );
 }

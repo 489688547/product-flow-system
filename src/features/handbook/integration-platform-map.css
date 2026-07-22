@@ -57,7 +57,7 @@
 
 .integration-map-search:focus-within {
   border-color: var(--accent);
-  outline: 2px solid color-mix(in oklch, var(--accent), transparent 82%);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 1px;
 }
 
@@ -94,7 +94,7 @@
 }
 
 .integration-status-filters button {
-  min-height: 32px;
+  min-height: 40px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -259,7 +259,7 @@
 .integration-form-grid input { height: var(--control-height); padding: 0 9px; }
 .integration-form-grid textarea { min-height: 62px; padding: 8px 9px; resize: vertical; line-height: 1.45; }
 .integration-form-grid small { color: var(--text-tertiary); font-weight: 400; }
-.integration-form-grid input:focus-visible, .integration-form-grid textarea:focus-visible { border-color: var(--accent); outline: 2px solid color-mix(in oklch, var(--accent), transparent 82%); outline-offset: 1px; }
+.integration-form-grid input:focus-visible, .integration-form-grid textarea:focus-visible { border-color: var(--accent); outline: 2px solid var(--focus-ring); outline-offset: 1px; }
 .integration-form-error { margin: 0; padding: 8px 10px; border-radius: 6px; background: var(--danger-soft); color: var(--danger); font-size: 12px; }
 .integration-editor-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
 

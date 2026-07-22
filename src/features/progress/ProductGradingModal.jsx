@@ -46,7 +46,7 @@ export function ProductGradingModal({ open, product, canEdit = false, onClose, o
                 {dimension.options.map((label, index) => {
                   const score = index + 1;
                   const active = answers[dimension.key] === score;
-                  return <button type="button" key={score} className={active ? "active" : ""} aria-pressed={active} disabled={!canEdit} title={!canEdit ? "只有产品负责人可以修改定级打分" : undefined} onClick={() => setScore(dimension.key, score)}><b>{score}</b><span>{label}</span>{active ? <Check size={14} /> : null}</button>;
+                  return <button type="button" key={score} className={active ? "active" : ""} aria-pressed={active} disabled={!canEdit} title={!canEdit ? "只有产品负责人可以修改定级打分" : undefined} onClick={() => setScore(dimension.key, score)}><b>{score}</b><span>{label}</span>{active ? <Check size={16} /> : null}</button>;
                 })}
               </div>
             </fieldset>

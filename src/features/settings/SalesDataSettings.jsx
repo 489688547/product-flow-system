@@ -4,6 +4,7 @@ import { createSalesAggregator, detectSalesColumns, detectSalesHeader, SALES_COL
 import { streamSpreadsheetRows } from "../../domain/xlsxLite.js";
 import { deleteSalesMonth, loadSalesMeta, saveSalesData } from "../../state/salesStore.js";
 import { Button, IconAction } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 
 const RULE_LABELS = new Map(SALES_COLUMN_RULES.map(rule => [rule.key, rule.label]));
@@ -62,6 +63,7 @@ export function SalesDataSettings({ canEdit = false, currentUser }) {
   const [pending, setPending] = useState(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [monthToDelete, setMonthToDelete] = useState("");
 
   const refreshMeta = () => loadSalesMeta().then(setMeta).catch(event => setError(event.message || "销售数据加载失败。"));
   useEffect(() => { refreshMeta(); }, []);
@@ -101,8 +103,14 @@ export function SalesDataSettings({ canEdit = false, currentUser }) {
     }
   }
 
-  async function handleDeleteMonth(month) {
-    if (!window.confirm(`确认删除 ${month} 的全部销售数据？`)) return;
+  function handleDeleteMonth(month) {
+    setMonthToDelete(month);
+  }
+
+  async function confirmDeleteMonth() {
+    const month = monthToDelete;
+    setMonthToDelete("");
+    if (!month) return;
     setError("");
     try {
       await deleteSalesMonth(month);
@@ -191,6 +199,14 @@ export function SalesDataSettings({ canEdit = false, currentUser }) {
         empty={<div className="empty-state compact-empty">还没有导入过销售数据{canEdit ? "，每月从ERP按创建时间导出销售明细后在这里上传" : ""}</div>}
       />
       {monthRows.length && meta.local ? <p className="muted sales-import-note">本地预览模式：数据保存在当前浏览器，未进入共享数据库。</p> : null}
+      <ConfirmDialog
+        open={Boolean(monthToDelete)}
+        title="删除销售数据"
+        message={monthToDelete ? `确认删除 ${monthToDelete} 的全部销售数据？` : ""}
+        description="删除后需要重新导入对应月份的ERP明细才能恢复。"
+        onClose={() => setMonthToDelete("")}
+        onConfirm={confirmDeleteMonth}
+      />
     </section>
   );
 }

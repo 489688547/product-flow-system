@@ -5,6 +5,7 @@ import { streamSpreadsheetRows } from "../../domain/xlsxLite.js";
 import { useSupplyChain } from "../../state/SupplyChainProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
+import { Modal } from "../../ui/Modal.jsx";
 import { collaborationDraftFromSupplyIssue } from "../../domain/collaborationAdapters.js";
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 
@@ -23,6 +24,9 @@ export function QualityWorkspace({ products, canEdit }) {
   const [pending, setPending] = useState(null);
   const [parsing, setParsing] = useState(false);
   const [error, setError] = useState("");
+  const [closingIssue, setClosingIssue] = useState(null);
+  const [closeResult, setCloseResult] = useState("");
+  const [closeError, setCloseError] = useState("");
   const productMap = useMemo(() => new Map(products.map(item => [item.id, item])), [products]);
   const supplierMap = useMemo(() => new Map(state.suppliers.map(item => [item.id, item])), [state.suppliers]);
   async function handleFile(file) {
@@ -43,10 +47,24 @@ export function QualityWorkspace({ products, canEdit }) {
     ] });
     setPending(null);
   }
-  function closeIssue(issue) {
-    const publicRelationsResult = window.prompt("请记录公关处理结果和整改结论：", issue.publicRelationsResult || "");
-    if (publicRelationsResult === null || !publicRelationsResult.trim()) return;
-    dispatch({ type: "upsert", collection: "qualityIssues", record: { ...issue, status: "closed", publicRelationsStatus: "已处理", publicRelationsResult: publicRelationsResult.trim(), verificationResult: issue.verificationResult || "关闭时已确认", closedAt: new Date().toISOString() } });
+  function openCloseDialog(issue) {
+    setClosingIssue(issue);
+    setCloseResult(issue.publicRelationsResult || "");
+    setCloseError("");
+  }
+  function cancelCloseDialog() {
+    setClosingIssue(null);
+    setCloseError("");
+  }
+  function confirmCloseIssue() {
+    if (!closingIssue) return;
+    const publicRelationsResult = closeResult.trim();
+    if (!publicRelationsResult) {
+      setCloseError("请记录公关处理结果和整改结论。");
+      return;
+    }
+    dispatch({ type: "upsert", collection: "qualityIssues", record: { ...closingIssue, status: "closed", publicRelationsStatus: "已处理", publicRelationsResult, verificationResult: closingIssue.verificationResult || "关闭时已确认", closedAt: new Date().toISOString() } });
+    cancelCloseDialog();
   }
   const columns = [
     { key: "product", header: "产品 / 批次", render: row => <span><strong>{productMap.get(row.productId)?.name || row.skuCode}</strong><small className="table-secondary">{row.batchNo || "批次待补充"}</small></span> },
@@ -57,7 +75,61 @@ export function QualityWorkspace({ products, canEdit }) {
     { key: "action", header: "处置与整改", render: row => <span><strong>{row.disposition || "处置待补充"}</strong><small className="table-secondary">{row.correctiveAction || row.publicRelationsResult || "整改待补充"}</small></span> },
     { key: "verification", header: "验证 / 公关", render: row => <span><strong>{row.verificationResult || "待验证"}</strong><small className="table-secondary">{row.publicRelationsStatus || (row.status === "closed" ? "公关已处理" : "公关待处理")}</small></span> },
     { key: "status", header: "闭环状态", render: row => <span className={`status-badge ${row.status === "closed" ? "success" : "warning"}`}>{row.status === "closed" ? "已关闭" : "待处理"}</span> },
-    { key: "actions", header: "操作", render: row => <TableActions>{canEdit && row.status !== "closed" ? <Button className="compact" onClick={() => closeIssue(row)}><CheckCircle2 size={15} />关闭问题</Button> : null}<AppCollaborationButton draft={collaborationDraftFromSupplyIssue(row, { productName: productMap.get(row.productId)?.name })} /></TableActions> }
+    { key: "actions", header: "操作", render: row => <TableActions>{canEdit && row.status !== "closed" ? <Button className="compact" onClick={() => openCloseDialog(row)}><CheckCircle2 size={15} />关闭问题</Button> : null}<AppCollaborationButton draft={collaborationDraftFromSupplyIssue(row, { productName: productMap.get(row.productId)?.name })} /></TableActions> }
   ];
-  return <div className="supply-work-grid"><section className="section-panel"><div className="section-head"><div><h2>质量数据导入</h2><p>兼容差评、到货抽检、月度抽检和仓库验收表，统一进入批次质量闭环。</p></div>{canEdit ? <label className={`upload-field ${parsing ? "is-busy" : ""}`}><Upload size={16} />{parsing ? "正在解析…" : "导入质量 XLSX / CSV"}<input type="file" accept=".xlsx,.csv" disabled={parsing} onChange={event => { handleFile(event.target.files?.[0]); event.target.value = ""; }} /></label> : null}</div>{error ? <p className="supply-message error" role="alert">{error}</p> : null}{pending ? <div className="supply-import-preview"><FileSpreadsheet size={20} /><div><strong>{pending.fileName}</strong><span>有效 {pending.validRows.length} 行 · 错误 {pending.errors.length} 行</span>{pending.errors.slice(0, 3).map(item => <small key={`${item.rowNumber}-${item.field}`}>第 {item.rowNumber} 行：{item.message}</small>)}</div><div className="supply-import-actions"><Button onClick={() => setPending(null)}>取消</Button><Button variant="primary" disabled={!pending.validRows.length} onClick={confirmImport}>确认导入</Button></div></div> : null}</section><section className="section-panel"><div className="section-head"><div><h2>质量问题闭环</h2><p>按产品、批次、供应商和仓库追踪处置、整改、验证与公关结果。</p></div></div><DataTable minWidth={1280} columns={columns} rows={state.qualityIssues} empty={<div className="empty-state compact-empty">还没有导入质量问题。</div>} /></section></div>;
+  return (
+    <div className="supply-work-grid">
+      <section className="section-panel">
+        <div className="section-head">
+          <div>
+            <h2>质量数据导入</h2>
+            <p>兼容差评、到货抽检、月度抽检和仓库验收表，统一进入批次质量闭环。</p>
+          </div>
+          {canEdit ? (
+            <label className={`upload-field ${parsing ? "is-busy" : ""}`}>
+              <Upload size={16} />
+              {parsing ? "正在解析…" : "导入质量 XLSX / CSV"}
+              <input type="file" accept=".xlsx,.csv" disabled={parsing} onChange={event => { handleFile(event.target.files?.[0]); event.target.value = ""; }} />
+            </label>
+          ) : null}
+        </div>
+        {error ? <p className="supply-message error" role="alert">{error}</p> : null}
+        {pending ? (
+          <div className="supply-import-preview">
+            <FileSpreadsheet size={20} />
+            <div>
+              <strong>{pending.fileName}</strong>
+              <span>有效 {pending.validRows.length} 行 · 错误 {pending.errors.length} 行</span>
+              {pending.errors.slice(0, 3).map(item => <small key={`${item.rowNumber}-${item.field}`}>第 {item.rowNumber} 行：{item.message}</small>)}
+            </div>
+            <div className="supply-import-actions">
+              <Button onClick={() => setPending(null)}>取消</Button>
+              <Button variant="primary" disabled={!pending.validRows.length} onClick={confirmImport}>确认导入</Button>
+            </div>
+          </div>
+        ) : null}
+      </section>
+      <section className="section-panel">
+        <div className="section-head">
+          <div>
+            <h2>质量问题闭环</h2>
+            <p>按产品、批次、供应商和仓库追踪处置、整改、验证与公关结果。</p>
+          </div>
+        </div>
+        <DataTable minWidth={1280} columns={columns} rows={state.qualityIssues} empty={<div className="empty-state compact-empty">还没有导入质量问题。</div>} />
+      </section>
+      <Modal
+        open={Boolean(closingIssue)}
+        title="关闭质量问题"
+        onClose={cancelCloseDialog}
+        footer={<>
+          <Button onClick={cancelCloseDialog}>取消</Button>
+          <Button variant="primary" disabled={!closeResult.trim()} disabledReason="请记录公关处理结果和整改结论" onClick={confirmCloseIssue}>确认关闭</Button>
+        </>}
+      >
+        <label className="full-field">公关处理结果与整改结论（必填）<textarea rows="4" value={closeResult} onChange={event => setCloseResult(event.target.value)} placeholder="记录公关处理结果、整改结论和验证情况。" /></label>
+        {closeError ? <p className="form-error" role="alert">{closeError}</p> : null}
+      </Modal>
+    </div>
+  );
 }

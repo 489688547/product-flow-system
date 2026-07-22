@@ -15,7 +15,28 @@ export function ProductPicker({ products, value, onChange, currentUser, label = 
     [currentUser, products]
   );
 
-  if (!product) return null;
+  if (!product) {
+    return (
+      <div className={`product-picker ${className}`.trim()}>
+        <button
+          type="button"
+          className="product-identity-select"
+          aria-label={label}
+          disabled
+          title="暂无可用产品"
+        >
+          <span className="product-identity-thumb" aria-hidden="true" />
+          <span className="product-identity-copy">
+            <span className="product-name-line">
+              <strong>暂无可用产品</strong>
+            </span>
+            <em>请先创建或选择一个产品</em>
+          </span>
+          <ChevronDown className="product-switch-icon" size={16} aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
   const productMeta = item => item.levelConfirmed ? item.level : `期望上线：${formatExpectedLaunchMonth(item.expectedLaunchMonth)}`;
   const owned = item => isProductOwnedBy(item, currentUser);
 
@@ -49,6 +70,8 @@ export function ProductPicker({ products, value, onChange, currentUser, label = 
         maxHeight={320}
         role="listbox"
         ariaLabel="选择产品"
+        focusOnOpen
+        enableArrowNavigation
       >
         {orderedProducts.map(item => (
           <button

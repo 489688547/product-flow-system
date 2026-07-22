@@ -58,7 +58,7 @@ export function SyncRunsWorkspace({ quality }) {
       { key: "time", header: "执行时间", render: row => row.completedAt || row.startedAt || "—" },
       { key: "source", header: "数据源", render: row => row.sourceName || row.sourceId || "未知来源" },
       { key: "range", header: "数据范围", render: row => [row.from, row.to].filter(Boolean).join(" 至 ") || "—" },
-      { key: "rows", header: "行数", render: row => row.rowCount || 0 },
+      { key: "rows", header: "行数", className: "num", render: row => row.rowCount || 0 },
       { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : row.status === "running" ? "warning" : "danger"}`}>{statusLabel(row.status)}</span> },
       { key: "message", header: "结果", render: row => row.message || "—" }
     ]} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} /></section>
