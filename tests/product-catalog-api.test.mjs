@@ -113,6 +113,18 @@ test("only data administrators can import and readonly is always blocked", async
   assert.equal(readonly.status, 403);
 });
 
+test("executive sessions with multiple departments can maintain the catalog", async () => {
+  const db = createD1Mock();
+  const response = await onImportRequest({
+    request: request("/api/platform/v1/product-catalog/import", "POST", importPayload),
+    env: { PRODUCT_FLOW_DB: db },
+    data: { session: { ...admin, department: "总经办 / 运营部 / 品牌部" } }
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(db.items.size, 1);
+});
+
 test("import is idempotent and employees read the same catalog", async () => {
   const db = createD1Mock();
   for (let index = 0; index < 2; index += 1) {
