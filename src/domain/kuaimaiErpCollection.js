@@ -147,6 +147,22 @@ function normalizeArchive(rawArchive, batch) {
   };
 }
 
+export function normalizeErpArchive(rawArchive) {
+  if (!rawArchive || typeof rawArchive !== "object" || Array.isArray(rawArchive)) fail("ERP_COLLECTION_ARCHIVE_INVALID", "归档清单格式无效。");
+  const platformId = text(rawArchive.platformId || "kuaimai", 80).toLowerCase();
+  if (platformId !== "kuaimai") fail("ERP_COLLECTION_PLATFORM_INVALID", "当前采集器只接受快麦 ERP 官方导出数据。");
+  const resourceType = text(rawArchive.resourceType, 80).toLowerCase();
+  if (!RESOURCE_TYPES.has(resourceType)) fail("ERP_COLLECTION_RESOURCE_INVALID", "资源类型未登记。", { supported: KUAIMAI_ERP_RESOURCE_TYPES });
+  const contentHash = hash(rawArchive.contentHash);
+  return normalizeArchive(rawArchive, {
+    platformId,
+    resourceType,
+    contentHash,
+    sourceFileName: text(rawArchive.fileName, 240),
+    collectedAt: timestamp(rawArchive.archivedAt || new Date().toISOString(), { required: true, label: "归档时间" })
+  });
+}
+
 function normalizeIssue(issue, resourceType, batchId, index) {
   if (!issue || typeof issue !== "object" || Array.isArray(issue)) fail("ERP_COLLECTION_ISSUE_INVALID", `第 ${index + 1} 条异常格式无效。`);
   const code = text(issue.code, 120);

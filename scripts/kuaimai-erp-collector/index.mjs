@@ -3,11 +3,11 @@ import { open, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
-import { uploadErpCollection } from "./api.mjs";
+import { uploadErpArchive, uploadErpCollection } from "./api.mjs";
 import { DEFAULT_ARCHIVE_ROOT, ensureArchiveLayout } from "./archive.mjs";
 import { installLaunchAgent, readCollectorToken, storeCollectorToken } from "./automation.mjs";
 import { readKuaimaiExport } from "./core.mjs";
-import { archiveExistingFile, archiveExistingRawFile, scanWaitingDirectory } from "./scanner.mjs";
+import { archiveExistingFile, archiveExistingRawFile, scanWaitingDirectory, syncLocalArchiveManifest } from "./scanner.mjs";
 
 function argument(argv, name, fallback = "") {
   const index = argv.indexOf(name);
@@ -73,6 +73,12 @@ export async function runCollector(argv = process.argv.slice(2)) {
       root,
       resourceType,
       upload: async collection => uploadErpCollection(collection, { baseUrl, headers: await runnerHeaders() })
+    }));
+  }
+  if (command === "sync-archives") {
+    return withCollectorLock(root, async () => syncLocalArchiveManifest({
+      root,
+      upload: async archive => uploadErpArchive(archive, { baseUrl, headers: await runnerHeaders() })
     }));
   }
   if (command === "archive-existing") {

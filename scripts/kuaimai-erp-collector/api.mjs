@@ -40,3 +40,19 @@ export async function uploadErpCollection(collection, { baseUrl, fetchImpl = fet
   }
   return { batchId: collection.batch.id, chunks: chunks.length, records: collection.records.length, issues: collection.issues?.length || 0, results };
 }
+
+export async function uploadErpArchive(archive, { baseUrl, fetchImpl = fetch, headers = {} } = {}) {
+  const response = await fetchImpl(`${normalizeBaseUrl(baseUrl)}/api/platform/v1/erp-collection/archives`, {
+    method: "POST",
+    headers: { "content-type": "application/json", ...headers },
+    body: JSON.stringify({ archive })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || `ERP 归档清单上传失败（HTTP ${response.status}）。`);
+    error.code = payload?.error?.code || "ERP_COLLECTION_ARCHIVE_UPLOAD_FAILED";
+    error.status = response.status;
+    throw error;
+  }
+  return payload.data || payload;
+}

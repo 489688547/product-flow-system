@@ -101,3 +101,29 @@ test("invalid, revoked or wrong-scope collector tokens cannot ingest", async () 
   assert.equal(result.body.error.code, "ERP_COLLECTION_RUNNER_TOKEN_INVALID");
 });
 
+test("collector can sync an archive manifest before row parsing is available", async () => {
+  const db = createErpCollectionD1Mock();
+  const registered = await jsonCall(onRunners, "https://flow.example.com/api/platform/v1/erp-collection/runners", {
+    method: "POST", db, session, body: { name: "公司 Mac" }
+  });
+  const archive = {
+    platformId: "kuaimai",
+    resourceType: "order_items",
+    contentHash: "c".repeat(64),
+    fileName: "销售主题明细.xlsx",
+    sizeBytes: 242885680,
+    relativePath: "原始归档/order_items/2026-07/ccc__销售主题明细.xlsx",
+    storageType: "local_desktop",
+    status: "archived",
+    archivedAt: "2026-07-22T10:00:00.000Z"
+  };
+  const result = await jsonCall(onArchives, "https://flow.example.com/api/platform/v1/erp-collection/archives", {
+    method: "POST",
+    db,
+    headers: { authorization: `Bearer ${registered.body.data.token}` },
+    body: { archive }
+  });
+  assert.equal(result.response.status, 201);
+  assert.equal(db.tables.erp_file_archives.size, 1);
+  assert.equal([...db.tables.erp_file_archives.values()][0].batch_id, null);
+});

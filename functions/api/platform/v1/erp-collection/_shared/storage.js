@@ -245,3 +245,11 @@ export async function listErpArchives(db, { resourceType = "", status = "", limi
       updatedAt: row.updated_at
     }));
 }
+
+export async function upsertErpArchive(db, archive, { actor = "" } = {}) {
+  const now = new Date().toISOString();
+  const existing = await findArchive(db, archive);
+  const archiveId = existing?.id || archive.id;
+  await archiveStatement(db, archive, archiveId, null, archive.status || "archived", now).run();
+  return { archiveId, duplicateFile: Boolean(existing), status: archive.status || "archived", updatedBy: String(actor).slice(0, 120) };
+}

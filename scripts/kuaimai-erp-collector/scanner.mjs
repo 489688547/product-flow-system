@@ -215,3 +215,26 @@ export async function archiveExistingRawFile(filePath, { root, resourceType } = 
   });
   return { ...archived, resourceType, status: "archived" };
 }
+
+export async function syncLocalArchiveManifest({ root, upload }) {
+  const layout = await ensureArchiveLayout(root);
+  const manifest = await loadLocalManifest(layout.manifest);
+  const results = [];
+  for (const item of manifest.values()) {
+    if (!item.relativePath || !item.resourceType || !item.fileName) continue;
+    results.push(await upload({
+      platformId: "kuaimai",
+      resourceType: item.resourceType,
+      contentHash: item.contentHash,
+      fileName: item.fileName,
+      sizeBytes: item.sizeBytes || 0,
+      relativePath: item.relativePath,
+      storageType: "local_desktop",
+      status: item.status || "archived",
+      archivedAt: item.archivedAt,
+      processedAt: item.processedAt || null,
+      errorCode: item.errorCode || null
+    }));
+  }
+  return { archives: results.length, results };
+}
