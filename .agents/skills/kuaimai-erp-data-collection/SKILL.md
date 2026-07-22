@@ -50,6 +50,16 @@ npm run collect:kuaimai -- upload "/absolute/path/to/export.xlsx" --resource ord
 
 采集器每 500 条分块，使用文件哈希和 `resource_type + source_key` 双层幂等。重复运行同一文件应只返回 unchanged，不应新增事实。
 
+快麦把大体量销售主题报表拆成多个 XLSX 时，不得逐份按月覆盖导入；先在本机合并成只含经营汇总的 CSV：
+
+```bash
+python3 scripts/kuaimai-erp-collector/aggregate_split_exports.py \
+  --output "/absolute/path/to/compact.csv" \
+  "/absolute/path/to/part-1.xlsx" "/absolute/path/to/part-2.xlsx"
+```
+
+原始文件不得上传 D1。若汇总仍超过单次请求等待时间，用 `--split-compact` 按月拆分后逐月导入；界面必须显示“已保存并共享给全公司”，显示“本机浏览器”不算成功。每月仍需用远程 D1 行数与金额复核。
+
 ### 4. 核对 D1
 
 至少核对：

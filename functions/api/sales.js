@@ -1,7 +1,9 @@
 const META_ID = "sales-meta";
 // Cloudflare D1 allows at most 100 bound parameters per statement; 9 rows × 11 columns = 99.
 const INSERT_CHUNK = 9;
-const BATCH_STATEMENTS = 40;
+// Keep each statement below D1's binding limit, but send enough statements per
+// batch that a full monthly import finishes before the browser request timeout.
+const BATCH_STATEMENTS = 250;
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
