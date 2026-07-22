@@ -123,3 +123,34 @@ test("legacy projection keeps linked approvals and reports uncertain mappings", 
   assert.equal(projection.events.find(row => row.eventType === "sale_consumed").payload.netSales, 80);
   assert.equal(projection.events.find(row => row.eventType === "purchase_approved").payload.receivedAt, "2026-07-02T00:00:00.000Z");
 });
+
+test("legacy projection expands one bundle sale into inventory-unit consumption once", () => {
+  const projection = projectLegacyGoodsFlow({
+    asOf: "2026-07-20",
+    catalogItems: [
+      {
+        id: "catalog-bundle",
+        merchantCode: "2DGZZ",
+        productKind: "bundle",
+        skus: [],
+        components: [{ id: "bundle-component", inventoryUnitCode: "1111", ratio: 2, purchasePrice: 2.5 }]
+      },
+      {
+        id: "catalog-single",
+        merchantCode: "SINGLE-1111",
+        productKind: "single",
+        skus: [{ id: "physical-1111", barcode: "1111", barcodeType: "internal_unique", purchasePrice: 2.5 }],
+        components: []
+      }
+    ],
+    salesRows: [{ id: "bundle-sale", code: "2DGZZ", platform: "天猫", qty: 3, netSales: 60, date: "2026-07-19" }]
+  });
+
+  const event = projection.events.find(row => row.eventType === "sale_consumed");
+  assert.equal(projection.events.filter(row => row.eventType === "sale_consumed").length, 1);
+  assert.equal(event.payload.quantity, 3);
+  assert.equal(event.payload.netSales, 60);
+  assert.equal(event.payload.cost, 15);
+  assert.deepEqual(event.payload.components, [{ inventoryUnitCode: "1111", ratio: 2, quantity: 6, unitCost: 2.5, cost: 15 }]);
+  assert.equal(projection.exceptions.length, 0);
+});

@@ -104,7 +104,7 @@ const integrationRegistry = {
       "id": "kuaimai",
       "name": "快麦开放平台",
       "status": "integrating",
-      "summary": "开放平台订单与商品接口只能覆盖部分数据，历史补数以快麦后台官方导出文件为准；原始文件留在公司 Mac，D1 保存归档清单、最小索引和共享业务投影。",
+      "summary": "开放平台按订单创建时间拉取订单，并由数据中心分页读取 ERP 商品列表和组合详情；历史补数仍以快麦后台官方导出文件为准，D1 保存归档清单、共享商品目录和业务投影。",
       "capabilities": [
         "官方文件历史补数",
         "订单创建时间口径",
@@ -114,15 +114,26 @@ const integrationRegistry = {
         "固定范围采集令牌",
         "有限订单 API",
         "有限商品 API",
+        "商品目录同步",
+        "组合商品详情",
+        "库存单位与组合比例",
+        "会话刷新",
+        "销售日聚合",
+        "连接状态检查",
         "平台连接配置"
       ],
       "businessQuestions": [
         "快麦历史数据补录",
         "三个月内订单与归档订单如何完整导出",
+        "快麦连接失败",
         "订单同步缺失",
-        "ERP 商品或 69 码未同步",
+        "ERP 商品或库存单位编码未同步",
+        "组合商品比例未同步",
         "库存和出入库数据如何补录",
         "销售数据未落库",
+        "本地如何触发真实同步",
+        "刷新令牌失败",
+        "月度数据校准",
         "API 与官方导出覆盖不同"
       ],
       "keywords": [
@@ -138,11 +149,13 @@ const integrationRegistry = {
         "functions/api/platform/v1/erp-collection/**",
         "functions/api/platform/v1/product-catalog.js",
         "functions/api/platform/v1/product-catalog/**",
+        "functions/api/platform/v1/goods-flow/**",
         "functions/api/sales.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
         "src/domain/kuaimaiErpCollection.js",
         "src/domain/productCatalog.js",
+        "src/domain/productCatalogGraph.js",
         "src/domain/productCatalogSales.js",
         "src/state/ProductCatalogProvider.jsx",
         "src/state/productCatalogApi.js",
@@ -152,6 +165,7 @@ const integrationRegistry = {
         "src/state/salesStore.js",
         "scripts/kuaimai-erp-collector/**",
         ".agents/skills/kuaimai-erp-data-collection/**",
+        "migrations/0006_product_catalog_components.sql",
         "migrations/0007_kuaimai_erp_collection.sql",
         "migrations/0008_kuaimai_erp_local_archives.sql",
         "docs/features/kuaimai-erp-history/**",
@@ -193,8 +207,10 @@ const integrationRegistry = {
         "functions/api/platform/_shared/platformCredentials.js",
         "functions/api/platform/v1/product-catalog/sync/kuaimai.js",
         "functions/api/platform/v1/product-catalog/_shared/sales.js",
+        "functions/api/platform/v1/goods-flow/imports.js",
         "src/domain/kuaimaiErpCollection.js",
         "src/domain/productCatalog.js",
+        "src/domain/productCatalogGraph.js",
         "src/domain/productCatalogSales.js",
         "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/data-center/PlatformConnectionsWorkspace.jsx",
@@ -203,18 +219,19 @@ const integrationRegistry = {
         ".agents/skills/kuaimai-erp-data-collection/SKILL.md",
         "docs/platform/apis/erp-collection-v1.md",
         "docs/features/kuaimai-erp-history/prd.md",
+        "migrations/0006_product_catalog_components.sql",
         "migrations/0007_kuaimai_erp_collection.sql"
       ],
       "relations": [
         {
           "platformId": "cloudflare-d1",
-          "type": "stores-erp-source-records",
-          "description": "快麦官方导出文件的归档清单、批次、最小标准索引和异常审计写入 D1；原始文件留在公司 Mac。"
+          "type": "stores-sales-and-product-catalog",
+          "description": "快麦订单日聚合、共享商品目录和组合关系分别写入 D1。"
         },
         {
           "platformId": "erp-file-import",
           "type": "primary-history-channel",
-          "description": "官方文件是当前快麦全历史补数的主通道，开放平台接口仅作为有限补充。"
+          "description": "官方文件是当前快麦全历史补数的主通道，并校准销售事实及补齐 API 未返回的商品字段。"
         }
       ]
     },
@@ -488,7 +505,8 @@ const integrationRegistry = {
         "migrations/0003_data_center_credentials.sql",
         "migrations/0004_data_standards.sql",
         "migrations/0005_user_insights.sql",
-        "migrations/0005_goods_flow_core.sql"
+        "migrations/0005_goods_flow_core.sql",
+        "migrations/0006_product_catalog_components.sql"
       ],
       "envVars": [
         "PRODUCT_FLOW_DB"
@@ -573,7 +591,8 @@ const integrationRegistry = {
         "migrations/0004_company_ai_skills.sql",
         "migrations/0005_user_insights.sql",
         "migrations/0005_goods_flow_core.sql",
-        "migrations/0006_shared_state_revision.sql"
+        "migrations/0006_shared_state_revision.sql",
+        "migrations/0006_product_catalog_components.sql"
       ],
       "relations": [
         {
@@ -655,12 +674,14 @@ const integrationRegistry = {
       "id": "erp-file-import",
       "name": "ERP / 文件导入",
       "status": "integrating",
-      "summary": "承接销售明细、ERP 商品档案、库存快照和月度盘点文件；快麦原始文件在公司 Mac 哈希归档，线上只接收脱敏最小索引和共享业务投影。",
+      "summary": "承接销售明细、ERP 商品档案、库存单位编码、库存快照和月度盘点文件；快麦原始文件在公司 Mac 哈希归档，线上只接收脱敏最小索引和共享业务投影，作为 API 同步的校准、补齐和兼容通道。",
       "capabilities": [
         "快麦官方文件历史补数",
         "本地原始归档",
         "销售明细导入",
         "商品档案导入",
+        "库存单位编码",
+        "组合关系补齐",
         "ERP 库存快照导入",
         "月度盘点导入",
         "GB18030 CSV",
@@ -673,7 +694,9 @@ const integrationRegistry = {
       ],
       "businessQuestions": [
         "Excel 或 CSV 导入失败",
-        "商品 69 码或供应商字段缺失",
+        "库存单位编码或供应商字段缺失",
+        "内部唯一码被误判",
+        "组合比例不一致",
         "库存或盘点字段口径不一致",
         "历史数据补录",
         "API 与文件结果不同"
@@ -692,6 +715,7 @@ const integrationRegistry = {
         "src/domain/kuaimaiErpCollection.js",
         "src/domain/salesData.js",
         "src/domain/productCatalog.js",
+        "src/domain/productCatalogGraph.js",
         "src/domain/xlsxLite.js",
         "src/domain/supplyChain.js",
         "src/state/salesStore.js",
@@ -701,6 +725,7 @@ const integrationRegistry = {
         "functions/api/platform/v1/goods-flow/imports.js",
         "scripts/kuaimai-erp-collector/**",
         ".agents/skills/kuaimai-erp-data-collection/**",
+        "migrations/0006_product_catalog_components.sql",
         "migrations/0007_kuaimai_erp_collection.sql",
         "docs/features/kuaimai-erp-history/**"
       ],
@@ -722,6 +747,7 @@ const integrationRegistry = {
         "src/domain/kuaimaiErpCollection.js",
         "src/domain/salesData.js",
         "src/domain/productCatalog.js",
+        "src/domain/productCatalogGraph.js",
         "src/domain/xlsxLite.js",
         "src/domain/supplyChain.js",
         "functions/api/platform/v1/erp-collection/ingest.js",
@@ -729,6 +755,7 @@ const integrationRegistry = {
         ".agents/skills/kuaimai-erp-data-collection/SKILL.md",
         "docs/platform/apis/erp-collection-v1.md",
         "docs/features/kuaimai-erp-history/prd.md",
+        "migrations/0006_product_catalog_components.sql",
         "migrations/0007_kuaimai_erp_collection.sql"
       ],
       "relations": [

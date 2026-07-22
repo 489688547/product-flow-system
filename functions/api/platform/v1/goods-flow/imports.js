@@ -6,6 +6,7 @@ import {
   saveGoodsFlowExceptions,
   saveInventoryDaily
 } from "./_shared/storage.js";
+import { readProductCatalog } from "../product-catalog/_shared/storage.js";
 
 export async function onRequest(context) {
   return runGoodsFlowRoute(context, {
@@ -14,7 +15,8 @@ export async function onRequest(context) {
     handler: async ({ request, db, actor, requestId }) => {
       const batchId = requireIdempotencyKey(request);
       const body = await readJson(request);
-      const projection = projectLegacyGoodsFlow(body);
+      const catalog = await readProductCatalog(db);
+      const projection = projectLegacyGoodsFlow({ ...body, catalogItems: catalog.items });
       const now = new Date().toISOString();
       await appendGoodsFlowEvents(db, projection.events.map(row => ({ ...row, createdBy: actor.actor })));
       await saveInventoryDaily(db, projection.inventoryDaily, now);

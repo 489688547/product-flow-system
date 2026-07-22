@@ -122,10 +122,22 @@ test("sales date and barcode normalization handle excel serials and bad values",
   assert.equal(normalizeSalesDate("2000-11-30"), "");
   assert.equal(isSalesBarcode("6977173969783"), true);
   assert.equal(isSalesBarcode("123456"), false);
-  assert.deepEqual(normalizeSkuCodes([{ code: "6977173969783", price: "29.9" }, { code: "bad" }, { code: "6978705011352", price: "" }]), [
+  assert.deepEqual(normalizeSkuCodes([{ code: "6977173969783", price: "29.9" }, { code: "internal-test-sku" }, { code: "6978705011352", price: "" }]), [
     { code: "6977173969783", price: 29.9 },
+    { code: "internal-test-sku", price: null },
     { code: "6978705011352", price: null }
   ]);
+});
+
+test("sales aggregation keeps ERP internal inventory-unit codes", () => {
+  const mapping = detectSalesColumns(ERP_HEADER).mapping;
+  const result = aggregateSalesRows([
+    erpRow({ "系统商品编码(订单)": "1111", "系统商品标题(订单)": "测试库存单位" })
+  ], mapping);
+  assert.equal(result.skipped, 0);
+  assert.equal(result.rows.length, 1);
+  assert.equal(result.rows[0].code, "1111");
+  assert.equal(result.rows[0].qty, 2);
 });
 
 test("product sales summary computes margin, refunds and marketing expense from list price", () => {
@@ -304,6 +316,8 @@ test("archive and settings wire the sales feature into the UI", () => {
   assert.match(archive, /open-product-sales/);
   const modal = read("src/features/archive/ProductModal.jsx");
   assert.match(modal, /skuCodes/);
+  assert.match(modal, /库存单位编码与定价/);
+  assert.doesNotMatch(modal, /69码需为69开头|isSalesBarcode/);
   const settings = read("src/features/settings/SettingsPage.jsx");
   assert.match(settings, /SalesDataSettings/);
   assert.match(settings, /salesData/);

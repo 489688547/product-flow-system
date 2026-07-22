@@ -1,4 +1,5 @@
 import { jsonResponse, optionsResponse } from "../../../../dingtalk/_shared/dingtalk.js";
+import { canAccessCompanyPlatform } from "../../../../../../src/domain/permissions.js";
 
 const COST_DEPARTMENTS = new Set(["总经办", "财务部", "供应链", "供应链部", "供应链团队", "采购部"]);
 const EDIT_DEPARTMENTS = new Set(["总经办", "运营部"]);
@@ -22,8 +23,14 @@ export function requireCatalogSession(data = {}) {
 }
 
 export function requireCatalogEditor(session = {}) {
-  const department = String(session.department || session.departmentName || "").trim();
-  if (session.role === "readonly" || !EDIT_DEPARTMENTS.has(department)) {
+  const departments = [...new Set([session.department, session.departmentName, ...(session.departments || []), ...(session.departmentNames || [])]
+    .flatMap(value => String(value || "").split(/\s*(?:\/|、|,|，|;|；|\|)\s*/))
+    .map(value => value.trim())
+    .filter(Boolean))];
+  const canEdit = session.role === "executive"
+    || canAccessCompanyPlatform(session)
+    || departments.some(department => EDIT_DEPARTMENTS.has(department));
+  if (session.role === "readonly" || !canEdit) {
     const error = new Error("仅总经办和运营部可维护商品主数据。");
     error.status = 403;
     error.code = "PERMISSION_WRITE_DENIED";
@@ -32,14 +39,19 @@ export function requireCatalogEditor(session = {}) {
 }
 
 export function canViewCatalogCost(session = {}) {
-  return COST_DEPARTMENTS.has(String(session.department || session.departmentName || "").trim());
+  if (session.role === "executive" || canAccessCompanyPlatform(session)) return true;
+  return [session.department, session.departmentName, ...(session.departments || []), ...(session.departmentNames || [])]
+    .flatMap(value => String(value || "").split(/\s*(?:\/|、|,|，|;|；|\|)\s*/))
+    .map(value => value.trim())
+    .some(department => COST_DEPARTMENTS.has(department));
 }
 
 export function filterCatalogCosts(items = [], session = {}) {
   if (canViewCatalogCost(session)) return items;
   return items.map(item => ({
     ...item,
-    skus: (item.skus || []).map(({ purchasePrice: _purchasePrice, wholesalePrice: _wholesalePrice, ...sku }) => sku)
+    skus: (item.skus || []).map(({ purchasePrice: _purchasePrice, wholesalePrice: _wholesalePrice, ...sku }) => sku),
+    components: (item.components || []).map(({ purchasePrice: _purchasePrice, ...component }) => component)
   }));
 }
 
