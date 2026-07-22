@@ -133,13 +133,15 @@ PRODUCTION_DATA_ACCESS_TOKEN=仅属于当前授权账号的个人令牌
 
 ## 本地沙箱模式（本地 D1）
 
-当远程 D1 绑定故障（dev 代理报 `D1_ERROR: Failed to parse body as JSON ... internal error`）或只想安全地点开界面验证时，可以使用本地沙箱：D1 改走本机 SQLite 持久化，写入只影响本机，不触达生产库。
+当远程 D1 绑定故障（dev 代理报 `D1_ERROR: Failed to parse body as JSON ... internal error`）或只想安全地点开界面验证时，可以使用本地沙箱：D1 改走本机 SQLite 持久化，写入只影响本机，不触达生产库。**一切测试性、试验性数据写入都必须在这里进行**，本地线上模式只用于真实业务操作与真实能力验证。
 
 ```bash
-node scripts/seed-local-sandbox.mjs   # 首次或 .wrangler/state 清空后执行：迁移 + 播种身份
+npm run seed:sandbox                   # 首次执行迁移 + 播种身份；之后可随时重跑刷新（已有本地库自动跳过迁移）
+npm run seed:sandbox -- --with-state   # 可选：再从生产库只读复制共享业务状态，打开即见线上数据
 npm run start:sandbox                  # 等价于 npm start -- --local-d1
 ```
 
 - 播种脚本应用全部迁移，并从生产库**只读**复制当前个人令牌对应的身份行与令牌哈希行（不读取 .env 明文令牌）。
+- `--with-state` 只复制 `product_flow_state` 与 `product_flow_state_parts` 两张白名单表；凭据、令牌、审计类表一律不复制。超大 payload 会按 `part_index` 无损切片写入多行（服务端读取时自动拼接），业务数据原样保留。沙箱中的任何修改都只写本机，不会回传生产。
 - 沙箱模式启动时会临时把 `wrangler.local.toml` 换入 `wrangler.toml`（Pages 不支持自定义配置路径），退出时自动恢复线上配置；备份写入 `.wrangler-toml.online-backup`，进程被强杀后下次启动也会自愈。
 - 沙箱仍走同一份 Pages Functions 路由与鉴权中间件，身份由同一个服务器端哈希令牌解析，只是数据库落在本机。
