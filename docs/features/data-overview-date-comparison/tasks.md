@@ -19,14 +19,14 @@
   - 验证：`node --test react-tests/data-center-date-comparison.test.mjs react-tests/data-center.test.mjs react-tests/data-center-governed-overview.test.mjs` 通过 14 项；覆盖 7/15/30 天、跨月、闰日、零值、缺失、覆盖率和方向。
   - 提交：领域函数与对应测试。
 
-- [ ] 共享确认式日期范围选择器
+- [x] 共享确认式日期范围选择器
   - 依赖：日期领域规则完成。
   - 文件：`src/ui/DateRangePickerField.jsx`、`src/styles.css`、`docs/platform/components.md`、`react-tests/date-range-picker.test.mjs`。
   - 输入：已应用范围、快捷项、最晚日期、最大天数。
   - 输出：只在确认时调用 `onConfirm` 的共享基础控件。
   - 失败测试：缺少组件、确认/取消契约和焦点语义断言失败。
   - 实现步骤：复用 `DayPicker` 与 `FloatingMenu`，完成草稿、校验、确认、取消和响应式。
-  - 验证：聚焦测试及键盘/焦点浏览器验证。
+  - 验证：`node --test react-tests/date-range-picker.test.mjs react-tests/data-center-app.test.mjs` 通过 10 项，`npm run lint` 通过；键盘、焦点和真实视口留待最终浏览器验收。
   - 提交：共享组件、样式、目录和测试。
 
 - [ ] 本期与上期共享口径编排
