@@ -66,7 +66,7 @@
   - 实际结果：边界测试扫描业务路由中的模型地址、Secret、低层适配器导入和电商点评归属，3 项测试通过；`npm run check:governance` 通过。长期规则已反写到 Agent、产品、设计、API、集成、权限、错误码与 ADR。
   - 提交：只提交测试、治理接入和长期文档，信息 `chore(ai): enforce shared provider boundary`。
 
-- [ ] 任务 6：同步环境能力与集成注册表
+- [x] 任务 6：同步环境能力与集成注册表
   - 依赖：任务 3、任务 5。
   - 文件：`docs/platform/environment-capabilities.json`、`docs/platform/integration-registry.json`、`functions/api/platform/_generated/environmentCapabilities.js`、`functions/api/platform/_generated/integrationRegistry.js`、`tests/environment-capabilities.test.mjs`、`tests/integration-registry.test.mjs`。
   - 输入：电商点评已迁移、OpenAI 环境变量已移除、D1 新迁移与灵算统一消费者。
@@ -74,6 +74,7 @@
   - 失败测试：`node --test tests/environment-capabilities.test.mjs tests/integration-registry.test.mjs`；预期因旧 `operations-ai-review` 和 OpenAI 依赖仍存在而失败。
   - 实现步骤：更新两个 JSON 来源；运行 `npm run generate:platform-manifests`；更新测试期望，不手改生成文件。
   - 验证：`npm run check:environment-capabilities` 和 `npm run check:integrations` 通过，路由结果只要求 Cloudflare Pages、D1 与灵算。
+  - 实际结果：旧 `operations-ai-review` 与 `openai-responses` 已移除，电商点评和用量页进入灵算统一消费者清单；环境与集成合同 8 项测试通过，两个生成模块已重建，两项检查均通过。
   - 提交：只提交清单、生成文件和合同测试，信息 `docs(platform): govern unified AI capability`。
 
 - [ ] 任务 7：完成全量验证与三环境验收

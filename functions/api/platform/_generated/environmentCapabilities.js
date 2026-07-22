@@ -409,23 +409,6 @@ const environmentCapabilities = {
       ]
     },
     {
-      "id": "operations-ai-review",
-      "name": "经营方案 AI 点评",
-      "description": "可选的 OpenAI Responses API 点评；未配置时使用本地规则检查，不阻断经营流程。",
-      "platforms": [
-        "openai-responses",
-        "cloudflare-pages"
-      ],
-      "requiredIn": [],
-      "level": "warning",
-      "envVars": [
-        "OPENAI_API_KEY",
-        "OPENAI_MODEL"
-      ],
-      "bindings": [],
-      "tables": []
-    },
-    {
       "id": "user-insights-browser-collection",
       "name": "用户洞察浏览器采集",
       "description": "保存已确认平台类目、标准市场事实、部门规则、竞品候选、采集设备哈希和审计记录。",
@@ -456,8 +439,8 @@ const environmentCapabilities = {
     },
     {
       "id": "company-ai-assistant",
-      "name": "公司 AI 总助",
-      "description": "可选的公司只读总助、灵算 Responses 网关、数据外发策略和无内容审计能力。",
+      "name": "公司统一 AI",
+      "description": "公司总助与业务 App 共用的灵算模型调用、规则降级、App 功能归属、Token 与 Skill 聚合及无内容审计能力。",
       "platforms": [
         "lingsuan-ai-gateway",
         "cloudflare-pages",

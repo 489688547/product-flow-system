@@ -14,7 +14,7 @@
     "check:branch-base": "node scripts/check-branch-base.mjs",
     "check:pages-environment-parity": "node scripts/check-pages-environment-parity.mjs",
     "configure:pages-environment-parity": "node scripts/configure-pages-environment-parity.mjs",
-    "check:integrations": "node scripts/check-integration-impact.mjs",
+    "check:integrations": "node --test tests/integration-registry.test.mjs && node scripts/check-integration-impact.mjs",
     "generate:platform-manifests": "node scripts/generate-platform-manifests.mjs",
     "check:environment-capabilities": "node scripts/generate-platform-manifests.mjs --check",
     "collect:user-insights": "node scripts/user-insights-collector/index.mjs",
