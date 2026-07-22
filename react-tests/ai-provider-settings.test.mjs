@@ -4,11 +4,12 @@ import { existsSync, readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("data services mounts the governed AI Provider settings", () => {
+test("AI model workspace mounts the governed AI Provider settings in a disclosure", () => {
   assert.equal(existsSync(new URL("../src/features/data-center/AiProviderSettings.jsx", import.meta.url)), true);
-  const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
-  assert.match(workspaces, /AiProviderSettings/);
-  assert.match(workspaces, /<AiProviderSettings\s*\/>/);
+  const workspace = read("src/features/data-center/AiModelWorkspace.jsx");
+  assert.match(workspace, /AiProviderSettings/);
+  assert.match(workspace, /<details/);
+  assert.match(workspace, /<AiProviderSettings\b[^>]*\/>/);
 });
 
 test("Provider settings expose safe metadata without credential inputs", () => {
@@ -24,6 +25,9 @@ test("Provider settings expose safe metadata without credential inputs", () => {
   assert.match(settings, /财务/);
   assert.match(settings, /阻止外发/);
   assert.match(settings, /canManage/);
+  assert.match(settings, /统一公司 AI/);
+  assert.match(settings, /前往数据接入配置连接/);
+  assert.match(settings, /#\/data-sources\/company/);
   assert.doesNotMatch(settings, /type=["']password["']/);
   assert.doesNotMatch(settings, /apiKey|API_KEY|LINGSUAN_API_KEY/);
 });

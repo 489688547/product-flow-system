@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, Share2, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Bot, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -69,7 +69,7 @@ const DATA_CENTER_NAV = [
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
   ["data-metrics", "数据口径", Ruler, "数据中心", "metrics"],
   ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
-  ["data-services", "数据服务", Share2, "数据中心", "services"],
+  ["data-services", "AI 大模型", Bot, "数据中心", "services"],
   ["data-settings", "设置", Settings, "数据中心", "settings"]
 ];
 const DATA_CENTER_SCREEN_TO_SECTION = new Map(DATA_CENTER_NAV.map(([screen, , , , section]) => [screen, section]));

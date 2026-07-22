@@ -44,7 +44,7 @@
   - 实际结果：`node --test tests/platform-connections-api.test.mjs react-tests/platform-connections.test.mjs tests/ai-feature-invocation.test.mjs tests/ecommerce-operations-api.test.mjs tests/ai-provider.test.mjs tests/ai-api.test.mjs` 通过，54 项测试、0 失败。
   - 提交：只提交共享调用器、电商迁移和对应测试，信息 `refactor(ai): route operations review through gateway`。
 
-- [ ] 任务 4：交付「AI 大模型」页面
+- [x] 任务 4：交付「AI 大模型」页面
   - 依赖：任务 2。
   - 文件：`src/domain/aiModelGovernance.js`、`src/state/aiModelGovernanceApi.js`、`src/features/data-center/AiModelWorkspace.jsx`、`src/features/data-center/AiProviderSettings.jsx`、`src/features/data-center/DataGovernanceWorkspaces.jsx`、`src/features/data-center/DataCenterAppPage.jsx`、`src/App.jsx`、`src/styles.css`、`react-tests/ai-model-governance.test.mjs`、`react-tests/ai-provider-settings.test.mjs`、`react-tests/data-center-app.test.mjs`。
   - 输入：用量聚合 API、现有 `DateRangeControls`、`DataTable`、`AiProviderSettings`。
@@ -52,6 +52,7 @@
   - 失败测试：`node --test react-tests/ai-model-governance.test.mjs react-tests/ai-provider-settings.test.mjs react-tests/data-center-app.test.mjs`；预期因新名称、页面和状态不存在而失败。
   - 实现步骤：先实现日期纯函数与 API 客户端；再实现页面结构与状态；最后替换路由组合、删除旧销售/订阅页面并补齐响应式样式。
   - 验证：最近 7/30/90、自定义未确认不请求、空/错/禁用/只读、设置折叠、旧链接和无销售/订阅文案测试全部通过。
+  - 实际结果：`node --test react-tests/ai-model-governance.test.mjs react-tests/ai-provider-settings.test.mjs react-tests/data-center-app.test.mjs` 通过，14 项测试、0 失败；`npm run lint`、`npm run build` 通过。
   - 提交：只提交 UI、客户端、纯规则和对应测试，信息 `feat(data-center): add AI model governance workspace`。
 
 - [ ] 任务 5：阻止未来 App 绕过统一 AI 能力
