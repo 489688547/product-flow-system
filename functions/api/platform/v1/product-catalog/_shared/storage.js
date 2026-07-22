@@ -111,15 +111,26 @@ export async function replaceProductCatalogComponents(db, items = [], { actor = 
   const context = { actor: String(actor).slice(0, 120), syncedAt, updatedAt: new Date().toISOString() };
   let componentCount = 0;
   let parentCount = 0;
+  const groups = [];
   for (const item of items) {
     const components = Array.isArray(item?.components) ? item.components : [];
     if (!components.length && !replaceEmpty) continue;
     const statements = [db.prepare("DELETE FROM product_catalog_components WHERE parent_item_id = ?").bind(item.id)];
     for (const component of components) statements.push(componentStatement(db, component, context));
-    await db.batch(statements);
+    groups.push(statements);
     parentCount += 1;
     componentCount += components.length;
   }
+  let pending = [];
+  for (const group of groups) {
+    if (pending.length && pending.length + group.length > BATCH_SIZE) {
+      await db.batch(pending);
+      pending = [];
+    }
+    if (group.length > BATCH_SIZE) await db.batch(group);
+    else pending.push(...group);
+  }
+  if (pending.length) await db.batch(pending);
   return { parents: parentCount, components: componentCount };
 }
 

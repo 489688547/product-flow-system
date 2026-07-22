@@ -110,16 +110,67 @@ test("keeps detail failures safe and resumable", async () => {
   assert.deepEqual(result.failures, [{ sourceProductId: "1", merchantCode: "BROKEN", code: "20103", message: "快麦商品详情读取失败。" }]);
 });
 
+test("bundle detail reads use bounded concurrency", async () => {
+  let active = 0;
+  let maxActive = 0;
+  const candidates = Array.from({ length: 12 }, (_, index) => ({
+    sysItemId: index + 1,
+    outerId: `BUNDLE-${index + 1}`,
+    type: "2"
+  }));
+  const result = await pullKuaimaiProductDetails(config, candidates, { maxDetails: 30 }, async (_url, options) => {
+    const params = new URLSearchParams(options.body);
+    active += 1;
+    maxActive = Math.max(maxActive, active);
+    await new Promise(resolve => setTimeout(resolve, 2));
+    active -= 1;
+    const sysItemId = Number(params.get("sysItemId"));
+    return new Response(JSON.stringify({ success: true, item: { sysItemId, outerId: `BUNDLE-${sysItemId}`, suitSingleList: [] } }), { status: 200 });
+  });
+
+  assert.equal(result.details.length, 12);
+  assert.ok(maxActive > 1);
+  assert.ok(maxActive <= 5);
+});
+
+test("bundle cursors keep the same identity order across provider and stored catalog shapes", async () => {
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    const params = new URLSearchParams(options.body);
+    calls.push(params.get("sysItemId"));
+    const sysItemId = Number(params.get("sysItemId"));
+    return new Response(JSON.stringify({ success: true, item: { sysItemId, outerId: `BUNDLE-${sysItemId}`, suitSingleList: [] } }), { status: 200 });
+  };
+  const providerItems = [
+    { sysItemId: 30, outerId: "BUNDLE-30", type: "2" },
+    { sysItemId: 10, outerId: "BUNDLE-10", type: "2" },
+    { sysItemId: 20, outerId: "BUNDLE-20", type: "2" }
+  ];
+  const storedItems = [
+    { sourceProductId: "20", merchantCode: "BUNDLE-20", type: "2" },
+    { sourceProductId: "30", merchantCode: "BUNDLE-30", type: "2" },
+    { sourceProductId: "10", merchantCode: "BUNDLE-10", type: "2" }
+  ];
+
+  const first = await pullKuaimaiProductDetails(config, providerItems, { cursor: 0, maxDetails: 1 }, fetchImpl);
+  const second = await pullKuaimaiProductDetails(config, storedItems, { cursor: first.nextCursor, maxDetails: 1 }, fetchImpl);
+
+  assert.deepEqual(calls, ["10", "20"]);
+  assert.equal(second.nextCursor, 2);
+});
+
 function createD1Mock() {
   const items = new Map();
   const skus = new Map();
   const components = new Map();
   const runs = new Map();
   const meta = new Map();
+  let batchCalls = 0;
   return {
     items,
     components,
     meta,
+    get batchCalls() { return batchCalls; },
     prepare(sql) {
       const statement = {
         values: [],
@@ -157,7 +208,7 @@ function createD1Mock() {
       };
       return statement;
     },
-    async batch(statements) { return Promise.all(statements.map(statement => statement.run())); }
+    async batch(statements) { batchCalls += 1; return Promise.all(statements.map(statement => statement.run())); }
   };
 }
 
@@ -226,6 +277,76 @@ test("sync endpoint reads and persists bundle component ratios", async () => {
     assert.equal(db.components.size, 1);
     assert.equal(JSON.parse([...db.components.values()][0].payload).inventoryUnitCode, "1111");
     assert.deepEqual(calls.map(call => call.method), ["item.list.query", "item.single.get"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("continuation batches reuse the stored catalog instead of rewriting every product", async () => {
+  const db = createD1Mock();
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async (_url, options) => {
+      const params = new URLSearchParams(options.body);
+      calls.push(Object.fromEntries(params.entries()));
+      if (params.get("method") === "item.list.query") {
+        const uniqueItems = Array.from({ length: 31 }, (_, index) => ({
+          sysItemId: index + 1,
+          outerId: `BUNDLE-${index + 1}`,
+          title: `组合商品 ${index + 1}`,
+          type: "2",
+          items: []
+        }));
+        return new Response(JSON.stringify({
+          success: true,
+          total: 32,
+          items: [...uniqueItems, { ...uniqueItems[0], sysItemId: 999 }]
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      const sysItemId = Number(params.get("sysItemId"));
+      return new Response(JSON.stringify({
+        success: true,
+        item: {
+          sysItemId,
+          outerId: `BUNDLE-${sysItemId}`,
+          title: `组合商品 ${sysItemId}`,
+          type: "2",
+          suitSingleList: [{ outerId: `UNIT-${sysItemId}`, ratio: 1 }]
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+
+    const firstResponse = await onRequest({
+      request: new Request("https://flow.example.com/api/platform/v1/product-catalog/sync/kuaimai", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cursor: 0 })
+      }),
+      env: { PRODUCT_FLOW_DB: db, KUAIMAI_APP_KEY: "app", KUAIMAI_APP_SECRET: "secret", KUAIMAI_ACCESS_TOKEN: "token" },
+      data: { session: { name: "数据管理员", role: "executive", department: "总经办" } }
+    });
+    const first = await firstResponse.json();
+    assert.equal(first.complete, false);
+    assert.equal(first.nextCursor, 30);
+    assert.equal(first.progress.totalCandidates, 31);
+
+    const secondResponse = await onRequest({
+      request: new Request("https://flow.example.com/api/platform/v1/product-catalog/sync/kuaimai", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ cursor: first.nextCursor })
+      }),
+      env: { PRODUCT_FLOW_DB: db, KUAIMAI_APP_KEY: "app", KUAIMAI_APP_SECRET: "secret", KUAIMAI_ACCESS_TOKEN: "token" },
+      data: { session: { name: "数据管理员", role: "executive", department: "总经办" } }
+    });
+    const second = await secondResponse.json();
+
+    assert.equal(second.complete, true);
+    assert.equal(second.progress.totalCandidates, 31);
+    assert.equal(calls.filter(call => call.method === "item.list.query").length, 1);
+    assert.equal(calls.filter(call => call.method === "item.single.get").length, 31);
+    assert.ok(db.batchCalls <= 6, `expected batched component writes, received ${db.batchCalls} D1 batches`);
   } finally {
     globalThis.fetch = originalFetch;
   }
