@@ -105,7 +105,6 @@ export function ProductCatalogWorkspace({ canEdit }) {
   const { state: productState } = useProductFlow();
   const { state: supplyState } = useSupplyChain();
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
   const [category, setCategory] = useState("all");
   const [kind, setKind] = useState("all");
   const [linked, setLinked] = useState("all");
@@ -135,11 +134,10 @@ export function ProductCatalogWorkspace({ canEdit }) {
   }, [salesMeta.availablePlatforms, salesQuery.platform]);
   const filtered = useMemo(() => sortProductCatalogBySales(items
     .filter(item => includesQuery(item, deferredQuery))
-    .filter(item => status === "all" || (status === "active" ? item.active && item.presentInSource !== false : status === "inactive" ? !item.active : item.presentInSource === false))
     .filter(item => category === "all" || item.category === category)
     .filter(item => kind === "all" || item.productKind === kind)
-    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id))), [category, deferredQuery, items, kind, linked, productLinks, status]);
-  useEffect(() => setPage(1), [category, kind, linked, query, salesQuery.from, salesQuery.platform, salesQuery.to, status]);
+    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id))), [category, deferredQuery, items, kind, linked, productLinks]);
+  useEffect(() => setPage(1), [category, kind, linked, query, salesQuery.from, salesQuery.platform, salesQuery.to]);
   const visible = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
   const totals = useMemo(() => ({
     products: items.length,
@@ -210,7 +208,6 @@ export function ProductCatalogWorkspace({ canEdit }) {
     { key: "classification", header: "分类 / 品牌", render: item => <span><strong>{item.category || "未分类"}</strong><small className="table-secondary">{item.brand || "未设置品牌"}</small></span> },
     { key: "sales", header: "销量", render: salesCell },
     { key: "cost", header: "ERP 成本", render: item => <span><strong>{priceRange(item)}</strong><small className="table-secondary">{item.productKind === "bundle" ? `${(item.components || []).length} 项组成` : `${(item.skus || []).length} 个库存单位`}</small></span> },
-    { key: "status", header: "ERP 状态", render: item => <span className={`status-badge ${item.presentInSource === false ? "warning" : item.active ? "success" : "neutral"}`}>{item.presentInSource === false ? "来源已缺失" : item.active ? "启用" : "停用"}</span> },
     { key: "link", header: "业务关联", render: item => {
       const product = productLinks.get(item.id);
       return <span><strong>{product ? `已关联产品：${product.name}` : "未关联产品"}</strong><small className="table-secondary">{supplierCounts.get(item.id) || 0} 家关联供应商</small></span>;
@@ -239,7 +236,6 @@ export function ProductCatalogWorkspace({ canEdit }) {
       <div className="product-catalog-filters">
         <HeaderFilter label="平台" value={salesQuery.platform} onChange={selectPlatform} options={[{ value: "", label: "全部平台" }, ...platforms.map(value => ({ value, label: value }))]} />
         <HeaderFilter label="日期" value={salesQuery.preset} onChange={selectDatePreset} options={DATE_OPTIONS} />
-        <HeaderFilter label="状态" value={status} onChange={setStatus} options={[{ value: "all", label: "全部状态" }, { value: "active", label: "启用" }, { value: "inactive", label: "停用" }, { value: "missing", label: "来源已缺失" }]} />
         <HeaderFilter label="类型" value={kind} onChange={setKind} options={[{ value: "all", label: "全部类型" }, { value: "single", label: "单品" }, { value: "bundle", label: "组合商品" }]} />
         <HeaderFilter label="分类" value={category} onChange={setCategory} options={[{ value: "all", label: "全部分类" }, ...categories.map(value => ({ value, label: value }))]} />
         <HeaderFilter label="关联" value={linked} onChange={setLinked} options={[{ value: "all", label: "全部关联状态" }, { value: "linked", label: "已关联产品" }, { value: "unlinked", label: "未关联产品" }]} />
@@ -266,7 +262,7 @@ export function ProductCatalogWorkspace({ canEdit }) {
     {notice ? <p className="supply-message success" role="status">{notice}</p> : null}
     {pending ? <section className="supply-import-preview product-catalog-preview"><FileSpreadsheet size={20} /><div><strong>{pending.fileName}</strong><span>识别 {pending.items.length} 个商品、{pending.counts.skus} 个 SKU · 异常 {pending.errors.length} 行</span>{pending.errors.slice(0, 3).map(item => <small key={`${item.rowNumber}-${item.field}`}>第 {item.rowNumber} 行：{item.message}</small>)}</div><div className="supply-import-actions"><Button onClick={() => setPending(null)}>取消</Button><Button variant="primary" disabled={!pending.items.length || Boolean(busy)} onClick={confirmImport}>确认导入</Button></div></section> : null}
 
-    <DataTable className="product-catalog-table" columns={columns} rows={visible} minWidth={1420} empty={empty} />
+    <DataTable className="product-catalog-table" columns={columns} rows={visible} minWidth={1380} empty={empty} />
     {filtered.length ? <TablePagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} /> : null}
   </div>;
 }
