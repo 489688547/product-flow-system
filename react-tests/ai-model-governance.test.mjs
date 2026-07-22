@@ -37,6 +37,14 @@ test("AI usage client sends only the applied range and preserves safe API errors
     }), { status: 500 })),
     error => error.message === "AI 使用统计加载失败。" && error.code === "AI_USAGE_QUERY_FAILED" && error.requestId === "req_safe" && error.retryable === true
   );
+
+  await assert.rejects(
+    loadAiUsage({ from: "2026-07-16", to: "2026-07-22" }, async () => new Response(JSON.stringify({
+      message: "D1_ERROR: Network connection lost at internal worker path",
+      error: { code: "LOCAL_ONLINE_AUTH_FAILED", retryable: true }
+    }), { status: 500 })),
+    error => error.message === "AI 使用统计加载失败，请稍后重试。" && !error.message.includes("D1_ERROR")
+  );
 });
 
 test("AI model workspace confirms custom dates and renders aggregate-only governance", () => {

@@ -32,6 +32,26 @@ test("Provider settings expose safe metadata without credential inputs", () => {
   assert.doesNotMatch(settings, /apiKey|API_KEY|LINGSUAN_API_KEY/);
 });
 
+test("Provider API hides infrastructure errors while preserving safe guidance", async () => {
+  const { loadAiProvider, saveAiProvider } = await import("../src/state/aiAssistantApi.js");
+
+  await assert.rejects(
+    loadAiProvider(async () => new Response(JSON.stringify({
+      message: "D1_ERROR: Network connection lost at internal worker path",
+      error: { code: "LOCAL_ONLINE_AUTH_FAILED", retryable: true }
+    }), { status: 500 })),
+    error => error.message === "模型服务状态加载失败。" && !error.message.includes("D1_ERROR")
+  );
+
+  await assert.rejects(
+    saveAiProvider({ providerId: "lingsuan-responses", model: "gpt-5.6-sol", reasoningEffort: "xhigh", enabled: true }, async () => new Response(JSON.stringify({
+      message: "server internals",
+      error: { code: "AI_PROVIDER_SECRET_MISSING" }
+    }), { status: 409 })),
+    error => error.message === "请先在数据接入中配置模型服务凭据。" && error.code === "AI_PROVIDER_SECRET_MISSING"
+  );
+});
+
 test("Provider settings cover loading errors readonly and responsive layout", () => {
   const settings = read("src/features/data-center/AiProviderSettings.jsx");
   const styles = read("src/styles.css");
