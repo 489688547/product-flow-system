@@ -59,11 +59,11 @@ Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状
 
 公司级 AI 能力统一经过 `/api/platform/v1/ai/*` 服务端网关。业务 App 不直接调用模型供应商，也不把浏览器中的业务状态作为可信上下文；服务端根据钉钉会话、数据域权限和外发策略读取、脱敏并限额公司数据。灵算首期使用固定 `https://lingsuan.top/responses`、`gpt-5.6-sol` 和 `store: false`，设置页不得覆盖域名、路径、任意 Header 或保存凭据。
 
-`AI_ASSISTANT_ENABLED` 默认关闭。`LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 只允许作为 Pages 服务端 Secret 配置，D1 只保存非敏感 Provider 元数据。连接测试仅使用固定合成输入；Function Calling 另用 `lookup_status({})` 做无公司数据能力测试。业务查询只能从服务端按当前会话权限下发的只读 Skill 中选择，每次调用重新校验固定 Schema、数据域和外发策略，并限制为两轮、六次。调用审计只保存 Skill、App、参数名、数量、耗时和结果码，不保存参数值、业务结果或对话内容。
+`AI_ASSISTANT_ENABLED` 默认关闭。公司级凭据优先由平台连接保险箱解析，迁移期允许 `LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 作为 Pages 服务端 Secret 回退；D1 只保存加密凭据、非敏感 Provider 元数据和安全审计。连接测试仅使用固定合成输入；Function Calling 另用 `lookup_status({})` 做无公司数据能力测试。业务查询只能从服务端按当前会话权限下发的只读 Skill 中选择，每次调用重新校验固定 Schema、数据域和外发策略，并限制为两轮、六次。调用审计只保存 Skill、App、参数名、数量、耗时和结果码，不保存参数值、业务结果或对话内容。
 
 模型使用审计只记录身份、数据域、记录数、数据时间、token、耗时和结果码，不保存问题、回答、上下文或 Provider 原始响应。财务数据即使用户内部有权查看，也在当前 Provider 下统一阻止外发；只有获得可审计的不留存承诺并完成新的安全决策后才能调整。
 
-现有电商运营方案 AI 点评仍是功能内的兼容接入。后续新增跨 App AI 功能必须复用公司网关；迁移旧接入时保持原业务审批和降级行为，不能在本次总助建设中无验证替换。
+公司总助对话与电商运营方案点评都通过统一 AI 能力调用。每个功能必须在服务端注册稳定 `appId/featureId` 并复用 `invokeAiFeature` 或流式聊天编排；业务路由不得导入 Provider 配置、Responses 适配器或自行发起模型请求。治理 CI 会扫描直接模型地址、Secret 和低层适配器导入，唯一例外是平台连接测试器使用合成内容验证候选凭据。
 
 ## 内部平台资料
 

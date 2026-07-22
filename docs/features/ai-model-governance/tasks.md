@@ -55,7 +55,7 @@
   - 实际结果：`node --test react-tests/ai-model-governance.test.mjs react-tests/ai-provider-settings.test.mjs react-tests/data-center-app.test.mjs` 通过，14 项测试、0 失败；`npm run lint`、`npm run build` 通过。
   - 提交：只提交 UI、客户端、纯规则和对应测试，信息 `feat(data-center): add AI model governance workspace`。
 
-- [ ] 任务 5：阻止未来 App 绕过统一 AI 能力
+- [x] 任务 5：阻止未来 App 绕过统一 AI 能力
   - 依赖：任务 3。
   - 文件：`tests/ai-provider-boundary.test.mjs`、`package.json`、`AGENTS.md`、`docs/platform/api-catalog.md`、`docs/platform/integrations.md`、`docs/platform/error-codes.md`、`docs/product/roles-and-permissions.md`、`docs/decisions/2026-07-19-company-ai-gateway.md`、`PRODUCT.md`、`DESIGN.md`。
   - 输入：统一功能注册表、调用器和现有治理命令。
@@ -63,6 +63,7 @@
   - 失败测试：`node --test tests/ai-provider-boundary.test.mjs`；预期首先命中电商路由遗留的 Provider 域名/Secret，迁移后才通过。
   - 实现步骤：定义唯一允许出现 Provider 域名和 Secret 的服务端适配器/配置白名单；扫描其他业务路由；将同一规则反写到 AGENTS、平台 API、集成、错误、权限、产品和设计来源。
   - 验证：边界测试和 `npm run check:governance` 通过；文档不存在“电商点评仍独立直连”的旧表述。
+  - 实际结果：边界测试扫描业务路由中的模型地址、Secret、低层适配器导入和电商点评归属，3 项测试通过；`npm run check:governance` 通过。长期规则已反写到 Agent、产品、设计、API、集成、权限、错误码与 ADR。
   - 提交：只提交测试、治理接入和长期文档，信息 `chore(ai): enforce shared provider boundary`。
 
 - [ ] 任务 6：同步环境能力与集成注册表
