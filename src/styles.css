@@ -2170,6 +2170,8 @@ main { min-width: 0; overflow-x: hidden; }
 .ai-provider-toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
 .ai-provider-secret-note { margin: 0; padding: 12px var(--space-4); display: flex; align-items: flex-start; gap: 8px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); color: var(--text-secondary); background: var(--surface-subtle); }
 .ai-provider-secret-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--success); }
+.ai-provider-credential-panel { padding: var(--space-4); border-bottom: 1px solid var(--border); }
+.ai-provider-credential-panel .platform-connection-detail { gap: var(--space-3); }
 .ai-provider-feedback { margin: var(--space-3) var(--space-4) 0; padding: 10px 12px; border-radius: var(--radius-control); font-weight: 650; }
 .ai-provider-feedback.danger { border: 1px solid color-mix(in oklch, var(--danger), white 65%); color: var(--danger); background: var(--danger-soft); }
 .ai-provider-feedback.success { border: 1px solid color-mix(in oklch, var(--success), white 65%); color: var(--success); background: var(--success-soft); }

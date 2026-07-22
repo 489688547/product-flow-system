@@ -25,7 +25,7 @@ export function credentialRequestId() {
   return crypto.randomUUID?.() || `req_${Date.now().toString(36)}`;
 }
 
-export function credentialErrorResponse(error, requestId = credentialRequestId()) {
+export function credentialErrorResponse(error, requestId = credentialRequestId(), headers = {}) {
   const status = Number(error?.status || 500);
   const code = error?.code || "INTERNAL_UNEXPECTED";
   const message = status >= 500 && code === "INTERNAL_UNEXPECTED"
@@ -35,7 +35,7 @@ export function credentialErrorResponse(error, requestId = credentialRequestId()
     synced: false,
     message,
     error: { code, message, requestId, retryable: status >= 500 && code !== "CREDENTIAL_DECRYPT_FAILED" }
-  }, status);
+  }, status, headers);
 }
 
 export function credentialContext(session, env, requestId, extra = {}) {

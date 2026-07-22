@@ -57,9 +57,9 @@ Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状
 
 ## 公司 AI Provider 网关
 
-公司级 AI 能力统一经过 `/api/platform/v1/ai/*` 服务端网关。业务 App 不直接调用模型供应商，也不把浏览器中的业务状态作为可信上下文；服务端根据钉钉会话、数据域权限和外发策略读取、脱敏并限额公司数据。灵算首期使用固定 `https://lingsuan.top/responses`、`gpt-5.6-sol` 和 `store: false`，设置页不得覆盖域名、路径、任意 Header 或保存凭据。
+公司级 AI 能力统一经过 `/api/platform/v1/ai/*` 服务端网关。业务 App 不直接调用模型供应商，也不把浏览器中的业务状态作为可信上下文；服务端根据钉钉会话、数据域权限和外发策略读取、脱敏并限额公司数据。灵算首期使用固定 `https://lingsuan.top/responses`、`gpt-5.6-sol` 和 `store: false`，设置页不得覆盖域名、路径或任意 Header；灵算凭据直接复用平台连接保险箱保存和验证，不建立独立凭据存储。
 
-`AI_ASSISTANT_ENABLED` 默认关闭。公司级凭据优先由平台连接保险箱解析，迁移期允许 `LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 作为 Pages 服务端 Secret 回退；D1 只保存加密凭据、非敏感 Provider 元数据和安全审计。连接测试仅使用固定合成输入；Function Calling 另用 `lookup_status({})` 做无公司数据能力测试。业务查询只能从服务端按当前会话权限下发的只读 Skill 中选择，每次调用重新校验固定 Schema、数据域和外发策略，并限制为两轮、六次。调用审计只保存 Skill、App、参数名、数量、耗时和结果码，不保存参数值、业务结果或对话内容。
+`AI_ASSISTANT_ENABLED` 默认关闭。公司级凭据优先由平台连接保险箱解析，迁移期允许 `LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 作为 Pages 服务端 Secret 回退；环境回退值不可回显。最高权限管理员通过专用 POST reveal 路由查看当前启用的保险箱版本时，必须满足 15 分钟内会话、用途、精确确认语、15 分钟最多 5 次、`private, no-store` 和无秘密审计，浏览器只在内存保留 5 分钟并在离开设置时清除。连接测试仅使用固定合成输入；Function Calling 另用 `lookup_status({})` 做无公司数据能力测试。业务查询只能从服务端按当前会话权限下发的只读 Skill 中选择，每次调用重新校验固定 Schema、数据域和外发策略，并限制为两轮、六次。调用审计只保存 Skill、App、参数名、数量、耗时和结果码，不保存参数值、业务结果或对话内容。
 
 模型使用审计只记录身份、数据域、记录数、数据时间、token、耗时和结果码，不保存问题、回答、上下文或 Provider 原始响应。财务数据即使用户内部有权查看，也在当前 Provider 下统一阻止外发；只有获得可审计的不留存承诺并完成新的安全决策后才能调整。
 

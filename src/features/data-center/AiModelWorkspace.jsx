@@ -113,6 +113,7 @@ export function AiModelWorkspace() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [providerStatus, setProviderStatus] = useState({ label: "读取中", tone: "neutral" });
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const validation = validateAiUsageRange(draftRange);
 
   useEffect(() => {
@@ -176,9 +177,9 @@ export function AiModelWorkspace() {
         {data ? <AiUsageTables data={data} loading={loading} /> : <div className="ai-usage-skeleton" aria-label="正在加载 AI 使用统计" aria-busy="true"><span /><span /><span /></div>}
       </>}
 
-      <details className="ai-model-settings">
+      <details className="ai-model-settings" onToggle={event => setSettingsOpen(event.currentTarget.open)}>
         <summary><span><ShieldCheck size={17} aria-hidden="true" /><strong>模型与安全设置</strong><small>Provider、连接测试与数据外发边界</small></span><span className={`status-badge ${providerStatus.tone}`}>{providerStatus.label}</span></summary>
-        <AiProviderSettings onStatusChange={handleProviderStatus} />
+        <AiProviderSettings onStatusChange={handleProviderStatus} active={settingsOpen} />
       </details>
     </div>
   );

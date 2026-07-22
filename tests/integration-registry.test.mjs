@@ -17,6 +17,9 @@ test("integration registry routes every AI consumer through Lingsuan", () => {
   assert.equal(lingsuan.codePaths.includes("src/features/data-center/AiModelWorkspace.jsx"), true);
   assert.equal(lingsuan.apiRoutes.includes("/api/platform/v1/ai/usage"), true);
   assert.equal(lingsuan.apiRoutes.includes("/api/ecommerce-operations/ai-review"), true);
+  assert.equal(lingsuan.apiRoutes.includes("/api/platform/v1/platform-connections/:platformId/reveal"), true);
+  assert.equal(lingsuan.codePaths.includes("functions/api/platform/v1/platform-connections/[platformId]/reveal.js"), true);
+  assert.equal(lingsuan.evidence.includes("migrations/0010_platform_credential_reveal.sql"), true);
   assert.equal(lingsuan.evidence.includes("migrations/0009_ai_model_governance.sql"), true);
   assert.equal(JSON.stringify(lingsuan).includes("OPENAI_API_KEY"), false);
   assert.equal(JSON.stringify(lingsuan).includes("api.openai.com"), false);

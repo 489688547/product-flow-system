@@ -2,10 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { platformCredentialCryptoInternals } from "../functions/api/platform/_shared/credentialCrypto.js";
 import {
+  assertPlatformCredentialRevealRateLimit,
   disablePlatformCredentials,
   listPlatformCredentialMetadata,
   platformEnv,
   readPlatformCredentials,
+  revealPlatformCredentials,
   savePlatformCredentials
 } from "../functions/api/platform/_shared/platformCredentials.js";
 
@@ -40,6 +42,10 @@ function createD1Mock({ failAudit = false } = {}) {
         bind(...values) { statement.values = values; return statement; },
         async first() {
           if (normalized.includes("from platform_credentials")) return rows.get(statement.values[0]) || null;
+          if (normalized.includes("count(*)") && normalized.includes("from platform_credential_audit")) {
+            const [platformId, action, since] = statement.values;
+            return { count: audits.filter(row => row.platform_id === platformId && row.action === action && row.result === "success" && row.created_at >= since).length };
+          }
           return null;
         },
         async all() {
@@ -70,6 +76,13 @@ function createD1Mock({ failAudit = false } = {}) {
           }
           if (normalized.startsWith("insert into platform_credential_audit")) {
             if (failAudit) throw new Error("audit unavailable");
+            if (normalized.includes("count(*) from platform_credential_audit")) {
+              const [id, platformId, requestId, actorId, actorName, purpose, createdAt, ratePlatformId, since, limit] = statement.values;
+              const count = audits.filter(row => row.platform_id === ratePlatformId && row.action === "reveal" && row.result === "success" && row.created_at >= since).length;
+              if (count >= Number(limit)) return { success: true, meta: { changes: 0 } };
+              audits.push({ id, platform_id: platformId, action: "reveal", changed_fields: "[]", result: "success", request_id: requestId, actor_id: actorId, actor_name: actorName, purpose, created_at: createdAt });
+              return { success: true, meta: { changes: 1 } };
+            }
             const platformId = statement.values[1];
             const current = rows.get(platformId);
             if (normalized.includes("where not exists") && current) return { success: true, meta: { changes: 0 } };
@@ -77,8 +90,8 @@ function createD1Mock({ failAudit = false } = {}) {
               const expectedVersion = statement.values.at(-1);
               if (!current || Number(current.version) !== Number(expectedVersion)) return { success: true, meta: { changes: 0 } };
             }
-            const [id, , action, changedFields, result, requestId, actorId, actorName, createdAt] = statement.values;
-            audits.push({ id, platform_id: platformId, action, changed_fields: changedFields, result, request_id: requestId, actor_id: actorId, actor_name: actorName, created_at: createdAt });
+            const [id, , action, changedFields, result, requestId, actorId, actorName, purpose, createdAt] = statement.values;
+            audits.push({ id, platform_id: platformId, action, changed_fields: changedFields, result, request_id: requestId, actor_id: actorId, actor_name: actorName, purpose, created_at: createdAt });
             return { success: true, meta: { changes: 1 } };
           }
           return { success: true, meta: { changes: 1 } };
@@ -200,5 +213,51 @@ test("unknown fields and stale versions are rejected", async () => {
       fields: { appSecret: "next" }
     }, { ...actor, masterKey: key, validate: async () => ({ ok: true }) }),
     error => error.code === "PLATFORM_CONNECTION_VERSION_CONFLICT"
+  );
+});
+
+test("only an enabled vault version can be revealed and the audit excludes secret values", async () => {
+  const db = createD1Mock();
+  const key = masterKey();
+  await savePlatformCredentials(db, {
+    platformId: "lingsuan-ai-gateway",
+    expectedVersion: 0,
+    fields: { apiKey: "lingsuan-secret", actorAuthorization: "actor-secret" }
+  }, { ...actor, masterKey: key, validate: async () => ({ ok: true }) });
+
+  const revealed = await revealPlatformCredentials(db, "lingsuan-ai-gateway", {
+    ...actor,
+    masterKey: key,
+    purpose: "确认公司 AI 连接配置"
+  });
+
+  assert.deepEqual(revealed.fields, { apiKey: "lingsuan-secret", actorAuthorization: "actor-secret" });
+  assert.equal(revealed.platformId, "lingsuan-ai-gateway");
+  const revealAudit = db.audits.find(row => row.action === "reveal");
+  assert.equal(revealAudit.purpose, "确认公司 AI 连接配置");
+  assert.equal(revealAudit.changed_fields, "[]");
+  assert.doesNotMatch(JSON.stringify(db.audits), /lingsuan-secret|actor-secret/);
+
+  await disablePlatformCredentials(db, { platformId: "lingsuan-ai-gateway", expectedVersion: 1 }, actor);
+  await assert.rejects(
+    () => revealPlatformCredentials(db, "lingsuan-ai-gateway", { ...actor, masterKey: key, purpose: "再次确认" }),
+    error => error.code === "PLATFORM_CREDENTIAL_REVEAL_UNAVAILABLE"
+  );
+});
+
+test("platform reveal is rate limited after five successful views in fifteen minutes", async () => {
+  const db = createD1Mock();
+  const now = new Date().toISOString();
+  for (let index = 0; index < 5; index += 1) {
+    db.audits.push({
+      platform_id: "lingsuan-ai-gateway",
+      action: "reveal",
+      result: "success",
+      created_at: now
+    });
+  }
+  await assert.rejects(
+    () => assertPlatformCredentialRevealRateLimit(db, "lingsuan-ai-gateway"),
+    error => error.code === "PLATFORM_CREDENTIAL_REVEAL_RATE_LIMITED" && error.status === 429
   );
 });
