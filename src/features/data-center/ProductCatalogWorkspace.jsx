@@ -136,7 +136,7 @@ export function ProductCatalogWorkspace({ canEdit }) {
     .filter(item => includesQuery(item, deferredQuery))
     .filter(item => category === "all" || item.category === category)
     .filter(item => kind === "all" || item.productKind === kind)
-    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id))), [category, deferredQuery, items, kind, linked, productLinks]);
+    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id)))), [category, deferredQuery, items, kind, linked, productLinks]);
   useEffect(() => setPage(1), [category, kind, linked, query, salesQuery.from, salesQuery.platform, salesQuery.to]);
   const visible = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
   const totals = useMemo(() => ({
