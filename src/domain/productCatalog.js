@@ -161,7 +161,7 @@ export function normalizeCatalogItem(input = {}, context = {}) {
     const existing = skuMap.get(sku.id);
     skuMap.set(sku.id, existing ? { ...existing, ...Object.fromEntries(Object.entries(sku).filter(([, value]) => value !== "" && value !== null)) } : sku);
   }
-  const componentInputs = Array.isArray(input.components)
+  const componentInputs = Array.isArray(input.components) && input.components.length
     ? input.components
     : Array.isArray(input.suitSingleList)
       ? input.suitSingleList
