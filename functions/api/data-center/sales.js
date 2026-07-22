@@ -1,5 +1,6 @@
 import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
 import { ensureSalesTables, salesDatabase } from "../sales.js";
+import { normalizeDataCenterStorageError } from "./_shared/errors.js";
 
 const VIEW_DEPARTMENTS = new Set(["总经办", "运营部", "财务部", "产品部", "供应链部", "供应链", "供应链团队", "采购部"]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -99,6 +100,7 @@ export async function onRequest({ request, env, data = {} }) {
       }
     });
   } catch (error) {
-    return errorResponse(error.message || "销售数据读取失败。", error.status || 500, "INTERNAL_UNEXPECTED", true);
+    const normalized = normalizeDataCenterStorageError(error, "销售数据读取失败。");
+    return errorResponse(normalized.message, normalized.status, normalized.code, normalized.retryable);
   }
 }

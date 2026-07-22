@@ -92,6 +92,7 @@
 - `DATA_SERVICE_DATE_RANGE_INVALID`：销售数据服务只收到一个日期，或日期非法、倒置、超出服务上限。
 - `DATA_SERVICE_QUERY_FAILED`：销售数据服务读取或聚合 D1 失败，可重试。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+- `DATA_STORAGE_TEMPORARILY_UNAVAILABLE`：D1 远程读取链路暂时中断；不暴露 Miniflare 或 D1 底层错误，GET 客户端可自动重试一次。
 - `DATA_CONNECTOR_INVALID`：连接器 ID、字段、URL、保险箱类型或敏感字段边界不合法。
 - `DATA_CONNECTOR_NOT_FOUND`：连接实例不存在、已归档或对当前身份不可见。
 - `DATA_CONNECTOR_VERSION_CONFLICT`：连接实例或保险箱条目版本已经更新，HTTP 409。

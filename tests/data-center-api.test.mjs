@@ -81,6 +81,19 @@ function createD1Mock() {
   };
 }
 
+function createDisconnectedD1Mock() {
+  const fail = async () => {
+    throw new Error("D1_ERROR: Failed to parse body as JSON, got: Error: Network connection lost.");
+  };
+  return {
+    prepare() {
+      const statement = { bind: () => statement, run: fail, all: fail, first: fail };
+      return statement;
+    },
+    batch: fail
+  };
+}
+
 const executive = { name: "周总", userId: "u-1", role: "executive", department: "总经办" };
 
 test("executive role can view data center with multi-department organization data", async () => {
@@ -114,6 +127,28 @@ test("data center API requires a session, allowed department and D1", async () =
 
   const missingD1 = await onDataCenterRequest({ request: new Request("https://flow.example.com/api/data-center"), env: {}, data: { session: executive } });
   assert.equal(missingD1.status, 501);
+});
+
+test("data center routes hide transient D1 internals behind a retryable storage error", async () => {
+  const contexts = [
+    {
+      handler: onDataCenterRequest,
+      request: new Request("https://flow.example.com/api/data-center")
+    },
+    {
+      handler: onSalesRequest,
+      request: new Request("https://flow.example.com/api/data-center/sales?from=2026-07-01&to=2026-07-21")
+    }
+  ];
+  for (const context of contexts) {
+    const response = await context.handler({ request: context.request, env: { PRODUCT_FLOW_DB: createDisconnectedD1Mock() }, data: { session: executive } });
+    const payload = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(payload.error.code, "DATA_STORAGE_TEMPORARILY_UNAVAILABLE");
+    assert.equal(payload.error.retryable, true);
+    assert.equal(payload.message, "线上数据库连接暂时中断，请稍后重试。");
+    assert.doesNotMatch(JSON.stringify(payload), /D1_ERROR|Network connection lost|entry\.worker/);
+  }
 });
 
 test("data center metadata round-trips by collection without credentials", async () => {
