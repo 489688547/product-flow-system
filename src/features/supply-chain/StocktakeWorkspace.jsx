@@ -24,7 +24,7 @@ function statusLabel(status) {
   }[status] || "待处理";
 }
 
-export function StocktakeWorkspace({ products, stocktakes = [], permissions = {}, createStocktake, transitionStocktake }) {
+export function StocktakeWorkspace({ anchorId, products, stocktakes = [], permissions = {}, createStocktake, transitionStocktake }) {
   const { state } = useSupplyChain();
   const [warehouseId, setWarehouseId] = useState("兰山云仓");
   const [countedAt, setCountedAt] = useState(new Date().toISOString().slice(0, 10));
@@ -120,7 +120,7 @@ export function StocktakeWorkspace({ products, stocktakes = [], permissions = {}
 
   const latestProgress = stocktakes.length ? Math.max(...stocktakes.map(row => completedStage(row.status))) : 0;
   return (
-    <section className="section-panel stocktake-workspace">
+    <section className="section-panel stocktake-workspace" id={anchorId}>
       <div className="section-head"><div><h2>月度线下盘点</h2><p>ERP 原始快照始终保留；确认后追加盘盈或盘亏事实，不覆盖账面库存。</p></div></div>
       <ol className="stocktake-stages" aria-label="盘点流程">
         {STAGES.map((stage, index) => <li key={stage} className={`stocktake-stage ${index < latestProgress ? "complete" : ""}`}><span>{index < latestProgress ? <Check size={13} /> : index + 1}</span>{stage}</li>)}

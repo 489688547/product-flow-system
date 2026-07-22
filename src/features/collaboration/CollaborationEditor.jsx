@@ -41,6 +41,10 @@ function identityFor(name, orgCache) {
   return name ? { userId: user?.userId || user?.userid || "", unionId: user?.unionId || user?.unionid || "", name } : null;
 }
 
+// 只选日期时的默认截止时间：当天 18:00（北京时间），
+// 业务含义为“工作日下班前完成”，与协同验收按工作日推进的口径一致。
+const DEFAULT_DUE_TIME_OF_DAY = "T18:00:00+08:00";
+
 function payloadFor(form, orgCache) {
   const ownerUser = identityFor(form.ownerUser, orgCache);
   return {
@@ -54,7 +58,7 @@ function payloadFor(form, orgCache) {
     ownerUser,
     decisionOwner: form.kind === "decision" ? ownerUser : null,
     partnerDepartments: form.partnerDepartments.split(" / ").filter(name => name && name !== form.ownerDepartment).map(name => ({ name })),
-    dueAt: form.dueDate ? `${form.dueDate}T18:00:00+08:00` : ""
+    dueAt: form.dueDate ? `${form.dueDate}${DEFAULT_DUE_TIME_OF_DAY}` : ""
   };
 }
 

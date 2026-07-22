@@ -55,7 +55,8 @@ export function CollaborationDetailPanel({ item, currentUser, orgCache, onClose,
   const actor = useMemo(() => actorFor(currentUser), [currentUser]);
   const allowed = useMemo(() => item ? collaborationTransitionsFor(item, actor) : [], [actor, item]);
   const activities = item ? activitiesByItem[item.id] || [] : [];
-  const dingError = item.dingTodo && item.dingTodo.lastError;
+  const dingTodo = item?.dingTodo;
+  const dingError = dingTodo ? dingTodo.lastError : undefined;
 
   useEffect(() => {
     if (!item) return;

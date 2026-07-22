@@ -1,6 +1,7 @@
 import { Link2, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Button, IconAction } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 
 function isDingTalkDocument(url) {
@@ -13,21 +14,23 @@ function isDingTalkDocument(url) {
 
 export function DeliverableTemplateEditorModal({ open, task, onClose, onSave }) {
   const [documents, setDocuments] = useState([]);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
 
   useEffect(() => {
     if (!open) return;
     setDocuments((task?.deliverableTemplates || []).map(document => ({ ...document })));
+    setDocumentToDelete(null);
   }, [open, task]);
 
   const valid = useMemo(() => documents.every(document => document.name.trim() && isDingTalkDocument(document.url.trim())), [documents]);
   const updateDocument = (id, patch) => setDocuments(current => current.map(document => document.id === id ? { ...document, ...patch } : document));
   const addDocument = () => setDocuments(current => [...current, { id: `doc-template-${Date.now()}`, name: "", url: "" }]);
   const deleteDocument = id => {
-    if (!window.confirm("确认删除这个交付物模板？")) return;
-    setDocuments(current => current.filter(document => document.id !== id));
+    setDocumentToDelete(documents.find(document => document.id === id) || null);
   };
 
   return (
+    <>
     <Modal
       open={open}
       title={`${task?.title || "任务"} · 交付物模板`}
@@ -49,5 +52,17 @@ export function DeliverableTemplateEditorModal({ open, task, onClose, onSave }) 
         <Button className="compact" onClick={addDocument}><Plus size={16} />添加钉钉文档模板</Button>
       </div>
     </Modal>
+    <ConfirmDialog
+      open={Boolean(documentToDelete)}
+      title="删除交付物模板"
+      message={documentToDelete ? `确认删除“${documentToDelete.name.trim() || "未命名模板"}”？` : ""}
+      description="保存模板后生效，删除后不可恢复。"
+      onClose={() => setDocumentToDelete(null)}
+      onConfirm={() => {
+        setDocuments(current => current.filter(document => document.id !== documentToDelete.id));
+        setDocumentToDelete(null);
+      }}
+    />
+    </>
   );
 }

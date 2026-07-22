@@ -83,7 +83,7 @@ test("shared rich text editor supports compact text-only disabled mode", () => {
 });
 
 test("shared modal traps focus and restores the trigger", () => {
-  assert.match(sharedModal, /previousFocusRef/);
-  assert.match(sharedModal, /event\.key === "Tab"/);
-  assert.match(sharedModal, /previousFocusRef\.current\?\.focus/);
+  assert.match(sharedModal, /trigger: document\.activeElement/);
+  assert.match(sharedModal, /event\.key !== "Tab"/);
+  assert.match(sharedModal, /trigger\.focus\(\)/);
 });

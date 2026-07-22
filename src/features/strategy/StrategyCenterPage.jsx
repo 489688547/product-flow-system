@@ -22,7 +22,7 @@ const RESULT_STATUS = {
 const COMMITMENT_STATUS = {
   draft: ["草稿", "neutral"],
   office_review: ["总经办审核", "info"],
-  executive_review: ["老板确认", "warning"],
+  executive_review: ["老板确认", "info"],
   returned: ["已退回", "danger"],
   active: ["执行中", "success"],
   at_risk: ["有风险", "warning"],
@@ -101,7 +101,7 @@ function CompanyStrategyView({ state, canManage, canCreateCommitment, currentUse
                           })}
                         </div> : null}
                       </section>;
-                    }) : <div className="result-execution-empty"><span><strong>还没有部门任务承接这项结果</strong><small>从这里拆出部门责任、验收标准和月度里程碑。</small></span>{canCreateCommitment ? <Button className="compact" onClick={() => onAddCommitment(strategy.id, result.id)}><Plus size={15} />添加部门任务</Button> : null}</div>}
+                    }) : <div className="result-execution-empty"><span><strong>暂无部门任务承接这项结果</strong><small>从这里拆出部门责任、验收标准和月度里程碑。</small></span>{canCreateCommitment ? <Button className="compact" onClick={() => onAddCommitment(strategy.id, result.id)}><Plus size={15} />添加部门任务</Button> : null}</div>}
                   </div> : null}
                 </article>;
               })}
@@ -153,7 +153,7 @@ function DepartmentCommitmentView({ state, canManage, onEdit, onDelete, onTransi
           {commitment.statusReason ? <p className="commitment-reason"><AlertTriangle size={14} />{commitment.statusReason}</p> : null}
         </article>;
       })}
-      {!state.departmentCommitments.length ? <div className="empty-state">尚未建立部门承诺。部门负责人可从公司战略拆出季度承诺，并设置月度里程碑。</div> : null}
+      {!state.departmentCommitments.length ? <div className="empty-state">暂无部门承诺。部门负责人可从公司战略拆出季度承诺，并设置月度里程碑。</div> : null}
     </section>
   </>;
 }

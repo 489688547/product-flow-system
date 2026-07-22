@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,8 +10,34 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const HOST = "127.0.0.1";
 const VITE_PORT = 8127;
 const PAGES_PORT = 8132;
+const WRANGLER_CONFIG = resolve(ROOT, "wrangler.toml");
+const WRANGLER_SANDBOX_CONFIG = resolve(ROOT, "wrangler.local.toml");
+const WRANGLER_BACKUP = resolve(ROOT, ".wrangler-toml.online-backup");
+const SANDBOX_MARKER = "本地沙箱模式";
 const children = new Set();
 let stopping = false;
+
+function swapToSandboxConfig() {
+  writeFileSync(WRANGLER_BACKUP, readFileSync(WRANGLER_CONFIG, "utf8"));
+  writeFileSync(WRANGLER_CONFIG, readFileSync(WRANGLER_SANDBOX_CONFIG, "utf8"));
+}
+
+// 沙箱模式临时改写 wrangler.toml；无论正常退出还是上次被强杀，都要恢复线上配置。
+function restoreConfigIfSwapped() {
+  if (!existsSync(WRANGLER_BACKUP)) return;
+  try {
+    const current = readFileSync(WRANGLER_CONFIG, "utf8");
+    if (current.includes(SANDBOX_MARKER)) {
+      writeFileSync(WRANGLER_CONFIG, readFileSync(WRANGLER_BACKUP, "utf8"));
+    }
+  } finally {
+    try {
+      unlinkSync(WRANGLER_BACKUP);
+    } catch {
+      // 备份清理由下次启动重试
+    }
+  }
+}
 
 function executable(name) {
   return resolve(ROOT, "node_modules", ".bin", process.platform === "win32" ? `${name}.cmd` : name);
@@ -66,6 +93,7 @@ function shutdown() {
   if (stopping) return;
   stopping = true;
   for (const child of children) killChild(child);
+  restoreConfigIfSwapped();
 }
 
 process.once("SIGINT", shutdown);
@@ -77,6 +105,14 @@ async function main() {
   if (!branchBase.current) {
     throw new Error(`本地环境启动已阻止：${branchBase.reason}`);
   }
+  const useLocalD1 = process.argv.includes("--local-d1") || process.env.LOCAL_D1_SANDBOX === "1";
+  // 上次沙箱运行若被强杀，先恢复线上配置再启动。
+  restoreConfigIfSwapped();
+  if (useLocalD1) {
+    // 沙箱模式：Pages 不支持 --config 指定自定义路径，临时将沙箱配置（本地 D1）
+    // 换入 wrangler.toml，退出时在 shutdown() 中恢复原配置。
+    swapToSandboxConfig();
+  }
   const sharedEnvPath = resolveSharedEnvPath(ROOT);
   const sharedEnv = loadSharedEnv(ROOT, { envPath: sharedEnvPath });
   const wranglerEnv = {
@@ -84,7 +120,7 @@ async function main() {
     ...sharedEnv.values,
     CLOUDFLARE_INCLUDE_PROCESS_ENV: "true"
   };
-  console.log("正在启动本地代码 · 线上真实环境...");
+  console.log(useLocalD1 ? "正在启动本地代码 · 本地沙箱环境（本地 D1，不连生产库）..." : "正在启动本地代码 · 线上真实环境...");
   startChild("Wrangler", executable("wrangler"), [
     "pages", "dev",
     "--port", String(PAGES_PORT),
@@ -98,7 +134,9 @@ async function main() {
   });
   await waitForPort(VITE_PORT);
   console.log(`请打开 http://${HOST}:${VITE_PORT}/`);
-  console.log("当前使用线上真实账号、生产数据和外部平台，所有操作立即生效。");
+  console.log(useLocalD1
+    ? "当前使用本地沙箱账号与本地数据库，写入只影响本机，可放心操作。"
+    : "当前使用线上真实账号、生产数据和外部平台，所有操作立即生效。");
 }
 
 main().catch(error => {

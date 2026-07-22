@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button, IconAction } from "../../ui/Button.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
+import { currentQuarterValue, quarterOptionsIncluding } from "./quarterOptions.js";
 
 function defaultForm(record, currentUser, defaults = {}) {
   return record ? { ...record } : {
@@ -13,7 +14,7 @@ function defaultForm(record, currentUser, defaults = {}) {
     owner: currentUser?.name || "",
     reviewerName: "周荣庆",
     executiveOwner: "周荣庆",
-    period: `${new Date().getFullYear()}-Q3`,
+    period: currentQuarterValue(),
     successStandard: "",
     dueDate: "",
     status: "draft"
@@ -36,6 +37,7 @@ export function DepartmentCommitmentModal({ open, record, defaults, milestones =
   }, [currentUser, defaults, milestones, open, record]);
   const set = patch => setForm(current => ({ ...current, ...patch }));
   const availableResults = requiredResults.filter(item => item.strategyId === form.strategyId && !item.archived);
+  const periodOptions = quarterOptionsIncluding(form.period);
   const patchMilestone = (index, patch) => setItems(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, ...patch } : item));
   const save = () => {
     if (!form.title.trim() || !form.strategyId || !form.requiredResultId || !form.department || !form.owner) return setError("请填写承诺名称、关联战略、必达结果、部门和负责人。");
@@ -54,7 +56,7 @@ export function DepartmentCommitmentModal({ open, record, defaults, milestones =
         <label>关联必达结果<select value={form.requiredResultId || ""} onChange={event => set({ requiredResultId: event.target.value })} disabled={!form.strategyId}><option value="">选择必达结果…</option>{availableResults.map(item => <option value={item.id} key={item.id}>{item.title}</option>)}</select></label>
         <label>责任部门<OrgSelect type="department" value={form.department || ""} onChange={department => set({ department })} orgCache={orgCache} placeholder="选择部门…" /></label>
         <label>部门负责人<OrgSelect type="user" value={form.owner || ""} onChange={owner => set({ owner })} orgCache={orgCache} placeholder="选择负责人…" /></label>
-        <label>承诺周期<select value={form.period || "2026-Q3"} onChange={event => set({ period: event.target.value })}>{["2026-Q3", "2026-Q4", "2027-Q1", "2027-Q2"].map(period => <option key={period}>{period}</option>)}</select></label>
+        <label>承诺周期<select value={form.period || periodOptions[0]} onChange={event => set({ period: event.target.value })}>{periodOptions.map(period => <option key={period}>{period}</option>)}</select></label>
         <label>最终截止<input type="date" value={form.dueDate || ""} onChange={event => set({ dueDate: event.target.value })} /></label>
         <label>总经办审核人<OrgSelect type="user" value={form.reviewerName || ""} onChange={reviewerName => set({ reviewerName })} orgCache={orgCache} placeholder="选择审核人…" /></label>
         <label>老板确认人<OrgSelect type="user" value={form.executiveOwner || ""} onChange={executiveOwner => set({ executiveOwner })} orgCache={orgCache} placeholder="选择确认人…" /></label>

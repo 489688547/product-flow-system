@@ -22,7 +22,7 @@
 .platform-connection-state.unavailable, .platform-connection-state.disabled { color: var(--text-tertiary); }
 .platform-connection-action { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; color: var(--accent); font-size: 12px; font-weight: 700; white-space: nowrap; }
 .platform-connection-row:disabled .platform-connection-action { color: var(--text-tertiary); font-weight: 600; }
-.platform-connection-back { width: fit-content; min-height: 32px; padding: 0; border: 0; background: transparent; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
+.platform-connection-back { width: fit-content; min-height: 40px; padding: 0; border: 0; background: transparent; color: var(--text-secondary); display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
 .platform-connection-back:hover { color: var(--text-primary); }
 .platform-connection-detail-head { min-height: 66px; display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); }
 .platform-connection-detail-head h2 { font-size: 18px; }

@@ -83,7 +83,60 @@ export function EcommerceOperationsAppPage({ section = "dashboard" }) {
       <section className="section-panel"><h2>方案推进</h2><div className="ops-card-list">{state.plans.length ? state.plans.map(plan => {
         const review = state.aiReviews.find(item => item.planId === plan.id);
         const planExecutions = state.executions.filter(item => item.planId === plan.id);
-        return <article className="ops-plan-card" key={plan.id}><div className="ops-card-heading"><div><strong>{plan.product || "未命名重点产品"}</strong><small>{plan.platform} · {plan.store} · {plan.ownerName}</small></div><span className={`status-badge ${plan.status}`}>{plan.status === "draft" ? "草稿" : plan.status === "submitted" ? "待审批" : plan.status === "approved" ? "执行中" : "已退回"}</span></div><p><b>目标：</b>{plan.goals?.join("；") || "—"}</p><p><b>关键问题：</b>{plan.issues?.join("；") || "—"}</p>{review ? <div className="ai-review"><b>{review.mode === "ai" ? "AI 点评" : "智能规则检查"}</b><p>{review.summary}</p>{review.suggestions?.map(item => <p key={item}>· {item}</p>)}</div> : null}<div className="table-actions"><Button type="button" onClick={() => reviewWithAi(plan).then(() => setFeedback("点评已生成，建议由运营优化后再提交。" )).catch(err => setFeedback(err.message))}>智能点评</Button>{plan.status === "draft" || plan.status === "returned" ? <Button type="button" onClick={() => act({ type: "submit_plan", id: plan.id }, "已提交主管审批。")}>提交主管</Button> : null}{manager && plan.status === "submitted" ? <><Button type="button" variant="primary" onClick={() => act({ type: "review_plan", id: plan.id, decision: "approved", reason: "主管确认方案逻辑和资源匹配" }, "方案已批准，进入执行。")}>批准</Button><Button type="button" onClick={() => act({ type: "review_plan", id: plan.id, decision: "returned", reason: "请补充数据基线和止损线" }, "方案已退回优化。")}>退回</Button></> : null}</div>{plan.status === "approved" ? <form className="ops-execution-form" onSubmit={e => { e.preventDefault(); act({ type: "append_execution", record: { ...execution, planId: plan.id, ownerId: plan.ownerId, ownerName: plan.ownerName } }, "执行与复盘记录已提交主管验收。" ); }}><h3>执行检查与复盘</h3><label>本次执行<textarea required value={execution.progress} onChange={e => setExecution({ ...execution, progress: e.target.value })} /></label><label>检测数据<input required value={execution.monitorData} onChange={e => setExecution({ ...execution, monitorData: e.target.value })} /></label><label>新问题与原因<input value={execution.issue} onChange={e => setExecution({ ...execution, issue: e.target.value })} /></label><label>下一步调整<input required value={execution.nextAction} onChange={e => setExecution({ ...execution, nextAction: e.target.value })} /></label><label>阶段复盘<textarea value={execution.review} onChange={e => setExecution({ ...execution, review: e.target.value })} /></label><Button variant="primary">提交执行记录</Button></form> : null}{planExecutions.map(item => <div className="ops-execution-item" key={item.id}><p><b>执行：</b>{item.progress}；<b>数据：</b>{item.monitorData}</p><p><b>下一步：</b>{item.nextAction}</p><span className="status-badge">{item.status}</span>{manager && item.status === "submitted" ? <div className="table-actions"><Button onClick={() => act({ type: "review_execution", id: item.id, decision: "accepted", reason: "执行结果和证据已核验" }, "执行记录已验收，可作为绩效证据。")}>验收</Button><Button onClick={() => act({ type: "review_execution", id: item.id, decision: "returned", reason: "检测数据或复盘不足" }, "执行记录已退回补充。")}>退回</Button></div> : null}</div>)}</article>;
+        return (
+          <article className="ops-plan-card" key={plan.id}>
+            <div className="ops-card-heading">
+              <div>
+                <strong>{plan.product || "未命名重点产品"}</strong>
+                <small>{plan.platform} · {plan.store} · {plan.ownerName}</small>
+              </div>
+              <span className={`status-badge ${plan.status}`}>{plan.status === "draft" ? "草稿" : plan.status === "submitted" ? "待审批" : plan.status === "approved" ? "执行中" : "已退回"}</span>
+            </div>
+            <p><b>目标：</b>{plan.goals?.join("；") || "—"}</p>
+            <p><b>关键问题：</b>{plan.issues?.join("；") || "—"}</p>
+            {review ? (
+              <div className="ai-review">
+                <b>{review.mode === "ai" ? "AI 点评" : "智能规则检查"}</b>
+                <p>{review.summary}</p>
+                {review.suggestions?.map(item => <p key={item}>· {item}</p>)}
+              </div>
+            ) : null}
+            <div className="table-actions">
+              <Button type="button" onClick={() => reviewWithAi(plan).then(() => setFeedback("点评已生成，建议由运营优化后再提交。")).catch(err => setFeedback(err.message))}>智能点评</Button>
+              {plan.status === "draft" || plan.status === "returned" ? <Button type="button" onClick={() => act({ type: "submit_plan", id: plan.id }, "已提交主管审批。")}>提交主管</Button> : null}
+              {manager && plan.status === "submitted" ? (
+                <>
+                  <Button type="button" variant="primary" onClick={() => act({ type: "review_plan", id: plan.id, decision: "approved", reason: "主管确认方案逻辑和资源匹配" }, "方案已批准，进入执行。")}>批准</Button>
+                  <Button type="button" onClick={() => act({ type: "review_plan", id: plan.id, decision: "returned", reason: "请补充数据基线和止损线" }, "方案已退回优化。")}>退回</Button>
+                </>
+              ) : null}
+            </div>
+            {plan.status === "approved" ? (
+              <form className="ops-execution-form" onSubmit={e => { e.preventDefault(); act({ type: "append_execution", record: { ...execution, planId: plan.id, ownerId: plan.ownerId, ownerName: plan.ownerName } }, "执行与复盘记录已提交主管验收。"); }}>
+                <h3>执行检查与复盘</h3>
+                <label>本次执行<textarea required value={execution.progress} onChange={e => setExecution({ ...execution, progress: e.target.value })} /></label>
+                <label>检测数据<input required value={execution.monitorData} onChange={e => setExecution({ ...execution, monitorData: e.target.value })} /></label>
+                <label>新问题与原因<input value={execution.issue} onChange={e => setExecution({ ...execution, issue: e.target.value })} /></label>
+                <label>下一步调整<input required value={execution.nextAction} onChange={e => setExecution({ ...execution, nextAction: e.target.value })} /></label>
+                <label>阶段复盘<textarea value={execution.review} onChange={e => setExecution({ ...execution, review: e.target.value })} /></label>
+                <Button variant="primary">提交执行记录</Button>
+              </form>
+            ) : null}
+            {planExecutions.map(item => (
+              <div className="ops-execution-item" key={item.id}>
+                <p><b>执行：</b>{item.progress}；<b>数据：</b>{item.monitorData}</p>
+                <p><b>下一步：</b>{item.nextAction}</p>
+                <span className="status-badge">{item.status}</span>
+                {manager && item.status === "submitted" ? (
+                  <div className="table-actions">
+                    <Button onClick={() => act({ type: "review_execution", id: item.id, decision: "accepted", reason: "执行结果和证据已核验" }, "执行记录已验收，可作为绩效证据。")}>验收</Button>
+                    <Button onClick={() => act({ type: "review_execution", id: item.id, decision: "returned", reason: "检测数据或复盘不足" }, "执行记录已退回补充。")}>退回</Button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </article>
+        );
       }) : <div className="empty-state">还没有重点产品方案。先把现状、目标和关键问题写清楚。</div>}</div></section>
     </div>
     </>

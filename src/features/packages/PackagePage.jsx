@@ -4,6 +4,7 @@ import { canDownloadDeliverable, deliverableExtension, deliverableKind, isBroken
 import { stripHtml } from "../../domain/productFlow.js";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button, IconAction } from "../../ui/Button.jsx";
+import { ConfirmDialog } from "../../ui/ConfirmDialog.jsx";
 import { DeliverablePreviewModal } from "../../ui/DeliverablePreviewModal.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
@@ -56,6 +57,7 @@ export function PackageFileManager({ product }) {
   const [error, setError] = useState("");
   const [previewFile, setPreviewFile] = useState(null);
   const [editingFile, setEditingFile] = useState(null);
+  const [fileToDelete, setFileToDelete] = useState(null);
   const inputRef = useRef(null);
   const files = (state.deliverables || []).filter(file => file.productId === product?.id);
 
@@ -73,7 +75,7 @@ export function PackageFileManager({ product }) {
   }
 
   const confirmDeleteFile = file => {
-    if (window.confirm("确认删除这个文件？删除后不可恢复。")) deleteDeliverable(file.id);
+    setFileToDelete(file);
   };
 
   return (
@@ -113,6 +115,17 @@ export function PackageFileManager({ product }) {
       {!files.length ? <div className="empty-state empty-panel"><FileImage size={24} aria-hidden="true" /><strong>这个产品还没有文件</strong><span>拖入文件后会显示在这里。</span></div> : null}
       <DeliverablePreviewModal file={previewFile} onClose={() => setPreviewFile(null)} />
       <DeliverableEditModal file={editingFile} onClose={() => setEditingFile(null)} onSave={patch => { updateDeliverable(editingFile.id, { name: patch.name.trim(), url: patch.url, content: patch.content }); setEditingFile(null); }} />
+      <ConfirmDialog
+        open={Boolean(fileToDelete)}
+        title="删除文件"
+        message={fileToDelete ? `确定删除“${fileToDelete.name}”？` : ""}
+        description="删除后不可恢复。"
+        onClose={() => setFileToDelete(null)}
+        onConfirm={() => {
+          deleteDeliverable(fileToDelete.id);
+          setFileToDelete(null);
+        }}
+      />
     </>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button } from "../../ui/Button.jsx";
 import { Modal } from "../../ui/Modal.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
+import { currentQuarterValue, quarterOptionsIncluding } from "./quarterOptions.js";
 
 const TITLES = {
   strategy: "年度战略",
@@ -12,7 +13,7 @@ const TITLES = {
 function initialForm(kind, record, context) {
   if (record) return { ...record };
   if (kind === "strategy") return { year: new Date().getFullYear(), status: "active" };
-  if (kind === "objective") return { strategyId: context.strategyId || "", quarter: `${new Date().getFullYear()}-Q3`, confidence: 70, departments: [] };
+  if (kind === "objective") return { strategyId: context.strategyId || "", quarter: currentQuarterValue(), confidence: 70, departments: [] };
   return { objectiveId: context.objectiveId || "", direction: "increase", unit: "%", baseline: 0, current: 0, target: 100, warningLine: 70, offTrackLine: 50, sourceType: "manual", sourceName: "负责人确认", frequencyDays: 7 };
 }
 
@@ -24,6 +25,7 @@ export function StrategyEditorModal({ open, kind, record, context = {}, orgCache
     setError("");
   }, [context.objectiveId, context.strategyId, kind, open, record]);
   const set = patch => setForm(current => ({ ...current, ...patch }));
+  const quarterOptions = quarterOptionsIncluding(form.quarter);
   const save = () => {
     const name = kind === "strategy" ? form.name : kind === "objective" ? form.title : form.name;
     if (!String(name || "").trim()) return setError(`请填写${TITLES[kind]}名称。`);
@@ -54,7 +56,7 @@ export function StrategyEditorModal({ open, kind, record, context = {}, orgCache
           <div className="form-grid">
             <label>季度目标<input name="objective-title" autoComplete="off" value={form.title || ""} onChange={event => set({ title: event.target.value })} placeholder="描述要实现的结果，而不是任务" /></label>
             <label>负责人<OrgSelect type="user" value={form.owner || ""} onChange={owner => set({ owner })} orgCache={orgCache} placeholder="选择负责人…" /></label>
-            <label>所属季度<select value={form.quarter || "2026-Q3"} onChange={event => set({ quarter: event.target.value })}>{["2026-Q1", "2026-Q2", "2026-Q3", "2026-Q4", "2027-Q1"].map(value => <option key={value}>{value}</option>)}</select></label>
+            <label>所属季度<select value={form.quarter || quarterOptions[0]} onChange={event => set({ quarter: event.target.value })}>{quarterOptions.map(value => <option key={value}>{value}</option>)}</select></label>
             <label>负责人信心<input type="number" min="0" max="100" value={form.confidence ?? ""} onChange={event => set({ confidence: Number(event.target.value) })} /></label>
             <label>参与部门<OrgSelect type="department" multiple searchInMenu value={(form.departments || []).join(" / ")} onChange={value => set({ departments: value.split(" / ").filter(Boolean) })} orgCache={orgCache} placeholder="选择参与部门…" /></label>
           </div>

@@ -35,8 +35,8 @@ export function SupplierWorkspace({ summary, canEdit, catalogItems = [] }) {
     { key: "scope", header: "供货范围", render: row => row.supplyScope || "—" },
     { key: "contact", header: "联系人", render: row => [row.contactName, row.contactPhone].filter(Boolean).join(" · ") || "—" },
     { key: "payment", header: "账期", render: row => row.paymentTerms || "—" },
-    { key: "paid", header: "累计实付", render: row => money(summaryBySupplier.get(row.id)?.actualPaid) },
-    { key: "funds", header: "库存资金", render: row => money(summaryBySupplier.get(row.id)?.adjustedInventoryFunds) },
+    { key: "paid", header: <span className="num">累计实付</span>, render: row => <span className="num">{money(summaryBySupplier.get(row.id)?.actualPaid)}</span> },
+    { key: "funds", header: <span className="num">库存资金</span>, render: row => <span className="num">{money(summaryBySupplier.get(row.id)?.adjustedInventoryFunds)}</span> },
     { key: "quality", header: "质量风险", render: row => {
       const openIssues = summaryBySupplier.get(row.id)?.openQualityIssues || 0;
       return <span><strong>{openIssues ? `${openIssues} 个未关闭` : "暂无未关闭问题"}</strong><small className="table-secondary">{openIssues >= 3 ? "建议降级或启用备选" : openIssues ? "持续跟进整改" : "质量状态稳定"}</small></span>;

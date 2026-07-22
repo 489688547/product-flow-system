@@ -2,7 +2,7 @@ import { Trash2 } from "lucide-react";
 import { Button } from "./Button.jsx";
 import { Modal } from "./Modal.jsx";
 
-export function ConfirmDialog({ open, title, message, description, confirmLabel = "删除", onClose, onConfirm }) {
+export function ConfirmDialog({ open, title, message, description, confirmLabel = "删除", confirmLoading = false, confirmLoadingLabel = "处理中…", onClose, onConfirm }) {
   return (
     <Modal
       title={title}
@@ -12,7 +12,7 @@ export function ConfirmDialog({ open, title, message, description, confirmLabel 
       footer={(
         <>
           <Button autoFocus onClick={onClose}>取消</Button>
-          <Button variant="danger" onClick={onConfirm}><Trash2 size={16} />{confirmLabel}</Button>
+          <Button variant="danger" disabled={confirmLoading} onClick={onConfirm}><Trash2 size={16} />{confirmLoading ? confirmLoadingLabel : confirmLabel}</Button>
         </>
       )}
     >

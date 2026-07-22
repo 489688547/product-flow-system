@@ -13,7 +13,7 @@
 .collaboration-tabs button[aria-selected="true"] { border-bottom-color: var(--primary); color: var(--primary); }
 .collaboration-tabs button:focus-visible,
 .collaboration-list-meta button:focus-visible,
-.collaboration-action-form > div > button:focus-visible { outline: 2px solid color-mix(in oklch, var(--accent), white 28%); outline-offset: -2px; }
+.collaboration-action-form > div > button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 
 .collaboration-filters { display: grid; grid-template-columns: minmax(240px, 1.5fr) repeat(3, minmax(130px, .65fr)) auto; align-items: end; gap: 10px; border: 1px solid var(--border); border-radius: var(--radius-panel); padding: 12px; background: var(--surface); }
 .collaboration-filters label { display: grid; gap: 5px; min-width: 0; color: var(--text-tertiary); font-size: 11px; font-weight: 650; }
