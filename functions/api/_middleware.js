@@ -16,12 +16,15 @@ const ALTERNATE_AUTH_PATHS = new Set([
   "/api/platform/v1/production-write-session",
   "/api/platform/v1/production-data/state",
   "/api/platform/v1/production-data/store-connections",
-  "/api/platform/v1/environment-readiness"
+  "/api/platform/v1/environment-readiness",
+  "/api/platform/v1/erp-collection/runners"
 ]);
 
 function usesHandlerBearerAuth(path) {
   return path === "/api/platform/v1/user-insights/collector"
     || path === "/api/platform/v1/user-insights/ingest"
+    || path === "/api/platform/v1/erp-collection/archives"
+    || path === "/api/platform/v1/erp-collection/ingest"
     || path.startsWith("/api/platform/v1/browser-agent/");
 }
 

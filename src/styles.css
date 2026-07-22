@@ -2040,6 +2040,26 @@ main { min-width: 0; overflow-x: hidden; }
 .data-service-intro > div span { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
 .data-service-intro > strong { color: var(--accent); font-size: 40px; font-variant-numeric: tabular-nums; }
 .data-service-intro > small { grid-column: 2; color: var(--text-tertiary); }
+.sales-data-service { display: grid; gap: var(--space-4); }
+.data-service-eyebrow { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
+.sales-data-service .section-head { margin: 0; }
+.sales-data-service .section-head .status-badge { display: inline-flex; align-items: center; gap: 5px; }
+.sales-service-coverage { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.sales-service-coverage > div { min-width: 0; padding: var(--space-3); display: grid; gap: 4px; border-right: 1px solid var(--border); }
+.sales-service-coverage > div:last-child { border-right: 0; }
+.sales-service-coverage span, .sales-service-result span, .sales-service-result small { color: var(--text-tertiary); font-size: 10px; }
+.sales-service-coverage strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.sales-service-query { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(360px, 1.5fr) auto; align-items: end; gap: var(--space-3); }
+.sales-service-query > label { display: grid; gap: 3px; color: var(--text-tertiary); font-size: 10px; font-weight: 700; }
+.sales-service-query select { width: 100%; height: var(--control-height); padding: 0 30px 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); }
+.sales-service-query .data-range-controls { display: grid; grid-template-columns: minmax(150px, 1fr) auto minmax(150px, 1fr); }
+.sales-service-query .btn { white-space: nowrap; }
+.sales-service-message { min-height: 46px; padding: var(--space-3); display: flex; align-items: center; border: 1px dashed var(--border-strong); border-radius: var(--radius-control); color: var(--text-secondary); background: var(--surface-subtle); font-size: 12px; }
+.sales-service-message.danger { border-style: solid; border-color: color-mix(in oklch, var(--danger), transparent 65%); color: var(--danger); background: var(--danger-soft); }
+.sales-service-result { display: grid; grid-template-columns: 1.5fr repeat(4, 1fr); overflow: hidden; border: 1px solid color-mix(in oklch, var(--accent), transparent 70%); border-radius: var(--radius-control); background: var(--accent-soft); }
+.sales-service-result > div { min-width: 0; min-height: 76px; padding: var(--space-3); display: grid; align-content: center; gap: 3px; border-right: 1px solid color-mix(in oklch, var(--accent), transparent 78%); }
+.sales-service-result > div:last-child { border-right: 0; }
+.sales-service-result strong { overflow: hidden; color: var(--text-primary); font-size: 17px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .ai-provider-settings { padding: 0; overflow: hidden; }
 .ai-provider-heading { margin: 0; padding: var(--space-4); align-items: flex-start; border-bottom: 1px solid var(--border); }
 .ai-provider-heading h2 { margin: 3px 0 4px; }
@@ -2333,6 +2353,11 @@ main { min-width: 0; overflow-x: hidden; }
   .data-health-grid > div, .data-quality-summary article { border-right: 0; border-bottom: 1px solid var(--border); }
   .data-health-grid > div:last-child, .data-quality-summary article:last-child { border-bottom: 0; }
   .data-service-intro { padding: var(--space-4); }
+  .sales-service-coverage, .sales-service-query, .sales-service-result { grid-template-columns: 1fr; }
+  .sales-service-coverage > div, .sales-service-result > div { border-right: 0; border-bottom: 1px solid var(--border); }
+  .sales-service-coverage > div:last-child, .sales-service-result > div:last-child { border-bottom: 0; }
+  .sales-service-query .data-range-controls { grid-template-columns: 1fr; }
+  .sales-service-query .btn { width: 100%; justify-content: center; }
   .data-source-form .btn { width: 100%; }
   .product-catalog-toolbar { grid-template-columns: 1fr; align-items: stretch; }
   .product-catalog-filters, .product-catalog-actions { align-items: stretch; flex-direction: column; }

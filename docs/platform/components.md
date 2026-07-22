@@ -10,6 +10,7 @@
 | `DataTable` / `TableActions` | 高密度结构化数据 | 表头不拆字，列宽稳定，窄屏水平滚动，操作不换行 |
 | `HeaderFilter` | 页面级轻量筛选 | 选项数量有限且不会遮挡页面主操作 |
 | `DatePickerField` | 标准日期输入 | 输出稳定日期格式，浮层不被表格裁切 |
+| `DateRangeControls` | 起止日期组合 | 复用 `DatePickerField`；只上报草稿值，是否查询由业务页面显式决定 |
 | `ExpectedLaunchMonthSelect` | 预计上市月份 | 只提供当前及未来月份，存储 `YYYY-MM` |
 | `ProductPicker` | 产品切换 | 保留显式选择，清楚展示当前产品和责任归属 |
 | `OrgSelect` | 钉钉部门或人员选择 | 不使用自由文本伪造组织成员，浮层通过安全层级展示 |

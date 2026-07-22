@@ -147,7 +147,7 @@ export function SalesDataSettings({ canEdit = false, currentUser }) {
       <div className="section-head settings-template-head">
         <div>
           <h2>销售数据源</h2>
-          <p>导入快麦ERP导出的《销售统计分析-按订单商品明细》Excel（导出时按<strong>付款时间</strong>筛选整月），系统自动按 69码×日×平台 聚合保存。</p>
+          <p>导入快麦ERP导出的《销售主题分析-按订单商品明细》或《销售统计分析-按订单商品明细》Excel（导出时按<strong>创建时间</strong>筛选整月），系统自动按 69码×日×平台 聚合保存。</p>
           <p className="sales-workflow-tip">建议每月导入两个文件：<strong>本月新数据 + 上月重新导出的数据</strong>。晚到的退款会更新在上月订单里，重导上月即可自动校准，不漏数据。</p>
         </div>
         {canEdit ? (
@@ -188,7 +188,7 @@ export function SalesDataSettings({ canEdit = false, currentUser }) {
         minWidth={720}
         columns={monthColumns}
         rows={monthRows}
-        empty={<div className="empty-state compact-empty">还没有导入过销售数据{canEdit ? "，每月从ERP按付款时间导出销售明细后在这里上传" : ""}</div>}
+        empty={<div className="empty-state compact-empty">还没有导入过销售数据{canEdit ? "，每月从ERP按创建时间导出销售明细后在这里上传" : ""}</div>}
       />
       {monthRows.length && meta.local ? <p className="muted sales-import-note">本地预览模式：数据保存在当前浏览器，未进入共享数据库。</p> : null}
     </section>

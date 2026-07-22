@@ -1,6 +1,7 @@
 import { AlertCircle, PackageCheck, Percent, RefreshCw, TrendingUp, WalletCards } from "lucide-react";
 import { DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
 import { Button } from "../../ui/Button.jsx";
+import { DateRangeControls } from "../../ui/DateRangeControls.jsx";
 
 const money = value => value == null ? "暂无结果" : `¥${Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
 const number = value => value == null ? "暂无结果" : Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
@@ -32,16 +33,6 @@ function resultReason(code) {
   return RESULT_REASONS[code] || "当前范围暂无可用结果";
 }
 
-function DateRange({ range, setRange }) {
-  return (
-    <div className="data-range-controls" aria-label="数据日期范围">
-      <label>开始日期<input type="date" value={range.from} max={range.to} onChange={event => setRange(current => ({ ...current, from: event.target.value }))} /></label>
-      <span>至</span>
-      <label>截止日期<input type="date" value={range.to} min={range.from} onChange={event => setRange(current => ({ ...current, to: event.target.value }))} /></label>
-    </div>
-  );
-}
-
 function Trend({ rows }) {
   const maximum = Math.max(...rows.map(row => row.netSales), 1);
   return (
@@ -63,7 +54,7 @@ export function DataOverview({ factViews, quality, range, setRange, salesMeta, m
     <div className="data-workspace">
       <section className="data-basis-strip">
         <div><strong>订单创建时间</strong><span>Asia/Shanghai · 默认当月至截止昨天 · 日常口径排除“其它”</span></div>
-        <DateRange range={range} setRange={setRange} />
+        <DateRangeControls range={range} setRange={setRange} idPrefix="overview-range" />
       </section>
       {compatibilityRollback ? <section className="data-metric-state updating" role="alert"><AlertCircle size={17} /><span><strong>兼容回滚口径</strong><small>当前仅临时读取旧销售事实摘要；共享口径定义、结果、版本和审计均未删除。</small></span><span className="status-badge warning">临时模式</span></section> : updating || failed || metricError || missingCount ? <section className={`data-metric-state ${failed || metricError ? "danger" : updating ? "updating" : "neutral"}`} role={failed || metricError ? "alert" : "status"}>
         <AlertCircle size={17} /><span><strong>{updating ? "统一口径正在更新" : failed || metricError ? "统一口径结果读取失败" : `还有 ${missingCount} 项口径暂无结果`}</strong><small>{updating ? "旧批次结果继续保留；新批次完整成功后才会切换。" : resultReason(metricError?.code || runForRange?.errorCode || "RESULT_NOT_AVAILABLE")}</small></span>
