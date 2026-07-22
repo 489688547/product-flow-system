@@ -1,11 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { dataCenterApiUrl, dataCenterRangeFromSearch, dataCenterSalesApiUrl, loadDataCenterSales, loadDataCenterState } from "../src/state/dataCenterApi.js";
+import { dataCenterApiUrl, dataCenterRangeFromSearch, dataCenterSalesApiUrl, loadDataCenterSales, loadDataCenterState, requestSalesRepair } from "../src/state/dataCenterApi.js";
 
 test("data center API URLs are stable and date scoped", () => {
   assert.equal(dataCenterApiUrl(), "/api/data-center");
   assert.equal(dataCenterSalesApiUrl({ from: "2026-07-01", to: "2026-07-17" }), "/api/data-center/sales?from=2026-07-01&to=2026-07-17");
+});
+
+test("sales anomaly repair uses an explicit authenticated POST", async () => {
+  const calls = [];
+  const payload = await requestSalesRepair("2026-07-21", async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({ synced: true, scheduled: true, run: { status: "running", attempts: 1 } }), { status: 202 });
+  });
+  assert.equal(calls[0].url, "/api/platform/v1/data-services/sales-repair");
+  assert.equal(calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { date: "2026-07-21" });
+  assert.equal(payload.run.status, "running");
 });
 
 test("data center preview accepts a valid date range from the page query", () => {

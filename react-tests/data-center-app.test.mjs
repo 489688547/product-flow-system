@@ -81,6 +81,9 @@ test("governance workspaces merge quality into sync and use the focused AI model
   assert.match(page, /sync: <SyncRunsWorkspace quality=\{quality\} \/>/);
   assert.match(workspaces, /export function SyncRunsWorkspace\(\{ quality \}\)/);
   assert.match(workspaces, /待处理问题[\s\S]*执行记录[\s\S]*待处理数据问题/);
+  assert.match(workspaces, /quality\.latestSalesAnomaly/);
+  assert.match(workspaces, /自动补拉/);
+  assert.match(workspaces, /重新导入快麦官方文件/);
   assert.doesNotMatch(workspaces, /<h2>同步记录<\/h2>/);
   assert.match(workspaces, /collaborationDraftFromDataIssue/);
   assert.match(workspaces, /refresh/);

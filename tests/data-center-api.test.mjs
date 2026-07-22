@@ -60,6 +60,16 @@ function createD1Mock() {
             return { results: [...records.values()].filter(row => row.entity_type === collection) };
           }
           if (/from product_sales_daily/i.test(sql)) {
+            if (/group by date/i.test(sql)) {
+              const grouped = new Map();
+              sales.filter(row => !["其它", "其他", "未知", "未知平台", ""].includes(row.platform)).forEach(row => {
+                const item = grouped.get(row.date) || { date: row.date, sales: 0, qty: 0 };
+                item.sales += row.sales;
+                item.qty += row.qty;
+                grouped.set(row.date, item);
+              });
+              return { results: [...grouped.values()].sort((left, right) => right.date.localeCompare(left.date)).slice(0, 8) };
+            }
             const [from, to] = statement.values;
             return { results: sales.filter(row => row.date >= from && row.date <= to && !["其它", "其他", "未知", "未知平台", ""].includes(row.platform)) };
           }
@@ -240,6 +250,10 @@ test("data center sales uses creation-date range and excludes Other", async () =
   assert.equal(payload.meta.excludeOther, true);
   assert.equal(payload.meta.lastSuccessfulSyncAt, "2026-07-18T00:10:00.000Z");
   assert.equal(payload.meta.latestDataDate, "2026-07-17");
+  assert.deepEqual(payload.meta.latestDailyFacts, [
+    { date: "2026-07-16", sales: 120, qty: 2 },
+    { date: "2026-07-17", sales: 80, qty: 1 }
+  ]);
 });
 
 test("data center sales validates date range and permissions", async () => {

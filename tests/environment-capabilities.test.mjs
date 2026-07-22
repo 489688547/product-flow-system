@@ -49,6 +49,13 @@ test("platform credential vault declares its root secret migration and affected 
 
   const kuaimai = manifest.capabilities.find(entry => entry.id === "kuaimai-sales-sync");
   assert.equal(kuaimai.envVars.includes("KUAIMAI_ACCESS_TOKEN"), true);
+  assert.equal(kuaimai.tables.includes("data_sync_runs"), true);
+  assert.match(kuaimai.description, /自动补拉/);
+
+  const registry = JSON.parse(readFileSync(resolve(root, "docs/platform/integration-registry.json"), "utf8"));
+  const kuaimaiRegistry = registry.platforms.find(entry => entry.id === "kuaimai");
+  assert.equal(kuaimaiRegistry.apiRoutes.includes("/api/platform/v1/data-services/sales-repair"), true);
+  assert.equal(kuaimaiRegistry.codePaths.includes("functions/api/platform/v1/data-services/sales-repair.js"), true);
 });
 
 test("Pages declares explicit local Preview and Production D1 environment parity", () => {

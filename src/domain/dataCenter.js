@@ -416,6 +416,50 @@ export function buildDataCenterSalesFactViews(rows = [], options = {}) {
   };
 }
 
+function median(values) {
+  const ordered = values.map(number).sort((left, right) => left - right);
+  if (!ordered.length) return 0;
+  const middle = Math.floor(ordered.length / 2);
+  return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
+}
+
+export function detectLatestSalesAnomaly(latestDailyFacts = [], threshold = 0.25) {
+  const facts = latestDailyFacts
+    .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(String(item?.date || "")))
+    .map(item => ({ date: String(item.date), sales: number(item.sales), qty: number(item.qty) }))
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .slice(-8);
+  const latest = facts.at(-1);
+  if (!latest) return { status: "empty", code: "SALES_COMPLETENESS_NO_DATA", date: "", baselineDays: 0, threshold };
+  const baseline = facts.slice(0, -1).slice(-7);
+  if (baseline.length < 3) {
+    return {
+      status: "insufficient_baseline",
+      code: "SALES_COMPLETENESS_BASELINE_INSUFFICIENT",
+      date: latest.date,
+      baselineDays: baseline.length,
+      threshold
+    };
+  }
+  const salesMedian = median(baseline.map(item => item.sales));
+  const qtyMedian = median(baseline.map(item => item.qty));
+  const salesRatio = salesMedian > 0 ? round(latest.sales / salesMedian, 4) : 1;
+  const qtyRatio = qtyMedian > 0 ? round(latest.qty / qtyMedian, 4) : 1;
+  return {
+    status: salesRatio < threshold && qtyRatio < threshold ? "anomaly" : "healthy",
+    code: salesRatio < threshold && qtyRatio < threshold ? "SALES_LATEST_DAY_INCOMPLETE" : "SALES_LATEST_DAY_COMPLETE",
+    date: latest.date,
+    sales: latest.sales,
+    qty: latest.qty,
+    baselineDays: baseline.length,
+    salesMedian,
+    qtyMedian,
+    salesRatio,
+    qtyRatio,
+    threshold
+  };
+}
+
 export function buildDataQualitySummary({ state, salesMeta, salesRows } = {}) {
   const normalized = normalizeDataCenterState(state);
   const latestRowDate = (salesRows || []).reduce((latest, row) => {

@@ -1,6 +1,6 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
-import { useEffect, useMemo } from "react";
-import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS, previousDataCenterRange } from "../../domain/dataCenter.js";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS, detectLatestSalesAnomaly, previousDataCenterRange } from "../../domain/dataCenter.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
@@ -12,6 +12,7 @@ import { ProductCatalogWorkspace } from "./ProductCatalogWorkspace.jsx";
 import { useDataStandards } from "../../state/DataStandardsProvider.jsx";
 import { DataStandardsWorkspace } from "./data-standards/DataStandardsWorkspace.jsx";
 import { AiModelWorkspace } from "./AiModelWorkspace.jsx";
+import { requestSalesRepair } from "../../state/dataCenterApi.js";
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据、趋势和平台分布。"],
@@ -34,7 +35,9 @@ function formatChineseDate(value) {
 
 export function DataCenterAppPage({ section = "overview", dataAccessCategory = "" }) {
   const { user } = useAuth();
-  const { state, range, setRange, salesRows, salesMeta, loading, error } = useDataCenter();
+  const { state, range, setRange, salesRows, salesMeta, loading, error, refresh } = useDataCenter();
+  const [repairRunState, setRepairRunState] = useState(null);
+  const repairTracking = useRef({ date: "", requests: 0, polls: 0 });
   const {
     results,
     run,
@@ -58,16 +61,41 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
     .map(result => [result.metricCode, Number(result.version)])), [range.from, range.to, results]);
   const comparisonVersionsReady = overviewMetricCodes.every(metricCode => comparisonTargetVersions[metricCode] >= 1);
   const comparisonVersionKey = overviewMetricCodes.map(metricCode => `${metricCode}:${comparisonTargetVersions[metricCode] || ""}`).join("|");
-  const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
+  const latestSalesAnomaly = useMemo(() => detectLatestSalesAnomaly(salesMeta.latestDailyFacts || []), [salesMeta.latestDailyFacts]);
+  const persistedRepairRun = useMemo(() => state.syncRuns
+    .filter(item => item.id === `kuaimai-sales-repair:${latestSalesAnomaly.date}:sales-completeness-v1`)
+    .sort((left, right) => String(right.updatedAt || right.completedAt || right.startedAt || "").localeCompare(String(left.updatedAt || left.completedAt || left.startedAt || "")))[0] || null,
+  [latestSalesAnomaly.date, state.syncRuns]);
+  const repairRun = useMemo(() => [persistedRepairRun, repairRunState].filter(Boolean)
+    .sort((left, right) => String(right.updatedAt || right.completedAt || right.startedAt || "").localeCompare(String(left.updatedAt || left.completedAt || left.startedAt || "")))[0] || null,
+  [persistedRepairRun, repairRunState]);
+  const canRepairSales = user?.role !== "readonly" && (user?.role === "executive" || String(user?.department || user?.departmentName || "")
+    .split(/\s*(?:\/|、|,|，|;|；|\|)\s*/).some(item => ["总经办", "运营部", "运营"].includes(item)));
+  const quality = useMemo(() => ({
+    ...buildDataQualitySummary({ state, salesMeta, salesRows }),
+    latestSalesAnomaly,
+    repairRun
+  }), [latestSalesAnomaly, repairRun, salesMeta, salesRows, state]);
   const dataHealthIssueCount = quality.openIssues + quality.unmappedProducts + quality.syncAttentionCount;
   const latestDataDate = formatChineseDate(quality.latestDataDate);
   const dataHealthUnavailable = Boolean(error || metricError || comparisonError);
-  const dataHealthOkay = Boolean(latestDataDate) && !dataHealthUnavailable && dataHealthIssueCount === 0;
-  const dataHealthLabel = dataHealthOkay
-    ? `✅ 数据截取到 ${latestDataDate}`
-    : dataHealthUnavailable
+  const repairRunning = latestSalesAnomaly.status === "anomaly" && repairRun?.status === "running";
+  const repairExhausted = latestSalesAnomaly.status === "anomaly" && (repairRun?.status === "manual_required" || repairRun?.status === "success" || Number(repairRun?.attempts) >= 2);
+  const completenessVerified = latestSalesAnomaly.status === "healthy";
+  const dataHealthOkay = Boolean(latestDataDate) && completenessVerified && !dataHealthUnavailable && dataHealthIssueCount === 0;
+  const dataHealthLabel = latestSalesAnomaly.status === "anomaly"
+    ? repairRunning
+      ? `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据异常 · 自动补拉中`
+      : repairExhausted
+        ? `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}自动补拉失败 · 处理数据异常`
+        : `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据疑似不完整 · 正在自动处理`
+    : dataHealthOkay
+      ? `✅ 数据截取到 ${latestDataDate}`
+      : dataHealthUnavailable
       ? `⚠️ 数据读取异常${latestDataDate ? ` · 截取到 ${latestDataDate}` : ""}`
-      : dataHealthIssueCount
+      : !completenessVerified && latestDataDate
+        ? `⚠️ 数据截取到 ${latestDataDate} · 完整性待校验`
+        : dataHealthIssueCount
         ? `⚠️ 数据同步有 ${dataHealthIssueCount} 项待处理${latestDataDate ? ` · 截取到 ${latestDataDate}` : ""}`
         : "⚠️ 暂无可用数据";
   useEffect(() => {
@@ -75,6 +103,36 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
     scheduleEnsureResults(range, overviewMetricCodes);
     if (comparisonVersionsReady) scheduleComparisonResults(comparisonRange, overviewMetricCodes, comparisonTargetVersions);
   }, [comparisonRange.from, comparisonRange.to, comparisonVersionKey, comparisonVersionsReady, range.from, range.to, scheduleComparisonResults, scheduleEnsureResults, section]);
+  useEffect(() => {
+    const date = latestSalesAnomaly.date;
+    if (repairTracking.current.date !== date) repairTracking.current = { date, requests: 0, polls: 0 };
+    if (section !== "overview" || legacyOverviewRollback || !canRepairSales || salesMeta.local || latestSalesAnomaly.status !== "anomaly") return undefined;
+    if (repairRun?.status === "manual_required" || repairRun?.status === "success" || Number(repairRun?.attempts) >= 2) return undefined;
+    if (repairRun?.status === "running") {
+      if (repairTracking.current.polls >= 12) return undefined;
+      const timer = setTimeout(() => {
+        repairTracking.current.polls += 1;
+        refresh();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+    if (repairTracking.current.requests >= 2) return undefined;
+    let active = true;
+    repairTracking.current.requests += 1;
+    requestSalesRepair(date).then(payload => {
+      if (!active) return;
+      if (payload.run) setRepairRunState({ ...payload.run, updatedAt: payload.run.updatedAt || new Date().toISOString() });
+      const timer = setTimeout(refresh, 2000);
+      repairTracking.current.refreshTimer = timer;
+    }).catch(requestError => {
+      if (!active) return;
+      setRepairRunState({ date, status: "failed", attempts: repairTracking.current.requests, message: requestError.message, updatedAt: new Date().toISOString() });
+    });
+    return () => {
+      active = false;
+      if (repairTracking.current.refreshTimer) clearTimeout(repairTracking.current.refreshTimer);
+    };
+  }, [canRepairSales, latestSalesAnomaly.date, latestSalesAnomaly.status, refresh, repairRun?.attempts, repairRun?.status, salesMeta.local, section]);
   const retryMetricResults = async () => {
     try {
       const current = await ensureResults(range, overviewMetricCodes);

@@ -6,11 +6,55 @@ import {
   buildDataQualitySummary,
   createDefaultDataCenterState,
   defaultDataCenterRange,
+  detectLatestSalesAnomaly,
   filterOperationalSales,
   normalizeDataCenterState,
   reduceDataCenterState,
   summarizeDataCenterSales
 } from "../src/domain/dataCenter.js";
+
+test("latest sales day is incomplete only when GMV and quantity are both below 25 percent of the seven-day median", () => {
+  const facts = [
+    ["2026-07-14", 100, 10],
+    ["2026-07-15", 120, 12],
+    ["2026-07-16", 110, 11],
+    ["2026-07-17", 130, 13],
+    ["2026-07-18", 90, 9],
+    ["2026-07-19", 105, 10],
+    ["2026-07-20", 115, 12],
+    ["2026-07-21", 20, 2]
+  ].map(([date, sales, qty]) => ({ date, sales, qty }));
+
+  assert.deepEqual(detectLatestSalesAnomaly(facts), {
+    status: "anomaly",
+    code: "SALES_LATEST_DAY_INCOMPLETE",
+    date: "2026-07-21",
+    sales: 20,
+    qty: 2,
+    baselineDays: 7,
+    salesMedian: 110,
+    qtyMedian: 11,
+    salesRatio: 0.1818,
+    qtyRatio: 0.1818,
+    threshold: 0.25
+  });
+
+  const onlySalesLow = facts.map(item => item.date === "2026-07-21" ? { ...item, qty: 4 } : item);
+  assert.equal(detectLatestSalesAnomaly(onlySalesLow).status, "healthy");
+});
+
+test("latest sales completeness does not infer an anomaly without three baseline days", () => {
+  assert.deepEqual(detectLatestSalesAnomaly([
+    { date: "2026-07-20", sales: 100, qty: 10 },
+    { date: "2026-07-21", sales: 1, qty: 1 }
+  ]), {
+    status: "insufficient_baseline",
+    code: "SALES_COMPLETENESS_BASELINE_INSUFFICIENT",
+    date: "2026-07-21",
+    baselineDays: 1,
+    threshold: 0.25
+  });
+});
 
 test("data center keeps legacy metric definitions read-only and out of generic persistence", () => {
   assert.ok(createDefaultDataCenterState().metricDefinitions.length > 0);

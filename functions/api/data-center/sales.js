@@ -56,6 +56,20 @@ async function latestDataDate(db) {
   return String(row?.latest_data_date || "");
 }
 
+async function latestDailyFacts(db) {
+  const result = await db.prepare(`SELECT date, COALESCE(SUM(sales), 0) AS sales, COALESCE(SUM(qty), 0) AS qty
+    FROM product_sales_daily
+    WHERE TRIM(COALESCE(platform, '')) NOT IN ('', '其它', '其他', '未知', '未知平台')
+    GROUP BY date
+    ORDER BY date DESC
+    LIMIT 8`).all();
+  return (result?.results || []).map(row => ({
+    date: String(row.date || ""),
+    sales: Number(row.sales) || 0,
+    qty: Number(row.qty) || 0
+  })).reverse();
+}
+
 export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (request.method !== "GET") return errorResponse("Method not allowed", 405, "VALIDATION_METHOD_NOT_ALLOWED");
@@ -81,9 +95,10 @@ export async function onRequest({ request, env, data = {} }) {
         AND TRIM(COALESCE(platform, '')) NOT IN ('', '其它', '其他', '未知', '未知平台')
       ORDER BY date, platform, code`).bind(from, to).all();
     const rows = (result?.results || []).map(mapRow);
-    const [lastSyncAt, latestDate] = await Promise.all([
+    const [lastSyncAt, latestDate, dailyFacts] = await Promise.all([
       lastSuccessfulSyncAt(db),
-      latestDataDate(db)
+      latestDataDate(db),
+      latestDailyFacts(db)
     ]);
     return jsonResponse({
       synced: true,
@@ -96,7 +111,8 @@ export async function onRequest({ request, env, data = {} }) {
         timezone: "Asia/Shanghai",
         excludeOther: true,
         lastSuccessfulSyncAt: lastSyncAt,
-        latestDataDate: latestDate
+        latestDataDate: latestDate,
+        latestDailyFacts: dailyFacts
       }
     });
   } catch (error) {

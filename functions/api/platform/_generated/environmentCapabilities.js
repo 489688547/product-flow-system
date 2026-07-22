@@ -203,9 +203,10 @@ const environmentCapabilities = {
     {
       "id": "kuaimai-sales-sync",
       "name": "快麦销售同步",
-      "description": "按订单创建时间拉取快麦订单、刷新会话并保存销售日聚合所需配置。",
+      "description": "按订单创建时间拉取快麦订单、刷新会话、保存销售日聚合，并对疑似截断的最新日执行幂等自动补拉。",
       "platforms": [
         "kuaimai",
+        "cloudflare-pages",
         "cloudflare-d1"
       ],
       "requiredIn": [
@@ -223,7 +224,8 @@ const environmentCapabilities = {
       ],
       "tables": [
         "product_sales_daily",
-        "product_sales_meta"
+        "product_sales_meta",
+        "data_sync_runs"
       ]
     },
     {

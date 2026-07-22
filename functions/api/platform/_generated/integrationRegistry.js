@@ -104,10 +104,11 @@ const integrationRegistry = {
       "id": "kuaimai",
       "name": "快麦开放平台",
       "status": "integrating",
-      "summary": "开放平台按订单创建时间拉取订单，并由数据中心分页读取 ERP 商品列表和组合详情；历史补数仍以快麦后台官方导出文件为准，D1 保存归档清单、共享商品目录和业务投影。",
+      "summary": "开放平台按订单创建时间拉取订单，对疑似截断的最新销售日进行幂等完整分页补拉，并由数据中心分页读取 ERP 商品列表和组合详情；历史补数与退款校准仍以快麦后台官方导出文件为准。",
       "capabilities": [
         "官方文件历史补数",
         "订单创建时间口径",
+        "异常日自动补拉",
         "本地原始文件归档",
         "最小索引幂等落库",
         "导入批次与异常审计",
@@ -127,6 +128,7 @@ const integrationRegistry = {
         "三个月内订单与归档订单如何完整导出",
         "快麦连接失败",
         "订单同步缺失",
+        "最新销售日疑似截断如何自动修复",
         "ERP 商品或库存单位编码未同步",
         "组合商品比例未同步",
         "库存和出入库数据如何补录",
@@ -146,6 +148,8 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/api/kuaimai/**",
+        "functions/api/platform/v1/data-services/sales-repair.js",
+        "functions/api/platform/v1/data-services/_shared/salesRepair.js",
         "functions/api/platform/v1/erp-collection/**",
         "functions/api/platform/v1/product-catalog.js",
         "functions/api/platform/v1/product-catalog/**",
@@ -186,6 +190,7 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/kuaimai/",
         "/api/sales",
+        "/api/platform/v1/data-services/sales-repair",
         "/api/platform/v1/erp-collection/ingest",
         "/api/platform/v1/erp-collection/archives",
         "/api/platform/v1/erp-collection/runners",
@@ -202,6 +207,8 @@ const integrationRegistry = {
       ],
       "evidence": [
         "functions/api/kuaimai/",
+        "functions/api/platform/v1/data-services/sales-repair.js",
+        "functions/api/platform/v1/data-services/_shared/salesRepair.js",
         "functions/api/platform/v1/erp-collection/ingest.js",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
@@ -217,6 +224,7 @@ const integrationRegistry = {
         "src/features/settings/KuaimaiSyncSettings.jsx",
         "scripts/kuaimai-erp-collector/core.mjs",
         ".agents/skills/kuaimai-erp-data-collection/SKILL.md",
+        "docs/platform/apis/sales-data-repair-v1.md",
         "docs/platform/apis/erp-collection-v1.md",
         "docs/features/kuaimai-erp-history/prd.md",
         "migrations/0006_product_catalog_components.sql",
@@ -322,7 +330,8 @@ const integrationRegistry = {
         "凭证加密服务",
         "加密平台连接",
         "用户洞察共享 API",
-        "共享数据口径"
+        "共享数据口径",
+        "销售异常后台修复"
       ],
       "businessQuestions": [
         "构建或部署失败",
@@ -376,6 +385,7 @@ const integrationRegistry = {
         "/api/platform/v1/credential-vault",
         "/api/platform/v1/data-standards",
         "/api/platform/v1/data-services/sales",
+        "/api/platform/v1/data-services/sales-repair",
         "/api/platform/v1/production-write-session",
         "/api/platform/v1/production-data/",
         "/api/platform/v1/user-insights",
@@ -425,6 +435,7 @@ const integrationRegistry = {
         "登录会话",
         "组织数据",
         "销售聚合",
+        "销售异常修复任务",
         "共享商品目录",
         "用户洞察标准事实",
         "用户洞察部门规则",
@@ -523,6 +534,7 @@ const integrationRegistry = {
         "/api/sales",
         "/api/data-center",
         "/api/platform/v1/data-services/sales",
+        "/api/platform/v1/data-services/sales-repair",
         "/api/platform/v1/product-catalog",
         "/api/platform/v1/product-catalog/import",
         "/api/platform/v1/product-catalog/sync/kuaimai",

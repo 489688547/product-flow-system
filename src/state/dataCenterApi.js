@@ -22,6 +22,10 @@ export function dataCenterSalesApiUrl({ from, to }) {
   return `/api/data-center/sales?${params}`;
 }
 
+export function salesRepairApiUrl() {
+  return "/api/platform/v1/data-services/sales-repair";
+}
+
 async function payloadFor(response, fallbackMessage, { allowUnsynced = false } = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || (!allowUnsynced && payload.synced === false)) {
@@ -75,4 +79,13 @@ export async function loadDataCenterSales({ from, to, codes = [], fetchImpl = fe
     const payload = await payloadFor(response, "数据中心销售数据加载失败。");
     return { rows: payload.rows || [], meta: payload.meta || {}, local: false };
   });
+}
+
+export async function requestSalesRepair(date, fetchImpl = fetch) {
+  const response = await fetchImpl(salesRepairApiUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ date })
+  });
+  return payloadFor(response, "销售数据自动补拉任务创建失败。");
 }
