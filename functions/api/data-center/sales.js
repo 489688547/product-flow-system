@@ -1,5 +1,6 @@
 import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
 import { ensureSalesTables, salesDatabase } from "../sales.js";
+import { normalizeDataCenterStorageError } from "./_shared/errors.js";
 
 const VIEW_DEPARTMENTS = new Set(["总经办", "运营部", "财务部", "产品部", "供应链部", "供应链", "供应链团队", "采购部"]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -50,6 +51,25 @@ async function lastSuccessfulSyncAt(db) {
   }
 }
 
+async function latestDataDate(db) {
+  const row = await db.prepare("SELECT MAX(date) AS latest_data_date FROM product_sales_daily").first();
+  return String(row?.latest_data_date || "");
+}
+
+async function latestDailyFacts(db) {
+  const result = await db.prepare(`SELECT date, COALESCE(SUM(sales), 0) AS sales, COALESCE(SUM(qty), 0) AS qty
+    FROM product_sales_daily
+    WHERE TRIM(COALESCE(platform, '')) NOT IN ('', '其它', '其他', '未知', '未知平台')
+    GROUP BY date
+    ORDER BY date DESC
+    LIMIT 8`).all();
+  return (result?.results || []).map(row => ({
+    date: String(row.date || ""),
+    sales: Number(row.sales) || 0,
+    qty: Number(row.qty) || 0
+  })).reverse();
+}
+
 export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (request.method !== "GET") return errorResponse("Method not allowed", 405, "VALIDATION_METHOD_NOT_ALLOWED");
@@ -75,6 +95,11 @@ export async function onRequest({ request, env, data = {} }) {
         AND TRIM(COALESCE(platform, '')) NOT IN ('', '其它', '其他', '未知', '未知平台')
       ORDER BY date, platform, code`).bind(from, to).all();
     const rows = (result?.results || []).map(mapRow);
+    const [lastSyncAt, latestDate, dailyFacts] = await Promise.all([
+      lastSuccessfulSyncAt(db),
+      latestDataDate(db),
+      latestDailyFacts(db)
+    ]);
     return jsonResponse({
       synced: true,
       rows,
@@ -85,10 +110,13 @@ export async function onRequest({ request, env, data = {} }) {
         timeBasis: "create_time",
         timezone: "Asia/Shanghai",
         excludeOther: true,
-        lastSuccessfulSyncAt: await lastSuccessfulSyncAt(db)
+        lastSuccessfulSyncAt: lastSyncAt,
+        latestDataDate: latestDate,
+        latestDailyFacts: dailyFacts
       }
     });
   } catch (error) {
-    return errorResponse(error.message || "销售数据读取失败。", error.status || 500, "INTERNAL_UNEXPECTED", true);
+    const normalized = normalizeDataCenterStorageError(error, "销售数据读取失败。");
+    return errorResponse(normalized.message, normalized.status, normalized.code, normalized.retryable);
   }
 }

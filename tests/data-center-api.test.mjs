@@ -60,6 +60,16 @@ function createD1Mock() {
             return { results: [...records.values()].filter(row => row.entity_type === collection) };
           }
           if (/from product_sales_daily/i.test(sql)) {
+            if (/group by date/i.test(sql)) {
+              const grouped = new Map();
+              sales.filter(row => !["其它", "其他", "未知", "未知平台", ""].includes(row.platform)).forEach(row => {
+                const item = grouped.get(row.date) || { date: row.date, sales: 0, qty: 0 };
+                item.sales += row.sales;
+                item.qty += row.qty;
+                grouped.set(row.date, item);
+              });
+              return { results: [...grouped.values()].sort((left, right) => right.date.localeCompare(left.date)).slice(0, 8) };
+            }
             const [from, to] = statement.values;
             return { results: sales.filter(row => row.date >= from && row.date <= to && !["其它", "其他", "未知", "未知平台", ""].includes(row.platform)) };
           }
@@ -68,6 +78,7 @@ function createD1Mock() {
         async first() {
           if (/from data_center_meta/i.test(sql)) return meta.has(statement.values[0]) ? { value: meta.get(statement.values[0]) } : null;
           if (/from product_sales_meta/i.test(sql)) return { payload: JSON.stringify({ imports: [{ importedAt: "2026-07-18T00:10:00.000Z" }], titles: {} }) };
+          if (/max\(date\)[\s\S]*from product_sales_daily/i.test(sql)) return { latest_data_date: sales.reduce((latest, row) => row.date > latest ? row.date : latest, "") };
           return null;
         }
       };
@@ -77,6 +88,19 @@ function createD1Mock() {
       batchSizes.push(statements.length);
       return Promise.all(statements.map(statement => statement.run()));
     }
+  };
+}
+
+function createDisconnectedD1Mock() {
+  const fail = async () => {
+    throw new Error("D1_ERROR: Failed to parse body as JSON, got: Error: Network connection lost.");
+  };
+  return {
+    prepare() {
+      const statement = { bind: () => statement, run: fail, all: fail, first: fail };
+      return statement;
+    },
+    batch: fail
   };
 }
 
@@ -113,6 +137,28 @@ test("data center API requires a session, allowed department and D1", async () =
 
   const missingD1 = await onDataCenterRequest({ request: new Request("https://flow.example.com/api/data-center"), env: {}, data: { session: executive } });
   assert.equal(missingD1.status, 501);
+});
+
+test("data center routes hide transient D1 internals behind a retryable storage error", async () => {
+  const contexts = [
+    {
+      handler: onDataCenterRequest,
+      request: new Request("https://flow.example.com/api/data-center")
+    },
+    {
+      handler: onSalesRequest,
+      request: new Request("https://flow.example.com/api/data-center/sales?from=2026-07-01&to=2026-07-21")
+    }
+  ];
+  for (const context of contexts) {
+    const response = await context.handler({ request: context.request, env: { PRODUCT_FLOW_DB: createDisconnectedD1Mock() }, data: { session: executive } });
+    const payload = await response.json();
+    assert.equal(response.status, 503);
+    assert.equal(payload.error.code, "DATA_STORAGE_TEMPORARILY_UNAVAILABLE");
+    assert.equal(payload.error.retryable, true);
+    assert.equal(payload.message, "线上数据库连接暂时中断，请稍后重试。");
+    assert.doesNotMatch(JSON.stringify(payload), /D1_ERROR|Network connection lost|entry\.worker/);
+  }
 });
 
 test("data center metadata round-trips by collection without credentials", async () => {
@@ -203,6 +249,11 @@ test("data center sales uses creation-date range and excludes Other", async () =
   assert.equal(payload.meta.timezone, "Asia/Shanghai");
   assert.equal(payload.meta.excludeOther, true);
   assert.equal(payload.meta.lastSuccessfulSyncAt, "2026-07-18T00:10:00.000Z");
+  assert.equal(payload.meta.latestDataDate, "2026-07-17");
+  assert.deepEqual(payload.meta.latestDailyFacts, [
+    { date: "2026-07-16", sales: 120, qty: 2 },
+    { date: "2026-07-17", sales: 80, qty: 1 }
+  ]);
 });
 
 test("data center sales validates date range and permissions", async () => {

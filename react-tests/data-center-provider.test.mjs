@@ -1,11 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import { dataCenterApiUrl, dataCenterRangeFromSearch, dataCenterSalesApiUrl, loadDataCenterSales, loadDataCenterState } from "../src/state/dataCenterApi.js";
+import { dataCenterApiUrl, dataCenterRangeFromSearch, dataCenterSalesApiUrl, loadDataCenterSales, loadDataCenterState, requestSalesRepair } from "../src/state/dataCenterApi.js";
 
 test("data center API URLs are stable and date scoped", () => {
   assert.equal(dataCenterApiUrl(), "/api/data-center");
   assert.equal(dataCenterSalesApiUrl({ from: "2026-07-01", to: "2026-07-17" }), "/api/data-center/sales?from=2026-07-01&to=2026-07-17");
+});
+
+test("sales anomaly repair uses an explicit authenticated POST", async () => {
+  const calls = [];
+  const payload = await requestSalesRepair("2026-07-21", async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({ synced: true, scheduled: true, run: { status: "running", attempts: 1 } }), { status: 202 });
+  });
+  assert.equal(calls[0].url, "/api/platform/v1/data-services/sales-repair");
+  assert.equal(calls[0].options.method, "POST");
+  assert.deepEqual(JSON.parse(calls[0].options.body), { date: "2026-07-21" });
+  assert.equal(payload.run.status, "running");
 });
 
 test("data center preview accepts a valid date range from the page query", () => {
@@ -45,6 +57,36 @@ test("sales loader uses shared data center endpoint when available", async () =>
   assert.equal(payload.local, false);
 });
 
+test("data center read clients retry one transient storage outage", async () => {
+  let salesAttempts = 0;
+  const sales = await loadDataCenterSales({
+    from: "2026-07-01",
+    to: "2026-07-21",
+    fetchImpl: async () => {
+      salesAttempts += 1;
+      if (salesAttempts === 1) return new Response(JSON.stringify({
+        message: "线上数据库连接暂时中断，请稍后重试。",
+        error: { code: "DATA_STORAGE_TEMPORARILY_UNAVAILABLE", retryable: true }
+      }), { status: 503 });
+      return new Response(JSON.stringify({ rows: [], meta: { latestDataDate: "2026-07-21" } }), { status: 200 });
+    }
+  });
+  assert.equal(salesAttempts, 2);
+  assert.equal(sales.meta.latestDataDate, "2026-07-21");
+
+  let metadataAttempts = 0;
+  const metadata = await loadDataCenterState(async () => {
+    metadataAttempts += 1;
+    if (metadataAttempts === 1) return new Response(JSON.stringify({
+      message: "线上数据库连接暂时中断，请稍后重试。",
+      error: { code: "DATA_STORAGE_TEMPORARILY_UNAVAILABLE", retryable: true }
+    }), { status: 503 });
+    return new Response(JSON.stringify({ synced: true, state: { sources: [] } }), { status: 200 });
+  });
+  assert.equal(metadataAttempts, 2);
+  assert.deepEqual(metadata.state.sources, []);
+});
+
 test("sales loader falls back to browser repository only when shared storage is unavailable", async () => {
   const fallbackCodes = [];
   const payload = await loadDataCenterSales({
@@ -66,6 +108,7 @@ test("sales loader falls back to browser repository only when shared storage is 
   assert.equal(payload.local, true);
   assert.equal(payload.meta.timeBasis, "create_time");
   assert.equal(payload.meta.excludeOther, true);
+  assert.equal(payload.meta.latestDataDate, "2026-07-16");
 });
 
 test("provider derives SKU codes, debounces metadata and never persists sales rows in localStorage", () => {

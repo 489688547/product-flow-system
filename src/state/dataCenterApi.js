@@ -22,19 +22,37 @@ export function dataCenterSalesApiUrl({ from, to }) {
   return `/api/data-center/sales?${params}`;
 }
 
+export function salesRepairApiUrl() {
+  return "/api/platform/v1/data-services/sales-repair";
+}
+
 async function payloadFor(response, fallbackMessage, { allowUnsynced = false } = {}) {
   const payload = await response.json().catch(() => ({}));
   if (!response.ok || (!allowUnsynced && payload.synced === false)) {
     const error = new Error(payload.message || fallbackMessage);
     error.status = response.status;
+    error.code = payload.error?.code || "INTERNAL_UNEXPECTED";
+    error.retryable = Boolean(payload.error?.retryable);
     throw error;
   }
   return payload;
 }
 
+async function retryDataCenterRead(operation) {
+  try {
+    return await operation();
+  } catch (error) {
+    if (!error?.retryable || Number(error?.status || 0) < 500) throw error;
+    await new Promise(resolve => setTimeout(resolve, 250));
+    return operation();
+  }
+}
+
 export async function loadDataCenterState(fetchImpl = fetch) {
-  const response = await fetchImpl(dataCenterApiUrl());
-  return payloadFor(response, "数据中心元数据加载失败。", { allowUnsynced: true });
+  return retryDataCenterRead(async () => {
+    const response = await fetchImpl(dataCenterApiUrl());
+    return payloadFor(response, "数据中心元数据加载失败。", { allowUnsynced: true });
+  });
 }
 
 export async function saveDataCenterState(state, fetchImpl = fetch) {
@@ -47,15 +65,27 @@ export async function saveDataCenterState(state, fetchImpl = fetch) {
 }
 
 export async function loadDataCenterSales({ from, to, codes = [], fetchImpl = fetch, fallback }) {
-  const response = await fetchImpl(dataCenterSalesApiUrl({ from, to }));
-  if ([404, 405, 501].includes(response.status) && fallback) {
-    const rows = filterOperationalSales(await fallback(codes)).filter(row => row.date >= from && row.date <= to);
-    return {
-      rows,
-      local: true,
-      meta: { from, to, rowCount: rows.length, timeBasis: "create_time", timezone: "Asia/Shanghai", excludeOther: true, lastSuccessfulSyncAt: "" }
-    };
-  }
-  const payload = await payloadFor(response, "数据中心销售数据加载失败。");
-  return { rows: payload.rows || [], meta: payload.meta || {}, local: false };
+  return retryDataCenterRead(async () => {
+    const response = await fetchImpl(dataCenterSalesApiUrl({ from, to }));
+    if ([404, 405, 501].includes(response.status) && fallback) {
+      const rows = filterOperationalSales(await fallback(codes)).filter(row => row.date >= from && row.date <= to);
+      const latestDataDate = rows.reduce((latest, row) => row.date > latest ? row.date : latest, "");
+      return {
+        rows,
+        local: true,
+        meta: { from, to, rowCount: rows.length, timeBasis: "create_time", timezone: "Asia/Shanghai", excludeOther: true, lastSuccessfulSyncAt: "", latestDataDate }
+      };
+    }
+    const payload = await payloadFor(response, "数据中心销售数据加载失败。");
+    return { rows: payload.rows || [], meta: payload.meta || {}, local: false };
+  });
+}
+
+export async function requestSalesRepair(date, fetchImpl = fetch) {
+  const response = await fetchImpl(salesRepairApiUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ date })
+  });
+  return payloadFor(response, "销售数据自动补拉任务创建失败。");
 }

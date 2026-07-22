@@ -8,7 +8,7 @@ import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapt
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
 
-const STATUS_LABELS = { healthy: "正常", pending_validation: "待验证", waiting_verification: "等待人工验证", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", disabled: "未启用" };
+const STATUS_LABELS = { healthy: "正常", success: "成功", pending_validation: "待验证", waiting_verification: "等待人工验证", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", disabled: "未启用" };
 
 function statusLabel(status) {
   return STATUS_LABELS[status] || status || "未启用";
@@ -35,11 +35,21 @@ export function SyncRunsWorkspace({ quality }) {
     return () => { active = false; };
   }, []);
   const cards = [["待处理问题", quality.openIssues], ["待确认商品映射", quality.unmappedProducts], ["本期口径排除", quality.excludedRows]];
+  const salesAnomaly = quality.latestSalesAnomaly;
+  const repairRun = quality.repairRun;
+  const salesRepairMessage = repairRun?.status === "running"
+    ? `系统正在自动补拉，已开始第 ${repairRun.attempts || 1} 次尝试。`
+    : repairRun?.status === "manual_required"
+      ? "当天已有更完整的退款明细，请重新导入快麦官方文件。"
+      : Number(repairRun?.attempts) >= 2
+        ? "自动补拉已连续失败，请检查快麦连接或重新导入快麦官方文件。"
+        : "系统将先自动补拉；补拉失败后再转人工处理。";
   return <div className="data-workspace data-sync-workspace">
     <div className="data-sync-status-bar">
       <div className="data-quality-summary" aria-label="数据质量摘要">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
       <Button onClick={refresh}><RefreshCw size={16} />刷新状态</Button>
     </div>
+    {salesAnomaly?.status === "anomaly" ? <section className="section-panel" role="alert"><div className="section-head"><div><h2>{salesAnomaly.date} 销售数据疑似不完整</h2><p>GMV 为近 7 个有效日中位数的 {(salesAnomaly.salesRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，销量为 {(salesAnomaly.qtyRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，均低于 25% 警戒线。</p></div><span className={`status-badge ${repairRun?.status === "running" ? "warning" : "danger"}`}>{statusLabel(repairRun?.status || "pending_validation")}</span></div><p className="sales-service-message danger">{salesRepairMessage}</p></section> : null}
     <section className="section-panel"><div className="section-head"><div><h2>快麦原始归档</h2><p>公司 Mac 保存原文件，线上只显示安全清单和入库状态；归档成功不等于已经入库。</p></div><span className={`status-badge ${archiveError ? "danger" : archives.length ? "success" : "neutral"}`}>{archiveLoading ? "读取中" : archiveError ? "读取失败" : archives.length ? `${archives.length} 个归档文件` : "等待导出"}</span></div>
       {archiveError ? <div className="sales-service-message danger" role="alert">{archiveError}</div> : null}
       {!archiveLoading && !archiveError ? <DataTable minWidth={760} columns={[

@@ -108,6 +108,13 @@
 - `DATA_SERVICE_DATE_RANGE_INVALID`：销售数据服务只收到一个日期，或日期非法、倒置、超出服务上限。
 - `DATA_SERVICE_QUERY_FAILED`：销售数据服务读取或聚合 D1 失败，可重试。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
+- `DATA_STORAGE_TEMPORARILY_UNAVAILABLE`：D1 远程读取链路暂时中断；不暴露 Miniflare 或 D1 底层错误，GET 客户端可自动重试一次。
+- `SALES_REPAIR_DATE_INVALID`：自动补拉日期不是合法自然日。
+- `SALES_REPAIR_SCHEDULE_FAILED`：修复任务未能安全建立，可重试；原销售事实未修改。
+- `SALES_REPAIR_PROVIDER_NOT_CONFIGURED` / `SALES_REPAIR_PROVIDER_FAILED`：快麦配置缺失或调用失败，原销售事实保留。
+- `SALES_REPAIR_PAGINATION_INCOMPLETE`：快麦分页未到 `hasNext=false`，禁止写入。
+- `SALES_REPAIR_RICH_FACTS_PROTECTED`：当天存在退款明细，API 不覆盖，需重新导入官方文件。
+- `SALES_REPAIR_STILL_INCOMPLETE` / `SALES_REPAIR_ROWS_INVALID`：补拉后仍低于基准或行数据不满足安全写入条件，原事实保留。
 - `DATA_CONNECTOR_INVALID`：连接器 ID、字段、URL、保险箱类型或敏感字段边界不合法。
 - `DATA_CONNECTOR_NOT_FOUND`：连接实例不存在、已归档或对当前身份不可见。
 - `DATA_CONNECTOR_VERSION_CONFLICT`：连接实例或保险箱条目版本已经更新，HTTP 409。
