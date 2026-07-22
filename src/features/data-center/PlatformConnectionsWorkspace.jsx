@@ -9,8 +9,9 @@ import {
   RefreshCw,
   ShieldCheck
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PLATFORM_CONNECTION_DEFINITIONS } from "../../domain/platformConnections.js";
+import { createTransientRevealGate } from "../../state/transientRevealGate.js";
 import { Button } from "../../ui/Button.jsx";
 import "./platform-connections.css";
 
@@ -66,6 +67,21 @@ function ConnectionField({ field, value, configured, disabled, onChange }) {
   );
 }
 
+function RevealedConnectionField({ field, value }) {
+  const [showValue, setShowValue] = useState(false);
+  return (
+    <label className="platform-connection-field">
+      <span className="platform-connection-label"><strong>{field.label}</strong><small>仅本页暂时显示</small></span>
+      <span className="platform-connection-input">
+        <input type={showValue ? "text" : "password"} value={value} readOnly autoComplete="off" spellCheck="false" />
+        <button type="button" aria-label={showValue ? `隐藏${field.label}` : `显示${field.label}`} onClick={() => setShowValue(shown => !shown)}>
+          {showValue ? <EyeOff size={16} aria-hidden="true" /> : <Eye size={16} aria-hidden="true" />}
+        </button>
+      </span>
+    </label>
+  );
+}
+
 function statusText(connection, definition) {
   if (!definition.available) return STATUS_LABELS.unavailable;
   return STATUS_LABELS[connection?.status] || STATUS_LABELS.unconfigured;
@@ -108,7 +124,20 @@ function PlatformConnectionList({ definitions, connections, onSelect, buttonRefs
   );
 }
 
-function PlatformConnectionForm({ definition, connection, canManage, onBack, onConflict, onSave, onDisable, backLabel = "返回数据接入" }) {
+function PlatformConnectionForm({
+  definition,
+  connection,
+  canManage,
+  onBack,
+  onConflict,
+  onSave,
+  onDisable,
+  onReveal,
+  onConnectionChange,
+  showBackButton = true,
+  revealActive = true,
+  backLabel = "返回数据接入"
+}) {
   const [draft, setDraft] = useState(() => Object.fromEntries(definition.fields.map(field => [field.key, ""])));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -116,21 +145,62 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
   const [notice, setNotice] = useState("");
   const [confirmDisable, setConfirmDisable] = useState(false);
   const [confirmBack, setConfirmBack] = useState(false);
+  const [confirmReveal, setConfirmReveal] = useState(false);
+  const [revealPurpose, setRevealPurpose] = useState("");
+  const [revealConfirmation, setRevealConfirmation] = useState("");
+  const [revealBusy, setRevealBusy] = useState(false);
+  const [revealError, setRevealError] = useState("");
+  const [revealed, setRevealed] = useState(null);
   const resultRef = useRef(null);
+  const revealGateRef = useRef(null);
+  if (!revealGateRef.current) revealGateRef.current = createTransientRevealGate();
   const changedFields = useMemo(() => Object.fromEntries(Object.entries(draft).filter(([, value]) => value.trim())), [draft]);
   const changed = Object.keys(changedFields).length > 0;
   const configured = new Set(connection?.configuredFields || []);
   const canDisable = canManage && connection?.source === "vault" && connection?.enabled;
+  const canReveal = canDisable && typeof onReveal === "function";
+  const clearRevealed = useCallback(() => {
+    revealGateRef.current.invalidate();
+    setRevealBusy(false);
+    setRevealed(null);
+    setRevealPurpose("");
+    setRevealConfirmation("");
+    setConfirmReveal(false);
+    setRevealError("");
+  }, []);
+
+  useEffect(() => {
+    if (!revealed?.expiresAt) return undefined;
+    const delay = Math.max(0, Date.parse(revealed.expiresAt) - Date.now());
+    const timer = setTimeout(clearRevealed, delay);
+    return () => clearTimeout(timer);
+  }, [clearRevealed, revealed?.expiresAt]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) clearRevealed();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, [clearRevealed]);
+
+  useEffect(() => {
+    if (!revealActive) clearRevealed();
+  }, [clearRevealed, revealActive]);
+
+  useEffect(() => () => revealGateRef.current.invalidate(), []);
 
   async function handleSave(event) {
     event.preventDefault();
     if (!changed || busy) return;
+    clearRevealed();
     setBusy(true);
     setError("");
     setRequestId("");
     setNotice("");
     try {
       await onSave({ platformId: definition.id, expectedVersion: connection?.version || 0, fields: changedFields });
+      await onConnectionChange?.();
       setDraft(Object.fromEntries(definition.fields.map(field => [field.key, ""])));
       setNotice("连接已验证并启用。");
       requestAnimationFrame(() => resultRef.current?.focus());
@@ -158,11 +228,13 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
   }
 
   async function handleDisable() {
+    clearRevealed();
     setBusy(true);
     setError("");
     setNotice("");
     try {
       await onDisable({ platformId: definition.id, expectedVersion: connection?.version || 0 });
+      await onConnectionChange?.();
       setConfirmDisable(false);
       setNotice("连接已停用，系统将使用原有回退配置（如有）。");
       requestAnimationFrame(() => resultRef.current?.focus());
@@ -174,9 +246,35 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
     }
   }
 
+  async function handleReveal() {
+    if (!canReveal || revealBusy) return;
+    const revealRequest = revealGateRef.current.begin();
+    setRevealBusy(true);
+    setRevealError("");
+    try {
+      const result = await onReveal({
+        platformId: definition.id,
+        purpose: revealPurpose,
+        confirmation: revealConfirmation,
+        signal: revealRequest.signal
+      });
+      if (!revealGateRef.current.accepts(revealRequest, { active: revealActive, hidden: document.hidden })) return;
+      setRevealed(result);
+      setConfirmReveal(false);
+      setRevealPurpose("");
+      setRevealConfirmation("");
+    } catch (nextError) {
+      if (nextError?.name === "AbortError" || !revealGateRef.current.accepts(revealRequest, { active: revealActive, hidden: document.hidden })) return;
+      setRevealError(nextError?.message || "已保存内容查看失败。");
+      setRequestId(nextError?.requestId || "");
+    } finally {
+      if (revealGateRef.current.accepts(revealRequest, { active: revealActive, hidden: document.hidden })) setRevealBusy(false);
+    }
+  }
+
   return (
     <div className="platform-connection-detail">
-      <button type="button" className="platform-connection-back" disabled={busy} onClick={handleBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</button>
+      {showBackButton ? <button type="button" className="platform-connection-back" disabled={busy} onClick={handleBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</button> : null}
       {confirmBack ? (
         <div className="platform-connection-disable-confirm" role="alert">
           <div><strong>放弃本次填写？</strong><p>尚未保存的连接信息会被清空。</p></div>
@@ -191,7 +289,7 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
 
       <div className="platform-connection-detail-grid">
         <form className="platform-connection-form" onSubmit={handleSave}>
-          <div className="platform-connection-form-head"><div><h3>连接信息</h3><p>只填写需要新增或更换的内容，已保存信息不会显示。</p></div></div>
+          <div className="platform-connection-form-head"><div><h3>连接信息</h3><p>只填写需要新增或更换的内容；已保存内容默认隐藏。</p></div></div>
           {!canManage ? <p className="platform-connection-permission"><ShieldCheck size={16} aria-hidden="true" />仅最高权限管理员可以修改平台连接。</p> : null}
           <fieldset disabled={!canManage || busy}>
             {definition.fields.map(field => (
@@ -210,7 +308,24 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
               {busy ? <RefreshCw size={16} aria-hidden="true" /> : <ShieldCheck size={16} aria-hidden="true" />}{busy ? "正在验证…" : "保存并验证"}
             </Button>
             {canDisable ? <Button type="button" className="quiet-danger" disabled={busy} onClick={() => setConfirmDisable(true)}>停用连接</Button> : null}
+            {canReveal ? <Button type="button" disabled={busy || revealBusy} onClick={() => { clearRevealed(); setConfirmReveal(true); }}><Eye size={16} aria-hidden="true" />显示已保存内容</Button> : null}
           </div>
+          {confirmReveal ? (
+            <div className="platform-connection-reveal-confirm" role="group" aria-labelledby="platform-reveal-title">
+              <div><strong id="platform-reveal-title">确认查看灵算凭据</strong><p>请说明用途并输入确认语。查看行为会被审计，内容将在 5 分钟后或离开页面时清除。</p></div>
+              <label>本次查看用途<input value={revealPurpose} maxLength={200} autoComplete="off" onChange={event => setRevealPurpose(event.target.value)} /></label>
+              <label>确认语<input value={revealConfirmation} autoComplete="off" placeholder="输入：查看灵算凭据" onChange={event => setRevealConfirmation(event.target.value)} /></label>
+              <span><Button type="button" onClick={clearRevealed} disabled={revealBusy}>取消</Button><Button type="button" variant="primary" onClick={handleReveal} disabled={revealBusy || !revealPurpose.trim() || revealConfirmation !== "查看灵算凭据"}>{revealBusy ? "正在读取…" : "确认查看"}</Button></span>
+              {revealError ? <p className="platform-connection-message error" role="alert">{revealError}{requestId ? <small>请求编号：{requestId}</small> : null}</p> : null}
+            </div>
+          ) : null}
+          {revealed?.fields ? (
+            <div className="platform-connection-revealed">
+              <div><strong>已保存内容</strong><p role="status">仅当前页面暂时可见，最迟 5 分钟后自动清除。</p></div>
+              {definition.fields.filter(field => revealed.fields[field.key]).map(field => <RevealedConnectionField key={field.key} field={field} value={revealed.fields[field.key]} />)}
+              <Button type="button" onClick={clearRevealed}>立即隐藏</Button>
+            </div>
+          ) : null}
           {confirmDisable ? (
             <div className="platform-connection-disable-confirm" role="alert">
               <div><strong>确认停用当前连接？</strong><p>停用后会自动使用原有回退配置；没有回退时相关能力将不可用。</p></div>
@@ -229,7 +344,7 @@ function PlatformConnectionForm({ definition, connection, canManage, onBack, onC
             <div><dt>最近验证</dt><dd>{connection?.verifiedAt ? new Date(connection.verifiedAt).toLocaleString("zh-CN") : "尚未验证"}</dd></div>
             <div><dt>更新人</dt><dd>{connection?.verifiedBy || "—"}</dd></div>
           </dl>
-          <div className="platform-connection-security"><ShieldCheck size={18} aria-hidden="true" /><div><strong>安全保存</strong><p>已保存内容不会回显。每次更换都先验证，失败不会影响正在使用的连接。</p></div></div>
+          <div className="platform-connection-security"><ShieldCheck size={18} aria-hidden="true" /><div><strong>安全保存</strong><p>已保存内容默认隐藏；最高权限明确确认后可临时查看。每次更换都先验证，失败不会影响正在使用的连接。</p></div></div>
         </aside>
       </div>
     </div>
@@ -241,6 +356,9 @@ export function PlatformConnectionsWorkspace({
   platformIds = PLATFORM_CONNECTION_DEFINITIONS.map(item => item.id),
   initialPlatformId = "",
   embedded = false,
+  showBackButton = true,
+  revealActive = true,
+  onConnectionChange,
   controller,
   onBack
 }) {
@@ -255,6 +373,8 @@ export function PlatformConnectionsWorkspace({
   const refresh = controller?.refresh;
   const save = controller?.save;
   const disable = controller?.disable;
+  const reveal = controller?.reveal;
+  const effectiveCanManage = controller?.canManage ?? canManage;
   useEffect(() => {
     const allowed = new Set(platformIdKey.split("|").filter(Boolean));
     setSelectedId(current => {
@@ -278,7 +398,9 @@ export function PlatformConnectionsWorkspace({
     return <PlatformConnectionForm
       definition={definition}
       connection={connection}
-      canManage={canManage}
+      canManage={effectiveCanManage}
+      showBackButton={showBackButton}
+      revealActive={revealActive}
       onBack={() => {
         if (embedded) onBack?.();
         else { setReturnFocusId(definition.id); setSelectedId(""); }
@@ -286,6 +408,8 @@ export function PlatformConnectionsWorkspace({
       onConflict={() => refresh?.()}
       onSave={save}
       onDisable={disable}
+      onReveal={reveal}
+      onConnectionChange={onConnectionChange}
     />;
   }
   return (

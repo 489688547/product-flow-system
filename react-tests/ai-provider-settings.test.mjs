@@ -12,7 +12,7 @@ test("AI model workspace mounts the governed AI Provider settings in a disclosur
   assert.match(workspace, /<AiProviderSettings\b[^>]*\/>/);
 });
 
-test("Provider settings expose safe metadata without credential inputs", () => {
+test("Provider settings embed the Lingsuan vault without the cancelled data-access link", () => {
   const settings = read("src/features/data-center/AiProviderSettings.jsx");
   assert.match(settings, /loadAiProvider/);
   assert.match(settings, /saveAiProvider/);
@@ -26,10 +26,15 @@ test("Provider settings expose safe metadata without credential inputs", () => {
   assert.match(settings, /阻止外发/);
   assert.match(settings, /canManage/);
   assert.match(settings, /统一公司 AI/);
-  assert.match(settings, /前往数据接入配置连接/);
-  assert.match(settings, /#\/data-sources\/company/);
-  assert.doesNotMatch(settings, /type=["']password["']/);
-  assert.doesNotMatch(settings, /apiKey|API_KEY|LINGSUAN_API_KEY/);
+  assert.match(settings, /PlatformConnectionsWorkspace/);
+  assert.match(settings, /usePlatformConnections/);
+  assert.match(settings, /platformIds=\{\["lingsuan-ai-gateway"\]\}/);
+  assert.match(settings, /initialPlatformId="lingsuan-ai-gateway"/);
+  assert.match(settings, /showBackButton=\{false\}/);
+  assert.match(settings, /revealActive=\{active\}/);
+  assert.doesNotMatch(settings, /前往数据接入配置连接/);
+  assert.doesNotMatch(settings, /#\/data-sources\/company/);
+  assert.doesNotMatch(settings, /LINGSUAN_API_KEY/);
 });
 
 test("Provider API hides infrastructure errors while preserving safe guidance", async () => {
@@ -48,7 +53,7 @@ test("Provider API hides infrastructure errors while preserving safe guidance", 
       message: "server internals",
       error: { code: "AI_PROVIDER_SECRET_MISSING" }
     }), { status: 409 })),
-    error => error.message === "请先在数据接入中配置模型服务凭据。" && error.code === "AI_PROVIDER_SECRET_MISSING"
+    error => error.message === "请先在 AI 大模型的模型与安全设置中配置灵算凭据。" && error.code === "AI_PROVIDER_SECRET_MISSING"
   );
 });
 

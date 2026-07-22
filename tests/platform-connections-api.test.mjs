@@ -65,8 +65,8 @@ function createD1Mock() {
               const expectedVersion = statement.values.at(-1);
               if (!current || Number(current.version) !== Number(expectedVersion)) return { success: true, meta: { changes: 0 } };
             }
-            const [id, , action, changedFields, result, requestId, actorId, actorName, createdAt] = statement.values;
-            audits.push({ id, platform_id: auditPlatformId, action, changed_fields: changedFields, result, request_id: requestId, actor_id: actorId, actor_name: actorName, created_at: createdAt });
+            const [id, , action, changedFields, result, requestId, actorId, actorName, purpose, createdAt] = statement.values;
+            audits.push({ id, platform_id: auditPlatformId, action, changed_fields: changedFields, result, request_id: requestId, actor_id: actorId, actor_name: actorName, purpose, created_at: createdAt });
             return { success: true, meta: { changes: 1 } };
           }
           return { success: true, meta: { changes: 1 } };

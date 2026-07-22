@@ -3,7 +3,7 @@ const SAFE_ERROR_MESSAGES = Object.freeze({
   AI_SESSION_REQUIRED: "请先使用钉钉登录。",
   AI_PROVIDER_MANAGE_DENIED: "仅总经办可维护 AI 模型服务。",
   AI_PROVIDER_TEST_DENIED: "仅总经办可测试 AI 模型服务。",
-  AI_PROVIDER_SECRET_MISSING: "请先在数据接入中配置模型服务凭据。",
+  AI_PROVIDER_SECRET_MISSING: "请先在 AI 大模型的模型与安全设置中配置灵算凭据。",
   AI_PROVIDER_NOT_READY: "模型服务尚未准备好。",
   AI_PROVIDER_AUTH_FAILED: "模型服务认证失败，请检查公司级连接。",
   AI_PROVIDER_RATE_LIMITED: "模型服务请求较多，请稍后重试。",

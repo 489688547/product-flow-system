@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   disablePlatformConnection,
   loadPlatformConnections,
+  revealPlatformConnection,
   savePlatformConnection
 } from "./platformConnectionsApi.js";
 
@@ -9,6 +10,7 @@ export function usePlatformConnections() {
   const [connections, setConnections] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [canManage, setCanManage] = useState(false);
 
   const replaceConnection = useCallback(next => {
     setConnections(current => [
@@ -24,6 +26,7 @@ export function usePlatformConnections() {
     try {
       const payload = await loadPlatformConnections();
       setConnections(payload.connections || []);
+      setCanManage(payload.canManage === true);
       return payload.connections || [];
     } catch (nextError) {
       setError(nextError?.message || "平台连接暂时无法读取。");
@@ -45,5 +48,7 @@ export function usePlatformConnections() {
     replaceConnection(await disablePlatformConnection(input))
   ), [replaceConnection]);
 
-  return { connections, loading, error, refresh, save, disable };
+  const reveal = useCallback(input => revealPlatformConnection(input), []);
+
+  return { connections, canManage, loading, error, refresh, save, disable, reveal };
 }

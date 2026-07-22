@@ -67,6 +67,9 @@ test("AI model workspace confirms custom dates and renders aggregate-only govern
   assert.match(workspace, /Skill 用量/);
   assert.match(workspace, /DataTable/);
   assert.match(workspace, /<details/);
+  assert.match(workspace, /onToggle/);
+  assert.match(workspace, /settingsOpen/);
+  assert.match(workspace, /<AiProviderSettings onStatusChange=\{handleProviderStatus\} active=\{settingsOpen\}/);
   assert.match(workspace, /模型与安全设置/);
   assert.match(workspace, /页面只展示汇总，不展示员工排行、提示词或回答内容/);
   assert.match(workspace, /AI 使用统计加载失败/);
