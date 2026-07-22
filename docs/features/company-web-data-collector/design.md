@@ -1,0 +1,99 @@
+# 公司网页数据采集器设计
+
+## 用户任务
+
+数据负责人启用一个内置平台 adapter、首次登录独立采集 Chrome，并确认每天 05:00 自动采集是否成功；日常只处理登录失效、验证和页面改版等异常。
+
+## 信息层级
+
+主信息是今天哪些 provider/resource 成功、失败或等待人工，以及公司 Mac 是否在线。辅助信息是业务日期、当前阶段、耗时、记录数、批次和下次动作。历史运行、选择器版本和通知记录默认折叠。
+
+## 页面结构
+
+复用数据中心“数据接入”管理 adapter，复用“数据同步”展示设备、任务和运行。首期不新增左侧导航。快麦卡片是第一个启用的网页采集 adapter，未适配平台显示能力边界而不是虚假连接状态。
+
+## 交互流程
+
+管理员启用 adapter 后，系统打开独立公司采集 Chrome 的固定登录页。用户完成首次登录；采集器不读取凭据。每天 05:00 后台任务自动运行，成功记录折叠；失败任务置顶并显示 Mac 通知。人工完成登录或验证后无需点击“重试”，下一轮自动恢复相同任务。
+
+## 组件复用
+
+- 复用 `scripts/data-connection-agent/chrome.mjs` 启动独立 Profile。
+- 复用 `scripts/user-insights-collector/chrome-devtools.mjs` 的 CDP 连接和页面复用能力，并扩展受限导航、DOM 交互和下载目录。
+- 复用快麦 `scanner.mjs`、`archive.mjs`、ingest API、归档清单和领域投影。
+- 复用数据中心同步卡片、状态徽标、表格、空态、错误态和人工配合动作。
+- 现有 `browser_agent_tasks` 只服务带凭据的一次性连接身份识别，`user_insight_sync_runs` 只服务市场页面采集；两者不承担长期通用日计划，避免混入不兼容状态和权限。
+
+## 新增组件
+
+- `scripts/web-data-collector/schedule.mjs`：纯函数计算上海时区任务、补跑、资源范围和幂等键。
+- `scripts/web-data-collector/browser.mjs`：封装白名单导航、受限 DOM 动作、下载目录、登录/验证检测和超时。
+- `scripts/web-data-collector/orchestrator.mjs`：领取任务并串联 adapter、下载、解析、入库、状态和通知。
+- `scripts/web-data-collector/notification.mjs`：发送无敏感内容的 macOS 首次失败和 06:30 汇总通知。
+- `scripts/web-data-collector/providers/<providerId>/`：provider 页面和文件适配器；首个目录为 `kuaimai`。
+- `/api/platform/v1/web-collection/jobs`：设备心跳、任务领取、阶段更新、运行和游标接口。
+- `web_collection_runners/jobs/runs/cursors/notifications`：通用 D1 运行元数据；provider 事实继续写入各自现有事实表。
+
+每个 provider adapter 输出同一接口：
+
+```js
+{
+  id,
+  allowedOrigins,
+  resources,
+  classifyPage(page),
+  exportResource(context),
+  locateDownload(context),
+  ingest(file, context)
+}
+```
+
+adapter 不直接写 D1，不创建 Chrome，不计算全局计划，也不能执行来自远端字符串的 JavaScript。
+
+## 页面状态
+
+- 加载：读取设备心跳、今日任务和最近成功游标。
+- 空数据：解释未启用 adapter 或今日尚未到 05:00。
+- 错误：区分设备离线、未登录、人工验证、页面变化、下载、解析、网络和 D1。
+- 无权限：可查看安全状态但不能启停 adapter 或登记设备。
+- 禁用：显示 adapter 未启用、未安装或缺少首次登录。
+- 成功：显示资源业务日期、完成时间、行数和批次；成功历史默认折叠。
+
+## 响应式与钉钉 WebView
+
+沿用数据同步页的笔记本和 390px 单列布局。钉钉 WebView 只显示状态和恢复说明，不尝试控制本机 Chrome。Mac 通知点击后打开数据同步页面。
+
+## 交互文案
+
+- “公司 Mac 离线”
+- “等待首次登录”
+- “等待人工验证”
+- “页面结构变化，已停止采集”
+- “昨天数据尚未全部入库”
+- “打开公司采集 Chrome”
+
+## 无障碍
+
+任务状态同时使用文字和图标。错误操作可键盘聚焦；成功历史使用原生 details/summary；通知不是唯一错误渠道。颜色保持 WCAG AA。
+
+## 视觉验收
+
+检查数据接入 adapter 状态、数据同步的设备离线、等待登录、部分失败、全部成功和无任务状态；覆盖 1440、1180、640、390px 和钉钉 WebView。
+
+## 数据流与故障恢复
+
+LaunchAgent 每 15 分钟运行一次 `daily`。本地调度器先向 jobs API 上报心跳并拉取到期任务；05:00 后创建或领取昨天任务。adapter 打开固定页面并导出到受控目录，通用下载器确认文件稳定后交给 provider ingest。每个阶段回写 D1；只有 provider ingest 完整成功才完成任务和推进游标。
+
+任务租约超时后可恢复，幂等键阻止重复任务，文件哈希和 provider ingest 阻止重复事实。登录/验证保持页面打开并释放长任务执行，下一轮重新分类页面后继续。通知使用独立去重记录；通知失败不影响任务结果。
+
+## 安全边界
+
+独立 Chrome 调试端口只监听 `127.0.0.1`。代码注册表固定允许域名、入口、动作类型和选择器版本。D1 任务不能下发任意 URL、选择器或脚本。浏览器会话只存在独立 Profile；Cookie、页面正文、截图、网络响应和个人信息不进入日志、API、D1 或通知。
+
+## 测试策略
+
+- 纯领域测试：05:00、昨天范围、关机补跑、全部资源、幂等键、06:30 汇总和通知去重。
+- CDP 适配器测试：固定安全 HTML fixture 覆盖成功、未登录、验证、结构变化、下载超时和域名拒绝。
+- API/迁移测试：认证、权限、任务租约、状态转换、游标、心跳、通知和旧数据兼容。
+- provider 契约测试：第二个测试 adapter 不复制共享运行时；快麦 adapter 保持订单创建时间和敏感字段剔除。
+- 真实验收：独立 Chrome 首次登录、05:00 任务补跑、Mac 通知、D1 任务与事实、数据同步页面分别留证。
