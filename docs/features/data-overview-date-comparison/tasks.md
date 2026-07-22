@@ -29,14 +29,14 @@
   - 验证：`node --test react-tests/date-range-picker.test.mjs react-tests/data-center-app.test.mjs` 通过 10 项，`npm run lint` 通过；键盘、焦点和真实视口留待最终浏览器验收。
   - 提交：共享组件、样式、目录和测试。
 
-- [ ] 本期与上期共享口径编排
+- [x] 本期与上期共享口径编排
   - 依赖：领域规则完成。
   - 文件：`src/state/DataStandardsProvider.jsx`、相关 Provider 测试。
   - 输入：本期范围、等长上期范围、五项指标代码。
   - 输出：独立的本期/上期结果、运行状态和错误状态。
   - 失败测试：比较调度方法不存在，且上期失败会覆盖本期状态。
   - 实现步骤：抽取单范围结果补齐，统一取消边界，分别保存两组结果。
-  - 验证：本期命中、上期缺失、上期失败、新范围取消旧请求。
+  - 验证：`node --test react-tests/data-standards-provider.test.mjs react-tests/data-standards-api-client.test.mjs tests/data-standards-results-api.test.mjs` 通过 12 项，`npm run lint` 通过；覆盖独立取消、幂等计算、失败隔离和结果读取。
   - 提交：状态编排与测试。
 
 - [ ] 数据总览交互与环比展示

@@ -56,6 +56,24 @@ function errorState(error, fallback = "数据口径暂不可用。") {
   };
 }
 
+async function resolveMetricResults(range, metricCodes, { signal, onRun } = {}) {
+  const query = { metricCodes, from: range.from, to: range.to };
+  const current = await loadMetricResults(query, fetch, signal);
+  const availableCodes = new Set((current.results || []).map(result => result.metricCode));
+  if (metricCodes.every(code => availableCodes.has(code))) return current;
+  const requested = await requestMetricCalculation({ ...query, targetVersions: {}, mode: "ensure_current" }, fetch, signal);
+  onRun?.(requested.run || null);
+  return pollMetricResults({ ...query, runId: requested.run.id }, { signal, interval: 800, maxAttempts: 20 });
+}
+
+function failedCalculationError(run, message) {
+  return new DataStandardsApiError(message, {
+    status: 500,
+    code: run?.errorCode || "DATA_STANDARD_CALCULATION_FAILED",
+    retryable: true
+  });
+}
+
 export function DataStandardsProvider({ children, enabled = true }) {
   const { state: productState, currentUser } = useProductFlow();
   const [definitions, setDefinitions] = useState([]);
@@ -63,14 +81,20 @@ export function DataStandardsProvider({ children, enabled = true }) {
   const [detail, setDetail] = useState(null);
   const [results, setResults] = useState([]);
   const [run, setRun] = useState(null);
+  const [comparisonResults, setComparisonResults] = useState([]);
+  const [comparisonRun, setComparisonRun] = useState(null);
   const [loading, setLoading] = useState(enabled);
   const [resultLoading, setResultLoading] = useState(false);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [comparisonError, setComparisonError] = useState(null);
   const [storageUnavailable, setStorageUnavailable] = useState(false);
   const definitionRequest = useRef(null);
   const resultRequest = useRef(null);
+  const comparisonRequest = useRef(null);
   const resultDebounce = useRef(null);
+  const comparisonDebounce = useRef(null);
   const actor = useMemo(() => {
     const departments = [...new Set([
       currentUser?.department,
@@ -199,28 +223,13 @@ export function DataStandardsProvider({ children, enabled = true }) {
     resultRequest.current?.abort();
     const controller = new AbortController();
     resultRequest.current = controller;
-    const query = { metricCodes, from: range.from, to: range.to };
     setResultLoading(true);
     try {
-      const current = await loadMetricResults(query, fetch, controller.signal);
-      const availableCodes = new Set((current.results || []).map(result => result.metricCode));
-      if (metricCodes.every(code => availableCodes.has(code))) {
-        setResults(current.results || []);
-        setRun(current.run || null);
-        setError(null);
-        return current;
-      }
-      const requested = await requestMetricCalculation({ ...query, targetVersions: {}, mode: "ensure_current" }, fetch, controller.signal);
-      setRun(requested.run || null);
-      const completed = await pollMetricResults({ ...query, runId: requested.run.id }, { signal: controller.signal, interval: 800, maxAttempts: 20 });
+      const completed = await resolveMetricResults(range, metricCodes, { signal: controller.signal, onRun: setRun });
       setResults(completed.results || []);
-      setRun(completed.run || requested.run || null);
+      setRun(completed.run || null);
       if (completed.run?.status === "failed") {
-        throw new DataStandardsApiError("数据口径计算失败，请稍后重试。", {
-          status: 500,
-          code: completed.run.errorCode || "DATA_STANDARD_CALCULATION_FAILED",
-          retryable: true
-        });
+        throw failedCalculationError(completed.run, "数据口径计算失败，请稍后重试。");
       }
       setError(null);
       return completed;
@@ -232,16 +241,47 @@ export function DataStandardsProvider({ children, enabled = true }) {
     }
   }, [enabled]);
 
+  const ensureComparisonResults = useCallback(async (range, metricCodes) => {
+    if (!enabled) return { results: [] };
+    comparisonRequest.current?.abort();
+    const controller = new AbortController();
+    comparisonRequest.current = controller;
+    setComparisonLoading(true);
+    setComparisonError(null);
+    try {
+      const completed = await resolveMetricResults(range, metricCodes, { signal: controller.signal, onRun: setComparisonRun });
+      setComparisonResults(completed.results || []);
+      setComparisonRun(completed.run || null);
+      if (completed.run?.status === "failed") {
+        throw failedCalculationError(completed.run, "上期数据口径计算失败，请稍后重试。");
+      }
+      return completed;
+    } catch (resultError) {
+      if (resultError?.name !== "AbortError") setComparisonError(errorState(resultError, "上期数据口径结果加载失败。"));
+      throw resultError;
+    } finally {
+      if (comparisonRequest.current === controller) setComparisonLoading(false);
+    }
+  }, [enabled]);
+
   const scheduleEnsureResults = useCallback((range, metricCodes) => {
     clearTimeout(resultDebounce.current);
     resultRequest.current?.abort();
     resultDebounce.current = setTimeout(() => ensureResults(range, metricCodes).catch(() => {}), 250);
   }, [ensureResults]);
 
+  const scheduleComparisonResults = useCallback((range, metricCodes) => {
+    clearTimeout(comparisonDebounce.current);
+    comparisonRequest.current?.abort();
+    comparisonDebounce.current = setTimeout(() => ensureComparisonResults(range, metricCodes).catch(() => {}), 250);
+  }, [ensureComparisonResults]);
+
   useEffect(() => () => {
     clearTimeout(resultDebounce.current);
+    clearTimeout(comparisonDebounce.current);
     definitionRequest.current?.abort();
     resultRequest.current?.abort();
+    comparisonRequest.current?.abort();
   }, []);
 
   const value = useMemo(() => ({
@@ -251,6 +291,10 @@ export function DataStandardsProvider({ children, enabled = true }) {
     results,
     run,
     resultLoading,
+    comparisonResults,
+    comparisonRun,
+    comparisonLoading,
+    comparisonError,
     loading,
     saving,
     error,
@@ -269,8 +313,10 @@ export function DataStandardsProvider({ children, enabled = true }) {
     recalculate,
     ensureResults,
     scheduleEnsureResults,
+    ensureComparisonResults,
+    scheduleComparisonResults,
     clearError: () => setError(null)
-  }), [actor.executive, archiveDefinition, canManageDefinition, canWrite, createDefinition, definitions, detail, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, ownerDepartments, previewDefinition, publishVersion, recalculate, resultLoading, results, run, saving, scheduleEnsureResults, storageUnavailable]);
+  }), [actor.executive, archiveDefinition, canManageDefinition, canWrite, comparisonError, comparisonLoading, comparisonResults, comparisonRun, createDefinition, definitions, detail, ensureComparisonResults, ensureResults, error, filters, loadDefinition, loadDefinitions, loading, ownerDepartments, previewDefinition, publishVersion, recalculate, resultLoading, results, run, saving, scheduleComparisonResults, scheduleEnsureResults, storageUnavailable]);
 
   return <DataStandardsContext.Provider value={value}>{children}</DataStandardsContext.Provider>;
 }

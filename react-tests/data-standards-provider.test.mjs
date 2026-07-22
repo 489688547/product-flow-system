@@ -17,6 +17,19 @@ test("shared provider owns governed definitions, results and cancellable bounded
   assert.doesNotMatch(provider, /localStorage/);
 });
 
+test("comparison results use an independent cancellable request and error boundary", () => {
+  assert.match(provider, /resolveMetricResults/);
+  assert.match(provider, /comparisonRequest/);
+  assert.match(provider, /comparisonResults/);
+  assert.match(provider, /comparisonRun/);
+  assert.match(provider, /comparisonLoading/);
+  assert.match(provider, /comparisonError/);
+  assert.match(provider, /ensureComparisonResults/);
+  assert.match(provider, /scheduleComparisonResults/);
+  assert.match(provider, /comparisonRequest\.current\?\.abort\(\)/);
+  assert.match(provider, /setComparisonError\(errorState/);
+});
+
 test("provider is mounted inside product flow and outside all business app providers", () => {
   assert.match(main, /<ProductFlowProvider>[\s\S]*<DataStandardsProvider enabled=\{hasDataCenterAccess\}>[\s\S]*<DataCenterProvider/);
   assert.match(main, /<DataStandardsProvider[\s\S]*<SupplyChainProvider/);
