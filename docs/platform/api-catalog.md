@@ -17,7 +17,7 @@
 | `/api/supply-chain/approvals/sync` | 分批读取钉钉采购和付款审批并写入供应链状态 | 仅总经办、供应链、采购和财务；每次只读取一个流程的一页，客户端先完成采购再完成付款 |
 | `/api/platform/v1/goods-flow/dashboard` | 读取 CCC、断货率、库存周转、库存资金和例外投影 | 公司会话；金额按部门裁剪；响应包含来源时间、覆盖率和计算版本 |
 | `/api/platform/v1/goods-flow/inventory` | 按日期、SKU 和仓库读取账面、实盘与校准库存 | 公司会话；支持截止日期过滤；未盘点和过期来源必须显式标记 |
-| `/api/platform/v1/goods-flow/imports` | 幂等导入 ERP 库存、钉钉审批、销售和兼容盘点事实 | 数据中心、供应链、财务或总经办；部分成功返回 207；浏览器不直连 ERP |
+| `/api/platform/v1/goods-flow/imports` | 幂等导入 ERP 库存、钉钉审批、销售和兼容盘点事实 | 数据中心、供应链、财务或总经办；服务端读取共享商品目录展开组合消耗；部分成功返回 207；浏览器不直连 ERP |
 | `/api/platform/v1/goods-flow/stocktakes` | 查询或创建月度盘点任务 | 仓库维护实存；供应链确认差异；金额调整由财务确认 |
 | `/api/platform/v1/goods-flow/stocktakes/:id/transitions` | 按乐观版本推进盘点确认或追加更正 | 仓库录数、供应链确认差异、财务确认金额；写入需要 `Idempotency-Key` |
 | `/api/platform/v1/goods-flow/receivable-terms` | 查询或版本化维护平台固定账期 | 全部货流角色可读；仅财务和总经办可写；区间不可重叠 |
@@ -56,9 +56,9 @@
 | `/api/platform/v1/collaboration-items/:id/transitions` | 执行协同状态动作 | 状态机和角色双重校验；动作幂等；追加活动 |
 | `/api/platform/v1/collaboration-items/:id/activities` | 读取协同活动记录 | 与事项相同的读取范围；按时间倒序 |
 | `/api/platform/v1/collaboration-items/:id/dingtalk` | 同步协同责任到钉钉待办 | 已确认稳定主负责人；平台统一调用；失败不回滚协同状态 |
-| `/api/platform/v1/product-catalog` | 读取共享 ERP 商品、SKU 与同步元数据 | 全员登录后可读；产品/品牌等非授权部门不返回采购成本 |
+| `/api/platform/v1/product-catalog` | 读取共享 ERP 商品、库存单位、组合关系与同步元数据 | 全员登录后可读；产品/品牌等非授权部门不返回采购成本 |
 | `/api/platform/v1/product-catalog/import` | 导入数据中心确认后的 ERP 商品文件 | 仅总经办、运营部非只读身份；幂等合并，不保存原始整行 |
-| `/api/platform/v1/product-catalog/sync/kuaimai` | 分页读取快麦商品并合并共享目录 | 仅总经办、运营部非只读身份；全部分页成功后写入；不反向修改快麦 |
+| `/api/platform/v1/product-catalog/sync/kuaimai` | 分页读取快麦商品及组合详情并合并共享目录 | 仅总经办、运营部非只读身份；请求体可传详情游标；客户端续跑至完成；不反向修改快麦 |
 | `/api/platform/v1/data-standards` | 查询和发布共享数据口径 | 公司会话；按责任部门服务端授权；受控公式；版本快照与乐观锁；无物理删除 |
 | `/api/platform/v1/data-standards/:id` | 读取详情或追加口径版本 | 详情含版本、依赖和最近结果；`metricCode` 不可变；元数据随版本快照 |
 | `/api/platform/v1/data-standards/:id/archive` | 归档共享数据口径 | 责任部门或总经办；版本检查；保留定义、版本、结果和审计 |
@@ -130,13 +130,13 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 ### 商品主数据契约
 
-`GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是产品全周期、供应链和供应商管理共同消费的目录；采购成本仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、SKU、标准/非标准/缺失条码数量，以及最后成功同步时间、来源和方式。
+`GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是产品全周期、供应链、供应商管理和货流共同消费的库存单位；`items[].components[]` 为向后兼容新增的组合关系，包含库存单位编码和正整数组合比例。采购成本（包括组件成本）仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、库存单位、内部唯一码、组合商品、组件关系及最后成功同步时间、来源和方式。
 
 商品经营读取使用 `GET /api/platform/v1/product-catalog?from=YYYY-MM-DD&to=YYYY-MM-DD&platform=<平台>`。`from` 与 `to` 必须同时提交、包含边界日期且最多 370 天；`platform` 省略时排除空值、`其它`、`其他`、`未知` 和 `未知平台`。服务端在 D1 先按 `code × platform` 聚合 `product_sales_daily`，再用目录 SKU 条码/规格商家编码确定性关联商品，避免把明细或任意 SQL 暴露给浏览器。
 
 带销量范围时每个商品增加 `{ sales: { quantity, netSales, matchedCodeCount, platforms } }`；`meta.sales` 返回 `from`、`to`、`platform`、`availablePlatforms`、`totalQuantity`、`totalNetSales`、`coveredProducts`、`unmatchedRowCount`、`latestDataDate`、`timeBasis=create_time`、`timezone=Asia/Shanghai` 和销售事实最后入库时间。销量基础字段对现有商品目录读者可见，采购成本裁剪规则不变。旧客户端不带日期参数时不扫描销售表且响应保持兼容；商品 GET 只读已治理 D1 表，不在读取请求中执行建表或改表。
 
-`POST /api/platform/v1/product-catalog/import` 接收 `{ source, fileName, items, errors }`。客户端只提交已标准化商品与异常摘要，不提交原始文件内容；服务端按主商家编码和规格商家编码幂等合并。`POST /api/platform/v1/product-catalog/sync/kuaimai` 无业务参数，服务端使用密钥读取全部 `item.list.query` 分页，任何分页不完整都返回 409 且不写本批。
+`POST /api/platform/v1/product-catalog/import` 接收 `{ source, fileName, items, errors }`。客户端只提交已标准化商品与异常摘要，不提交原始文件内容；服务端按主商家编码和规格商家编码幂等合并。`POST /api/platform/v1/product-catalog/sync/kuaimai` 接收可选 `{ cursor }`：服务端先完整读取 `item.list.query`，再对官方类型标记的组合候选每批最多读取 30 个 `item.single.get` 详情，返回 `complete`、`nextCursor`、`progress` 和安全失败摘要。成功详情按父商品替换组件；失败详情保留旧关系。
 
 快麦 API 与商品档案导出覆盖范围不同，自动同步不把 API 未返回的文件补齐商品标记为删除。订单日同步按快麦官方 `timeType=created` 查询并用响应 `created` 归日。回滚销量视图不删除目录或 `product_sales_daily`；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。销量查询按日期、编码和平台聚合，最大范围 370 天，不新增销售复制表。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_SALES_RANGE_INVALID`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`、`KUAIMAI_CONFIG_MISSING`、`KUAIMAI_PRODUCT_SYNC_INCOMPLETE`、`KUAIMAI_PRODUCT_SYNC_FAILED`。
 

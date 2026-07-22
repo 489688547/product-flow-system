@@ -256,7 +256,7 @@ const environmentCapabilities = {
     {
       "id": "product-catalog-storage",
       "name": "共享商品主数据",
-      "description": "数据中心、产品全周期和供应链共用的 ERP 商品、SKU、69 码与同步批次存储；商品经营视图读取已落库销售日聚合。",
+      "description": "数据中心统一维护，产品全周期、供应链和货流共用的 ERP 商品、库存单位编码、组合比例与同步批次存储；商品经营视图读取已落库销售日聚合。",
       "platforms": [
         "cloudflare-pages",
         "cloudflare-d1",
@@ -274,6 +274,7 @@ const environmentCapabilities = {
       "tables": [
         "product_catalog_items",
         "product_catalog_skus",
+        "product_catalog_components",
         "product_catalog_sync_runs",
         "product_catalog_meta",
         "product_sales_daily",
@@ -283,7 +284,7 @@ const environmentCapabilities = {
     {
       "id": "kuaimai-product-sync",
       "name": "快麦商品目录同步",
-      "description": "从快麦开放平台分页读取 ERP 商品并合并共享商品目录；缺少配置时仍可使用文件导入。",
+      "description": "从快麦开放平台分页读取 ERP 商品列表和组合详情并合并共享商品目录；缺少配置时仍可使用文件导入。",
       "platforms": [
         "kuaimai",
         "cloudflare-d1"
@@ -304,6 +305,7 @@ const environmentCapabilities = {
       "tables": [
         "product_catalog_items",
         "product_catalog_skus",
+        "product_catalog_components",
         "product_catalog_sync_runs",
         "product_catalog_meta"
       ]
