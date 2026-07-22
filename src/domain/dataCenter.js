@@ -54,11 +54,11 @@ const EXCLUDED_PLATFORMS = new Set(["", "其它", "其他", "未知", "未知平
 const SALES_METRICS = ["qty", "sales", "netSales", "grossProfit", "refund", "cost"];
 
 export const DATA_CENTER_OVERVIEW_METRICS = Object.freeze([
-  { metricCode: "sales.net_sales", label: "净销售额", format: "money" },
-  { metricCode: "sales.quantity", label: "销售数量", format: "number" },
-  { metricCode: "sales.gross_profit", label: "毛利", format: "money" },
-  { metricCode: "sales.refund_rate", label: "退款率", format: "percent" },
-  { metricCode: "sales.gross_margin_rate", label: "毛利率", format: "percent" }
+  { metricCode: "sales.net_sales", label: "净销售额", format: "money", comparison: "relative", favorable: "increase" },
+  { metricCode: "sales.quantity", label: "销售数量", format: "number", comparison: "relative", favorable: "increase" },
+  { metricCode: "sales.gross_profit", label: "毛利", format: "money", comparison: "relative", favorable: "increase" },
+  { metricCode: "sales.refund_rate", label: "退款率", format: "percent", comparison: "percentage_point", favorable: "decrease" },
+  { metricCode: "sales.gross_margin_rate", label: "毛利率", format: "percent", comparison: "percentage_point", favorable: "increase" }
 ]);
 
 function shanghaiDate(value) {
@@ -74,6 +74,10 @@ function shanghaiDate(value) {
 
 function previousDay(day) {
   return shanghaiDate(new Date(Date.parse(`${day}T00:00:00+08:00`) - 86400000));
+}
+
+function shiftDay(day, amount) {
+  return new Date(Date.parse(`${day}T00:00:00Z`) + amount * 86400000).toISOString().slice(0, 10);
 }
 
 function number(value) {
@@ -124,6 +128,81 @@ function groupSales(rows, key) {
 export function defaultDataCenterRange(today = new Date()) {
   const to = previousDay(shanghaiDate(today));
   return { from: `${to.slice(0, 7)}-01`, to };
+}
+
+export function dataCenterPresetRange(days, today = new Date()) {
+  const length = Number(days);
+  if (![7, 15, 30].includes(length)) throw new RangeError("数据总览只支持近 7、15、30 天快捷范围。");
+  const to = previousDay(shanghaiDate(today));
+  return { from: shiftDay(to, -(length - 1)), to };
+}
+
+export function dataCenterRangeDays(range = {}) {
+  const from = Date.parse(`${range.from || ""}T00:00:00Z`);
+  const to = Date.parse(`${range.to || ""}T00:00:00Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || from > to) return 0;
+  return Math.floor((to - from) / 86400000) + 1;
+}
+
+export function previousDataCenterRange(range = {}) {
+  const days = dataCenterRangeDays(range);
+  if (!days) return { from: "", to: "" };
+  const to = shiftDay(range.from, -1);
+  return { from: shiftDay(to, -(days - 1)), to };
+}
+
+function comparisonUnit(metric = {}) {
+  return metric.comparison === "percentage_point" ? "percentage_point" : "percent";
+}
+
+function unavailableComparison(reasonCode, metric) {
+  return {
+    available: false,
+    direction: "flat",
+    favorable: false,
+    value: null,
+    unit: comparisonUnit(metric),
+    reasonCode
+  };
+}
+
+function resultIssue(result, period) {
+  if (!result || result.value == null || !Number.isFinite(Number(result.value))) {
+    return result?.reasonCode || `${period}_RESULT_NOT_AVAILABLE`;
+  }
+  if (result.status && result.status !== "complete") {
+    return result.reasonCode || `${period}_RESULT_NOT_AVAILABLE`;
+  }
+  if (result.coverageRate != null && Number(result.coverageRate) < 1) return `${period}_DATA_NOT_COVERED`;
+  return "";
+}
+
+export function compareDataCenterMetric(currentResult, previousResult, metric = {}) {
+  const currentIssue = resultIssue(currentResult, "CURRENT");
+  if (currentIssue) return unavailableComparison(currentIssue, metric);
+  const previousIssue = resultIssue(previousResult, "PREVIOUS");
+  if (previousIssue) return unavailableComparison(previousIssue, metric);
+
+  const current = Number(currentResult.value);
+  const previous = Number(previousResult.value);
+  const unit = comparisonUnit(metric);
+  if (unit === "percent" && previous === 0 && current !== 0) {
+    return unavailableComparison("PREVIOUS_VALUE_ZERO", metric);
+  }
+  const difference = unit === "percentage_point"
+    ? round(current - previous)
+    : previous === 0 ? 0 : round((current - previous) / Math.abs(previous) * 100);
+  const direction = difference > 0 ? "up" : difference < 0 ? "down" : "flat";
+  const favorable = direction === "flat"
+    || (metric.favorable === "decrease" ? direction === "down" : direction === "up");
+  return {
+    available: true,
+    direction,
+    favorable,
+    value: Math.abs(difference),
+    unit,
+    reasonCode: ""
+  };
 }
 
 export function isOperationalPlatform(value) {

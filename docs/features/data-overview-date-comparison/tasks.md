@@ -9,14 +9,14 @@
 
 ## 任务
 
-- [ ] 日期范围与环比领域规则
+- [x] 日期范围与环比领域规则
   - 依赖：书面设计复核通过。
   - 文件：`src/domain/dataCenter.js`、`react-tests/data-center-date-comparison.test.mjs`。
   - 输入：上海自然日、已确认范围、两期共享口径结果。
   - 输出：快捷范围、范围校验、等长上期和环比展示模型纯函数。
   - 失败测试：函数尚不存在，且上期为零、比率百分点等断言失败。
   - 实现步骤：先日期函数，再比较函数，不读取 React 或网络。
-  - 验证：聚焦测试覆盖 7/15/30 天、跨月、闰日、370 天、零值、缺失和方向。
+  - 验证：`node --test react-tests/data-center-date-comparison.test.mjs react-tests/data-center.test.mjs react-tests/data-center-governed-overview.test.mjs` 通过 14 项；覆盖 7/15/30 天、跨月、闰日、零值、缺失、覆盖率和方向。
   - 提交：领域函数与对应测试。
 
 - [ ] 共享确认式日期范围选择器
