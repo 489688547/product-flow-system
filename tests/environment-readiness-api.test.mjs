@@ -21,7 +21,12 @@ const REQUIRED_PRODUCTION_TABLES = [
   "credential_vault_entries",
   "credential_vault_permissions",
   "credential_vault_audit",
-  "internal_vault_items"
+  "internal_vault_items",
+  "data_connections",
+  "data_connection_shops",
+  "browser_agent_tasks",
+  "browser_agent_task_grants",
+  "data_connection_audit"
 ];
 const TEST_PLATFORM_MASTER_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const HR_CORE_TABLES = [
@@ -98,10 +103,16 @@ const businessDataTables = [
   "data_center_meta",
   "product_catalog_items",
   "product_catalog_skus",
+  "product_catalog_components",
   "product_catalog_sync_runs",
   "product_catalog_meta",
   "product_sales_daily",
   "product_sales_meta",
+  "erp_collection_batches",
+  "erp_source_records",
+  "erp_collection_issues",
+  "erp_file_archives",
+  "erp_collector_tokens",
   "ecommerce_operation_records",
   "ecommerce_operation_meta",
   "ecommerce_operation_state",

@@ -18,7 +18,7 @@ test("integration registry is valid and contains the approved initial lifecycle"
 
   const statusById = Object.fromEntries(registry.platforms.map(platform => [platform.id, platform.status]));
   assert.equal(statusById.dingtalk, "connected");
-  assert.equal(statusById.kuaimai, "connected");
+  assert.equal(statusById.kuaimai, "integrating");
   assert.equal(statusById["cloudflare-pages"], "connected");
   assert.equal(statusById["cloudflare-d1"], "connected");
   assert.equal(statusById.aliyun, "integrating");

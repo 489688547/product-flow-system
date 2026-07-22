@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Database, LockKeyhole, RefreshCw } from "lucide-react";
 import { DATA_ACCESS_CATEGORIES, dataAccessCategoryFor } from "../../../domain/dataAccessCatalog.js";
-import { DATA_CONNECTOR_DEFINITIONS } from "../../../domain/dataCenterConnectors.js";
+import { DATA_CONNECTOR_DEFINITIONS, storeFileImportPending } from "../../../domain/dataCenterConnectors.js";
 import { useDataCenter } from "../../../state/DataCenterProvider.jsx";
 import { usePlatformConnections } from "../../../state/usePlatformConnections.js";
 import { Button } from "../../../ui/Button.jsx";
@@ -76,6 +76,9 @@ export function DataConnectionsWorkspace({
             canEdit={canEdit}
             onAdd={openNew}
             onManage={openExisting}
+            waitingForSamples={storeFileImportPending}
+            pendingMessage="请先提供平台后台原始 XLSX / CSV；识别规则验证后再开放导入。"
+            pendingActionLabel="等待文件样例"
           />
         ) : null}
         {!connectionsLoading && category === "erp" ? (
@@ -102,7 +105,7 @@ export function DataConnectionsWorkspace({
           />
         ) : null}
       </div>
-      {selection ? (
+      {selection && category !== "ecommerce" ? (
         <ConnectorConfigDialog
           definition={selection.definition}
           instance={selection.instance}

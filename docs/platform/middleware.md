@@ -21,7 +21,7 @@
 ## 外部平台共享适配
 
 - `functions/api/dingtalk/_shared/dingtalk.js`：钉钉 Token、组织、待办、日历、文档和会议数据的共同请求与响应处理。
-- `functions/api/kuaimai/_shared/kuaimai.js`：快麦签名、订单与商品分页、订单标准化和日聚合。商品分页最多 200 条/页，调用方设置总页保护；任一页失败时不返回完整标记，平台目录不得提交半批。
+- `functions/api/kuaimai/_shared/kuaimai.js`：快麦签名、订单与商品分页、组合详情和日聚合。商品列表最多 200 条/页，组合详情每批最多 30 条并返回游标；任一列表页失败时不返回完整标记，平台目录不得提交半批。订单库存单位编码只校验非空和长度，不按 69 码格式过滤内部唯一码。
 - `functions/api/platform/v1/product-catalog/_shared/http.js`：商品目录会话、维护权限、成本字段裁剪和统一错误响应。执行顺序为公司会话 → 维护权限（写请求）→ D1 能力 → 输入/提供商读取 → 幂等写入；只记录安全错误码，不记录文件原行或快麦原始响应。
 - `functions/api/platform/_shared/environmentReadiness.js`：环境识别、变量/绑定/表存在性检查和脱敏响应；无外部副作用，不重试。
 - `functions/api/platform/_shared/productionDataAccess.js`：共享个人令牌哈希、能力与组织身份校验，并为运维修复网关提供短时解锁、快照和审计；写入前置于业务状态写入，失败时业务写入不得继续。
@@ -35,3 +35,5 @@
 ## 目标能力
 
 后续逐步统一请求 ID、错误结构、服务端日志、输入校验和写操作幂等。迁移按路由分批完成，不要求现有接口一次性改写。
+
+`/api/platform/v1/browser-agent/*`、用户洞察 collector 和 ingest 在会话中间件中允许进入路由，由路由使用设备 Bearer Token 完成最终认证。普通公司会话不能代替设备令牌；task credential 只接受一次性 grant。顺序固定为：解析 Bearer → SHA-256 比对 active 设备 → platform scope → 领取任务 → grant 哈希/到期/消费/credentialVersion 校验 → 解密单个连接 → no-store 响应。日志不得记录 Authorization、grant、邮箱、密码或页面内容。

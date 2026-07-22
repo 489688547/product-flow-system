@@ -9,6 +9,7 @@ import {
   summarizeErpAccessHealth,
   summarizePlatformConnectionHealth
 } from "../src/domain/dataAccessCatalog.js";
+import { DATA_CONNECTOR_DEFINITIONS } from "../src/domain/dataCenterConnectors.js";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const read = path => readFileSync(resolve(root, path), "utf8");
@@ -30,6 +31,16 @@ test("data access has the approved categories and stable membership", () => {
     "xiaohongshu",
     "jd-jingmai"
   ]);
+});
+
+test("store connectors wait for native files and define no login secrets", () => {
+  const storeIds = new Set(["douyin-ecommerce", "kuaishou", "taobao", "pinduoduo", "xiaohongshu", "jd-jingmai"]);
+  const stores = DATA_CONNECTOR_DEFINITIONS.filter(item => storeIds.has(item.id));
+  assert.equal(stores.length, storeIds.size);
+  for (const definition of stores) {
+    assert.deepEqual(definition.methods, ["export"]);
+    assert.deepEqual(definition.fields, []);
+  }
 });
 
 test("catalog health keeps sync failures and stale platform reads visible", () => {

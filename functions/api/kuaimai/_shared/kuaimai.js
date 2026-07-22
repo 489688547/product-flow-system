@@ -3,7 +3,6 @@ import { platformEnv } from "../../platform/_shared/platformCredentials.js";
 // 快麦ERP开放平台客户端。使用 Web Crypto（hmac-sha256 签名），
 // 同一份代码跑在 Cloudflare Pages Functions 和本地 server.mjs（Node 18+）里。
 const GATEWAY = "https://gw.superboss.cc/router";
-const CODE_PATTERN = /^69\d{10,12}$/;
 
 // 平台简码 → 与Excel导入一致的平台名称（保证两个数据源能合并统计）
 const PLATFORM_NAMES = {
@@ -133,7 +132,8 @@ function kuaimaiDate(value) {
   return Number.isNaN(date.valueOf()) ? null : date;
 }
 
-// 把订单里的子订单聚合成 69码×日×平台 的日行（与Excel导入同一个存储结构）。
+// 把订单里的子订单聚合成库存单位编码×日×平台的日行（与Excel导入同一个存储结构）。
+// ERP 中的最小库存单位既可能是标准 69 码，也可能是内部唯一码，不能按格式丢弃。
 // 口径说明：API的订单接口没有净销售额/退款金额明细，sales/netSales 先取买家已付，
 // 毛利=已付−成本；统计日固定使用快麦 created（下单时间），退款字段留0，
 // 等每月Excel重导时整月覆盖校准。
@@ -151,7 +151,7 @@ export function createOrderAggregator(shopPlatformMap = new Map()) {
         if (child?.isCancel === 1) return;
         const code = String(child?.sysOuterId || "").trim();
         const childCreatedDate = kuaimaiDate(child?.created) || orderCreatedDate;
-        if (!CODE_PATTERN.test(code) || !childCreatedDate) {
+        if (!code || code.length > 160 || !childCreatedDate) {
           skippedItems += 1;
           return;
         }
@@ -259,5 +259,62 @@ export async function pullKuaimaiProductCatalog(config, { pageNo = 1, pageSize =
     pagesFetched,
     complete,
     nextPage: complete ? null : page
+  };
+}
+
+function kuaimaiProductDetail(payload = {}) {
+  if (payload.item && typeof payload.item === "object") return payload.item;
+  if (payload.body?.item && typeof payload.body.item === "object") return payload.body.item;
+  if (typeof payload.body === "string") {
+    try {
+      const body = JSON.parse(payload.body);
+      return body?.item && typeof body.item === "object" ? body.item : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function isKuaimaiBundleCandidate(item = {}) {
+  return ["1", "2"].includes(String(item.type ?? "")) || ["3", "4"].includes(String(item.typeTag ?? ""));
+}
+
+// 商品列表只给出类型；组合比例由商品详情的 suitSingleList 提供。
+// 单次最多读取 30 个详情，给 Pages Functions 留出列表、存储和认证子请求余量。
+export async function pullKuaimaiProductDetails(config, items = [], { cursor = 0, maxDetails = 30 } = {}, fetchImpl = fetch) {
+  const candidates = items.filter(isKuaimaiBundleCandidate);
+  const start = Math.min(candidates.length, Math.max(0, Number(cursor) || 0));
+  const limit = Math.min(30, Math.max(1, Number(maxDetails) || 30));
+  const selected = candidates.slice(start, start + limit);
+  const details = [];
+  const failures = [];
+  for (const candidate of selected) {
+    try {
+      const request = candidate.sysItemId
+        ? { sysItemId: candidate.sysItemId, whetherReturnPurchase: 0 }
+        : { outerId: candidate.outerId, whetherReturnPurchase: 0 };
+      const payload = await callKuaimai("item.single.get", request, config, fetchImpl);
+      const detail = kuaimaiProductDetail(payload);
+      if (!detail) throw new Error("快麦商品详情为空。");
+      details.push({ ...candidate, ...detail });
+    } catch (error) {
+      failures.push({
+        sourceProductId: String(candidate.sysItemId || ""),
+        merchantCode: String(candidate.outerId || ""),
+        code: String(error?.kuaimaiCode || "KUAIMAI_PRODUCT_DETAIL_FAILED"),
+        message: "快麦商品详情读取失败。"
+      });
+    }
+  }
+  const consumed = start + selected.length;
+  const complete = consumed >= candidates.length;
+  return {
+    details,
+    failures,
+    totalCandidates: candidates.length,
+    cursor: start,
+    nextCursor: complete ? null : consumed,
+    complete
   };
 }

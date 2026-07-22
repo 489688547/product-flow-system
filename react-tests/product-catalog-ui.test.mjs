@@ -15,7 +15,7 @@ test("data center exposes product master data as a first-class route", () => {
 
 test("product catalog workspace provides dense search, sales filters, sync and file import", () => {
   const workspace = read("src/features/data-center/ProductCatalogWorkspace.jsx");
-  assert.match(workspace, /搜索商品、69 码或商家编码/);
+  assert.match(workspace, /搜索商品、69 码、内部唯一码或商家编码/);
   assert.match(workspace, /同步快麦商品/);
   assert.match(workspace, /导入 ERP 商品文件/);
   assert.match(workspace, /全部平台/);
@@ -29,7 +29,11 @@ test("product catalog workspace provides dense search, sales filters, sync and f
   assert.match(workspace, /已关联产品|未关联产品/);
   assert.match(workspace, /主商家编码/);
   assert.match(workspace, /规格商家编码/);
-  assert.match(workspace, /标准 69 码|非标准条码/);
+  assert.match(workspace, /库存单位编码/);
+  assert.match(workspace, /内部唯一码/);
+  assert.match(workspace, /库存组成/);
+  assert.match(workspace, /组合商品/);
+  assert.doesNotMatch(workspace, /非标准条码|条码异常/);
   assert.match(workspace, /streamSpreadsheetRows/);
   assert.match(workspace, /确认导入/);
   assert.match(workspace, /TablePagination/);
@@ -62,6 +66,7 @@ test("catalog table styles preserve readable codes and responsive table scrollin
   assert.match(styles, /\.product-catalog-sales-cell/);
   assert.match(styles, /\.product-catalog-date-range/);
   assert.match(styles, /\.catalog-code/);
+  assert.match(styles, /\.catalog-component-list/);
   assert.match(styles, /white-space:\s*nowrap/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.product-catalog-toolbar/);
   assert.match(styles, /\.table-pagination/);

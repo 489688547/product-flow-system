@@ -1,19 +1,25 @@
 const CODE_PATTERN = /^69\d{10,12}$/;
 
 export const SALES_COLUMN_RULES = [
-  { key: "code", label: "69码", required: true, synonyms: ["系统商品编码", "商品编码", "69码", "条码", "条形码", "商品条码", "barcode"] },
+  { key: "code", label: "69码", required: true, synonyms: ["系统商品编码", "规格商家编码", "主商家编码", "商品编码", "69码", "条码", "条形码", "商品条码", "barcode"] },
+  { key: "fallbackCode", label: "主商家编码", required: false, synonyms: ["主商家编码"] },
   { key: "title", label: "商品标题", required: false, synonyms: ["系统商品标题", "商品标题", "商品名称", "标题"] },
-  { key: "platform", label: "平台", required: false, synonyms: ["店铺平台", "平台", "渠道"] },
+  { key: "platform", label: "平台", required: false, synonyms: ["店铺平台", "所属平台", "平台", "渠道"] },
   { key: "shop", label: "店铺", required: false, synonyms: ["店铺名称", "店铺"] },
+  { key: "createTime", label: "订单创建时间", required: false, synonyms: ["订单创建时间", "创建时间", "下单时间", "交易创建时间"] },
   { key: "payTime", label: "付款时间", required: false, synonyms: ["付款时间", "支付时间"] },
   { key: "consignTime", label: "发货时间", required: false, synonyms: ["发货时间"] },
   { key: "finishTime", label: "完成时间", required: false, synonyms: ["完成时间", "成交时间"] },
-  { key: "qty", label: "净销量", required: true, synonyms: ["净销量", "销售数量", "销量", "数量"] },
-  { key: "sales", label: "已付金额", required: false, synonyms: ["订单买家已付金额", "买家已付金额", "已付金额", "支付金额", "销售额"] },
-  { key: "netSales", label: "净销售额", required: true, synonyms: ["净销售额", "实收金额", "净销售"] },
-  { key: "grossProfit", label: "净毛利", required: false, synonyms: ["净毛利", "销售毛利", "毛利"] },
+  { key: "qty", label: "净销量", required: false, synonyms: ["净销量", "销量", "数量"] },
+  { key: "grossQty", label: "销售数量", required: false, synonyms: ["销售数量"] },
+  { key: "returnQty", label: "退货数量", required: false, synonyms: ["退货数量"] },
+  { key: "sales", label: "已付金额", required: false, synonyms: ["订单买家已付金额", "商品买家已付金额", "买家已付金额", "已付金额", "支付金额", "销售额"] },
+  { key: "netSales", label: "净销售额", required: false, synonyms: ["净销售额", "实收金额", "净销售"] },
+  { key: "grossSales", label: "销售金额", required: false, synonyms: ["销售金额"] },
+  { key: "grossProfit", label: "净毛利", required: false, synonyms: ["净毛利"] },
   { key: "refund", label: "退款金额", required: false, synonyms: ["退款金额", "退款"] },
   { key: "cost", label: "销售成本", required: false, synonyms: ["销售成本", "成本"] },
+  { key: "returnCost", label: "退货成本", required: false, synonyms: ["退货成本"] },
   { key: "preShipRate", label: "发货前退款率", required: false, synonyms: ["发货前退款率"] },
   { key: "postShipRate", label: "发货后退款率", required: false, synonyms: ["发货后退款率"] }
 ];
@@ -43,7 +49,10 @@ export function detectSalesHeader(rows, scanLimit = 8) {
   for (let index = 0; index < Math.min(rows.length, scanLimit); index += 1) {
     const row = (rows[index] || []).map(cellText);
     const codeAt = findColumn(row, SALES_COLUMN_RULES[0].synonyms);
-    const qtyAt = findColumn(row, SALES_COLUMN_RULES.find(rule => rule.key === "qty").synonyms);
+    const qtyAt = findColumn(row, [
+      ...SALES_COLUMN_RULES.find(rule => rule.key === "qty").synonyms,
+      ...SALES_COLUMN_RULES.find(rule => rule.key === "grossQty").synonyms
+    ]);
     if (codeAt >= 0 && qtyAt >= 0) return { headerIndex: index, header: row };
   }
   return null;
@@ -57,6 +66,8 @@ export function detectSalesColumns(header) {
     if (at >= 0) mapping[rule.key] = at;
     else if (rule.required) misses.push(rule.label);
   });
+  if (mapping.qty == null && mapping.grossQty == null) misses.push("净销量/销售数量");
+  if (mapping.netSales == null && mapping.grossSales == null) misses.push("净销售额/销售金额");
   return { mapping, missing: misses, complete: misses.length === 0 };
 }
 
@@ -98,6 +109,11 @@ export function isSalesBarcode(value) {
   return CODE_PATTERN.test(cellText(value));
 }
 
+function isInventoryUnitCode(value) {
+  const code = cellText(value);
+  return Boolean(code) && code.length <= 160;
+}
+
 export function createSalesAggregator(mapping) {
   const buckets = new Map();
   const titles = {};
@@ -108,12 +124,14 @@ export function createSalesAggregator(mapping) {
   return {
     add(row) {
       sourceRows += 1;
-      const code = cellText(cell(row, "code"));
-      if (!isSalesBarcode(code)) {
+      const primaryCode = cellText(cell(row, "code"));
+      const fallbackCode = cellText(cell(row, "fallbackCode"));
+      const code = isInventoryUnitCode(primaryCode) ? primaryCode : fallbackCode;
+      if (!isInventoryUnitCode(code)) {
         skipped += 1;
         return;
       }
-      const date = normalizeSalesDate(cell(row, "payTime")) || normalizeSalesDate(cell(row, "consignTime")) || normalizeSalesDate(cell(row, "finishTime"));
+      const date = normalizeSalesDate(cell(row, "createTime")) || normalizeSalesDate(cell(row, "payTime")) || normalizeSalesDate(cell(row, "consignTime")) || normalizeSalesDate(cell(row, "finishTime"));
       if (!date) {
         skipped += 1;
         return;
@@ -122,12 +140,26 @@ export function createSalesAggregator(mapping) {
       const key = `${code}|${date}|${platform}`;
       const bucket = buckets.get(key) || { code, date, platform, qty: 0, sales: 0, netSales: 0, grossProfit: 0, refund: 0, cost: 0, preShipRefund: 0, postShipRefund: 0 };
       const rowSales = toNumber(cell(row, "sales"));
-      bucket.qty += toNumber(cell(row, "qty"));
+      const refund = toNumber(cell(row, "refund"));
+      const derivesNetMetrics = mapping.netSales == null && mapping.grossSales != null;
+      const quantity = mapping.qty == null
+        ? toNumber(cell(row, "grossQty")) - toNumber(cell(row, "returnQty"))
+        : toNumber(cell(row, "qty"));
+      const netSales = derivesNetMetrics
+        ? toNumber(cell(row, "grossSales")) - refund
+        : toNumber(cell(row, "netSales"));
+      const cost = derivesNetMetrics
+        ? toNumber(cell(row, "cost")) - toNumber(cell(row, "returnCost"))
+        : toNumber(cell(row, "cost"));
+      const grossProfit = mapping.grossProfit == null && derivesNetMetrics
+        ? netSales - cost
+        : toNumber(cell(row, "grossProfit"));
+      bucket.qty += quantity;
       bucket.sales += rowSales;
-      bucket.netSales += toNumber(cell(row, "netSales"));
-      bucket.grossProfit += toNumber(cell(row, "grossProfit"));
-      bucket.refund += toNumber(cell(row, "refund"));
-      bucket.cost += toNumber(cell(row, "cost"));
+      bucket.netSales += netSales;
+      bucket.grossProfit += grossProfit;
+      bucket.refund += refund;
+      bucket.cost += cost;
       bucket.preShipRefund += toRate(cell(row, "preShipRate")) * rowSales;
       bucket.postShipRefund += toRate(cell(row, "postShipRate")) * rowSales;
       buckets.set(key, bucket);
@@ -162,7 +194,7 @@ export function normalizeSkuCodes(value) {
   if (!Array.isArray(value)) return [];
   return value
     .map(item => ({ code: cellText(item?.code), price: item?.price === "" || item?.price == null ? null : Number(item.price) }))
-    .filter(item => isSalesBarcode(item.code))
+    .filter(item => isInventoryUnitCode(item.code))
     .map(item => ({ code: item.code, price: Number.isFinite(item.price) && item.price > 0 ? item.price : null }));
 }
 

@@ -215,6 +215,34 @@ test("connector updates require the current version and archive is administrator
   assert.equal(archived.status, 200);
 });
 
+test("store connector destruction is administrator-only and needs exact confirmation", async () => {
+  const db = createD1Mock();
+  const created = await onRequest({
+    request: request("PUT", { expectedVersion: 0, instance: { ...instance, credentialEntryId: "" } }),
+    env: { PRODUCT_FLOW_DB: db }, data: { session: operator }
+  });
+  const createdInstance = (await created.json()).instance;
+
+  const denied = await onRequest({
+    request: request("PUT", { action: "destroy", id: createdInstance.id, expectedVersion: 1, confirmation: "销毁店铺凭证" }),
+    env: { PRODUCT_FLOW_DB: db }, data: { session: operator }
+  });
+  assert.equal(denied.status, 403);
+
+  const invalid = await onRequest({
+    request: request("PUT", { action: "destroy", id: createdInstance.id, expectedVersion: 1, confirmation: "确认" }),
+    env: { PRODUCT_FLOW_DB: db }, data: { session: admin }
+  });
+  assert.equal(invalid.status, 400);
+
+  const destroyed = await onRequest({
+    request: request("PUT", { action: "destroy", id: createdInstance.id, expectedVersion: 1, confirmation: "销毁店铺凭证" }),
+    env: { PRODUCT_FLOW_DB: db }, data: { session: admin }
+  });
+  assert.equal(destroyed.status, 200);
+  assert.ok(db.connectors.get(createdInstance.id).archived_at);
+});
+
 test("OPTIONS advertises PUT and unsupported methods are rejected", async () => {
   const options = await onRequest({ request: request("OPTIONS"), env: {}, data: {} });
   assert.equal(options.status, 204);

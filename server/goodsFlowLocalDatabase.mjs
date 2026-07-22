@@ -5,7 +5,12 @@ const TABLE_NAMES = [
   "goods_flow_stocktake_lines",
   "goods_flow_receivable_terms",
   "goods_flow_ccc_monthly",
-  "goods_flow_exceptions"
+  "goods_flow_exceptions",
+  "product_catalog_items",
+  "product_catalog_skus",
+  "product_catalog_components",
+  "product_catalog_sync_runs",
+  "product_catalog_meta"
 ];
 
 function rowForInsert(table, values) {
@@ -37,6 +42,26 @@ function rowForInsert(table, values) {
     const [id, code, severity, status, owner_department, entity_type, entity_id, source, source_reference, message, details, created_at, updated_at, resolved_at, resolved_by] = values;
     return { id, code, severity, status, owner_department, entity_type, entity_id, source, source_reference, message, details, created_at, updated_at, resolved_at, resolved_by };
   }
+  if (table === "product_catalog_items") {
+    const [id, source, source_product_id, merchant_code, name, payload, active, present_in_source, synced_at, updated_at, updated_by] = values;
+    return { id, source, source_product_id, merchant_code, name, payload, active, present_in_source, synced_at, updated_at, updated_by };
+  }
+  if (table === "product_catalog_skus") {
+    const [id, item_id, source, source_sku_id, merchant_sku_code, barcode, payload, active, synced_at, updated_at, updated_by] = values;
+    return { id, item_id, source, source_sku_id, merchant_sku_code, barcode, payload, active, synced_at, updated_at, updated_by };
+  }
+  if (table === "product_catalog_components") {
+    const [id, parent_item_id, source, component_code, ratio, payload, synced_at, updated_at, updated_by] = values;
+    return { id, parent_item_id, source, component_code, ratio, payload, synced_at, updated_at, updated_by };
+  }
+  if (table === "product_catalog_sync_runs") {
+    const [id, source, mode, status, payload, started_at, completed_at, updated_by] = values;
+    return { id, source, mode, status, payload, started_at, completed_at, updated_by };
+  }
+  if (table === "product_catalog_meta") {
+    const [key, value] = values;
+    return { key, value };
+  }
   throw new Error(`Unsupported insert table ${table}`);
 }
 
@@ -45,6 +70,7 @@ function keyFor(table, row) {
   if (table === "goods_flow_inventory_daily") return `${row.snapshot_date}:${row.sku_id}:${row.warehouse_id}`;
   if (table === "goods_flow_stocktake_lines") return `${row.stocktake_id}:${row.sku_id}:${row.warehouse_id}`;
   if (table === "goods_flow_ccc_monthly") return `${row.month}:${row.version}`;
+  if (table === "product_catalog_meta") return row.key;
   return row.id;
 }
 
@@ -64,7 +90,27 @@ export function createGoodsFlowLocalDatabase(snapshot = {}) {
         values: [],
         bind(...values) { statement.values = values; return statement; },
         async run() {
-          const insert = normalized.match(/^insert into (goods_flow_[a-z_]+)/);
+          if (/^create (table|index)/.test(normalized)) return { success: true, meta: { changes: 0 } };
+          const deleteComponents = normalized.match(/^delete from product_catalog_components where parent_item_id = \?/);
+          if (deleteComponents) {
+            let changes = 0;
+            for (const [key, row] of tables.product_catalog_components) {
+              if (row.parent_item_id !== statement.values[0]) continue;
+              tables.product_catalog_components.delete(key);
+              changes += 1;
+            }
+            return { success: true, meta: { changes } };
+          }
+          if (/^update product_catalog_items set present_in_source = 0/.test(normalized)) {
+            let changes = 0;
+            for (const [key, row] of tables.product_catalog_items) {
+              if (row.source !== statement.values[0] || row.synced_at === statement.values[1]) continue;
+              tables.product_catalog_items.set(key, { ...row, present_in_source: 0 });
+              changes += 1;
+            }
+            return { success: true, meta: { changes } };
+          }
+          const insert = normalized.match(/^insert into ((?:goods_flow|product_catalog)_[a-z_]+)/);
           if (!insert) throw new Error(`Unsupported local goods-flow SQL: ${normalized}`);
           const table = insert[1];
           const row = rowForInsert(table, statement.values);
@@ -74,7 +120,7 @@ export function createGoodsFlowLocalDatabase(snapshot = {}) {
           return { success: true, meta: { changes: 1 } };
         },
         async all() {
-          const from = normalized.match(/ from (goods_flow_[a-z_]+)/);
+          const from = normalized.match(/ from ((?:goods_flow|product_catalog)_[a-z_]+)/);
           if (!from) throw new Error(`Unsupported local goods-flow SQL: ${normalized}`);
           let results = [...tables[from[1]].values()];
           if (normalized.includes("where platform = ?")) results = results.filter(row => row.platform === statement.values[0]);
@@ -82,6 +128,7 @@ export function createGoodsFlowLocalDatabase(snapshot = {}) {
           if (normalized.includes("where month = ?")) results = results.filter(row => row.month === statement.values[0]);
           if (normalized.includes("where id = ?")) results = results.filter(row => row.id === statement.values[0]);
           if (normalized.includes("where stocktake_id = ?")) results = results.filter(row => row.stocktake_id === statement.values[0]);
+          if (normalized.includes("where key = ?")) results = results.filter(row => row.key === statement.values[0]);
           return { results };
         },
         async first() {

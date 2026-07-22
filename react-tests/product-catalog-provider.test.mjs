@@ -34,14 +34,24 @@ test("catalog client loads, imports and synchronizes through one boundary", asyn
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     calls.push({ url, options });
-    return new Response(JSON.stringify({ synced: true, items: [{ id: "p1" }], meta: { products: 1 } }), { status: 200 });
+    if (url !== productCatalogSyncUrl()) {
+      return new Response(JSON.stringify({ synced: true, items: [{ id: "p1" }], meta: { products: 1 } }), { status: 200 });
+    }
+    const cursor = JSON.parse(options.body).cursor;
+    return new Response(JSON.stringify(cursor === 0
+      ? { synced: true, complete: false, nextCursor: 30, progress: { processed: 30, totalCandidates: 31, components: 30 } }
+      : { synced: true, complete: true, nextCursor: null, progress: { processed: 31, totalCandidates: 31, components: 2 } }), { status: 200 });
   };
+  const progress = [];
   assert.equal((await loadProductCatalog(fetchImpl)).items.length, 1);
   await importProductCatalog({ source: "kuaimai-file", items: [{ merchantCode: "A1" }] }, fetchImpl);
-  await syncKuaimaiProductCatalog(fetchImpl);
-  assert.deepEqual(calls.map(call => call.url), [productCatalogApiUrl(), productCatalogImportUrl(), productCatalogSyncUrl()]);
+  const synced = await syncKuaimaiProductCatalog(fetchImpl, update => progress.push(update));
+  assert.deepEqual(calls.map(call => call.url), [productCatalogApiUrl(), productCatalogImportUrl(), productCatalogSyncUrl(), productCatalogSyncUrl()]);
   assert.equal(calls[1].options.method, "POST");
   assert.equal(calls[2].options.method, "POST");
+  assert.deepEqual(calls.slice(2).map(call => JSON.parse(call.options.body).cursor), [0, 30]);
+  assert.deepEqual(progress.map(update => update.processed), [30, 31]);
+  assert.equal(synced.progress.components, 32);
 });
 
 test("catalog client treats an unsynced successful read as an empty catalog", async () => {

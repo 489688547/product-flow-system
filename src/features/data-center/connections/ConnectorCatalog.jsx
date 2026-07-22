@@ -20,7 +20,7 @@ const LOGOS = {
   kuaimai: kuaimaiLogo
 };
 
-const METHOD_LABELS = { api: "API", browser: "网页", export: "文件导出" };
+const METHOD_LABELS = { api: "API", browser: "网页", export: "文件导入" };
 const STATUS_LABELS = {
   waiting_verification: "等待人工验证",
   schema_changed: "页面结构变化",
@@ -39,18 +39,28 @@ function summaryStatus(instances) {
   return CONNECTOR_STATUS_PRIORITY.find(status => instances.some(item => item.status === status)) || "pending_validation";
 }
 
-export function ConnectorCatalog({ definitions = DATA_CONNECTOR_DEFINITIONS, instances = [], canEdit = false, onAdd, onManage }) {
+export function ConnectorCatalog({
+  definitions = DATA_CONNECTOR_DEFINITIONS,
+  instances = [],
+  canEdit = false,
+  onAdd,
+  onManage,
+  waitingForSamples = () => false,
+  pendingMessage = "",
+  pendingActionLabel = "等待文件样例"
+}) {
   return (
     <div className="data-access-grid connector-catalog-grid">
       {definitions.map(definition => {
-        const configured = instances.filter(item => item.connectorId === definition.id);
-        const status = summaryStatus(configured);
+        const samplePending = waitingForSamples(definition.id);
+        const configured = samplePending ? [] : instances.filter(item => item.connectorId === definition.id);
+        const status = samplePending ? "sample_pending" : summaryStatus(configured);
         return (
           <article className={`connector-card status-${status}`} key={definition.id}>
             <div className="connector-card-head">
               <img src={LOGOS[definition.logo]} alt="" aria-hidden="true" />
               <div><strong>{definition.name}</strong><span>{definition.description}</span></div>
-              <em>{STATUS_LABELS[status]}</em>
+              <em>{samplePending ? "等待文件样例" : STATUS_LABELS[status]}</em>
             </div>
             <div className="connector-methods" aria-label={`${definition.name}支持的接入方式`}>
               {definition.methods.map(method => <span key={method}>{METHOD_LABELS[method]}</span>)}
@@ -70,9 +80,15 @@ export function ConnectorCatalog({ definitions = DATA_CONNECTOR_DEFINITIONS, ins
                   </li>
                 ))}
               </ul>
-            ) : <p>配置保存后先进入待验证，不会直接标记为已接通。</p>}
-            <button className="connector-add-action" type="button" disabled={!canEdit} onClick={() => onAdd(definition)}>
-              <Plus size={15} />添加连接
+            ) : <p>{samplePending ? pendingMessage : "配置保存后先进入待验证，不会直接标记为已接通。"}</p>}
+            <button
+              className="connector-add-action"
+              type="button"
+              disabled={samplePending || !canEdit}
+              title={samplePending ? pendingMessage : (!canEdit ? "当前账号没有数据接入编辑权限" : undefined)}
+              onClick={() => onAdd(definition)}
+            >
+              <Plus size={15} />{samplePending ? pendingActionLabel : "添加连接"}
             </button>
           </article>
         );
