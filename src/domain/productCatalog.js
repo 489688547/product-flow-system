@@ -1,4 +1,5 @@
 import { isSalesBarcode } from "./salesData.js";
+import { normalizeCatalogComponent } from "./productCatalogGraph.js";
 
 const SKU_ARRAY_KEYS = ["skus", "items", "itemSkus"];
 const ROW_FIELDS = {
@@ -95,7 +96,7 @@ function skuInputsFor(item = {}) {
 export function catalogBarcodeType(value) {
   const barcode = text(value, 80);
   if (!barcode) return "missing";
-  return isSalesBarcode(barcode) ? "sales_barcode" : "non_standard";
+  return isSalesBarcode(barcode) ? "sales_barcode" : "internal_unique";
 }
 
 export function normalizeCatalogSku(input = {}, context = {}) {
@@ -160,6 +161,21 @@ export function normalizeCatalogItem(input = {}, context = {}) {
     const existing = skuMap.get(sku.id);
     skuMap.set(sku.id, existing ? { ...existing, ...Object.fromEntries(Object.entries(sku).filter(([, value]) => value !== "" && value !== null)) } : sku);
   }
+  const componentInputs = Array.isArray(input.components)
+    ? input.components
+    : Array.isArray(input.suitSingleList)
+      ? input.suitSingleList
+      : [];
+  const components = componentInputs.map(component => normalizeCatalogComponent(component, {
+    source,
+    parentItemId: id,
+    syncedAt: context.syncedAt
+  }));
+  const type = text(input.type, 80);
+  const typeTag = text(input.typeTag, 40);
+  const productKind = components.length || ["1", "2"].includes(type) || ["3", "4"].includes(typeTag)
+    ? "bundle"
+    : "single";
   return {
     id,
     source,
@@ -169,8 +185,9 @@ export function normalizeCatalogItem(input = {}, context = {}) {
     shortName: text(input.shortName || input.shortTitle, 160),
     remark: text(input.remark, 500),
     imageUrl: text(input.imageUrl || input.picPath, 1000),
-    type: text(input.type, 80),
-    typeTag: text(input.typeTag, 40),
+    type,
+    typeTag,
+    productKind,
     category,
     brand,
     supplierName: text(input.supplierName, 160),
@@ -181,7 +198,8 @@ export function normalizeCatalogItem(input = {}, context = {}) {
     sourceCreatedAt: text(input.sourceCreatedAt || input.created, 80),
     sourceModifiedAt: text(input.sourceModifiedAt || input.modified, 80),
     syncedAt: text(context.syncedAt || input.syncedAt, 80),
-    skus: [...skuMap.values()]
+    skus: [...skuMap.values()],
+    components
   };
 }
 
@@ -221,8 +239,12 @@ export function normalizeCatalogPayload(input = {}) {
       products: normalized.length,
       skus: normalized.reduce((sum, item) => sum + item.skus.length, 0),
       salesBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "sales_barcode").length,
-      nonStandardBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "non_standard").length,
-      missingBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "missing").length
+      internalUniqueCodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "internal_unique").length,
+      nonStandardBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "internal_unique").length,
+      missingBarcodes: normalized.flatMap(item => item.skus).filter(sku => sku.barcodeType === "missing").length,
+      bundles: normalized.filter(item => item.productKind === "bundle").length,
+      components: normalized.reduce((sum, item) => sum + (item.components || []).length, 0),
+      componentCoveredItems: normalized.filter(item => item.productKind === "bundle" && item.components?.length).length
     }
   };
 }
@@ -246,13 +268,14 @@ export function mergeCatalogRecords(existing, incoming) {
   if (!incoming) return existing;
   const skuMap = new Map((existing.skus || []).map(sku => [sku.id, sku]));
   for (const sku of incoming.skus || []) skuMap.set(sku.id, mergeCatalogFields(skuMap.get(sku.id), sku));
-  return { ...mergeCatalogFields(existing, incoming), skus: [...skuMap.values()] };
+  const components = incoming.components?.length ? incoming.components : existing.components || [];
+  return { ...mergeCatalogFields(existing, incoming), skus: [...skuMap.values()], components };
 }
 
 export function catalogBarcodesForProduct(items = [], productId = "") {
   const product = items.find(item => item.id === productId);
   if (!product) return [];
-  return [...new Set((product.skus || []).filter(sku => sku.barcodeType === "sales_barcode").map(sku => sku.barcode))];
+  return [...new Set((product.skus || []).filter(sku => sku.barcodeType !== "missing").map(sku => sku.barcode))];
 }
 
 function catalogSkuCodes(item, storedCodes = []) {
@@ -262,7 +285,7 @@ function catalogSkuCodes(item, storedCodes = []) {
   }));
   const byCode = new Map();
   for (const sku of item?.skus || []) {
-    if (sku.barcodeType !== "sales_barcode" || !sku.barcode) continue;
+    if (sku.barcodeType === "missing" || !sku.barcode) continue;
     const existing = stored.get(sku.barcode);
     byCode.set(sku.barcode, {
       code: sku.barcode,

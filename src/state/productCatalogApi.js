@@ -50,7 +50,29 @@ export async function importProductCatalog(input, fetchImpl = fetch) {
   return payloadFor(response, "商品主数据导入失败。");
 }
 
-export async function syncKuaimaiProductCatalog(fetchImpl = fetch) {
-  const response = await fetchImpl(productCatalogSyncUrl(), { method: "POST" });
-  return payloadFor(response, "快麦商品同步失败。");
+export async function syncKuaimaiProductCatalog(fetchImpl = fetch, onProgress) {
+  let cursor = 0;
+  let componentCount = 0;
+  let failedCount = 0;
+  const failures = [];
+  for (let batch = 0; batch < 40; batch += 1) {
+    const response = await fetchImpl(productCatalogSyncUrl(), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ cursor })
+    });
+    const payload = await payloadFor(response, "快麦商品同步失败。");
+    componentCount += Number(payload.progress?.components || 0);
+    failedCount += Number(payload.progress?.failed || 0);
+    if (Array.isArray(payload.failures)) failures.push(...payload.failures);
+    const progress = { ...(payload.progress || {}), components: componentCount, failed: failedCount };
+    if (typeof onProgress === "function") onProgress(progress);
+    if (payload.complete !== false) {
+      return { ...payload, status: failures.length ? "partial" : payload.status, progress, failures };
+    }
+    const nextCursor = Number(payload.nextCursor);
+    if (!Number.isFinite(nextCursor) || nextCursor <= cursor) throw new Error("快麦组合商品同步游标异常，请稍后重试。");
+    cursor = nextCursor;
+  }
+  throw new Error("快麦组合商品数量超过本次同步安全范围，请稍后继续。");
 }

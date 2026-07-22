@@ -1,7 +1,6 @@
 import { ImagePlus, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
-import { isSalesBarcode } from "../../domain/salesData.js";
 import { productManagerAssignment } from "../../domain/productOwnership.js";
 import { Button, IconAction } from "../../ui/Button.jsx";
 import { Modal } from "../../ui/Modal.jsx";
@@ -49,30 +48,27 @@ export function ProductModal({ open, product, orgCache, catalogItems = [], onClo
         </div>
       </div>
       <div className="full-field product-catalog-link-field">
-        <span>ERP 商品关联<small>商品、SKU 和 69 码来自数据中心；产品阶段、负责人和资料仍由产品全周期维护。</small></span>
+        <span>ERP 商品关联<small>商品、库存单位编码和组合关系来自数据中心；产品阶段、负责人和资料仍由产品全周期维护。</small></span>
         <ProductCatalogSelect items={catalogItems} value={form.catalogProductId || ""} onChange={catalogProductId => {
           if (!catalogProductId) set({ catalogProductId: "" });
           else set(mergeProductCatalogLink(form, catalogItems.find(item => item.id === catalogProductId)));
         }} />
-        {catalogItem ? <p className="product-catalog-link-summary">主商家编码 <b>{catalogItem.merchantCode || "—"}</b> · {(catalogItem.skus || []).length} 个 SKU · {(catalogItem.skus || []).filter(sku => sku.barcodeType === "sales_barcode").length} 个标准 69 码</p> : null}
+        {catalogItem ? <p className="product-catalog-link-summary">主商家编码 <b>{catalogItem.merchantCode || "—"}</b> · {(catalogItem.skus || []).length} 个库存单位 · {(catalogItem.components || []).length} 条组合关系</p> : null}
       </div>
       <div className="full-field sku-code-field">
-        <span>SKU 69码与定价<small>填写69码后，产品档案里可点击查看销售数据；定价用于计算营销费用（定价×净销量−净销售额）。</small></span>
+        <span>库存单位编码与定价<small>未关联 ERP 商品时可兼容手工维护；标准商品条码和内部唯一码都可用于匹配销售数据。</small></span>
         {(form.skuCodes || []).map((item, index) => {
           const codeText = String(item.code || "");
-          const invalid = codeText && !isSalesBarcode(codeText);
           return (
             <div className="sku-code-row" key={index}>
               <input
-                aria-label={`第${index + 1}个69码`}
-                placeholder="69开头的商品条码"
-                inputMode="numeric"
+                aria-label={`第${index + 1}个库存单位编码`}
+                placeholder="商品条码或内部唯一码"
                 value={codeText}
-                className={invalid ? "input-invalid" : ""}
                 onChange={event => set({ skuCodes: form.skuCodes.map((current, at) => at === index ? { ...current, code: event.target.value.trim() } : current) })}
               />
               <input
-                aria-label={`第${index + 1}个69码定价`}
+                aria-label={`第${index + 1}个库存单位定价`}
                 placeholder="定价（元）"
                 type="number"
                 min="0"
@@ -80,12 +76,11 @@ export function ProductModal({ open, product, orgCache, catalogItems = [], onClo
                 value={item.price ?? ""}
                 onChange={event => set({ skuCodes: form.skuCodes.map((current, at) => at === index ? { ...current, price: event.target.value } : current) })}
               />
-              <IconAction label={`删除第${index + 1}个69码`} className="danger" onClick={() => set({ skuCodes: form.skuCodes.filter((current, at) => at !== index) })}><Trash2 size={16} /></IconAction>
-              {invalid ? <em className="sku-code-error">69码需为69开头的12-14位数字</em> : null}
+              <IconAction label={`删除第${index + 1}个库存单位编码`} className="danger" onClick={() => set({ skuCodes: form.skuCodes.filter((current, at) => at !== index) })}><Trash2 size={16} /></IconAction>
             </div>
           );
         })}
-        <Button className="compact" onClick={() => set({ skuCodes: [...(form.skuCodes || []), { code: "", price: "" }] })}><Plus size={16} />添加69码</Button>
+        <Button className="compact" onClick={() => set({ skuCodes: [...(form.skuCodes || []), { code: "", price: "" }] })}><Plus size={16} />添加库存单位</Button>
       </div>
       <label className="full-field">产品描述<RichTextEditor value={form.desc || ""} onChange={desc => set({ desc })} placeholder="产品背景、讨论记录、关键结论…" /></label>
     </Modal>

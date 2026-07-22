@@ -103,6 +103,7 @@ const businessDataTables = [
   "data_center_meta",
   "product_catalog_items",
   "product_catalog_skus",
+  "product_catalog_components",
   "product_catalog_sync_runs",
   "product_catalog_meta",
   "product_sales_daily",

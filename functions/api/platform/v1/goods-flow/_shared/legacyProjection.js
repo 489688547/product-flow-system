@@ -4,6 +4,7 @@ import {
   normalizeSupplyChainState
 } from "../../../../../../src/domain/supplyChain.js";
 import { buildInventoryDailyRows } from "../../../../../../src/domain/goodsFlow.js";
+import { flattenCatalogConsumption } from "../../../../../../src/domain/productCatalogGraph.js";
 
 const APPROVED_STATUSES = new Set(["COMPLETED", "APPROVED", "AGREE"]);
 
@@ -28,7 +29,7 @@ function codesForProduct(product) {
   return values.map(value => clean(typeof value === "object" ? value?.code : value)).filter(Boolean);
 }
 
-function productIndexes(products = []) {
+function productIndexes(products = [], catalogItems = []) {
   const byId = new Map();
   const bySku = new Map();
   for (const product of products) {
@@ -37,6 +38,20 @@ function productIndexes(products = []) {
     byId.set(productId, product);
     for (const skuCode of codesForProduct(product)) {
       bySku.set(skuCode, { product, productId, skuCode, skuId: `${productId}::${skuCode}` });
+    }
+  }
+  for (const item of catalogItems) {
+    const productId = clean(item?.id);
+    if (!productId) continue;
+    if (!byId.has(productId)) byId.set(productId, item);
+    const merchantCode = clean(item?.merchantCode);
+    if (merchantCode && !bySku.has(merchantCode)) {
+      bySku.set(merchantCode, { product: item, catalogItem: item, productId, skuCode: merchantCode, skuId: null });
+    }
+    for (const sku of item?.skus || []) {
+      const skuCode = clean(sku?.barcode || sku?.merchantSkuCode);
+      if (!skuCode || bySku.has(skuCode)) continue;
+      bySku.set(skuCode, { product: item, catalogItem: item, productId, skuCode, skuId: clean(sku.id) || `${productId}::${skuCode}` });
     }
   }
   return { byId, bySku };
@@ -72,9 +87,9 @@ function approved(row) {
   return APPROVED_STATUSES.has(clean(row?.status).toUpperCase());
 }
 
-export function projectLegacyGoodsFlow({ supplyState = {}, products = [], salesRows = [], asOf = "" } = {}) {
+export function projectLegacyGoodsFlow({ supplyState = {}, products = [], catalogItems = [], salesRows = [], asOf = "" } = {}) {
   const state = normalizeSupplyChainState(supplyState);
-  const indexes = productIndexes(products);
+  const indexes = productIndexes(products, catalogItems);
   const events = [];
   const exceptions = [];
   const purchasesByProcess = new Map();
@@ -151,16 +166,58 @@ export function projectLegacyGoodsFlow({ supplyState = {}, products = [], salesR
         entityId: reference,
         source: clean(sale.source) || "kuaimai-sales",
         sourceReference: reference,
-        message: `销量记录的 SKU/69 码 ${skuCode || "为空"} 未匹配商品主数据。`,
+        message: `销量记录的库存单位编码 ${skuCode || "为空"} 未匹配商品主数据。`,
         details: { skuCode },
         asOf
       }));
       continue;
     }
+    let components = null;
+    let graphCost = 0;
+    if (mapping.catalogItem) {
+      if (mapping.catalogItem.productKind === "bundle" && !(mapping.catalogItem.components || []).length) {
+        exceptions.push(exception({
+          code: "GOODS_FLOW_COMPONENT_MAPPING_REQUIRED",
+          entityType: "sale",
+          entityId: reference,
+          source: clean(sale.source) || "kuaimai-sales",
+          sourceReference: reference,
+          message: `组合商品 ${skuCode} 尚未同步库存组成，未计入库存消耗。`,
+          details: { skuCode, catalogProductId: mapping.productId },
+          asOf
+        }));
+        continue;
+      }
+      const consumption = flattenCatalogConsumption({
+        items: catalogItems,
+        itemId: mapping.catalogItem.id,
+        skuId: mapping.skuId || "",
+        quantity: number(sale.qty ?? sale.quantity)
+      });
+      if (consumption.issues.length || !consumption.components.length) {
+        exceptions.push(exception({
+          code: "GOODS_FLOW_COMPONENT_MAPPING_REQUIRED",
+          entityType: "sale",
+          entityId: reference,
+          source: clean(sale.source) || "kuaimai-sales",
+          sourceReference: reference,
+          message: `商品 ${skuCode} 的库存组成不完整，未计入库存消耗。`,
+          details: { skuCode, catalogProductId: mapping.productId, issueCodes: consumption.issues.map(item => item.code) },
+          asOf
+        }));
+        continue;
+      }
+      components = consumption.components;
+      graphCost = consumption.totalCost;
+    }
+    const suppliedCost = sale.cost ?? sale.salesCost;
+    const cost = suppliedCost === null || suppliedCost === undefined || clean(suppliedCost) === ""
+      ? graphCost
+      : number(suppliedCost);
     events.push({
       id: stableId("sale-consumed", reference, sourceVersion(sale)),
       eventType: "sale_consumed",
-      skuId: mapping.skuId,
+      skuId: mapping.skuId || null,
       occurredAt: isoDate(sale.date || sale.occurredAt, asOf),
       source: clean(sale.source) || "kuaimai-sales",
       sourceReference: reference,
@@ -170,8 +227,9 @@ export function projectLegacyGoodsFlow({ supplyState = {}, products = [], salesR
         skuCode,
         platform: clean(sale.platform),
         quantity: number(sale.qty ?? sale.quantity),
-        cost: number(sale.cost ?? sale.salesCost),
-        netSales: number(sale.netSales ?? sale.salesAmount ?? sale.amount)
+        cost,
+        netSales: number(sale.netSales ?? sale.salesAmount ?? sale.amount),
+        components
       },
       createdAt: isoDate(asOf, new Date().toISOString())
     });
@@ -191,7 +249,7 @@ export function projectLegacyGoodsFlow({ supplyState = {}, products = [], salesR
         entityId: reference,
         source,
         sourceReference: reference,
-        message: `库存记录的 SKU/69 码 ${skuCode || "为空"} 未匹配商品主数据。`,
+        message: `库存记录的库存单位编码 ${skuCode || "为空"} 未匹配商品主数据。`,
         details: { skuCode, warehouse: snapshot.warehouse },
         asOf
       }));

@@ -13,11 +13,11 @@ const catalogItem = {
   skus: [
     { id: "kuaimai:sku:1", barcode: "6978705011208", barcodeType: "sales_barcode", salePrice: 19.9 },
     { id: "kuaimai:sku:2", barcode: "6978705011215", barcodeType: "sales_barcode", salePrice: 29.9 },
-    { id: "kuaimai:sku:3", barcode: "112233", barcodeType: "non_standard", salePrice: 9.9 }
+    { id: "kuaimai:sku:3", barcode: "112233", barcodeType: "internal_unique", salePrice: 9.9 }
   ]
 };
 
-test("linking a lifecycle product keeps its identity and derives catalog barcodes", () => {
+test("linking a lifecycle product keeps its identity and derives all inventory-unit codes", () => {
   const product = { id: "p1", name: "业务产品", skuCodes: [{ code: "6978705011208", price: 18.8 }] };
   const linked = mergeProductCatalogLink(product, catalogItem);
   assert.equal(linked.id, "p1");
@@ -25,7 +25,8 @@ test("linking a lifecycle product keeps its identity and derives catalog barcode
   assert.equal(linked.catalogProductId, catalogItem.id);
   assert.deepEqual(linked.skuCodes, [
     { code: "6978705011208", price: 18.8 },
-    { code: "6978705011215", price: 29.9 }
+    { code: "6978705011215", price: 29.9 },
+    { code: "112233", price: 9.9 }
   ]);
 });
 

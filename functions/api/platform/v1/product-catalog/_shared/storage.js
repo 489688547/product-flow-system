@@ -43,6 +43,17 @@ export async function ensureProductCatalogTables(db) {
     completed_at TEXT,
     updated_by TEXT
   )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS product_catalog_components (
+    id TEXT PRIMARY KEY,
+    parent_item_id TEXT NOT NULL,
+    source TEXT NOT NULL,
+    component_code TEXT,
+    ratio INTEGER NOT NULL,
+    payload TEXT NOT NULL,
+    synced_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT
+  )`).run();
   await db.prepare(`CREATE TABLE IF NOT EXISTS product_catalog_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -61,7 +72,7 @@ function metaStatement(db, key, value) {
 }
 
 function itemStatement(db, item, context) {
-  const { skus: _skus, ...payload } = item;
+  const { skus: _skus, components: _components, ...payload } = item;
   return db.prepare(`INSERT INTO product_catalog_items
     (id, source, source_product_id, merchant_code, name, payload, active, present_in_source, synced_at, updated_at, updated_by)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -77,6 +88,39 @@ function itemStatement(db, item, context) {
       updated_at = excluded.updated_at,
       updated_by = excluded.updated_by`)
     .bind(item.id, item.source, item.sourceProductId, item.merchantCode, item.name, JSON.stringify(payload), item.active ? 1 : 0, item.presentInSource === false ? 0 : 1, context.syncedAt, context.updatedAt, context.actor);
+}
+
+function componentStatement(db, component, context) {
+  return db.prepare(`INSERT INTO product_catalog_components
+    (id, parent_item_id, source, component_code, ratio, payload, synced_at, updated_at, updated_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      parent_item_id = excluded.parent_item_id,
+      source = excluded.source,
+      component_code = excluded.component_code,
+      ratio = excluded.ratio,
+      payload = excluded.payload,
+      synced_at = excluded.synced_at,
+      updated_at = excluded.updated_at,
+      updated_by = excluded.updated_by`)
+    .bind(component.id, component.parentItemId, component.source, component.inventoryUnitCode, component.ratio, JSON.stringify(component), context.syncedAt, context.updatedAt, context.actor);
+}
+
+export async function replaceProductCatalogComponents(db, items = [], { actor = "", syncedAt = new Date().toISOString(), replaceEmpty = false } = {}) {
+  await ensureProductCatalogTables(db);
+  const context = { actor: String(actor).slice(0, 120), syncedAt, updatedAt: new Date().toISOString() };
+  let componentCount = 0;
+  let parentCount = 0;
+  for (const item of items) {
+    const components = Array.isArray(item?.components) ? item.components : [];
+    if (!components.length && !replaceEmpty) continue;
+    const statements = [db.prepare("DELETE FROM product_catalog_components WHERE parent_item_id = ?").bind(item.id)];
+    for (const component of components) statements.push(componentStatement(db, component, context));
+    await db.batch(statements);
+    parentCount += 1;
+    componentCount += components.length;
+  }
+  return { parents: parentCount, components: componentCount };
 }
 
 function skuStatement(db, sku, context) {
@@ -124,6 +168,10 @@ export async function writeProductCatalog(db, input, { actor = "", mode = "impor
     for (const sku of item.skus) statements.push(skuStatement(db, { ...sku, syncedAt }, context));
   }
   await runBatches(db, statements);
+  await replaceProductCatalogComponents(db, normalized.items.filter(item => item.components?.length), {
+    actor: context.actor,
+    syncedAt
+  });
   if (replaceSource) {
     await db.prepare("UPDATE product_catalog_items SET present_in_source = 0 WHERE source = ? AND synced_at <> ?")
       .bind(normalized.source, syncedAt).run();
@@ -174,9 +222,10 @@ function parsePayload(row) {
 
 export async function readProductCatalog(db) {
   await ensureProductCatalogTables(db);
-  const [itemRows, skuRows, runRows] = await Promise.all([
+  const [itemRows, skuRows, componentRows, runRows] = await Promise.all([
     db.prepare("SELECT * FROM product_catalog_items ORDER BY active DESC, name, merchant_code").all(),
     db.prepare("SELECT * FROM product_catalog_skus ORDER BY item_id, merchant_sku_code, barcode").all(),
+    db.prepare("SELECT * FROM product_catalog_components ORDER BY parent_item_id, component_code").all(),
     db.prepare("SELECT * FROM product_catalog_sync_runs ORDER BY started_at DESC LIMIT 20").all()
   ]);
   const skuByItem = new Map();
@@ -187,11 +236,19 @@ export async function readProductCatalog(db) {
     list.push(sku);
     skuByItem.set(row.item_id, list);
   }
+  const componentsByItem = new Map();
+  for (const row of componentRows?.results || []) {
+    const component = parsePayload(row);
+    if (!component) continue;
+    const list = componentsByItem.get(row.parent_item_id) || [];
+    list.push(component);
+    componentsByItem.set(row.parent_item_id, list);
+  }
   const items = [];
   for (const row of itemRows?.results || []) {
     const item = parsePayload(row);
     if (!item) continue;
-    items.push({ ...item, presentInSource: Boolean(row.present_in_source), skus: skuByItem.get(row.id) || [] });
+    items.push({ ...item, presentInSource: Boolean(row.present_in_source), skus: skuByItem.get(row.id) || [], components: componentsByItem.get(row.id) || [] });
   }
   const runs = (runRows?.results || []).map(parsePayload).filter(Boolean);
   const [lastSuccessfulSyncAt, lastSource, lastMode, version] = await Promise.all([

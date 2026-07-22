@@ -147,7 +147,8 @@
 - `GOODS_FLOW_WRITE_DENIED`：只读账号尝试执行货流写入，HTTP 403。
 - `GOODS_FLOW_VERSION_CONFLICT`：盘点、账期或 CCC 的读取版本已过期，HTTP 409。
 - `GOODS_FLOW_IDEMPOTENCY_CONFLICT`：同一来源引用或业务幂等键指向不同内容，HTTP 409。
-- `GOODS_FLOW_SKU_MAPPING_REQUIRED`：商品、SKU 或 69 码不能确定性映射，记录进入异常队列。
+- `GOODS_FLOW_SKU_MAPPING_REQUIRED`：商品或库存单位编码不能确定性映射，记录进入异常队列。
+- `GOODS_FLOW_COMPONENT_MAPPING_REQUIRED`：组合商品的库存组成、比例或叶子库存单位不完整，本条销量不计入库存消耗。
 - `GOODS_FLOW_PURCHASE_LINK_REQUIRED`：付款没有可验证的采购关联，不计入货流金额。
 - `GOODS_FLOW_TERM_OVERLAP`：同一平台账期生效区间重叠，HTTP 409。
 - `GOODS_FLOW_METRIC_INCOMPLETE`：计算来源覆盖不足，指标不可冻结。

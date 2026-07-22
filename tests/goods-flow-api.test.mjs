@@ -10,6 +10,7 @@ import { onRequest as stocktakes } from "../functions/api/platform/v1/goods-flow
 import { onRequest as stocktakeTransitions } from "../functions/api/platform/v1/goods-flow/stocktakes/[id]/transitions.js";
 import { onRequest as recalculateCcc } from "../functions/api/platform/v1/goods-flow/ccc/[month]/recalculate.js";
 import { onRequest as freezeCcc } from "../functions/api/platform/v1/goods-flow/ccc/[month]/freeze.js";
+import { upsertProductCatalog } from "../functions/api/platform/v1/product-catalog/_shared/storage.js";
 
 const sessions = {
   finance: { userId: "finance-1", name: "财务同事", department: "财务部" },
@@ -79,6 +80,49 @@ test("legacy import commits valid rows and returns mapping failures as partial s
   assert.equal(listed.body.data[0].skuCode, "690001");
   const productView = await call(inventory, { session: sessions.product, db });
   assert.equal(Object.hasOwn(productView.body.data[0], "unitCost"), false);
+});
+
+test("goods-flow import reads the shared catalog instead of trusting client product copies", async () => {
+  const db = createGoodsFlowD1Mock();
+  await upsertProductCatalog(db, {
+    source: "kuaimai",
+    items: [
+      {
+        sourceProductId: "bundle-1",
+        merchantCode: "2DGZZ",
+        name: "单个慕斯粽子*2",
+        type: "2",
+        components: [{ inventoryUnitCode: "1111", ratio: 2, purchasePrice: 2.5 }]
+      },
+      {
+        sourceProductId: "single-1",
+        merchantCode: "SINGLE-1111",
+        name: "慕斯粽子",
+        skus: [{ sourceSkuId: "sku-1111", barcode: "1111", purchasePrice: 2.5 }]
+      }
+    ]
+  }, { actor: "数据同事", mode: "test" });
+
+  const result = await call(imports, {
+    method: "POST",
+    session: sessions.data,
+    db,
+    headers: { "idempotency-key": "bundle-sale-from-shared-catalog" },
+    body: {
+      asOf: "2026-07-20",
+      products: [{ id: "spoofed", skuCodes: ["WRONG"] }],
+      catalogItems: [],
+      salesRows: [{ id: "bundle-sale", code: "2DGZZ", qty: 3, netSales: 60, date: "2026-07-19" }]
+    }
+  });
+
+  assert.equal(result.response.status, 201);
+  const event = [...db.tables.goods_flow_events.values()].find(row => row.source_reference === "bundle-sale");
+  const payload = JSON.parse(event.payload);
+  assert.equal(payload.cost, 15);
+  assert.equal(payload.netSales, 60);
+  assert.equal(payload.components[0].inventoryUnitCode, "1111");
+  assert.equal(payload.components[0].quantity, 6);
 });
 
 test("stocktake transitions enforce warehouse, supply and finance responsibilities", async () => {

@@ -64,7 +64,7 @@ test("normalizes JSON-array category text returned by Kuaimai", () => {
   assert.equal(catalog.items[0].category, "仓鼠用品");
 });
 
-test("keeps non-standard codes visible and merges duplicate SKU rows", () => {
+test("keeps internal unique codes valid and merges duplicate SKU rows", () => {
   const catalog = normalizeCatalogPayload({
     source: "kuaimai",
     items: [{
@@ -79,8 +79,8 @@ test("keeps non-standard codes visible and merges duplicate SKU rows", () => {
   });
 
   assert.equal(catalog.items[0].skus.length, 1);
-  assert.equal(catalog.items[0].skus[0].barcodeType, "non_standard");
-  assert.deepEqual(catalogBarcodesForProduct(catalog.items, catalog.items[0].id), []);
+  assert.equal(catalog.items[0].skus[0].barcodeType, "internal_unique");
+  assert.deepEqual(catalogBarcodesForProduct(catalog.items, catalog.items[0].id), ["112233"]);
 });
 
 test("parses Kuaimai product archive rows and groups variants under one product", () => {
