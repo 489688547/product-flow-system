@@ -82,6 +82,8 @@
 - `PERMISSION_WRITE_DENIED`：当前身份不能维护数据中心元数据。
 - `DATA_STATE_INVALID`：提交的元数据状态结构无效。
 - `DATA_DATE_RANGE_INVALID`：日期缺失、倒置或跨度超过 370 天。
+- `DATA_SERVICE_DATE_RANGE_INVALID`：销售数据服务只收到一个日期，或日期非法、倒置、超出服务上限。
+- `DATA_SERVICE_QUERY_FAILED`：销售数据服务读取或聚合 D1 失败，可重试。
 - `DATA_STORAGE_UNAVAILABLE`：当前部署缺少 `PRODUCT_FLOW_DB` 绑定。
 - `DATA_CONNECTOR_INVALID`：连接器 ID、字段、URL、保险箱类型或敏感字段边界不合法。
 - `DATA_CONNECTOR_NOT_FOUND`：连接实例不存在、已归档或对当前身份不可见。
