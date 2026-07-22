@@ -1,4 +1,5 @@
 import { authorizeCredentialAction } from "../../../_shared/credentialVaultAuthorization.js";
+import { canManagePlatformConnections } from "../../../../../../src/domain/permissions.js";
 import {
   assertPlatformCredentialRevealRateLimit,
   platformCredentialDatabase,
@@ -34,6 +35,9 @@ export async function onRequest({ request, env = {}, data = {}, params = {} }) {
     const platformId = String(params.platformId || "").trim();
     if (platformId !== SUPPORTED_PLATFORM_ID) {
       throw revealError("当前平台不支持查看已保存内容。", "PLATFORM_CREDENTIAL_REVEAL_UNAVAILABLE", 404);
+    }
+    if (!canManagePlatformConnections(data.session)) {
+      throw revealError("当前身份没有凭据查看权限。", "CREDENTIAL_REVEAL_DENIED", 403);
     }
     authorizeCredentialAction(data.session, "credential:reveal", { scopeType: "company" });
     const body = await credentialRequestBody(request);

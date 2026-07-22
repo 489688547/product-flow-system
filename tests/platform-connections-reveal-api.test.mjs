@@ -12,6 +12,7 @@ function masterKey() {
 const recent = new Date().toISOString();
 const executive = { userId: "u-exec", name: "最高权限账号", role: "executive", department: "总经办", createdAt: recent };
 const employee = { userId: "u-employee", name: "普通员工", role: "employee", department: "产品部", createdAt: recent };
+const executiveOfficeEmployee = { userId: "u-office", name: "总经办同事", role: "employee", department: "总经办", createdAt: recent };
 
 function request(platformId = "lingsuan-ai-gateway", body = { purpose: "确认公司 AI 凭据", confirmation: "查看灵算凭据" }) {
   return new Request(`https://product-flow-system.pages.dev/api/platform/v1/platform-connections/${platformId}/reveal`, {
@@ -60,6 +61,7 @@ test("reveal rejects non-executive stale session invalid confirmation and unsupp
   const { env } = await setup();
   const cases = [
     { session: employee, platformId: "lingsuan-ai-gateway", body: undefined, status: 403, code: "CREDENTIAL_REVEAL_DENIED" },
+    { session: executiveOfficeEmployee, platformId: "lingsuan-ai-gateway", body: undefined, status: 403, code: "CREDENTIAL_REVEAL_DENIED" },
     { session: { ...executive, createdAt: "2026-07-01T00:00:00.000Z" }, platformId: "lingsuan-ai-gateway", body: undefined, status: 401, code: "CREDENTIAL_REAUTH_REQUIRED" },
     { session: executive, platformId: "lingsuan-ai-gateway", body: { purpose: "确认", confirmation: "错误短语" }, status: 400, code: "PLATFORM_CREDENTIAL_REVEAL_INVALID" },
     { session: executive, platformId: "dingtalk", body: undefined, status: 404, code: "PLATFORM_CREDENTIAL_REVEAL_UNAVAILABLE" }
