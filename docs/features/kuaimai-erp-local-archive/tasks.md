@@ -10,7 +10,7 @@
 
 ## 任务
 
-- [ ] 本地原始归档能力
+- [x] 本地原始归档能力
   - 文件：`scripts/kuaimai-erp-collector/archive.mjs`、CLI、归档测试和 fixture。
   - 输出：固定目录、0700 权限、稳定性门、空间门、哈希去重、APFS clone/copy、原子归档和可恢复 manifest。
   - 验证：重复文件只存一次；来源文件路径、哈希和字节保持不变。
@@ -43,4 +43,3 @@
 - [ ] 发布与最终验收
   - 输出：环境和集成写回、全套 Definition of Done、生产迁移、Pages 部署、浏览器验收、LaunchAgent 启用、分支合入并推送 `main`。
   - 验证：本地、生产 D1、生产页面、定时任务和 Git main 五条证据链均通过；回滚步骤可执行。
-

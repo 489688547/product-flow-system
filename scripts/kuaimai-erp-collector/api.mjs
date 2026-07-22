@@ -23,6 +23,7 @@ export async function uploadErpCollection(collection, { baseUrl, fetchImpl = fet
         ...headers
       },
       body: JSON.stringify({
+        ...(collection.archive ? { archive: collection.archive } : {}),
         batch: { ...collection.batch, status: last ? collection.batch.status : "pending" },
         records,
         issues: last ? collection.issues || [] : []

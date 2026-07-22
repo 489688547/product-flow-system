@@ -11,6 +11,12 @@ import {
   inspectFileStability,
   loadLocalManifest
 } from "../scripts/kuaimai-erp-collector/archive.mjs";
+import {
+  collectorLaunchAgentPlist,
+  readCollectorToken,
+  storeCollectorToken
+} from "../scripts/kuaimai-erp-collector/automation.mjs";
+import { scanWaitingDirectory } from "../scripts/kuaimai-erp-collector/scanner.mjs";
 
 async function tempRoot() {
   return mkdtemp(path.join(os.tmpdir(), "kuaimai-archive-"));
@@ -94,3 +100,43 @@ test("manifest appends recoverable events without absolute source paths", async 
   assert.equal(JSON.stringify([...state.values()]).includes(root), false);
 });
 
+test("collector token is exchanged only with macOS Keychain", async () => {
+  const calls = [];
+  const command = async (program, args, options = {}) => {
+    calls.push({ program, args, options });
+    return args[0] === "find-generic-password" ? { stdout: "kec_secret\n" } : { stdout: "" };
+  };
+  await storeCollectorToken("kec_secret", { command, account: "roger" });
+  assert.equal(calls[0].program, "/usr/bin/security");
+  assert.equal(calls[0].args.includes("kec_secret"), false);
+  assert.equal(calls[0].options.input, "kec_secret\n");
+  assert.equal(await readCollectorToken({ command, account: "roger" }), "kec_secret");
+});
+
+test("LaunchAgent runs every 15 minutes without embedding secrets", () => {
+  const plist = collectorLaunchAgentPlist({
+    nodePath: "/usr/local/bin/node",
+    collectorPath: "/Company/product-flow-system/scripts/kuaimai-erp-collector/index.mjs",
+    root: "/Users/roger/Desktop/公司数据中心/快麦ERP",
+    baseUrl: "https://product-flow-system.pages.dev"
+  });
+  assert.match(plist, /<key>StartInterval<\/key>\s*<integer>900<\/integer>/);
+  assert.match(plist, /<string>scan<\/string>/);
+  assert.doesNotMatch(plist, /kec_|token|password|cookie/i);
+});
+
+test("scanner waits for one stable interval before archiving and uploading", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  const source = path.join(layout.waiting, "orders.csv");
+  await writeFile(source, "系统订单号,订单创建时间,店铺名称\nKM1,2026-07-22 10:00:00,抖音旗舰店\n");
+  const uploads = [];
+  const first = await scanWaitingDirectory({ root, upload: async value => uploads.push(value) });
+  assert.equal(first.waiting, 1);
+  assert.equal(first.processed, 0);
+  const second = await scanWaitingDirectory({ root, upload: async value => uploads.push(value) });
+  assert.equal(second.processed, 1);
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].archive.relativePath.startsWith("原始归档/orders/"), true);
+  assert.equal((await loadLocalManifest(layout.manifest)).values().next().value.status, "processed");
+});
