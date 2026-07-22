@@ -50,6 +50,11 @@ async function lastSuccessfulSyncAt(db) {
   }
 }
 
+async function latestDataDate(db) {
+  const row = await db.prepare("SELECT MAX(date) AS latest_data_date FROM product_sales_daily").first();
+  return String(row?.latest_data_date || "");
+}
+
 export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (request.method !== "GET") return errorResponse("Method not allowed", 405, "VALIDATION_METHOD_NOT_ALLOWED");
@@ -75,6 +80,10 @@ export async function onRequest({ request, env, data = {} }) {
         AND TRIM(COALESCE(platform, '')) NOT IN ('', '其它', '其他', '未知', '未知平台')
       ORDER BY date, platform, code`).bind(from, to).all();
     const rows = (result?.results || []).map(mapRow);
+    const [lastSyncAt, latestDate] = await Promise.all([
+      lastSuccessfulSyncAt(db),
+      latestDataDate(db)
+    ]);
     return jsonResponse({
       synced: true,
       rows,
@@ -85,7 +94,8 @@ export async function onRequest({ request, env, data = {} }) {
         timeBasis: "create_time",
         timezone: "Asia/Shanghai",
         excludeOther: true,
-        lastSuccessfulSyncAt: await lastSuccessfulSyncAt(db)
+        lastSuccessfulSyncAt: lastSyncAt,
+        latestDataDate: latestDate
       }
     });
   } catch (error) {

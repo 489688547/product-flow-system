@@ -58,3 +58,13 @@
   - 实现步骤：写回确认式范围与环比规则，更新任务证据，审查差异。
   - 验证：`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm test`（主套件 424 项及后续专项套件）和 `npm run build` 全部通过；完成 1440/900/640/390px 浏览器与窄 WebView 尺寸检查，`git diff --check` 通过。规则已写回 `DESIGN.md`，共享组件已登记到 `docs/platform/components.md`。
   - 提交：文档与最终验证记录。
+
+- [x] 精简总览并补充趋势明细与同步状态入口
+  - 依赖：日期范围与环比交付完成；产品负责人确认 GMV 统一口径。
+  - 文件：`src/domain/dataCenter.js`、`src/features/data-center/DataOverview.jsx`、`src/features/data-center/DataCenterAppPage.jsx`、`src/styles.css`、相关测试和文档。
+  - 输入：当前已确认范围的销售事实、共享口径结果、同步记录和质量问题。
+  - 输出：精简 KPI、GMV 经营趋势、GMV 平台分布、可访问日明细和页头数据状态链接。
+  - 失败测试：每日平台明细、GMV 排序、状态链接、旧标题删除和数据健康区删除断言失败。
+  - 实现步骤：扩展纯事实视图与质量摘要，精简总览组合，再完成提示层、响应式和规则写回。
+  - 验证：相关聚焦测试 40 项、`npm run lint`、治理/集成/环境能力检查、完整 `npm test`（API 主套件 455 项及专项套件）和生产构建全部通过。真实远程 D1 页面确认默认 2026-07-01 至 2026-07-21、五项同版环比、最新事实日期、21 个可聚焦日柱和逐平台 GMV 明细；900/640/390px 页面无横向溢出。验收期间远程 D1 曾出现一次 `Network connection lost`，页面按既有错误边界显示失败态，恢复后数据读取正常。
+  - 提交：本次精简总览全部文件。

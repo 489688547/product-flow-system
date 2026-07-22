@@ -66,16 +66,42 @@ function MetricComparison({ current, previous, metric, loading, error, compatibi
   return <span className={`data-kpi-comparison ${tone}`} aria-label={text}><DirectionIcon size={13} aria-hidden="true" />{text}</span>;
 }
 
+function grossMarginRate(row) {
+  return row.netSales ? row.grossProfit / row.netSales * 100 : null;
+}
+
+function trendDayLabel(row) {
+  const rate = grossMarginRate(row);
+  const platforms = row.platforms.map(item => `${item.platform} GMV ${money(item.sales)}`).join("，");
+  return `${row.date}，GMV ${money(row.sales)}，销售数量 ${number(row.qty)}，毛利率 ${rate == null ? "暂无结果" : `${number(rate)}%`}，${platforms}`;
+}
+
 function Trend({ rows }) {
-  const maximum = Math.max(...rows.map(row => row.netSales), 1);
+  const maximum = Math.max(...rows.map(row => row.sales), 1);
   return (
-    <div className="data-mini-trend" role="img" aria-label="按订单创建时间统计的日净销售额趋势">
-      {rows.map(row => <div key={row.date} title={`${row.date} · ${money(row.netSales)}`}><i style={{ height: `${Math.max(4, row.netSales / maximum * 100)}%` }} /><span>{row.date.slice(5)}</span></div>)}
+    <div className="data-mini-trend" role="list" aria-label="按订单创建时间统计的每日 GMV 趋势">
+      {rows.map(row => {
+        const rate = grossMarginRate(row);
+        const tooltipId = `trend-${row.date}`;
+        return <div className="data-trend-day" role="listitem" tabIndex={0} key={row.date} aria-label={trendDayLabel(row)} aria-describedby={tooltipId}>
+          <i style={{ height: `${Math.max(4, row.sales / maximum * 100)}%` }} aria-hidden="true" />
+          <span>{row.date.slice(5)}</span>
+          <div className="data-trend-tooltip" id={tooltipId} role="tooltip">
+            <strong>{row.date}</strong>
+            <dl>
+              <div><dt>GMV</dt><dd>{money(row.sales)}</dd></div>
+              <div><dt>销售数量</dt><dd>{number(row.qty)}</dd></div>
+              <div><dt>毛利率</dt><dd>{rate == null ? "暂无结果" : `${number(rate)}%`}</dd></div>
+            </dl>
+            <ul>{row.platforms.map(item => <li key={item.platform}><span>{item.platform}</span><b>{money(item.sales)}</b></li>)}</ul>
+          </div>
+        </div>;
+      })}
     </div>
   );
 }
 
-export function DataOverview({ factViews, quality, range, setRange, salesMeta, metricResults = [], metricRun, metricLoading, metricError, comparisonRange, comparisonResults = [], comparisonRun, comparisonLoading, comparisonError, retryMetricResults, compatibilityRollback = false }) {
+export function DataOverview({ factViews, range, setRange, metricResults = [], metricRun, metricLoading, metricError, comparisonRange, comparisonResults = [], comparisonRun, comparisonLoading, comparisonError, retryMetricResults, compatibilityRollback = false }) {
   const rangeResults = metricResults.filter(result => result.from === range.from && result.to === range.to);
   const byMetricCode = new Map(rangeResults.map(result => [result.metricCode, result]));
   const previousRangeResults = comparisonResults.filter(result => result.from === comparisonRange.from && result.to === comparisonRange.to);
@@ -86,7 +112,7 @@ export function DataOverview({ factViews, quality, range, setRange, salesMeta, m
   const comparisonUpdating = comparisonLoading || ["pending", "running"].includes(comparisonRunForRange?.status);
   const failed = runForRange?.status === "failed";
   const missingCount = DATA_CENTER_OVERVIEW_METRICS.filter(metric => !byMetricCode.has(metric.metricCode)).length;
-  const topNetSales = factViews.byPlatform.reduce((sum, row) => sum + row.netSales, 0);
+  const totalGmv = factViews.byPlatform.reduce((sum, row) => sum + row.sales, 0);
   const datePresets = [
     { id: "last7", label: "近 7 天", range: dataCenterPresetRange(7) },
     { id: "last15", label: "近 15 天", range: dataCenterPresetRange(15) },
@@ -96,7 +122,7 @@ export function DataOverview({ factViews, quality, range, setRange, salesMeta, m
   return (
     <div className="data-workspace">
       <section className="data-basis-strip">
-        <div><strong>订单创建时间</strong><span>Asia/Shanghai · 默认当月至截止昨天 · 日常口径排除“其它”</span></div>
+        <div><strong>订单创建时间</strong><span>Asia/Shanghai</span></div>
         <DateRangePickerField value={range} onConfirm={setRange} presets={datePresets} maxDate={maxDate} maxDays={370} ariaLabel="选择数据总览日期范围" />
       </section>
       {compatibilityRollback ? <section className="data-metric-state updating" role="alert"><AlertCircle size={17} /><span><strong>兼容回滚口径</strong><small>当前仅临时读取旧销售事实摘要；共享口径定义、结果、版本和审计均未删除。</small></span><span className="status-badge warning">临时模式</span></section> : updating || failed || metricError || missingCount ? <section className={`data-metric-state ${failed || metricError ? "danger" : updating ? "updating" : "neutral"}`} role={failed || metricError ? "alert" : "status"}>
@@ -109,13 +135,12 @@ export function DataOverview({ factViews, quality, range, setRange, salesMeta, m
         const coverageRate = result?.coverageRate;
         const reasonCode = result?.reasonCode || metricError?.code || "RESULT_NOT_AVAILABLE";
         const previous = previousByMetricCode.get(metric.metricCode);
-        return <article key={metric.metricCode}><Icon size={18} /><span>{metric.label}</span><strong>{formatMetric(result?.value, metric.format)}</strong><MetricComparison current={result} previous={previous} metric={metric} loading={comparisonUpdating} error={comparisonError} compatibilityRollback={compatibilityRollback} /><small className="data-kpi-meta">{result ? <><span>版本 v{result.version} · 数据截止 {result.cutoffAt || "—"}</span>{coverageRate < 1 ? <span className="text-warning">覆盖率 {Math.round((coverageRate || 0) * 100)}%</span> : null}</> : <span>{resultReason(reasonCode)}</span>}</small></article>;
+        return <article key={metric.metricCode}><Icon size={18} /><span>{metric.label}</span><strong>{formatMetric(result?.value, metric.format)}</strong><MetricComparison current={result} previous={previous} metric={metric} loading={comparisonUpdating} error={comparisonError} compatibilityRollback={compatibilityRollback} />{!result || coverageRate < 1 ? <small className="data-kpi-meta">{result ? <span className="text-warning">覆盖率 {Math.round((coverageRate || 0) * 100)}%</span> : <span>{resultReason(reasonCode)}</span>}</small> : null}</article>;
       })}</div>
       <div className="data-overview-grid">
-        <section className="section-panel data-trend-panel"><div className="section-head"><div><h2>销售事实视图 · 经营趋势</h2><p>{range.from} 至 {range.to}，按日净销售额。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>
-        <section className="section-panel"><div className="section-head"><div><h2>销售事实视图 · 平台贡献</h2><p>用于判断收入集中度，不包含“其它”。</p></div></div><div className="data-contribution-list">{factViews.byPlatform.slice(0, 6).map(row => { const share = topNetSales ? row.netSales / topNetSales * 100 : 0; return <div key={row.platform}><span><strong>{row.platform}</strong><small>{number(share)}%</small></span><i><b style={{ width: `${share}%` }} /></i><em>{money(row.netSales)}</em></div>; })}{!factViews.byPlatform.length ? <div className="empty-state compact-empty">暂无平台数据。</div> : null}</div></section>
+        <section className="section-panel data-trend-panel"><div className="section-head"><div><h2>经营趋势</h2><p>{range.from} 至 {range.to}，按日 GMV。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>
+        <section className="section-panel"><div className="section-head"><div><h2>平台分布</h2><p>按 GMV 查看当前日期范围的平台占比。</p></div></div><div className="data-contribution-list">{factViews.byPlatform.slice(0, 6).map(row => { const share = totalGmv ? row.sales / totalGmv * 100 : 0; return <div key={row.platform}><span><strong>{row.platform}</strong><small>{number(share)}%</small></span><i><b style={{ width: `${share}%` }} /></i><em>{money(row.sales)}</em></div>; })}{!factViews.byPlatform.length ? <div className="empty-state compact-empty">暂无平台数据。</div> : null}</div></section>
       </div>
-      <section className="section-panel data-health-panel"><div className="section-head"><div><h2>数据健康</h2><p>先看数据是否可信，再看经营结论。</p></div><span className={`status-badge ${quality.openIssues ? "warning" : "success"}`}>{quality.openIssues ? `${quality.openIssues} 个待处理问题` : "当前无阻塞问题"}</span></div><div className="data-health-grid"><div><span>最近成功同步</span><strong>{quality.lastSuccessfulSyncAt ? new Date(quality.lastSuccessfulSyncAt).toLocaleString("zh-CN", { hour12: false }) : "尚无记录"}</strong></div><div><span>待确认商品映射</span><strong>{quality.unmappedProducts}</strong></div><div><span>口径排除行</span><strong>{quality.excludedRows}</strong></div><div><span>读取方式</span><strong>{salesMeta.local ? "浏览器本地降级" : "线上数据库"}</strong></div></div></section>
     </div>
   );
 }

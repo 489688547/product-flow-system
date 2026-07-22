@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   DATA_CENTER_PERSISTED_COLLECTIONS,
+  buildDataCenterSalesFactViews,
   buildDataQualitySummary,
   createDefaultDataCenterState,
   defaultDataCenterRange,
@@ -55,6 +56,26 @@ test("sales summary exposes totals coverage and contribution", () => {
   assert.equal(summary.excludedRows, 1);
 });
 
+test("sales fact views expose daily platform GMV details and rank platform distribution by GMV", () => {
+  const views = buildDataCenterSalesFactViews([
+    { date: "2026-07-20", platform: "抖音", qty: 2, sales: 200, netSales: 160, grossProfit: 80 },
+    { date: "2026-07-20", platform: "天猫", qty: 1, sales: 120, netSales: 110, grossProfit: 44 },
+    { date: "2026-07-21", platform: "天猫", qty: 3, sales: 300, netSales: 240, grossProfit: 96 },
+    { date: "2026-07-21", platform: "其它", qty: 9, sales: 900, netSales: 900, grossProfit: 1 }
+  ], { from: "2026-07-01", to: "2026-07-21" });
+
+  assert.deepEqual(views.byDay[0].platforms.map(item => [item.platform, item.sales]), [
+    ["抖音", 200],
+    ["天猫", 120]
+  ]);
+  assert.equal(views.byDay[0].qty, 3);
+  assert.equal(views.byDay[0].grossProfit, 124);
+  assert.deepEqual(views.byPlatform.map(item => [item.platform, item.sales]), [
+    ["天猫", 420],
+    ["抖音", 200]
+  ]);
+});
+
 test("source records reject credential-like fields", () => {
   const normalized = normalizeDataCenterState({
     sources: [{
@@ -101,15 +122,22 @@ test("quality summary separates excluded rows and unresolved mappings", () => {
   const quality = buildDataQualitySummary({
     state: {
       qualityIssues: [{ id: "q1", status: "open" }, { id: "q2", status: "resolved" }],
-      mappings: [{ id: "m1", dimensionType: "product", status: "pending" }]
+      mappings: [{ id: "m1", dimensionType: "product", status: "pending" }],
+      syncRuns: [
+        { id: "old-failure", sourceId: "kuaimai", status: "failed", completedAt: "2026-07-17T07:00:00.000Z" },
+        { id: "latest-success", sourceId: "kuaimai", status: "success", completedAt: "2026-07-18T07:30:00.000Z" },
+        { id: "latest-failure", sourceId: "douyin", status: "failed", completedAt: "2026-07-18T08:00:00.000Z" }
+      ]
     },
-    salesRows: [{ platform: "抖音" }, { platform: "其它" }],
+    salesRows: [{ date: "2026-07-20", platform: "抖音" }, { date: "2026-07-21", platform: "其它" }],
     salesMeta: { lastSuccessfulSyncAt: "2026-07-18T07:30:00.000Z" }
   });
   assert.deepEqual(quality, {
     openIssues: 1,
     unmappedProducts: 1,
     excludedRows: 1,
-    lastSuccessfulSyncAt: "2026-07-18T07:30:00.000Z"
+    lastSuccessfulSyncAt: "2026-07-18T07:30:00.000Z",
+    latestDataDate: "2026-07-21",
+    syncAttentionCount: 1
   });
 });

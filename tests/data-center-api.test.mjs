@@ -68,6 +68,7 @@ function createD1Mock() {
         async first() {
           if (/from data_center_meta/i.test(sql)) return meta.has(statement.values[0]) ? { value: meta.get(statement.values[0]) } : null;
           if (/from product_sales_meta/i.test(sql)) return { payload: JSON.stringify({ imports: [{ importedAt: "2026-07-18T00:10:00.000Z" }], titles: {} }) };
+          if (/max\(date\)[\s\S]*from product_sales_daily/i.test(sql)) return { latest_data_date: sales.reduce((latest, row) => row.date > latest ? row.date : latest, "") };
           return null;
         }
       };
@@ -203,6 +204,7 @@ test("data center sales uses creation-date range and excludes Other", async () =
   assert.equal(payload.meta.timezone, "Asia/Shanghai");
   assert.equal(payload.meta.excludeOther, true);
   assert.equal(payload.meta.lastSuccessfulSyncAt, "2026-07-18T00:10:00.000Z");
+  assert.equal(payload.meta.latestDataDate, "2026-07-17");
 });
 
 test("data center sales validates date range and permissions", async () => {

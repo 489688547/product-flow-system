@@ -66,6 +66,7 @@ test("sales loader falls back to browser repository only when shared storage is 
   assert.equal(payload.local, true);
   assert.equal(payload.meta.timeBasis, "create_time");
   assert.equal(payload.meta.excludeOther, true);
+  assert.equal(payload.meta.latestDataDate, "2026-07-16");
 });
 
 test("provider derives SKU codes, debounces metadata and never persists sales rows in localStorage", () => {

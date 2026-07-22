@@ -56,12 +56,14 @@ function errorState(error, fallback = "数据口径暂不可用。") {
   };
 }
 
-async function resolveMetricResults(range, metricCodes, { signal, onRun } = {}) {
+async function resolveMetricResults(range, metricCodes, { signal, onRun, targetVersions = {} } = {}) {
   const query = { metricCodes, from: range.from, to: range.to };
   const current = await loadMetricResults(query, fetch, signal);
-  const availableCodes = new Set((current.results || []).map(result => result.metricCode));
+  const availableCodes = new Set((current.results || [])
+    .filter(result => targetVersions[result.metricCode] == null || Number(result.version) === Number(targetVersions[result.metricCode]))
+    .map(result => result.metricCode));
   if (metricCodes.every(code => availableCodes.has(code))) return current;
-  const requested = await requestMetricCalculation({ ...query, targetVersions: {}, mode: "ensure_current" }, fetch, signal);
+  const requested = await requestMetricCalculation({ ...query, targetVersions, mode: "ensure_current" }, fetch, signal);
   onRun?.(requested.run || null);
   return pollMetricResults({ ...query, runId: requested.run.id }, { signal, interval: 800, maxAttempts: 20 });
 }
@@ -241,7 +243,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     }
   }, [enabled]);
 
-  const ensureComparisonResults = useCallback(async (range, metricCodes) => {
+  const ensureComparisonResults = useCallback(async (range, metricCodes, targetVersions = {}) => {
     if (!enabled) return { results: [] };
     comparisonRequest.current?.abort();
     const controller = new AbortController();
@@ -249,7 +251,7 @@ export function DataStandardsProvider({ children, enabled = true }) {
     setComparisonLoading(true);
     setComparisonError(null);
     try {
-      const completed = await resolveMetricResults(range, metricCodes, { signal: controller.signal, onRun: setComparisonRun });
+      const completed = await resolveMetricResults(range, metricCodes, { signal: controller.signal, onRun: setComparisonRun, targetVersions });
       setComparisonResults(completed.results || []);
       setComparisonRun(completed.run || null);
       if (completed.run?.status === "failed") {
@@ -270,10 +272,10 @@ export function DataStandardsProvider({ children, enabled = true }) {
     resultDebounce.current = setTimeout(() => ensureResults(range, metricCodes).catch(() => {}), 250);
   }, [ensureResults]);
 
-  const scheduleComparisonResults = useCallback((range, metricCodes) => {
+  const scheduleComparisonResults = useCallback((range, metricCodes, targetVersions = {}) => {
     clearTimeout(comparisonDebounce.current);
     comparisonRequest.current?.abort();
-    comparisonDebounce.current = setTimeout(() => ensureComparisonResults(range, metricCodes).catch(() => {}), 250);
+    comparisonDebounce.current = setTimeout(() => ensureComparisonResults(range, metricCodes, targetVersions).catch(() => {}), 250);
   }, [ensureComparisonResults]);
 
   useEffect(() => () => {

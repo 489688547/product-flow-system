@@ -493,7 +493,7 @@ git commit -m "feat(data): add data standards workspace"
 - Create: `react-tests/data-center-governed-overview.test.mjs`
 - Modify: `react-tests/data-center-app.test.mjs`
 
-- [x] 8.1 先写失败测试：页面源码不再调用 `summarizeDataCenterSales` 生成 KPI；5 张 KPI 卡按 metricCode 读取结果；空值显示“暂无结果”和原因；覆盖不足显示覆盖率；计算中、失败、重试、版本和截止时间可见；绝不回退到硬编码金额。
+- [x] 8.1 先写失败测试：页面源码不再调用 `summarizeDataCenterSales` 生成 KPI；5 张 KPI 卡按 metricCode 读取结果；空值显示“暂无结果”和原因；覆盖不足显示覆盖率；计算中、失败和重试可见；绝不回退到硬编码金额。正常结果的版本和截止时间已在后续总览精简中移除。
 
 - [x] 8.2 定义固定映射，不在组件内写公式：
 
@@ -511,7 +511,8 @@ const OVERVIEW_METRICS = [
 
 - [x] 8.3 日期范围变化后调用 `ensureResults`；有当前结果立即展示，有运行中的新批次时标注“正在更新”但不拿部分结果替换旧批次。结果无覆盖时显示 `reasonCode` 对应中文说明。
 
-- [x] 8.4 经营趋势和平台贡献暂时继续读取事实数据，标题明确它们是“销售事实视图”；五张 KPI 完成共享口径切换。后续要治理趋势/平台维度时复用同一结果 API 的 dimension 参数，不在本任务扩展。
+- [x] 8.4 经营趋势和平台分布继续读取事实数据，后续总览精简已将两者统一为当前确认范围的 GMV，并为每日趋势补充平台明细；五张 KPI 保持共享口径结果。后续要治理可复用趋势/平台维度时复用同一结果 API 的 dimension 参数。
+- [x] 8.5 环比上期通过现有重算契约的 `targetVersions` 显式沿用本期五项结果版本；缓存结果版本不一致时重新计算，避免跨期公式漂移或历史日期没有生效版本。
 
 - [x] 8.5 删除生产界面对 `summarizeDataCenterSales` 的 KPI 依赖；该函数若仍被产品详情等真实消费者使用则保留，否则连同过时测试删除。更新 durable docs，明确本次只切 5 个 KPI、趋势/贡献仍是事实维度视图。
 

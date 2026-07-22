@@ -28,6 +28,8 @@ test("comparison results use an independent cancellable request and error bounda
   assert.match(provider, /scheduleComparisonResults/);
   assert.match(provider, /comparisonRequest\.current\?\.abort\(\)/);
   assert.match(provider, /setComparisonError\(errorState/);
+  assert.match(provider, /ensureComparisonResults = useCallback\(async \(range, metricCodes, targetVersions/);
+  assert.match(provider, /resolveMetricResults\(range, metricCodes, \{ signal: controller\.signal, onRun: setComparisonRun, targetVersions \}\)/);
 });
 
 test("provider is mounted inside product flow and outside all business app providers", () => {

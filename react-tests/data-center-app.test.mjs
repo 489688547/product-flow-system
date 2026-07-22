@@ -59,13 +59,12 @@ test("overview exposes governed metrics without restoring the deleted analysis w
   assert.match(page, /overview: <DataOverview/);
   assert.doesNotMatch(page, /DataAnalysis/);
   assert.doesNotMatch(page, /analysis: <DataAnalysis/);
-  assert.match(overview, /净销售额/);
+  assert.match(domain, /净销售额/);
   assert.match(overview, /订单创建时间/);
-  assert.match(overview, /截止昨天/);
   assert.match(domain, /退款率/);
   assert.match(domain, /毛利率/);
-  assert.match(overview, /平台贡献/);
-  assert.match(overview, /数据健康/);
+  assert.match(overview, /平台分布/);
+  assert.doesNotMatch(overview, /数据健康/);
   assert.match(overview, /DateRangePickerField/);
   assert.match(overview, /环比/);
   assert.match(page, /scheduleComparisonResults/);
@@ -110,6 +109,8 @@ test("data center has restrained responsive layouts and visible focus states", (
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.date-range-picker-field/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.date-range-picker-menu/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
+  assert.match(styles, /\.data-trend-tooltip/);
+  assert.match(styles, /\.data-trend-day:focus/);
   assert.doesNotMatch(styles, /\.data-analysis-toolbar/);
   assert.doesNotMatch(styles, /\.data-analysis-series/);
   assert.match(styles, /\.data-sync-status-bar/);

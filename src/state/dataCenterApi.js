@@ -50,10 +50,11 @@ export async function loadDataCenterSales({ from, to, codes = [], fetchImpl = fe
   const response = await fetchImpl(dataCenterSalesApiUrl({ from, to }));
   if ([404, 405, 501].includes(response.status) && fallback) {
     const rows = filterOperationalSales(await fallback(codes)).filter(row => row.date >= from && row.date <= to);
+    const latestDataDate = rows.reduce((latest, row) => row.date > latest ? row.date : latest, "");
     return {
       rows,
       local: true,
-      meta: { from, to, rowCount: rows.length, timeBasis: "create_time", timezone: "Asia/Shanghai", excludeOther: true, lastSuccessfulSyncAt: "" }
+      meta: { from, to, rowCount: rows.length, timeBasis: "create_time", timezone: "Asia/Shanghai", excludeOther: true, lastSuccessfulSyncAt: "", latestDataDate }
     };
   }
   const payload = await payloadFor(response, "数据中心销售数据加载失败。");

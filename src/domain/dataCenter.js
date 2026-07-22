@@ -125,6 +125,36 @@ function groupSales(rows, key) {
   return [...grouped.values()];
 }
 
+function groupDailySales(rows) {
+  const rowsByDay = new Map();
+  for (const row of rows) {
+    const date = String(row?.date || "");
+    const dailyRows = rowsByDay.get(date) || [];
+    dailyRows.push(row);
+    rowsByDay.set(date, dailyRows);
+  }
+  return groupSales(rows, "date").map(day => ({
+    ...day,
+    platforms: groupSales(rowsByDay.get(day.date) || [], "platform")
+      .sort((a, b) => b.sales - a.sales)
+  }));
+}
+
+function syncRunTimestamp(run = {}) {
+  const parsed = Date.parse(run.completedAt || run.startedAt || run.createdAt || "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function countLatestSyncAttention(syncRuns = []) {
+  const latestBySource = new Map();
+  for (const run of syncRuns) {
+    const source = String(run.sourceId || run.sourceName || run.provider || run.id || "unknown");
+    const current = latestBySource.get(source);
+    if (!current || syncRunTimestamp(run) >= syncRunTimestamp(current)) latestBySource.set(source, run);
+  }
+  return [...latestBySource.values()].filter(run => !["success", "healthy"].includes(String(run.status || ""))).length;
+}
+
 export function defaultDataCenterRange(today = new Date()) {
   const to = previousDay(shanghaiDate(today));
   return { from: `${to.slice(0, 7)}-01`, to };
@@ -378,8 +408,8 @@ export function buildDataCenterSalesFactViews(rows = [], options = {}) {
     (!options.from || row.date >= options.from) && (!options.to || row.date <= options.to)
   ));
   return {
-    byDay: groupSales(filtered, "date").sort((a, b) => a.date.localeCompare(b.date)),
-    byPlatform: groupSales(filtered, "platform").sort((a, b) => b.netSales - a.netSales),
+    byDay: groupDailySales(filtered).sort((a, b) => a.date.localeCompare(b.date)),
+    byPlatform: groupSales(filtered, "platform").sort((a, b) => b.sales - a.sales),
     excludedRows: rows.length - operational.length,
     rowCount: filtered.length,
     filteredRows: filtered
@@ -388,10 +418,19 @@ export function buildDataCenterSalesFactViews(rows = [], options = {}) {
 
 export function buildDataQualitySummary({ state, salesMeta, salesRows } = {}) {
   const normalized = normalizeDataCenterState(state);
+  const latestRowDate = (salesRows || []).reduce((latest, row) => {
+    const date = String(row?.date || "");
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) && date > latest ? date : latest;
+  }, "");
+  const latestDataDate = /^\d{4}-\d{2}-\d{2}$/.test(String(salesMeta?.latestDataDate || ""))
+    ? String(salesMeta.latestDataDate)
+    : latestRowDate;
   return {
     openIssues: normalized.qualityIssues.filter(item => item.status !== "resolved").length,
     unmappedProducts: normalized.mappings.filter(item => item.dimensionType === "product" && item.status !== "confirmed").length,
     excludedRows: (salesRows || []).filter(row => !isOperationalPlatform(row?.platform)).length,
-    lastSuccessfulSyncAt: salesMeta?.lastSuccessfulSyncAt || salesMeta?.imports?.[0]?.importedAt || ""
+    lastSuccessfulSyncAt: salesMeta?.lastSuccessfulSyncAt || salesMeta?.imports?.[0]?.importedAt || "",
+    latestDataDate,
+    syncAttentionCount: countLatestSyncAttention(normalized.syncRuns)
   };
 }

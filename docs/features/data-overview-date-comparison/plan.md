@@ -69,7 +69,7 @@
 ## 数据迁移
 
 - 无数据库结构、环境变量和持久化数据变化。
-- 既有共享口径结果继续按精确 `from/to` 读取；上期缺失时使用现有幂等 `ensure_current` 计算批次补齐。
+- 既有共享口径结果继续按精确 `from/to` 读取；上期缺失或缓存版本不匹配时，使用本期实际结果版本作为 `targetVersions` 发起现有幂等 `ensure_current` 计算批次补齐。
 - 环比只在读取时计算，不新增结果表字段，不改变历史有效批次。
 - API 单范围上限仍为 370 天；本期和上期作为两个独立合法范围读取。
 
@@ -440,7 +440,7 @@ const presets = [7, 15, 30].map(days => ({
 
 - [ ] **Step 4：连接上期调度与重试**
 
-`DataCenterAppPage` 用 `useMemo` 计算 `comparisonRange`，在本期 effect 中分别调用 `scheduleEnsureResults(range, codes)` 和 `scheduleComparisonResults(comparisonRange, codes)`。重新计算使用 `Promise.all` 同时重试本期与上期；兼容回滚开启时不调度上期。
+`DataCenterAppPage` 用 `useMemo` 计算 `comparisonRange`，先调用 `scheduleEnsureResults(range, codes)`；本期结果齐备后提取每项实际版本，通过 `scheduleComparisonResults(comparisonRange, codes, targetVersions)` 调度上期。重新计算也先取得本期版本再顺序重试上期；兼容回滚开启时不调度上期。
 
 - [ ] **Step 5：渲染环比行**
 

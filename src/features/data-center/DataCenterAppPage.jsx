@@ -13,7 +13,7 @@ import { useDataStandards } from "../../state/DataStandardsProvider.jsx";
 import { DataStandardsWorkspace } from "./data-standards/DataStandardsWorkspace.jsx";
 
 const SECTION_META = {
-  overview: ["数据总览", "统一查看公司经营数据和数据健康状态。"],
+  overview: ["数据总览", "统一查看公司经营数据、趋势和平台分布。"],
   insights: ["用户洞察", "按平台、店铺和产品查看用户市场与竞品参考。"],
   products: ["商品主数据", "统一维护 ERP 商品、SKU、69 码及跨 App 关联。"],
   sources: ["数据接入", "统一管理电商平台、ERP 与公司数据。"],
@@ -25,6 +25,11 @@ const SECTION_META = {
 
 const overviewMetricCodes = DATA_CENTER_OVERVIEW_METRICS.map(metric => metric.metricCode);
 const legacyOverviewRollback = import.meta.env.VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK === "1";
+
+function formatChineseDate(value) {
+  const match = String(value || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return match ? `${match[1]}年${Number(match[2])}月${Number(match[3])}日` : "";
+}
 
 export function DataCenterAppPage({ section = "overview", dataAccessCategory = "" }) {
   const { user } = useAuth();
@@ -47,21 +52,44 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
   const factViews = useMemo(() => buildDataCenterSalesFactViews(salesRows, range), [range, salesRows]);
   const legacyMetricResults = useMemo(() => legacyOverviewRollback ? buildLegacyDataCenterMetricResults(salesRows, range) : [], [range, salesRows]);
   const comparisonRange = useMemo(() => previousDataCenterRange(range), [range.from, range.to]);
+  const comparisonTargetVersions = useMemo(() => Object.fromEntries(results
+    .filter(result => result.from === range.from && result.to === range.to && overviewMetricCodes.includes(result.metricCode) && Number.isInteger(Number(result.version)))
+    .map(result => [result.metricCode, Number(result.version)])), [range.from, range.to, results]);
+  const comparisonVersionsReady = overviewMetricCodes.every(metricCode => comparisonTargetVersions[metricCode] >= 1);
+  const comparisonVersionKey = overviewMetricCodes.map(metricCode => `${metricCode}:${comparisonTargetVersions[metricCode] || ""}`).join("|");
   const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
+  const dataHealthIssueCount = quality.openIssues + quality.unmappedProducts + quality.syncAttentionCount;
+  const latestDataDate = formatChineseDate(quality.latestDataDate);
+  const dataHealthUnavailable = Boolean(error || metricError || comparisonError);
+  const dataHealthOkay = Boolean(latestDataDate) && !dataHealthUnavailable && dataHealthIssueCount === 0;
+  const dataHealthLabel = dataHealthOkay
+    ? `✅ 数据截取到 ${latestDataDate}`
+    : dataHealthUnavailable
+      ? `⚠️ 数据读取异常${latestDataDate ? ` · 截取到 ${latestDataDate}` : ""}`
+      : dataHealthIssueCount
+        ? `⚠️ 数据同步有 ${dataHealthIssueCount} 项待处理${latestDataDate ? ` · 截取到 ${latestDataDate}` : ""}`
+        : "⚠️ 暂无可用数据";
   useEffect(() => {
     if (section !== "overview" || legacyOverviewRollback) return;
     scheduleEnsureResults(range, overviewMetricCodes);
-    scheduleComparisonResults(comparisonRange, overviewMetricCodes);
-  }, [comparisonRange.from, comparisonRange.to, range.from, range.to, scheduleComparisonResults, scheduleEnsureResults, section]);
-  const retryMetricResults = () => Promise.all([
-    ensureResults(range, overviewMetricCodes),
-    ensureComparisonResults(comparisonRange, overviewMetricCodes)
-  ]).catch(() => {});
+    if (comparisonVersionsReady) scheduleComparisonResults(comparisonRange, overviewMetricCodes, comparisonTargetVersions);
+  }, [comparisonRange.from, comparisonRange.to, comparisonVersionKey, comparisonVersionsReady, range.from, range.to, scheduleComparisonResults, scheduleEnsureResults, section]);
+  const retryMetricResults = async () => {
+    try {
+      const current = await ensureResults(range, overviewMetricCodes);
+      const targetVersions = Object.fromEntries((current.results || [])
+        .filter(result => overviewMetricCodes.includes(result.metricCode) && Number.isInteger(Number(result.version)))
+        .map(result => [result.metricCode, Number(result.version)]));
+      await ensureComparisonResults(comparisonRange, overviewMetricCodes, targetVersions);
+    } catch {
+      // Errors stay visible through the provider state and can be retried from the cards.
+    }
+  };
   const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
   const canManageConnections = canManagePlatformConnections(user);
   const canManage = user?.role !== "readonly" && canAccessCompanyPlatform(user);
   const content = {
-    overview: <DataOverview factViews={factViews} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} comparisonRange={comparisonRange} comparisonResults={comparisonResults} comparisonRun={comparisonRun} comparisonLoading={!legacyOverviewRollback && comparisonLoading} comparisonError={legacyOverviewRollback ? null : comparisonError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} />,
+    overview: <DataOverview factViews={factViews} range={range} setRange={setRange} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} comparisonRange={comparisonRange} comparisonResults={comparisonResults} comparisonRun={comparisonRun} comparisonLoading={!legacyOverviewRollback && comparisonLoading} comparisonError={legacyOverviewRollback ? null : comparisonError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} />,
     insights: <UserInsightsProvider><UserInsightsWorkspace /></UserInsightsProvider>,
     products: <ProductCatalogWorkspace canEdit={canEdit} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManageConnections} initialCategory={dataAccessCategory} />,
@@ -72,7 +100,9 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
   };
   return (
     <section className="page data-center-page">
-      <PageHeader title={title} description={description} identity={section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : "统一口径 · 可追溯 · 截止昨天"} />
+      <PageHeader title={title} description={description} identity={section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : undefined}>
+        {section === "overview" ? <a className={`data-health-link ${dataHealthOkay ? "success" : "warning"}`} href="#data-sync" aria-label={`${dataHealthLabel}，查看同步记录`}>{dataHealthLabel}</a> : null}
+      </PageHeader>
       {error ? <div className="section-panel" role="status">{error}</div> : null}
       {loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}
     </section>
