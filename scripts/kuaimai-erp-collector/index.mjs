@@ -7,6 +7,7 @@ import { uploadErpArchive, uploadErpCollection } from "./api.mjs";
 import { DEFAULT_ARCHIVE_ROOT, ensureArchiveLayout } from "./archive.mjs";
 import { installLaunchAgent, readCollectorToken, storeCollectorToken } from "./automation.mjs";
 import { readKuaimaiExport } from "./core.mjs";
+import { nodeRequest } from "./http.mjs";
 import { archiveExistingFile, archiveExistingRawFile, scanWaitingDirectory, syncLocalArchiveManifest } from "./scanner.mjs";
 
 function argument(argv, name, fallback = "") {
@@ -37,7 +38,7 @@ async function runnerHeaders() {
   return { authorization: `Bearer ${token}` };
 }
 
-async function registerCollector(baseUrl, fetchImpl = fetch) {
+async function registerCollector(baseUrl, fetchImpl = nodeRequest) {
   const personalToken = String(process.env.PRODUCTION_DATA_ACCESS_TOKEN || "").trim();
   const response = await fetchImpl(`${baseUrl.replace(/\/+$/, "")}/api/platform/v1/erp-collection/runners`, {
     method: "POST",

@@ -107,7 +107,8 @@ test("collector token is exchanged only with macOS Keychain", async () => {
     return args[0] === "find-generic-password" ? { stdout: "kec_secret\n" } : { stdout: "" };
   };
   await storeCollectorToken("kec_secret", { command, account: "roger" });
-  assert.equal(calls[0].program, "/usr/bin/security");
+  assert.equal(calls[0].program, "/usr/bin/xcrun");
+  assert.equal(calls[0].args[0], "swift");
   assert.equal(calls[0].args.includes("kec_secret"), false);
   assert.equal(calls[0].options.input, "kec_secret\n");
   assert.equal(await readCollectorToken({ command, account: "roger" }), "kec_secret");

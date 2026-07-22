@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const KEYCHAIN_SERVICE = "com.company.kuaimai-erp-collector";
 export const LAUNCH_AGENT_LABEL = "com.company.kuaimai-erp-collector";
@@ -33,7 +34,8 @@ async function systemCommand(program, args, { input = "" } = {}) {
 export async function storeCollectorToken(token, {
   command = systemCommand,
   account = os.userInfo().username,
-  service = KEYCHAIN_SERVICE
+  service = KEYCHAIN_SERVICE,
+  helperPath = fileURLToPath(new URL("./keychain-helper.swift", import.meta.url))
 } = {}) {
   const value = String(token || "").trim();
   if (!/^kec_[a-f0-9]{48}$/i.test(value) && value !== "kec_secret") {
@@ -41,7 +43,7 @@ export async function storeCollectorToken(token, {
     error.code = "KUAIMAI_KEYCHAIN_TOKEN_INVALID";
     throw error;
   }
-  await command("/usr/bin/security", ["add-generic-password", "-U", "-a", account, "-s", service, "-w"], { input: `${value}\n` });
+  await command("/usr/bin/xcrun", ["swift", helperPath, service, account], { input: `${value}\n` });
 }
 
 export async function readCollectorToken({
@@ -102,4 +104,3 @@ export async function installLaunchAgent({
   await command("/bin/launchctl", ["bootstrap", `gui/${process.getuid()}`, plistPath]);
   return { label: LAUNCH_AGENT_LABEL, plistPath, intervalSeconds: 900 };
 }
-

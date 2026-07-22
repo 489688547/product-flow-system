@@ -1,10 +1,12 @@
+import { nodeRequest } from "./http.mjs";
+
 const CHUNK_SIZE = 500;
 
 function normalizeBaseUrl(value) {
   return String(value || "http://127.0.0.1:8132").trim().replace(/\/+$/, "");
 }
 
-export async function uploadErpCollection(collection, { baseUrl, fetchImpl = fetch, headers = {} } = {}) {
+export async function uploadErpCollection(collection, { baseUrl, fetchImpl = nodeRequest, headers = {} } = {}) {
   if (!collection?.batch || !Array.isArray(collection.records) || !collection.records.length) {
     throw new Error("没有可上传的 ERP 记录。");
   }
@@ -41,7 +43,7 @@ export async function uploadErpCollection(collection, { baseUrl, fetchImpl = fet
   return { batchId: collection.batch.id, chunks: chunks.length, records: collection.records.length, issues: collection.issues?.length || 0, results };
 }
 
-export async function uploadErpArchive(archive, { baseUrl, fetchImpl = fetch, headers = {} } = {}) {
+export async function uploadErpArchive(archive, { baseUrl, fetchImpl = nodeRequest, headers = {} } = {}) {
   const response = await fetchImpl(`${normalizeBaseUrl(baseUrl)}/api/platform/v1/erp-collection/archives`, {
     method: "POST",
     headers: { "content-type": "application/json", ...headers },

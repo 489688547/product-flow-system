@@ -23,6 +23,8 @@ const ALTERNATE_AUTH_PATHS = new Set([
 function usesHandlerBearerAuth(path) {
   return path === "/api/platform/v1/user-insights/collector"
     || path === "/api/platform/v1/user-insights/ingest"
+    || path === "/api/platform/v1/erp-collection/archives"
+    || path === "/api/platform/v1/erp-collection/ingest"
     || path.startsWith("/api/platform/v1/browser-agent/");
 }
 
