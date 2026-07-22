@@ -39,22 +39,22 @@
   - 验证：`node --test react-tests/data-standards-provider.test.mjs react-tests/data-standards-api-client.test.mjs tests/data-standards-results-api.test.mjs` 通过 12 项，`npm run lint` 通过；覆盖独立取消、幂等计算、失败隔离和结果读取。
   - 提交：状态编排与测试。
 
-- [ ] 数据总览交互与环比展示
+- [x] 数据总览交互与环比展示
   - 依赖：共享选择器和状态编排完成。
   - 文件：`src/features/data-center/DataCenterAppPage.jsx`、`src/features/data-center/DataOverview.jsx`、`src/styles.css`、`react-tests/data-center-governed-overview.test.mjs`、`react-tests/data-center-app.test.mjs`。
   - 输入：已确认范围、两期结果和环比展示模型。
   - 输出：确认后单次刷新、五项 KPI 环比和不可比状态。
   - 失败测试：开始日期草稿仍触发全局 `setRange`，KPI 缺少环比语义。
   - 实现步骤：替换原生双输入，连接两期结果，增加环比行和状态文案。
-  - 验证：聚焦 React 测试及 1440/900/640/390px 浏览器验收。
+  - 验证：相关 22 项聚焦测试、`npm run lint` 与 `npm run build` 通过；本地隔离验收页确认快捷范围和手动开始/结束日期均不立即提交，确认仅提交一次，取消与 Esc 不提交且焦点返回。1440/900/640/390px 均无横向溢出，390px 日期浮层宽 340px 且完整位于视口内。线上真实本地入口因 Cloudflare 远程代理 `fetch failed` 未完成生产数据联调，不影响本次无外部依赖的交互验收。
   - 提交：数据总览组合、样式与测试。
 
-- [ ] 规则写回与完整交付验证
+- [x] 规则写回与完整交付验证
   - 依赖：全部行为任务完成。
   - 文件：`DESIGN.md`、四份功能文档及必要测试记录。
   - 输入：最终实现和验证证据。
   - 输出：长期设计规则、已完成任务状态和可审查交付说明。
   - 失败测试：治理检查无法确认共享组件与设计事实源一致。
   - 实现步骤：写回确认式范围与环比规则，更新任务证据，审查差异。
-  - 验证：完整 Definition of Done、浏览器、WebView、`git diff --check` 和干净状态。
+  - 验证：`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm test`（主套件 424 项及后续专项套件）和 `npm run build` 全部通过；完成 1440/900/640/390px 浏览器与窄 WebView 尺寸检查，`git diff --check` 通过。规则已写回 `DESIGN.md`，共享组件已登记到 `docs/platform/components.md`。
   - 提交：文档与最终验证记录。
