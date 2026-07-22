@@ -200,6 +200,7 @@
 - `PRODUCT_CATALOG_WRITE_DENIED`：当前身份不是总经办或运营部维护人，或账号为只读。
 - `KUAIMAI_CONFIG_MISSING`：部署缺少快麦商品读取配置。
 - `KUAIMAI_PRODUCT_SYNC_INCOMPLETE`：分页保护触发，本批没有写入。
+- `KUAIMAI_PRODUCT_SYNC_CURSOR_STALE`：续传游标存在但共享商品目录为空；客户端应从游标 0 重新刷新商品列表。
 - `KUAIMAI_PRODUCT_SYNC_FAILED`：快麦拒绝、超时或返回失败，可按 `retryable` 判断重试。
 生产数据与环境 API 使用：
 

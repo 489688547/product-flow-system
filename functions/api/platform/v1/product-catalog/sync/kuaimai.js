@@ -1,6 +1,6 @@
 import { normalizeCatalogPayload } from "../../../../../../src/domain/productCatalog.js";
 import { pullKuaimaiProductCatalog, pullKuaimaiProductDetails, resolveKuaimaiConfig } from "../../../../kuaimai/_shared/kuaimai.js";
-import { productCatalogDatabase, replaceProductCatalogComponents, upsertProductCatalog } from "../_shared/storage.js";
+import { productCatalogDatabase, readProductCatalog, replaceProductCatalogComponents, upsertProductCatalog } from "../_shared/storage.js";
 import { catalogError, errorResponse, jsonResponse, optionsResponse, requireCatalogEditor, requireCatalogSession } from "../_shared/http.js";
 
 async function syncCursor(request) {
@@ -22,21 +22,40 @@ export async function onRequest({ request, env, data = {} }) {
     const cursor = await syncCursor(request);
     const actor = session.name || session.userId || "unknown";
     const startedAt = new Date().toISOString();
-    const pulled = await pullKuaimaiProductCatalog(config, { pageSize: 200, maxPages: 8 });
-    if (!pulled.complete) {
-      return errorResponse(`快麦商品超过单次安全分页范围，已读取 ${pulled.items.length} 条，未写入目录。`, 409, "KUAIMAI_PRODUCT_SYNC_INCOMPLETE", true);
+    let catalogItems;
+    let providerTotal;
+    let pagesFetched;
+    let saved;
+    if (cursor === 0) {
+      const pulled = await pullKuaimaiProductCatalog(config, { pageSize: 200, maxPages: 8 });
+      if (!pulled.complete) {
+        return errorResponse(`快麦商品超过单次安全分页范围，已读取 ${pulled.items.length} 条，未写入目录。`, 409, "KUAIMAI_PRODUCT_SYNC_INCOMPLETE", true);
+      }
+      const catalog = normalizeCatalogPayload({ source: "kuaimai", items: pulled.items, syncedAt: new Date().toISOString() });
+      saved = await upsertProductCatalog(db, { ...catalog, startedAt }, {
+        actor,
+        mode: "kuaimai_api",
+        pages: pulled.pagesFetched
+      });
+      catalogItems = catalog.items;
+      providerTotal = pulled.total;
+      pagesFetched = pulled.pagesFetched;
+    } else {
+      const stored = await readProductCatalog(db);
+      catalogItems = stored.items.filter(item => item.source === "kuaimai" && item.presentInSource !== false);
+      if (!catalogItems.length) {
+        return errorResponse("共享商品目录为空，无法继续组合详情同步，请从头重试。", 409, "KUAIMAI_PRODUCT_SYNC_CURSOR_STALE", true);
+      }
+      providerTotal = catalogItems.length;
+      pagesFetched = 0;
+      saved = { counts: stored.meta, run: stored.runs[0], meta: stored.meta };
     }
-    const catalog = normalizeCatalogPayload({ source: "kuaimai", items: pulled.items, syncedAt: new Date().toISOString() });
-    const saved = await upsertProductCatalog(db, { ...catalog, startedAt }, {
-      actor,
-      mode: "kuaimai_api",
-      pages: pulled.pagesFetched
-    });
-    const details = await pullKuaimaiProductDetails(config, pulled.items, { cursor, maxDetails: 30 });
-    const detailCatalog = normalizeCatalogPayload({ source: "kuaimai", items: details.details, syncedAt: catalog.syncedAt });
+    const syncedAt = saved.meta?.lastSuccessfulSyncAt || startedAt;
+    const details = await pullKuaimaiProductDetails(config, catalogItems, { cursor, maxDetails: 30 });
+    const detailCatalog = normalizeCatalogPayload({ source: "kuaimai", items: details.details, syncedAt });
     const componentSaved = await replaceProductCatalogComponents(db, detailCatalog.items, {
       actor,
-      syncedAt: catalog.syncedAt,
+      syncedAt,
       replaceEmpty: true
     });
     const processed = details.cursor + details.details.length + details.failures.length;
@@ -45,8 +64,8 @@ export async function onRequest({ request, env, data = {} }) {
       complete: details.complete,
       nextCursor: details.nextCursor,
       status: details.failures.length ? "partial" : details.complete ? "success" : "running",
-      providerTotal: pulled.total,
-      pagesFetched: pulled.pagesFetched,
+      providerTotal,
+      pagesFetched,
       ...saved,
       progress: {
         cursor: details.cursor,

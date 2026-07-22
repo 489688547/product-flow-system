@@ -280,31 +280,47 @@ export function isKuaimaiBundleCandidate(item = {}) {
   return ["1", "2"].includes(String(item.type ?? "")) || ["3", "4"].includes(String(item.typeTag ?? ""));
 }
 
+function kuaimaiBundleIdentity(item = {}) {
+  const sourceProductId = String(item.sysItemId || item.sourceProductId || "").trim();
+  const merchantCode = String(item.outerId || item.merchantCode || "").trim();
+  return `${sourceProductId}\u0000${merchantCode}`;
+}
+
 // 商品列表只给出类型；组合比例由商品详情的 suitSingleList 提供。
 // 单次最多读取 30 个详情，给 Pages Functions 留出列表、存储和认证子请求余量。
 export async function pullKuaimaiProductDetails(config, items = [], { cursor = 0, maxDetails = 30 } = {}, fetchImpl = fetch) {
-  const candidates = items.filter(isKuaimaiBundleCandidate);
+  const candidates = items.filter(isKuaimaiBundleCandidate)
+    .sort((left, right) => kuaimaiBundleIdentity(left).localeCompare(kuaimaiBundleIdentity(right), "en", { numeric: true, sensitivity: "base" }));
   const start = Math.min(candidates.length, Math.max(0, Number(cursor) || 0));
   const limit = Math.min(30, Math.max(1, Number(maxDetails) || 30));
   const selected = candidates.slice(start, start + limit);
   const details = [];
   const failures = [];
-  for (const candidate of selected) {
+  const readCandidate = async candidate => {
     try {
-      const request = candidate.sysItemId
-        ? { sysItemId: candidate.sysItemId, whetherReturnPurchase: 0 }
-        : { outerId: candidate.outerId, whetherReturnPurchase: 0 };
+      const sourceProductId = candidate.sysItemId || candidate.sourceProductId;
+      const merchantCode = candidate.outerId || candidate.merchantCode;
+      const request = sourceProductId
+        ? { sysItemId: sourceProductId, whetherReturnPurchase: 0 }
+        : { outerId: merchantCode, whetherReturnPurchase: 0 };
       const payload = await callKuaimai("item.single.get", request, config, fetchImpl);
       const detail = kuaimaiProductDetail(payload);
       if (!detail) throw new Error("快麦商品详情为空。");
-      details.push({ ...candidate, ...detail });
+      return { detail: { ...candidate, ...detail } };
     } catch (error) {
-      failures.push({
-        sourceProductId: String(candidate.sysItemId || ""),
-        merchantCode: String(candidate.outerId || ""),
+      return { failure: {
+        sourceProductId: String(candidate.sysItemId || candidate.sourceProductId || ""),
+        merchantCode: String(candidate.outerId || candidate.merchantCode || ""),
         code: String(error?.kuaimaiCode || "KUAIMAI_PRODUCT_DETAIL_FAILED"),
         message: "快麦商品详情读取失败。"
-      });
+      } };
+    }
+  };
+  for (let index = 0; index < selected.length; index += 5) {
+    const outcomes = await Promise.all(selected.slice(index, index + 5).map(readCandidate));
+    for (const outcome of outcomes) {
+      if (outcome.detail) details.push(outcome.detail);
+      if (outcome.failure) failures.push(outcome.failure);
     }
   }
   const consumed = start + selected.length;
