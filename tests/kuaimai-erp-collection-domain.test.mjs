@@ -38,13 +38,13 @@ test("ERP collection exposes the governed resource registry", () => {
   ]);
 });
 
-test("normalization derives a stable batch id and preserves provider payload", () => {
+test("normalization derives a stable batch id and keeps only the standard minimum index", () => {
   const normalized = normalizeErpCollectionPayload(payload(), { idempotencyKey: "orders-20260701-1" });
   assert.equal(normalized.batch.id, `kuaimai-orders-${hash.slice(0, 24)}`);
   assert.equal(normalized.batch.schemaVersion, "v1");
   assert.equal(normalized.batch.status, "completed");
   assert.equal(normalized.records[0].sourceKey, "order-1001");
-  assert.equal(normalized.records[0].payload.系统订单号, "order-1001");
+  assert.deepEqual(normalized.records[0].payload, { sourceOrderId: "order-1001" });
 });
 
 test("normalization rejects unknown resources, oversized chunks and secret fields", () => {

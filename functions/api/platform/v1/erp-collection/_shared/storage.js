@@ -17,6 +17,14 @@ async function findBatch(db, batch) {
     .first();
 }
 
+async function findArchive(db, archive) {
+  if (!archive) return null;
+  return db.prepare(`SELECT id, status FROM erp_file_archives
+    WHERE platform_id = ? AND content_hash = ? LIMIT 1`)
+    .bind(archive.platformId, archive.contentHash)
+    .first();
+}
+
 async function readExistingRecords(db, resourceType, records) {
   const existing = new Map();
   for (let index = 0; index < records.length; index += WRITE_BATCH_SIZE) {
@@ -31,11 +39,11 @@ async function readExistingRecords(db, resourceType, records) {
   return existing;
 }
 
-function batchStatement(db, batch, context, summary) {
+function batchStatement(db, batch, context, summary, archiveId) {
   return db.prepare(`INSERT INTO erp_collection_batches
     (id, platform_id, resource_type, source_file_name, content_hash, schema_version, range_start, range_end,
-      row_count, status, collected_at, imported_at, imported_by, summary, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      row_count, status, collected_at, imported_at, imported_by, summary, created_at, updated_at, archive_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(platform_id, resource_type, content_hash) DO UPDATE SET
       source_file_name = excluded.source_file_name,
       schema_version = excluded.schema_version,
@@ -46,11 +54,37 @@ function batchStatement(db, batch, context, summary) {
       imported_at = excluded.imported_at,
       imported_by = excluded.imported_by,
       summary = excluded.summary,
+      archive_id = excluded.archive_id,
       updated_at = excluded.updated_at`)
     .bind(
       batch.id, batch.platformId, batch.resourceType, batch.sourceFileName, batch.contentHash,
       batch.schemaVersion, batch.rangeStart, batch.rangeEnd, batch.rowCount, batch.status,
-      batch.collectedAt, context.now, context.actor, JSON.stringify(summary), context.now, context.now
+      batch.collectedAt, context.now, context.actor, JSON.stringify(summary), context.now, context.now, archiveId
+    );
+}
+
+function archiveStatement(db, archive, archiveId, batchId, status, now) {
+  return db.prepare(`INSERT INTO erp_file_archives
+    (id, platform_id, resource_type, content_hash, file_name, size_bytes, relative_path, storage_type,
+      runner_id, status, batch_id, archived_at, processed_at, error_code, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(platform_id, content_hash) DO UPDATE SET
+      resource_type = excluded.resource_type,
+      file_name = excluded.file_name,
+      size_bytes = excluded.size_bytes,
+      relative_path = excluded.relative_path,
+      storage_type = excluded.storage_type,
+      runner_id = COALESCE(excluded.runner_id, erp_file_archives.runner_id),
+      status = excluded.status,
+      batch_id = excluded.batch_id,
+      processed_at = excluded.processed_at,
+      error_code = excluded.error_code,
+      updated_at = excluded.updated_at`)
+    .bind(
+      archiveId, archive.platformId, archive.resourceType, archive.contentHash, archive.fileName,
+      archive.sizeBytes, archive.relativePath, archive.storageType, archive.runnerId, status, batchId,
+      archive.archivedAt, status === "processed" ? (archive.processedAt || now) : archive.processedAt,
+      archive.errorCode, now, now
     );
 }
 
@@ -97,6 +131,8 @@ export async function ingestErpCollection(db, input, { actor = "" } = {}) {
   const now = new Date().toISOString();
   const existingBatch = await findBatch(db, input.batch);
   const batchId = existingBatch?.id || input.batch.id;
+  const existingArchive = await findArchive(db, input.archive);
+  const archiveId = input.archive ? (existingArchive?.id || input.archive.id) : null;
   const existingRecords = await readExistingRecords(db, input.batch.resourceType, input.records);
   const counts = { inserted: 0, updated: 0, unchanged: 0, issues: input.issues.length };
   const changedRecords = [];
@@ -113,15 +149,99 @@ export async function ingestErpCollection(db, input, { actor = "" } = {}) {
     ...counts
   };
   await runBatches(db, [
-    batchStatement(db, { ...input.batch, id: batchId }, { actor: String(actor).slice(0, 120), now }, summary),
+    batchStatement(db, { ...input.batch, id: batchId }, { actor: String(actor).slice(0, 120), now }, summary, archiveId),
+    ...(input.archive ? [archiveStatement(
+      db,
+      input.archive,
+      archiveId,
+      batchId,
+      input.batch.status === "completed" ? "processed" : "processing",
+      now
+    )] : []),
     ...changedRecords.map(record => recordStatement(db, record, input.batch.resourceType, batchId, now)),
     ...input.issues.map(issue => issueStatement(db, issue, input.batch.resourceType, batchId, now))
   ]);
   return {
     batchId,
+    archiveId,
     resourceType: input.batch.resourceType,
     status: input.batch.status,
     duplicateFile: Boolean(existingBatch),
     counts
   };
+}
+
+export async function sha256(value) {
+  const encoded = new TextEncoder().encode(String(value));
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", encoded);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function createCollectorToken() {
+  const bytes = new Uint8Array(24);
+  globalThis.crypto.getRandomValues(bytes);
+  return `kec_${[...bytes].map(byte => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+export async function registerErpCollector(db, { name = "公司 Mac 快麦采集器" } = {}, actor = {}) {
+  const token = createCollectorToken();
+  const tokenHash = await sha256(token);
+  const id = globalThis.crypto?.randomUUID?.() || `erp-runner-${Date.now().toString(36)}`;
+  const now = new Date().toISOString();
+  const safeName = String(name || "公司 Mac 快麦采集器").trim().slice(0, 120);
+  await db.prepare(`INSERT INTO erp_collector_tokens
+    (id, token_hash, name, scope, status, created_at, created_by)
+    VALUES (?, ?, ?, ?, ?, ?, ?)`)
+    .bind(id, tokenHash, safeName, "kuaimai_erp_ingest", "active", now, String(actor.actor || actor.userId || "unknown").slice(0, 120))
+    .run();
+  return { id, token, name: safeName, scope: "kuaimai_erp_ingest", createdAt: now };
+}
+
+export async function authenticateErpCollector(db, request) {
+  const authorization = String(request.headers.get("authorization") || "");
+  const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+  if (!token) {
+    const error = new Error("采集器令牌缺失。");
+    error.status = 401;
+    error.code = "ERP_COLLECTION_RUNNER_TOKEN_REQUIRED";
+    throw error;
+  }
+  const tokenHash = await sha256(token);
+  const row = await db.prepare(`SELECT id, name, scope, status FROM erp_collector_tokens
+    WHERE token_hash = ? AND status = 'active' LIMIT 1`).bind(tokenHash).first();
+  if (!row || row.scope !== "kuaimai_erp_ingest") {
+    const error = new Error("采集器令牌无效、已停用或权限范围不符。");
+    error.status = 401;
+    error.code = "ERP_COLLECTION_RUNNER_TOKEN_INVALID";
+    throw error;
+  }
+  const now = new Date().toISOString();
+  await db.prepare("UPDATE erp_collector_tokens SET last_seen_at = ? WHERE id = ?").bind(now, row.id).run();
+  return { actor: row.name, userId: row.id, department: "collector", runnerId: row.id, scope: row.scope };
+}
+
+export async function listErpArchives(db, { resourceType = "", status = "", limit = 100 } = {}) {
+  const result = await db.prepare(`SELECT id, platform_id, resource_type, content_hash, file_name, size_bytes,
+    relative_path, storage_type, runner_id, status, batch_id, archived_at, processed_at, error_code, updated_at
+    FROM erp_file_archives ORDER BY archived_at DESC LIMIT ?`).bind(Math.min(500, Math.max(1, Number(limit) || 100))).all();
+  return (result?.results || [])
+    .filter(row => !resourceType || row.resource_type === resourceType)
+    .filter(row => !status || row.status === status)
+    .map(row => ({
+      id: row.id,
+      platformId: row.platform_id,
+      resourceType: row.resource_type,
+      contentHash: row.content_hash,
+      fileName: row.file_name,
+      sizeBytes: Number(row.size_bytes || 0),
+      relativePath: row.relative_path,
+      storageType: row.storage_type,
+      runnerId: row.runner_id || null,
+      status: row.status,
+      batchId: row.batch_id || null,
+      archivedAt: row.archived_at,
+      processedAt: row.processed_at || null,
+      errorCode: row.error_code || null,
+      updatedAt: row.updated_at
+    }));
 }

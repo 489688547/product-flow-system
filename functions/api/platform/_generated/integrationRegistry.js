@@ -104,12 +104,14 @@ const integrationRegistry = {
       "id": "kuaimai",
       "name": "快麦开放平台",
       "status": "integrating",
-      "summary": "开放平台订单与商品接口只能覆盖部分数据，历史补数以快麦后台官方导出文件为准；文件按订单创建时间等来源口径解析、校验并幂等写入 D1。",
+      "summary": "开放平台订单与商品接口只能覆盖部分数据，历史补数以快麦后台官方导出文件为准；原始文件留在公司 Mac，D1 保存归档清单、最小索引和共享业务投影。",
       "capabilities": [
         "官方文件历史补数",
         "订单创建时间口径",
-        "原始记录幂等落库",
+        "本地原始文件归档",
+        "最小索引幂等落库",
         "导入批次与异常审计",
+        "固定范围采集令牌",
         "有限订单 API",
         "有限商品 API",
         "平台连接配置"
@@ -151,7 +153,9 @@ const integrationRegistry = {
         "scripts/kuaimai-erp-collector/**",
         ".agents/skills/kuaimai-erp-data-collection/**",
         "migrations/0007_kuaimai_erp_collection.sql",
+        "migrations/0008_kuaimai_erp_local_archives.sql",
         "docs/features/kuaimai-erp-history/**",
+        "docs/features/kuaimai-erp-local-archive/**",
         "server.mjs"
       ],
       "envVars": [
@@ -169,6 +173,8 @@ const integrationRegistry = {
         "/api/kuaimai/",
         "/api/sales",
         "/api/platform/v1/erp-collection/ingest",
+        "/api/platform/v1/erp-collection/archives",
+        "/api/platform/v1/erp-collection/runners",
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/product-catalog",
         "/api/platform/v1/product-catalog/import",
@@ -203,7 +209,7 @@ const integrationRegistry = {
         {
           "platformId": "cloudflare-d1",
           "type": "stores-erp-source-records",
-          "description": "快麦官方导出文件的批次、标准索引、原始行和异常审计写入 D1；既有销售聚合与商品目录继续作为消费模型。"
+          "description": "快麦官方导出文件的归档清单、批次、最小标准索引和异常审计写入 D1；原始文件留在公司 Mac。"
         },
         {
           "platformId": "erp-file-import",
@@ -649,9 +655,10 @@ const integrationRegistry = {
       "id": "erp-file-import",
       "name": "ERP / 文件导入",
       "status": "integrating",
-      "summary": "承接销售明细、ERP 商品档案、库存快照和月度盘点文件，并逐步覆盖快麦订单、商品、库存、采购、售后及基础资料的历史原始记录。",
+      "summary": "承接销售明细、ERP 商品档案、库存快照和月度盘点文件；快麦原始文件在公司 Mac 哈希归档，线上只接收脱敏最小索引和共享业务投影。",
       "capabilities": [
         "快麦官方文件历史补数",
+        "本地原始归档",
         "销售明细导入",
         "商品档案导入",
         "ERP 库存快照导入",
@@ -659,6 +666,7 @@ const integrationRegistry = {
         "GB18030 CSV",
         "字段映射",
         "内容哈希幂等",
+        "固定范围采集令牌",
         "导入异常审计",
         "整月重导",
         "数据校准"
@@ -701,6 +709,8 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/sales",
         "/api/platform/v1/erp-collection/ingest",
+        "/api/platform/v1/erp-collection/archives",
+        "/api/platform/v1/erp-collection/runners",
         "/api/platform/v1/product-catalog/import",
         "/api/platform/v1/goods-flow/imports"
       ],
@@ -730,7 +740,7 @@ const integrationRegistry = {
         {
           "platformId": "cloudflare-d1",
           "type": "stores-imports",
-          "description": "导入批次、原始记录、异常、聚合销售结果和标准化商品目录通过内部 API 写入 D1。"
+          "description": "导入归档清单、批次、最小索引、异常、聚合销售结果和标准化商品目录通过内部 API 写入 D1；完整原文件不进入 D1。"
         }
       ]
     },

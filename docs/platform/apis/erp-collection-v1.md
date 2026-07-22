@@ -2,11 +2,11 @@
 
 ## Purpose
 
-`POST /api/platform/v1/erp-collection/ingest` accepts preflighted official ERP export rows through the shared data-acquisition boundary. The first provider is Kuaimai. Provider files are read locally; credentials, cookies, verification codes and browser sessions never enter the request.
+`POST /api/platform/v1/erp-collection/ingest` accepts preflighted official ERP export indexes through the shared data-acquisition boundary. The first provider is Kuaimai. Provider files remain in the company Mac archive; credentials, cookies, verification codes, browser sessions and full raw rows never enter the request.
 
 ## Authentication and authorization
 
-- Requires the existing authenticated organization session; local loopback uses the governed server-side personal token flow.
+- Manual calls require the existing authenticated organization session. The installed collector uses a fixed-scope `kuaimai_erp_ingest` token created by an executive session; plaintext is returned once and stored only in macOS Keychain, while D1 stores its SHA-256 hash.
 - Rejects read-only identities.
 - Write access is limited to 总经办、数据中心/数据部、供应链和财务.
 - Requires the `PRODUCT_FLOW_DB` D1 binding and an `Idempotency-Key` header.
@@ -16,14 +16,17 @@
 JSON object with:
 
 - `batch`: provider, registered resource type, source filename, SHA-256 file hash, schema version, source range, source row count, status and collection time.
-- `records`: at most 500 normalized records with stable source key, source timestamps, shop/warehouse references, row SHA-256 and the allowed provider field object.
+- `archive`: optional local archive manifest with file hash, safe filename, byte size, relative path, runner and status. Absolute paths are ignored.
+- `records`: at most 500 normalized records with stable source key, source timestamps, shop/warehouse references, row SHA-256 and the whitelisted minimum standard index.
 - `issues`: at most 500 preflight quality issues.
 
 Orders and order items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values.
 
 ## Response
 
-HTTP `201` returns `data.batchId`, normalized batch status and `counts` for inserted, updated, unchanged and issue rows. Repeating the same idempotent chunk or unchanged source row does not create another fact.
+HTTP `201` returns `data.archiveId`, `data.batchId`, normalized batch status and `counts` for inserted, updated, unchanged and issue rows. Repeating the same file hash, idempotent chunk or unchanged source row does not create another fact.
+
+`POST /api/platform/v1/erp-collection/runners` creates the one-time fixed-scope token and requires an executive company session. `GET /api/platform/v1/erp-collection/archives` returns safe archive and batch metadata to authorized company users; it never returns an absolute local path.
 
 ## Errors
 
@@ -39,7 +42,7 @@ The route is additive under `/api/platform/v1`. Resource types and payload valid
 
 ## Capacity and retention
 
-D1 stores queryable facts, batch metadata and quality issues; it is not the long-term binary-file archive. A verified 15-day Kuaimai order-item sample contains 157,217 rows and approximately 339.84 MiB of serialized records, so full raw history must use NAS/R2 before D1 receives only normalized facts and aggregates.
+D1 stores archive metadata, minimum query indexes, business projections, batch metadata and quality issues; it is not the binary-file archive. A verified 15-day Kuaimai order-item sample contains 157,217 rows and approximately 339.84 MiB of serialized records, so full raw history stays under `~/Desktop/公司数据中心/快麦ERP/` until a governed NAS/R2 location is available.
 
 ## Observability
 
@@ -51,3 +54,5 @@ Audit by batch ID, provider, resource type, file hash, range, row count, status,
 - `tests/kuaimai-erp-collection-api.test.mjs`
 - `tests/kuaimai-erp-collection-cli.test.mjs`
 - `tests/kuaimai-erp-collection-migration.test.mjs`
+- `tests/kuaimai-erp-local-archive.test.mjs`
+- `tests/kuaimai-erp-local-archive-api.test.mjs`

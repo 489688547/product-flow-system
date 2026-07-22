@@ -229,7 +229,7 @@ const environmentCapabilities = {
     {
       "id": "kuaimai-erp-file-collection",
       "name": "快麦 ERP 文件采集",
-      "description": "通过快麦后台官方导出文件补录订单、商品、库存等原始 ERP 数据，按内容哈希幂等写入 D1 并保留批次与异常审计。",
+      "description": "通过快麦后台官方导出文件补录订单、商品、库存等 ERP 数据；原始文件保存在公司 Mac，D1 按内容哈希保存归档清单、最小索引、批次与异常审计。",
       "platforms": [
         "kuaimai",
         "erp-file-import",
@@ -248,7 +248,9 @@ const environmentCapabilities = {
       "tables": [
         "erp_collection_batches",
         "erp_source_records",
-        "erp_collection_issues"
+        "erp_collection_issues",
+        "erp_file_archives",
+        "erp_collector_tokens"
       ]
     },
     {

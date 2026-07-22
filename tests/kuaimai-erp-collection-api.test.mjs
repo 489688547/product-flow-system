@@ -55,7 +55,7 @@ test("ERP collection ingest creates a batch and writes source records", async ()
   assert.equal(result.body.data.counts.unchanged, 0);
   assert.equal(db.tables.erp_collection_batches.size, 1);
   assert.equal(db.tables.erp_source_records.size, 1);
-  assert.equal(JSON.parse([...db.tables.erp_source_records.values()][0].payload).系统订单号, "order-1001");
+  assert.deepEqual(JSON.parse([...db.tables.erp_source_records.values()][0].payload), { sourceOrderId: "order-1001" });
 });
 
 test("ERP collection ingest is idempotent and updates a changed source record", async () => {

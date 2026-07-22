@@ -2,7 +2,9 @@ export function createErpCollectionD1Mock() {
   const tables = {
     erp_collection_batches: new Map(),
     erp_source_records: new Map(),
-    erp_collection_issues: new Map()
+    erp_collection_issues: new Map(),
+    erp_file_archives: new Map(),
+    erp_collector_tokens: new Map()
   };
 
   function statement(sql) {
@@ -18,6 +20,14 @@ export function createErpCollectionD1Mock() {
           const [platformId, resourceType, contentHash] = state.values;
           return [...tables.erp_collection_batches.values()].find(row => row.platform_id === platformId && row.resource_type === resourceType && row.content_hash === contentHash) || null;
         }
+        if (query.includes("from erp_file_archives") && query.includes("platform_id = ?") && query.includes("content_hash = ?")) {
+          const [platformId, contentHash] = state.values;
+          return [...tables.erp_file_archives.values()].find(row => row.platform_id === platformId && row.content_hash === contentHash) || null;
+        }
+        if (query.includes("from erp_collector_tokens") && query.includes("token_hash = ?")) {
+          const [tokenHash] = state.values;
+          return [...tables.erp_collector_tokens.values()].find(row => row.token_hash === tokenHash && row.status === "active") || null;
+        }
         return null;
       },
       async all() {
@@ -30,11 +40,14 @@ export function createErpCollectionD1Mock() {
               .map(row => ({ source_key: row.source_key, content_hash: row.content_hash }))
           };
         }
+        if (query.includes("from erp_file_archives") && query.includes("order by archived_at")) {
+          return { results: [...tables.erp_file_archives.values()].sort((left, right) => right.archived_at.localeCompare(left.archived_at)) };
+        }
         return { results: [] };
       },
       async run() {
         if (query.startsWith("insert into erp_collection_batches")) {
-          const [id, platformId, resourceType, sourceFileName, contentHash, schemaVersion, rangeStart, rangeEnd, rowCount, status, collectedAt, importedAt, importedBy, summary, createdAt, updatedAt] = state.values;
+          const [id, platformId, resourceType, sourceFileName, contentHash, schemaVersion, rangeStart, rangeEnd, rowCount, status, collectedAt, importedAt, importedBy, summary, createdAt, updatedAt, archiveId] = state.values;
           const existing = [...tables.erp_collection_batches.values()].find(row => row.platform_id === platformId && row.resource_type === resourceType && row.content_hash === contentHash);
           const row = {
             id: existing?.id || id,
@@ -52,7 +65,8 @@ export function createErpCollectionD1Mock() {
             imported_by: importedBy,
             summary,
             created_at: existing?.created_at || createdAt,
-            updated_at: updatedAt
+            updated_at: updatedAt,
+            archive_id: archiveId || null
           };
           tables.erp_collection_batches.set(row.id, row);
           return { success: true };
@@ -83,6 +97,44 @@ export function createErpCollectionD1Mock() {
             id, source_batch_id: sourceBatchId, resource_type: resourceType, source_key: sourceKey,
             code, severity, message, details, status, created_at: createdAt, updated_at: updatedAt
           });
+          return { success: true };
+        }
+        if (query.startsWith("insert into erp_file_archives")) {
+          const [id, platformId, resourceType, contentHash, fileName, sizeBytes, relativePath, storageType, runnerId, status, batchId, archivedAt, processedAt, errorCode, createdAt, updatedAt] = state.values;
+          const existing = [...tables.erp_file_archives.values()].find(row => row.platform_id === platformId && row.content_hash === contentHash);
+          const row = {
+            id: existing?.id || id,
+            platform_id: platformId,
+            resource_type: resourceType,
+            content_hash: contentHash,
+            file_name: fileName,
+            size_bytes: sizeBytes,
+            relative_path: relativePath,
+            storage_type: storageType,
+            runner_id: runnerId || existing?.runner_id || null,
+            status,
+            batch_id: batchId,
+            archived_at: archivedAt,
+            processed_at: processedAt,
+            error_code: errorCode,
+            created_at: existing?.created_at || createdAt,
+            updated_at: updatedAt
+          };
+          tables.erp_file_archives.set(row.id, row);
+          return { success: true };
+        }
+        if (query.startsWith("insert into erp_collector_tokens")) {
+          const [id, tokenHash, name, scope, status, createdAt, createdBy] = state.values;
+          tables.erp_collector_tokens.set(id, {
+            id, token_hash: tokenHash, name, scope, status, created_at: createdAt, created_by: createdBy,
+            last_seen_at: null, revoked_at: null, revoked_by: null
+          });
+          return { success: true };
+        }
+        if (query.startsWith("update erp_collector_tokens set last_seen_at")) {
+          const [lastSeenAt, id] = state.values;
+          const row = tables.erp_collector_tokens.get(id);
+          if (row) row.last_seen_at = lastSeenAt;
           return { success: true };
         }
         return { success: true };
