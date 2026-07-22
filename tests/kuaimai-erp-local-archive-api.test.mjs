@@ -3,6 +3,7 @@ import test from "node:test";
 import { onRequest as onArchives } from "../functions/api/platform/v1/erp-collection/archives.js";
 import { onRequest as onIngest } from "../functions/api/platform/v1/erp-collection/ingest.js";
 import { onRequest as onRunners } from "../functions/api/platform/v1/erp-collection/runners.js";
+import { hashSecret } from "../functions/api/platform/_shared/productionDataAccess.js";
 import { createErpCollectionD1Mock } from "./helpers/erp-collection-d1-mock.mjs";
 
 const session = { userId: "exec-1", name: "负责人", role: "executive", department: "总经办" };
@@ -33,6 +34,40 @@ test("executive registers a one-time fixed-scope collector token stored as a has
   assert.equal(stored.scope, "kuaimai_erp_ingest");
   assert.equal(stored.token_hash.length, 64);
   assert.equal(JSON.stringify(stored).includes(result.body.data.token), false);
+});
+
+test("active executive production token can register a collector without a browser session", async () => {
+  const db = createErpCollectionD1Mock();
+  const personalToken = "personal-production-token";
+  const tokenHash = await hashSecret(personalToken);
+  db.tables.production_data_access_tokens.set(tokenHash, {
+    token_hash: tokenHash,
+    user_id: "exec-1",
+    union_id: "union-1",
+    name: "负责人",
+    capabilities: JSON.stringify(["read", "write"]),
+    expires_at: null,
+    revoked_at: null
+  });
+  db.tables.product_flow_org_members.set("exec-1", {
+    corp_id: "corp-1",
+    user_id: "exec-1",
+    union_id: "union-1",
+    name: "负责人",
+    department: "总经办",
+    title: "负责人",
+    role: "executive",
+    active: 1
+  });
+  const result = await jsonCall(onRunners, "https://flow.example.com/api/platform/v1/erp-collection/runners", {
+    method: "POST",
+    db,
+    headers: { authorization: `Bearer ${personalToken}` },
+    body: { name: "公司 Mac 快麦采集器" }
+  });
+  assert.equal(result.response.status, 201);
+  assert.equal(result.body.data.scope, "kuaimai_erp_ingest");
+  assert.ok(db.tables.production_data_access_tokens.get(tokenHash).last_used_at);
 });
 
 test("collector token can ingest an archive and archives endpoint omits absolute paths", async () => {
@@ -82,6 +117,16 @@ test("collector token can ingest an archive and archives endpoint omits absolute
   assert.equal(db.tables.erp_file_archives.size, 1);
   assert.equal([...db.tables.erp_collection_batches.values()][0].archive_id, ingested.body.data.archiveId);
   assert.deepEqual(JSON.parse([...db.tables.erp_source_records.values()][0].payload), { sourceOrderId: "order-1" });
+
+  const repeatedManifestSync = await jsonCall(onArchives, "https://flow.example.com/api/platform/v1/erp-collection/archives", {
+    method: "POST",
+    db,
+    headers: { authorization: `Bearer ${token}` },
+    body: { archive: { ...payload.archive, status: "archived" } }
+  });
+  assert.equal(repeatedManifestSync.response.status, 200);
+  assert.equal([...db.tables.erp_file_archives.values()][0].status, "processed");
+  assert.equal([...db.tables.erp_file_archives.values()][0].batch_id, ingested.body.data.batchId);
 
   const listed = await jsonCall(onArchives, "https://flow.example.com/api/platform/v1/erp-collection/archives", { db, session });
   assert.equal(listed.response.status, 200);

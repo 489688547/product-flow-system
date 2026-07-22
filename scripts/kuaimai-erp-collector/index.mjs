@@ -38,9 +38,10 @@ async function runnerHeaders() {
 }
 
 async function registerCollector(baseUrl, fetchImpl = fetch) {
+  const personalToken = String(process.env.PRODUCTION_DATA_ACCESS_TOKEN || "").trim();
   const response = await fetchImpl(`${baseUrl.replace(/\/+$/, "")}/api/platform/v1/erp-collection/runners`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...(personalToken ? { authorization: `Bearer ${personalToken}` } : {}) },
     body: JSON.stringify({ name: "公司 Mac 快麦采集器" })
   });
   const payload = await response.json().catch(() => ({}));

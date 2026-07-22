@@ -4,7 +4,9 @@ export function createErpCollectionD1Mock() {
     erp_source_records: new Map(),
     erp_collection_issues: new Map(),
     erp_file_archives: new Map(),
-    erp_collector_tokens: new Map()
+    erp_collector_tokens: new Map(),
+    production_data_access_tokens: new Map(),
+    product_flow_org_members: new Map()
   };
 
   function statement(sql) {
@@ -27,6 +29,14 @@ export function createErpCollectionD1Mock() {
         if (query.includes("from erp_collector_tokens") && query.includes("token_hash = ?")) {
           const [tokenHash] = state.values;
           return [...tables.erp_collector_tokens.values()].find(row => row.token_hash === tokenHash && row.status === "active") || null;
+        }
+        if (query.includes("from production_data_access_tokens") && query.includes("token_hash = ?")) {
+          const [tokenHash] = state.values;
+          return tables.production_data_access_tokens.get(tokenHash) || null;
+        }
+        if (query.includes("from product_flow_org_members") && query.includes("user_id = ?")) {
+          const [userId] = state.values;
+          return tables.product_flow_org_members.get(userId) || null;
         }
         return null;
       },
@@ -116,11 +126,11 @@ export function createErpCollectionD1Mock() {
             relative_path: relativePath,
             storage_type: storageType,
             runner_id: runnerId || existing?.runner_id || null,
-            status,
-            batch_id: batchId,
+            status: existing?.status === "processed" && status === "archived" ? "processed" : status,
+            batch_id: batchId || existing?.batch_id || null,
             archived_at: archivedAt,
-            processed_at: processedAt,
-            error_code: errorCode,
+            processed_at: processedAt || existing?.processed_at || null,
+            error_code: status === "archived" ? (existing?.error_code || null) : errorCode,
             created_at: existing?.created_at || createdAt,
             updated_at: updatedAt
           };
@@ -139,6 +149,12 @@ export function createErpCollectionD1Mock() {
           const [lastSeenAt, id] = state.values;
           const row = tables.erp_collector_tokens.get(id);
           if (row) row.last_seen_at = lastSeenAt;
+          return { success: true };
+        }
+        if (query.startsWith("update production_data_access_tokens set last_used_at")) {
+          const [lastUsedAt, tokenHash] = state.values;
+          const row = tables.production_data_access_tokens.get(tokenHash);
+          if (row) row.last_used_at = lastUsedAt;
           return { success: true };
         }
         return { success: true };

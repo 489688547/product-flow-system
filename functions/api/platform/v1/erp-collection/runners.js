@@ -1,3 +1,4 @@
+import { authorizeProductionAccess } from "../../_shared/productionDataAccess.js";
 import { authorizeErpCollection } from "./_shared/authorization.js";
 import { errorResponse, requestId, routeError, successResponse } from "./_shared/http.js";
 import { erpCollectionDatabase, registerErpCollector } from "./_shared/storage.js";
@@ -7,10 +8,11 @@ export async function onRequest({ request, env, data = {} }) {
   try {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { allow: "POST, OPTIONS" } });
     if (request.method !== "POST") throw routeError(405, "VALIDATION_METHOD_NOT_ALLOWED", "Method not allowed");
-    const actor = authorizeErpCollection(data.session);
-    if (data.session?.role !== "executive") throw routeError(403, "ERP_COLLECTION_RUNNER_REGISTER_DENIED", "仅总经办可登记采集器。");
     const db = erpCollectionDatabase(env);
     if (!db) throw routeError(501, "ERP_COLLECTION_STORAGE_UNAVAILABLE", "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB。", true);
+    const session = data.session || await authorizeProductionAccess(request, db, { capability: "write" });
+    const actor = authorizeErpCollection(session);
+    if (session?.role !== "executive") throw routeError(403, "ERP_COLLECTION_RUNNER_REGISTER_DENIED", "仅总经办可登记采集器。");
     const body = await request.json().catch(() => {
       throw routeError(400, "VALIDATION_INVALID_JSON", "请求内容不是有效的 JSON 对象。");
     });
@@ -20,4 +22,3 @@ export async function onRequest({ request, env, data = {} }) {
     return errorResponse(error, id);
   }
 }
-

@@ -118,10 +118,16 @@ function archiveStatement(db, archive, archiveId, batchId, status, now) {
       relative_path = excluded.relative_path,
       storage_type = excluded.storage_type,
       runner_id = COALESCE(excluded.runner_id, erp_file_archives.runner_id),
-      status = excluded.status,
-      batch_id = excluded.batch_id,
-      processed_at = excluded.processed_at,
-      error_code = excluded.error_code,
+      status = CASE
+        WHEN erp_file_archives.status = 'processed' AND excluded.status = 'archived' THEN erp_file_archives.status
+        ELSE excluded.status
+      END,
+      batch_id = COALESCE(excluded.batch_id, erp_file_archives.batch_id),
+      processed_at = COALESCE(excluded.processed_at, erp_file_archives.processed_at),
+      error_code = CASE
+        WHEN excluded.status = 'archived' THEN erp_file_archives.error_code
+        ELSE excluded.error_code
+      END,
       updated_at = excluded.updated_at`)
     .bind(
       archiveId, archive.platformId, archive.resourceType, archive.contentHash, archive.fileName,

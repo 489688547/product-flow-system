@@ -16,7 +16,8 @@ const ALTERNATE_AUTH_PATHS = new Set([
   "/api/platform/v1/production-write-session",
   "/api/platform/v1/production-data/state",
   "/api/platform/v1/production-data/store-connections",
-  "/api/platform/v1/environment-readiness"
+  "/api/platform/v1/environment-readiness",
+  "/api/platform/v1/erp-collection/runners"
 ]);
 
 function usesHandlerBearerAuth(path) {
