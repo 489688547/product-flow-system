@@ -97,6 +97,8 @@ test("saved Lingsuan values require explicit confirmation and remain transient",
   assert.match(workspace, /document\.hidden/);
   assert.match(workspace, /revealActive/);
   assert.match(workspace, /clearRevealed/);
+  assert.doesNotMatch(workspace, /className="platform-connection-revealed" role="status"/);
+  assert.match(workspace, /role="status">仅当前页面暂时可见/);
   assert.doesNotMatch(workspace, /localStorage|sessionStorage/);
   assert.match(controller, /canManage/);
   assert.match(controller, /reveal/);

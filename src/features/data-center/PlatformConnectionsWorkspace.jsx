@@ -309,8 +309,8 @@ function PlatformConnectionForm({
             </div>
           ) : null}
           {revealed?.fields ? (
-            <div className="platform-connection-revealed" role="status">
-              <div><strong>已保存内容</strong><p>仅当前页面暂时可见，最迟 5 分钟后自动清除。</p></div>
+            <div className="platform-connection-revealed">
+              <div><strong>已保存内容</strong><p role="status">仅当前页面暂时可见，最迟 5 分钟后自动清除。</p></div>
               {definition.fields.filter(field => revealed.fields[field.key]).map(field => <RevealedConnectionField key={field.key} field={field} value={revealed.fields[field.key]} />)}
               <Button type="button" onClick={clearRevealed}>立即隐藏</Button>
             </div>
