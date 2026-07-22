@@ -481,6 +481,42 @@ test("API middleware allows bearer-token routes to authorize inside their handle
   assert.equal(continued, true);
 });
 
+test("API middleware lets the web collection runner registration route validate the personal token", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/platform/v1/web-collection/runners", {
+      method: "POST",
+      headers: { authorization: "Bearer personal-token" }
+    }),
+    env: { PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.equal(continued, true);
+});
+
+test("API middleware lets web collection jobs validate the runner token", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/platform/v1/web-collection/jobs", {
+      method: "POST",
+      headers: { authorization: "Bearer runner-token" }
+    }),
+    env: { PRODUCT_FLOW_DB: createAuthD1Mock() },
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+  assert.equal(response.status, 200);
+  assert.equal(continued, true);
+});
+
 test("API middleware lets ERP archive and ingest routes validate collector tokens", async () => {
   for (const path of ["archives", "ingest"]) {
     let continued = false;

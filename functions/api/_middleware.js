@@ -17,7 +17,8 @@ const ALTERNATE_AUTH_PATHS = new Set([
   "/api/platform/v1/production-data/state",
   "/api/platform/v1/production-data/store-connections",
   "/api/platform/v1/environment-readiness",
-  "/api/platform/v1/erp-collection/runners"
+  "/api/platform/v1/erp-collection/runners",
+  "/api/platform/v1/web-collection/runners"
 ]);
 
 function usesHandlerBearerAuth(path) {
@@ -25,6 +26,7 @@ function usesHandlerBearerAuth(path) {
     || path === "/api/platform/v1/user-insights/ingest"
     || path === "/api/platform/v1/erp-collection/archives"
     || path === "/api/platform/v1/erp-collection/ingest"
+    || path === "/api/platform/v1/web-collection/jobs"
     || path.startsWith("/api/platform/v1/browser-agent/");
 }
 

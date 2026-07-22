@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>公司数据采集器</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="mark">数</div>
+        <div>
+          <h1>公司数据采集器</h1>
+          <p>复用当前 Chrome 登录态</p>
+        </div>
+      </header>
+      <section class="status" aria-live="polite">
+        <span id="status-dot" class="dot"></span>
+        <div>
+          <strong id="status-title">正在检查本机执行器</strong>
+          <p id="status-detail">请稍候</p>
+        </div>
+      </section>
+      <form id="pairing-form" hidden>
+        <label for="pairing-key">本机配对码</label>
+        <input id="pairing-key" name="pairingKey" autocomplete="off" placeholder="wcp_…" required>
+        <button type="submit">保存配对</button>
+        <p id="pairing-error" class="error" role="alert"></p>
+      </form>
+      <div class="actions">
+        <button id="sync-now" type="button">立即检查任务</button>
+        <button id="open-kuaimai" type="button" class="secondary">打开快麦订单</button>
+      </div>
+      <p class="privacy">插件不会读取或上传密码、Cookie、验证码和完整页面。</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>
