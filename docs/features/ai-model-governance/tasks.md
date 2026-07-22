@@ -22,7 +22,7 @@
   - 实际结果：`node --test tests/ai-feature-invocation.test.mjs tests/ai-api.test.mjs` 通过，14 项测试、0 失败。
   - 提交：只提交注册表、迁移、审计和对应测试，信息 `feat(ai): register governed feature usage`。
 
-- [ ] 任务 2：提供无个人维度的 AI 用量聚合 API
+- [x] 任务 2：提供无个人维度的 AI 用量聚合 API
   - 依赖：任务 1。
   - 文件：`functions/api/platform/v1/ai/usage.js`、`functions/api/platform/v1/ai/_shared/feature-registry.js`、`functions/api/platform/v1/ai/_shared/skill-registry.js`、`tests/ai-usage-api.test.mjs`。
   - 输入：已迁移的 AI 审计、当前钉钉会话、`from/to` 日期。
@@ -30,6 +30,7 @@
   - 失败测试：`node --test tests/ai-usage-api.test.mjs`；预期因路由不存在而失败。
   - 实现步骤：先校验会话、数据中心权限和 366 天区间；再在 D1 聚合；最后用注册表补齐零调用功能并显式白名单序列化。
   - 验证：认证、拒绝权限、上海日期边界、多个模型、规则降级、Skill 关联、空数据、D1 错误和响应禁敏测试全部通过。
+  - 实际结果：`node --test tests/ai-usage-api.test.mjs tests/ai-api.test.mjs tests/ai-skill-loop.test.mjs tests/data-center-api.test.mjs` 通过，30 项测试、0 失败。
   - 提交：只提交聚合 API、元数据读取和对应测试，信息 `feat(ai): expose aggregate usage report`。
 
 - [ ] 任务 3：建立统一非流式 AI 调用器并迁移电商点评
