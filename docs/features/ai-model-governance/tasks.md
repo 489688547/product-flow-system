@@ -33,7 +33,7 @@
   - 实际结果：`node --test tests/ai-usage-api.test.mjs tests/ai-api.test.mjs tests/ai-skill-loop.test.mjs tests/data-center-api.test.mjs` 通过，30 项测试、0 失败。
   - 提交：只提交聚合 API、元数据读取和对应测试，信息 `feat(ai): expose aggregate usage report`。
 
-- [ ] 任务 3：建立统一非流式 AI 调用器并迁移电商点评
+- [x] 任务 3：建立统一非流式 AI 调用器并迁移电商点评
   - 依赖：任务 1。
   - 文件：`functions/api/platform/v1/ai/_shared/invoke-feature.js`、`functions/api/platform/v1/ai/_shared/responses-adapter.js`、`functions/api/platform/v1/ai/_shared/http.js`、`functions/api/platform/v1/ai/_shared/provider-config.js`、`src/domain/platformConnections.js`、`functions/api/platform/_shared/platformConnectionTesters.js`、`functions/api/ecommerce-operations/ai-review.js`、`tests/ai-feature-invocation.test.mjs`、`tests/ecommerce-operations-api.test.mjs`、`tests/platform-connections-api.test.mjs`、`react-tests/platform-connections-ui.test.mjs`。
   - 输入：服务端固定 App/功能 ID、白名单化方案、共享 Provider 配置、现有规则检查函数。
@@ -41,6 +41,7 @@
   - 失败测试：`node --test tests/ai-feature-invocation.test.mjs tests/ecommerce-operations-api.test.mjs tests/platform-connections-api.test.mjs react-tests/platform-connections-ui.test.mjs`；预期因灵算尚未进入平台连接注册表、统一调用器不存在且旧路由仍直连 OpenAI 而失败。
   - 实现步骤：先把灵算登记为公司数据连接并增加合成只读验证；让 AI 配置优先解析保险箱、环境变量兼容回退；再从现有 Responses 事件解析提取非流式文本结果，实现注册、超时、降级和一次审计；最后替换电商路由直连并保留输入白名单与权限。
   - 验证：保险箱加密保存与优先解析、候选凭证合成验证、模型成功 Token、Provider 失败后降级、未配置直接降级、未知功能拒绝、无原始错误和旧响应兼容全部通过。
+  - 实际结果：`node --test tests/platform-connections-api.test.mjs react-tests/platform-connections.test.mjs tests/ai-feature-invocation.test.mjs tests/ecommerce-operations-api.test.mjs tests/ai-provider.test.mjs tests/ai-api.test.mjs` 通过，54 项测试、0 失败。
   - 提交：只提交共享调用器、电商迁移和对应测试，信息 `refactor(ai): route operations review through gateway`。
 
 - [ ] 任务 4：交付「AI 大模型」页面

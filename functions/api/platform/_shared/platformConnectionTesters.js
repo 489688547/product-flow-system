@@ -1,5 +1,7 @@
 import { getDingAccessToken } from "../../dingtalk/_shared/dingtalk.js";
 import { callKuaimai } from "../../kuaimai/_shared/kuaimai.js";
+import { PROVIDER_REGISTRY } from "../v1/ai/_shared/provider-config.js";
+import { testProviderConnection } from "../v1/ai/_shared/responses-adapter.js";
 
 const VALIDATION_TIMEOUT_MS = 8_000;
 
@@ -55,9 +57,27 @@ async function testKuaimai(values, fetchImpl, signal) {
   };
 }
 
+async function testLingsuan(values, fetchImpl, signal) {
+  const registered = PROVIDER_REGISTRY["lingsuan-responses"];
+  const result = await testProviderConnection({
+    config: {
+      ...registered,
+      apiKey: values.apiKey,
+      actorAuthorization: values.actorAuthorization || "",
+      secretConfigured: Boolean(values.apiKey)
+    },
+    fetchImpl: fetchWithSignal(fetchImpl, signal)
+  });
+  if (!result.connected) {
+    throw validationError(result.error?.message || "灵算 AI 网关验证失败。", result.statusCode || 502, Boolean(result.error?.retryable));
+  }
+  return { connected: true, message: "灵算 AI 网关连接已验证。", model: result.model };
+}
+
 const TESTERS = new Map([
   ["dingtalk", testDingTalk],
-  ["kuaimai", testKuaimai]
+  ["kuaimai", testKuaimai],
+  ["lingsuan-ai-gateway", testLingsuan]
 ]);
 
 export async function testPlatformConnection(platformId, values, fetchImpl = fetch) {
