@@ -110,6 +110,8 @@ const businessDataTables = [
   "erp_collection_batches",
   "erp_source_records",
   "erp_collection_issues",
+  "erp_file_archives",
+  "erp_collector_tokens",
   "ecommerce_operation_records",
   "ecommerce_operation_meta",
   "ecommerce_operation_state",
