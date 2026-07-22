@@ -136,7 +136,7 @@
     {
       "id": "company-web-data-collection",
       "name": "公司网页数据采集运行时",
-      "description": "公司 Mac 通过固定 provider adapter、独立 Chrome、日计划和任务租约采集已验证网页数据；D1 只保存设备、任务、运行、游标和通知安全元数据。",
+      "description": "公司 Mac 通过日常 Chrome 的内置 MV3 插件、本机 loopback 执行器、固定 provider adapter、日计划和任务租约采集已验证网页数据；D1 只保存设备、任务、运行、游标和通知安全元数据。",
       "platforms": ["cloudflare-pages", "cloudflare-d1", "kuaimai", "erp-file-import"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",

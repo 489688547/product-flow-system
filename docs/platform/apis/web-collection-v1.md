@@ -14,7 +14,7 @@
 
 ## Provider and task contract
 
-The server accepts only code-registered provider and resource IDs. A plan item contains `providerId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie or token field are rejected.
+The server accepts only code-registered provider and resource IDs. Kuaimai's canonical sales-detail resource is `order_items`; the legacy `sales_items` ID remains accepted for backwards compatibility but is not scheduled by the MV3 extension. A plan item contains `providerId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie or token field are rejected.
 
 Runner actions are:
 
@@ -50,4 +50,3 @@ This is an additive v1 API. New providers add code adapters and registered resou
 ## Observability and contract tests
 
 Record runner ID, provider, resource, business date, task stage, attempt, safe error code, batch/archive ID, row count and timestamps. Never log raw page or source rows. Contract coverage lives in `tests/web-collection-schedule.test.mjs`, `tests/web-collection-migration.test.mjs` and `tests/web-collection-api.test.mjs`.
-

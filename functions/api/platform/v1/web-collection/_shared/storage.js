@@ -4,7 +4,7 @@ import { routeError } from "./http.js";
 const RUNNER_SCOPE = "company_web_collection";
 const PROVIDER_RESOURCES = Object.freeze({
   kuaimai: new Set([
-    "orders", "sales_items", "products", "inventory", "purchases", "suppliers", "aftersales",
+    "orders", "order_items", "sales_items", "products", "inventory", "purchases", "suppliers", "aftersales",
     "shops", "warehouses", "sales_analysis", "goods_ledger", "inventory_cost"
   ]),
   test_fixture: new Set(["sample"])
@@ -255,4 +255,3 @@ export async function listWebCollectionStatus(db, { limit = 100 } = {}) {
     notifications: (notifications?.results || []).map(row => ({ id: row.id, jobId: row.job_id || null, runnerId: row.runner_id, kind: row.kind, dedupeKey: row.dedupe_key, result: row.result, sentAt: row.sent_at }))
   };
 }
-

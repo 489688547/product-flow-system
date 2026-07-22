@@ -99,4 +99,3 @@ CREATE INDEX IF NOT EXISTS idx_web_collection_runs_job
 
 CREATE INDEX IF NOT EXISTS idx_web_collection_runners_seen
   ON web_collection_runners(status, last_seen_at DESC);
-

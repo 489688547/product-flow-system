@@ -41,7 +41,6 @@ function dateParts(value, timeZone) {
   }).formatToParts(date);
   return Object.fromEntries(parts.filter(part => part.type !== "literal").map(part => [part.type, part.value]));
 }
-
 function isoDate(parts) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
@@ -171,4 +170,3 @@ export function notificationIntents({
   }
   return intents;
 }
-

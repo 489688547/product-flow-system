@@ -10,10 +10,8 @@ export function authorizeWebCollectionView(session) {
   }
   return { actor: String(session.name || session.userName || session.userId || "unknown").slice(0, 120), department };
 }
-
 export function authorizeWebCollectionAdmin(session) {
   const actor = authorizeWebCollectionView(session);
   if (session?.role !== "executive") throw routeError(403, "WEB_COLLECTION_RUNNER_REGISTER_DENIED", "仅总经办可登记采集设备。");
   return { ...actor, userId: String(session.userId || session.id || "").slice(0, 160) };
 }
-

@@ -41,4 +41,3 @@ export async function onRequest({ request, env, data = {} }) {
     return errorResponse(error, id);
   }
 }
-

@@ -167,6 +167,7 @@ const integrationRegistry = {
         "src/features/data-center/PlatformConnectionsWorkspace.jsx",
         "src/features/settings/KuaimaiSyncSettings.jsx",
         "src/state/salesStore.js",
+        "chrome-extension/company-data-collector/**",
         "scripts/kuaimai-erp-collector/**",
         "scripts/web-data-collector/**",
         ".agents/skills/kuaimai-erp-data-collection/**",
@@ -189,6 +190,7 @@ const integrationRegistry = {
         "open.kuaimai.com",
         "api.kuaimai.com",
         "scm.superboss.cc",
+        "erp.superboss.cc",
         "erpb.superboss.cc"
       ],
       "apiRoutes": [
@@ -227,6 +229,8 @@ const integrationRegistry = {
         "src/features/data-center/ProductCatalogWorkspace.jsx",
         "src/features/data-center/PlatformConnectionsWorkspace.jsx",
         "src/features/settings/KuaimaiSyncSettings.jsx",
+        "chrome-extension/company-data-collector/manifest.json",
+        "chrome-extension/company-data-collector/providers/kuaimai.js",
         "scripts/kuaimai-erp-collector/core.mjs",
         "scripts/web-data-collector/",
         ".agents/skills/kuaimai-erp-data-collection/SKILL.md",
@@ -747,6 +751,7 @@ const integrationRegistry = {
         "functions/api/platform/v1/web-collection/**",
         "functions/api/platform/v1/product-catalog/import.js",
         "functions/api/platform/v1/goods-flow/imports.js",
+        "chrome-extension/company-data-collector/**",
         "scripts/kuaimai-erp-collector/**",
         "scripts/web-data-collector/**",
         ".agents/skills/kuaimai-erp-data-collection/**",

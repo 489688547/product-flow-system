@@ -15,7 +15,7 @@ const kuaimai = {
   enabled: true,
   resources: [
     { type: "orders", rangeKind: "daily_fact", scheduleVersion: "v1" },
-    { type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v1" },
+    { type: "order_items", rangeKind: "daily_fact", scheduleVersion: "v1" },
     { type: "inventory", rangeKind: "current_snapshot", scheduleVersion: "v2" }
   ]
 };
@@ -28,7 +28,7 @@ test("daily plan creates yesterday facts and current snapshots after 05:00", () 
   const plan = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T05:01:00+08:00" });
   assert.deepEqual(plan.map(job => [job.resourceType, job.businessDate, job.rangeKind]), [
     ["orders", "2026-07-21", "daily_fact"],
-    ["sales_items", "2026-07-21", "daily_fact"],
+    ["order_items", "2026-07-21", "daily_fact"],
     ["inventory", "2026-07-22", "current_snapshot"]
   ]);
   assert.deepEqual(plan[0].range, {
@@ -98,4 +98,3 @@ test("notifications emit first failure once and one 06:30 summary", () => {
   assert.equal(summary[0].count, 2);
   assert.match(summary[0].dedupeKey, /^2026-07-22:daily-summary$/);
 });
-

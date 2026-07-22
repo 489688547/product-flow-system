@@ -1,7 +1,6 @@
 export function requestId() {
   return globalThis.crypto?.randomUUID?.() || `web-collection-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
-
 export function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -32,4 +31,3 @@ export function routeError(status, code, message, retryable = false) {
   error.retryable = retryable;
   return error;
 }
-

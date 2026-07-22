@@ -4,9 +4,9 @@
 
 **Goal:** 在公司 Mac 上建立每天 05:00 自动运行的通用网页数据采集器，并以快麦 ERP 作为首个完整适配器，将昨天事实数据和当前快照/维度数据安全、幂等地写入 D1。
 
-**Architecture:** 通用运行时负责上海时区调度、D1 任务租约、独立 Chrome、受限页面动作、下载确认、运行状态和 macOS 通知；provider adapter 只声明固定域名、资源、页面状态和导出/入库步骤。Cloudflare Pages Functions 是设备和 D1 之间唯一的数据控制面，现有快麦文件解析与 ingest API 继续作为业务数据入口。
+**Architecture:** Chrome MV3 插件运行在公司日常 Chrome 中复用登录态并执行打包在扩展内的受限页面动作；本机 loopback 执行器负责上海时区调度、D1 任务租约、下载交接、运行状态和 macOS 通知。provider adapter 只声明固定域名、资源、页面状态和导出/入库步骤。Cloudflare Pages Functions 是设备和 D1 之间唯一的数据控制面，现有快麦文件解析与 ingest API 继续作为业务数据入口。
 
-**Tech Stack:** Node.js ESM、Cloudflare Pages Functions、Cloudflare D1、Chrome DevTools Protocol、macOS LaunchAgent/Keychain/osascript、React、Node Test Runner。
+**Tech Stack:** Chrome Extensions Manifest V3、Node.js ESM、loopback HTTP、Cloudflare Pages Functions、Cloudflare D1、macOS LaunchAgent/Keychain/osascript、React、Node Test Runner。
 
 ## Global Constraints
 
@@ -135,52 +135,60 @@ Expected: 全部 PASS。
 
 ---
 
-## Task 3: 建立公司 Mac 通用采集运行时
+## Task 3: 建立 MV3 插件与公司 Mac 通用采集运行时
 
 **Files:**
 - Create: `scripts/web-data-collector/index.mjs`
 - Create: `scripts/web-data-collector/api.mjs`
 - Create: `scripts/web-data-collector/schedule.mjs`
-- Create: `scripts/web-data-collector/browser.mjs`
+- Create: `scripts/web-data-collector/bridge.mjs`
 - Create: `scripts/web-data-collector/orchestrator.mjs`
 - Create: `scripts/web-data-collector/notification.mjs`
 - Create: `scripts/web-data-collector/automation.mjs`
 - Create: `scripts/web-data-collector/providers/index.mjs`
+- Create: `chrome-extension/company-data-collector/manifest.json`
+- Create: `chrome-extension/company-data-collector/service-worker.js`
+- Create: `chrome-extension/company-data-collector/content-script.js`
+- Create: `chrome-extension/company-data-collector/popup.html`
+- Create: `chrome-extension/company-data-collector/popup.js`
+- Create: `chrome-extension/company-data-collector/popup.css`
 - Create: `tests/web-data-collector-runtime.test.mjs`
-- Create: `tests/web-data-collector-browser.test.mjs`
+- Create: `tests/chrome-collector-extension.test.mjs`
+- Create: `tests/web-data-collector-bridge.test.mjs`
 - Create: `tests/web-data-collector-notification.test.mjs`
-- Modify: `scripts/data-connection-agent/chrome.mjs`
-- Modify: `scripts/user-insights-collector/chrome-devtools.mjs`
 - Modify: `package.json`
 
 - [ ] **Step 1: 写运行时失败测试**
 
-覆盖 provider 契约校验、白名单 origin 拒绝、Chrome 复用和重启、任务串行领取、页面状态分类、下载文件稳定、相同文件恢复、租约释放、阶段回写、Keychain 令牌读取、LaunchAgent 使用当前仓库绝对路径，以及通知文案无业务数据。
+覆盖 MV3 最小权限、固定 host 白名单、无 Cookie/History/WebRequest 权限、配对密钥与扩展来源校验、provider 契约、任务串行领取、页面状态分类、下载文件稳定、相同文件恢复、租约释放、阶段回写、Keychain 令牌读取、LaunchAgent 使用当前仓库绝对路径，以及通知文案无业务数据。
 
 - [ ] **Step 2: 运行测试并确认失败**
 
-Run: `node --test tests/web-data-collector-runtime.test.mjs tests/web-data-collector-browser.test.mjs tests/web-data-collector-notification.test.mjs`
+Run: `node --test tests/chrome-collector-extension.test.mjs tests/web-data-collector-bridge.test.mjs tests/web-data-collector-runtime.test.mjs tests/web-data-collector-notification.test.mjs`
 
 Expected: FAIL，因为共享运行时不存在。
 
-- [ ] **Step 3: 抽取独立 Chrome 和安全 CDP 原语**
+- [ ] **Step 3: 实现 MV3 最小权限插件**
 
-复用 `ensureCompanyChrome` 与 `ChromeDevtoolsBrowser`，新增仅限代码白名单的：
+扩展只申请 `alarms/storage/tabs/downloads` 和已登记 host 权限。service worker 只接收安全任务字段；content script 将 provider/resource 映射到扩展内固定动作，不实现 `eval`、远程脚本或任意 selector 执行。
 
 ```js
-await browser.openAllowedPage({ origin, url });
-await browser.classify(adapter.classifyPage);
-await browser.performAllowedActions(actionPlan);
-await browser.waitForDownload({ directory, signature, timeoutMs });
+await extension.openRegisteredResource({ providerId, resourceType });
+await extension.runBundledActionPlan({ jobId, businessDate });
+await extension.reportDownload({ jobId, downloadId });
 ```
 
-调试端口只监听 `127.0.0.1`；运行日志只输出 provider、resource、stage 和安全错误码。
+运行日志只输出 provider、resource、stage 和安全错误码。
 
-- [ ] **Step 4: 实现调度、编排和 macOS 通知**
+- [ ] **Step 4: 实现 loopback 安全桥接**
+
+桥接仅监听 `127.0.0.1`，只接受固定 `chrome-extension://<id>` 来源和配对密钥；返回安全任务投影并拒绝凭据、Cookie、Token、页面正文、绝对路径以及远程 URL/selector/script。runner token 只由本机进程从 Keychain 读取，绝不返回扩展。
+
+- [ ] **Step 5: 实现调度、编排和 macOS 通知**
 
 `daily` 命令每 15 分钟心跳并确保当天计划，按 provider 串行执行。首次失败或 `waiting_human/schema_changed` 立即使用 `/usr/bin/osascript` 发系统通知；06:30 后对未成功任务发一条汇总；通知失败单独记录但不改变采集结果。
 
-- [ ] **Step 5: 实现安装命令并修复路径漂移**
+- [ ] **Step 6: 实现安装命令并修复路径漂移**
 
 新增 npm 命令：
 
@@ -188,11 +196,11 @@ await browser.waitForDownload({ directory, signature, timeoutMs });
 "collect:web": "node scripts/web-data-collector/index.mjs"
 ```
 
-LaunchAgent label 使用 `com.company.web-data-collector`，`StartInterval=900`，命令固定为当前仓库的 `scripts/web-data-collector/index.mjs daily`。安装时原子替换 plist，并将通用 runner token 只写 macOS Keychain。
+LaunchAgent label 使用 `com.company.web-data-collector`，守护固定为当前仓库的 `scripts/web-data-collector/index.mjs serve`。安装时原子替换 plist，并将通用 runner token 与本机配对密钥只写 macOS Keychain；命令输出扩展加载目录和配对步骤，不自动修改 Chrome 策略。
 
-- [ ] **Step 6: 运行定向测试**
+- [ ] **Step 7: 运行定向测试**
 
-Run: `node --test tests/web-data-collector-runtime.test.mjs tests/web-data-collector-browser.test.mjs tests/web-data-collector-notification.test.mjs`
+Run: `node --test tests/chrome-collector-extension.test.mjs tests/web-data-collector-bridge.test.mjs tests/web-data-collector-runtime.test.mjs tests/web-data-collector-notification.test.mjs`
 
 Expected: PASS。
 
@@ -231,7 +239,7 @@ Expected: FAIL，因为 adapter 不存在。
 
 ```text
 orders            #/trade/searchlist/                    昨天事实
-sales_items       #/report/sale_multidimension_next/     昨天事实
+order_items       #/trade/searchlist/                    昨天事实（导出订单明细）
 products          #/prod/parallel/                       当前维度
 inventory         #/stock/warehouse_status/              当前快照
 purchases         #/purchase/manager/                    当前及未完结事实
@@ -355,13 +363,12 @@ npm run collect:web -- install --base-url <production-origin>
 npm run collect:web -- preflight --base-url <production-origin>
 ```
 
-确认 LaunchAgent 程序路径指向当前仓库，不再引用 `.worktrees/kuaimai-erp-history`；确认独立 Chrome 调试端口只监听 `127.0.0.1`。
+确认 LaunchAgent 程序路径指向当前仓库，不再引用 `.worktrees/kuaimai-erp-history`；确认 loopback 端口只监听 `127.0.0.1`，扩展 ID 和配对状态正确，且 Chrome 未授予 Cookie/History/WebRequest 权限。
 
 - [ ] **Step 5: 完成真实快麦验收**
 
-在独立公司采集 Chrome 中完成一次登录。手动触发一个昨天订单/销售明细任务，核对：页面日期、官方导出、桌面原始归档、文件哈希、D1 batch/facts、任务运行、游标、数据服务和数据同步页面一致。再用一个安全故障演练验证首次 Mac 通知与 06:30 汇总去重。
+在已加载插件的公司日常 Chrome 中确认快麦已有登录态。手动触发一个昨天订单/订单明细任务，核对：页面使用创建时间、官方导出、桌面原始归档、文件哈希、D1 batch/facts、任务运行、游标、数据服务和数据同步页面一致。再用一个安全故障演练验证首次 Mac 通知与 06:30 汇总去重。
 
 - [ ] **Step 6: 更新任务清单与完成证据**
 
 逐项勾选 `tasks.md`，记录本地测试、D1/Pages 和真实网页三条证据。未完成真实登录或某资源导出验收时必须保留为未完成，不得把代码通过宣称为数据已自动入库。
-

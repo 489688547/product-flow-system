@@ -78,6 +78,30 @@ test("runner heartbeats and ensures a plan without accepting remote browser inst
   assert.equal(rejected.body.error.code, "WEB_COLLECTION_JOB_INVALID");
 });
 
+test("control plane accepts the canonical Kuaimai order_items resource used by the extension and parser", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: registration.body.data.token,
+    body: {
+      action: "ensure_plan",
+      jobs: [{
+        providerId: "kuaimai",
+        resourceType: "order_items",
+        businessDate: "2026-07-21",
+        rangeKind: "daily_fact",
+        range: { start: "2026-07-21T00:00:00+08:00", end: "2026-07-21T23:59:59+08:00", timeZone: "Asia/Shanghai" },
+        scheduleVersion: "v1",
+        idempotencyKey: "kuaimai:order_items:2026-07-21:v1"
+      }]
+    }
+  });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.jobs[0].resourceType, "order_items");
+});
+
 test("claim lease, legal transitions, completion and cursor are atomic from the runner perspective", async () => {
   const db = createWebCollectionD1Mock();
   const registration = await register(db);
@@ -155,4 +179,3 @@ test("company session reads safe status while unauthenticated callers are reject
   assert.equal(allowed.response.status, 200);
   assert.equal(JSON.stringify(allowed.body).includes("token_hash"), false);
 });
-
