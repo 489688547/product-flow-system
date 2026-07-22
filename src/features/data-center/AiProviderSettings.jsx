@@ -3,6 +3,8 @@ import { Bot, CheckCircle2, CircleAlert, RefreshCw, Save, ShieldCheck } from "lu
 import { loadAiProvider, saveAiProvider, testAiProvider } from "../../state/aiAssistantApi.js";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
+import { usePlatformConnections } from "../../state/usePlatformConnections.js";
+import { PlatformConnectionsWorkspace } from "./PlatformConnectionsWorkspace.jsx";
 
 const FINANCE_POLICY = {
   domainId: "finance",
@@ -31,7 +33,7 @@ function providerDraft(provider = {}) {
   };
 }
 
-export function AiProviderSettings({ onStatusChange }) {
+export function AiProviderSettings({ onStatusChange, active = true }) {
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState(providerDraft());
   const [loading, setLoading] = useState(true);
@@ -39,6 +41,7 @@ export function AiProviderSettings({ onStatusChange }) {
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const platformController = usePlatformConnections();
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -144,7 +147,18 @@ export function AiProviderSettings({ onStatusChange }) {
         <label className="ai-provider-toggle"><input type="checkbox" checked={draft.enabled} disabled={!canManage || saving || testing || (!configured && !draft.enabled)} onChange={event => setDraft(current => ({ ...current, enabled: event.target.checked }))} /><span>启用统一公司 AI</span></label>
       </fieldset>
 
-      <p className="ai-provider-secret-note"><ShieldCheck size={16} aria-hidden="true" /><span>凭据通过数据接入的公司级连接保险箱保存；此页面不会录入或回显凭据。连接与 Skill 测试只发送合成数据，不读取公司业务数据。 <a href="#/data-sources/company">前往数据接入配置连接</a></span></p>
+      <p className="ai-provider-secret-note"><ShieldCheck size={16} aria-hidden="true" /><span>灵算凭据保存在公司级连接保险箱中。连接与 Skill 测试只发送合成数据，不读取公司业务数据。</span></p>
+      <div className="ai-provider-credential-panel" aria-label="灵算凭据管理">
+        <PlatformConnectionsWorkspace
+          platformIds={["lingsuan-ai-gateway"]}
+          initialPlatformId="lingsuan-ai-gateway"
+          embedded
+          showBackButton={false}
+          revealActive={active}
+          controller={platformController}
+          onConnectionChange={reload}
+        />
+      </div>
       {error ? <div className="ai-provider-feedback danger" role="status">{error}</div> : null}
       {notice ? <div className="ai-provider-feedback success" role="status">{notice}</div> : null}
 

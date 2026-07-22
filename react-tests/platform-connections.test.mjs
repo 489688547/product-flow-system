@@ -63,6 +63,9 @@ test("platform connection API client never caches credential fields", () => {
   assert.match(api, /\/api\/platform\/v1\/platform-connections/);
   assert.match(api, /method: "PUT"/);
   assert.match(api, /method: "DELETE"/);
+  assert.match(api, /encodeURIComponent\(platformId\)/);
+  assert.match(api, /method: "POST"/);
+  assert.match(api, /purpose, confirmation/);
   assert.match(api, /credentials: "include"/);
   assert.doesNotMatch(api, /localStorage|sessionStorage/);
 });
@@ -75,8 +78,28 @@ test("platform connection UI accepts controlled state and a filtered embedded de
   assert.match(workspace, /controller/);
   assert.match(workspace, /controller\?\.save/);
   assert.match(workspace, /controller\?\.disable/);
+  assert.match(workspace, /controller\?\.reveal/);
+  assert.match(workspace, /showBackButton/);
   assert.match(workspace, /platformIdKey/);
   assert.doesNotMatch(workspace, /import \{[\s\S]*loadPlatformConnections[\s\S]*\} from "\.\.\/\.\.\/state\/platformConnectionsApi\.js"/);
+});
+
+test("saved Lingsuan values require explicit confirmation and remain transient", () => {
+  const workspace = read(workspacePath);
+  const controller = read("src/state/usePlatformConnections.js");
+  assert.match(workspace, /显示已保存内容/);
+  assert.match(workspace, /查看灵算凭据/);
+  assert.match(workspace, /本次查看用途/);
+  assert.match(workspace, /readOnly/);
+  assert.match(workspace, /revealed\.fields/);
+  assert.match(workspace, /setTimeout/);
+  assert.match(workspace, /visibilitychange/);
+  assert.match(workspace, /document\.hidden/);
+  assert.match(workspace, /revealActive/);
+  assert.match(workspace, /clearRevealed/);
+  assert.doesNotMatch(workspace, /localStorage|sessionStorage/);
+  assert.match(controller, /canManage/);
+  assert.match(controller, /reveal/);
 });
 
 test("connection layout is restrained responsive and keyboard visible", () => {

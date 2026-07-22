@@ -42,6 +42,13 @@
 .platform-connection-input > button { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); display: grid; place-items: center; }
 .platform-connection-input > button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
 .platform-connection-form-actions { padding: 0 var(--space-4) var(--space-4); display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.platform-connection-reveal-confirm, .platform-connection-revealed { margin: 0 var(--space-4) var(--space-4); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); display: grid; gap: var(--space-3); }
+.platform-connection-reveal-confirm > div > p, .platform-connection-revealed > div > p { margin-top: 3px; color: var(--text-tertiary); font-size: 11px; }
+.platform-connection-reveal-confirm > label { display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
+.platform-connection-reveal-confirm input { width: 100%; height: 40px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); }
+.platform-connection-reveal-confirm > span { display: flex; justify-content: flex-end; gap: var(--space-2); }
+.platform-connection-revealed { border-color: color-mix(in oklch, var(--warning), white 68%); background: var(--warning-soft); }
+.platform-connection-revealed > .btn { width: fit-content; }
 .platform-connection-permission { margin: var(--space-4) var(--space-4) 0; padding: 9px 10px; border-radius: var(--radius-control); background: var(--surface-subtle); color: var(--text-secondary); display: flex; align-items: center; gap: 7px; }
 .platform-connection-disable-confirm { margin: 0 var(--space-4) var(--space-4); padding: var(--space-3); border: 1px solid color-mix(in oklch, var(--danger), white 72%); border-radius: var(--radius-control); background: var(--danger-soft); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
 .platform-connection-disable-confirm > span { display: flex; gap: var(--space-2); }
@@ -80,6 +87,7 @@
   .platform-connection-form-actions .btn { width: 100%; min-height: 44px; }
   .platform-connection-disable-confirm > span { display: grid; grid-template-columns: 1fr 1fr; }
   .platform-connection-label { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .platform-connection-reveal-confirm > span { display: grid; grid-template-columns: 1fr 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
