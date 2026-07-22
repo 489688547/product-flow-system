@@ -74,12 +74,13 @@ const environmentCapabilities = {
     {
       "id": "platform-credential-vault",
       "name": "平台连接安全存储",
-      "description": "公司级钉钉、快麦连接的加密存储、审计和统一读取。",
+      "description": "公司级钉钉、快麦和灵算连接的加密存储、受控查看、审计和统一读取。",
       "platforms": [
         "cloudflare-pages",
         "cloudflare-d1",
         "dingtalk",
-        "kuaimai"
+        "kuaimai",
+        "lingsuan-ai-gateway"
       ],
       "requiredIn": [
         "preview",

@@ -40,12 +40,15 @@ test("platform credential vault declares its root secret migration and affected 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "platform-credential-vault");
   assert.ok(capability, "platform credential vault capability must be declared");
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "dingtalk", "kuaimai"]);
+  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "dingtalk", "kuaimai", "lingsuan-ai-gateway"]);
   assert.deepEqual(capability.requiredIn, ["preview", "production"]);
   assert.deepEqual(capability.envVars, ["PLATFORM_CREDENTIAL_MASTER_KEY"]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
   assert.deepEqual(capability.tables, ["platform_credentials", "platform_credential_audit"]);
   assert.equal(existsSync(resolve(root, "migrations/0003_platform_credentials.sql")), true);
+  const revealMigration = readFileSync(resolve(root, "migrations/0010_platform_credential_reveal.sql"), "utf8");
+  assert.match(revealMigration, /ALTER TABLE platform_credential_audit/);
+  assert.match(revealMigration, /ADD COLUMN purpose TEXT NOT NULL DEFAULT ''/);
 
   const kuaimai = manifest.capabilities.find(entry => entry.id === "kuaimai-sales-sync");
   assert.equal(kuaimai.envVars.includes("KUAIMAI_ACCESS_TOKEN"), true);

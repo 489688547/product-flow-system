@@ -1106,6 +1106,8 @@ const integrationRegistry = {
         "Token 与 Skill 聚合",
         "规则降级",
         "合成连接测试",
+        "保险箱凭据管理",
+        "最高权限受控查看",
         "无留存请求参数",
         "安全错误映射"
       ],
@@ -1135,17 +1137,23 @@ const integrationRegistry = {
         "functions/api/platform/v1/ai/**",
         "functions/api/ecommerce-operations/ai-review.js",
         "functions/api/platform/_shared/platformConnectionTesters.js",
+        "functions/api/platform/_shared/platformCredentials.js",
+        "functions/api/platform/v1/platform-connections/[platformId]/reveal.js",
         "src/domain/aiAssistant.js",
         "src/domain/aiModelGovernance.js",
         "src/domain/platformConnections.js",
         "src/state/aiAssistant*.js",
         "src/state/aiModelGovernanceApi.js",
+        "src/state/platformConnectionsApi.js",
+        "src/state/usePlatformConnections.js",
         "src/features/ai-assistant/**",
         "src/features/data-center/AiModelWorkspace.jsx",
         "src/features/data-center/AiProviderSettings.jsx",
+        "src/features/data-center/PlatformConnectionsWorkspace.jsx",
         "migrations/0003_company_ai_assistant.sql",
         "migrations/0004_company_ai_skills.sql",
-        "migrations/0009_ai_model_governance.sql"
+        "migrations/0009_ai_model_governance.sql",
+        "migrations/0010_platform_credential_reveal.sql"
       ],
       "envVars": [
         "AI_ASSISTANT_ENABLED",
@@ -1161,6 +1169,7 @@ const integrationRegistry = {
         "/api/platform/v1/ai/provider/test",
         "/api/platform/v1/ai/chat",
         "/api/platform/v1/ai/usage",
+        "/api/platform/v1/platform-connections/:platformId/reveal",
         "/api/ecommerce-operations/ai-review"
       ],
       "publicDocs": [
@@ -1173,17 +1182,23 @@ const integrationRegistry = {
         "src/domain/aiAssistant.js",
         "src/domain/aiModelGovernance.js",
         "src/features/data-center/AiModelWorkspace.jsx",
+        "src/features/data-center/AiProviderSettings.jsx",
+        "src/features/data-center/PlatformConnectionsWorkspace.jsx",
         "functions/api/platform/v1/ai/_shared/invoke-feature.js",
         "functions/api/platform/v1/ai/_shared/routed-skill-fallback.js",
         "functions/api/platform/v1/ai/usage.js",
+        "functions/api/platform/v1/platform-connections/[platformId]/reveal.js",
         "functions/api/ecommerce-operations/ai-review.js",
         "react-tests/ai-model-governance.test.mjs",
+        "react-tests/platform-connections.test.mjs",
         "tests/ai-feature-invocation.test.mjs",
         "tests/ai-usage-api.test.mjs",
         "tests/ai-skill-loop.test.mjs",
+        "tests/platform-connections-reveal-api.test.mjs",
         "migrations/0003_company_ai_assistant.sql",
         "migrations/0004_company_ai_skills.sql",
-        "migrations/0009_ai_model_governance.sql"
+        "migrations/0009_ai_model_governance.sql",
+        "migrations/0010_platform_credential_reveal.sql"
       ],
       "relations": [
         {

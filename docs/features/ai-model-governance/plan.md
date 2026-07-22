@@ -744,3 +744,11 @@ git merge-base --is-ancestor origin/main HEAD
 ```
 
 预期：分支包含最新主线且完整测试仍通过。部署和 Production readiness 在合并授权范围内单独执行，不能用本地或 Preview 代替。
+
+### 补充实施：AI 页面灵算凭据管理
+
+已取消「数据接入 > 公司数据 > 灵算 AI 网关」入口后，`AiProviderSettings` 直接嵌入过滤为 `lingsuan-ai-gateway` 的共享连接表单。保存、候选合成验证、版本冲突、停用和 Provider 解析继续使用现有 `/api/platform/v1/platform-connections` 与 `platform_credentials`，不建立第二套凭据状态。
+
+新增 `POST /api/platform/v1/platform-connections/:platformId/reveal`，首期只接受灵算平台。服务端要求 `role=executive`、15 分钟内会话、用途、确认语「查看灵算凭据」，并通过 `platform_credential_audit` 对同一连接执行 15 分钟 5 次成功查看限制。迁移 `0010_platform_credential_reveal.sql` 为审计增加 `purpose`；审计动作不记录字段名或字段值。环境变量回退、已停用版本和其他平台一律不可查看。
+
+成功响应使用 `private, no-store`，包含 `revealedAt/expiresAt`。React 只在连接表单组件状态中保存返回字段，5 分钟定时清除，并在设置折叠、`visibilitychange`、保存、停用和卸载时清除；禁止进入 URL、浏览器存储或共享连接元数据。应用回滚保留新增审计列，旧代码忽略该列；数据迁移无需复制或重写凭据。
