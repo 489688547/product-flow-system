@@ -109,6 +109,11 @@ export function isSalesBarcode(value) {
   return CODE_PATTERN.test(cellText(value));
 }
 
+function isInventoryUnitCode(value) {
+  const code = cellText(value);
+  return Boolean(code) && code.length <= 160;
+}
+
 export function createSalesAggregator(mapping) {
   const buckets = new Map();
   const titles = {};
@@ -121,8 +126,8 @@ export function createSalesAggregator(mapping) {
       sourceRows += 1;
       const primaryCode = cellText(cell(row, "code"));
       const fallbackCode = cellText(cell(row, "fallbackCode"));
-      const code = isSalesBarcode(primaryCode) ? primaryCode : fallbackCode;
-      if (!isSalesBarcode(code)) {
+      const code = isInventoryUnitCode(primaryCode) ? primaryCode : fallbackCode;
+      if (!isInventoryUnitCode(code)) {
         skipped += 1;
         return;
       }
@@ -189,7 +194,7 @@ export function normalizeSkuCodes(value) {
   if (!Array.isArray(value)) return [];
   return value
     .map(item => ({ code: cellText(item?.code), price: item?.price === "" || item?.price == null ? null : Number(item.price) }))
-    .filter(item => isSalesBarcode(item.code))
+    .filter(item => isInventoryUnitCode(item.code))
     .map(item => ({ code: item.code, price: Number.isFinite(item.price) && item.price > 0 ? item.price : null }));
 }
 
