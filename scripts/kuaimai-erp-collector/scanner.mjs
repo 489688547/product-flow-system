@@ -158,6 +158,10 @@ export async function scanWaitingDirectory({ root, upload, resourceType = "" }) 
 export async function archiveExistingFile(filePath, { root, resourceType = "", upload = null } = {}) {
   const layout = await ensureArchiveLayout(root);
   const identified = await identifyAndRead(filePath, resourceType);
+  return archiveExistingParsedFile(filePath, identified, { layout, upload });
+}
+
+async function archiveExistingParsedFile(filePath, identified, { layout, upload }) {
   const archived = await archiveSourceFile(filePath, { root: layout.root, resourceType: identified.resourceType });
   await appendManifestEvent(layout.manifest, {
     contentHash: archived.contentHash,
@@ -191,3 +195,23 @@ export async function archiveExistingFile(filePath, { root, resourceType = "", u
   return { ...archived, resourceType: identified.resourceType, rowCount: identified.parsed.batch.rowCount, status: "processed", batchId: uploaded?.batchId || identified.parsed.batch.id };
 }
 
+export async function archiveExistingRawFile(filePath, { root, resourceType } = {}) {
+  if (!resourceType) {
+    const error = new Error("仅归档模式必须明确指定资源类型。");
+    error.code = "KUAIMAI_ARCHIVE_RESOURCE_REQUIRED";
+    throw error;
+  }
+  const layout = await ensureArchiveLayout(root);
+  const archived = await archiveSourceFile(filePath, { root: layout.root, resourceType });
+  await appendManifestEvent(layout.manifest, {
+    contentHash: archived.contentHash,
+    fileName: path.basename(filePath),
+    relativePath: archived.relativePath,
+    sizeBytes: archived.sizeBytes,
+    resourceType,
+    sourceModifiedAt: (await stat(filePath)).mtime.toISOString(),
+    archivedAt: new Date().toISOString(),
+    status: "archived"
+  });
+  return { ...archived, resourceType, status: "archived" };
+}

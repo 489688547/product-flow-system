@@ -7,7 +7,7 @@ import { uploadErpCollection } from "./api.mjs";
 import { DEFAULT_ARCHIVE_ROOT, ensureArchiveLayout } from "./archive.mjs";
 import { installLaunchAgent, readCollectorToken, storeCollectorToken } from "./automation.mjs";
 import { readKuaimaiExport } from "./core.mjs";
-import { archiveExistingFile, scanWaitingDirectory } from "./scanner.mjs";
+import { archiveExistingFile, archiveExistingRawFile, scanWaitingDirectory } from "./scanner.mjs";
 
 function argument(argv, name, fallback = "") {
   const index = argv.indexOf(name);
@@ -77,7 +77,7 @@ export async function runCollector(argv = process.argv.slice(2)) {
   }
   if (command === "archive-existing") {
     if (!filePath) throw new Error("用法：npm run collect:kuaimai -- archive-existing <导出文件> [--resource orders] [--upload]");
-    return withCollectorLock(root, async () => archiveExistingFile(resolve(filePath), {
+    return withCollectorLock(root, async () => (argv.includes("--archive-only") ? archiveExistingRawFile : archiveExistingFile)(resolve(filePath), {
       root,
       resourceType,
       upload: argv.includes("--upload")
