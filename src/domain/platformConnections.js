@@ -43,6 +43,16 @@ export const PLATFORM_CONNECTION_DEFINITIONS = Object.freeze([
     ]
   }),
   connectionDefinition({
+    id: "lingsuan-ai-gateway",
+    name: "灵算 AI 网关",
+    mark: "AI",
+    description: "公司统一模型调用、Token 与 Skill 审计",
+    fields: [
+      connectionField("apiKey", "API Key", "LINGSUAN_API_KEY"),
+      connectionField("actorAuthorization", "Actor Authorization", "LINGSUAN_ACTOR_AUTHORIZATION", { required: false })
+    ]
+  }),
+  connectionDefinition({
     id: "aliyun",
     name: "阿里云",
     mark: "云",

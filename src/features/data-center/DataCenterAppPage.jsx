@@ -5,12 +5,13 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
 import { canAccessCompanyPlatform, canManagePlatformConnections } from "../../domain/permissions.js";
-import { DataCenterSettingsWorkspace, DataServicesWorkspace, DataSourcesWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
+import { DataCenterSettingsWorkspace, DataSourcesWorkspace, SyncRunsWorkspace } from "./DataGovernanceWorkspaces.jsx";
 import { UserInsightsProvider } from "../../state/UserInsightsProvider.jsx";
 import { UserInsightsWorkspace } from "./UserInsightsWorkspace.jsx";
 import { ProductCatalogWorkspace } from "./ProductCatalogWorkspace.jsx";
 import { useDataStandards } from "../../state/DataStandardsProvider.jsx";
 import { DataStandardsWorkspace } from "./data-standards/DataStandardsWorkspace.jsx";
+import { AiModelWorkspace } from "./AiModelWorkspace.jsx";
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据、趋势和平台分布。"],
@@ -19,7 +20,7 @@ const SECTION_META = {
   sources: ["数据接入", "统一管理电商平台、ERP 与公司数据。"],
   metrics: ["数据口径", "维护公司统一的定义、公式、版本和责任部门。"],
   sync: ["同步记录", "查看采集结果、数据质量和待处理异常。"],
-  services: ["数据服务", "管理各业务 App 的数据订阅。"],
+  services: ["AI 大模型", "查看各业务 App 的模型与 Skill 使用情况，统一管理公司 AI 服务。"],
   settings: ["设置", "维护时区、截止时间和保留策略。"]
 };
 
@@ -95,16 +96,16 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManageConnections} initialCategory={dataAccessCategory} />,
     metrics: <DataStandardsWorkspace />,
     sync: <SyncRunsWorkspace quality={quality} />,
-    services: <DataServicesWorkspace />,
+    services: <AiModelWorkspace />,
     settings: <DataCenterSettingsWorkspace canEdit={canEdit} />
   };
   return (
     <section className="page data-center-page">
-      <PageHeader title={title} description={description} identity={section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : undefined}>
+      <PageHeader title={title} description={description} identity={section === "services" ? "服务端统一调用 · 不展示个人排行 · 内容不入审计" : section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : undefined}>
         {section === "overview" ? <a className={`data-health-link ${dataHealthOkay ? "success" : "warning"}`} href="#data-sync" aria-label={`${dataHealthLabel}，查看同步记录`}>{dataHealthLabel}</a> : null}
       </PageHeader>
-      {error ? <div className="section-panel" role="status">{error}</div> : null}
-      {loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}
+      {section !== "services" && error ? <div className="section-panel" role="status">{error}</div> : null}
+      {section !== "services" && loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}
     </section>
   );
 }

@@ -45,6 +45,8 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 - Database or persisted-state changes require migration, backwards compatibility, capacity impact, and rollback notes.
 - Environment or provider configuration changes must update `docs/platform/environment-capabilities.json`, regenerate platform modules, and pass `npm run check:environment-capabilities` in the same pull request.
 - A reusable component, middleware, skill, API, integration or environment rule discovered during feature work must be written back to `AGENTS.md`, `docs/platform/`, the integration registry or an ADR before merge; feature-only notes are not a durable rule.
+- Every business AI capability must first register a server-owned `appId` and `featureId`, then call the shared `invokeAiFeature` boundary. 业务 App 和浏览器不得直接调用 Provider，也不得持有模型 URL、Secret、Authorization header 或 Responses adapter；unknown features fail closed with `AI_FEATURE_NOT_REGISTERED`. The shared platform-connection tester is the only non-AI-route exception and may use the low-level adapter solely with synthetic content to validate a candidate credential.
+- AI usage audit records stable App, feature, execution mode, Provider-call flag, token counts and safe result codes. Prompts, answers, business context, Skill argument values and Provider raw responses are never audited. The Data Center AI usage page may show company aggregates by App, feature, model and Skill, but never employee rankings or personal drill-downs.
 
 ## Security and external systems
 

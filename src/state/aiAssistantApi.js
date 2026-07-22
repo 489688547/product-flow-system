@@ -1,11 +1,25 @@
 const KNOWN_EVENTS = new Set(["meta", "text_delta", "sources", "usage", "skill_started", "skill_completed", "skill_failed", "error", "done"]);
+const SAFE_ERROR_MESSAGES = Object.freeze({
+  AI_SESSION_REQUIRED: "请先使用钉钉登录。",
+  AI_PROVIDER_MANAGE_DENIED: "仅总经办可维护 AI 模型服务。",
+  AI_PROVIDER_TEST_DENIED: "仅总经办可测试 AI 模型服务。",
+  AI_PROVIDER_SECRET_MISSING: "请先在数据接入中配置模型服务凭据。",
+  AI_PROVIDER_NOT_READY: "模型服务尚未准备好。",
+  AI_PROVIDER_AUTH_FAILED: "模型服务认证失败，请检查公司级连接。",
+  AI_PROVIDER_RATE_LIMITED: "模型服务请求较多，请稍后重试。",
+  AI_PROVIDER_TIMEOUT: "模型服务响应超时，请稍后重试。",
+  AI_PROVIDER_UNAVAILABLE: "模型服务暂不可用，请稍后重试。",
+  AI_MESSAGES_INVALID: "请输入有效的问题。",
+  AI_FINANCE_TRANSFER_BLOCKED: "财务数据暂不允许发送给第三方模型。"
+});
 
 async function jsonPayload(response, fallback) {
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw Object.assign(new Error(body.error?.message || body.message || fallback), {
+    const code = body.error?.code || "AI_REQUEST_FAILED";
+    throw Object.assign(new Error(SAFE_ERROR_MESSAGES[code] || fallback), {
       status: response.status,
-      code: body.error?.code,
+      code,
       requestId: body.error?.requestId,
       retryable: Boolean(body.error?.retryable)
     });

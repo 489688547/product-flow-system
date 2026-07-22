@@ -73,6 +73,14 @@ export function listAvailableSkills(input = {}) {
   }));
 }
 
+export function listAiSkillMetadata() {
+  return AI_SKILL_DEFINITIONS.map(item => ({
+    skillId: item.name,
+    sourceAppId: item.appId,
+    skillName: item.displayName
+  }));
+}
+
 function parseArguments(definitionValue, argumentsText) {
   let parsed;
   try { parsed = JSON.parse(argumentsText || "{}"); } catch { throw skillError("AI_SKILL_ARGUMENTS_INVALID", "Skill 参数不是有效 JSON。"); }

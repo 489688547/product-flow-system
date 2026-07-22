@@ -31,7 +31,7 @@ function providerDraft(provider = {}) {
   };
 }
 
-export function AiProviderSettings() {
+export function AiProviderSettings({ onStatusChange }) {
   const [data, setData] = useState(null);
   const [draft, setDraft] = useState(providerDraft());
   const [loading, setLoading] = useState(true);
@@ -64,6 +64,15 @@ export function AiProviderSettings() {
     return available.some(item => item.domainId === "finance") ? available : [...available, FINANCE_POLICY];
   }, [data?.policies]);
 
+  useEffect(() => {
+    if (!onStatusChange) return;
+    if (loading) onStatusChange({ label: "读取中", tone: "neutral" });
+    else if (!data || error) onStatusChange({ label: "未就绪", tone: "danger" });
+    else if (!canManage) onStatusChange({ label: "只读", tone: "neutral" });
+    else if (provider.enabled && provider.secretConfigured) onStatusChange({ label: "可用", tone: "success" });
+    else onStatusChange({ label: "未就绪", tone: "warning" });
+  }, [canManage, data, error, loading, onStatusChange, provider.enabled, provider.secretConfigured]);
+
   const save = async () => {
     setSaving(true);
     setError("");
@@ -88,7 +97,7 @@ export function AiProviderSettings() {
       const result = await testAiProvider();
       setNotice(result.skillsSupported
         ? `连接与只读 Skill 能力测试通过，耗时 ${result.latencyMs || 0} ms。`
-        : `模型连接通过，但原生 Function Calling 未通过（${result.skillError?.code || "AI_PROVIDER_SKILLS_UNSUPPORTED"}）；总助将使用受控服务端 Skills。`);
+        : `模型连接通过，但原生 Function Calling 未通过（${result.skillError?.code || "AI_PROVIDER_SKILLS_UNSUPPORTED"}）；统一公司 AI 将使用受控服务端 Skills。`);
       const next = await loadAiProvider();
       setData(next);
       setDraft(providerDraft(next.provider));
@@ -110,7 +119,7 @@ export function AiProviderSettings() {
   return (
     <section className="section-panel ai-provider-settings" aria-labelledby="ai-provider-title">
       <div className="section-head ai-provider-heading">
-        <div><span className="ai-provider-eyebrow">COMPANY AI</span><h2 id="ai-provider-title">AI 模型服务</h2><p>统一管理公司总助使用的第三方模型、安全状态和数据外发边界。</p></div>
+        <div><span className="ai-provider-eyebrow">COMPANY AI</span><h2 id="ai-provider-title">AI 模型服务</h2><p>统一管理公司 AI 使用的第三方模型、安全状态和数据外发边界。</p></div>
         <div className="ai-provider-actions">
           {!canManage ? <span className="status-badge neutral">只读</span> : null}
           <Button disabled={!canManage || !configured || testing || saving} onClick={testConnection}><RefreshCw size={16} aria-hidden="true" />{testing ? "测试中…" : "连接与 Skill 测试"}</Button>
@@ -132,10 +141,10 @@ export function AiProviderSettings() {
         <label>白名单地址<input value={provider.baseUrl || "https://lingsuan.top"} readOnly /></label>
         <label>模型<select value={draft.model} onChange={event => setDraft(current => ({ ...current, model: event.target.value }))}><option value="gpt-5.6-sol">gpt-5.6-sol</option></select></label>
         <label>推理强度<select value={draft.reasoningEffort} onChange={event => setDraft(current => ({ ...current, reasoningEffort: event.target.value }))}><option value="xhigh">xhigh</option></select></label>
-        <label className="ai-provider-toggle"><input type="checkbox" checked={draft.enabled} disabled={!canManage || saving || testing || (!configured && !draft.enabled)} onChange={event => setDraft(current => ({ ...current, enabled: event.target.checked }))} /><span>启用公司 AI 总助</span></label>
+        <label className="ai-provider-toggle"><input type="checkbox" checked={draft.enabled} disabled={!canManage || saving || testing || (!configured && !draft.enabled)} onChange={event => setDraft(current => ({ ...current, enabled: event.target.checked }))} /><span>启用统一公司 AI</span></label>
       </fieldset>
 
-      <p className="ai-provider-secret-note"><ShieldCheck size={16} aria-hidden="true" />密钥仅通过部署环境的服务端 Secret 配置；此页面不会录入或回显凭据。连接与 Skill 测试只发送合成数据，不读取公司业务数据。</p>
+      <p className="ai-provider-secret-note"><ShieldCheck size={16} aria-hidden="true" /><span>凭据通过数据接入的公司级连接保险箱保存；此页面不会录入或回显凭据。连接与 Skill 测试只发送合成数据，不读取公司业务数据。 <a href="#/data-sources/company">前往数据接入配置连接</a></span></p>
       {error ? <div className="ai-provider-feedback danger" role="status">{error}</div> : null}
       {notice ? <div className="ai-provider-feedback success" role="status">{notice}</div> : null}
 

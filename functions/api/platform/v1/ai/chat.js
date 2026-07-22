@@ -7,6 +7,7 @@ import { selectRoutedSkillIds, streamRoutedSkillResponse } from "./_shared/route
 import { executeSkill, listAvailableSkillDefinitions, listAvailableSkills } from "./_shared/skill-registry.js";
 import { acquireAiLease, releaseAiLease, writeAiAudit, writeAiSkillAudit } from "./_shared/audit.js";
 import { aiError, loadAiConfiguration } from "./_shared/http.js";
+import { getAiFeatureDefinition } from "./_shared/feature-registry.js";
 
 const encoder = new TextEncoder();
 const MAX_MESSAGES = 12;
@@ -15,6 +16,7 @@ const MAX_ASSISTANT_CHARS = 8_000;
 const MAX_TOTAL_CHARS = 24_000;
 const FINANCE_TERM = /(?:成本|毛利|利润|预算|结算|奖金|工资|薪资|佣金|应收|应付|现金流|银行账户|银行卡)/i;
 const FINANCE_VALUE = /(?:[¥￥$]\s*[\d,.]+|[\d,.]+\s*(?:元|万元|万|亿|%))/;
+const ASSISTANT_FEATURE = getAiFeatureDefinition("company-ai-assistant", "assistant-chat");
 
 function requestId() {
   return globalThis.crypto?.randomUUID?.() || `req_${Date.now().toString(36)}`;
@@ -175,7 +177,11 @@ export async function onRequest({ request, env, data = {} }) {
             outputTokens: usage.outputTokens,
             latencyMs: Date.now() - started,
             resultCode,
-            completed
+            completed,
+            appId: ASSISTANT_FEATURE.appId,
+            featureId: ASSISTANT_FEATURE.featureId,
+            executionMode: "model",
+            providerCalled: true
           }),
           releaseAiLease(loaded.db, userId, id)
         ]).catch(() => {}).finally(() => request.signal.removeEventListener("abort", abortFromRequest));
