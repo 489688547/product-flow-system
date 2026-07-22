@@ -25,6 +25,15 @@ export function createPlatformCredentialD1Mock({ tables = [] } = {}) {
         bind(...values) { statement.values = values; return statement; },
         async first() {
           if (normalized.includes("from platform_credentials")) return rows.get(statement.values[0]) || null;
+          if (normalized.includes("count(*)") && normalized.includes("from platform_credential_audit")) {
+            const [platformId, action, since] = statement.values;
+            return {
+              count: audits.filter(row => row.platform_id === platformId
+                && row.action === action
+                && row.result === "success"
+                && row.created_at >= since).length
+            };
+          }
           return null;
         },
         async all() {
@@ -48,7 +57,19 @@ export function createPlatformCredentialD1Mock({ tables = [] } = {}) {
               const expectedVersion = statement.values.at(-1);
               if (!current || Number(current.version) !== Number(expectedVersion)) return { success: true, meta: { changes: 0 } };
             }
-            audits.push({ values: [...statement.values] });
+            const [id, , action, changedFields, result, requestId, actorId, actorName, purpose, createdAt] = statement.values;
+            audits.push({
+              id,
+              platform_id: platformId,
+              action,
+              changed_fields: changedFields,
+              result,
+              request_id: requestId,
+              actor_id: actorId,
+              actor_name: actorName,
+              purpose,
+              created_at: createdAt
+            });
             return { success: true, meta: { changes: 1 } };
           }
           return { success: true, meta: { changes: 1 } };

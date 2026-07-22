@@ -102,6 +102,7 @@ export async function ensurePlatformCredentialTables(db) {
     request_id TEXT NOT NULL,
     actor_id TEXT NOT NULL,
     actor_name TEXT NOT NULL,
+    purpose TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   )`).run();
 }
@@ -116,13 +117,13 @@ async function currentRow(db, platformId) {
 async function writeAudit(db, input, context, result = "success") {
   const now = new Date().toISOString();
   await db.prepare(`INSERT INTO platform_credential_audit
-    (id, platform_id, action, changed_fields, result, request_id, actor_id, actor_name, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+    (id, platform_id, action, changed_fields, result, request_id, actor_id, actor_name, purpose, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
     crypto.randomUUID(), input.platformId, input.action,
     JSON.stringify([...new Set(input.changedFields || [])].sort()), result,
     cleanString(context.requestId || "", "requestId", 120),
     cleanString(context.actorId || "unknown", "actorId", 160),
-    actorName(context), now
+    actorName(context), cleanString(context.purpose || "", "用途", 200), now
   ).run();
 }
 
@@ -133,13 +134,13 @@ function conditionalAuditStatement(db, input, context, { exists, expectedVersion
     : "NOT EXISTS (SELECT 1 FROM platform_credentials WHERE platform_id = ?)";
   const conditionValues = exists ? [input.platformId, Number(expectedVersion)] : [input.platformId];
   return db.prepare(`INSERT INTO platform_credential_audit
-    (id, platform_id, action, changed_fields, result, request_id, actor_id, actor_name, created_at)
-    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${conditionSql}`).bind(
+    (id, platform_id, action, changed_fields, result, request_id, actor_id, actor_name, purpose, created_at)
+    SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE ${conditionSql}`).bind(
     crypto.randomUUID(), input.platformId, input.action,
     JSON.stringify([...new Set(input.changedFields || [])].sort()), "success",
     cleanString(context.requestId || "", "requestId", 120),
     cleanString(context.actorId || "unknown", "actorId", 160),
-    actorName(context), now, ...conditionValues
+    actorName(context), cleanString(context.purpose || "", "用途", 200), now, ...conditionValues
   );
 }
 
@@ -208,6 +209,39 @@ export async function configuredCredentialEnvVars(env = {}) {
   } catch {
     return new Set();
   }
+}
+
+export async function assertPlatformCredentialRevealRateLimit(db, platformId, { limit = 5, windowMs = 15 * 60 * 1000 } = {}) {
+  await ensurePlatformCredentialTables(db);
+  const since = new Date(Date.now() - windowMs).toISOString();
+  const row = await db.prepare(`SELECT COUNT(*) AS count FROM platform_credential_audit
+    WHERE platform_id = ? AND action = ? AND result = 'success' AND created_at >= ?`)
+    .bind(cleanString(platformId, "平台", 80), "reveal", since)
+    .first();
+  if (Number(row?.count || 0) >= limit) {
+    throw platformError("凭据查看过于频繁，请稍后再试。", "PLATFORM_CREDENTIAL_REVEAL_RATE_LIMITED", 429);
+  }
+}
+
+export async function revealPlatformCredentials(db, platformIdInput, context = {}) {
+  const platformId = cleanString(platformIdInput, "平台", 80);
+  const purpose = cleanString(context.purpose, "查看用途", 200);
+  if (!purpose) throw platformError("请填写本次查看用途。", "PLATFORM_CREDENTIAL_REVEAL_INVALID", 400);
+  const row = await currentRow(db, platformId);
+  if (!row || !Boolean(row.enabled)) {
+    throw platformError("当前没有可查看的保险箱凭据。", "PLATFORM_CREDENTIAL_REVEAL_UNAVAILABLE", 404);
+  }
+  const masterKey = cleanString(context.masterKey, "加密主密钥", 500);
+  if (!platformCredentialCryptoInternals.validMasterKey(masterKey)) {
+    throw platformError("平台连接的解密能力暂不可用。", "PLATFORM_CREDENTIAL_KEY_UNAVAILABLE", 503);
+  }
+  const fields = await decryptPlatformCredentials(row, {
+    masterKey,
+    platformId,
+    keyVersion: Number(row.key_version)
+  });
+  await writeAudit(db, { platformId, action: "reveal", changedFields: [] }, { ...context, purpose });
+  return { platformId, fields };
 }
 
 export async function savePlatformCredentials(db, input = {}, context = {}) {
