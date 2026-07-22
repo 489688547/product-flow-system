@@ -68,7 +68,7 @@ test("overview exposes governed metrics without restoring the deleted analysis w
   assert.match(overview, /数据健康/);
 });
 
-test("governance workspaces merge quality into sync while preserving services and settings", () => {
+test("governance workspaces merge quality into sync and use the focused AI model workspace", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   const workspaces = read("src/features/data-center/DataGovernanceWorkspaces.jsx");
   const standards = read("src/features/data-center/data-standards/DataStandardsWorkspace.jsx");
@@ -82,14 +82,16 @@ test("governance workspaces merge quality into sync while preserving services an
   assert.doesNotMatch(workspaces, /<h2>同步记录<\/h2>/);
   assert.match(workspaces, /collaborationDraftFromDataIssue/);
   assert.match(workspaces, /refresh/);
-  assert.match(page, /DataServicesWorkspace/);
+  assert.match(page, /AiModelWorkspace/);
   assert.match(page, /DataCenterSettingsWorkspace/);
   assert.match(workspaces, /DataConnectionsWorkspace/);
   assert.match(workspaces, /敏感信息加密保存/);
   assert.doesNotMatch(workspaces, /function SourceForm/);
   assert.match(standards, /订单创建时间/);
   assert.match(workspaces, /Asia\/Shanghai/);
-  assert.match(workspaces, /应用订阅/);
+  assert.doesNotMatch(page, /DataServicesWorkspace/);
+  assert.doesNotMatch(workspaces, /export function DataServicesWorkspace/);
+  assert.doesNotMatch(workspaces, /销售数据服务|应用订阅/);
   assert.match(workspaces, /原始数据保留天数/);
 });
 

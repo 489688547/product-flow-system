@@ -170,6 +170,18 @@ export async function* streamProviderResponse({ config, input, tools = [], toolC
   }
 }
 
+export async function collectProviderResponse({ config, input, fetchImpl = fetch, signal, timeoutMs = TIMEOUT_MS } = {}) {
+  let text = "";
+  let usage = { inputTokens: 0, outputTokens: 0 };
+  for await (const event of streamProviderResponse({ config, input, fetchImpl, signal, timeoutMs })) {
+    if (event.type === "text_delta") text += event.delta;
+    if (event.type === "usage") usage = { inputTokens: event.inputTokens, outputTokens: event.outputTokens };
+  }
+  const output = text.trim();
+  if (!output) throw aiError("AI_PROVIDER_INVALID_RESPONSE", "模型服务未返回有效内容。", 502, true);
+  return { text: output, usage };
+}
+
 const SYNTHETIC_STATUS_TOOL = Object.freeze({
   type: "function",
   name: "lookup_status",

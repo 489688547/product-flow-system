@@ -60,10 +60,11 @@ test("Pages declares explicit local Preview and Production D1 environment parity
   assert.equal(existsSync(resolve(root, "scripts/check-pages-environment-parity.mjs")), true);
 });
 
-test("company assistant declares Provider secrets and production D1 schema", () => {
+test("company AI declares one governed capability without the retired OpenAI review", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "company-ai-assistant");
-  assert.ok(capability, "company AI assistant capability must be declared");
+  assert.ok(capability, "company AI capability must be declared");
+  assert.equal(capability.name, "公司统一 AI");
   assert.deepEqual(capability.platforms, ["lingsuan-ai-gateway", "cloudflare-pages", "cloudflare-d1"]);
   assert.deepEqual(capability.envVars, ["AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
@@ -76,6 +77,10 @@ test("company assistant declares Provider secrets and production D1 schema", () 
   ]);
   assert.equal(existsSync(resolve(root, "migrations/0003_company_ai_assistant.sql")), true);
   assert.equal(existsSync(resolve(root, "migrations/0004_company_ai_skills.sql")), true);
+  assert.equal(existsSync(resolve(root, "migrations/0009_ai_model_governance.sql")), true);
+  assert.equal(manifest.capabilities.some(entry => entry.id === "operations-ai-review"), false);
+  assert.equal(JSON.stringify(manifest).includes("OPENAI_API_KEY"), false);
+  assert.equal(JSON.stringify(manifest).includes("OPENAI_MODEL"), false);
 });
 
 test("goods flow declares its production D1 schema without claiming Kuaimai inventory", () => {

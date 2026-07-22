@@ -3,6 +3,7 @@ import test from "node:test";
 import { platformCredentialCryptoInternals } from "../functions/api/platform/_shared/credentialCrypto.js";
 import { handlePlatformConnectionsRequest } from "../functions/api/platform/v1/platform-connections.js";
 import { testPlatformConnection } from "../functions/api/platform/_shared/platformConnectionTesters.js";
+import { platformEnv } from "../functions/api/platform/_shared/platformCredentials.js";
 
 function masterKey() {
   return platformCredentialCryptoInternals.bytesToBase64Url(crypto.getRandomValues(new Uint8Array(32)));
@@ -110,7 +111,7 @@ test("employees read safe connection metadata but cannot write", async () => {
   const payload = await get.json();
   assert.equal(get.status, 200);
   assert.equal(payload.canManage, false);
-  assert.deepEqual(payload.connections.map(item => item.platformId), ["dingtalk", "kuaimai", "aliyun"]);
+  assert.deepEqual(payload.connections.map(item => item.platformId), ["dingtalk", "kuaimai", "lingsuan-ai-gateway", "aliyun"]);
   assert.equal(JSON.stringify(payload).includes("ciphertext"), false);
 
   const put = await call({ method: "PUT", session: employee, db, body: { platformId: "dingtalk", expectedVersion: 0, fields: { appKey: "key", appSecret: "secret" } } });
@@ -219,4 +220,37 @@ test("provider testers perform only the expected read-only checks", async () => 
   });
   assert.equal(kuaimai.connected, true);
   assert.match(kuaimaiBody, /method=open\.system\.time\.get/);
+
+  let lingsuanUrl = "";
+  let lingsuanBody = "";
+  const lingsuan = await testPlatformConnection("lingsuan-ai-gateway", { apiKey: "ai-key", actorAuthorization: "actor" }, async (url, options) => {
+    lingsuanUrl = String(url);
+    lingsuanBody = options.body;
+    return new Response([
+      "event: response.output_text.delta\ndata: {\"delta\":\"ok\"}\n\n",
+      "event: response.completed\ndata: {\"response\":{\"usage\":{\"input_tokens\":2,\"output_tokens\":1}}}\n\n"
+    ].join(""), { status: 200 });
+  });
+  assert.equal(lingsuan.connected, true);
+  assert.equal(lingsuanUrl, "https://lingsuan.top/responses");
+  assert.match(lingsuanBody, /返回 ok/);
+  assert.match(lingsuanBody, /"store":false/);
+  assert.doesNotMatch(lingsuanBody, /公司|销售|财务/);
+});
+
+test("AI gateway credentials use the validated vault before legacy environment values", async () => {
+  const db = createD1Mock();
+  const key = masterKey();
+  const saved = await call({
+    method: "PUT",
+    db,
+    key,
+    env: { LINGSUAN_API_KEY: "legacy-key" },
+    body: { platformId: "lingsuan-ai-gateway", expectedVersion: 0, fields: { apiKey: "vault-key", actorAuthorization: "vault-actor" } }
+  });
+  assert.equal(saved.status, 200);
+
+  const resolved = await platformEnv({ PRODUCT_FLOW_DB: db, PLATFORM_CREDENTIAL_MASTER_KEY: key, LINGSUAN_API_KEY: "legacy-key" }, "lingsuan-ai-gateway");
+  assert.equal(resolved.LINGSUAN_API_KEY, "vault-key");
+  assert.equal(resolved.LINGSUAN_ACTOR_AUTHORIZATION, "vault-actor");
 });

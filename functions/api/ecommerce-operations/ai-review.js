@@ -1,6 +1,9 @@
 import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
 import { validateStorePlan } from "../../../src/domain/ecommerceOperations.js";
 import { canViewOperations } from "./_shared/access.js";
+import { invokeAiFeature } from "../platform/v1/ai/_shared/invoke-feature.js";
+
+const OPERATIONS_REVIEW_INSTRUCTION = "你是电商运营方案教练。只提供优化建议，不替代主管决策。用中文输出一段总结，再列出 3 条可执行建议。";
 
 function fallbackReview(plan) {
   const missing = validateStorePlan(plan);
@@ -20,16 +23,18 @@ export async function onRequest({ request, env, data = {} }) {
   const body = await request.json().catch(() => ({})); const plan = body.plan;
   if (!plan || typeof plan !== "object") return jsonResponse({ message: "缺少打品方案。" }, 400);
   const safePlan = Object.fromEntries(["product", "platform", "store", "evidence", "goals", "issues", "countermeasures", "monitors"].map(key => [key, plan[key]]));
-  if (!env.OPENAI_API_KEY) return jsonResponse(fallbackReview(safePlan));
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${env.OPENAI_API_KEY}` },
-      body: JSON.stringify({ model: env.OPENAI_MODEL || "gpt-5-mini", store: false, input: [{ role: "system", content: "你是电商运营方案教练。只提供优化建议，不替代主管决策。用中文输出一段总结，再列出3条可执行建议。" }, { role: "user", content: JSON.stringify(safePlan) }] }),
-      signal: AbortSignal.timeout(20000)
+    const result = await invokeAiFeature({
+      env,
+      session: data.session,
+      appId: "ecommerce-operations",
+      featureId: "plan-review",
+      systemInstruction: OPERATIONS_REVIEW_INSTRUCTION,
+      userInput: JSON.stringify(safePlan),
+      timeoutMs: 20_000,
+      fallback: () => fallbackReview(safePlan)
     });
-    const payload = await response.json(); if (!response.ok) throw new Error(payload.error?.message || "AI provider failed");
-    const output = String(payload.output_text || payload.output?.flatMap(item => item.content || []).find(item => item.type === "output_text")?.text || "").trim();
-    if (!output) throw new Error("AI returned no content");
-    return jsonResponse({ mode: "ai", summary: output, suggestions: [] });
+    if (result.mode === "rule_fallback") return jsonResponse(result.fallback);
+    return jsonResponse({ mode: "ai", summary: result.text, suggestions: [] });
   } catch { return jsonResponse(fallbackReview(plan)); }
 }

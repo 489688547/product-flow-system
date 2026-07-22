@@ -1094,20 +1094,26 @@ const integrationRegistry = {
       "id": "lingsuan-ai-gateway",
       "name": "灵算 AI 网关",
       "status": "connected",
-      "summary": "为公司 AI 总助提供服务端 Responses 兼容模型调用；功能默认关闭，密钥只存在服务端 Secret。",
+      "summary": "为公司统一 AI 提供服务端 Responses 兼容调用；凭据优先来自平台连接保险箱，业务 App 不直连 Provider。",
       "capabilities": [
         "Responses 流式生成",
+        "非流式业务调用",
         "固定模型配置",
         "原生 Function Calling 能力探测",
         "服务端受控 Skill 路由",
         "公司只读 Skills",
+        "App 与功能归属审计",
+        "Token 与 Skill 聚合",
+        "规则降级",
         "合成连接测试",
         "无留存请求参数",
         "安全错误映射"
       ],
       "businessQuestions": [
-        "AI 总助不可用",
+        "AI 大模型不可用",
         "模型服务连接失败",
+        "哪些 App 和功能使用 AI",
+        "Token 消耗多少",
         "Skill 调用失败",
         "响应超时或限流",
         "公司数据能否外发",
@@ -1116,7 +1122,10 @@ const integrationRegistry = {
       "keywords": [
         "灵算",
         "LingSuan",
+        "AI 大模型",
         "AI 总助",
+        "AI 点评",
+        "Token",
         "Responses API",
         "Function Calling",
         "Skills",
@@ -1124,10 +1133,19 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/api/platform/v1/ai/**",
+        "functions/api/ecommerce-operations/ai-review.js",
+        "functions/api/platform/_shared/platformConnectionTesters.js",
         "src/domain/aiAssistant.js",
+        "src/domain/aiModelGovernance.js",
+        "src/domain/platformConnections.js",
         "src/state/aiAssistant*.js",
+        "src/state/aiModelGovernanceApi.js",
         "src/features/ai-assistant/**",
-        "src/features/data-center/AiProviderSettings.jsx"
+        "src/features/data-center/AiModelWorkspace.jsx",
+        "src/features/data-center/AiProviderSettings.jsx",
+        "migrations/0003_company_ai_assistant.sql",
+        "migrations/0004_company_ai_skills.sql",
+        "migrations/0009_ai_model_governance.sql"
       ],
       "envVars": [
         "AI_ASSISTANT_ENABLED",
@@ -1141,7 +1159,9 @@ const integrationRegistry = {
         "/api/platform/v1/ai/status",
         "/api/platform/v1/ai/provider",
         "/api/platform/v1/ai/provider/test",
-        "/api/platform/v1/ai/chat"
+        "/api/platform/v1/ai/chat",
+        "/api/platform/v1/ai/usage",
+        "/api/ecommerce-operations/ai-review"
       ],
       "publicDocs": [
         {
@@ -1151,11 +1171,19 @@ const integrationRegistry = {
       ],
       "evidence": [
         "src/domain/aiAssistant.js",
+        "src/domain/aiModelGovernance.js",
+        "src/features/data-center/AiModelWorkspace.jsx",
+        "functions/api/platform/v1/ai/_shared/invoke-feature.js",
         "functions/api/platform/v1/ai/_shared/routed-skill-fallback.js",
-        "react-tests/ai-assistant-domain.test.mjs",
+        "functions/api/platform/v1/ai/usage.js",
+        "functions/api/ecommerce-operations/ai-review.js",
+        "react-tests/ai-model-governance.test.mjs",
+        "tests/ai-feature-invocation.test.mjs",
+        "tests/ai-usage-api.test.mjs",
         "tests/ai-skill-loop.test.mjs",
         "migrations/0003_company_ai_assistant.sql",
-        "migrations/0004_company_ai_skills.sql"
+        "migrations/0004_company_ai_skills.sql",
+        "migrations/0009_ai_model_governance.sql"
       ],
       "relations": [
         {
@@ -1242,60 +1270,6 @@ const integrationRegistry = {
           "platformId": "kuaimai",
           "type": "possible-overlap",
           "description": "接入前需确认京东订单是否已由快麦覆盖。"
-        }
-      ]
-    },
-    {
-      "id": "openai-responses",
-      "name": "OpenAI Responses API",
-      "status": "integrating",
-      "summary": "为电商店铺运营方案提供可选的服务端优化建议；未配置时明确降级为规则检查。",
-      "capabilities": [
-        "方案结构点评",
-        "问题与对策检查",
-        "监测指标建议"
-      ],
-      "businessQuestions": [
-        "AI 点评不可用",
-        "模型响应超时",
-        "建议是否替代主管审批",
-        "输入是否包含敏感字段"
-      ],
-      "keywords": [
-        "OpenAI",
-        "Responses API",
-        "AI 点评",
-        "智能建议",
-        "OPENAI_API_KEY"
-      ],
-      "codePaths": [
-        "functions/api/ecommerce-operations/ai-review.js"
-      ],
-      "envVars": [
-        "OPENAI_API_KEY",
-        "OPENAI_MODEL"
-      ],
-      "domains": [
-        "api.openai.com",
-        "platform.openai.com"
-      ],
-      "apiRoutes": [
-        "/api/ecommerce-operations/ai-review"
-      ],
-      "publicDocs": [
-        {
-          "label": "OpenAI API 开发者快速入门",
-          "url": "https://platform.openai.com/docs/quickstart/make-your-first-api-request"
-        }
-      ],
-      "evidence": [
-        "functions/api/ecommerce-operations/ai-review.js"
-      ],
-      "relations": [
-        {
-          "platformId": "cloudflare-pages",
-          "type": "called-by",
-          "description": "Pages Function 从服务端调用 Responses API，密钥不进入浏览器。"
         }
       ]
     }

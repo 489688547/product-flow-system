@@ -1,6 +1,7 @@
 import { jsonResponse } from "../../../../dingtalk/_shared/dingtalk.js";
 import { dataCenterDatabase, readDataCenterState } from "../../../../data-center/_shared/storage.js";
 import { resolveProviderConfig } from "./provider-config.js";
+import { platformEnv } from "../../../_shared/platformCredentials.js";
 
 function requestId() {
   return globalThis.crypto?.randomUUID?.() || `req_${Date.now().toString(36)}`;
@@ -24,6 +25,7 @@ export async function loadAiConfiguration(env = {}) {
     });
   }
   const stored = await readDataCenterState(db);
-  const provider = resolveProviderConfig({ env, storedProvider: stored.state.aiProviders[0] });
+  const providerEnvironment = await platformEnv(env, "lingsuan-ai-gateway");
+  const provider = resolveProviderConfig({ env: providerEnvironment, storedProvider: stored.state.aiProviders[0] });
   return { db, stored, provider };
 }

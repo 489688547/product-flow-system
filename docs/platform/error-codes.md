@@ -159,7 +159,7 @@
 - `GOODS_FLOW_STOCKTAKE_TRANSITION_INVALID`：盘点操作不在允许状态机内，HTTP 400。
 - `GOODS_FLOW_STOCKTAKE_STATE_CONFLICT`：当前盘点状态不能执行请求动作，HTTP 409。
 
-公司 AI 总助 API 使用：
+公司统一 AI API 使用：
 
 - `AI_DISABLED`：公司 AI 总助功能开关关闭。
 - `AI_SESSION_REQUIRED`：没有有效公司会话。
@@ -187,6 +187,10 @@
 - `AI_SKILL_CALL_LIMIT` / `AI_SKILL_LOOP_LIMIT`：单次回答超过六次调用或两轮工具循环，服务端停止生成。
 - `AI_STREAM_CANCELLED`：客户端主动停止回答，租约已释放且审计标记未完成。
 - `AI_LOCAL_PREVIEW_READ_ONLY`：本地 Node 预览只展示脱敏状态，不调用 Provider 或修改配置。
+- `AI_FEATURE_NOT_REGISTERED`：业务 App 或功能没有进入服务端注册表；在 Provider 调用前失败，不能由客户端临时补充归属。
+- `AI_USAGE_RANGE_INVALID`：AI 用量查询缺少日期、日期倒序或超过 366 天。
+- `AI_USAGE_ACCESS_DENIED`：当前身份没有数据中心读取权限，HTTP 403。
+- `AI_USAGE_QUERY_FAILED`：AI 用量聚合读取失败；可按 `retryable` 手动重试，响应不包含 SQL 或 Provider 原始错误。
 
 商品主数据 API 使用：
 
