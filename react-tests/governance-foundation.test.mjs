@@ -105,7 +105,7 @@ test("environment parity skill is mandatory, discoverable, and wired into delive
 
 test("package exposes the repository lint gate", () => {
   const pkg = JSON.parse(read("package.json"));
-  assert.equal(pkg.scripts.lint, "eslint src functions server scripts tests react-tests");
+  assert.equal(pkg.scripts.lint, "eslint src functions server scripts tests react-tests chrome-extension");
   assert.ok(pkg.devDependencies.eslint);
   assert.match(read("eslint.config.js"), /\.worktrees/);
   assert.match(read("eslint.config.js"), /no-unreachable/);

@@ -155,9 +155,10 @@ export async function scanWaitingDirectory({ root, upload, resourceType = "" }) 
   return result;
 }
 
-export async function archiveExistingFile(filePath, { root, resourceType = "", upload = null } = {}) {
+export async function archiveExistingFile(filePath, { root, resourceType = "", upload = null, onValidated = null } = {}) {
   const layout = await ensureArchiveLayout(root);
   const identified = await identifyAndRead(filePath, resourceType);
+  if (onValidated) await onValidated({ resourceType: identified.resourceType, rowCount: identified.parsed.batch.rowCount });
   return archiveExistingParsedFile(filePath, identified, { layout, upload });
 }
 
