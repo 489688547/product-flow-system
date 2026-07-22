@@ -254,6 +254,33 @@ const environmentCapabilities = {
       ]
     },
     {
+      "id": "company-web-data-collection",
+      "name": "公司网页数据采集运行时",
+      "description": "公司 Mac 通过日常 Chrome 的内置 MV3 插件、本机 loopback 执行器、固定 provider adapter、日计划和任务租约采集已验证网页数据；D1 只保存设备、任务、运行、游标和通知安全元数据。",
+      "platforms": [
+        "cloudflare-pages",
+        "cloudflare-d1",
+        "kuaimai",
+        "erp-file-import"
+      ],
+      "requiredIn": [
+        "preview",
+        "production"
+      ],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": [
+        "PRODUCT_FLOW_DB"
+      ],
+      "tables": [
+        "web_collection_runners",
+        "web_collection_jobs",
+        "web_collection_runs",
+        "web_collection_cursors",
+        "web_collection_notifications"
+      ]
+    },
+    {
       "id": "product-catalog-storage",
       "name": "共享商品主数据",
       "description": "数据中心统一维护，产品全周期、供应链和货流共用的 ERP 商品、库存单位编码、组合比例与同步批次存储；商品经营视图读取已落库销售日聚合。",

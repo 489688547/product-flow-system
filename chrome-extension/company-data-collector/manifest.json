@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "公司数据采集器",
+  "version": "0.1.0",
+  "description": "在公司 Chrome 中安全执行已登记平台的数据导出任务。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvrGIn6XSWXMX7oNxP+/x1pJc/gU8FurJnhulL9BhR4NQeWGc5sERoqxDDIyN70v64Ajb5TLk35uQHJ0tKuqCxtvYzbvYfQKQ/Q7ULAj5NNr6C350AO2Fz2nMutiKFnxTttxOzL1iL+NQmRB8OLIb79/dTxWYvGoxuom+YBRgHyfQdetocGTbPK8ihQ3QnDI6YFDgZtpZ/l8LYNURXRCxccmdNHOaMAkxCiHijtJbYu4gE7t2bqGedoUMpDrF4/Ml5rQkGBPjN6ea0sPqRKwcSm+Btx2ygCjypUyqbzjR+6ErxTODfkskZkVAYNrb+DzLF5ClFqV3T5T8KPUF+AbklwIDAQAB",
+  "permissions": ["alarms", "downloads", "storage", "tabs"],
+  "host_permissions": [
+    "http://127.0.0.1:17653/*",
+    "https://erp.superboss.cc/*",
+    "https://erpb.superboss.cc/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "公司数据采集器",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://erp.superboss.cc/*", "https://erpb.superboss.cc/*"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["providers/registry.js", "providers/kuaimai.js"],
+      "matches": ["https://erp.superboss.cc/*", "https://erpb.superboss.cc/*"]
+    }
+  ]
+}
