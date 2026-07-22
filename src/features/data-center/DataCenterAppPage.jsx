@@ -1,6 +1,6 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { useEffect, useMemo } from "react";
-import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
+import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS, previousDataCenterRange } from "../../domain/dataCenter.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
@@ -29,20 +29,39 @@ const legacyOverviewRollback = import.meta.env.VITE_DATA_CENTER_LEGACY_OVERVIEW_
 export function DataCenterAppPage({ section = "overview", dataAccessCategory = "" }) {
   const { user } = useAuth();
   const { state, range, setRange, salesRows, salesMeta, loading, error } = useDataCenter();
-  const { results, run, resultLoading, error: metricError, ensureResults, scheduleEnsureResults } = useDataStandards();
+  const {
+    results,
+    run,
+    resultLoading,
+    error: metricError,
+    comparisonResults,
+    comparisonRun,
+    comparisonLoading,
+    comparisonError,
+    ensureResults,
+    scheduleEnsureResults,
+    ensureComparisonResults,
+    scheduleComparisonResults
+  } = useDataStandards();
   const [title, description] = SECTION_META[section] || SECTION_META.overview;
   const factViews = useMemo(() => buildDataCenterSalesFactViews(salesRows, range), [range, salesRows]);
   const legacyMetricResults = useMemo(() => legacyOverviewRollback ? buildLegacyDataCenterMetricResults(salesRows, range) : [], [range, salesRows]);
+  const comparisonRange = useMemo(() => previousDataCenterRange(range), [range.from, range.to]);
   const quality = useMemo(() => buildDataQualitySummary({ state, salesMeta, salesRows }), [salesMeta, salesRows, state]);
   useEffect(() => {
-    if (section === "overview" && !legacyOverviewRollback) scheduleEnsureResults(range, overviewMetricCodes);
-  }, [range.from, range.to, scheduleEnsureResults, section]);
-  const retryMetricResults = () => ensureResults(range, overviewMetricCodes).catch(() => {});
+    if (section !== "overview" || legacyOverviewRollback) return;
+    scheduleEnsureResults(range, overviewMetricCodes);
+    scheduleComparisonResults(comparisonRange, overviewMetricCodes);
+  }, [comparisonRange.from, comparisonRange.to, range.from, range.to, scheduleComparisonResults, scheduleEnsureResults, section]);
+  const retryMetricResults = () => Promise.all([
+    ensureResults(range, overviewMetricCodes),
+    ensureComparisonResults(comparisonRange, overviewMetricCodes)
+  ]).catch(() => {});
   const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
   const canManageConnections = canManagePlatformConnections(user);
   const canManage = user?.role !== "readonly" && canAccessCompanyPlatform(user);
   const content = {
-    overview: <DataOverview factViews={factViews} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} />,
+    overview: <DataOverview factViews={factViews} quality={quality} range={range} setRange={setRange} salesMeta={salesMeta} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} comparisonRange={comparisonRange} comparisonResults={comparisonResults} comparisonRun={comparisonRun} comparisonLoading={!legacyOverviewRollback && comparisonLoading} comparisonError={legacyOverviewRollback ? null : comparisonError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} />,
     insights: <UserInsightsProvider><UserInsightsWorkspace /></UserInsightsProvider>,
     products: <ProductCatalogWorkspace canEdit={canEdit} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManageConnections} initialCategory={dataAccessCategory} />,

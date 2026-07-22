@@ -1,7 +1,7 @@
-import { AlertCircle, PackageCheck, Percent, RefreshCw, TrendingUp, WalletCards } from "lucide-react";
-import { DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
+import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, PackageCheck, Percent, RefreshCw, TrendingUp, WalletCards } from "lucide-react";
+import { compareDataCenterMetric, dataCenterPresetRange, DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
 import { Button } from "../../ui/Button.jsx";
-import { DateRangeControls } from "../../ui/DateRangeControls.jsx";
+import { DateRangePickerField } from "../../ui/DateRangePickerField.jsx";
 
 const money = value => value == null ? "暂无结果" : `¥${Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
 const number = value => value == null ? "暂无结果" : Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
@@ -33,6 +33,39 @@ function resultReason(code) {
   return RESULT_REASONS[code] || "当前范围暂无可用结果";
 }
 
+function comparisonReason(code) {
+  const reasons = {
+    CURRENT_RESULT_NOT_AVAILABLE: "环比等待本期正式结果",
+    CURRENT_DATA_NOT_COVERED: "本期覆盖不完整，暂不能环比",
+    PREVIOUS_RESULT_NOT_AVAILABLE: "上期暂无正式结果",
+    PREVIOUS_DATA_NOT_COVERED: "上期覆盖不完整，暂不能环比",
+    PREVIOUS_VALUE_ZERO: "上期为 0，暂无可比比例",
+    DATA_STANDARD_CALCULATION_FAILED: "上期计算失败，暂不能环比",
+    DATA_STANDARD_CALCULATION_TIMEOUT: "上期计算较慢，请稍后查看环比",
+    DATA_STANDARD_STORAGE_UNAVAILABLE: "共享口径暂不可用"
+  };
+  return reasons[code] || "上期暂无正式结果";
+}
+
+function comparisonText(comparison) {
+  const direction = comparison.direction === "up" ? "环比上升" : comparison.direction === "down" ? "环比下降" : "环比持平";
+  const suffix = comparison.unit === "percentage_point" ? " 个百分点" : "%";
+  if (comparison.direction === "flat") return `${direction} 0${suffix}`;
+  return `${direction} ${number(comparison.value)}${suffix}`;
+}
+
+function MetricComparison({ current, previous, metric, loading, error, compatibilityRollback }) {
+  if (compatibilityRollback) return <span className="data-kpi-comparison neutral"><ArrowRight size={13} aria-hidden="true" />环比暂不可用</span>;
+  if (loading && !previous) return <span className="data-kpi-comparison neutral"><RefreshCw size={13} className="is-spinning" aria-hidden="true" />环比计算中</span>;
+  if (error) return <span className="data-kpi-comparison neutral"><AlertCircle size={13} aria-hidden="true" />{comparisonReason(error.code)}</span>;
+  const comparison = compareDataCenterMetric(current, previous, metric);
+  if (!comparison.available) return <span className="data-kpi-comparison neutral"><ArrowRight size={13} aria-hidden="true" />{comparisonReason(comparison.reasonCode)}</span>;
+  const DirectionIcon = comparison.direction === "up" ? ArrowUp : comparison.direction === "down" ? ArrowDown : ArrowRight;
+  const tone = comparison.direction === "flat" ? "neutral" : comparison.favorable ? "favorable" : "unfavorable";
+  const text = comparisonText(comparison);
+  return <span className={`data-kpi-comparison ${tone}`} aria-label={text}><DirectionIcon size={13} aria-hidden="true" />{text}</span>;
+}
+
 function Trend({ rows }) {
   const maximum = Math.max(...rows.map(row => row.netSales), 1);
   return (
@@ -42,19 +75,29 @@ function Trend({ rows }) {
   );
 }
 
-export function DataOverview({ factViews, quality, range, setRange, salesMeta, metricResults = [], metricRun, metricLoading, metricError, retryMetricResults, compatibilityRollback = false }) {
+export function DataOverview({ factViews, quality, range, setRange, salesMeta, metricResults = [], metricRun, metricLoading, metricError, comparisonRange, comparisonResults = [], comparisonRun, comparisonLoading, comparisonError, retryMetricResults, compatibilityRollback = false }) {
   const rangeResults = metricResults.filter(result => result.from === range.from && result.to === range.to);
   const byMetricCode = new Map(rangeResults.map(result => [result.metricCode, result]));
+  const previousRangeResults = comparisonResults.filter(result => result.from === comparisonRange.from && result.to === comparisonRange.to);
+  const previousByMetricCode = new Map(previousRangeResults.map(result => [result.metricCode, result]));
   const runForRange = metricRun?.from === range.from && metricRun?.to === range.to ? metricRun : null;
+  const comparisonRunForRange = comparisonRun?.from === comparisonRange.from && comparisonRun?.to === comparisonRange.to ? comparisonRun : null;
   const updating = metricLoading || ["pending", "running"].includes(runForRange?.status);
+  const comparisonUpdating = comparisonLoading || ["pending", "running"].includes(comparisonRunForRange?.status);
   const failed = runForRange?.status === "failed";
   const missingCount = DATA_CENTER_OVERVIEW_METRICS.filter(metric => !byMetricCode.has(metric.metricCode)).length;
   const topNetSales = factViews.byPlatform.reduce((sum, row) => sum + row.netSales, 0);
+  const datePresets = [
+    { id: "last7", label: "近 7 天", range: dataCenterPresetRange(7) },
+    { id: "last15", label: "近 15 天", range: dataCenterPresetRange(15) },
+    { id: "last30", label: "近 30 天", range: dataCenterPresetRange(30) }
+  ];
+  const maxDate = datePresets[0].range.to;
   return (
     <div className="data-workspace">
       <section className="data-basis-strip">
         <div><strong>订单创建时间</strong><span>Asia/Shanghai · 默认当月至截止昨天 · 日常口径排除“其它”</span></div>
-        <DateRangeControls range={range} setRange={setRange} idPrefix="overview-range" />
+        <DateRangePickerField value={range} onConfirm={setRange} presets={datePresets} maxDate={maxDate} maxDays={370} ariaLabel="选择数据总览日期范围" />
       </section>
       {compatibilityRollback ? <section className="data-metric-state updating" role="alert"><AlertCircle size={17} /><span><strong>兼容回滚口径</strong><small>当前仅临时读取旧销售事实摘要；共享口径定义、结果、版本和审计均未删除。</small></span><span className="status-badge warning">临时模式</span></section> : updating || failed || metricError || missingCount ? <section className={`data-metric-state ${failed || metricError ? "danger" : updating ? "updating" : "neutral"}`} role={failed || metricError ? "alert" : "status"}>
         <AlertCircle size={17} /><span><strong>{updating ? "统一口径正在更新" : failed || metricError ? "统一口径结果读取失败" : `还有 ${missingCount} 项口径暂无结果`}</strong><small>{updating ? "旧批次结果继续保留；新批次完整成功后才会切换。" : resultReason(metricError?.code || runForRange?.errorCode || "RESULT_NOT_AVAILABLE")}</small></span>
@@ -65,7 +108,8 @@ export function DataOverview({ factViews, quality, range, setRange, salesMeta, m
         const Icon = ICONS[metric.metricCode];
         const coverageRate = result?.coverageRate;
         const reasonCode = result?.reasonCode || metricError?.code || "RESULT_NOT_AVAILABLE";
-        return <article key={metric.metricCode}><Icon size={18} /><span>{metric.label}</span><strong>{formatMetric(result?.value, metric.format)}</strong><small className="data-kpi-meta">{result ? <><span>版本 v{result.version} · 数据截止 {result.cutoffAt || "—"}</span>{coverageRate < 1 ? <span className="text-warning">覆盖率 {Math.round((coverageRate || 0) * 100)}%</span> : null}</> : <span>{resultReason(reasonCode)}</span>}</small></article>;
+        const previous = previousByMetricCode.get(metric.metricCode);
+        return <article key={metric.metricCode}><Icon size={18} /><span>{metric.label}</span><strong>{formatMetric(result?.value, metric.format)}</strong><MetricComparison current={result} previous={previous} metric={metric} loading={comparisonUpdating} error={comparisonError} compatibilityRollback={compatibilityRollback} /><small className="data-kpi-meta">{result ? <><span>版本 v{result.version} · 数据截止 {result.cutoffAt || "—"}</span>{coverageRate < 1 ? <span className="text-warning">覆盖率 {Math.round((coverageRate || 0) * 100)}%</span> : null}</> : <span>{resultReason(reasonCode)}</span>}</small></article>;
       })}</div>
       <div className="data-overview-grid">
         <section className="section-panel data-trend-panel"><div className="section-head"><div><h2>销售事实视图 · 经营趋势</h2><p>{range.from} 至 {range.to}，按日净销售额。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>

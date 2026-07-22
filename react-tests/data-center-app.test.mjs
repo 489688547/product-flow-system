@@ -66,6 +66,9 @@ test("overview exposes governed metrics without restoring the deleted analysis w
   assert.match(domain, /毛利率/);
   assert.match(overview, /平台贡献/);
   assert.match(overview, /数据健康/);
+  assert.match(overview, /DateRangePickerField/);
+  assert.match(overview, /环比/);
+  assert.match(page, /scheduleComparisonResults/);
 });
 
 test("governance workspaces merge quality into sync while preserving services and settings", () => {
@@ -104,7 +107,8 @@ test("data center has restrained responsive layouts and visible focus states", (
   assert.match(styles, /\.data-settings-workspace/);
   assert.match(styles, /\.data-center-page[\s\S]*:focus-visible/);
   assert.match(styles, /@media \(max-width: 900px\)[\s\S]*\.data-overview-grid/);
-  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.data-range-controls/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.date-range-picker-field/);
+  assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.date-range-picker-menu/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
   assert.doesNotMatch(styles, /\.data-analysis-toolbar/);
   assert.doesNotMatch(styles, /\.data-analysis-series/);

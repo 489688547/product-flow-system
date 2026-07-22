@@ -1872,10 +1872,7 @@ main { min-width: 0; overflow-x: hidden; }
 .data-basis-strip > div:first-child { min-width: 0; display: grid; gap: 2px; }
 .data-basis-strip strong { font-size: 13px; }
 .data-basis-strip span, .data-basis-strip small { color: var(--text-tertiary); font-size: 11px; }
-.data-range-controls { display: flex; align-items: end; gap: var(--space-2); }
-.data-range-controls > span { align-self: center; }
-.data-range-controls label { display: grid; gap: 3px; color: var(--text-tertiary); font-size: 10px; font-weight: 700; }
-.data-range-controls input, .data-source-form input, .data-source-form select, .data-settings-workspace input { height: var(--control-height); padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); }
+.data-source-form input, .data-source-form select, .data-settings-workspace input { height: var(--control-height); padding: 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); color: var(--text-primary); }
 .data-metric-state { min-height: 48px; margin-top: calc(var(--space-4) * -1 + var(--space-2)); padding: 8px var(--space-3); display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); color: var(--text-secondary); }
 .data-metric-state > svg { color: var(--text-tertiary); }
 .data-metric-state > span:not(.status-badge) { min-width: 0; display: grid; gap: 2px; }
@@ -1886,12 +1883,16 @@ main { min-width: 0; overflow-x: hidden; }
 .data-metric-state.danger { border-color: color-mix(in oklch, var(--danger), transparent 70%); background: var(--danger-soft); }
 .data-metric-state.danger > svg { color: var(--danger); }
 .data-kpi-grid { display: grid; grid-template-columns: repeat(5, minmax(140px, 1fr)); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.data-kpi-grid article { min-width: 0; min-height: 98px; padding: var(--space-3); display: grid; grid-template-columns: 22px minmax(0, 1fr); align-content: center; gap: 3px 7px; border-right: 1px solid var(--border); }
+.data-kpi-grid article { min-width: 0; min-height: 118px; padding: var(--space-3); display: grid; grid-template-columns: 22px minmax(0, 1fr); align-content: center; gap: 3px 7px; border-right: 1px solid var(--border); }
 .data-kpi-grid article:last-child { border-right: 0; }
 .data-kpi-grid svg { grid-row: 1 / span 2; color: var(--text-tertiary); }
 .data-kpi-grid span, .data-kpi-grid small { color: var(--text-tertiary); font-size: 11px; }
 .data-kpi-grid strong { min-width: 0; overflow: hidden; color: var(--text-primary); font-size: 21px; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
 .data-kpi-grid small { grid-column: 2; }
+.data-kpi-comparison { grid-column: 2; min-width: 0; display: inline-flex; align-items: center; gap: 3px; overflow: hidden; color: var(--text-tertiary); font-size: 10px; font-weight: 650; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.data-kpi-comparison svg { grid-row: auto; flex: 0 0 auto; color: currentColor; }
+.data-kpi-comparison.favorable { color: var(--success); }
+.data-kpi-comparison.unfavorable { color: var(--danger); }
 .data-kpi-meta { min-width: 0; display: grid; gap: 1px; line-height: 1.35; }
 .data-kpi-meta > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .data-overview-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .75fr); gap: var(--space-4); }
@@ -2366,8 +2367,6 @@ main { min-width: 0; overflow-x: hidden; }
   .data-standard-preview-result dl, .data-standard-impact { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .data-standard-version-list article { grid-template-columns: 1fr; gap: 4px; }
   .data-basis-strip, .data-settings-toolbar { align-items: stretch; flex-direction: column; }
-  .data-range-controls { display: grid; grid-template-columns: 1fr; align-items: stretch; }
-  .data-range-controls > span { display: none; }
   .data-sync-status-bar { grid-template-columns: 1fr; align-items: stretch; }
   .data-sync-status-bar > .btn { width: 100%; justify-content: center; }
   .data-kpi-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
