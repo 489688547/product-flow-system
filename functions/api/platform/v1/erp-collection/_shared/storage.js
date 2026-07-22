@@ -1,3 +1,7 @@
+import { projectKuaimaiErpRecords } from "../../../../../../src/domain/kuaimaiErpProjection.js";
+import { appendGoodsFlowEvents, saveGoodsFlowExceptions, saveInventoryDaily } from "../../goods-flow/_shared/storage.js";
+import { upsertProductCatalog } from "../../product-catalog/_shared/storage.js";
+
 const WRITE_BATCH_SIZE = 50;
 
 export function erpCollectionDatabase(env = {}) {
@@ -37,6 +41,45 @@ async function readExistingRecords(db, resourceType, records) {
     for (const row of result?.results || []) existing.set(row.source_key, row.content_hash);
   }
   return existing;
+}
+
+async function readBatchRecords(db, batchId) {
+  const result = await db.prepare(`SELECT source_key, occurred_at, modified_at, shop_id, warehouse_id, content_hash, payload
+    FROM erp_source_records WHERE source_batch_id = ? ORDER BY source_key`).bind(batchId).all();
+  return (result?.results || []).map(row => ({
+    sourceKey: row.source_key,
+    occurredAt: row.occurred_at || null,
+    modifiedAt: row.modified_at || null,
+    shopId: row.shop_id || null,
+    warehouseId: row.warehouse_id || null,
+    contentHash: row.content_hash,
+    payload: JSON.parse(row.payload || "{}")
+  }));
+}
+
+async function projectCompletedBatch(db, resourceType, batchId, actor, now) {
+  const records = await readBatchRecords(db, batchId);
+  const projection = projectKuaimaiErpRecords(resourceType, records, { batchId, now });
+  let catalog = { products: 0, skus: 0 };
+  if (projection.catalog.items.length) {
+    const result = await upsertProductCatalog(db, projection.catalog, {
+      actor: String(actor).slice(0, 120),
+      mode: "kuaimai-erp-file",
+      fileName: batchId
+    });
+    catalog = result.counts;
+  }
+  if (projection.events.length) await appendGoodsFlowEvents(db, projection.events.map(event => ({ ...event, createdBy: String(actor).slice(0, 120) })));
+  if (projection.inventoryDaily.length) await saveInventoryDaily(db, projection.inventoryDaily, now);
+  if (projection.exceptions.length) await saveGoodsFlowExceptions(db, projection.exceptions);
+  return {
+    sourceRecords: records.length,
+    catalogProducts: catalog.products || 0,
+    catalogSkus: catalog.skus || 0,
+    goodsFlowEvents: projection.events.length,
+    inventoryDaily: projection.inventoryDaily.length,
+    exceptions: projection.exceptions.length
+  };
 }
 
 function batchStatement(db, batch, context, summary, archiveId) {
@@ -161,13 +204,17 @@ export async function ingestErpCollection(db, input, { actor = "" } = {}) {
     ...changedRecords.map(record => recordStatement(db, record, input.batch.resourceType, batchId, now)),
     ...input.issues.map(issue => issueStatement(db, issue, input.batch.resourceType, batchId, now))
   ]);
+  const projection = input.batch.status === "completed"
+    ? await projectCompletedBatch(db, input.batch.resourceType, batchId, actor, now)
+    : null;
   return {
     batchId,
     archiveId,
     resourceType: input.batch.resourceType,
     status: input.batch.status,
     duplicateFile: Boolean(existingBatch),
-    counts
+    counts,
+    projection
   };
 }
 

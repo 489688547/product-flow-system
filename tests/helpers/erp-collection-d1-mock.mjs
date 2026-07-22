@@ -40,6 +40,10 @@ export function createErpCollectionD1Mock() {
               .map(row => ({ source_key: row.source_key, content_hash: row.content_hash }))
           };
         }
+        if (query.includes("from erp_source_records") && query.includes("source_batch_id = ?")) {
+          const [batchId] = state.values;
+          return { results: [...tables.erp_source_records.values()].filter(row => row.source_batch_id === batchId) };
+        }
         if (query.includes("from erp_file_archives") && query.includes("order by archived_at")) {
           return { results: [...tables.erp_file_archives.values()].sort((left, right) => right.archived_at.localeCompare(left.archived_at)) };
         }
