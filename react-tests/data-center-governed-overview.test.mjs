@@ -78,6 +78,16 @@ test("overview uses concise GMV trend and platform distribution with accessible 
   assert.doesNotMatch(overview, /数据健康/);
 });
 
+test("trend keeps selected empty dates visible and shows hover details outside the plot", () => {
+  const overview = read("src/features/data-center/DataOverview.jsx");
+  const styles = read("src/styles.css");
+  assert.match(overview, /factViews\.trendByDay/);
+  assert.match(overview, /暂无销售数据/);
+  assert.match(overview, /data-trend-detail/);
+  assert.match(styles, /\.data-trend-detail\s*\{[^}]*pointer-events:\s*none/s);
+  assert.doesNotMatch(styles, /\.data-trend-detail\s*\{[^}]*position:\s*absolute/s);
+});
+
 test("overview header links freshness health to sync records and removes the identity slogan", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
   assert.match(page, /href="#data-sync"/);

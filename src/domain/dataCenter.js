@@ -140,6 +140,27 @@ function groupDailySales(rows) {
   }));
 }
 
+function completeDailySalesRange(rows, range = {}) {
+  const days = dataCenterRangeDays(range);
+  const actualByDate = new Map(rows.map(row => [row.date, row]));
+  if (!days || days > 370) return rows.map(row => ({ ...row, hasData: true }));
+  return Array.from({ length: days }, (_, index) => {
+    const date = shiftDay(range.from, index);
+    const actual = actualByDate.get(date);
+    return actual ? { ...actual, hasData: true } : {
+      date,
+      qty: 0,
+      sales: 0,
+      netSales: 0,
+      grossProfit: 0,
+      refund: 0,
+      cost: 0,
+      platforms: [],
+      hasData: false
+    };
+  });
+}
+
 function syncRunTimestamp(run = {}) {
   const parsed = Date.parse(run.completedAt || run.startedAt || run.createdAt || "");
   return Number.isFinite(parsed) ? parsed : 0;
@@ -407,8 +428,10 @@ export function buildDataCenterSalesFactViews(rows = [], options = {}) {
   const filtered = operational.filter(row => (
     (!options.from || row.date >= options.from) && (!options.to || row.date <= options.to)
   ));
+  const byDay = groupDailySales(filtered).sort((a, b) => a.date.localeCompare(b.date));
   return {
-    byDay: groupDailySales(filtered).sort((a, b) => a.date.localeCompare(b.date)),
+    byDay,
+    trendByDay: completeDailySalesRange(byDay, options),
     byPlatform: groupSales(filtered, "platform").sort((a, b) => b.sales - a.sales),
     excludedRows: rows.length - operational.length,
     rowCount: filtered.length,

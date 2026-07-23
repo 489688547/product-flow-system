@@ -120,6 +120,21 @@ test("sales fact views expose daily platform GMV details and rank platform distr
   ]);
 });
 
+test("sales trend preserves every selected date and marks dates without facts as empty", () => {
+  const views = buildDataCenterSalesFactViews([
+    { date: "2026-07-20", platform: "抖音", qty: 2, sales: 200, netSales: 160, grossProfit: 80 },
+    { date: "2026-07-21", platform: "天猫", qty: 3, sales: 300, netSales: 240, grossProfit: 96 }
+  ], { from: "2026-07-20", to: "2026-07-22" });
+
+  assert.deepEqual(views.trendByDay.map(day => [day.date, day.hasData, day.sales]), [
+    ["2026-07-20", true, 200],
+    ["2026-07-21", true, 300],
+    ["2026-07-22", false, 0]
+  ]);
+  assert.deepEqual(views.trendByDay[2].platforms, []);
+  assert.equal(views.byDay.length, 2);
+});
+
 test("source records reject credential-like fields", () => {
   const normalized = normalizeDataCenterState({
     sources: [{
