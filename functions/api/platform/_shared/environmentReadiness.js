@@ -25,6 +25,16 @@ export function readinessDatabase(env = {}, binding = "PRODUCT_FLOW_DB") {
   return env[binding] || null;
 }
 
+function environmentVariableMissing(name, env, vaultEnvVars) {
+  if (name === "PLATFORM_CREDENTIAL_MASTER_KEY") {
+    return !isValidPlatformCredentialMasterKey(env[name]);
+  }
+  if (name === "DEMO_DATA_MASKING_KEY") {
+    return String(env[name] || "").length < 16;
+  }
+  return !env[name] && !vaultEnvVars.has(name);
+}
+
 async function existingTables(db, names) {
   if (!db || !names.length) return new Set();
   const placeholders = names.map(() => "?").join(", ");
@@ -63,9 +73,7 @@ export async function inspectEnvironmentReadiness({ env = {}, requestUrl = "", m
   const capabilities = required.map(capability => {
     const defaultBinding = capability.bindings?.[0] || "PRODUCT_FLOW_DB";
     const missing = [
-      ...(capability.envVars || []).filter(name => name === "PLATFORM_CREDENTIAL_MASTER_KEY"
-        ? !isValidPlatformCredentialMasterKey(env[name])
-        : !env[name] && !vaultEnvVars.has(name)),
+      ...(capability.envVars || []).filter(name => environmentVariableMissing(name, env, vaultEnvVars)),
       ...(capability.bindings || []).filter(name => !readinessDatabase(env, name)),
       ...(capability.tables || []).filter(name => !tablesByBinding.get(defaultBinding)?.has(name)),
       ...Object.entries(capability.bindingTables || {}).flatMap(([binding, tables]) =>

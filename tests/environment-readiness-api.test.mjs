@@ -29,6 +29,7 @@ const REQUIRED_PRODUCTION_TABLES = [
   "data_connection_audit"
 ];
 const TEST_PLATFORM_MASTER_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const TEST_DEMO_MASKING_KEY = "test-demo-masking-key-with-enough-entropy";
 const HR_CORE_TABLES = [
   "hr_employees",
   "hr_assignments",
@@ -180,7 +181,8 @@ test("warning capabilities do not block an otherwise ready production environmen
       DEMO_FLOW_DB: createTableDb(DISPLAY_REQUIRED_TABLES),
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
-      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY
+      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
     },
     data: { session: { name: "员工", role: "product", department: "产品部" } }
   });
@@ -237,7 +239,8 @@ test("a server-only production data token can read readiness without an employee
       DEMO_FLOW_DB: createTableDb(DISPLAY_REQUIRED_TABLES),
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
-      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY
+      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
     },
     data: {}
   });

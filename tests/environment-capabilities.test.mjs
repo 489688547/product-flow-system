@@ -75,6 +75,7 @@ test("display data environment declares separate control and business D1 require
   const capability = manifest.capabilities.find(entry => entry.id === "display-data-environment");
 
   assert.ok(capability, "display data environment capability must be declared");
+  assert.deepEqual(capability.envVars, ["DEMO_DATA_MASKING_KEY"]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"]);
   assert.deepEqual(capability.bindingTables.PRODUCT_FLOW_DB, [
     "data_environment_grants",

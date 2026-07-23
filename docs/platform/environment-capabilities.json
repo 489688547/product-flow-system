@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-22",
+  "updatedAt": "2026-07-23",
   "capabilities": [
     {
       "id": "shared-production-data",
@@ -20,7 +20,7 @@
       "platforms": ["cloudflare-pages", "cloudflare-d1"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",
-      "envVars": [],
+      "envVars": ["DEMO_DATA_MASKING_KEY"],
       "bindings": ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"],
       "tables": [],
       "bindingTables": {
