@@ -201,12 +201,16 @@ test("planning range bar separates precise editing from cancellable pointer drag
   assert.match(rangeBar, /data-range-edge="start"/);
   assert.match(rangeBar, /data-range-edge="end"/);
   assert.match(rangeBar, /onChange\(nextDates\)/);
+  assert.match(rangeBar, /label-align-end/);
   assert.match(timeline, /<PlanningRangeBar/);
   assert.match(timeline, /onChange=\{dates => onChangePlanDates\(plan\.id, dates\)\}/);
   assert.match(page, /const changePlanDates = \(planId, dates\) => updateProductPlan\(planId, dates\)/);
   assert.match(page, /onChangePlanDates=\{changePlanDates\}/);
   assert.match(styles, /\.planning-range-handle/);
   assert.match(styles, /touch-action: pan-y/);
+  assert.match(styles, /\.planning-range-bar::before/);
+  assert.match(styles, /\.planning-bar \{[^}]*overflow: visible;/s);
+  assert.match(styles, /\.planning-range-label \{[^}]*color: var\(--text-primary\);/s);
   assert.match(styles, /\.planning-timeline-section \{ overflow: hidden; \}/);
   assert.doesNotMatch(styles, /\.planning-timeline-row:last-child \{ border-bottom: 0; \}/);
 });

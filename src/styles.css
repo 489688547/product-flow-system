@@ -1216,18 +1216,20 @@ main { min-width: 0; overflow-x: hidden; }
 .planning-month-cells { position: absolute; inset: 0; }
 .planning-month-drop { border-right: 1px solid var(--border); transition: background-color var(--transition-fast); }
 .planning-month-drop:hover { background: var(--accent-soft); }
-.planning-bar { position: absolute; z-index: 2; height: 28px; min-width: 30px; padding: 0 12px; border: 0; border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; color: white; box-shadow: 0 1px 2px oklch(22% .03 258 / .12); transition: filter var(--transition-fast), box-shadow var(--transition-fast); }
-.planning-bar:hover { filter: brightness(.96); }
-.planning-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: 0 0 0 3px var(--surface); }
-.planning-bar.period { top: 50%; transform: translateY(-50%); background: var(--accent); }
-.planning-range-bar { touch-action: pan-y; }
+.planning-bar { position: absolute; z-index: 2; height: 34px; min-width: 2px; padding: 0; border: 0; border-radius: 4px; display: block; overflow: visible; color: var(--accent); background: transparent; touch-action: pan-y; }
+.planning-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.planning-bar.period { top: 50%; transform: translateY(-50%); background: transparent; }
+.planning-range-bar::before { position: absolute; right: 0; bottom: 4px; left: 0; height: 8px; border-radius: 4px; background: var(--accent); box-shadow: 0 1px 2px oklch(22% .03 258 / .12); transition: filter var(--transition-fast); content: ""; }
+.planning-range-bar:hover::before { filter: brightness(.94); }
 .planning-range-bar.is-editable { cursor: grab; }
-.planning-range-bar.is-dragging { cursor: grabbing; filter: brightness(.92); }
-.planning-range-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; pointer-events: none; }
+.planning-range-bar.is-dragging { cursor: grabbing; }
+.planning-range-bar.is-dragging::before { filter: brightness(.88); }
+.planning-range-label { position: absolute; z-index: 2; bottom: 15px; left: 0; width: max-content; padding: 0 3px; border-radius: 3px; white-space: nowrap; color: var(--text-primary); background: var(--surface); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 17px; pointer-events: none; }
+.planning-range-bar.label-align-end .planning-range-label { right: 0; left: auto; }
 .planning-range-handle { position: absolute; z-index: 1; top: 0; bottom: 0; width: 12px; cursor: ew-resize; touch-action: pan-y; }
 .planning-range-handle.start { left: 0; }
 .planning-range-handle.end { right: 0; }
-.planning-range-handle::after { position: absolute; top: 7px; bottom: 7px; left: 5px; width: 2px; border-radius: 1px; background: currentColor; opacity: 0; transition: opacity var(--transition-fast); content: ""; }
+.planning-range-handle::after { position: absolute; bottom: 5px; left: 5px; width: 2px; height: 6px; border-radius: 1px; background: var(--surface); opacity: 0; transition: opacity var(--transition-fast); content: ""; }
 .planning-range-bar:hover .planning-range-handle::after, .planning-range-handle:hover::after, .planning-range-bar.is-dragging .planning-range-handle::after { opacity: .72; }
 .planning-empty-row .planning-product-column { color: var(--text-tertiary); font-size: 12px; }
 .planning-empty-row .planning-track p { position: absolute; z-index: 1; inset: 0; margin: 0; display: grid; place-items: center; pointer-events: none; color: var(--text-tertiary); font-size: 12px; }

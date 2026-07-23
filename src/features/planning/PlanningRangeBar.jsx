@@ -30,6 +30,7 @@ export function PlanningRangeBar({ plan, year, canEdit, onEdit, onChange }) {
   if (!segment.visible) return null;
 
   const dateLabel = formatPlanningDateRange(dates.developmentStart, dates.launchDate);
+  const labelAlignsEnd = segment.left + segment.width > 90;
   const fullDescription = `开发至上线：${dates.developmentStart} 至 ${dates.launchDate}`;
   const editDescription = canEdit
     ? "拖动中部移动时间段，拖动两端调整日期；点击精确编辑。"
@@ -122,7 +123,7 @@ export function PlanningRangeBar({ plan, year, canEdit, onEdit, onChange }) {
   return (
     <button
       type="button"
-      className={`planning-bar period planning-range-bar${canEdit ? " is-editable" : ""}${preview ? " is-dragging" : ""}`}
+      className={`planning-bar period planning-range-bar${canEdit ? " is-editable" : ""}${preview ? " is-dragging" : ""}${labelAlignsEnd ? " label-align-end" : ""}`}
       style={{ left: `${segment.left}%`, width: `${segment.width}%` }}
       title={`${fullDescription}。${editDescription}`}
       aria-label={`${fullDescription}。${editDescription}`}
