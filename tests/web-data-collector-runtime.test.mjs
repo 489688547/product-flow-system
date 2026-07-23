@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { assertBusinessDateMatchesRange } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 
 function apiDouble(job) {
@@ -29,14 +30,30 @@ const job = {
   scheduleVersion: "v1"
 };
 
-test("orchestrator schedules only extension-implemented Kuaimai resources after 05:00", async () => {
+test("orchestrator schedules all extension-implemented Kuaimai resources after 05:00", async () => {
   const api = apiDouble(job);
   const orchestrator = createWebCollectorOrchestrator({ api, processDownload: async () => ({}) });
 
   await orchestrator.prepare({ now: "2026-07-22T05:01:00+08:00" });
   const plan = api.calls.find(([name]) => name === "ensurePlan")[1];
-  assert.deepEqual(plan.map(item => item.resourceType), ["orders", "order_items"]);
-  assert.deepEqual(plan.map(item => item.businessDate), ["2026-07-21", "2026-07-21"]);
+  assert.deepEqual(plan.map(item => item.resourceType), ["orders", "order_items", "sales_items"]);
+  assert.deepEqual(plan.map(item => item.businessDate), ["2026-07-21", "2026-07-21", "2026-07-21"]);
+});
+
+test("download validation rejects a parsed range from another business date", () => {
+  assert.doesNotThrow(() => assertBusinessDateMatchesRange({
+    businessDate: "2026-07-22",
+    rangeStart: "2026-07-22T00:00:41+08:00",
+    rangeEnd: "2026-07-22T23:59:44+08:00"
+  }));
+  assert.throws(
+    () => assertBusinessDateMatchesRange({
+      businessDate: "2026-07-22",
+      rangeStart: "2026-07-21T00:00:41+08:00",
+      rangeEnd: "2026-07-21T23:59:44+08:00"
+    }),
+    error => error?.code === "WEB_COLLECTION_BUSINESS_DATE_MISMATCH"
+  );
 });
 
 test("orchestrator returns a safe task and completes only after archive ingest", async () => {

@@ -240,6 +240,7 @@ Expected: FAIL，因为 adapter 不存在。
 ```text
 orders            #/trade/searchlist/                    昨天事实
 order_items       #/trade/searchlist/                    昨天事实（导出订单明细）
+sales_items       #/report/sale_multidimension_next/     昨天事实（销售主题/按订单商品明细）
 products          #/prod/parallel/                       当前维度
 inventory         #/stock/warehouse_status/              当前快照
 purchases         #/purchase/manager/                    当前及未完结事实
@@ -256,7 +257,7 @@ inventory_cost    #/report/stock_cost_next/              当前快照
 
 - [ ] **Step 4: 先完成订单与销售明细端到端，再逐资源复用**
 
-订单与销售明细必须在真实登录页核对日期控件和官方导出动作；随后按资源表逐项实现。事实日期必须设置完整昨天自然日，不能使用页面默认“近一天”。下载进入 provider waiting 目录，scanner 稳定性检查、归档、脱敏预检和现有 ERP ingest 全部成功后才返回 provider success。
+订单、交易订单明细与销售主题明细必须在真实登录页核对日期控件和官方导出动作；随后按资源表逐项实现。事实日期必须设置完整昨天自然日，不能使用页面默认“近一天”。下载进入 provider waiting 目录，scanner 稳定性检查、业务日期二次核对、归档、脱敏预检和现有 ERP ingest 全部成功后才返回 provider success。
 
 - [ ] **Step 5: 完成人工边界和恢复**
 
@@ -325,7 +326,7 @@ Expected: PASS。
 
 - [ ] **Step 5: 更新本机扩展并真实回归**
 
-合并并部署后，把公司 Chrome 加载的未打包扩展更新到已合并版本并点击“重新加载”。重新触发 2026-07-22 的 `orders` 与 `order_items`，核对下载中心只下载当前任务文件、本机归档成功、D1 任务进入 `success`、游标推进到 2026-07-22，最后刷新数据同步页面。
+合并并部署后，把公司 Chrome 加载的未打包扩展更新到已合并版本并点击“重新加载”。重新触发 2026-07-22 的 `orders`、`order_items` 与 `sales_items`，核对下载中心只下载当前任务文件、本机归档成功、D1 任务进入 `success`、游标推进到 2026-07-22，最后刷新数据同步页面。
 
 ---
 

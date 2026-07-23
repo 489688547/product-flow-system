@@ -32,7 +32,7 @@ function payload(overrides = {}) {
 
 test("ERP collection exposes the governed resource registry", () => {
   assert.deepEqual(KUAIMAI_ERP_RESOURCE_TYPES, [
-    "orders", "order_items", "products", "skus", "inventory_snapshot",
+    "orders", "order_items", "sales_items", "products", "skus", "inventory_snapshot",
     "inventory_movements", "suppliers", "purchase_orders", "aftersales",
     "shops", "warehouses", "finance"
   ]);

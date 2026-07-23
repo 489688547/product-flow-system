@@ -94,6 +94,105 @@ async function waitForKuaimaiOrderPage(provider, selectors, matchesText) {
   return classification;
 }
 
+async function salesPageProbe(provider, selectors, matchesText) {
+  const bodyText = String(document.body?.innerText || "");
+  const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
+  const base = provider.classifyPage({
+    url: location.href,
+    markers: {
+      loginPage: /\/login(?:[/?#]|$)/i.test(location.pathname) || Boolean(document.querySelector("input[type='password']")),
+      humanVerification: verificationTerms.some(term => bodyText.includes(term))
+    }
+  });
+  if (["waiting_login", "waiting_human", "blocked_origin"].includes(base.state)) return base;
+  const ready = Boolean(document.querySelector(selectors.timeBasis))
+    && Boolean(document.querySelector(selectors.startDate))
+    && Boolean(document.querySelector(selectors.endDate))
+    && Boolean(exactTextElement(selectors.calculateButton, "计算数据", matchesText))
+    && Boolean(exactTextElement(selectors.exportButton, "导出", matchesText))
+    && Boolean(exactTextElement(selectors.reportTab, "按订单商品明细", matchesText));
+  return ready
+    ? { state: "ready" }
+    : { state: "schema_changed", errorCode: "KUAIMAI_SALES_PAGE_SCHEMA_CHANGED" };
+}
+
+async function waitForKuaimaiSalesPage(provider, selectors, matchesText) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  let classification;
+  do {
+    classification = await salesPageProbe(provider, selectors, matchesText);
+    if (["ready", "waiting_login", "waiting_human", "blocked_origin"].includes(classification.state)) {
+      return classification;
+    }
+    await wait(250);
+  } while (Date.now() < deadline);
+  return classification;
+}
+
+function setNativeInputValue(input, value) {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  descriptor?.set?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  input.dispatchEvent(new Event("blur", { bubbles: true }));
+}
+
+async function prepareKuaimaiSalesReport(action, selectors, matchesText, context) {
+  const legacyButton = exactTextElement(selectors.dialogButton, "暂不，继续使用旧版", matchesText);
+  if (legacyButton) {
+    legacyButton.click();
+    await wait(300);
+  }
+  const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_SALES_TIME_BASIS_MISSING");
+  if (timeBasis.value !== action.timeBasis) {
+    timeBasis.click();
+    await wait(150);
+    const option = findRequiredTextElement(
+      selectors.selectOption,
+      action.timeBasis,
+      matchesText,
+      "KUAIMAI_SALES_TIME_BASIS_OPTION_MISSING"
+    );
+    option.click();
+    await wait(250);
+  }
+  const yesterday = exactTextElement(selectors.yesterdayRadio, "昨天", matchesText);
+  if (yesterday) {
+    yesterday.click();
+    await wait(250);
+  }
+  const startDate = findRequired(selectors.startDate, "KUAIMAI_SALES_START_DATE_MISSING");
+  const endDate = findRequired(selectors.endDate, "KUAIMAI_SALES_END_DATE_MISSING");
+  if (startDate.value !== action.businessDate) setNativeInputValue(startDate, action.businessDate);
+  if (endDate.value !== action.businessDate) setNativeInputValue(endDate, action.businessDate);
+  await wait(250);
+  const reportTab = findRequiredTextElement(
+    selectors.reportTab,
+    action.dimension,
+    matchesText,
+    "KUAIMAI_SALES_DETAIL_TAB_MISSING"
+  );
+  reportTab.click();
+  await wait(500);
+  context.expectedSalesDate = action.businessDate;
+  context.expectedSalesTimeBasis = action.timeBasis;
+}
+
+function assertAppliedKuaimaiSalesRange(selectors, context) {
+  const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_SALES_TIME_BASIS_MISSING");
+  const startDate = findRequired(selectors.startDate, "KUAIMAI_SALES_START_DATE_MISSING");
+  const endDate = findRequired(selectors.endDate, "KUAIMAI_SALES_END_DATE_MISSING");
+  if (
+    timeBasis.value !== context.expectedSalesTimeBasis
+    || startDate.value !== context.expectedSalesDate
+    || endDate.value !== context.expectedSalesDate
+  ) {
+    throw Object.assign(new Error("销售报表创建时间范围未生效。"), {
+      code: "KUAIMAI_SALES_TIME_RANGE_NOT_APPLIED"
+    });
+  }
+}
+
 function readDownloadCenterRows(selectors) {
   return Array.from(document.querySelectorAll(selectors.row)).map(row => ({
     exportTime: row.querySelector(selectors.exportTime)?.textContent || "",
@@ -144,6 +243,45 @@ async function downloadFromKuaimaiCenter({
 
 async function runKuaimaiAction(action, selectors, matchesText, context) {
   switch (action.action) {
+    case "prepare_sales_report":
+      await prepareKuaimaiSalesReport(action, context.salesSelectors, matchesText, context);
+      return;
+    case "calculate_sales_report": {
+      assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
+      const button = findRequiredTextElement(
+        context.salesSelectors.calculateButton,
+        "计算数据",
+        matchesText,
+        "KUAIMAI_SALES_CALCULATE_MISSING"
+      );
+      button.click();
+      await wait(3500);
+      assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
+      return;
+    }
+    case "export_sales_items": {
+      const button = findRequiredTextElement(
+        context.salesSelectors.exportButton,
+        "导出",
+        matchesText,
+        "KUAIMAI_SALES_EXPORT_MISSING"
+      );
+      button.click();
+      await wait(500);
+      return;
+    }
+    case "confirm_sales_export": {
+      const button = findRequiredTextElement(
+        context.salesSelectors.dialogButton,
+        "确定",
+        matchesText,
+        "KUAIMAI_SALES_EXPORT_CONFIRM_MISSING"
+      );
+      context.exportStartedAt = Date.now();
+      button.click();
+      await wait(800);
+      return;
+    }
     case "verify_time_range": {
       context.expectedTimeBasis = action.timeBasis;
       context.expectedStartTime = action.startValue;
@@ -206,16 +344,14 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
 
 async function runRegisteredTask(task) {
   const [{ registeredTaskRuntime }, kuaimai] = await Promise.all([registryPromise, kuaimaiPromise]);
-  const { KUAIMAI_SELECTORS, matchesKuaimaiControlText } = kuaimai;
+  const { KUAIMAI_SELECTORS, KUAIMAI_SALES_SELECTORS, matchesKuaimaiControlText } = kuaimai;
   const runtime = registeredTaskRuntime(task);
   if (runtime.provider.id !== "kuaimai") {
     return { status: "failed", stage: "opening", errorCode: "EXTENSION_PROVIDER_NOT_IMPLEMENTED" };
   }
-  const classification = await waitForKuaimaiOrderPage(
-    runtime.provider,
-    KUAIMAI_SELECTORS,
-    matchesKuaimaiControlText
-  );
+  const classification = task.resourceType === "sales_items"
+    ? await waitForKuaimaiSalesPage(runtime.provider, KUAIMAI_SALES_SELECTORS, matchesKuaimaiControlText)
+    : await waitForKuaimaiOrderPage(runtime.provider, KUAIMAI_SELECTORS, matchesKuaimaiControlText);
   if (classification.state !== "ready") {
     return {
       status: classification.state,
@@ -224,7 +360,7 @@ async function runRegisteredTask(task) {
     };
   }
   try {
-    const context = { exportStartedAt: null, kuaimai };
+    const context = { exportStartedAt: null, kuaimai, salesSelectors: KUAIMAI_SALES_SELECTORS };
     for (const action of runtime.actionPlan) {
       await runKuaimaiAction(action, KUAIMAI_SELECTORS, matchesKuaimaiControlText, context);
     }

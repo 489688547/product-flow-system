@@ -5,6 +5,8 @@ export const KUAIMAI_ALLOWED_ORIGINS = Object.freeze([
 
 export const KUAIMAI_ORDER_ROUTE = "/index.html#/trade/searchlist/";
 
+export const KUAIMAI_SALES_ROUTE = "/index.html#/report/sale_multidimension_next/";
+
 export const KUAIMAI_DOWNLOAD_CENTER_ROUTE = "/index.html#/index/download_center/";
 
 export const KUAIMAI_DOWNLOAD_ORIGINS = Object.freeze([
@@ -31,6 +33,19 @@ export const KUAIMAI_SELECTORS = Object.freeze({
   exportConfirmButton: ".modal-dialog button, .el-dialog button"
 });
 
+export const KUAIMAI_SALES_SELECTORS = Object.freeze({
+  timeBasis: ".statistics-dimension input[placeholder='请选择']",
+  startDate: ".time-wrap input[placeholder='选择开始时间']",
+  endDate: ".time-wrap input[placeholder='选择结束时间']",
+  yesterdayRadio: "label.el-radio",
+  selectOption: ".el-select-dropdown__item",
+  reportTab: ".el-tabs__item",
+  calculateButton: "button",
+  exportButton: "button",
+  dialogButton: ".el-dialog button",
+  upgradeDialog: ".el-dialog"
+});
+
 export function matchesKuaimaiControlText(text, label) {
   const normalized = String(text || "").replace(/\s+/g, " ").trim();
   const expected = String(label || "").trim();
@@ -55,6 +70,9 @@ function matchesKuaimaiExportResource(resourceType, value) {
   if (resourceType === "orders") {
     return content.startsWith("快麦ERP交易订单导出")
       && !content.startsWith("快麦ERP交易订单明细导出");
+  }
+  if (resourceType === "sales_items") {
+    return content.startsWith("销售主题分析-按订单商品明细-");
   }
   return false;
 }
@@ -149,6 +167,11 @@ export function buildKuaimaiTaskUrl(baseUrl, task) {
     error.code = "KUAIMAI_ORIGIN_BLOCKED";
     throw error;
   }
+  if (task?.resourceType === "sales_items") {
+    const url = new URL(baseUrl);
+    url.hash = "#/report/sale_multidimension_next/";
+    return url.href;
+  }
   const startTime = Date.parse(`${businessDate}T00:00:00+08:00`);
   const endTime = Date.parse(`${businessDate}T23:59:59+08:00`);
   const url = new URL(baseUrl);
@@ -166,6 +189,20 @@ export function buildKuaimaiTaskUrl(baseUrl, task) {
 
 export function buildKuaimaiActionPlan(task) {
   const businessDate = assertBusinessDate(task?.businessDate);
+  if (task?.resourceType === "sales_items") {
+    return [
+      {
+        action: "prepare_sales_report",
+        timeBasis: "创建时间",
+        businessDate,
+        dimension: "按订单商品明细"
+      },
+      { action: "calculate_sales_report" },
+      { action: "export_sales_items" },
+      { action: "confirm_sales_export" },
+      { action: "download_from_center", resourceType: "sales_items" }
+    ];
+  }
   const exportAction = task?.resourceType === "orders"
     ? "export_orders"
     : task?.resourceType === "order_items"
@@ -211,6 +248,17 @@ export const kuaimaiResources = Object.freeze({
     scheduleVersion: "v1",
     downloadExtensions: [".xlsx", ".xls", ".csv"],
     downloadFilePrefixes: ["快麦ERP交易订单明细导出"],
+    downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
+  }),
+  sales_items: Object.freeze({
+    providerId: "kuaimai",
+    resourceType: "sales_items",
+    origin: "https://erpb.superboss.cc",
+    route: KUAIMAI_SALES_ROUTE,
+    rangeKind: "daily_fact",
+    scheduleVersion: "v2",
+    downloadExtensions: [".xlsx", ".xls", ".csv"],
+    downloadFilePrefixes: ["销售主题分析-按订单商品明细-"],
     downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
   })
 });

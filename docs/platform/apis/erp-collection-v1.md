@@ -20,7 +20,9 @@ JSON object with:
 - `records`: at most 500 normalized records with stable source key, source timestamps, shop/warehouse references, row SHA-256 and the whitelisted minimum standard index.
 - `issues`: at most 500 preflight quality issues.
 
-Orders and order items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values.
+Orders, order items and rich sales items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. `sales_items` comes from 《销售主题分析-按订单商品明细》 and projects `69码 × 创建日 × 平台` facts only after the whole batch is completed. Quantity, net sales, net cost and gross profit use the governed formulas in `docs/product/data-definitions.md`; unmapped product codes become safe quality exceptions rather than guessed mappings. The projection replaces only the exact completed business dates, never an entire month.
+
+Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values. The server repeats the allowlist normalization before persistence as defense in depth.
 
 ## Response
 
@@ -36,6 +38,7 @@ Archive metadata, runner authorization and collection batch control stay in the 
 - `ERP_COLLECTION_IDEMPOTENCY_REQUIRED`: missing idempotency key.
 - `ERP_COLLECTION_DB_UNAVAILABLE`: D1 binding unavailable.
 - `ERP_COLLECTION_*`: invalid platform, resource, hash, source key, timestamp, secret field or chunk size.
+- `ERP_COLLECTION_SALES_FACTS_EMPTY`: a completed rich sales batch did not produce any trusted aggregate facts.
 - `ERP_COLLECTION_INGEST_FAILED`: unexpected storage failure; response and logs must not expose source rows or credentials.
 
 ## Compatibility and deprecation

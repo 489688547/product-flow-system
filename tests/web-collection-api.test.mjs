@@ -241,6 +241,20 @@ test("authorized operator idempotently triggers the Kuaimai Chrome order-item co
   assert.equal(db.tables.web_collection_jobs.size, 1);
 });
 
+test("authorized operator triggers the registered rich Kuaimai sales report", async () => {
+  const db = createWebCollectionD1Mock();
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    body: { action: "trigger", providerId: "kuaimai", resourceType: "sales_items", businessDate: "2026-07-22" }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.job.resourceType, "sales_items");
+  assert.equal(result.body.data.job.idempotencyKey, "kuaimai:sales_items:2026-07-22:v2:env:production:v1");
+});
+
 test("manual confirmation requeues a Kuaimai job after login is restored", async () => {
   const db = createWebCollectionD1Mock();
   const registration = await register(db);

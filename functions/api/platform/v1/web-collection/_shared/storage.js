@@ -176,10 +176,10 @@ export async function triggerWebCollectionJob(db, input) {
   const providerId = String(input?.providerId || "").trim();
   const resourceType = String(input?.resourceType || "").trim();
   const businessDate = String(input?.businessDate || "").trim();
-  if (providerId !== "kuaimai" || resourceType !== "order_items" || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
-    throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发快麦订单商品明细采集。");
+  if (providerId !== "kuaimai" || !["orders", "order_items", "sales_items"].includes(resourceType) || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+    throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发已登记的快麦订单、订单商品明细或销售主题明细采集。");
   }
-  const scheduleVersion = "v1";
+  const scheduleVersion = resourceType === "sales_items" ? "v2" : "v1";
   const plan = await ensureWebCollectionPlan(db, [{
     providerId,
     resourceType,

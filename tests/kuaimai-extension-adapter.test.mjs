@@ -101,6 +101,35 @@ test("Kuaimai order item task uses the registered detail export", async () => {
   ]);
 });
 
+test("Kuaimai sales-item task uses the rich sales report and creation-time controls", async () => {
+  const { buildKuaimaiActionPlan, buildKuaimaiTaskUrl, kuaimaiResources } = await import(adapterUrl);
+  const task = {
+    jobId: "job-sales",
+    providerId: "kuaimai",
+    resourceType: "sales_items",
+    businessDate: "2026-07-22"
+  };
+
+  assert.equal(
+    buildKuaimaiTaskUrl("https://erpb.superboss.cc/index.html#/report/sale_multidimension_next/", task),
+    "https://erpb.superboss.cc/index.html#/report/sale_multidimension_next/"
+  );
+  assert.deepEqual(buildKuaimaiActionPlan(task), [
+    {
+      action: "prepare_sales_report",
+      timeBasis: "创建时间",
+      businessDate: "2026-07-22",
+      dimension: "按订单商品明细"
+    },
+    { action: "calculate_sales_report" },
+    { action: "export_sales_items" },
+    { action: "confirm_sales_export" },
+    { action: "download_from_center", resourceType: "sales_items" }
+  ]);
+  assert.equal(kuaimaiResources.sales_items.route, "/index.html#/report/sale_multidimension_next/");
+  assert.deepEqual(kuaimaiResources.sales_items.downloadFilePrefixes, ["销售主题分析-按订单商品明细-"]);
+});
+
 test("Kuaimai download center selects only the current task resource and time window", async () => {
   const {
     KUAIMAI_DOWNLOAD_CENTER_ROUTE,
@@ -123,6 +152,11 @@ test("Kuaimai download center selects only the current task resource and time wi
       exportTime: "2026-07-22 20:52:55",
       content: "快麦ERP交易订单明细导出20260722205305_269021_W4k3pA.xlsx",
       status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-23 15:07:40",
+      content: "销售主题分析-按订单商品明细-20260723150740_a01a2c7ba370217f",
+      status: "导出完成"
     }
   ];
 
@@ -142,6 +176,10 @@ test("Kuaimai download center selects only the current task resource and time wi
   assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "orders", startedAt, rows }), {
     state: "ready",
     rowIndex: 1
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "sales_items", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 3
   });
 });
 
