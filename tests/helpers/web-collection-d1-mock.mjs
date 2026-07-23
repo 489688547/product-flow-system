@@ -91,6 +91,21 @@ export function createWebCollectionD1Mock() {
           });
           return { success: true };
         }
+        if (query.startsWith("update web_collection_jobs set status = 'queued'")) {
+          const [updatedAt, id] = state.values;
+          Object.assign(tables.web_collection_jobs.get(id), {
+            status: "queued",
+            stage: "queued",
+            runner_id: null,
+            lease_expires_at: null,
+            error_code: null,
+            error_summary: null,
+            started_at: null,
+            completed_at: null,
+            updated_at: updatedAt
+          });
+          return { success: true };
+        }
         if (query.startsWith("update web_collection_jobs set status = ?")) {
           const [status, stage, errorCode, errorSummary, leaseExpiresAt, updatedAt, id] = state.values;
           Object.assign(tables.web_collection_jobs.get(id), {

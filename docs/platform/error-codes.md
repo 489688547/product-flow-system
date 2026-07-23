@@ -51,6 +51,8 @@
 
 - `WEB_COLLECTION_RUNNER_TOKEN_REQUIRED` / `WEB_COLLECTION_RUNNER_TOKEN_INVALID`：公司 Mac 钥匙串令牌缺失、失效、停用或 scope 不符。
 - `WEB_COLLECTION_RUNNER_REGISTER_DENIED` / `WEB_COLLECTION_VIEW_DENIED`：当前公司身份无权登记设备或查看采集状态。
+- `WEB_COLLECTION_TRIGGER_DENIED`：当前公司身份为只读或不属于总经办、数据中心、运营，不能触发采集。
+- `WEB_COLLECTION_TRIGGER_INVALID`：用户触发请求不是已登记的快麦订单商品明细与有效业务日期。
 - `WEB_COLLECTION_JOB_INVALID`：provider、resource、业务日期、范围、幂等键无效，或任务试图携带 URL、选择器、脚本和凭据。
 - `WEB_COLLECTION_JOB_NOT_FOUND` / `WEB_COLLECTION_JOB_OWNER_MISMATCH`：任务不存在或不属于当前领取设备。
 - `WEB_COLLECTION_STATE_CONFLICT` / `WEB_COLLECTION_TRANSITION_INVALID`：任务已被更新、租约恢复或状态跳转不合法。
