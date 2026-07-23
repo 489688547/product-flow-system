@@ -105,11 +105,13 @@ test("authenticated app gates business providers behind the environment provider
   assert.match(main, /<DataEnvironmentProvider>[\s\S]*<ProductCatalogProvider>/);
   assert.match(provider, /key=\{`\$\{environment\.current\.id\}:\$\{environment\.current\.version\}`\}/);
   assert.match(provider, /activateDataEnvironment/);
+  assert.match(provider, /refreshPromiseRef/);
   assert.match(settings, /正式数据库/);
   assert.match(settings, /展示数据库/);
   assert.match(settings, /只有当前账号的当前浏览器/);
   assert.match(settings, /更新展示数据库/);
   assert.match(settings, /继续更新/);
+  assert.match(settings, /date\.getTime\(\) <= 0/);
   assert.match(settings, /aria-live/);
 });
 

@@ -1,4 +1,4 @@
-import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "./AuthProvider.jsx";
 import {
   createDisplayRefresh,
@@ -49,37 +49,47 @@ export function DataEnvironmentProvider({ children }) {
   const [refreshJob, setRefreshJob] = useState(null);
   const [refreshingDisplay, setRefreshingDisplay] = useState(false);
   const [error, setError] = useState("");
+  const refreshPromiseRef = useRef(null);
 
-  const refresh = useCallback(async () => {
-    if (user?.role !== "executive") {
-      activateDataEnvironment(PRODUCTION_ENVIRONMENT.current);
-      setEnvironment(PRODUCTION_ENVIRONMENT);
-      setError("");
-      setReady(true);
-      setLoading(false);
-      return PRODUCTION_ENVIRONMENT;
-    }
-    setLoading(true);
-    try {
-      const next = normalizeEnvironment(await loadDataEnvironment());
-      activateDataEnvironment(next.current);
-      setEnvironment(next);
-      if (next.display.activeJobId) {
-        loadDisplayRefresh(next.display.activeJobId)
-          .then(payload => setRefreshJob(payload.job || null))
-          .catch(() => setRefreshJob(null));
-      } else {
-        setRefreshJob(null);
+  const refresh = useCallback(() => {
+    if (refreshPromiseRef.current) return refreshPromiseRef.current;
+    const refreshPromise = (async () => {
+      if (user?.role !== "executive") {
+        activateDataEnvironment(PRODUCTION_ENVIRONMENT.current);
+        setEnvironment(PRODUCTION_ENVIRONMENT);
+        setError("");
+        setReady(true);
+        setLoading(false);
+        return PRODUCTION_ENVIRONMENT;
       }
-      setError("");
-      setReady(true);
-      return next;
-    } catch (loadError) {
-      setError(loadError?.message || "数据环境读取失败，请重试。");
-      throw loadError;
-    } finally {
-      setLoading(false);
-    }
+      setLoading(true);
+      try {
+        const next = normalizeEnvironment(await loadDataEnvironment());
+        activateDataEnvironment(next.current);
+        setEnvironment(next);
+        if (next.display.activeJobId) {
+          loadDisplayRefresh(next.display.activeJobId)
+            .then(payload => setRefreshJob(payload.job || null))
+            .catch(() => setRefreshJob(null));
+        } else {
+          setRefreshJob(null);
+        }
+        setError("");
+        setReady(true);
+        return next;
+      } catch (loadError) {
+        setError(loadError?.message || "数据环境读取失败，请重试。");
+        throw loadError;
+      } finally {
+        setLoading(false);
+      }
+    })();
+    refreshPromiseRef.current = refreshPromise;
+    const clearRefreshPromise = () => {
+      if (refreshPromiseRef.current === refreshPromise) refreshPromiseRef.current = null;
+    };
+    refreshPromise.then(clearRefreshPromise, clearRefreshPromise);
+    return refreshPromise;
   }, [user?.role]);
 
   useEffect(() => {

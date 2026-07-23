@@ -27,7 +27,7 @@ function displayStatusText(display) {
 function formattedTime(value) {
   if (!value) return "尚无成功更新时间";
   const date = new Date(value);
-  return Number.isNaN(date.getTime())
+  return Number.isNaN(date.getTime()) || date.getTime() <= 0
     ? "尚无成功更新时间"
     : `最近更新 ${date.toLocaleString("zh-CN", { hour12: false })}`;
 }
