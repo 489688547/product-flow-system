@@ -6,6 +6,7 @@ import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { loadErpArchives } from "../../state/erpCollectionApi.js";
 import { loadWebCollectionStatus, triggerKuaimaiSalesCollection } from "../../state/webCollectionApi.js";
 import { buildKuaimaiSalesRecovery } from "../../domain/dataSyncRecovery.js";
+import { buildDataSyncRunRows } from "../../domain/dataSyncRunRows.js";
 import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapters.js";
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
@@ -69,6 +70,11 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
     loading: webCollectionLoading,
     error: webCollectionError
   }), [salesAnomaly?.date, webCollection.jobs, webCollection.runners, webCollectionError, webCollectionLoading]);
+  const syncRunRows = useMemo(() => buildDataSyncRunRows({
+    legacyRuns: state.syncRuns,
+    jobs: webCollection.jobs,
+    runs: webCollection.runs
+  }), [state.syncRuns, webCollection.jobs, webCollection.runs]);
   useEffect(() => {
     if (focusTarget !== "kuaimai-sales" || salesAnomaly?.status !== "anomaly") return;
     const frame = requestAnimationFrame(() => {
@@ -139,10 +145,10 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
       { key: "time", header: "执行时间", render: row => row.completedAt || row.startedAt || "—" },
       { key: "source", header: "数据源", render: row => row.sourceName || row.sourceId || "未知来源" },
       { key: "range", header: "数据范围", render: row => [row.from, row.to].filter(Boolean).join(" 至 ") || "—" },
-      { key: "rows", header: "行数", className: "num", render: row => row.rowCount || 0 },
+      { key: "rows", header: "行数", className: "num", render: row => row.rowCount === null || row.rowCount === undefined ? "—" : row.rowCount },
       { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : row.status === "running" ? "warning" : "danger"}`}>{statusLabel(row.status)}</span> },
       { key: "message", header: "结果", render: row => row.message || "—" }
-    ]} rows={state.syncRuns} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} /></section>
+    ]} rows={syncRunRows} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} /></section>
     <section className="section-panel"><div className="section-head"><div><h2>待处理数据问题</h2><p>同步产生的缺失、重复、延迟和映射异常在这里闭环。</p></div></div><DataTable minWidth={680} columns={[
       { key: "title", header: "问题", render: row => row.title || row.message || "未命名问题" },
       { key: "type", header: "类型", render: row => row.type || "数据校验" },

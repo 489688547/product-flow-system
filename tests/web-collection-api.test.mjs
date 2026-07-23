@@ -181,6 +181,29 @@ test("claim lease, legal transitions, completion and cursor are atomic from the 
   assert.equal(completed.response.status, 200);
   assert.equal(completed.body.data.job.status, "success");
   assert.equal(db.tables.web_collection_cursors.get("kuaimai:orders").business_date, "2026-07-21");
+
+  const status = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    db,
+    session: executive
+  });
+  assert.equal(status.response.status, 200);
+  assert.equal(status.body.data.runs.length, 1);
+  assert.deepEqual(status.body.data.runs[0], {
+    id: completed.body.data.runId,
+    jobId,
+    runnerId: registration.body.data.id,
+    attempt: 1,
+    status: "success",
+    stage: "ingesting",
+    batchId: "batch-1",
+    archiveId: "archive-1",
+    rowCount: 42,
+    errorCode: null,
+    errorSummary: null,
+    startedAt: status.body.data.jobs[0].startedAt,
+    completedAt: status.body.data.jobs[0].completedAt,
+    createdAt: status.body.data.jobs[0].completedAt
+  });
 });
 
 test("failed task does not advance cursor and notification dedupe is durable", async () => {
@@ -202,6 +225,10 @@ test("failed task does not advance cursor and notification dedupe is durable", a
   });
   assert.equal(failed.response.status, 200);
   assert.equal(db.tables.web_collection_cursors.size, 0);
+  assert.equal(db.tables.web_collection_runs.size, 1);
+  const failedRun = [...db.tables.web_collection_runs.values()][0];
+  assert.equal(failedRun.status, "failed");
+  assert.equal(failedRun.error_code, "LOGIN_REQUIRED");
 
   const notification = { action: "record_notification", jobId, kind: "failure", dedupeKey: "2026-07-22:kuaimai:inventory:LOGIN_REQUIRED:opening", result: "sent" };
   const first = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", { method: "POST", db, token, body: notification });
@@ -253,6 +280,19 @@ test("authorized operator triggers the registered rich Kuaimai sales report", as
   assert.equal(result.response.status, 200);
   assert.equal(result.body.data.job.resourceType, "sales_items");
   assert.equal(result.body.data.job.idempotencyKey, "kuaimai:sales_items:2026-07-22:v3:env:production:v1");
+});
+
+test("authorized operator triggers the repaired Kuaimai orders schedule", async () => {
+  const db = createWebCollectionD1Mock();
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    body: { action: "trigger", providerId: "kuaimai", resourceType: "orders", businessDate: "2026-07-22" }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.job.idempotencyKey, "kuaimai:orders:2026-07-22:v2:env:production:v1");
 });
 
 test("manual confirmation requeues a Kuaimai job after login is restored", async () => {

@@ -228,7 +228,7 @@ export async function ingestErpCollection(controlDb, input, {
       input.archive,
       archiveId,
       batchId,
-      input.batch.status === "completed" ? "processed" : "processing",
+      input.batch.status === "pending" ? "processing" : "processed",
       now
     )] : []),
     ...changedRecords.map(record => recordStatement(controlDb, record, input.batch.resourceType, batchId, now)),
