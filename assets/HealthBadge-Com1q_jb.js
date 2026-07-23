@@ -1,0 +1,1 @@
+import{j as e}from"./react-vendor-CgER1fZB.js";import{at as t}from"./index-svmxita5.js";function m({health:r="normal",suffix:s=""}){const a=t[r]||t.normal;return e.jsxs("span",{className:`health-badge ${a.tone}`,children:[e.jsx("i",{"aria-hidden":"true"}),a.label,s]})}export{m as H};
