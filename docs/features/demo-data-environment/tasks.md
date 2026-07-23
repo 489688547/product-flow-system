@@ -156,26 +156,26 @@
 - [x] 新增展示数据环境 ADR
 - [x] 清除治理检查全部临时 allowlist
 - [x] 逐条审计所有 `PRODUCT_FLOW_DB` 和 `DEMO_FLOW_DB` 引用
-- [ ] 运行 `npm run lint`
-- [ ] 运行 `npm run check:governance`
-- [ ] 运行 `npm run check:integrations`
-- [ ] 运行 `npm run check:environment-capabilities`
-- [ ] 运行 `npm test`
-- [ ] 运行 `npm run build`
-- [ ] 运行 branch-base、Cloudflare Pages 兼容和专项测试
-- [ ] 本地沙箱验证不触远程 D1/Provider
-- [ ] 本地线上验证前证明 HEAD 包含 `origin/main`
+- [x] 运行 `npm run lint`
+- [x] 运行 `npm run check:governance`
+- [x] 运行 `npm run check:integrations`
+- [x] 运行 `npm run check:environment-capabilities`
+- [x] 运行 `npm test`
+- [x] 运行 `npm run build`
+- [x] 运行 branch-base、Cloudflare Pages 兼容和专项测试
+- [x] 本地沙箱验证不触远程 D1/Provider
+- [x] 本地线上验证前证明 HEAD 包含 `origin/main`
 - [ ] 本地线上验证正式/展示切换和真实采集
-- [ ] 对两个 D1 应用正确迁移
+- [x] 对两个 D1 应用正确迁移
 - [ ] 运行双 binding readiness
-- [ ] 使用 `npm run release:pages` 发布
+- [x] 使用 `npm run release:pages` 生成发布包
 - [ ] 验证 Git deployment 与当前 Wrangler CLI
 - [ ] 完成 Preview、Production 和钉钉 WebView 验收
 - [ ] 首次刷新展示数据库并记录校验摘要
 - [ ] 验证销售两倍、比例不变、外部写未触 Provider、AI 双库
-- [ ] 合并前再次包含最新 main 并重跑全部门禁
-- [ ] 只暂存和提交本功能文件
-- [ ] 提交 `docs: govern display data environment`
+- [x] 合并前再次包含最新 main 并重跑全部门禁
+- [x] 只暂存和提交本功能文件
+- [x] 提交 `docs: govern display data environment`
 
 ## 完成证据
 
@@ -183,6 +183,6 @@
 - [ ] 记录销售来源/展示总计与比例不变量
 - [ ] 记录展示环境模拟动作的 Provider 零调用测试
 - [ ] 记录 AI 控制库/业务库测试
-- [ ] 记录六项仓库门禁输出
+- [x] 记录六项仓库门禁输出
 - [ ] 记录四条运行验证通道结果
 - [ ] 记录部署提交、Pages 部署和最高权限账号验收结果
