@@ -6,25 +6,25 @@
 
 ## 0. 开始前
 
-- [ ] 新实施分支包含最新 `origin/main`
-- [ ] 记录当前工作区已有未提交修改，避免覆盖或误提交
-- [ ] 运行 `npm run check:branch-base`
-- [ ] PR 预先声明五项 Integration Impact
-- [ ] PR 预先声明 Rule Writeback
+- [x] 新实施分支包含最新 `origin/main`
+- [x] 记录当前工作区已有未提交修改，避免覆盖或误提交
+- [x] 运行 `npm run check:branch-base`
+- [x] PR 预先声明五项 Integration Impact
+- [x] PR 预先声明 Rule Writeback
 
 ## 1. 数据库、迁移与环境合同
 
-- [ ] 先增加双 D1 和迁移失败测试
-- [ ] 创建 `0011_demo_data_environment.sql`
-- [ ] 创建环境授权、展示状态、刷新任务和环境审计表
-- [ ] 为异步采集控制表增加目标环境和版本
-- [ ] 使用 Wrangler 创建真实 `DEMO_FLOW_DB`
-- [ ] 在根、Preview、Production 配置双 D1
-- [ ] 确认正式与展示数据库 ID 不同
-- [ ] 扩展环境能力清单为 binding 级检查
-- [ ] 重新生成环境能力模块
-- [ ] 通过迁移、环境能力、Pages parity 和 readiness 测试
-- [ ] 提交 `feat: register display database environment`
+- [x] 先增加双 D1 和迁移失败测试
+- [x] 创建 `0011_demo_data_environment.sql`
+- [x] 创建环境授权、展示状态、刷新任务和环境审计表
+- [x] 为异步采集控制表增加目标环境和版本
+- [x] 使用 Wrangler 创建真实 `DEMO_FLOW_DB`
+- [x] 在根、Preview、Production 配置双 D1
+- [x] 确认正式与展示数据库 ID 不同
+- [x] 扩展环境能力清单为 binding 级检查
+- [x] 重新生成环境能力模块
+- [x] 通过迁移、环境能力、Pages parity 和 readiness 测试
+- [x] 提交 `feat: register display database environment`
 
 ## 2. 数据环境控制面与 API
 

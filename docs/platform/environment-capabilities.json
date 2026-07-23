@@ -14,6 +14,31 @@
       "tables": ["product_flow_state", "product_flow_state_parts"]
     },
     {
+      "id": "display-data-environment",
+      "name": "展示数据库环境",
+      "description": "正式控制库保存浏览器级环境授权和刷新任务，独立展示 D1 保存可切换业务数据；两套绑定必须同时就绪且物理隔离。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"],
+      "tables": [],
+      "bindingTables": {
+        "PRODUCT_FLOW_DB": [
+          "data_environment_grants",
+          "demo_data_environment_state",
+          "demo_data_refresh_jobs",
+          "data_environment_audit"
+        ],
+        "DEMO_FLOW_DB": [
+          "product_flow_state",
+          "product_flow_state_parts",
+          "product_sales_daily",
+          "product_sales_meta"
+        ]
+      }
+    },
+    {
       "id": "dingtalk-core",
       "name": "钉钉登录与组织能力",
       "description": "登录、组织通讯录及钉钉服务端适配所需的应用配置。",

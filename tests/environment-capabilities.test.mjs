@@ -70,6 +70,24 @@ test("Pages declares explicit local Preview and Production D1 environment parity
   assert.equal(existsSync(resolve(root, "scripts/check-pages-environment-parity.mjs")), true);
 });
 
+test("display data environment declares separate control and business D1 requirements", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const capability = manifest.capabilities.find(entry => entry.id === "display-data-environment");
+
+  assert.ok(capability, "display data environment capability must be declared");
+  assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"]);
+  assert.deepEqual(capability.bindingTables.PRODUCT_FLOW_DB, [
+    "data_environment_grants",
+    "demo_data_environment_state",
+    "demo_data_refresh_jobs",
+    "data_environment_audit"
+  ]);
+  assert.equal(capability.bindingTables.DEMO_FLOW_DB.includes("product_flow_state"), true);
+  assert.equal(capability.bindingTables.DEMO_FLOW_DB.includes("product_sales_daily"), true);
+  assert.equal(capability.bindingTables.DEMO_FLOW_DB.includes("platform_credentials"), false);
+  assert.equal(existsSync(resolve(root, "migrations/0011_demo_data_environment.sql")), true);
+});
+
 test("company AI declares one governed capability without the retired OpenAI review", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "company-ai-assistant");

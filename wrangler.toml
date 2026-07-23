@@ -11,6 +11,12 @@ database_name = "product-flow-system"
 database_id = "64389843-2c2f-4781-862d-48fe27caa012"
 remote = true
 
+[[d1_databases]]
+binding = "DEMO_FLOW_DB"
+database_name = "product-flow-system-display"
+database_id = "700a0679-eaf2-43ab-a50f-ff952503d338"
+remote = true
+
 [env.preview.vars]
 LOCAL_ONLINE_ACCOUNT_MODE = "1"
 
@@ -20,6 +26,12 @@ database_name = "product-flow-system"
 database_id = "64389843-2c2f-4781-862d-48fe27caa012"
 remote = true
 
+[[env.preview.d1_databases]]
+binding = "DEMO_FLOW_DB"
+database_name = "product-flow-system-display"
+database_id = "700a0679-eaf2-43ab-a50f-ff952503d338"
+remote = true
+
 [env.production.vars]
 LOCAL_ONLINE_ACCOUNT_MODE = "1"
 
@@ -27,4 +39,10 @@ LOCAL_ONLINE_ACCOUNT_MODE = "1"
 binding = "PRODUCT_FLOW_DB"
 database_name = "product-flow-system"
 database_id = "64389843-2c2f-4781-862d-48fe27caa012"
+remote = true
+
+[[env.production.d1_databases]]
+binding = "DEMO_FLOW_DB"
+database_name = "product-flow-system-display"
+database_id = "700a0679-eaf2-43ab-a50f-ff952503d338"
 remote = true
