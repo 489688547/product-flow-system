@@ -176,6 +176,7 @@
 - [x] 合并前再次包含最新 main 并重跑全部门禁
 - [x] 只暂存和提交本功能文件
 - [x] 提交 `docs: govern display data environment`
+- [x] PR 声明完整列出集成影响和规则写回文件
 
 ## 完成证据
 
