@@ -71,8 +71,7 @@ function TodoRow({ todo, busy, onOpen, onToggle, onSync }) {
       : "";
   return (
     <article
-      className={`personal-todo-row ${done ? "is-done" : ""}`}
-      style={{ borderLeft: `3px solid ${highPriority ? "var(--danger)" : "transparent"}` }}
+      className={`personal-todo-row ${done ? "is-done" : ""}${highPriority ? " is-priority" : ""}`}
     >
       <button className="personal-todo-check" type="button" onClick={onToggle} disabled={busy} aria-label={done ? `重新打开：${todo.title}` : `标记完成：${todo.title}`}>
         {done ? <Check size={15} aria-hidden="true" /> : <Circle size={16} aria-hidden="true" />}
