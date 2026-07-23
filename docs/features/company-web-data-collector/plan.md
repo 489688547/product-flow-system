@@ -283,21 +283,41 @@ Expected: PASS。
 - Modify: `docs/platform/data-acquisition.md`
 - Modify: `.agents/skills/kuaimai-erp-data-collection/SKILL.md`
 
-- [ ] **Step 1: 写下载中心失败测试**
+- [x] **Step 1: 写下载中心失败测试**
 
 覆盖固定下载中心入口、订单与订单明细文件名前缀互斥、当前任务时间窗口、生成中、生成失败、完成行选择，以及扩展不能把下载中心路径或选择器交给远端任务。
 
-- [ ] **Step 2: 运行测试并确认 RED**
+adapter 新增并由 content script 消费以下固定接口：
+
+```js
+export const KUAIMAI_DOWNLOAD_CENTER_ROUTE = "/index.html#/index/download_center/";
+export const KUAIMAI_DOWNLOAD_CENTER_SELECTORS = Object.freeze({
+  row: ".m-data-item",
+  exportTime: ".exportTime",
+  content: ".content",
+  status: ".schedule",
+  refresh: ".j-search",
+  download: ".J-download"
+});
+
+export function selectKuaimaiDownloadRow({ resourceType, startedAt, rows }) {
+  // 返回 { state: "ready"|"pending"|"failed"|"missing", rowIndex, errorCode? }
+}
+```
+
+`buildKuaimaiActionPlan(task)` 在已有导出动作后追加 `{ action: "download_from_center", resourceType }`。content script 在点击导出前记录 `exportStartedAt`，执行该动作时只解析固定行字段，并在 `ready` 时点击同一行固定下载控件。
+
+- [x] **Step 2: 运行测试并确认 RED**
 
 Run: `node --test tests/kuaimai-extension-adapter.test.mjs tests/chrome-collector-extension.test.mjs`
 
 Expected: FAIL，因为 adapter 只会在订单页点击导出并等待直接下载。
 
-- [ ] **Step 3: 实现最小异步下载流程**
+- [x] **Step 3: 实现最小异步下载流程**
 
 点击订单页官方导出后导航到代码登记的下载中心；最多等待三分钟，每轮用固定查询控件刷新并解析安全任务元数据。只选择当前任务窗口内、资源类型匹配且状态为“导出完成”的最近任务行，然后点击该行固定下载控件。明确失败和等待超时使用不同安全错误码。
 
-- [ ] **Step 4: 运行定向测试并确认 GREEN**
+- [x] **Step 4: 运行定向测试并确认 GREEN**
 
 Run: `node --test tests/kuaimai-extension-adapter.test.mjs tests/chrome-collector-extension.test.mjs tests/web-data-collector-runtime.test.mjs tests/web-data-collector-download.test.mjs`
 

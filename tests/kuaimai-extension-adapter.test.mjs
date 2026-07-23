@@ -43,7 +43,8 @@ test("Kuaimai orders use order creation time and yesterday full Shanghai day", a
     { action: "set_end_time", value: "2026-07-21 23:59:59" },
     { action: "submit_query" },
     { action: "wait_for_results" },
-    { action: "export_orders" }
+    { action: "export_orders" },
+    { action: "download_from_center", resourceType: "orders" }
   ]);
 });
 
@@ -55,7 +56,7 @@ test("Kuaimai control matcher tolerates the live leading icon without confusing 
 });
 
 test("Kuaimai order item task uses the registered detail export", async () => {
-  const { buildKuaimaiActionPlan } = await import(adapterUrl);
+  const { buildKuaimaiActionPlan, kuaimaiResources } = await import(adapterUrl);
   const plan = buildKuaimaiActionPlan({
     jobId: "job-2",
     providerId: "kuaimai",
@@ -63,5 +64,89 @@ test("Kuaimai order item task uses the registered detail export", async () => {
     businessDate: "2026-07-21"
   });
 
-  assert.equal(plan.at(-1).action, "export_order_items");
+  assert.equal(plan.at(-2).action, "export_order_items");
+  assert.deepEqual(plan.at(-1), { action: "download_from_center", resourceType: "order_items" });
+  assert.deepEqual(kuaimaiResources.orders.downloadFilePrefixes, ["快麦ERP交易订单导出"]);
+  assert.deepEqual(kuaimaiResources.order_items.downloadFilePrefixes, ["快麦ERP交易订单明细导出"]);
+});
+
+test("Kuaimai download center selects only the current task resource and time window", async () => {
+  const {
+    KUAIMAI_DOWNLOAD_CENTER_ROUTE,
+    KUAIMAI_DOWNLOAD_CENTER_SELECTORS,
+    selectKuaimaiDownloadRow
+  } = await import(adapterUrl);
+  const startedAt = Date.parse("2026-07-23T07:07:25.000Z");
+  const rows = [
+    {
+      exportTime: "2026-07-23 15:07:39",
+      content: "快麦ERP交易订单明细导出20260723150745_269021_3tS1kT.xlsx",
+      status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-23 15:07:36",
+      content: "快麦ERP交易订单导出20260723150742_269021_ab12Cd.xlsx",
+      status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-22 20:52:55",
+      content: "快麦ERP交易订单明细导出20260722205305_269021_W4k3pA.xlsx",
+      status: "导出完成"
+    }
+  ];
+
+  assert.equal(KUAIMAI_DOWNLOAD_CENTER_ROUTE, "/index.html#/index/download_center/");
+  assert.deepEqual(KUAIMAI_DOWNLOAD_CENTER_SELECTORS, {
+    row: ".m-data-item",
+    exportTime: ".exportTime",
+    content: ".content",
+    status: ".schedule",
+    refresh: ".j-search",
+    download: ".J-download"
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "order_items", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 0
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "orders", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 1
+  });
+});
+
+test("Kuaimai download center distinguishes pending, failed and missing exports", async () => {
+  const { selectKuaimaiDownloadRow } = await import(adapterUrl);
+  const startedAt = Date.parse("2026-07-23T07:07:25.000Z");
+
+  assert.deepEqual(selectKuaimaiDownloadRow({
+    resourceType: "order_items",
+    startedAt,
+    rows: [{
+      exportTime: "2026-07-23 15:07:39",
+      content: "快麦ERP交易订单明细导出20260723150745_269021_3tS1kT.xlsx",
+      status: "生成中"
+    }]
+  }), { state: "pending", rowIndex: 0 });
+  assert.deepEqual(selectKuaimaiDownloadRow({
+    resourceType: "order_items",
+    startedAt,
+    rows: [{
+      exportTime: "2026-07-23 15:07:39",
+      content: "快麦ERP交易订单明细导出20260723150745_269021_3tS1kT.xlsx",
+      status: "失败"
+    }]
+  }), {
+    state: "failed",
+    rowIndex: 0,
+    errorCode: "KUAIMAI_EXPORT_GENERATION_FAILED"
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({
+    resourceType: "order_items",
+    startedAt,
+    rows: [{
+      exportTime: "2026-07-23 15:06:50",
+      content: "快麦ERP交易订单明细导出20260723150655_269021_W4k3pA.xlsx",
+      status: "导出完成"
+    }]
+  }), { state: "missing", rowIndex: null });
 });
