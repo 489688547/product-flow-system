@@ -38,6 +38,19 @@ test("extension source never evaluates remote code or accepts remote selectors",
   assert.doesNotMatch(source, /chrome\.cookies/);
 });
 
+test("Kuaimai async exports are completed through the bundled download center adapter", async () => {
+  const contentScript = await readFile(new URL("content-script.js", extensionRoot), "utf8");
+  const adapter = await readFile(new URL("providers/kuaimai.js", extensionRoot), "utf8");
+
+  assert.match(adapter, /KUAIMAI_DOWNLOAD_CENTER_ROUTE/);
+  assert.match(adapter, /selectKuaimaiDownloadRow/);
+  assert.match(contentScript, /download_from_center/);
+  assert.match(contentScript, /waitForKuaimaiOrderPage/);
+  assert.match(contentScript, /KUAIMAI_DOWNLOAD_CENTER_TIMEOUT/);
+  assert.match(await readFile(new URL("service-worker.js", extensionRoot), "utf8"), /downloadFilePrefixes/);
+  assert.doesNotMatch(contentScript, /task\.(downloadCenter|selector|route|url)/);
+});
+
 test("extension task contract only allows registered provider resources", async () => {
   const { assertRegisteredTask, registeredResource } = await import(new URL("providers/registry.js", extensionRoot));
 

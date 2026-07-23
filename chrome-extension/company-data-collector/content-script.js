@@ -2,6 +2,9 @@ const registryPromise = import(chrome.runtime.getURL("providers/registry.js"));
 const kuaimaiPromise = import(chrome.runtime.getURL("providers/kuaimai.js"));
 
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
+const KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS = 15_000;
+const KUAIMAI_DOWNLOAD_CENTER_TIMEOUT_MS = 180_000;
+const KUAIMAI_DOWNLOAD_CENTER_POLL_MS = 2_500;
 
 function exactTextElement(selector, value, matchesText) {
   return Array.from(document.querySelectorAll(selector)).find(element =>
@@ -35,6 +38,12 @@ function findRequired(selector, code) {
   return element;
 }
 
+function findRequiredTextElement(selector, value, matchesText, code) {
+  const element = exactTextElement(selector, value, matchesText);
+  if (!element) throw Object.assign(new Error("页面控件不可用。"), { code });
+  return element;
+}
+
 async function pageProbe(selectors, matchesText) {
   const bodyText = String(document.body?.innerText || "");
   const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
@@ -53,7 +62,68 @@ async function pageProbe(selectors, matchesText) {
   };
 }
 
-async function runKuaimaiAction(action, selectors, matchesText) {
+async function waitForKuaimaiOrderPage(provider, selectors, matchesText) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  let classification;
+  do {
+    classification = provider.classifyPage(await pageProbe(selectors, matchesText));
+    if (["ready", "waiting_login", "waiting_human", "blocked_origin"].includes(classification.state)) {
+      return classification;
+    }
+    await wait(250);
+  } while (Date.now() < deadline);
+  return classification;
+}
+
+function readDownloadCenterRows(selectors) {
+  return Array.from(document.querySelectorAll(selectors.row)).map(row => ({
+    exportTime: row.querySelector(selectors.exportTime)?.textContent || "",
+    content: row.querySelector(selectors.content)?.textContent || "",
+    status: row.querySelector(selectors.status)?.textContent || ""
+  }));
+}
+
+async function downloadFromKuaimaiCenter({
+  resourceType,
+  exportStartedAt,
+  route,
+  selectors,
+  selectRow
+}) {
+  const downloadCenterUrl = new URL(route, location.origin).href;
+  if (location.href !== downloadCenterUrl) {
+    location.assign(downloadCenterUrl);
+    await wait(500);
+  }
+
+  const deadline = Date.now() + KUAIMAI_DOWNLOAD_CENTER_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const selection = selectRow({
+      resourceType,
+      startedAt: exportStartedAt,
+      rows: readDownloadCenterRows(selectors)
+    });
+    if (selection.state === "failed") {
+      throw Object.assign(new Error("快麦导出生成失败。"), { code: selection.errorCode });
+    }
+    if (selection.state === "ready") {
+      const row = document.querySelectorAll(selectors.row)[selection.rowIndex];
+      const download = row?.querySelector(selectors.download);
+      if (!download) {
+        throw Object.assign(new Error("快麦下载控件不可用。"), { code: "KUAIMAI_DOWNLOAD_BUTTON_MISSING" });
+      }
+      download.click();
+      return;
+    }
+
+    const refresh = document.querySelector(selectors.refresh);
+    if (refresh?.getClientRects().length > 0) refresh.click();
+    await wait(KUAIMAI_DOWNLOAD_CENTER_POLL_MS);
+  }
+  throw Object.assign(new Error("快麦下载中心等待超时。"), { code: "KUAIMAI_DOWNLOAD_CENTER_TIMEOUT" });
+}
+
+async function runKuaimaiAction(action, selectors, matchesText, context) {
   switch (action.action) {
     case "select_time_basis": {
       const input = findRequired(selectors.timeBasis, "KUAIMAI_TIME_BASIS_MISSING");
@@ -109,7 +179,27 @@ async function runKuaimaiAction(action, selectors, matchesText) {
       await wait(300);
       const button = exactTextElement(selectors.exportConfirmButton, "立即导出", matchesText);
       if (!button) throw Object.assign(new Error("立即导出按钮不可用。"), { code: "KUAIMAI_EXPORT_CONFIRM_MISSING" });
+      context.exportStartedAt = Date.now();
       button.click();
+      await wait(800);
+      return;
+    }
+    case "download_from_center": {
+      if (!Number.isFinite(context.exportStartedAt)) {
+        throw Object.assign(new Error("快麦导出任务缺少开始时间。"), { code: "KUAIMAI_EXPORT_START_MISSING" });
+      }
+      const {
+        KUAIMAI_DOWNLOAD_CENTER_ROUTE,
+        KUAIMAI_DOWNLOAD_CENTER_SELECTORS,
+        selectKuaimaiDownloadRow
+      } = context.kuaimai;
+      await downloadFromKuaimaiCenter({
+        resourceType: action.resourceType,
+        exportStartedAt: context.exportStartedAt,
+        route: KUAIMAI_DOWNLOAD_CENTER_ROUTE,
+        selectors: KUAIMAI_DOWNLOAD_CENTER_SELECTORS,
+        selectRow: selectKuaimaiDownloadRow
+      });
       return;
     }
     default:
@@ -118,12 +208,17 @@ async function runKuaimaiAction(action, selectors, matchesText) {
 }
 
 async function runRegisteredTask(task) {
-  const [{ registeredTaskRuntime }, { KUAIMAI_SELECTORS, matchesKuaimaiControlText }] = await Promise.all([registryPromise, kuaimaiPromise]);
+  const [{ registeredTaskRuntime }, kuaimai] = await Promise.all([registryPromise, kuaimaiPromise]);
+  const { KUAIMAI_SELECTORS, matchesKuaimaiControlText } = kuaimai;
   const runtime = registeredTaskRuntime(task);
   if (runtime.provider.id !== "kuaimai") {
     return { status: "failed", stage: "opening", errorCode: "EXTENSION_PROVIDER_NOT_IMPLEMENTED" };
   }
-  const classification = runtime.provider.classifyPage(await pageProbe(KUAIMAI_SELECTORS, matchesKuaimaiControlText));
+  const classification = await waitForKuaimaiOrderPage(
+    runtime.provider,
+    KUAIMAI_SELECTORS,
+    matchesKuaimaiControlText
+  );
   if (classification.state !== "ready") {
     return {
       status: classification.state,
@@ -132,7 +227,10 @@ async function runRegisteredTask(task) {
     };
   }
   try {
-    for (const action of runtime.actionPlan) await runKuaimaiAction(action, KUAIMAI_SELECTORS, matchesKuaimaiControlText);
+    const context = { exportStartedAt: null, kuaimai };
+    for (const action of runtime.actionPlan) {
+      await runKuaimaiAction(action, KUAIMAI_SELECTORS, matchesKuaimaiControlText, context);
+    }
     return { status: "exporting", stage: "exporting" };
   } catch (error) {
     return {

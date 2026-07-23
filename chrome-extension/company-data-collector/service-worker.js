@@ -9,6 +9,13 @@ function safeBaseName(value) {
   return String(value || "").split(/[\\/]/).pop();
 }
 
+function matchesRegisteredDownload(resource, item) {
+  const fileName = safeBaseName(item?.filename);
+  const normalized = fileName.toLowerCase();
+  return resource.downloadExtensions.some(extension => normalized.endsWith(extension))
+    && resource.downloadFilePrefixes.some(prefix => fileName.startsWith(prefix));
+}
+
 async function bridgeConfiguration() {
   const stored = await chrome.storage.local.get(["bridgeUrl", "pairingKey"]);
   return {
@@ -73,7 +80,7 @@ async function ensureProviderTab(resource) {
 
 async function findRecentDownload(resource, startedAt) {
   const downloads = await chrome.downloads.search({ startedAfter: new Date(startedAt - 1000).toISOString(), limit: 20 });
-  return downloads.find(item => resource.downloadExtensions.some(extension => safeBaseName(item.filename).toLowerCase().endsWith(extension)));
+  return downloads.find(item => matchesRegisteredDownload(resource, item));
 }
 
 async function waitForDownload(resource, startedAt) {
@@ -85,7 +92,7 @@ async function waitForDownload(resource, startedAt) {
         resolve(null);
       }, 30000);
       const listener = item => {
-        if (resource.downloadExtensions.some(extension => safeBaseName(item.filename).toLowerCase().endsWith(extension))) {
+        if (matchesRegisteredDownload(resource, item)) {
           clearTimeout(timeout);
           chrome.downloads.onCreated.removeListener(listener);
           resolve(item);
