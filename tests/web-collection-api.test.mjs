@@ -252,7 +252,7 @@ test("authorized operator triggers the registered rich Kuaimai sales report", as
 
   assert.equal(result.response.status, 200);
   assert.equal(result.body.data.job.resourceType, "sales_items");
-  assert.equal(result.body.data.job.idempotencyKey, "kuaimai:sales_items:2026-07-22:v2:env:production:v1");
+  assert.equal(result.body.data.job.idempotencyKey, "kuaimai:sales_items:2026-07-22:v3:env:production:v1");
 });
 
 test("manual confirmation requeues a Kuaimai job after login is restored", async () => {
@@ -292,6 +292,43 @@ test("manual confirmation requeues a Kuaimai job after login is restored", async
   assert.equal(retriggered.body.data.job.status, "queued");
   assert.equal(retriggered.body.data.job.runnerId, null);
   assert.equal(retriggered.body.data.job.errorCode, null);
+});
+
+test("ensure plan automatically requeues an eligible transient failure without changing its identity", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const token = registration.body.data.token;
+  const job = {
+    providerId: "kuaimai",
+    resourceType: "orders",
+    businessDate: "2026-07-22",
+    rangeKind: "daily_fact",
+    range: { start: "2026-07-22T00:00:00+08:00", end: "2026-07-22T23:59:59+08:00", timeZone: "Asia/Shanghai" },
+    scheduleVersion: "v1",
+    idempotencyKey: "kuaimai:orders:2026-07-22:v1"
+  };
+  const first = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "ensure_plan", jobs: [job] }
+  });
+  const stored = db.tables.web_collection_jobs.get(first.body.data.jobs[0].id);
+  Object.assign(stored, {
+    status: "failed",
+    stage: "downloading",
+    attempt: 1,
+    runner_id: registration.body.data.id,
+    error_code: "EXTENSION_DOWNLOAD_TIMEOUT",
+    updated_at: new Date(Date.now() - 6 * 60 * 1000).toISOString()
+  });
+
+  const retried = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "ensure_plan", jobs: [job] }
+  });
+  assert.equal(retried.response.status, 200);
+  assert.equal(retried.body.data.created, 0);
+  assert.equal(retried.body.data.jobs[0].id, stored.id);
+  assert.equal(retried.body.data.jobs[0].status, "queued");
+  assert.equal(retried.body.data.jobs[0].attempt, 1);
+  assert.equal(retried.body.data.jobs[0].errorCode, null);
 });
 
 test("Kuaimai Chrome trigger rejects missing sessions, readonly users and unregistered resources", async () => {

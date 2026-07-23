@@ -26,6 +26,31 @@ const TRANSITIONS = Object.freeze({
   schema_changed: new Set(["queued"])
 });
 
+const RETRYABLE_ERROR_CODES = new Set([
+  "EXTENSION_DOWNLOAD_TIMEOUT",
+  "KUAIMAI_DOWNLOAD_CENTER_TIMEOUT",
+  "KUAIMAI_EXPORT_GENERATION_FAILED",
+  "WEB_COLLECTION_API_FAILED",
+  "WEB_COLLECTION_EXTENSION_FAILED",
+  "WEB_COLLECTION_LOCAL_PROCESSING_FAILED"
+]);
+const RETRY_DELAYS_MINUTES = Object.freeze([5, 15]);
+
+export function webCollectionRetryDecision(job, { now = new Date() } = {}) {
+  const attempt = Number(job?.attempt || 0);
+  if (job?.status !== "failed" || attempt < 1 || attempt >= 3 || !RETRYABLE_ERROR_CODES.has(String(job?.errorCode || ""))) {
+    return { retry: false, delayMinutes: null };
+  }
+  const delayMinutes = RETRY_DELAYS_MINUTES[attempt - 1];
+  const failedAt = Date.parse(String(job?.updatedAt || ""));
+  const current = now instanceof Date ? now.valueOf() : Date.parse(String(now || ""));
+  if (!Number.isFinite(failedAt) || !Number.isFinite(current)) return { retry: false, delayMinutes };
+  return {
+    retry: current - failedAt >= delayMinutes * 60 * 1000,
+    delayMinutes
+  };
+}
+
 function dateParts(value, timeZone) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) throw new Error("采集计划时间无效。");

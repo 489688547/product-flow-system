@@ -86,7 +86,11 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
     setTriggerMessage("");
     setTriggerError("");
     try {
-      const result = await triggerKuaimaiSalesCollection({ date: salesAnomaly.date, force: true });
+      const result = await triggerKuaimaiSalesCollection({
+        date: salesAnomaly.date,
+        resourceType: salesRecovery.job?.resourceType || "order_items",
+        force: true
+      });
       setTriggerMessage(result.requeued
         ? "采集任务已重新排队，Chrome 插件将在下一轮轮询时领取。"
         : "采集任务已在队列中，Chrome 插件将在下一轮轮询时领取。");

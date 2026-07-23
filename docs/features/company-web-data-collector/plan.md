@@ -428,3 +428,41 @@ npm run collect:web -- preflight --base-url <production-origin>
 - [ ] **Step 6: 更新任务清单与完成证据**
 
 逐项勾选 `tasks.md`，记录本地测试、D1/Pages 和真实网页三条证据。未完成真实登录或某资源导出验收时必须保留为未完成，不得把代码通过宣称为数据已自动入库。
+
+---
+
+## Task 7: 失败任务自动恢复与按资源人工兜底
+
+**Files:**
+- Modify: `src/domain/webCollection.js`
+- Modify: `functions/api/platform/v1/web-collection/_shared/storage.js`
+- Modify: `scripts/web-data-collector/providers/index.mjs`
+- Modify: `src/state/webCollectionApi.js`
+- Modify: `src/features/data-center/DataGovernanceWorkspaces.jsx`
+- Modify: `tests/web-collection-schedule.test.mjs`
+- Modify: `tests/web-collection-api.test.mjs`
+- Modify: `react-tests/data-sync-recovery.test.mjs`
+
+- [x] **Step 1: 写自动恢复和按资源重试失败测试**
+
+覆盖瞬时下载错误在 5/15 分钟退避后重新排队、第三次失败不再自动重试、`waiting_human/schema_changed` 不自动循环、`sales_items` 适配器新版本生成新任务，以及前端把当前失败任务的 `resourceType` 传给触发接口。
+
+- [x] **Step 2: 运行定向测试并确认失败**
+
+Run: `node --test tests/web-collection-schedule.test.mjs tests/web-collection-api.test.mjs react-tests/data-sync-recovery.test.mjs`
+
+Expected: FAIL，因为当前控制面不会自动重排失败任务，销售主题仍使用旧计划版本，前端仍写死 `order_items`。
+
+- [x] **Step 3: 实现最小恢复策略**
+
+在纯领域层返回确定性的重试决策；`ensure_plan` 仅对允许的瞬时错误、未超过 3 次且退避已到期的原任务执行 `failed -> queued`。`sales_items` 提升计划版本，前端触发函数接受已登记资源类型，服务端继续执行既有会话权限和资源白名单校验。
+
+- [x] **Step 4: 运行定向测试并确认通过**
+
+Run: `node --test tests/web-collection-schedule.test.mjs tests/web-collection-api.test.mjs react-tests/data-sync-recovery.test.mjs`
+
+Expected: PASS。
+
+- [ ] **Step 5: 完成生产验收**
+
+合并后更新公司 Mac 的 LaunchAgent 与未打包扩展，确认 2026-07-22 `orders` 的下载超时任务自动重试、`sales_items` 新版本任务自动创建；核对本机原始归档、D1 批次与事实、游标和数据同步记录，只有三条资源均成功才勾选完成。
