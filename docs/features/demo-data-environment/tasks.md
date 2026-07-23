@@ -121,18 +121,18 @@
 
 ## 8. 展示环境外部写模拟
 
-- [ ] 先增加展示不调用 Provider、正式调用 Provider 测试
-- [ ] 实现共享 external action mode
-- [ ] 实现展示外部动作 adapter
-- [ ] 模拟 ID 稳定且与成功响应合同兼容
-- [ ] 模拟结果只写展示业务库
-- [ ] 无秘密审计写正式控制库
-- [ ] 钉钉待办创建/同步接入共享模拟器
-- [ ] 钉钉日历创建接入共享模拟器
-- [ ] 钉钉审批/协同写动作接入共享模拟器
-- [ ] 真实读取动作保持 Provider 路径
-- [ ] 更新集成注册表并重新生成
-- [ ] 提交 `feat: simulate external writes in display mode`
+- [x] 先增加展示不调用 Provider、正式调用 Provider 测试
+- [x] 实现共享 external action mode
+- [x] 实现展示外部动作 adapter
+- [x] 模拟 ID 稳定且与成功响应合同兼容
+- [x] 模拟结果只写展示业务库
+- [x] 无秘密审计写正式控制库
+- [x] 钉钉待办创建/同步接入共享模拟器
+- [x] 钉钉日历创建接入共享模拟器
+- [x] 钉钉审批/协同写动作接入共享模拟器
+- [x] 真实读取动作保持 Provider 路径
+- [x] 更新集成注册表并重新生成
+- [x] 提交 `feat: simulate external writes in display mode`
 
 ## 9. AI 控制面与业务面拆分
 

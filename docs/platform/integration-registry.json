@@ -1,23 +1,23 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-22",
+  "updatedAt": "2026-07-23",
   "platforms": [
     {
       "id": "dingtalk",
       "name": "钉钉开放平台",
       "status": "connected",
       "summary": "承载登录、组织通讯录、待办、群聊、日历、文档、供应链文件快照和钉钉内嵌工作台能力。",
-      "capabilities": ["身份登录", "组织通讯录", "待办任务", "群聊与成员", "日历", "文档读取", "采购与付款审批同步", "供应链文件快照", "内嵌工作台", "平台连接配置"],
-      "businessQuestions": ["登录或免登失败", "找不到人员或部门", "待办未创建或未同步", "本地如何执行真实待办与日历动作", "群成员选择异常", "供应链文件快照未导入", "钉钉 WebView 行为异常"],
+      "capabilities": ["身份登录", "组织通讯录", "待办任务", "群聊与成员", "日历", "文档读取", "采购与付款审批同步", "供应链文件快照", "内嵌工作台", "平台连接配置", "展示环境外部写模拟"],
+      "businessQuestions": ["登录或免登失败", "找不到人员或部门", "待办未创建或未同步", "本地如何执行真实待办与日历动作", "展示数据库为什么不发送真实钉钉动作", "群成员选择异常", "供应链文件快照未导入", "钉钉 WebView 行为异常"],
       "keywords": ["钉钉", "DingTalk", "免登", "待办", "通讯录", "群聊", "开放平台"],
-      "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "functions/api/supply-chain/approvals/sync.js", "functions/api/platform/v1/collaboration-items/**/dingtalk.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs", "server.mjs"],
+      "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "functions/api/supply-chain/approvals/sync.js", "functions/api/platform/v1/collaboration-items/**/dingtalk.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/_shared/externalActionMode.js", "functions/api/platform/_shared/displayExternalActionAdapter.js", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs", "server.mjs"],
       "envVars": ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET", "DINGTALK_CORP_ID", "DINGTALK_TOKEN_ENCRYPTION_KEY"],
       "domains": ["open.dingtalk.com", "api.dingtalk.com", "oapi.dingtalk.com"],
       "apiRoutes": ["/api/dingtalk/", "/api/auth/dingtalk/", "/api/supply-chain/approvals/sync", "/api/platform/v1/collaboration-items/:id/dingtalk", "/api/platform/v1/platform-connections"],
       "publicDocs": [
         { "label": "钉钉开放平台能力中心", "url": "https://open.dingtalk.com/" }
       ],
-      "evidence": ["functions/api/dingtalk/", "functions/api/auth/dingtalk/", "functions/api/supply-chain/approvals/sync.js", "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs"],
+      "evidence": ["functions/api/dingtalk/", "functions/api/auth/dingtalk/", "functions/api/supply-chain/approvals/sync.js", "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/_shared/externalActionMode.js", "functions/api/platform/_shared/displayExternalActionAdapter.js", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "stores-session-and-org-data", "description": "登录会话、用户令牌与组织同步结果使用 D1 持久化。" },
         { "platformId": "cloudflare-pages", "type": "hosts-callbacks", "description": "Pages Functions 承载登录回调和开放平台 API 适配器。" }
