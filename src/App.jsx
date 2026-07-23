@@ -152,6 +152,17 @@ function resolveScreen(screen) {
   return resolvedDataScreen === "performance-management" ? "performance-overview" : resolvedDataScreen;
 }
 
+const SIDEBAR_EXPANDED_GROUPS_KEY = "sidebar-expanded-groups:v1";
+
+function readStoredExpandedGroups() {
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(SIDEBAR_EXPANDED_GROUPS_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed.filter(item => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 function routeFromHash() {
   const route = parseAppHash(window.location.hash);
   if (route.screen === "data-connections") {
@@ -193,19 +204,23 @@ export default function App() {
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
   const screenAllowed = visibleScreenKeys.has(screen) || screen === "ai-assistant" || (screen === "packages" && visibleScreenKeys.has("archive"));
   const activeScreen = screenAllowed ? screen : defaultScreen;
-  const [expandedAppGroup, setExpandedAppGroup] = useState(() => expandedGroupForScreen(visibleNavigation, activeScreen));
+  const [expandedAppGroups, setExpandedAppGroups] = useState(() => {
+    const stored = readStoredExpandedGroups();
+    const group = expandedGroupForScreen(visibleNavigation, activeScreen);
+    return group && !stored.includes(group) ? [...stored, group] : stored;
+  });
   const sidebarNavigationGroups = useMemo(() => groupSidebarNavigation(visibleNavigation), [visibleNavigation]);
   const accountMeta = [currentUser?.department, currentUser?.title].filter(Boolean).join(" / ") || "组织信息待同步";
   const accountName = currentUser?.name || "未登录";
   useEffect(() => {
-    setExpandedAppGroup(expandedGroupForScreen(visibleNavigation, activeScreen));
+    const group = expandedGroupForScreen(visibleNavigation, activeScreen);
+    if (group) setExpandedAppGroups(current => current.includes(group) ? current : [...current, group]);
   }, [activeScreen, visibleNavigation]);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      document.querySelector(".sidebar nav button.active")?.scrollIntoView({ block: "nearest" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [activeScreen, expandedAppGroup]);
+    try {
+      window.localStorage.setItem(SIDEBAR_EXPANDED_GROUPS_KEY, JSON.stringify(expandedAppGroups));
+    } catch { /* 隐私模式等写入失败时仅保留会话内状态 */ }
+  }, [expandedAppGroups]);
   useEffect(() => {
     if (!accountMenuOpen) return undefined;
     const close = event => {
@@ -286,7 +301,7 @@ export default function App() {
         <div className="brand"><span>{hasCompanyAccess ? "企" : "P"}</span><div><strong>{hasCompanyAccess ? "经营执行平台" : "产品全周期"}</strong><small>{hasCompanyAccess ? "战略与业务协同" : "流程协同系统"}</small></div></div>
         <nav aria-label="主导航">
           {sidebarNavigationGroups.map((group, groupIndex) => {
-            const isExpanded = expandedAppGroup === group.label;
+            const isExpanded = expandedAppGroups.includes(group.label);
             const groupId = `sidebar-group-${groupIndex}`;
             return (
               <div className={`sidebar-app-group${group.collapsible ? " collapsible" : ""}${isExpanded ? " expanded" : ""}`} key={group.label}>
@@ -297,7 +312,7 @@ export default function App() {
                     aria-expanded={isExpanded}
                     aria-controls={groupId}
                     aria-label={`${isExpanded ? "收起" : "展开"}${group.label}`}
-                    onClick={() => setExpandedAppGroup(current => current === group.label ? "" : group.label)}
+                    onClick={() => setExpandedAppGroups(current => current.includes(group.label) ? current.filter(label => label !== group.label) : [...current, group.label])}
                   >
                     <span>{group.label}</span>
                     <ChevronDown size={15} aria-hidden="true" />
