@@ -191,8 +191,8 @@ test("dashboard uses aligned section headers plus reusable product thumbnails in
   assert.match(styles, /\.panel-title\s*\{[\s\S]*display: flex;[\s\S]*align-items: center;/);
   assert.match(styles, /\.product-thumb\s*\{[\s\S]*width: 40px;[\s\S]*height: 40px;/);
   assert.match(styles, /\.task-row, \.risk-row\s*\{[\s\S]*width: 100%;/);
-  assert.match(styles, /\.task-row\s*\{[\s\S]*grid-template-columns: 40px minmax\(0, 1fr\);/);
-  assert.match(styles, /\.task-row\s*\{[\s\S]*min-height: 54px;[\s\S]*border-radius: 0;/);
+  assert.match(styles, /\.task-row\s*\{[\s\S]*grid-template-columns: 30px minmax\(0, 1fr\);/);
+  assert.match(styles, /\.task-row\s*\{[\s\S]*min-height: 48px;[\s\S]*border-radius: 0;/);
   assert.match(styles, /\.task-row:hover\s*\{[\s\S]*background: var\(--surface-subtle\);/);
   assert.doesNotMatch(styles, /\.task-row:hover, \.risk-row:hover\s*\{[\s\S]*background: var\(--primary-soft\);/);
   assert.match(styles, /\.dashboard-grid\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
