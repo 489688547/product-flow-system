@@ -272,6 +272,41 @@ Run: `node --test tests/kuaimai-web-collector.test.mjs tests/kuaimai-erp-collect
 
 Expected: PASS。
 
+### Task 4.1: 修复快麦异步下载中心交接
+
+**Files:**
+- Modify: `chrome-extension/company-data-collector/providers/kuaimai.js`
+- Modify: `chrome-extension/company-data-collector/content-script.js`
+- Modify: `chrome-extension/company-data-collector/service-worker.js`
+- Modify: `tests/kuaimai-extension-adapter.test.mjs`
+- Modify: `tests/chrome-collector-extension.test.mjs`
+- Modify: `docs/platform/data-acquisition.md`
+- Modify: `.agents/skills/kuaimai-erp-data-collection/SKILL.md`
+
+- [ ] **Step 1: 写下载中心失败测试**
+
+覆盖固定下载中心入口、订单与订单明细文件名前缀互斥、当前任务时间窗口、生成中、生成失败、完成行选择，以及扩展不能把下载中心路径或选择器交给远端任务。
+
+- [ ] **Step 2: 运行测试并确认 RED**
+
+Run: `node --test tests/kuaimai-extension-adapter.test.mjs tests/chrome-collector-extension.test.mjs`
+
+Expected: FAIL，因为 adapter 只会在订单页点击导出并等待直接下载。
+
+- [ ] **Step 3: 实现最小异步下载流程**
+
+点击订单页官方导出后导航到代码登记的下载中心；最多等待三分钟，每轮用固定查询控件刷新并解析安全任务元数据。只选择当前任务窗口内、资源类型匹配且状态为“导出完成”的最近任务行，然后点击该行固定下载控件。明确失败和等待超时使用不同安全错误码。
+
+- [ ] **Step 4: 运行定向测试并确认 GREEN**
+
+Run: `node --test tests/kuaimai-extension-adapter.test.mjs tests/chrome-collector-extension.test.mjs tests/web-data-collector-runtime.test.mjs tests/web-data-collector-download.test.mjs`
+
+Expected: PASS。
+
+- [ ] **Step 5: 更新本机扩展并真实回归**
+
+合并并部署后，把公司 Chrome 加载的未打包扩展更新到已合并版本并点击“重新加载”。重新触发 2026-07-22 的 `orders` 与 `order_items`，核对下载中心只下载当前任务文件、本机归档成功、D1 任务进入 `success`、游标推进到 2026-07-22，最后刷新数据同步页面。
+
 ---
 
 ## Task 5: 让“数据同步”展示真实任务、设备和恢复动作
