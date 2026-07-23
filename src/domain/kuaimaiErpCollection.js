@@ -1,6 +1,7 @@
 export const KUAIMAI_ERP_RESOURCE_TYPES = Object.freeze([
   "orders",
   "order_items",
+  "sales_items",
   "products",
   "skus",
   "inventory_snapshot",
@@ -14,23 +15,36 @@ export const KUAIMAI_ERP_RESOURCE_TYPES = Object.freeze([
 ]);
 
 const RESOURCE_TYPES = new Set(KUAIMAI_ERP_RESOURCE_TYPES);
-const EVENT_TIME_REQUIRED = new Set(["orders", "order_items", "inventory_movements", "purchase_orders", "aftersales", "finance"]);
+const EVENT_TIME_REQUIRED = new Set(["orders", "order_items", "sales_items", "inventory_movements", "purchase_orders", "aftersales", "finance"]);
 const HASH_PATTERN = /^[a-f0-9]{64}$/i;
 const SECRET_KEY_PATTERN = /^(password|passwd|pwd|cookie|cookies|access_?token|refresh_?token|verification_?code|raw_?html)$/i;
-const PERSONAL_DATA_KEY_PATTERN = /^(收件人|收件姓名|收货人|收货姓名|手机号|手机号码|联系电话|联系手机|电话|收件地址|收货地址|详细地址|街道地址|快递单号|物流单号|退回快递单号|买家旺旺|买家昵称|买家姓名|买家ID|买家留言|系统备注|卖家备注|买家备注|身份证|身份证号|证件号)$/i;
+const PERSONAL_DATA_KEY_PATTERN = /^(收件人|收件姓名|收货人|收货姓名|手机|手机号|手机号码|联系电话|联系手机|电话|固话|座机|省|市|区|县|街道|收件地址|收货地址|详细地址|街道地址|详细地址\(包含省市区\)|购方地址|快递单号|物流单号|运单号|退回快递单号|邮箱|电子邮箱|email|买家旺旺|买家昵称|买家姓名|买家ID|买家留言|系统备注|卖家备注|买家备注|身份证|身份证号|证件号)$/i;
 const MAX_CHUNK_SIZE = 500;
 const INDEX_FIELDS = Object.freeze({
   sourceOrderId: ["sourceOrderId", "系统订单号", "系统单号", "订单编号", "订单号", "交易号"],
   sourceItemId: ["sourceItemId", "订单明细ID", "明细ID", "子订单号"],
   productCode: ["productCode", "主商家编码", "商品编码"],
   skuCode: ["skuCode", "规格商家编码", "商家编码", "规格编码", "SKU编码"],
-  barcode: ["barcode", "69码", "条码"],
+  barcode: ["barcode", "69码", "规格条形码", "商品条形码", "条码", "条形码"],
   productName: ["productName", "商品名称"],
   skuName: ["skuName", "规格名称", "商品规格"],
-  quantity: ["quantity", "数量", "销售数量", "库存数量", "可用库存", "变动数量", "采购数量", "退款数量"],
+  quantity: ["quantity", "数量", "净销量", "销售数量", "库存数量", "可用库存", "变动数量", "采购数量", "退款数量"],
+  netQuantity: ["netQuantity", "净销量"],
+  grossQuantity: ["grossQuantity", "销售数量"],
+  returnQuantity: ["returnQuantity", "退货数量"],
   amount: ["amount", "金额", "实发金额", "付款金额", "采购金额", "退款金额"],
+  paidAmount: ["paidAmount", "商品买家已付金额", "订单买家已付金额", "买家已付金额"],
+  grossSales: ["grossSales", "销售金额"],
+  netSales: ["netSales", "净销售额"],
+  salesCost: ["salesCost", "销售成本"],
+  returnCost: ["returnCost", "退货成本"],
+  netCost: ["netCost", "净销售成本"],
+  refundAmount: ["refundAmount", "退款金额", "退款"],
+  grossProfit: ["grossProfit", "净销售毛利", "净毛利"],
+  preShipRefundRate: ["preShipRefundRate", "发货前退款率"],
+  postShipRefundRate: ["postShipRefundRate", "发货后退款率"],
   status: ["status", "订单状态", "商品状态", "采购状态", "售后状态"],
-  platform: ["platform", "平台", "来源平台"],
+  platform: ["platform", "所属平台", "平台", "来源平台"],
   shopName: ["shopName", "店铺名称", "店铺"],
   warehouseName: ["warehouseName", "仓库名称", "仓库"],
   supplierCode: ["supplierCode", "供应商编号", "供应商编码"],

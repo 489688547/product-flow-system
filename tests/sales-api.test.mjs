@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { onRequest } from "../functions/api/sales.js";
+import { onRequest, replaceSalesFactsForDates } from "../functions/api/sales.js";
 
 function createDb() {
   const batchSizes = [];
   const batches = [];
+  const runs = [];
   const prepare = sql => ({
     sql,
     bindings: [],
@@ -14,6 +15,7 @@ function createDb() {
       return this;
     },
     async run() {
+      runs.push(this);
       return { success: true };
     },
     async first() {
@@ -26,6 +28,7 @@ function createDb() {
   return {
     batchSizes,
     batches,
+    runs,
     prepare,
     async batch(statements) {
       batchSizes.push(statements.length);
@@ -34,6 +37,29 @@ function createDb() {
     }
   };
 }
+
+test("ERP sales projection replaces only completed business dates", async () => {
+  const db = createDb();
+  const result = await replaceSalesFactsForDates(db, [{
+    code: "6978705011208",
+    date: "2026-07-22",
+    platform: "抖店(放心购)",
+    qty: 2,
+    sales: 39.8,
+    netSales: 35.8,
+    grossProfit: 19.8,
+    refund: 4,
+    cost: 16
+  }], { importedAt: "2026-07-23T05:10:00.000Z" });
+
+  assert.deepEqual(result.dates, ["2026-07-22"]);
+  assert.equal(result.rows, 1);
+  assert.equal(db.runs.some(statement =>
+    /DELETE FROM product_sales_daily WHERE date = \?/.test(statement.sql)
+    && statement.bindings[0] === "2026-07-22"
+  ), true);
+  assert.equal(db.batches.flat().some(statement => /INSERT INTO product_sales_daily/.test(statement.sql)), true);
+});
 
 test("sales import batches a full month without dozens of D1 round trips", async () => {
   const db = createDb();

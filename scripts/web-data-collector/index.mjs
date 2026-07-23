@@ -61,14 +61,28 @@ async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
   };
 }
 
+export function assertBusinessDateMatchesRange({ businessDate, rangeStart, rangeEnd } = {}) {
+  const expected = String(businessDate || "").trim();
+  const actualStart = String(rangeStart || "").slice(0, 10);
+  const actualEnd = String(rangeEnd || "").slice(0, 10);
+  if (!expected || actualStart !== expected || actualEnd !== expected) {
+    const error = new Error("下载文件的业务日期与采集任务不一致。");
+    error.code = "WEB_COLLECTION_BUSINESS_DATE_MISMATCH";
+    throw error;
+  }
+}
+
 async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
   const erpToken = await readErpCollectorToken();
-  return async ({ jobId, fileName, resourceType, onValidated }) => {
+  return async ({ jobId, fileName, resourceType, businessDate, onValidated }) => {
     const filePath = await resolveSafeDownload({ directory: downloadsDirectory, fileName });
     const archived = await archiveExistingFile(filePath, {
       root,
       resourceType,
-      onValidated,
+      onValidated: async validation => {
+        assertBusinessDateMatchesRange({ businessDate, ...validation });
+        await onValidated?.(validation);
+      },
       upload: collection => uploadErpCollection(collection, {
         baseUrl,
         headers: {

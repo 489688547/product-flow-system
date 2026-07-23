@@ -87,7 +87,7 @@ function validRow(row) {
   return row && typeof row === "object" && /^69\d{10,12}$/.test(String(row.code || "")) && /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || ""));
 }
 
-async function insertRows(db, rows) {
+export async function insertSalesRows(db, rows) {
   const statements = [];
   for (let index = 0; index < rows.length; index += INSERT_CHUNK) {
     const chunk = rows.slice(index, index + INSERT_CHUNK);
@@ -113,6 +113,48 @@ async function insertRows(db, rows) {
     return;
   }
   for (const statement of statements) await statement.run();
+}
+
+export async function replaceSalesFactsForDates(db, rows, {
+  source = "快麦销售主题报表",
+  importedBy = "公司网页采集器",
+  importedAt = new Date().toISOString()
+} = {}) {
+  await ensureSalesTables(db);
+  const validRows = (Array.isArray(rows) ? rows : []).filter(validRow);
+  if (!validRows.length) {
+    const error = new Error("销售明细没有可写入的 69 码事实。");
+    error.code = "ERP_COLLECTION_SALES_FACTS_EMPTY";
+    error.status = 422;
+    throw error;
+  }
+  const dates = [...new Set(validRows.map(row => String(row.date)))].sort();
+  for (const day of dates) {
+    await db.prepare("DELETE FROM product_sales_daily WHERE date = ?").bind(day).run();
+  }
+  await insertSalesRows(db, validRows);
+  const meta = await readMeta(db);
+  const months = [...new Set(dates.map(day => day.slice(0, 7)))].sort();
+  const monthRows = {};
+  validRows.forEach(row => {
+    const month = String(row.date).slice(0, 7);
+    monthRows[month] = (monthRows[month] || 0) + 1;
+  });
+  meta.imports = [
+    {
+      id: `import-${Date.parse(importedAt) || Date.now()}`,
+      months,
+      monthRows,
+      rows: validRows.length,
+      scope: "dates",
+      source: String(source || "").slice(0, 120),
+      importedBy: String(importedBy || "").slice(0, 80),
+      importedAt
+    },
+    ...meta.imports.filter(item => item.scope === "months" || !item.months?.some(month => months.includes(month)))
+  ].slice(0, 60);
+  await writeMeta(db, meta);
+  return { rows: validRows.length, dates, months, importedAt };
 }
 
 function mapDbRow(row) {
@@ -178,7 +220,7 @@ export async function onRequest({ request, env, data = {} }) {
           await db.prepare("DELETE FROM product_sales_daily WHERE substr(date, 1, 7) = ?").bind(month).run();
         }
       }
-      await insertRows(db, rows);
+      await insertSalesRows(db, rows);
       const meta = await readMeta(db);
       const importedAt = new Date().toISOString();
       meta.titles = { ...meta.titles, ...(body.titles && typeof body.titles === "object" ? body.titles : {}) };

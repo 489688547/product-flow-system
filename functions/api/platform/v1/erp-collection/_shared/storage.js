@@ -1,4 +1,6 @@
 import { projectKuaimaiErpRecords } from "../../../../../../src/domain/kuaimaiErpProjection.js";
+import { scaleSalesFact } from "../../../../../../src/domain/demoSalesTransform.js";
+import { replaceSalesFactsForDates } from "../../../../sales.js";
 import { appendGoodsFlowEvents, saveGoodsFlowExceptions, saveInventoryDaily } from "../../goods-flow/_shared/storage.js";
 import { upsertProductCatalog } from "../../product-catalog/_shared/storage.js";
 
@@ -57,7 +59,7 @@ async function readBatchRecords(db, batchId) {
   }));
 }
 
-async function projectCompletedBatch(controlDb, businessDb, resourceType, batchId, actor, now) {
+async function projectCompletedBatch(controlDb, businessDb, resourceType, batchId, actor, now, target) {
   const records = await readBatchRecords(controlDb, batchId);
   const projection = projectKuaimaiErpRecords(resourceType, records, { batchId, now });
   let catalog = { products: 0, skus: 0 };
@@ -71,6 +73,16 @@ async function projectCompletedBatch(controlDb, businessDb, resourceType, batchI
   }
   if (projection.events.length) await appendGoodsFlowEvents(businessDb, projection.events.map(event => ({ ...event, createdBy: String(actor).slice(0, 120) })));
   if (projection.inventoryDaily.length) await saveInventoryDaily(businessDb, projection.inventoryDaily, now);
+  const salesRows = target?.environmentId === "display"
+    ? projection.salesDaily.map(row => scaleSalesFact(row))
+    : projection.salesDaily;
+  const sales = salesRows.length
+    ? await replaceSalesFactsForDates(businessDb, salesRows, {
+      source: "快麦销售主题分析-按订单商品明细（Chrome 采集）",
+      importedBy: String(actor).slice(0, 80),
+      importedAt: now
+    })
+    : { rows: 0, dates: [] };
   if (projection.exceptions.length) await saveGoodsFlowExceptions(businessDb, projection.exceptions);
   return {
     sourceRecords: records.length,
@@ -78,6 +90,8 @@ async function projectCompletedBatch(controlDb, businessDb, resourceType, batchI
     catalogSkus: catalog.skus || 0,
     goodsFlowEvents: projection.events.length,
     inventoryDaily: projection.inventoryDaily.length,
+    salesRows: sales.rows,
+    salesDates: sales.dates,
     exceptions: projection.exceptions.length
   };
 }
@@ -221,7 +235,7 @@ export async function ingestErpCollection(controlDb, input, {
     ...input.issues.map(issue => issueStatement(controlDb, issue, input.batch.resourceType, batchId, now))
   ]);
   const projection = input.batch.status === "completed"
-    ? await projectCompletedBatch(controlDb, businessDb, input.batch.resourceType, batchId, actor, now)
+    ? await projectCompletedBatch(controlDb, businessDb, input.batch.resourceType, batchId, actor, now, target)
     : null;
   return {
     batchId,

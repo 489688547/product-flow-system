@@ -1,4 +1,8 @@
-import { assertRegisteredTask, registeredResource } from "./providers/registry.js";
+import {
+  assertRegisteredTask,
+  registeredResource,
+  registeredTaskUrl
+} from "./providers/registry.js";
 
 const DEFAULT_BRIDGE_URL = "http://127.0.0.1:17653";
 const POLL_ALARM = "company-data-collector-poll";
@@ -14,6 +18,18 @@ function matchesRegisteredDownload(resource, item) {
   const normalized = fileName.toLowerCase();
   return resource.downloadExtensions.some(extension => normalized.endsWith(extension))
     && resource.downloadFilePrefixes.some(prefix => fileName.startsWith(prefix));
+}
+
+function registeredDirectDownload(resource, value) {
+  try {
+    const url = new URL(String(value || ""));
+    if (!resource.downloadOrigins.includes(url.origin)) return null;
+    const fileName = decodeURIComponent(safeBaseName(url.pathname));
+    if (!matchesRegisteredDownload(resource, { filename: fileName })) return null;
+    return { url: url.href, fileName };
+  } catch {
+    return null;
+  }
 }
 
 async function bridgeConfiguration() {
@@ -39,6 +55,44 @@ async function bridgeFetch(path, options = {}) {
   });
 }
 
+async function waitForTabComplete(tabId) {
+  let tab = await chrome.tabs.get(tabId);
+  if (tab.status === "complete") return tab;
+  await new Promise(resolve => {
+    const listener = (updatedTabId, changeInfo) => {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+    setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    }, 15000);
+  });
+  tab = await chrome.tabs.get(tabId);
+  return tab;
+}
+
+async function probeContentScript(tabId) {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, { type: "COLLECTOR_CONTENT_SCRIPT_PROBE" });
+    return response?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForContentScript(tabId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (await probeContentScript(tabId)) return true;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  return false;
+}
+
 async function reportTaskResult(task, result) {
   const payload = {
     jobId: task.jobId,
@@ -53,26 +107,22 @@ async function reportTaskResult(task, result) {
   if (!response.ok) throw Object.assign(new Error("本机执行器未接受任务结果。"), { code: `BRIDGE_RESULT_HTTP_${response.status}` });
 }
 
-async function ensureProviderTab(resource) {
+async function ensureProviderTab(resource, targetUrl) {
   const matches = await chrome.tabs.query({ url: [`${resource.origin}/*`] });
-  const targetUrl = `${resource.origin}${resource.route}`;
   let tab = matches.find(candidate => candidate.url?.includes(resource.route));
   if (!tab) tab = matches[0];
   if (!tab) tab = await chrome.tabs.create({ url: targetUrl, active: false });
-  else if (!tab.url?.includes(resource.route)) tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
-  if (tab.status !== "complete") {
-    await new Promise(resolve => {
-      const listener = (tabId, changeInfo) => {
-        if (tabId === tab.id && changeInfo.status === "complete") {
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
-        }
-      };
-      chrome.tabs.onUpdated.addListener(listener);
-      setTimeout(() => {
-        chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
-      }, 15000);
+  else if (tab.url !== targetUrl) {
+    tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
+  }
+  tab = await waitForTabComplete(tab.id);
+  if (!await waitForContentScript(tab.id, 500)) {
+    await chrome.tabs.reload(tab.id);
+    tab = await waitForTabComplete(tab.id);
+  }
+  if (!await waitForContentScript(tab.id, 3000)) {
+    throw Object.assign(new Error("页面采集脚本不可用。"), {
+      code: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
     });
   }
   return tab;
@@ -83,8 +133,30 @@ async function findRecentDownload(resource, startedAt) {
   return downloads.find(item => matchesRegisteredDownload(resource, item));
 }
 
-async function waitForDownload(resource, startedAt) {
-  let candidate = await findRecentDownload(resource, startedAt);
+async function startRegisteredDirectDownload(resource, tabId, startedAt) {
+  const deadline = Date.now() + 3000;
+  do {
+    const existing = await findRecentDownload(resource, startedAt);
+    if (existing) return existing;
+    const tab = await chrome.tabs.get(tabId);
+    const direct = registeredDirectDownload(resource, tab.url);
+    if (direct) {
+      const id = await chrome.downloads.download({
+        url: direct.url,
+        filename: direct.fileName,
+        conflictAction: "uniquify",
+        saveAs: false
+      });
+      const [download] = await chrome.downloads.search({ id });
+      return download || null;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  return null;
+}
+
+async function waitForDownload(resource, tabId, startedAt) {
+  let candidate = await startRegisteredDirectDownload(resource, tabId, startedAt);
   if (!candidate) {
     candidate = await new Promise(resolve => {
       const timeout = setTimeout(() => {
@@ -131,8 +203,19 @@ async function waitForDownload(resource, startedAt) {
 async function executeTask(task) {
   assertRegisteredTask(task);
   const resource = registeredResource(task.providerId, task.resourceType);
+  const taskUrl = registeredTaskUrl(task);
   await chrome.storage.local.set({ [ACTIVE_JOB_KEY]: task });
-  const tab = await ensureProviderTab(resource);
+  let tab;
+  try {
+    tab = await ensureProviderTab(resource, taskUrl);
+  } catch (error) {
+    await reportTaskResult(task, {
+      status: "failed",
+      stage: "opening",
+      errorCode: error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
+    });
+    return;
+  }
   const startedAt = Date.now();
   let result;
   try {
@@ -145,7 +228,7 @@ async function executeTask(task) {
     await reportTaskResult(task, result || { status: "failed", stage: "opening", errorCode: "EXTENSION_NO_PAGE_RESPONSE" });
     return;
   }
-  const download = await waitForDownload(resource, startedAt);
+  const download = await waitForDownload(resource, tab.id, startedAt);
   if (!download) {
     await reportTaskResult(task, { status: "failed", stage: "downloading", errorCode: "EXTENSION_DOWNLOAD_TIMEOUT" });
     return;
@@ -175,12 +258,20 @@ async function poll() {
   }
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
+async function ensurePollAlarm() {
+  const alarm = await chrome.alarms.get(POLL_ALARM);
+  if (alarm?.periodInMinutes === 1) return;
   await chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
+}
+
+void ensurePollAlarm();
+
+chrome.runtime.onInstalled.addListener(async () => {
+  await ensurePollAlarm();
   await poll();
 });
 chrome.runtime.onStartup.addListener(async () => {
-  await chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
+  await ensurePollAlarm();
   await poll();
 });
 chrome.alarms.onAlarm.addListener(alarm => {
