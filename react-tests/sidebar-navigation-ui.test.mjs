@@ -4,14 +4,17 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("App renders permission-filtered navigation through accessible accordion groups", () => {
+test("App renders permission-filtered navigation through accessible expandable groups", () => {
   const app = read("src/App.jsx");
   assert.match(app, /groupSidebarNavigation\(visibleNavigation\)/);
   assert.match(app, /expandedGroupForScreen\(visibleNavigation, activeScreen\)/);
   assert.match(app, /className="sidebar-group-toggle"/);
   assert.match(app, /aria-expanded=\{isExpanded\}/);
   assert.match(app, /aria-controls=\{groupId\}/);
-  assert.match(app, /setExpandedAppGroup\(current => current === group\.label \? "" : group\.label\)/);
+  assert.match(app, /setExpandedAppGroups\(current => current\.includes\(group\.label\) \? current\.filter/);
+  assert.match(app, /expandedAppGroups\.includes\(group\.label\)/);
+  assert.match(app, /SIDEBAR_EXPANDED_GROUPS_KEY/);
+  assert.doesNotMatch(app, /current === group\.label \? "" : group\.label/);
   assert.match(app, /group\.items\.map/);
 });
 

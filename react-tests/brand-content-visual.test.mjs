@@ -33,7 +33,9 @@ test("brand content styling stays restrained and does not recreate top navigatio
   assert.doesNotMatch(css, /border-left\s*:\s*[2-9]px/);
 });
 
-test("desktop sidebar can scroll through every business app", async () => {
+test("desktop sidebar flows with the document instead of scrolling internally", async () => {
   const css = await read("src/styles.css");
-  assert.match(css, /\.sidebar nav\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.doesNotMatch(css, /\.sidebar nav\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /\.sidebar \{ min-height: 100dvh;/);
+  assert.doesNotMatch(css, /\.sidebar \{ position: sticky/);
 });
