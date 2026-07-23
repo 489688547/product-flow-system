@@ -2,9 +2,11 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createDefaultBrandContentState, createEmptyBrandContentState, normalizeBrandContentState, reduceBrandContentState } from "../domain/brandContent.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { brandContentApiUrl } from "./brandContentApi.js";
+import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const BrandContentContext = createContext(null);
 const STORAGE_KEY = "brandContentState:v1";
+const localCache = getBrowserStorage("localStorage");
 
 function isLocalPreview() {
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
@@ -12,7 +14,7 @@ function isLocalPreview() {
 
 function loadCachedState() {
   try {
-    const cached = localStorage.getItem(STORAGE_KEY);
+    const cached = tryGetStorageItem(localCache, STORAGE_KEY);
     if (cached) return normalizeBrandContentState(JSON.parse(cached));
   } catch {
     // A malformed local cache falls through to a safe state.
@@ -36,7 +38,7 @@ export function BrandContentProvider({ children }) {
 
   useEffect(() => {
     stateRef.current = state;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    persistLocalState(localCache, STORAGE_KEY, state);
   }, [state]);
 
   const refresh = useCallback(async ({ silent = false } = {}) => {

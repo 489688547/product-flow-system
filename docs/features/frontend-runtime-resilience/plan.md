@@ -16,6 +16,7 @@
 ## 文件职责
 
 - `src/state/resilientLocalStorage.js`：安全存储原语、状态序列化和应用缓存白名单清理。
+- `src/state/applicationRecovery.js`：确认、白名单清理与重新加载的浏览器恢复动作。
 - `src/ui/ApplicationErrorBoundary.jsx`：根级故障边界和恢复动作。
 - `src/main.jsx`：在所有 Provider 外挂载故障边界。
 - `src/state/*Provider.jsx`：移除直接存储写入，调用共享安全边界。

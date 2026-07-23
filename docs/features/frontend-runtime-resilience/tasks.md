@@ -9,7 +9,7 @@
 
 ## 任务
 
-- [ ] 统一安全存储边界
+- [x] 统一安全存储边界
   - 依赖：无。
   - 文件：`src/state/resilientLocalStorage.js`、`react-tests/resilient-local-storage.test.mjs`。
   - 输入：浏览器 Storage 和可序列化业务状态。
@@ -19,7 +19,7 @@
   - 验证：`node --test react-tests/resilient-local-storage.test.mjs`。
   - 提交：`fix(runtime): harden browser cache boundary`。
 
-- [ ] 迁移所有业务 Provider
+- [x] 迁移所有业务 Provider
   - 依赖：统一安全存储边界。
   - 文件：`src/state/AiAssistantProvider.jsx`、`BrandContentProvider.jsx`、`DataCenterProvider.jsx`、`PlatformProvider.jsx`、`ProductFlowProvider.jsx`、`SupplyChainProvider.jsx`、`react-tests/react-app.test.mjs`。
   - 输入：安全存储函数。
@@ -29,7 +29,7 @@
   - 验证：`node --test react-tests/react-app.test.mjs react-tests/resilient-local-storage.test.mjs`。
   - 提交：`fix(runtime): route providers through safe cache`。
 
-- [ ] 增加应用级故障页
+- [x] 增加应用级故障页
   - 依赖：统一安全存储边界。
   - 文件：`src/ui/ApplicationErrorBoundary.jsx`、`src/main.jsx`、`src/styles.css`、`react-tests/application-error-boundary.test.mjs`。
   - 输入：React 子树异常、刷新动作和缓存清理动作。
@@ -39,7 +39,7 @@
   - 验证：`node --test react-tests/application-error-boundary.test.mjs react-tests/react-app.test.mjs`。
   - 提交：`fix(runtime): render recoverable fatal fallback`。
 
-- [ ] 写回平台规则
+- [x] 写回平台规则
   - 依赖：前两项实现。
   - 文件：`DESIGN.md`、`docs/platform/architecture.md`、`docs/platform/integration-registry.json`、`functions/api/platform/_generated/integrationRegistry.js`。
   - 输入：已实现的缓存与故障边界。
