@@ -135,6 +135,70 @@ main { min-width: 0; overflow-x: hidden; }
 .account-menu button { width: 100%; min-height: 40px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; text-align: left; }
 .account-menu button:hover { background: var(--surface-subtle); color: var(--text-primary); }
 
+.fatal-error-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding:
+    max(24px, env(safe-area-inset-top))
+    max(24px, env(safe-area-inset-right))
+    max(24px, env(safe-area-inset-bottom))
+    max(24px, env(safe-area-inset-left));
+  background: var(--canvas);
+}
+.fatal-error-panel {
+  width: min(100%, 560px);
+  padding: 32px;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 24px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-modal);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+.fatal-error-brand {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: var(--text-primary);
+  color: white;
+  font-size: 17px;
+  font-weight: 800;
+}
+.fatal-error-copy { min-width: 0; display: grid; gap: 8px; }
+.fatal-error-copy > span { color: var(--text-tertiary); font-size: 12px; font-weight: 700; }
+.fatal-error-copy h1 { font-size: 24px; }
+.fatal-error-copy p { max-width: 48ch; margin: 0; color: var(--text-secondary); }
+.fatal-error-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fatal-error-actions .btn { min-height: 42px; }
+.fatal-error-panel > small {
+  grid-column: 1 / -1;
+  color: var(--text-tertiary);
+  line-height: 1.55;
+}
+@media (max-width: 640px) {
+  .fatal-error-screen {
+    place-items: stretch;
+    padding:
+      max(16px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      max(16px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+  .fatal-error-panel { align-self: center; padding: 24px; grid-template-columns: 40px minmax(0, 1fr); }
+  .fatal-error-brand { width: 40px; height: 40px; }
+  .fatal-error-actions { align-items: stretch; flex-direction: column; }
+  .fatal-error-actions .btn { width: 100%; }
+}
+
 .auth-screen { min-height: 100dvh; display: grid; place-items: center; padding: 24px; background: var(--canvas); }
 .auth-panel { width: min(100%, 540px); padding: 32px; border: 1px solid var(--border); border-radius: var(--radius-modal); background: var(--surface); display: grid; gap: 28px; }
 .auth-brand { display: flex; align-items: center; gap: 11px; }

@@ -358,7 +358,8 @@ const integrationRegistry = {
         "网页采集任务控制面",
         "用户洞察共享 API",
         "共享数据口径",
-        "销售异常后台修复"
+        "销售异常后台修复",
+        "前端运行时故障恢复"
       ],
       "businessQuestions": [
         "构建或部署失败",
@@ -382,6 +383,9 @@ const integrationRegistry = {
         "functions/api/platform/v1/data-standards/**",
         "functions/api/platform/v1/_shared/dataStandards*.js",
         "src/state/deploymentRecovery.js",
+        "src/state/resilientLocalStorage.js",
+        "src/state/applicationRecovery.js",
+        "src/ui/ApplicationErrorBoundary.jsx",
         "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
         "scripts/check-deployed-readiness.mjs",
@@ -439,6 +443,9 @@ const integrationRegistry = {
         "functions/api/platform/v1/_shared/dataStandardsStorage.js",
         "functions/api/platform/v1/data-services/sales.js",
         "src/state/deploymentRecovery.js",
+        "src/state/resilientLocalStorage.js",
+        "src/ui/ApplicationErrorBoundary.jsx",
+        "docs/features/frontend-runtime-resilience/prd.md",
         "docs/platform/architecture.md",
         "docs/platform/apis/data-services-sales-v1.md",
         "scripts/prepare-pages-build.mjs",

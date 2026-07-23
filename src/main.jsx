@@ -19,6 +19,7 @@ import { installDeploymentRecovery } from "./state/deploymentRecovery.js";
 import { DataEnvironmentProvider } from "./state/DataEnvironmentProvider.jsx";
 import { installDataEnvironmentFetchBoundary } from "./state/dataEnvironmentClient.js";
 import { ProductCatalogProvider } from "./state/ProductCatalogProvider.jsx";
+import { ApplicationErrorBoundary } from "./ui/ApplicationErrorBoundary.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
@@ -68,10 +69,12 @@ installDataEnvironmentFetchBoundary();
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AuthProvider>
-      <AuthGate>
-        <AuthenticatedApp />
-      </AuthGate>
-    </AuthProvider>
+    <ApplicationErrorBoundary>
+      <AuthProvider>
+        <AuthGate>
+          <AuthenticatedApp />
+        </AuthGate>
+      </AuthProvider>
+    </ApplicationErrorBoundary>
   </React.StrictMode>
 );

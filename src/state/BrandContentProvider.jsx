@@ -3,18 +3,20 @@ import { createEmptyBrandContentState, normalizeBrandContentState, reduceBrandCo
 import { useAuth } from "./AuthProvider.jsx";
 import { brandContentApiUrl } from "./brandContentApi.js";
 import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
+import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const BrandContentContext = createContext(null);
 const STORAGE_KEY = "brandContentState:v1";
+const localCache = getBrowserStorage("localStorage");
 
 function localStorageKey() {
-  migrateLegacyProductionCache(localStorage, STORAGE_KEY);
+  migrateLegacyProductionCache(localCache, STORAGE_KEY);
   return environmentStorageKey(STORAGE_KEY);
 }
 
 function loadCachedState() {
   try {
-    const cached = localStorage.getItem(localStorageKey());
+    const cached = tryGetStorageItem(localCache, localStorageKey());
     if (cached) return normalizeBrandContentState(JSON.parse(cached));
   } catch {
     // A malformed local cache falls through to a safe state.
@@ -38,7 +40,7 @@ export function BrandContentProvider({ children }) {
 
   useEffect(() => {
     stateRef.current = state;
-    localStorage.setItem(localStorageKey(), JSON.stringify(state));
+    persistLocalState(localCache, localStorageKey(), state);
   }, [state]);
 
   const refresh = useCallback(async ({ silent = false } = {}) => {

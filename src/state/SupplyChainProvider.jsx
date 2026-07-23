@@ -3,18 +3,20 @@ import { createDefaultSupplyChainState, normalizeSupplyChainState, reduceSupplyC
 import { useAuth } from "./AuthProvider.jsx";
 import { supplyChainApiUrl, syncSupplyApprovalPages } from "./supplyChainApi.js";
 import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
+import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const SupplyChainContext = createContext(null);
 const STORAGE_KEY = "supplyChainState";
+const localCache = getBrowserStorage("localStorage");
 
 function localStorageKey() {
-  migrateLegacyProductionCache(localStorage, STORAGE_KEY);
+  migrateLegacyProductionCache(localCache, STORAGE_KEY);
   return environmentStorageKey(STORAGE_KEY);
 }
 
 function loadLocalState() {
   try {
-    const raw = localStorage.getItem(localStorageKey());
+    const raw = tryGetStorageItem(localCache, localStorageKey());
     return raw ? normalizeSupplyChainState(JSON.parse(raw)) : createDefaultSupplyChainState();
   } catch {
     return createDefaultSupplyChainState();
@@ -48,7 +50,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
         if (active && payload.state) {
           const normalized = normalizeSupplyChainState(payload.state);
           setState(normalized);
-          localStorage.setItem(localStorageKey(), JSON.stringify(normalized));
+          persistLocalState(localCache, localStorageKey(), normalized);
           setError("");
         }
       } catch (loadError) {
@@ -62,7 +64,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
   }, [apiUrl, enabled]);
 
   useEffect(() => {
-    localStorage.setItem(localStorageKey(), JSON.stringify(state));
+    persistLocalState(localCache, localStorageKey(), state);
     if (!enabled) return undefined;
     if (!dirty.current) return undefined;
     const timer = setTimeout(async () => {

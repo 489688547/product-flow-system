@@ -71,10 +71,10 @@
       "name": "Cloudflare Pages",
       "status": "connected",
       "summary": "托管 React 应用与 Pages Functions，并提供生产和预览运行边界。",
-      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "本地线上账号运行", "回滚", "环境就绪检查", "正式与展示业务数据库路由", "生产数据网关", "凭证加密服务", "加密平台连接", "网页采集任务控制面", "用户洞察共享 API", "共享数据口径", "销售异常后台修复"],
+      "capabilities": ["静态站点托管", "Pages Functions", "生产部署", "预览环境", "本地线上账号运行", "回滚", "环境就绪检查", "正式与展示业务数据库路由", "生产数据网关", "凭证加密服务", "加密平台连接", "网页采集任务控制面", "用户洞察共享 API", "共享数据口径", "销售异常后台修复", "前端运行时故障恢复"],
       "businessQuestions": ["构建或部署失败", "生产页面与本地不一致", "Functions 路由异常", "预览环境配置缺失", "测试环境与生产配置漂移", "本地如何使用真实线上账号、数据与外部动作"],
       "keywords": ["Cloudflare", "Pages", "Pages Functions", "部署", "生产环境"],
-      "codePaths": ["functions/**", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/data-standards/**", "functions/api/platform/v1/_shared/dataStandards*.js", "src/state/deploymentRecovery.js", "scripts/prepare-pages-build.mjs", "scripts/prepare-pages-release.mjs", "scripts/check-deployed-readiness.mjs", "cloudflare-entry.html", "404.html", "public/404.html", "_redirects", "wrangler.toml", ".github/workflows/**"],
+      "codePaths": ["functions/**", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/data-standards/**", "functions/api/platform/v1/_shared/dataStandards*.js", "src/state/deploymentRecovery.js", "src/state/resilientLocalStorage.js", "src/state/applicationRecovery.js", "src/ui/ApplicationErrorBoundary.jsx", "scripts/prepare-pages-build.mjs", "scripts/prepare-pages-release.mjs", "scripts/check-deployed-readiness.mjs", "cloudflare-entry.html", "404.html", "public/404.html", "_redirects", "wrangler.toml", ".github/workflows/**"],
       "envVars": ["PLATFORM_CREDENTIAL_MASTER_KEY", "LOCAL_ONLINE_ACCOUNT_MODE", "PRODUCTION_DATA_ACCESS_TOKEN", "AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION", "VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK"],
       "domains": ["pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
       "apiRoutes": ["/api/platform/v1/data-environment", "/api/platform/v1/environment-readiness", "/api/platform/v1/platform-connections", "/api/platform/v1/credential-vault", "/api/platform/v1/data-standards", "/api/platform/v1/data-services/sales", "/api/platform/v1/data-services/sales-repair", "/api/platform/v1/web-collection/jobs", "/api/platform/v1/web-collection/runners", "/api/platform/v1/production-write-session", "/api/platform/v1/production-data/", "/api/platform/v1/user-insights", "/api/platform/v1/user-insights/", "/api/platform/v1/ai/"],
@@ -82,7 +82,7 @@
         { "label": "Cloudflare Pages 文档", "url": "https://developers.cloudflare.com/pages/" },
         { "label": "Pages Functions 文档", "url": "https://developers.cloudflare.com/pages/functions/" }
       ],
-      "evidence": ["functions/", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/_shared/dataStandardsStorage.js", "functions/api/platform/v1/data-services/sales.js", "src/state/deploymentRecovery.js", "docs/platform/architecture.md", "docs/platform/apis/data-services-sales-v1.md", "scripts/prepare-pages-build.mjs", "scripts/prepare-pages-release.mjs", "wrangler.toml"],
+      "evidence": ["functions/", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/v1/_shared/dataStandardsStorage.js", "functions/api/platform/v1/data-services/sales.js", "src/state/deploymentRecovery.js", "src/state/resilientLocalStorage.js", "src/ui/ApplicationErrorBoundary.jsx", "docs/features/frontend-runtime-resilience/prd.md", "docs/platform/architecture.md", "docs/platform/apis/data-services-sales-v1.md", "scripts/prepare-pages-build.mjs", "scripts/prepare-pages-release.mjs", "wrangler.toml"],
       "relations": [
         { "platformId": "cloudflare-d1", "type": "binds", "description": "Pages Functions 通过 PRODUCT_FLOW_DB 控制/正式绑定和独立 DEMO_FLOW_DB 展示业务绑定访问 D1。" }
       ]

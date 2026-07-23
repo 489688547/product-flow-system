@@ -116,10 +116,14 @@ export function environmentStorageKey(baseKey, environmentId = currentDataEnviro
 
 export function migrateLegacyProductionCache(storage, baseKey, environmentId = currentDataEnvironment().id) {
   if (!storage || environmentId !== "production") return false;
-  const targetKey = environmentStorageKey(baseKey, "production");
-  if (storage.getItem(targetKey) !== null) return false;
-  const legacyValue = storage.getItem(baseKey);
-  if (legacyValue === null) return false;
-  storage.setItem(targetKey, legacyValue);
-  return true;
+  try {
+    const targetKey = environmentStorageKey(baseKey, "production");
+    if (storage.getItem(targetKey) !== null) return false;
+    const legacyValue = storage.getItem(baseKey);
+    if (legacyValue === null) return false;
+    storage.setItem(targetKey, legacyValue);
+    return true;
+  } catch {
+    return false;
+  }
 }

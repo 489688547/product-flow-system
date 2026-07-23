@@ -6,21 +6,36 @@ import { useProductFlow } from "./ProductFlowProvider.jsx";
 import { platformApiUrl } from "./platformApi.js";
 import { buildDecisionTodoPayload, buildPersonalTodoPayload } from "../domain/platformNotifications.js";
 import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
+import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const PlatformContext = createContext(null);
 const STORAGE_KEY = "platformExecutionState";
+const localCache = getBrowserStorage("localStorage");
+const GOVERNED_DEMO_COLLECTIONS = ["departmentCommitments", "commitmentMilestones", "incentiveProjects", "departmentRewardBudgets", "monthlyReports"];
+
 function localStorageKey() {
-  migrateLegacyProductionCache(localStorage, STORAGE_KEY);
+  migrateLegacyProductionCache(localCache, STORAGE_KEY);
   return environmentStorageKey(STORAGE_KEY);
 }
 
+function isLocalHost() {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
+
 function normalizeWithLocalDemo(input) {
-  return normalizePlatformState(input);
+  const normalized = normalizePlatformState(input);
+  if (!isLocalHost() || normalized.version === "strategy-platform-v4") return normalized;
+  const demo = createDefaultPlatformState();
+  return {
+    ...normalized,
+    version: "strategy-platform-v4",
+    ...Object.fromEntries(GOVERNED_DEMO_COLLECTIONS.map(key => [key, normalized[key]?.length ? normalized[key] : demo[key]]))
+  };
 }
 
 function loadLocalState() {
   try {
-    const raw = localStorage.getItem(localStorageKey());
+    const raw = tryGetStorageItem(localCache, localStorageKey());
     return raw ? normalizeWithLocalDemo(JSON.parse(raw)) : createDefaultPlatformState();
   } catch {
     return createDefaultPlatformState();
@@ -56,11 +71,11 @@ export function PlatformProvider({ children, enabled = true }) {
         if (alive) {
           const normalized = normalizeWithLocalDemo(payload.state);
           setState(normalized);
-          localStorage.setItem(localStorageKey(), JSON.stringify(normalized));
+          persistLocalState(localCache, localStorageKey(), normalized);
           setError("");
         }
       } catch (loadError) {
-        if (alive) {
+        if (alive && !isLocalHost()) {
           setError(errorMessage(loadError, "战略执行数据加载失败，当前显示本地缓存。"));
         }
       } finally {
@@ -73,7 +88,7 @@ export function PlatformProvider({ children, enabled = true }) {
 
   useEffect(() => {
     if (!enabled) return undefined;
-    localStorage.setItem(localStorageKey(), JSON.stringify(state));
+    persistLocalState(localCache, localStorageKey(), state);
     if (firstSave.current) {
       firstSave.current = false;
       return undefined;

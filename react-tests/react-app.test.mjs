@@ -57,23 +57,40 @@ test("shared state layer uses the same-origin production data proxy during local
   assert.match(store, /persistLocalState/);
   assert.match(sync, /baseUpdatedAt/);
   assert.match(store, /productFlowStateRecoveryBackup/);
-  assert.match(store, /tryRemoveStorageItem\(localStorage, localKey\(DIRTY_STORAGE_KEY\)\)/);
+  assert.match(store, /tryRemoveStorageItem\(localCache, localKey\(DIRTY_STORAGE_KEY\)\)/);
   assert.match(store, /method: "POST"/);
-  assert.match(store, /localStorage\.getItem\(localKey\(STORAGE_KEY\)\)/);
-  assert.doesNotMatch(store, /localStorage\.setItem\(localKey\(STORAGE_KEY\)/);
+  assert.match(store, /tryGetStorageItem\(localCache, localKey\(STORAGE_KEY\)\)/);
+  assert.doesNotMatch(store, /localStorage\.setItem\(STORAGE_KEY/);
   assert.match(store, /sharedError/);
   assert.match(store, /productFlowStateDirty/);
   assert.doesNotMatch(store, /keepalive: true/);
   assert.match(store, /共享数据加载失败，已暂停自动保存，请刷新重试/);
-  assert.match(store, /localStorage\.getItem\(localKey\(DIRTY_STORAGE_KEY\)\)/);
+  assert.match(store, /tryGetStorageItem\(localCache, localKey\(DIRTY_STORAGE_KEY\)\)/);
   assert.match(store, /const commitState = useCallback/);
-  assert.match(store, /persistLocalState\(localStorage, localKey\(STORAGE_KEY\), nextState\)/);
+  assert.match(store, /persistLocalState\(localCache, localKey\(STORAGE_KEY\), nextState\)/);
   assert.match(store, /const updateTask = useCallback[\s\S]*commitState\(current/);
   assert.match(store, /latestState\.current === state/);
   assert.doesNotMatch(store, /if \(localStorage\.getItem\(DIRTY_STORAGE_KEY\) === "1"\) return;/);
   assert.match(store, /fetch\("\/api\/dingtalk\/org\/sync"/);
   assert.match(store, /orgSyncAttempted/);
   assert.match(store, /orgCache: payload\.org/);
+});
+
+test("business providers never write or remove browser storage outside the resilient cache boundary", () => {
+  const providerPaths = [
+    "src/state/AiAssistantProvider.jsx",
+    "src/state/BrandContentProvider.jsx",
+    "src/state/DataCenterProvider.jsx",
+    "src/state/PlatformProvider.jsx",
+    "src/state/ProductFlowProvider.jsx",
+    "src/state/SupplyChainProvider.jsx"
+  ];
+
+  for (const path of providerPaths) {
+    const source = read(path);
+    assert.doesNotMatch(source, /\b(?:localStorage|sessionStorage)\.(?:setItem|removeItem)\(/, path);
+    assert.doesNotMatch(source, /\b(?:localStorage|sessionStorage)\s*[,.)\[]/, path);
+  }
 });
 
 test("new app exposes all core product workflow pages", () => {
@@ -107,8 +124,9 @@ test("supply chain feature has department defaults and an isolated persistence p
   assert.equal(permissions.canAccessSupplyChain({ department: "供应链部" }), true);
   assert.equal(permissions.canAccessSupplyChain({ department: "品牌部" }), false);
   assert.equal(api.supplyChainApiUrl("product-flow-system.pages.dev"), "/api/supply-chain");
-  assert.match(provider, /localStorage\.getItem\(localStorageKey\(\)\)/);
+  assert.match(provider, /tryGetStorageItem\(localCache, localStorageKey\(\)\)/);
   assert.match(provider, /environmentStorageKey/);
+  assert.match(provider, /persistLocalState\(localCache, localStorageKey\(\), state\)/);
   assert.match(provider, /method: "POST"/);
   assert.match(provider, /syncApprovals/);
   assert.match(provider, /if \(!dirty\.current\) return undefined/);
