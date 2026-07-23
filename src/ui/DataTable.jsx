@@ -72,7 +72,7 @@ export function DataTable({
     }
 
     if (!rows.length) {
-      return <tr><td colSpan={columns.length}>{empty}</td></tr>;
+      return <tr className="data-table-empty-row"><td className="data-table-empty" colSpan={columns.length}>{empty}</td></tr>;
     }
 
     return (
