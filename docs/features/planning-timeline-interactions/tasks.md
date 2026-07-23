@@ -9,14 +9,14 @@
 
 ## 任务
 
-- [ ] 日期展示与拖动领域规则
+- [x] 日期展示与拖动领域规则
   - 依赖：无。
   - 文件：`src/domain/productPlanning.js`、`react-tests/product-planning.test.mjs`。
   - 输入：ISO 日期、年度、指针位移和轨道宽度。
   - 输出：日期文案、整数日差、移动或缩放后的日期范围。
   - 失败测试：`node --test react-tests/product-planning.test.mjs`，新增导出不存在。
   - 实现步骤：同月/跨月/跨年文案；像素换算；移动相交约束；端点年度与同日约束。
-  - 验证：定向测试通过。
+  - 验证：`node --test react-tests/product-planning.test.mjs`，9/9 通过。
   - 提交：`feat(planning): add timeline date calculations`。
 
 - [ ] 可拖动时间条交互
