@@ -39,12 +39,18 @@
   - 验证：`node --test react-tests/product-planning.test.mjs react-tests/react-app.test.mjs`，51/51 通过；定向 ESLint 通过。
   - 提交：`feat(planning): connect timeline drag editing`。
 
-- [ ] 浏览器验收与质量门禁
+- [x] 浏览器验收与质量门禁
   - 依赖：页面接线、视觉收口和持久规则。
   - 文件：本任务清单。
   - 输入：本地沙箱页面。
   - 输出：桌面、笔记本、窄 WebView 与键盘验收记录。
   - 失败测试：不适用；以浏览器状态和完整质量门禁为证据。
   - 实现步骤：沙箱启动；交互和视觉验收；全量命令；差异检查。
-  - 验证：`npm run lint`、治理检查、集成检查、环境能力检查、`npm test`、`npm run build` 全部通过。
+  - 浏览器验证：
+    - 1256px 桌面宽度：同月、跨月与短区间日期完整可读，时间线与表格底边连续。
+    - 中部拖动：`2026-07-22—2026-08-25` 移动为 `2026-08-02—2026-09-05`，持续天数保持不变。
+    - 左端拖动：仅开始日期由 `2026-08-02` 调整为 `2026-08-11`；右端拖动：仅结束日期由 `2026-07-28` 调整为 `2026-07-20`。
+    - 键盘：聚焦后 Enter 打开精确编辑弹窗，Escape 关闭；900px 与 390px 宽度下日期、焦点和横向滚动可用。
+    - 浏览器控制台无运行错误；沙箱未向生产环境写入数据。
+  - 命令验证：`node --test react-tests/product-planning.test.mjs react-tests/react-app.test.mjs` 52/52 通过；`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm test`、`npm run build` 全部通过。
   - 提交：`test(planning): verify timeline interactions`。
