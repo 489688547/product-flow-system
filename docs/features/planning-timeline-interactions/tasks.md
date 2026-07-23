@@ -29,14 +29,14 @@
   - 验证：`node --test react-tests/react-app.test.mjs`，42/42 通过。
   - 提交：`feat(planning): add draggable timeline range`。
 
-- [ ] 页面接线、视觉收口和持久规则
+- [x] 页面接线、视觉收口和持久规则
   - 依赖：可拖动时间条交互。
   - 文件：`src/features/planning/AnnualPlanningTimeline.jsx`、`src/features/planning/ProductPlanningPage.jsx`、`src/styles.css`、`react-tests/react-app.test.mjs`、`DESIGN.md`。
   - 输入：时间条日期变更。
   - 输出：现有共享状态的一次规划更新、完整表格边界与稳定交互状态。
   - 失败测试：`node --test react-tests/react-app.test.mjs`，旧接线或旧样式仍存在。
   - 实现步骤：替换旧时间条；接入 `updateProductPlan`；补齐手柄、焦点、触控和表格收口；记录设计规则。
-  - 验证：两个规划定向测试通过。
+  - 验证：`node --test react-tests/product-planning.test.mjs react-tests/react-app.test.mjs`，51/51 通过；定向 ESLint 通过。
   - 提交：`feat(planning): connect timeline drag editing`。
 
 - [ ] 浏览器验收与质量门禁

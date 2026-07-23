@@ -135,6 +135,7 @@ test("annual product planning uses one development-to-launch period and overwrit
   const page = read("src/features/planning/ProductPlanningPage.jsx");
   const tray = read("src/features/planning/PlanningDemandTray.jsx");
   const timeline = read("src/features/planning/AnnualPlanningTimeline.jsx");
+  const rangeBar = read("src/features/planning/PlanningRangeBar.jsx");
   const modal = read("src/features/planning/ProductPlanModal.jsx");
   const button = read("src/ui/Button.jsx");
   const styles = read("src/styles.css");
@@ -158,7 +159,7 @@ test("annual product planning uses one development-to-launch period and overwrit
   assert.match(tray, /\/>安排/);
   assert.doesNotMatch(tray, /需求池产品/);
   assert.match(timeline, /Array\.from\(\{ length: 12 \}/);
-  assert.match(timeline, /timelineSegment/);
+  assert.match(rangeBar, /timelineSegment/);
   assert.match(timeline, /开发至上线/);
   assert.match(timeline, /level-badge/);
   assert.match(timeline, /来源需求已删除/);
@@ -181,6 +182,9 @@ test("annual product planning uses one development-to-launch period and overwrit
 
 test("planning range bar separates precise editing from cancellable pointer dragging", () => {
   const rangeBar = read("src/features/planning/PlanningRangeBar.jsx");
+  const timeline = read("src/features/planning/AnnualPlanningTimeline.jsx");
+  const page = read("src/features/planning/ProductPlanningPage.jsx");
+  const styles = read("src/styles.css");
 
   assert.match(rangeBar, /export function PlanningRangeBar/);
   assert.match(rangeBar, /DRAG_THRESHOLD_PX = 4/);
@@ -197,6 +201,14 @@ test("planning range bar separates precise editing from cancellable pointer drag
   assert.match(rangeBar, /data-range-edge="start"/);
   assert.match(rangeBar, /data-range-edge="end"/);
   assert.match(rangeBar, /onChange\(nextDates\)/);
+  assert.match(timeline, /<PlanningRangeBar/);
+  assert.match(timeline, /onChange=\{dates => onChangePlanDates\(plan\.id, dates\)\}/);
+  assert.match(page, /const changePlanDates = \(planId, dates\) => updateProductPlan\(planId, dates\)/);
+  assert.match(page, /onChangePlanDates=\{changePlanDates\}/);
+  assert.match(styles, /\.planning-range-handle/);
+  assert.match(styles, /touch-action: pan-y/);
+  assert.match(styles, /\.planning-timeline-section \{ overflow: hidden; \}/);
+  assert.doesNotMatch(styles, /\.planning-timeline-row:last-child \{ border-bottom: 0; \}/);
 });
 
 test("dashboard uses aligned section headers plus reusable product thumbnails in task and risk rows", () => {
