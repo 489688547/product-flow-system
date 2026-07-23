@@ -1,23 +1,25 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { createDefaultBrandContentState, createEmptyBrandContentState, normalizeBrandContentState, reduceBrandContentState } from "../domain/brandContent.js";
+import { createEmptyBrandContentState, normalizeBrandContentState, reduceBrandContentState } from "../domain/brandContent.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { brandContentApiUrl } from "./brandContentApi.js";
+import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 
 const BrandContentContext = createContext(null);
 const STORAGE_KEY = "brandContentState:v1";
 
-function isLocalPreview() {
-  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+function localStorageKey() {
+  migrateLegacyProductionCache(localStorage, STORAGE_KEY);
+  return environmentStorageKey(STORAGE_KEY);
 }
 
 function loadCachedState() {
   try {
-    const cached = localStorage.getItem(STORAGE_KEY);
+    const cached = localStorage.getItem(localStorageKey());
     if (cached) return normalizeBrandContentState(JSON.parse(cached));
   } catch {
     // A malformed local cache falls through to a safe state.
   }
-  return isLocalPreview() ? createDefaultBrandContentState() : createEmptyBrandContentState();
+  return createEmptyBrandContentState();
 }
 
 function messageOf(error, fallback) {
@@ -36,15 +38,11 @@ export function BrandContentProvider({ children }) {
 
   useEffect(() => {
     stateRef.current = state;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(localStorageKey(), JSON.stringify(state));
   }, [state]);
 
   const refresh = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
-    if (isLocalPreview()) {
-      setLoading(false);
-      return stateRef.current;
-    }
     try {
       const response = await fetch(apiUrl);
       const payload = await response.json().catch(() => ({}));
@@ -75,13 +73,6 @@ export function BrandContentProvider({ children }) {
     stateRef.current = optimistic;
     setState(current => reduceBrandContentState(current, enrichedAction));
     setError("");
-
-    if (isLocalPreview()) {
-      const local = { ...optimistic, version: Number(previous.version || 0) + 1 };
-      stateRef.current = local;
-      setState(local);
-      return local;
-    }
 
     setSaving(true);
     try {

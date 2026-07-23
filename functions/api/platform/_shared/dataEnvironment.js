@@ -43,6 +43,7 @@ function validGrant(grant, actorId, now = new Date()) {
 }
 
 async function selectedGrant(context) {
+  if (context.data?.session?.role !== "executive") return null;
   const token = environmentCookieToken(context.request);
   if (!token) return null;
   const tokenHash = await hashEnvironmentToken(token);

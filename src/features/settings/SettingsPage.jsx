@@ -6,6 +6,7 @@ import { KuaimaiSyncSettings } from "./KuaimaiSyncSettings.jsx";
 import { PermissionSettings } from "./PermissionSettings.jsx";
 import { SalesDataSettings } from "./SalesDataSettings.jsx";
 import { TaskTemplateSettings } from "./TaskTemplateSettings.jsx";
+import { DataEnvironmentSettings } from "./DataEnvironmentSettings.jsx";
 
 export function SettingsPage() {
   const { state, currentUser, orgCache, updateSettings, updateTaskTemplates } = useProductFlow();
@@ -19,6 +20,7 @@ export function SettingsPage() {
   return (
     <section className="page">
       <PageHeader title="设置" description="按组织架构控制页面可见范围和功能编辑权限。" />
+      <DataEnvironmentSettings />
       {managePermissions ? <PermissionSettings permissions={permissions} orgCache={orgCache} onSave={nextPermissions => updateSettings({ permissions: nextPermissions })} /> : null}
       {viewSalesData ? <KuaimaiSyncSettings canEdit={editSalesData} currentUser={currentUser} /> : null}
       {viewSalesData ? <SalesDataSettings canEdit={editSalesData} currentUser={currentUser} /> : null}

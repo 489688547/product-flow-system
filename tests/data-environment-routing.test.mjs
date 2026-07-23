@@ -63,6 +63,32 @@ test("a valid ready display grant selects DEMO_FLOW_DB", async () => {
   assert.equal(result.businessDb, displayDb);
 });
 
+test("a non-executive session cannot keep using an old display grant", async () => {
+  const [{ resolveDataEnvironment }, { hashEnvironmentToken }] = await modules();
+  const controlDb = createDataEnvironmentD1Mock();
+  const token = "former-executive-display-grant";
+  const tokenHash = await hashEnvironmentToken(token);
+  controlDb.grants.set(tokenHash, {
+    token_hash: tokenHash,
+    actor_id: "employee-1",
+    environment_id: "display",
+    environment_version: 7,
+    expires_at: "2099-01-01T00:00:00.000Z",
+    revoked_at: null
+  });
+
+  const result = await resolveDataEnvironment({
+    request: new Request("https://example.com/api/state", {
+      headers: { cookie: `pfs_data_environment=${token}` }
+    }),
+    env: { PRODUCT_FLOW_DB: controlDb, DEMO_FLOW_DB: {} },
+    data: { session: { userId: "employee-1", role: "product", department: "产品部" } }
+  });
+
+  assert.equal(result.id, "production");
+  assert.equal(result.businessDb, controlDb);
+});
+
 test("display maintenance never falls back to production", async () => {
   const [{ resolveDataEnvironment }, { hashEnvironmentToken }] = await modules();
   const controlDb = createDataEnvironmentD1Mock({

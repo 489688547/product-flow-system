@@ -2,13 +2,19 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createDefaultSupplyChainState, normalizeSupplyChainState, reduceSupplyChainState } from "../domain/supplyChain.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { supplyChainApiUrl, syncSupplyApprovalPages } from "./supplyChainApi.js";
+import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 
 const SupplyChainContext = createContext(null);
 const STORAGE_KEY = "supplyChainState";
 
+function localStorageKey() {
+  migrateLegacyProductionCache(localStorage, STORAGE_KEY);
+  return environmentStorageKey(STORAGE_KEY);
+}
+
 function loadLocalState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(localStorageKey());
     return raw ? normalizeSupplyChainState(JSON.parse(raw)) : createDefaultSupplyChainState();
   } catch {
     return createDefaultSupplyChainState();
@@ -18,10 +24,6 @@ function loadLocalState() {
 function messageFor(error, fallback) {
   const message = String(error?.message || "").trim();
   return /load failed|failed to fetch/i.test(message) ? fallback : message || fallback;
-}
-
-function isLocalPreview() {
-  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
 }
 
 export function SupplyChainProvider({ children, enabled = true }) {
@@ -46,11 +48,11 @@ export function SupplyChainProvider({ children, enabled = true }) {
         if (active && payload.state) {
           const normalized = normalizeSupplyChainState(payload.state);
           setState(normalized);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          localStorage.setItem(localStorageKey(), JSON.stringify(normalized));
           setError("");
         }
       } catch (loadError) {
-        if (active && !isLocalPreview()) setError(messageFor(loadError, "供应链数据加载失败，当前显示本地缓存。"));
+        if (active) setError(messageFor(loadError, "供应链数据加载失败，当前显示本地缓存。"));
       } finally {
         if (active) setLoading(false);
       }
@@ -60,7 +62,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
   }, [apiUrl, enabled]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(localStorageKey(), JSON.stringify(state));
     if (!enabled) return undefined;
     if (!dirty.current) return undefined;
     const timer = setTimeout(async () => {
@@ -75,7 +77,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
         dirty.current = false;
         setError("");
       } catch (saveError) {
-        if (!isLocalPreview()) setError(messageFor(saveError, "供应链数据同步失败，修改已保存在本机。"));
+        setError(messageFor(saveError, "供应链数据同步失败，修改已保存在本机。"));
       }
     }, 600);
     return () => clearTimeout(timer);

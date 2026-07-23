@@ -1,9 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { loadAiStatus, sendAiChat } from "./aiAssistantApi.js";
 import { sanitizeAiSkillActivity, upsertAiSkillActivity } from "./aiAssistantActivity.js";
+import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 
 const AiAssistantContext = createContext(null);
 const STORAGE_KEY = "companyAiAssistantSessionV1";
+
+function sessionStorageKey() {
+  migrateLegacyProductionCache(sessionStorage, STORAGE_KEY);
+  return environmentStorageKey(STORAGE_KEY);
+}
 
 function id() {
   return globalThis.crypto?.randomUUID?.() || `ai_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -11,7 +17,7 @@ function id() {
 
 function loadSession() {
   try {
-    const value = JSON.parse(sessionStorage.getItem(STORAGE_KEY) || "{}");
+    const value = JSON.parse(sessionStorage.getItem(sessionStorageKey()) || "{}");
     return Array.isArray(value.messages) ? value.messages.slice(-12).map(message => ({
       ...message,
       skillActivity: sanitizeAiSkillActivity(message.skillActivity)
@@ -44,7 +50,7 @@ export function AiAssistantProvider({ children }) {
   }, [refreshStatus]);
 
   useEffect(() => {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ messages: messages.slice(-12) }));
+    sessionStorage.setItem(sessionStorageKey(), JSON.stringify({ messages: messages.slice(-12) }));
   }, [messages]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
@@ -110,7 +116,7 @@ export function AiAssistantProvider({ children }) {
   const clear = useCallback(() => {
     stop();
     setMessages([]);
-    sessionStorage.removeItem(STORAGE_KEY);
+    sessionStorage.removeItem(sessionStorageKey());
     setError(null);
   }, [stop]);
 

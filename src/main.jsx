@@ -16,6 +16,8 @@ import { PerformanceManagementProvider } from "./state/PerformanceManagementProv
 import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import { AiAssistantProvider } from "./state/AiAssistantProvider.jsx";
 import { installDeploymentRecovery } from "./state/deploymentRecovery.js";
+import { DataEnvironmentProvider } from "./state/DataEnvironmentProvider.jsx";
+import { installDataEnvironmentFetchBoundary } from "./state/dataEnvironmentClient.js";
 import { ProductCatalogProvider } from "./state/ProductCatalogProvider.jsx";
 import App from "./App.jsx";
 import "./styles.css";
@@ -30,36 +32,39 @@ function AuthenticatedApp() {
   const hasOperationsAccess = canAccessEcommerceOperations(user);
   const hasPerformanceAccess = canAccessPerformanceManagement(user);
   return (
-    <ProductCatalogProvider>
-      <ProductFlowProvider>
-        <DataStandardsProvider enabled={hasDataCenterAccess}>
-          <DataCenterProvider enabled={hasDataCenterAccess}>
-            <AiAssistantProvider>
-              <SupplyChainProvider enabled={hasSupplyChainAccess}>
-                <GoodsFlowProvider enabled={hasSupplyChainAccess}>
-                  <BrandContentProvider>
-                    <CollaborationProvider>
-                      <EcommerceOperationsProvider enabled={hasOperationsAccess}>
-                        <PerformanceManagementProvider enabled={hasPerformanceAccess}>
-                          <PlatformProvider enabled={hasCompanyAccess}>
-                            {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
-                            <App />
-                          </PlatformProvider>
-                        </PerformanceManagementProvider>
-                      </EcommerceOperationsProvider>
-                    </CollaborationProvider>
-                  </BrandContentProvider>
-                </GoodsFlowProvider>
-              </SupplyChainProvider>
-            </AiAssistantProvider>
-          </DataCenterProvider>
-        </DataStandardsProvider>
-      </ProductFlowProvider>
-    </ProductCatalogProvider>
+    <DataEnvironmentProvider>
+      <ProductCatalogProvider>
+        <ProductFlowProvider>
+          <DataStandardsProvider enabled={hasDataCenterAccess}>
+            <DataCenterProvider enabled={hasDataCenterAccess}>
+              <AiAssistantProvider>
+                <SupplyChainProvider enabled={hasSupplyChainAccess}>
+                  <GoodsFlowProvider enabled={hasSupplyChainAccess}>
+                    <BrandContentProvider>
+                      <CollaborationProvider>
+                        <EcommerceOperationsProvider enabled={hasOperationsAccess}>
+                          <PerformanceManagementProvider enabled={hasPerformanceAccess}>
+                            <PlatformProvider enabled={hasCompanyAccess}>
+                              {hasCompanyAccess ? <ProductFlowPlatformBridge /> : null}
+                              <App />
+                            </PlatformProvider>
+                          </PerformanceManagementProvider>
+                        </EcommerceOperationsProvider>
+                      </CollaborationProvider>
+                    </BrandContentProvider>
+                  </GoodsFlowProvider>
+                </SupplyChainProvider>
+              </AiAssistantProvider>
+            </DataCenterProvider>
+          </DataStandardsProvider>
+        </ProductFlowProvider>
+      </ProductCatalogProvider>
+    </DataEnvironmentProvider>
   );
 }
 
 installDeploymentRecovery();
+installDataEnvironmentFetchBoundary();
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>

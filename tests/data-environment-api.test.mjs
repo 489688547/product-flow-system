@@ -79,9 +79,11 @@ test("switching to display stores only a token hash and sets an HttpOnly cookie"
   assert.equal(response.status, 200);
   assert.equal(payload.current.id, "display");
   assert.equal(payload.current.version, 7);
+  assert.equal(payload.permissions.canManage, true);
   assert.match(cookie, /^pfs_data_environment=/);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Lax/);
+  assert.doesNotMatch(cookie, /Max-Age=/);
   assert.equal(controlDb.grants.size, 1);
   const [storedHash] = controlDb.grants.keys();
   const rawToken = decodeURIComponent(cookie.match(/^pfs_data_environment=([^;]+)/)?.[1] || "");

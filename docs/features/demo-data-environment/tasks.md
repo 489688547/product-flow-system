@@ -59,19 +59,19 @@
 
 ## 4. 前端状态、缓存和设置
 
-- [ ] 先增加环境 API、Provider、设置交互和缓存隔离测试
-- [ ] 实现 `dataEnvironmentApi`
-- [ ] 实现 `DataEnvironmentProvider`
-- [ ] 为业务写请求统一添加环境版本
-- [ ] 切换时中止旧请求并拒绝晚到响应
-- [ ] 所有业务 localStorage/sessionStorage key 加环境后缀
-- [ ] 销售 IndexedDB 按环境使用不同数据库名
-- [ ] 旧缓存只迁移到正式环境一次
-- [ ] 实现设置页数据环境卡片
+- [x] 先增加环境 API、Provider、设置交互和缓存隔离测试
+- [x] 实现 `dataEnvironmentApi`
+- [x] 实现 `DataEnvironmentProvider`
+- [x] 为业务写请求统一添加环境版本
+- [x] 切换时中止旧请求并拒绝晚到响应
+- [x] 所有业务 localStorage/sessionStorage key 加环境后缀
+- [x] 销售 IndexedDB 按环境使用不同数据库名
+- [x] 旧缓存只迁移到正式环境一次
+- [x] 实现设置页数据环境卡片
 - [ ] 展示刷新状态支持恢复、失败和重试
-- [ ] 普通业务页面不增加展示标签
+- [x] 普通业务页面不增加展示标签
 - [ ] 完成键盘、焦点、空、错误、禁用、响应式和 WebView 验收
-- [ ] 提交 `feat: add display database settings`
+- [x] 提交 `feat: add display database settings`
 
 ## 5. 数据目录、脱敏和销售两倍规则
 

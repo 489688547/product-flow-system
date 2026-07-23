@@ -38,8 +38,7 @@ export function environmentGrantCookie(token, requestUrl = "") {
     "HttpOnly",
     secure ? "Secure" : "",
     "SameSite=Lax",
-    "Path=/",
-    `Max-Age=${DATA_ENVIRONMENT_GRANT_TTL_SECONDS}`
+    "Path=/"
   ].filter(Boolean).join("; ");
 }
 

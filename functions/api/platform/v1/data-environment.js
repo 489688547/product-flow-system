@@ -127,7 +127,8 @@ export async function handleDataEnvironmentRequest(context) {
       version: environmentVersion,
       versionRequired: true
     },
-    display: publicDisplayState(displayState)
+    display: publicDisplayState(displayState),
+    permissions: { canManage: true }
   }, 200, {
     "set-cookie": environmentGrantCookie(grant.token, request.url)
   });
