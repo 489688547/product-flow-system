@@ -57,9 +57,17 @@ async function ensureProviderTab(resource) {
   const matches = await chrome.tabs.query({ url: [`${resource.origin}/*`] });
   const targetUrl = `${resource.origin}${resource.route}`;
   let tab = matches.find(candidate => candidate.url?.includes(resource.route));
+  let routeChanged = false;
   if (!tab) tab = matches[0];
   if (!tab) tab = await chrome.tabs.create({ url: targetUrl, active: false });
-  else if (!tab.url?.includes(resource.route)) tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
+  else if (!tab.url?.includes(resource.route)) {
+    tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
+    routeChanged = true;
+  }
+  if (routeChanged) {
+    await chrome.tabs.reload(tab.id);
+    tab = await chrome.tabs.get(tab.id);
+  }
   if (tab.status !== "complete") {
     await new Promise(resolve => {
       const listener = (tabId, changeInfo) => {

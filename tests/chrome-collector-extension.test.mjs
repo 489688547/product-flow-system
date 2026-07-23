@@ -41,13 +41,15 @@ test("extension source never evaluates remote code or accepts remote selectors",
 test("Kuaimai async exports are completed through the bundled download center adapter", async () => {
   const contentScript = await readFile(new URL("content-script.js", extensionRoot), "utf8");
   const adapter = await readFile(new URL("providers/kuaimai.js", extensionRoot), "utf8");
+  const serviceWorker = await readFile(new URL("service-worker.js", extensionRoot), "utf8");
 
   assert.match(adapter, /KUAIMAI_DOWNLOAD_CENTER_ROUTE/);
   assert.match(adapter, /selectKuaimaiDownloadRow/);
   assert.match(contentScript, /download_from_center/);
   assert.match(contentScript, /waitForKuaimaiOrderPage/);
   assert.match(contentScript, /KUAIMAI_DOWNLOAD_CENTER_TIMEOUT/);
-  assert.match(await readFile(new URL("service-worker.js", extensionRoot), "utf8"), /downloadFilePrefixes/);
+  assert.match(serviceWorker, /downloadFilePrefixes/);
+  assert.match(serviceWorker, /chrome\.tabs\.reload\(tab\.id\)/);
   assert.doesNotMatch(contentScript, /task\.(downloadCenter|selector|route|url)/);
 });
 
