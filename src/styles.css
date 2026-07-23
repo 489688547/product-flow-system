@@ -1913,23 +1913,23 @@ main { min-width: 0; overflow-x: hidden; }
 .data-kpi-meta > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .data-overview-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(320px, .75fr); gap: var(--space-4); }
 .data-trend-panel, .data-overview-grid > .section-panel { padding-bottom: var(--space-3); }
+.data-trend-figure { display: grid; gap: var(--space-2); }
+.data-trend-detail { height: 96px; padding: 8px 10px; display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-content: start; align-items: center; gap: 6px var(--space-3); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); color: var(--text-tertiary); pointer-events: none; }
+.data-trend-detail.is-visible { color: var(--text-primary); }
+.data-trend-detail > strong { font-size: 11px; white-space: nowrap; }
+.data-trend-detail > span { grid-column: 2 / -1; font-size: 11px; }
+.data-trend-detail dl, .data-trend-detail ul { min-width: 0; margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 5px var(--space-3); }
+.data-trend-detail dl > div, .data-trend-detail li { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.data-trend-detail dt, .data-trend-detail dd, .data-trend-detail li { margin: 0; font-size: 10px; }
+.data-trend-detail dt, .data-trend-detail li span { color: var(--text-tertiary); }
+.data-trend-detail dd, .data-trend-detail li b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.data-trend-detail ul { overflow: hidden; padding-left: var(--space-3); border-left: 1px solid var(--border); list-style: none; }
 .data-mini-trend { height: 220px; padding: var(--space-3) 4px 0; display: flex; align-items: end; gap: 3px; border-top: 1px solid var(--border); }
 .data-trend-day { min-width: 4px; height: 100%; flex: 1; position: relative; display: grid; grid-template-rows: 1fr 18px; align-items: end; gap: 4px; border-radius: 4px; cursor: default; }
 .data-trend-day:focus-visible { outline-offset: 1px; }
 .data-mini-trend i { width: 100%; min-height: 4px; display: block; border-radius: 3px 3px 0 0; background: color-mix(in oklch, var(--accent), white 28%); }
+.data-mini-trend i.is-empty { height: 0; min-height: 0; visibility: hidden; }
 .data-mini-trend span { overflow: hidden; color: var(--text-tertiary); font-size: 9px; text-align: center; text-overflow: clip; white-space: nowrap; }
-.data-trend-tooltip { width: 230px; padding: 10px; position: absolute; z-index: var(--z-tooltip); left: 50%; bottom: 26px; display: grid; gap: 7px; visibility: hidden; border: 1px solid var(--border-strong); border-radius: var(--radius-control); background: var(--surface); box-shadow: 0 4px 8px color-mix(in oklch, var(--text-primary), transparent 88%); color: var(--text-primary); opacity: 0; pointer-events: none; transform: translate(-50%, 4px); transition: opacity var(--transition-fast), transform var(--transition-fast), visibility var(--transition-fast); }
-.data-trend-day:first-child .data-trend-tooltip { left: 0; transform: translate(0, 4px); }
-.data-trend-day:last-child .data-trend-tooltip { right: 0; left: auto; transform: translate(0, 4px); }
-.data-trend-day:hover .data-trend-tooltip, .data-trend-day:focus .data-trend-tooltip { visibility: visible; opacity: 1; transform: translate(-50%, 0); }
-.data-trend-day:first-child:hover .data-trend-tooltip, .data-trend-day:first-child:focus .data-trend-tooltip, .data-trend-day:last-child:hover .data-trend-tooltip, .data-trend-day:last-child:focus .data-trend-tooltip { transform: translate(0, 0); }
-.data-trend-tooltip > strong { font-size: 11px; }
-.data-trend-tooltip dl, .data-trend-tooltip ul { margin: 0; display: grid; gap: 4px; }
-.data-trend-tooltip dl > div, .data-trend-tooltip li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
-.data-trend-tooltip dt, .data-trend-tooltip dd, .data-trend-tooltip li { margin: 0; font-size: 10px; }
-.data-trend-tooltip dt, .data-trend-tooltip li span { color: var(--text-tertiary); }
-.data-trend-tooltip dd, .data-trend-tooltip li b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.data-trend-tooltip ul { padding-top: 6px; border-top: 1px solid var(--border); list-style: none; }
 .data-contribution-list { display: grid; }
 .data-contribution-list > div { min-height: 46px; display: grid; grid-template-columns: minmax(76px, .7fr) minmax(80px, 1fr) auto; align-items: center; gap: 9px; border-top: 1px solid var(--border); }
 .data-contribution-list > div:first-child { border-top: 0; }
@@ -2450,6 +2450,10 @@ main { min-width: 0; overflow-x: hidden; }
   .data-sync-status-bar { grid-template-columns: 1fr; align-items: stretch; }
   .data-sync-status-bar > .btn { width: 100%; justify-content: center; }
   .data-kpi-grid { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
+  .data-trend-detail { height: 132px; grid-template-columns: auto minmax(0, 1fr); }
+  .data-trend-detail > span { grid-column: 2; }
+  .data-trend-detail dl { justify-content: flex-end; }
+  .data-trend-detail ul { grid-column: 1 / -1; padding-top: 6px; padding-left: 0; border-top: 1px solid var(--border); border-left: 0; }
   .data-mini-trend { height: 170px; overflow-x: auto; }
   .data-trend-day { min-width: 12px; }
   .data-source-grid, .data-source-form fieldset, .data-quality-summary, .data-settings-workspace fieldset { grid-template-columns: 1fr; }
@@ -2534,7 +2538,6 @@ main { min-width: 0; overflow-x: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   .data-mini-trend { scroll-behavior: auto; }
-  .data-trend-tooltip { transition: none; }
   .product-catalog-loading span { animation: none; }
   .connector-card { transition: none; }
   .connection-loading span { animation: none; }
