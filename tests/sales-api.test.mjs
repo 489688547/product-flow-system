@@ -58,3 +58,25 @@ test("sales import batches a full month without dozens of D1 round trips", async
   assert.deepEqual(db.batchSizes, [250, 250]);
   assert.deepEqual((await response.json()).months, ["2026-05"]);
 });
+
+test("sales routes use the selected business database without touching production", async () => {
+  const displayDb = createDb();
+  const productionDb = {
+    prepare() {
+      throw new Error("production database must not be touched");
+    }
+  };
+
+  const response = await onRequest({
+    request: new Request("https://example.test/api/sales"),
+    env: { PRODUCT_FLOW_DB: productionDb },
+    data: { businessDb: displayDb }
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    synced: true,
+    imports: [],
+    titles: {}
+  });
+});

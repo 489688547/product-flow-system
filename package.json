@@ -10,7 +10,7 @@
     "lint": "eslint src functions server scripts tests react-tests chrome-extension",
     "release:pages": "npm run build && node scripts/prepare-pages-release.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 8133",
-    "check:governance": "node scripts/check-project-governance.mjs && node --test tests/ai-provider-boundary.test.mjs",
+    "check:governance": "node scripts/check-project-governance.mjs && node scripts/check-data-environment-routing.mjs && node --test tests/ai-provider-boundary.test.mjs",
     "check:branch-base": "node scripts/check-branch-base.mjs",
     "check:pages-environment-parity": "node scripts/check-pages-environment-parity.mjs",
     "configure:pages-environment-parity": "node scripts/configure-pages-environment-parity.mjs",

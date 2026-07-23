@@ -109,3 +109,21 @@ test("business writes reject a stale environment version", async () => {
     error => error?.code === "DATA_ENVIRONMENT_VERSION_CONFLICT" && error?.status === 409
   );
 });
+
+test("request business database prefers the middleware-selected database", async () => {
+  const [{ requestBusinessDatabase }] = await modules();
+  const productionDb = { name: "production" };
+  const displayDb = { name: "display" };
+
+  assert.equal(
+    requestBusinessDatabase({
+      env: { PRODUCT_FLOW_DB: productionDb },
+      data: { businessDb: displayDb }
+    }),
+    displayDb
+  );
+  assert.equal(
+    requestBusinessDatabase({ env: { PRODUCT_FLOW_DB: productionDb } }),
+    productionDb
+  );
+});

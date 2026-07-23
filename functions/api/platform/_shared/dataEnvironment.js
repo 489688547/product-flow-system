@@ -125,6 +125,10 @@ export function businessDatabase(context) {
   return db;
 }
 
+export function requestBusinessDatabase({ env = {}, data = {} } = {}) {
+  return data.businessDb || env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+}
+
 export function assertEnvironmentWriteVersion(request, dataEnvironment) {
   if (["GET", "HEAD", "OPTIONS"].includes(request.method)) return;
   const value = request.headers.get("x-data-environment-version");

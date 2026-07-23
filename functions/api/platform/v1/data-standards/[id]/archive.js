@@ -14,7 +14,7 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
     const session = requireSession(data);
     const actor = dataStandardActor(session);
     requireDefinitionView(actor);
-    const db = requireDatabase(dataStandardsDatabase(env));
+    const db = requireDatabase(dataStandardsDatabase(env, data));
     await ensureDataStandardsTables(db);
     const existing = await getDefinitionDetail(db, String(params.id || ""));
     if (!existing) throw new DataStandardsHttpError(404, "DATA_STANDARD_INVALID", "数据口径不存在或不可用。");

@@ -1,7 +1,8 @@
 import { CollaborationHttpError } from "./collaborationHttp.js";
+import { requestBusinessDatabase } from "../../_shared/dataEnvironment.js";
 
-export function collaborationDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function collaborationDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureCollaborationTables(db) {

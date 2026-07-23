@@ -5,6 +5,7 @@ import {
   syncDingTodoTask
 } from "../_shared/dingtalk.js";
 import { readCompanyState } from "../../state.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 
 function requestError(message, status) {
   const error = new Error(message);
@@ -61,7 +62,7 @@ export async function onRequest({ request, env, data = {} }) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const db = env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB;
+    const db = requestBusinessDatabase({ env, data });
     if (!db) throw requestError("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB。", 501);
     const stored = await readCompanyState(db);
     if (!stored?.state) throw requestError("产品流程共享数据尚未初始化。", 409);

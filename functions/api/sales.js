@@ -1,3 +1,5 @@
+import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
+
 const META_ID = "sales-meta";
 // Cloudflare D1 allows at most 100 bound parameters per statement; 9 rows × 11 columns = 99.
 const INSERT_CHUNK = 9;
@@ -28,8 +30,8 @@ function optionsResponse() {
   });
 }
 
-export function salesDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function salesDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureSalesTables(db) {
@@ -128,9 +130,9 @@ function mapDbRow(row) {
   };
 }
 
-export async function onRequest({ request, env }) {
+export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
-  const db = salesDatabase(env);
+  const db = salesDatabase(env, data);
   if (!db) {
     return jsonResponse({ synced: false, message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，销售数据只能保存在本机浏览器。" }, 501);
   }

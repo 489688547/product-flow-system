@@ -8,7 +8,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (request.method !== "GET") return jsonResponse({ message: "Method not allowed" }, 405);
   if (!data.session) return jsonResponse({ message: "请先使用钉钉登录。" }, 401);
   if (!canViewOperationsEvidence(data.session)) return jsonResponse({ message: "无权读取经营证据。" }, 403);
-  const db = operationsDatabase(env);
+  const db = operationsDatabase(env, data);
   if (!db) return jsonResponse({ message: "缺少 D1 数据库绑定。" }, 501);
   const url = new URL(request.url);
   const employeeId = String(url.searchParams.get("employeeId") || "").trim();

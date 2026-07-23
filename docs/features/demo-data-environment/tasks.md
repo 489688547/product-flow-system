@@ -43,19 +43,19 @@
 
 ## 3. 全系统业务库存储改造
 
-- [ ] 先增加业务路由禁止直连 `PRODUCT_FLOW_DB` 的治理测试
-- [ ] 建立合法控制面 allowlist
-- [ ] 品牌内容存储改用 `businessDb`
-- [ ] 数据中心和销售存储改用 `businessDb`
-- [ ] 电商运营存储改用 `businessDb`
-- [ ] 人事和绩效存储改用 `businessDb`
-- [ ] 协同、数据标准和平台业务存储改用 `businessDb`
-- [ ] 商品、货品流和用户洞察存储改用 `businessDb`
-- [ ] Whole-state 保持 baseline、事务、fingerprint、快照和审计规则
-- [ ] 供应链存储改用 `businessDb`
-- [ ] 每类 API 增加正式/展示不串库测试
-- [ ] 将数据环境路由检查纳入 `check:governance`
-- [ ] 提交 `refactor: route business storage by data environment`
+- [x] 先增加业务路由禁止直连 `PRODUCT_FLOW_DB` 的治理测试
+- [x] 建立合法控制面 allowlist
+- [x] 品牌内容存储改用 `businessDb`
+- [x] 数据中心和销售存储改用 `businessDb`
+- [x] 电商运营存储改用 `businessDb`
+- [x] 人事和绩效存储改用 `businessDb`
+- [x] 协同、数据标准和平台业务存储改用 `businessDb`
+- [x] 商品、货品流和用户洞察存储改用 `businessDb`
+- [x] Whole-state 保持 baseline、事务、fingerprint、快照和审计规则
+- [x] 供应链存储改用 `businessDb`
+- [x] 每类 API 增加正式/展示不串库测试
+- [x] 将数据环境路由检查纳入 `check:governance`
+- [x] 提交 `refactor: route business storage by data environment`
 
 ## 4. 前端状态、缓存和设置
 

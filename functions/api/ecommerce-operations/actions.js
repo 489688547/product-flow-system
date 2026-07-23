@@ -18,7 +18,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (!ACTIONS.has(action.type)) return jsonResponse({ message: "不支持的经营动作。" }, 400);
   if (MANAGER_ACTIONS.has(action.type) && !isOperationsManager(data.session)) return jsonResponse({ message: "该动作需要运营主管权限。" }, 403);
   if (OPERATIONS_ACTIONS.has(action.type) && !isOperationsMember(data.session)) return jsonResponse({ message: "该动作仅限运营团队。" }, 403);
-  const db = operationsDatabase(env);
+  const db = operationsDatabase(env, data);
   if (!db) return jsonResponse({ message: "缺少 D1 数据库绑定。" }, 501);
   try {
     const current = await readOperationsState(db);

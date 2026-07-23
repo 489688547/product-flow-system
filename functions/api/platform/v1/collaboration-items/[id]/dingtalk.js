@@ -30,7 +30,7 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
     const session = requireSession(data);
     requireWritable(session);
     const actor = collaborationActor(session);
-    const db = collaborationDatabase(env);
+    const db = collaborationDatabase(env, data);
     if (!db) throw new CollaborationHttpError(501, "COLLABORATION_STORAGE_UNAVAILABLE", "共享协同数据暂不可用。", undefined, true);
     const deps = dependencies(data);
     await deps.ensureTables(db);
