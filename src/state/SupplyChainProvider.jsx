@@ -2,13 +2,15 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { createDefaultSupplyChainState, normalizeSupplyChainState, reduceSupplyChainState } from "../domain/supplyChain.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { supplyChainApiUrl, syncSupplyApprovalPages } from "./supplyChainApi.js";
+import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const SupplyChainContext = createContext(null);
 const STORAGE_KEY = "supplyChainState";
+const localCache = getBrowserStorage("localStorage");
 
 function loadLocalState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = tryGetStorageItem(localCache, STORAGE_KEY);
     return raw ? normalizeSupplyChainState(JSON.parse(raw)) : createDefaultSupplyChainState();
   } catch {
     return createDefaultSupplyChainState();
@@ -46,7 +48,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
         if (active && payload.state) {
           const normalized = normalizeSupplyChainState(payload.state);
           setState(normalized);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          persistLocalState(localCache, STORAGE_KEY, normalized);
           setError("");
         }
       } catch (loadError) {
@@ -60,7 +62,7 @@ export function SupplyChainProvider({ children, enabled = true }) {
   }, [apiUrl, enabled]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    persistLocalState(localCache, STORAGE_KEY, state);
     if (!enabled) return undefined;
     if (!dirty.current) return undefined;
     const timer = setTimeout(async () => {

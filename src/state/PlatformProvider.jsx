@@ -5,9 +5,11 @@ import { useAuth } from "./AuthProvider.jsx";
 import { useProductFlow } from "./ProductFlowProvider.jsx";
 import { platformApiUrl } from "./platformApi.js";
 import { buildDecisionTodoPayload, buildPersonalTodoPayload } from "../domain/platformNotifications.js";
+import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const PlatformContext = createContext(null);
 const STORAGE_KEY = "platformExecutionState";
+const localCache = getBrowserStorage("localStorage");
 const GOVERNED_DEMO_COLLECTIONS = ["departmentCommitments", "commitmentMilestones", "incentiveProjects", "departmentRewardBudgets", "monthlyReports"];
 
 function isLocalHost() {
@@ -27,7 +29,7 @@ function normalizeWithLocalDemo(input) {
 
 function loadLocalState() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = tryGetStorageItem(localCache, STORAGE_KEY);
     return raw ? normalizeWithLocalDemo(JSON.parse(raw)) : createDefaultPlatformState();
   } catch {
     return createDefaultPlatformState();
@@ -63,7 +65,7 @@ export function PlatformProvider({ children, enabled = true }) {
         if (alive) {
           const normalized = normalizeWithLocalDemo(payload.state);
           setState(normalized);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+          persistLocalState(localCache, STORAGE_KEY, normalized);
           setError("");
         }
       } catch (loadError) {
@@ -80,7 +82,7 @@ export function PlatformProvider({ children, enabled = true }) {
 
   useEffect(() => {
     if (!enabled) return undefined;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    persistLocalState(localCache, STORAGE_KEY, state);
     if (firstSave.current) {
       firstSave.current = false;
       return undefined;

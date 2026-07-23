@@ -11,13 +11,15 @@ import {
   persistInternalVaultConnection,
   revealCredential
 } from "./dataCenterConnectionsApi.js";
+import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const DataCenterContext = createContext(null);
 const STORAGE_KEY = "dataCenterMetadata";
+const localCache = getBrowserStorage("localStorage");
 
 function loadLocalMetadata() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = tryGetStorageItem(localCache, STORAGE_KEY);
     return raw ? normalizeDataCenterState(JSON.parse(raw)) : createDefaultDataCenterState();
   } catch {
     return createDefaultDataCenterState();
@@ -62,7 +64,7 @@ export function DataCenterProvider({ children, enabled = true }) {
       if (metadataResult.status === "fulfilled" && metadataResult.value.state) {
         const normalized = normalizeDataCenterState(metadataResult.value.state);
         setState(normalized);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableMetadata(normalized)));
+        persistLocalState(localCache, STORAGE_KEY, persistableMetadata(normalized));
       } else if (![404, 405, 501].includes(metadataResult.reason?.status)) {
         throw metadataResult.reason;
       }
@@ -108,7 +110,7 @@ export function DataCenterProvider({ children, enabled = true }) {
   }, [refreshConnections]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(persistableMetadata(state)));
+    persistLocalState(localCache, STORAGE_KEY, persistableMetadata(state));
     if (!enabled || !dirty.current) return undefined;
     const timer = setTimeout(async () => {
       try {
