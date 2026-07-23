@@ -48,7 +48,10 @@ test("Kuaimai async exports are completed through the bundled download center ad
   assert.match(contentScript, /download_from_center/);
   assert.match(contentScript, /waitForKuaimaiOrderPage/);
   assert.match(contentScript, /KUAIMAI_DOWNLOAD_CENTER_TIMEOUT/);
+  assert.match(contentScript, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
   assert.match(serviceWorker, /downloadFilePrefixes/);
+  assert.match(serviceWorker, /probeContentScript/);
+  assert.match(serviceWorker, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
   assert.match(serviceWorker, /chrome\.tabs\.reload\(tab\.id\)/);
   assert.doesNotMatch(contentScript, /task\.(downloadCenter|selector|route|url)/);
 });

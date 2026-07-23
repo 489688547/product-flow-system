@@ -242,6 +242,10 @@ async function runRegisteredTask(task) {
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "COLLECTOR_CONTENT_SCRIPT_PROBE") {
+    sendResponse({ ok: true });
+    return false;
+  }
   if (message?.type !== "RUN_REGISTERED_TASK") return false;
   runRegisteredTask(message.task)
     .then(sendResponse)

@@ -39,6 +39,44 @@ async function bridgeFetch(path, options = {}) {
   });
 }
 
+async function waitForTabComplete(tabId) {
+  let tab = await chrome.tabs.get(tabId);
+  if (tab.status === "complete") return tab;
+  await new Promise(resolve => {
+    const listener = (updatedTabId, changeInfo) => {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(listener);
+        resolve();
+      }
+    };
+    chrome.tabs.onUpdated.addListener(listener);
+    setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(listener);
+      resolve();
+    }, 15000);
+  });
+  tab = await chrome.tabs.get(tabId);
+  return tab;
+}
+
+async function probeContentScript(tabId) {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, { type: "COLLECTOR_CONTENT_SCRIPT_PROBE" });
+    return response?.ok === true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForContentScript(tabId, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  do {
+    if (await probeContentScript(tabId)) return true;
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  return false;
+}
+
 async function reportTaskResult(task, result) {
   const payload = {
     jobId: task.jobId,
@@ -57,30 +95,19 @@ async function ensureProviderTab(resource) {
   const matches = await chrome.tabs.query({ url: [`${resource.origin}/*`] });
   const targetUrl = `${resource.origin}${resource.route}`;
   let tab = matches.find(candidate => candidate.url?.includes(resource.route));
-  let routeChanged = false;
   if (!tab) tab = matches[0];
   if (!tab) tab = await chrome.tabs.create({ url: targetUrl, active: false });
   else if (!tab.url?.includes(resource.route)) {
     tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
-    routeChanged = true;
   }
-  if (routeChanged) {
+  tab = await waitForTabComplete(tab.id);
+  if (!await waitForContentScript(tab.id, 500)) {
     await chrome.tabs.reload(tab.id);
-    tab = await chrome.tabs.get(tab.id);
+    tab = await waitForTabComplete(tab.id);
   }
-  if (tab.status !== "complete") {
-    await new Promise(resolve => {
-      const listener = (tabId, changeInfo) => {
-        if (tabId === tab.id && changeInfo.status === "complete") {
-          chrome.tabs.onUpdated.removeListener(listener);
-          resolve();
-        }
-      };
-      chrome.tabs.onUpdated.addListener(listener);
-      setTimeout(() => {
-        chrome.tabs.onUpdated.removeListener(listener);
-        resolve();
-      }, 15000);
+  if (!await waitForContentScript(tab.id, 3000)) {
+    throw Object.assign(new Error("页面采集脚本不可用。"), {
+      code: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
     });
   }
   return tab;
@@ -140,7 +167,17 @@ async function executeTask(task) {
   assertRegisteredTask(task);
   const resource = registeredResource(task.providerId, task.resourceType);
   await chrome.storage.local.set({ [ACTIVE_JOB_KEY]: task });
-  const tab = await ensureProviderTab(resource);
+  let tab;
+  try {
+    tab = await ensureProviderTab(resource);
+  } catch (error) {
+    await reportTaskResult(task, {
+      status: "failed",
+      stage: "opening",
+      errorCode: error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
+    });
+    return;
+  }
   const startedAt = Date.now();
   let result;
   try {
