@@ -1,5 +1,6 @@
 import {
   authorizeWebCollectionAdmin,
+  authorizeWebCollectionTrigger,
   authorizeWebCollectionView
 } from "./_shared/authorization.js";
 import { collectionTargetFromRequestData } from "../../_shared/collectionTarget.js";
@@ -12,6 +13,7 @@ import {
   heartbeatRunner,
   listWebCollectionStatus,
   recordWebCollectionNotification,
+  triggerWebCollectionJob,
   transitionWebCollectionJob,
   webCollectionDatabase
 } from "./_shared/storage.js";
@@ -29,6 +31,10 @@ export async function onRequest({ request, env, data = {} }) {
     }
     if (request.method !== "POST") throw routeError(405, "VALIDATION_METHOD_NOT_ALLOWED", "Method not allowed");
     const body = await request.json().catch(() => { throw routeError(400, "VALIDATION_INVALID_JSON", "请求内容不是有效的 JSON 对象。"); });
+    if (body?.action === "trigger") {
+      authorizeWebCollectionTrigger(data.session);
+      return successResponse(await triggerWebCollectionJob(db, body), id);
+    }
     const sessionCreatesPlan = body?.action === "ensure_plan" && data.session;
     const runner = sessionCreatesPlan
       ? { id: `session:${authorizeWebCollectionAdmin(data.session).actor || data.session.userId}` }

@@ -188,7 +188,8 @@ test("warning capabilities do not block an otherwise ready production environmen
   });
   const payload = await response.json();
   assert.equal(payload.ready, true);
-  assert.equal(payload.capabilities.find(item => item.id === "kuaimai-sales-sync").status, "warning");
+  assert.equal(payload.capabilities.find(item => item.id === "kuaimai-sales-sync"), undefined);
+  assert.equal(payload.capabilities.find(item => item.id === "company-web-data-collection").status, "ready");
   assert.equal(payload.capabilities.find(item => item.id === "production-data-control").status, "ready");
   assert.equal(payload.checkedAt.endsWith("Z"), true);
 });

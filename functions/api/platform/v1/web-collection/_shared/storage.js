@@ -164,6 +164,45 @@ export async function ensureWebCollectionPlan(db, jobs, target = { environmentId
   return { created, duplicate: saved.length - created, jobs: saved };
 }
 
+function dailyRange(businessDate) {
+  return {
+    start: `${businessDate}T00:00:00+08:00`,
+    end: `${businessDate}T23:59:59+08:00`,
+    timeZone: "Asia/Shanghai"
+  };
+}
+
+export async function triggerWebCollectionJob(db, input) {
+  const providerId = String(input?.providerId || "").trim();
+  const resourceType = String(input?.resourceType || "").trim();
+  const businessDate = String(input?.businessDate || "").trim();
+  if (providerId !== "kuaimai" || resourceType !== "order_items" || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+    throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发快麦订单商品明细采集。");
+  }
+  const scheduleVersion = "v1";
+  const plan = await ensureWebCollectionPlan(db, [{
+    providerId,
+    resourceType,
+    businessDate,
+    rangeKind: "daily_fact",
+    range: dailyRange(businessDate),
+    scheduleVersion,
+    idempotencyKey: `${providerId}:${resourceType}:${businessDate}:${scheduleVersion}`
+  }]);
+  let job = plan.jobs[0];
+  let requeued = false;
+  if (input.force === true && ["waiting_human", "failed", "schema_changed", "success"].includes(job.status)) {
+    const now = new Date().toISOString();
+    await db.prepare(`UPDATE web_collection_jobs SET status = 'queued', stage = 'queued', runner_id = NULL,
+      lease_expires_at = NULL, error_code = NULL, error_summary = NULL, started_at = NULL, completed_at = NULL,
+      updated_at = ? WHERE id = ?`)
+      .bind(now, job.id).run();
+    job = mapJob(await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(job.id).first());
+    requeued = true;
+  }
+  return { created: plan.created, requeued, job };
+}
+
 export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } = {}) {
   const seconds = Math.min(900, Math.max(60, Number(leaseSeconds) || 300));
   const now = new Date();

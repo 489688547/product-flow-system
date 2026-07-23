@@ -74,6 +74,8 @@ test("data connections workspace organizes ecommerce ERP and company data", () =
   assert.match(workspace, /saveConnection/);
   assert.match(workspace, /saveVaultItem/);
   assert.match(erp, /kuaimai-erp/);
+  assert.match(erp, /Chrome 插件/);
+  assert.match(erp, /API 未打通/);
   assert.match(company, /InternalVaultWorkspace/);
   assert.match(company, /PlatformConnectionsWorkspace/);
   assert.match(vault, /INTERNAL_VAULT_TYPES/);

@@ -14,6 +14,7 @@ function connectionField(key, label, envVar, options = {}) {
 function connectionDefinition(input) {
   return Object.freeze({
     available: true,
+    configurable: true,
     ...input,
     fields: Object.freeze((input.fields || []).map(field => Object.freeze(field)))
   });
@@ -34,7 +35,10 @@ export const PLATFORM_CONNECTION_DEFINITIONS = Object.freeze([
     id: "kuaimai",
     name: "快麦 ERP",
     mark: "快",
-    description: "订单拉取、销售聚合和接口会话维护",
+    description: "开放平台 API 暂未打通；当前使用 Chrome 插件和官方文件",
+    configurable: false,
+    unavailableLabel: "未打通",
+    disabledReason: "快麦开放平台 API 暂未打通",
     fields: [
       connectionField("appKey", "应用凭证", "KUAIMAI_APP_KEY", { type: "text" }),
       connectionField("appSecret", "应用密钥", "KUAIMAI_APP_SECRET"),

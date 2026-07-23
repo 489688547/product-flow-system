@@ -82,7 +82,8 @@ test("new connector instances cannot forge a healthy connection", () => {
 });
 
 test("connector definitions expose only supported platform-specific methods", () => {
-  assert.deepEqual(connectorDefinition("kuaimai-erp").methods, ["api", "browser", "export"]);
+  assert.deepEqual(connectorDefinition("kuaimai-erp").methods, ["browser", "export"]);
+  assert.equal(connectorDefinition("kuaimai-erp").fields.some(field => field.methods?.includes("api")), false);
   assert.deepEqual(connectorDefinition("douyin-ecommerce").methods, ["export"]);
   assert.throws(() => connectorDefinition("unknown-platform"), /未知连接器/);
 });

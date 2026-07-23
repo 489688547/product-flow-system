@@ -41,9 +41,15 @@ test("Kuaimai orders use order creation time and yesterday full Shanghai day", a
     { action: "select_time_basis", value: "下单时间" },
     { action: "set_start_time", value: "2026-07-21 00:00:00" },
     { action: "set_end_time", value: "2026-07-21 23:59:59" },
+    {
+      action: "verify_time_range",
+      startValue: "2026-07-21 00:00:00",
+      endValue: "2026-07-21 23:59:59"
+    },
     { action: "submit_query" },
     { action: "wait_for_results" },
-    { action: "export_orders" }
+    { action: "export_orders" },
+    { action: "confirm_export" }
   ]);
 });
 
@@ -63,5 +69,8 @@ test("Kuaimai order item task uses the registered detail export", async () => {
     businessDate: "2026-07-21"
   });
 
-  assert.equal(plan.at(-1).action, "export_order_items");
+  assert.deepEqual(plan.slice(-2), [
+    { action: "export_order_items" },
+    { action: "confirm_export" }
+  ]);
 });

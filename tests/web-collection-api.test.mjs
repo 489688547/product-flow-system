@@ -6,6 +6,7 @@ import { onRequest as onRunners } from "../functions/api/platform/v1/web-collect
 import { createWebCollectionD1Mock } from "./helpers/web-collection-d1-mock.mjs";
 
 const executive = { userId: "exec-1", name: "负责人", role: "executive", department: "总经办" };
+const operator = { userId: "ops-1", name: "运营主管", role: "operations", department: "运营部" };
 
 async function jsonCall(handler, url, { method = "GET", db, session, dataEnvironment, token, body } = {}) {
   const request = new Request(url, {
@@ -217,4 +218,85 @@ test("company session reads safe status while unauthenticated callers are reject
   const allowed = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", { db, session: executive });
   assert.equal(allowed.response.status, 200);
   assert.equal(JSON.stringify(allowed.body).includes("token_hash"), false);
+});
+
+test("authorized operator idempotently triggers the Kuaimai Chrome order-item collection", async () => {
+  const db = createWebCollectionD1Mock();
+  const input = { action: "trigger", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-22" };
+  const first = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, session: operator, body: input
+  });
+  assert.equal(first.response.status, 200);
+  assert.equal(first.body.data.created, 1);
+  assert.equal(first.body.data.requeued, false);
+  assert.equal(first.body.data.job.status, "queued");
+  assert.equal(first.body.data.job.idempotencyKey, "kuaimai:order_items:2026-07-22:v1:env:production:v1");
+
+  const repeated = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, session: operator, body: input
+  });
+  assert.equal(repeated.response.status, 200);
+  assert.equal(repeated.body.data.created, 0);
+  assert.equal(repeated.body.data.requeued, false);
+  assert.equal(db.tables.web_collection_jobs.size, 1);
+});
+
+test("manual confirmation requeues a Kuaimai job after login is restored", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const token = registration.body.data.token;
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, session: operator,
+    body: { action: "trigger", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-22" }
+  });
+  const claimed = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "claim" }
+  });
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: {
+      action: "transition", jobId: claimed.body.data.job.id, from: "claimed", status: "opening", stage: "opening"
+    }
+  });
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: {
+      action: "transition",
+      jobId: claimed.body.data.job.id,
+      from: "opening",
+      status: "waiting_human",
+      stage: "login",
+      errorCode: "KUAIMAI_LOGIN_REQUIRED",
+      errorSummary: "快麦登录已过期"
+    }
+  });
+
+  const retriggered = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, session: operator,
+    body: { action: "trigger", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-22", force: true }
+  });
+  assert.equal(retriggered.response.status, 200);
+  assert.equal(retriggered.body.data.requeued, true);
+  assert.equal(retriggered.body.data.job.status, "queued");
+  assert.equal(retriggered.body.data.job.runnerId, null);
+  assert.equal(retriggered.body.data.job.errorCode, null);
+});
+
+test("Kuaimai Chrome trigger rejects missing sessions, readonly users and unregistered resources", async () => {
+  const db = createWebCollectionD1Mock();
+  const input = { action: "trigger", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-22" };
+  const missing = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, body: input
+  });
+  assert.equal(missing.response.status, 401);
+
+  const readonly = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, session: { ...operator, role: "readonly" }, body: input
+  });
+  assert.equal(readonly.response.status, 403);
+  assert.equal(readonly.body.error.code, "WEB_COLLECTION_TRIGGER_DENIED");
+
+  const otherResource = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, session: operator, body: { ...input, resourceType: "inventory" }
+  });
+  assert.equal(otherResource.response.status, 400);
+  assert.equal(otherResource.body.error.code, "WEB_COLLECTION_TRIGGER_INVALID");
 });

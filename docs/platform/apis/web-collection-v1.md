@@ -8,7 +8,8 @@
 
 - `POST /runners` requires an active executive company session or the existing server-only production personal token resolved to an active executive identity.
 - The runner token is returned once, stored only in macOS Keychain and sent as `Authorization: Bearer`. D1 stores only SHA-256.
-- `POST /jobs` requires an active `company_web_collection` runner token.
+- Runner actions on `POST /jobs` require an active `company_web_collection` runner token.
+- User action `POST /jobs` with `action=trigger` requires an active non-readonly company session in 总经办、数据中心 or 运营.
 - `GET /jobs` requires a company session in 总经办、数据中心、运营、供应链 or 财务.
 - Every route requires the formal control database. Job creation persists the server-resolved target environment and version; browser requests and runners cannot submit a binding or database ID.
 
@@ -25,6 +26,10 @@ Runner actions are:
 - `complete`: atomically append the success run, mark the job successful and upsert its resource cursor.
 - `record_notification`: persist one deduplicated macOS notification result.
 
+User action is:
+
+- `trigger`: enqueue the fixed `kuaimai/order_items` daily job for `businessDate`. `force=false` is idempotent and never resets an existing job. `force=true` may requeue `waiting_human`, `failed`, `schema_changed` or `success` after the user confirms login; queued or running work is not duplicated. The request cannot select a URL, selector, credential or arbitrary resource.
+
 ## States, leases and idempotency
 
 States are `queued`, `claimed`, `opening`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency includes `providerId:resourceType:businessDate:scheduleVersion` plus the server-owned target environment and version. Only `complete` from `ingesting` advances `(providerId, resourceType)` cursor. Provider facts are projected to the persisted target business database; a stale display version is rejected.
@@ -38,6 +43,8 @@ Responses use `{ data, meta }` and `cache-control: no-store`. The list response 
 - `WEB_COLLECTION_STORAGE_UNAVAILABLE`: D1 binding or table unavailable, retryable.
 - `WEB_COLLECTION_RUNNER_TOKEN_REQUIRED` / `WEB_COLLECTION_RUNNER_TOKEN_INVALID`: missing or invalid Keychain token.
 - `WEB_COLLECTION_RUNNER_REGISTER_DENIED` / `WEB_COLLECTION_VIEW_DENIED`: authorization failure.
+- `WEB_COLLECTION_TRIGGER_DENIED`: the company session cannot enqueue or retry collection.
+- `WEB_COLLECTION_TRIGGER_INVALID`: the requested provider, resource or business date is outside the fixed user-trigger contract.
 - `WEB_COLLECTION_JOB_INVALID`: provider, resource, date, range, key or forbidden instruction field is invalid.
 - `WEB_COLLECTION_JOB_NOT_FOUND` / `WEB_COLLECTION_JOB_OWNER_MISMATCH`: missing or wrong runner job.
 - `WEB_COLLECTION_STATE_CONFLICT` / `WEB_COLLECTION_TRANSITION_INVALID`: stale or illegal state update.

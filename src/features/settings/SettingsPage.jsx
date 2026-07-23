@@ -1,4 +1,5 @@
 import { LockKeyhole } from "lucide-react";
+import { useEffect } from "react";
 import { canEditFeature, canManagePermissions, canViewFeature } from "../../domain/permissions.js";
 import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
@@ -8,7 +9,7 @@ import { SalesDataSettings } from "./SalesDataSettings.jsx";
 import { TaskTemplateSettings } from "./TaskTemplateSettings.jsx";
 import { DataEnvironmentSettings } from "./DataEnvironmentSettings.jsx";
 
-export function SettingsPage() {
+export function SettingsPage({ detail = "" }) {
   const { state, currentUser, orgCache, updateSettings, updateTaskTemplates } = useProductFlow();
   const permissions = state.settings?.permissions || {};
   const managePermissions = canManagePermissions(currentUser);
@@ -16,6 +17,15 @@ export function SettingsPage() {
   const editTaskTemplates = canEditFeature(permissions, currentUser, "taskTemplates");
   const viewSalesData = canViewFeature(permissions, currentUser, "salesData");
   const editSalesData = canEditFeature(permissions, currentUser, "salesData");
+  useEffect(() => {
+    if (detail !== "sales-data" || !viewSalesData) return;
+    const frame = requestAnimationFrame(() => {
+      const target = document.getElementById("settings-sales-data");
+      target?.scrollIntoView({ block: "start", behavior: "smooth" });
+      target?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [detail, viewSalesData]);
 
   return (
     <section className="page">
