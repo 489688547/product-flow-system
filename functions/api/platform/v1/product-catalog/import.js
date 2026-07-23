@@ -12,7 +12,7 @@ export async function onRequest({ request, env, data = {} }) {
   try {
     const session = requireCatalogSession(data);
     requireCatalogEditor(session);
-    const db = productCatalogDatabase(env);
+    const db = productCatalogDatabase(env, data);
     if (!db) return errorResponse("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，商品导入暂不可用。", 501, "PRODUCT_CATALOG_STORAGE_UNAVAILABLE");
     const body = await request.json().catch(() => null);
     if (!body || !Array.isArray(body.items) || !body.items.length || body.items.some(item => !validIdentity(item))) {

@@ -74,6 +74,7 @@ function featureLabel(feature, row = {}) {
     appName: feature.appName,
     featureId: feature.featureId,
     featureName: feature.featureName,
+    dataEnvironment: row.data_environment === "display" ? "display" : "production",
     providerId: safeText(row.provider_id, 80),
     model: safeText(row.model),
     providerCalls,
@@ -136,6 +137,7 @@ function buildSkills(rows = []) {
       sourceAppId: safeText(row.source_app_id, 80) || skill?.sourceAppId || "unknown",
       skillId,
       skillName: skill?.skillName || skillId,
+      dataEnvironment: row.data_environment === "display" ? "display" : "production",
       calls: number(row.calls),
       successes: number(row.successes),
       failures: number(row.failures),
@@ -166,7 +168,7 @@ function buildSummary(features, skills) {
 }
 
 async function queryUsage(db, range) {
-  const features = await db.prepare(`SELECT app_id, feature_id, provider_id, model,
+  const features = await db.prepare(`SELECT app_id, feature_id, provider_id, model, data_environment,
     SUM(CASE WHEN provider_called = 1 THEN 1 ELSE 0 END) AS provider_calls,
     SUM(CASE WHEN provider_called = 1 AND execution_mode = 'model' AND completed = 1 THEN 1 ELSE 0 END) AS successful_calls,
     SUM(input_tokens) AS input_tokens,
@@ -175,12 +177,12 @@ async function queryUsage(db, range) {
     MAX(created_at) AS last_used_at
     FROM ai_usage_audit
     WHERE created_at >= ? AND created_at < ?
-    GROUP BY app_id, feature_id, provider_id, model`)
+    GROUP BY app_id, feature_id, provider_id, model, data_environment`)
     .bind(range.startUtc, range.endExclusiveUtc)
     .all();
   const skills = await db.prepare(`SELECT usage.app_id AS caller_app_id,
     usage.feature_id AS caller_feature_id, skill.app_id AS source_app_id,
-    skill.skill_id,
+    skill.skill_id, skill.data_environment,
     COUNT(*) AS calls,
     SUM(CASE WHEN skill.result_code = 'AI_SKILL_COMPLETED' THEN 1 ELSE 0 END) AS successes,
     SUM(CASE WHEN skill.result_code = 'AI_SKILL_COMPLETED' THEN 0 ELSE 1 END) AS failures,
@@ -189,7 +191,7 @@ async function queryUsage(db, range) {
     FROM ai_skill_audit AS skill
     INNER JOIN ai_usage_audit AS usage ON usage.request_id = skill.request_id
     WHERE skill.created_at >= ? AND skill.created_at < ?
-    GROUP BY usage.app_id, usage.feature_id, skill.app_id, skill.skill_id`)
+    GROUP BY usage.app_id, usage.feature_id, skill.app_id, skill.skill_id, skill.data_environment`)
     .bind(range.startUtc, range.endExclusiveUtc)
     .all();
   return { featureRows: features?.results || [], skillRows: skills?.results || [] };
@@ -200,7 +202,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (request.method !== "GET") return errorResponse("Method not allowed", 405, "AI_METHOD_NOT_ALLOWED");
   if (!data.session) return errorResponse("请先使用钉钉登录。", 401, "AI_SESSION_REQUIRED");
   if (!canViewDataCenter(data.session)) return errorResponse("当前账号没有数据中心查看权限。", 403, "AI_USAGE_ACCESS_DENIED");
-  const db = env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB;
+  const db = data.controlDb || env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB;
   if (!db) return errorResponse("AI 使用统计数据库暂不可用。", 503, "AI_STORAGE_UNAVAILABLE", true);
 
   let range;

@@ -4,13 +4,23 @@ import {
   jsonResponse,
   optionsResponse
 } from "../_shared/dingtalk.js";
+import { shouldSimulateExternalAction } from "../../platform/_shared/externalActionMode.js";
+import {
+  auditDisplayExternalAction,
+  simulateDingCalendarEvent
+} from "../../platform/_shared/displayExternalActionAdapter.js";
 
-export async function onRequest({ request, env }) {
+export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (request.method !== "POST") return jsonResponse({ message: "Method not allowed" }, 405);
 
   try {
     const body = await request.json().catch(() => ({}));
+    if (shouldSimulateExternalAction(data)) {
+      const event = simulateDingCalendarEvent(body);
+      await auditDisplayExternalAction({ env, data, kind: "dingtalk_calendar_create", resultId: event.id });
+      return jsonResponse({ synced: true, event });
+    }
     const accessToken = await getDingAccessToken(env);
     const event = await createDingCalendarEvent(accessToken, body);
     return jsonResponse({ synced: true, event });

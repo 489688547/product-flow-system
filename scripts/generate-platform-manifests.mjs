@@ -27,7 +27,8 @@ const CAPABILITY_FIELDS = new Set([
   "level",
   "envVars",
   "bindings",
-  "tables"
+  "tables",
+  "bindingTables"
 ]);
 const ENVIRONMENTS = new Set(["development", "preview", "production"]);
 const LEVELS = new Set(["blocking", "warning"]);
@@ -73,6 +74,20 @@ export function validateEnvironmentCapabilities(manifest, registry) {
     for (const field of ["envVars", "bindings", "tables"]) {
       if (!Array.isArray(capability[field]) || !capability[field].every(item => typeof item === "string" && item.trim())) {
         errors.push(`${context}.${field} 必须是字符串数组`);
+      }
+    }
+    if (capability.bindingTables !== undefined) {
+      if (!capability.bindingTables || typeof capability.bindingTables !== "object" || Array.isArray(capability.bindingTables)) {
+        errors.push(`${context}.bindingTables 必须是绑定到表名数组的对象`);
+      } else {
+        for (const [binding, tables] of Object.entries(capability.bindingTables)) {
+          if (!IDENTIFIER.test(binding) || !(capability.bindings || []).includes(binding)) {
+            errors.push(`${context}.bindingTables 包含未声明绑定：${binding}`);
+          }
+          if (!stringList(tables)) {
+            errors.push(`${context}.bindingTables.${binding} 必须是字符串数组`);
+          }
+        }
       }
     }
     for (const variable of [...(capability.envVars || []), ...(capability.bindings || [])]) {

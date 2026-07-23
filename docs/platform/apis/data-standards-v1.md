@@ -11,7 +11,7 @@
 - 预览：`POST /api/platform/v1/data-standards/preview`
 - 计算：`POST /api/platform/v1/data-standards/recalculate`
 - 结果：`GET /api/platform/v1/data-standards/results`
-- 存储：`PRODUCT_FLOW_DB` 中的版本化数据口径表
+- 存储：由服务端数据环境路由选定的业务 D1 中的版本化数据口径表
 
 该 API 是数据口径定义、版本、依赖、预览、计算批次和有效结果的共享边界。它不接收任意 SQL 或 JavaScript，也不执行外部平台动作。
 
@@ -90,6 +90,8 @@ PUT 使用与创建相同的字段白名单，并且必须提交整数 `expected
 预览使用与创建相同的口径字段，并增加 `from`、`to`。日期范围按上海时区解释，首尾均包含，最多连续 31 天。权限与发布一致；财务、运营、供应链只能预览自己责任部门的口径。
 
 预览和正式计算共用受控 AST 编译器与执行器。表名、列名、聚合和过滤只能来自服务端 registry，日期和值使用 D1 bound parameters；请求不能提交 SQL、JavaScript 或任意列名。销售事实固定读取 `product_sales_daily`，按 `create_time` 日聚合并排除“其它/其他/未知/未知平台”。
+
+展示数据库生成时，`product_sales_daily` 的销量、销售额、净销售额、退款额、成本、毛利和发货前后退款等可加总事实统一扩大为两倍；日期、平台、商品和 69 码等维度保持不变。退款率、毛利率、客单价等派生值必须从转换后的基础事实重新计算，不能直接乘二。`data_metric_results` 和计算批次不从正式库复制，而是在展示事实完成校验后重新生成，避免正式与展示结果串库。
 
 成功响应返回 `result`，包含 `value`（可为 `null`）、`unit`、`version`、`coverageRate`、`confidence`、`estimated`、`status`、`reasonCode` 和 `dataCutoffAt`。分母为零或事实缺失不补零；尚未覆盖的货流口径返回 `data_not_covered / DATA_NOT_COVERED`，不生成模拟值。预览不写 `data_metric_results`，但成功和失败均追加脱敏审计，只记录口径引用、范围、操作者和结果动作。
 

@@ -18,8 +18,21 @@ export function detectRuntimeEnvironment(env = {}, requestUrl = "") {
   return "production";
 }
 
-export function readinessDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function readinessDatabase(env = {}, binding = "PRODUCT_FLOW_DB") {
+  if (binding === "PRODUCT_FLOW_DB") {
+    return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+  }
+  return env[binding] || null;
+}
+
+function environmentVariableMissing(name, env, vaultEnvVars) {
+  if (name === "PLATFORM_CREDENTIAL_MASTER_KEY") {
+    return !isValidPlatformCredentialMasterKey(env[name]);
+  }
+  if (name === "DEMO_DATA_MASKING_KEY") {
+    return String(env[name] || "").length < 16;
+  }
+  return !env[name] && !vaultEnvVars.has(name);
 }
 
 async function existingTables(db, names) {
@@ -38,19 +51,36 @@ async function existingTables(db, names) {
 export async function inspectEnvironmentReadiness({ env = {}, requestUrl = "", manifest = environmentCapabilities } = {}) {
   const environment = detectRuntimeEnvironment(env, requestUrl);
   const required = (manifest.capabilities || []).filter(capability => capability.requiredIn.includes(environment));
-  const db = readinessDatabase(env);
-  const tableNames = [...new Set(required.flatMap(capability => capability.tables || []))];
-  const [tables, vaultEnvVars] = await Promise.all([
-    existingTables(db, tableNames),
-    configuredCredentialEnvVars(env)
-  ]);
+  const tableRequirements = new Map();
+  for (const capability of required) {
+    const defaultBinding = capability.bindings?.[0] || "PRODUCT_FLOW_DB";
+    if ((capability.tables || []).length) {
+      if (!tableRequirements.has(defaultBinding)) tableRequirements.set(defaultBinding, new Set());
+      capability.tables.forEach(table => tableRequirements.get(defaultBinding).add(table));
+    }
+    for (const [binding, tables] of Object.entries(capability.bindingTables || {})) {
+      if (!tableRequirements.has(binding)) tableRequirements.set(binding, new Set());
+      tables.forEach(table => tableRequirements.get(binding).add(table));
+    }
+  }
+  const tablesByBinding = new Map(await Promise.all(
+    [...tableRequirements.entries()].map(async ([binding, names]) => [
+      binding,
+      await existingTables(readinessDatabase(env, binding), [...names])
+    ])
+  ));
+  const vaultEnvVars = await configuredCredentialEnvVars(env);
   const capabilities = required.map(capability => {
+    const defaultBinding = capability.bindings?.[0] || "PRODUCT_FLOW_DB";
     const missing = [
-      ...(capability.envVars || []).filter(name => name === "PLATFORM_CREDENTIAL_MASTER_KEY"
-        ? !isValidPlatformCredentialMasterKey(env[name])
-        : !env[name] && !vaultEnvVars.has(name)),
-      ...(capability.bindings || []).filter(name => name === "PRODUCT_FLOW_DB" ? !db : !env[name]),
-      ...(capability.tables || []).filter(name => !tables.has(name))
+      ...(capability.envVars || []).filter(name => environmentVariableMissing(name, env, vaultEnvVars)),
+      ...(capability.bindings || []).filter(name => !readinessDatabase(env, name)),
+      ...(capability.tables || []).filter(name => !tablesByBinding.get(defaultBinding)?.has(name)),
+      ...Object.entries(capability.bindingTables || {}).flatMap(([binding, tables]) =>
+        tables
+          .filter(name => !tablesByBinding.get(binding)?.has(name))
+          .map(name => `${binding}:${name}`)
+      )
     ];
     return {
       id: capability.id,

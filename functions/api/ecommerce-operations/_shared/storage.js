@@ -1,9 +1,10 @@
 import { normalizeEcommerceOperationsState } from "../../../../src/domain/ecommerceOperations.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 
 const COLLECTIONS = ["cycles", "plans", "executions", "collaborations", "responsibilities", "playbooks", "aiReviews", "auditLogs"];
 
-export function operationsDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function operationsDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureOperationsTables(db) {

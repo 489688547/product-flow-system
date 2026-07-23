@@ -38,11 +38,44 @@ test("extension source never evaluates remote code or accepts remote selectors",
   assert.doesNotMatch(source, /chrome\.cookies/);
 });
 
+test("Kuaimai async exports are completed through the bundled download center adapter", async () => {
+  const contentScript = await readFile(new URL("content-script.js", extensionRoot), "utf8");
+  const adapter = await readFile(new URL("providers/kuaimai.js", extensionRoot), "utf8");
+  const serviceWorker = await readFile(new URL("service-worker.js", extensionRoot), "utf8");
+
+  assert.match(adapter, /KUAIMAI_DOWNLOAD_CENTER_ROUTE/);
+  assert.match(adapter, /selectKuaimaiDownloadRow/);
+  assert.match(contentScript, /download_from_center/);
+  assert.match(contentScript, /waitForKuaimaiOrderPage/);
+  assert.match(contentScript, /KUAIMAI_DOWNLOAD_CENTER_TIMEOUT/);
+  assert.match(contentScript, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
+  assert.match(contentScript, /assertAppliedKuaimaiRange/);
+  assert.match(contentScript, /openKuaimaiExportDialog/);
+  assert.match(serviceWorker, /downloadFilePrefixes/);
+  assert.match(serviceWorker, /registeredTaskUrl/);
+  assert.match(serviceWorker, /probeContentScript/);
+  assert.match(serviceWorker, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
+  assert.match(serviceWorker, /chrome\.tabs\.reload\(tab\.id\)/);
+  assert.match(serviceWorker, /registeredDirectDownload/);
+  assert.match(serviceWorker, /chrome\.downloads\.download/);
+  assert.match(serviceWorker, /ensurePollAlarm/);
+  assert.doesNotMatch(contentScript, /task\.(downloadCenter|selector|route|url)/);
+});
+
 test("extension task contract only allows registered provider resources", async () => {
-  const { assertRegisteredTask, registeredResource } = await import(new URL("providers/registry.js", extensionRoot));
+  const { assertRegisteredTask, registeredResource, registeredTaskUrl } = await import(new URL("providers/registry.js", extensionRoot));
 
   assert.equal(registeredResource("kuaimai", "orders").providerId, "kuaimai");
   assert.equal(registeredResource("kuaimai", "order_items").resourceType, "order_items");
+  assert.match(
+    registeredTaskUrl({
+      jobId: "job-1",
+      providerId: "kuaimai",
+      resourceType: "orders",
+      businessDate: "2026-07-21"
+    }),
+    /startTime=1784563200000&endTime=1784649599000/
+  );
   assert.throws(
     () => assertRegisteredTask({ jobId: "job-1", providerId: "unknown", resourceType: "orders", businessDate: "2026-07-21" }),
     error => error?.code === "EXTENSION_TASK_NOT_REGISTERED"

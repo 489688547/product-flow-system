@@ -7,7 +7,7 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
   if (request.method !== "GET") return methodNotAllowed();
   try {
     const actor = collaborationActor(requireSession(data));
-    const db = collaborationDatabase(env);
+    const db = collaborationDatabase(env, data);
     if (!db) throw new CollaborationHttpError(501, "COLLABORATION_STORAGE_UNAVAILABLE", "共享协同数据暂不可用。", undefined, true);
     await ensureCollaborationTables(db);
     const item = await findItemById(db, params.id);

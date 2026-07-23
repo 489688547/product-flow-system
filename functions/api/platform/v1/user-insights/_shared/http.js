@@ -49,7 +49,9 @@ export async function readJson(request) {
   return body;
 }
 
-export function requireD1(env = {}) {
-  if (env.PRODUCT_FLOW_DB) return env.PRODUCT_FLOW_DB;
+export function requireD1(env = {}, data = {}) {
+  const db = requestBusinessDatabase({ env, data });
+  if (db) return db;
   throw new UserInsightHttpError(501, "STORAGE_D1_UNAVAILABLE", "用户洞察数据库尚未配置。", undefined, true);
 }
+import { requestBusinessDatabase } from "../../../_shared/dataEnvironment.js";

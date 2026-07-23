@@ -5,12 +5,18 @@ import { useAuth } from "./AuthProvider.jsx";
 import { useProductFlow } from "./ProductFlowProvider.jsx";
 import { platformApiUrl } from "./platformApi.js";
 import { buildDecisionTodoPayload, buildPersonalTodoPayload } from "../domain/platformNotifications.js";
+import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const PlatformContext = createContext(null);
 const STORAGE_KEY = "platformExecutionState";
 const localCache = getBrowserStorage("localStorage");
 const GOVERNED_DEMO_COLLECTIONS = ["departmentCommitments", "commitmentMilestones", "incentiveProjects", "departmentRewardBudgets", "monthlyReports"];
+
+function localStorageKey() {
+  migrateLegacyProductionCache(localCache, STORAGE_KEY);
+  return environmentStorageKey(STORAGE_KEY);
+}
 
 function isLocalHost() {
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
@@ -29,7 +35,7 @@ function normalizeWithLocalDemo(input) {
 
 function loadLocalState() {
   try {
-    const raw = tryGetStorageItem(localCache, STORAGE_KEY);
+    const raw = tryGetStorageItem(localCache, localStorageKey());
     return raw ? normalizeWithLocalDemo(JSON.parse(raw)) : createDefaultPlatformState();
   } catch {
     return createDefaultPlatformState();
@@ -65,7 +71,7 @@ export function PlatformProvider({ children, enabled = true }) {
         if (alive) {
           const normalized = normalizeWithLocalDemo(payload.state);
           setState(normalized);
-          persistLocalState(localCache, STORAGE_KEY, normalized);
+          persistLocalState(localCache, localStorageKey(), normalized);
           setError("");
         }
       } catch (loadError) {
@@ -82,7 +88,7 @@ export function PlatformProvider({ children, enabled = true }) {
 
   useEffect(() => {
     if (!enabled) return undefined;
-    persistLocalState(localCache, STORAGE_KEY, state);
+    persistLocalState(localCache, localStorageKey(), state);
     if (firstSave.current) {
       firstSave.current = false;
       return undefined;
@@ -98,9 +104,7 @@ export function PlatformProvider({ children, enabled = true }) {
         if (!response.ok || payload.synced === false) throw new Error(payload.message || "战略执行数据保存失败。");
         setError("");
       } catch (saveError) {
-        if (!isLocalHost()) {
-          setError(errorMessage(saveError, "战略执行数据同步失败，修改已保存在本机。"));
-        }
+        setError(errorMessage(saveError, "战略执行数据同步失败，修改已保存在本机。"));
       }
     }, 600);
     return () => clearTimeout(timer);

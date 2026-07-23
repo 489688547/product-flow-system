@@ -14,35 +14,85 @@ export const REQUIRED_PAGES_SECRETS = Object.freeze([
 ]);
 
 function parseSections(source) {
-  const sections = new Map([["root", []]]);
+  const sections = new Map([["root", [[]]]]);
   let current = "root";
+  let block = sections.get("root")[0];
   for (const line of String(source || "").split(/\r?\n/)) {
-    const header = line.trim().match(/^\[\[?([^\]]+)\]\]?$/);
+    const header = line.trim().match(/^(\[\[?)([^\]]+)\]\]?$/);
     if (header) {
-      current = header[1].trim();
+      current = header[2].trim();
       if (!sections.has(current)) sections.set(current, []);
+      block = [];
+      sections.get(current).push(block);
       continue;
     }
-    sections.get(current).push(line);
+    block.push(line);
   }
   return sections;
 }
 
-function sectionValue(sections, section, key) {
+function blockValue(block, key) {
   const pattern = new RegExp(`^\\s*${key}\\s*=\\s*"([^"]*)"\\s*$`);
-  for (const line of sections.get(section) || []) {
+  for (const line of block || []) {
     const match = line.match(pattern);
     if (match) return match[1];
   }
   return "";
 }
 
-function environmentContract(source, { explicit = true } = {}) {
+function sectionBindings(sections, section) {
+  return Object.fromEntries((sections.get(section) || []).flatMap(block => {
+    const binding = blockValue(block, "binding");
+    const databaseId = blockValue(block, "database_id");
+    return binding ? [[binding, databaseId]] : [];
+  }));
+}
+
+function mergeFallback(primary, fallback) {
+  return { ...(fallback || {}), ...(primary || {}) };
+}
+
+export function inspectWranglerD1Bindings(source, { explicit = true } = {}) {
   const sections = parseSections(source);
-  const localD1 = sectionValue(sections, "d1_databases", "database_id");
-  const previewD1 = sectionValue(sections, "env.preview.d1_databases", "database_id") || (!explicit ? localD1 : "");
-  const productionD1 = sectionValue(sections, "env.production.d1_databases", "database_id") || (!explicit ? localD1 : "");
-  return { databaseIds: { local: localD1, preview: previewD1, production: productionD1 } };
+  const local = sectionBindings(sections, "d1_databases");
+  const preview = sectionBindings(sections, "env.preview.d1_databases");
+  const production = sectionBindings(sections, "env.production.d1_databases");
+  return {
+    local,
+    preview: explicit ? preview : mergeFallback(preview, local),
+    production: explicit ? production : mergeFallback(production, local)
+  };
+}
+
+export function validateD1Bindings(environments) {
+  const errors = [];
+  const requiredBindings = ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"];
+  for (const environment of ["local", "preview", "production"]) {
+    for (const binding of requiredBindings) {
+      if (!environments?.[environment]?.[binding]) {
+        errors.push(`${environment} 缺少 ${binding}`);
+      }
+    }
+  }
+  for (const binding of requiredBindings) {
+    const ids = [...new Set(
+      ["local", "preview", "production"]
+        .map(environment => environments?.[environment]?.[binding])
+        .filter(Boolean)
+    )];
+    if (ids.length > 1) {
+      errors.push(`本地、Preview、Production 的 D1 binding ${binding} database_id 不一致`);
+    }
+  }
+  for (const environment of ["local", "preview", "production"]) {
+    const productId = environments?.[environment]?.PRODUCT_FLOW_DB;
+    const displayId = environments?.[environment]?.DEMO_FLOW_DB;
+    if (productId && displayId && productId === displayId) {
+      errors.push("正式数据库与展示数据库必须使用不同 D1");
+      break;
+    }
+  }
+  return errors;
 }
 
 function missingNames(actual = [], required = REQUIRED_PAGES_SECRETS) {
@@ -51,16 +101,18 @@ function missingNames(actual = [], required = REQUIRED_PAGES_SECRETS) {
 }
 
 export function assertPagesEnvironmentParity(source) {
-  const contract = environmentContract(source, { explicit: true });
-  const errors = [];
-  const ids = Object.entries(contract.databaseIds);
-  for (const [environment, id] of ids) {
-    if (!id) errors.push(`${environment} 缺少 PRODUCT_FLOW_DB`);
-  }
-  const configuredIds = [...new Set(ids.map(([, id]) => id).filter(Boolean))];
-  if (configuredIds.length > 1) errors.push("本地、Preview、Production 的 D1 database_id 不一致");
+  const environments = inspectWranglerD1Bindings(source, { explicit: true });
+  const errors = validateD1Bindings(environments);
   if (errors.length) throw new Error(`Pages 环境契约不一致：${errors.join("；")}`);
-  return { databaseId: configuredIds[0] };
+  const databaseIds = {
+    PRODUCT_FLOW_DB: environments.local.PRODUCT_FLOW_DB,
+    DEMO_FLOW_DB: environments.local.DEMO_FLOW_DB
+  };
+  return {
+    databaseId: databaseIds.PRODUCT_FLOW_DB,
+    databaseIds,
+    environments
+  };
 }
 
 export function requiredPagesSecrets(manifest = {}) {
@@ -80,24 +132,29 @@ export function inspectRemotePagesParity({
   productionSecretOutput,
   requiredSecrets = REQUIRED_PAGES_SECRETS
 } = {}) {
-  const contract = environmentContract(configSource, { explicit: false });
-  const previewD1 = contract.databaseIds.preview;
-  const productionD1 = contract.databaseIds.production;
+  const environments = inspectWranglerD1Bindings(configSource, { explicit: false });
   const missingSecrets = {
     preview: missingNames(parsePagesSecretList(previewSecretOutput), requiredSecrets),
     production: missingNames(parsePagesSecretList(productionSecretOutput), requiredSecrets)
   };
-  const errors = [];
-  if (!previewD1 || !productionD1 || previewD1 !== productionD1) {
-    errors.push("Preview 与 Production 的远程 D1 不一致");
-  }
+  const errors = validateD1Bindings(environments);
   for (const environment of ["preview", "production"]) {
     if (missingSecrets[environment].length) {
       errors.push(`${environment} 缺少 Secret：${missingSecrets[environment].join("、")}`);
     }
   }
   if (errors.length) throw new Error(`Pages 远程环境不一致：${errors.join("；")}`);
-  return { preview: previewD1, production: productionD1, sameDatabase: true, missingSecrets };
+  const databaseIds = {
+    PRODUCT_FLOW_DB: environments.production.PRODUCT_FLOW_DB,
+    DEMO_FLOW_DB: environments.production.DEMO_FLOW_DB
+  };
+  return {
+    preview: environments.preview.PRODUCT_FLOW_DB,
+    production: environments.production.PRODUCT_FLOW_DB,
+    databaseIds,
+    sameDatabase: true,
+    missingSecrets
+  };
 }
 
 function wrangler(args, cwd) {
@@ -130,9 +187,9 @@ if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
     const requiredSecrets = requiredPagesSecrets(manifest);
     if (process.argv.includes("--remote")) {
       remoteCheck(root, "product-flow-system", requiredSecrets);
-      console.log("Pages 远程环境一致性检查通过：Preview 与 Production 使用同一 D1，必要 Secret 名称完整。");
+      console.log("Pages 远程环境一致性检查通过：Preview 与 Production 的正式/展示 D1 绑定一致，必要 Secret 名称完整。");
     } else {
-      console.log("Pages 环境契约检查通过：本地、Preview、Production 使用同一 D1 声明。");
+      console.log("Pages 环境契约检查通过：本地、Preview、Production 使用一致且相互隔离的正式/展示 D1 声明。");
     }
   } catch (error) {
     console.error(error?.message || error);

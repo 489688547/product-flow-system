@@ -49,17 +49,33 @@ test("collector preserves repeated lines for the same order and specification", 
 
 test("collector strips buyer, recipient, address and waybill fields before upload", async () => {
   const file = new File([
-    "系统订单号,规格商家编码,下单时间,店铺名称,销售数量,收件人,手机号,详细地址,快递单号,买家旺旺,系统备注\n",
-    "KM1001,SKU-A,2026-07-01 10:20:30,抖音官方旗舰店,1,张三,13800000000,测试路1号,SF123,buyer-1,联系买家\n"
+    "系统订单号,规格商家编码,下单时间,店铺名称,销售数量,收件人,手机,手机号,固话,省,市,区,街道,详细地址,收件地址,邮箱,快递单号,买家旺旺,买家ID,系统备注\n",
+    "KM1001,SKU-A,2026-07-01 10:20:30,抖音官方旗舰店,1,张三,13800000000,13800000000,010-12345678,江苏省,苏州市,工业园区,测试街道,测试路1号,江苏省苏州市测试路1号,buyer@example.com,SF123,buyer-1,buyer-id,联系买家\n"
   ], "kuaimai-private-order-items.csv");
   const result = await readKuaimaiExport(file, { resourceType: "order_items" });
   const stored = result.records[0].payload;
   assert.equal(stored.系统订单号, "KM1001");
   assert.equal(stored.销售数量, "1");
-  for (const key of ["收件人", "手机号", "详细地址", "快递单号", "买家旺旺", "系统备注"]) {
+  for (const key of [
+    "收件人", "手机", "手机号", "固话", "省", "市", "区", "街道", "详细地址", "收件地址",
+    "邮箱", "快递单号", "买家旺旺", "买家ID", "系统备注"
+  ]) {
     assert.equal(key in stored, false);
   }
   assert.equal(result.issues.some(issue => issue.code === "SENSITIVE_FIELDS_REDACTED"), true);
+});
+
+test("collector recognizes rich Kuaimai sales-item exports by order creation time", async () => {
+  const file = new File([
+    "系统订单号,规格商家编码,主商家编码,下单时间,店铺名称,所属平台,销售数量,退货数量,销售金额,商品买家已付金额,销售成本,退货成本,退款金额\n",
+    "KM1001,6978705011208,SPU-1,2026-07-22 10:20:30,抖音官方旗舰店,抖店(放心购),2,1,39.8,35.8,16,8,4\n"
+  ], "销售主题分析-按订单商品明细.csv");
+  const result = await readKuaimaiExport(file, { resourceType: "sales_items" });
+
+  assert.equal(result.batch.resourceType, "sales_items");
+  assert.equal(result.batch.rowCount, 1);
+  assert.equal(result.batch.rangeStart, "2026-07-22T10:20:30+08:00");
+  assert.equal(result.records[0].sourceKey, "KM1001::6978705011208");
 });
 
 test("uploader chunks records and marks only the final request completed", async () => {

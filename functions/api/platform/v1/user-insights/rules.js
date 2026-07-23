@@ -5,12 +5,12 @@ import { appendAudit, getInsightRecord, listInsightRecords, putInsightRecord } f
 
 async function handleGet(context) {
   requireInsightActor(context.data);
-  return jsonResponse({ synced: true, rules: await listInsightRecords(requireD1(context.env), "rules") });
+  return jsonResponse({ synced: true, rules: await listInsightRecords(requireD1(context.env, context.data), "rules") });
 }
 
 async function handleWrite(context) {
   const actor = requireInsightActor(context.data);
-  const db = requireD1(context.env);
+  const db = requireD1(context.env, context.data);
   const body = await readJson(context.request);
   let rule;
   if (body.action === "copy") {

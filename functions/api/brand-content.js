@@ -2,6 +2,7 @@ import { createEmptyBrandContentState, normalizeBrandContentState, reduceBrandCo
 import { canAccessCompanyPlatform } from "../../src/domain/permissions.js";
 import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
 import { ensureBrandContentTable, readBrandContentState } from "./brand-content/_shared/storage.js";
+import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
 
 const ACTION_TYPES = new Set([
   "create_content",
@@ -14,8 +15,8 @@ const ACTION_TYPES = new Set([
 
 const LEAD_ACTIONS = new Set(["create_content", "confirm_decision", "update_settings"]);
 
-function brandDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+function brandDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 function requestId() {
@@ -136,7 +137,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (request.method === "POST" && session.role === "readonly") {
     return errorResponse("只读账号不能修改品牌内容数据。", 403, "BRAND_CONTENT_WRITE_DENIED");
   }
-  const db = brandDatabase(env);
+  const db = brandDatabase(env, data);
   if (!db) {
     return errorResponse("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，品牌内容共享数据暂不可用。", 501, "BRAND_CONTENT_STORAGE_UNAVAILABLE", {}, true);
   }

@@ -23,6 +23,17 @@ const RESOURCE_SCHEMAS = {
     shop: ["店铺ID", "店铺编号", "店铺名称", "店铺"],
     warehouse: ["仓库ID", "仓库编号", "仓库名称", "仓库"]
   },
+  sales_items: {
+    identities: [
+      ["订单明细ID", "明细ID", "子订单号"],
+      ["系统订单号", "系统单号", "订单编号", "订单号"],
+      ["系统规格ID", "规格ID", "SKU ID", "规格商家编码", "商家编码", "规格编码", "SKU编码"]
+    ],
+    occurredAt: ["订单创建时间", "创建时间", "下单时间", "交易创建时间"],
+    modifiedAt: ["订单修改时间", "修改时间", "更新时间", "售后解决时间"],
+    shop: ["店铺ID", "店铺编号", "店铺名称", "店铺"],
+    warehouse: ["仓库ID", "仓库编号", "仓库名称", "发货仓库", "仓库"]
+  },
   products: {
     identities: [["系统商品ID", "商品ID", "主商家编码", "商品编码", "商家编码"]],
     modifiedAt: ["修改时间", "更新时间"],
@@ -163,9 +174,10 @@ function rowPayload(headers, row) {
 
 const SENSITIVE_HEADER_PATTERNS = [
   /^(收件人|收件姓名|收货人|收货姓名)$/,
-  /^(手机号|手机号码|联系电话|联系手机|电话)$/,
-  /^(收件地址|收货地址|详细地址|街道地址)$/,
-  /^(快递单号|物流单号|退回快递单号)$/,
+  /^(手机|手机号|手机号码|联系电话|联系手机|电话|固话|座机)$/,
+  /^(省|市|区|县|街道|收件地址|收货地址|详细地址|街道地址|详细地址\(包含省市区\)|购方地址)$/,
+  /^(快递单号|物流单号|运单号|退回快递单号)$/,
+  /^(邮箱|电子邮箱|email)$/i,
   /^买家(旺旺|昵称|姓名|ID|留言)$/i,
   /^(系统备注|卖家备注|买家备注|买家留言)$/,
   /^(身份证|身份证号|证件号)$/
@@ -245,7 +257,7 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
     const payload = rowPayload(headers, row);
     const baseSourceKey = identity.join("::");
     let sourceKey = baseSourceKey;
-    if (recordsByKey.has(baseSourceKey) && resourceType === "order_items") {
+    if (recordsByKey.has(baseSourceKey) && ["order_items", "sales_items"].includes(resourceType)) {
       const ordinal = (duplicateOrdinals.get(baseSourceKey) || 1) + 1;
       duplicateOrdinals.set(baseSourceKey, ordinal);
       sourceKey = `${baseSourceKey}::line:${ordinal}`;

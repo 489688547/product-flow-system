@@ -1,3 +1,6 @@
+import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
+import { scaleSalesFact } from "../../src/domain/demoSalesTransform.js";
+
 const META_ID = "sales-meta";
 // Cloudflare D1 allows at most 100 bound parameters per statement; 9 rows × 11 columns = 99.
 const INSERT_CHUNK = 9;
@@ -28,8 +31,8 @@ function optionsResponse() {
   });
 }
 
-export function salesDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function salesDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureSalesTables(db) {
@@ -84,7 +87,7 @@ function validRow(row) {
   return row && typeof row === "object" && /^69\d{10,12}$/.test(String(row.code || "")) && /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || ""));
 }
 
-async function insertRows(db, rows) {
+export async function insertSalesRows(db, rows) {
   const statements = [];
   for (let index = 0; index < rows.length; index += INSERT_CHUNK) {
     const chunk = rows.slice(index, index + INSERT_CHUNK);
@@ -112,6 +115,48 @@ async function insertRows(db, rows) {
   for (const statement of statements) await statement.run();
 }
 
+export async function replaceSalesFactsForDates(db, rows, {
+  source = "快麦销售主题报表",
+  importedBy = "公司网页采集器",
+  importedAt = new Date().toISOString()
+} = {}) {
+  await ensureSalesTables(db);
+  const validRows = (Array.isArray(rows) ? rows : []).filter(validRow);
+  if (!validRows.length) {
+    const error = new Error("销售明细没有可写入的 69 码事实。");
+    error.code = "ERP_COLLECTION_SALES_FACTS_EMPTY";
+    error.status = 422;
+    throw error;
+  }
+  const dates = [...new Set(validRows.map(row => String(row.date)))].sort();
+  for (const day of dates) {
+    await db.prepare("DELETE FROM product_sales_daily WHERE date = ?").bind(day).run();
+  }
+  await insertSalesRows(db, validRows);
+  const meta = await readMeta(db);
+  const months = [...new Set(dates.map(day => day.slice(0, 7)))].sort();
+  const monthRows = {};
+  validRows.forEach(row => {
+    const month = String(row.date).slice(0, 7);
+    monthRows[month] = (monthRows[month] || 0) + 1;
+  });
+  meta.imports = [
+    {
+      id: `import-${Date.parse(importedAt) || Date.now()}`,
+      months,
+      monthRows,
+      rows: validRows.length,
+      scope: "dates",
+      source: String(source || "").slice(0, 120),
+      importedBy: String(importedBy || "").slice(0, 80),
+      importedAt
+    },
+    ...meta.imports.filter(item => item.scope === "months" || !item.months?.some(month => months.includes(month)))
+  ].slice(0, 60);
+  await writeMeta(db, meta);
+  return { rows: validRows.length, dates, months, importedAt };
+}
+
 function mapDbRow(row) {
   return {
     code: row.code,
@@ -128,9 +173,9 @@ function mapDbRow(row) {
   };
 }
 
-export async function onRequest({ request, env }) {
+export async function onRequest({ request, env, data = {} }) {
   if (request.method === "OPTIONS") return optionsResponse();
-  const db = salesDatabase(env);
+  const db = salesDatabase(env, data);
   if (!db) {
     return jsonResponse({ synced: false, message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，销售数据只能保存在本机浏览器。" }, 501);
   }
@@ -151,7 +196,10 @@ export async function onRequest({ request, env }) {
     }
     if (request.method === "POST") {
       const body = await request.json().catch(() => ({}));
-      const rows = (Array.isArray(body.rows) ? body.rows : []).filter(validRow);
+      const sourceRows = (Array.isArray(body.rows) ? body.rows : []).filter(validRow);
+      const rows = data.dataEnvironment?.id === "display"
+        ? sourceRows.map(row => scaleSalesFact(row))
+        : sourceRows;
       if (!rows.length) return jsonResponse({ synced: false, message: "没有可保存的销售数据行。" }, 400);
       const monthRows = {};
       rows.forEach(row => {
@@ -172,7 +220,7 @@ export async function onRequest({ request, env }) {
           await db.prepare("DELETE FROM product_sales_daily WHERE substr(date, 1, 7) = ?").bind(month).run();
         }
       }
-      await insertRows(db, rows);
+      await insertSalesRows(db, rows);
       const meta = await readMeta(db);
       const importedAt = new Date().toISOString();
       meta.titles = { ...meta.titles, ...(body.titles && typeof body.titles === "object" ? body.titles : {}) };

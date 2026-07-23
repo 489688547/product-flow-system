@@ -2,7 +2,7 @@
 
 ## Contract
 
-`GET /api/platform/v1/data-services/sales` is a read-only shared sales dataset service. It reads `product_sales_daily` through the `PRODUCT_FLOW_DB` binding and never exposes D1 credentials or raw order records.
+`GET /api/platform/v1/data-services/sales` is a read-only shared sales dataset service. It reads `product_sales_daily` through the middleware-selected business database and never exposes D1 credentials or raw order records. The browser cannot choose a binding or database ID.
 
 ## Authentication and authorization
 

@@ -80,12 +80,14 @@ test("AI usage report aggregates model tokens fallbacks and skills without emplo
       {
         app_id: "company-ai-assistant", feature_id: "assistant-chat",
         provider_id: "lingsuan-responses", model: "gpt-5.6-sol",
+        data_environment: "display",
         provider_calls: 2, successful_calls: 1, input_tokens: 100,
         output_tokens: 30, fallback_runs: 1, last_used_at: "2026-07-22T02:00:00.000Z"
       },
       {
         app_id: "ecommerce-operations", feature_id: "plan-review",
         provider_id: "lingsuan-responses", model: "gpt-5.6-sol",
+        data_environment: "production",
         provider_calls: 1, successful_calls: 1, input_tokens: 20,
         output_tokens: 10, fallback_runs: 1, last_used_at: "2026-07-21T02:00:00.000Z"
       }
@@ -93,6 +95,7 @@ test("AI usage report aggregates model tokens fallbacks and skills without emplo
     skillRows: [{
       caller_app_id: "company-ai-assistant", caller_feature_id: "assistant-chat",
       source_app_id: "data-center", skill_id: "data_center_query_sales",
+      data_environment: "display",
       calls: 3, successes: 2, failures: 1, result_count: 24,
       last_used_at: "2026-07-22T02:00:00.000Z"
     }]
@@ -116,9 +119,12 @@ test("AI usage report aggregates model tokens fallbacks and skills without emplo
   });
   assert.equal(payload.features[0].appName, "公司 AI 总助");
   assert.equal(payload.features[0].featureName, "对话分析");
+  assert.equal(payload.features[0].dataEnvironment, "display");
   assert.equal(payload.features[0].totalTokens, 130);
   assert.equal(payload.skills[0].skillName, "销售经营");
   assert.equal(payload.skills[0].sourceAppId, "data-center");
+  assert.equal(payload.skills[0].dataEnvironment, "display");
+  assert.ok(db.calls.every(call => /data_environment/i.test(call.sql)));
   assert.doesNotMatch(JSON.stringify(payload), /user_id|department|prompt|answer|raw d1 failure/i);
 });
 

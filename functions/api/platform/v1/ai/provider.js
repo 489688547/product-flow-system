@@ -10,7 +10,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (!["GET", "PUT"].includes(request.method)) return aiError("Method not allowed", 405, "AI_METHOD_NOT_ALLOWED");
   if (!data.session) return aiError("请先使用钉钉登录。", 401, "AI_SESSION_REQUIRED");
   try {
-    const loaded = await loadAiConfiguration(env);
+    const loaded = await loadAiConfiguration(env, data);
     const canManage = canAccessCompanyPlatform(data.session) && data.session.role !== "readonly";
     if (request.method === "GET") {
       return jsonResponse({

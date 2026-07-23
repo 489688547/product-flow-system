@@ -57,17 +57,17 @@ test("shared state layer uses the same-origin production data proxy during local
   assert.match(store, /persistLocalState/);
   assert.match(sync, /baseUpdatedAt/);
   assert.match(store, /productFlowStateRecoveryBackup/);
-  assert.match(store, /tryRemoveStorageItem\(localCache, DIRTY_STORAGE_KEY\)/);
+  assert.match(store, /tryRemoveStorageItem\(localCache, localKey\(DIRTY_STORAGE_KEY\)\)/);
   assert.match(store, /method: "POST"/);
-  assert.match(store, /tryGetStorageItem\(localCache, STORAGE_KEY\)/);
+  assert.match(store, /tryGetStorageItem\(localCache, localKey\(STORAGE_KEY\)\)/);
   assert.doesNotMatch(store, /localStorage\.setItem\(STORAGE_KEY/);
   assert.match(store, /sharedError/);
   assert.match(store, /productFlowStateDirty/);
   assert.doesNotMatch(store, /keepalive: true/);
   assert.match(store, /共享数据加载失败，已暂停自动保存，请刷新重试/);
-  assert.match(store, /tryGetStorageItem\(localCache, DIRTY_STORAGE_KEY\)/);
+  assert.match(store, /tryGetStorageItem\(localCache, localKey\(DIRTY_STORAGE_KEY\)\)/);
   assert.match(store, /const commitState = useCallback/);
-  assert.match(store, /persistLocalState\(localCache, STORAGE_KEY, nextState\)/);
+  assert.match(store, /persistLocalState\(localCache, localKey\(STORAGE_KEY\), nextState\)/);
   assert.match(store, /const updateTask = useCallback[\s\S]*commitState\(current/);
   assert.match(store, /latestState\.current === state/);
   assert.doesNotMatch(store, /if \(localStorage\.getItem\(DIRTY_STORAGE_KEY\) === "1"\) return;/);
@@ -124,7 +124,9 @@ test("supply chain feature has department defaults and an isolated persistence p
   assert.equal(permissions.canAccessSupplyChain({ department: "供应链部" }), true);
   assert.equal(permissions.canAccessSupplyChain({ department: "品牌部" }), false);
   assert.equal(api.supplyChainApiUrl("product-flow-system.pages.dev"), "/api/supply-chain");
-  assert.match(provider, /tryGetStorageItem\(localCache, STORAGE_KEY\)/);
+  assert.match(provider, /tryGetStorageItem\(localCache, localStorageKey\(\)\)/);
+  assert.match(provider, /environmentStorageKey/);
+  assert.match(provider, /persistLocalState\(localCache, localStorageKey\(\), state\)/);
   assert.match(provider, /method: "POST"/);
   assert.match(provider, /syncApprovals/);
   assert.match(provider, /if \(!dirty\.current\) return undefined/);
@@ -135,6 +137,7 @@ test("annual product planning uses one development-to-launch period and overwrit
   const page = read("src/features/planning/ProductPlanningPage.jsx");
   const tray = read("src/features/planning/PlanningDemandTray.jsx");
   const timeline = read("src/features/planning/AnnualPlanningTimeline.jsx");
+  const rangeBar = read("src/features/planning/PlanningRangeBar.jsx");
   const modal = read("src/features/planning/ProductPlanModal.jsx");
   const button = read("src/ui/Button.jsx");
   const styles = read("src/styles.css");
@@ -158,7 +161,7 @@ test("annual product planning uses one development-to-launch period and overwrit
   assert.match(tray, /\/>安排/);
   assert.doesNotMatch(tray, /需求池产品/);
   assert.match(timeline, /Array\.from\(\{ length: 12 \}/);
-  assert.match(timeline, /timelineSegment/);
+  assert.match(rangeBar, /timelineSegment/);
   assert.match(timeline, /开发至上线/);
   assert.match(timeline, /level-badge/);
   assert.match(timeline, /来源需求已删除/);
@@ -177,6 +180,41 @@ test("annual product planning uses one development-to-launch period and overwrit
   assert.match(styles, /\.planning-bar\.period/);
   assert.doesNotMatch(styles, /\.planning-bar\.launch/);
   assert.match(styles, /grid-template-columns: repeat\(12, minmax\(68px, 1fr\)\)/);
+});
+
+test("planning range bar separates precise editing from cancellable pointer dragging", () => {
+  const rangeBar = read("src/features/planning/PlanningRangeBar.jsx");
+  const timeline = read("src/features/planning/AnnualPlanningTimeline.jsx");
+  const page = read("src/features/planning/ProductPlanningPage.jsx");
+  const styles = read("src/styles.css");
+
+  assert.match(rangeBar, /export function PlanningRangeBar/);
+  assert.match(rangeBar, /DRAG_THRESHOLD_PX = 4/);
+  assert.match(rangeBar, /setPointerCapture/);
+  assert.match(rangeBar, /releasePointerCapture/);
+  assert.match(rangeBar, /onPointerCancel=/);
+  assert.match(rangeBar, /onLostPointerCapture=/);
+  assert.match(rangeBar, /event\.key === "Enter" \|\| event\.key === " "/);
+  assert.match(rangeBar, /formatPlanningDateRange/);
+  assert.match(rangeBar, /planningDaysFromPixels/);
+  assert.match(rangeBar, /movePlanningRange/);
+  assert.match(rangeBar, /resizePlanningRange/);
+  assert.match(rangeBar, /aria-label=/);
+  assert.match(rangeBar, /data-range-edge="start"/);
+  assert.match(rangeBar, /data-range-edge="end"/);
+  assert.match(rangeBar, /onChange\(nextDates\)/);
+  assert.match(rangeBar, /label-align-end/);
+  assert.match(timeline, /<PlanningRangeBar/);
+  assert.match(timeline, /onChange=\{dates => onChangePlanDates\(plan\.id, dates\)\}/);
+  assert.match(page, /const changePlanDates = \(planId, dates\) => updateProductPlan\(planId, dates\)/);
+  assert.match(page, /onChangePlanDates=\{changePlanDates\}/);
+  assert.match(styles, /\.planning-range-handle/);
+  assert.match(styles, /touch-action: pan-y/);
+  assert.match(styles, /\.planning-range-bar::before/);
+  assert.match(styles, /\.planning-bar \{[^}]*overflow: visible;/s);
+  assert.match(styles, /\.planning-range-label \{[^}]*color: var\(--text-primary\);/s);
+  assert.match(styles, /\.planning-timeline-section \{ overflow: hidden; \}/);
+  assert.doesNotMatch(styles, /\.planning-timeline-row:last-child \{ border-bottom: 0; \}/);
 });
 
 test("dashboard uses aligned section headers plus reusable product thumbnails in task and risk rows", () => {

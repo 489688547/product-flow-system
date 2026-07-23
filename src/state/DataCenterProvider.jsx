@@ -11,15 +11,21 @@ import {
   persistInternalVaultConnection,
   revealCredential
 } from "./dataCenterConnectionsApi.js";
+import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
 
 const DataCenterContext = createContext(null);
 const STORAGE_KEY = "dataCenterMetadata";
 const localCache = getBrowserStorage("localStorage");
 
+function localStorageKey() {
+  migrateLegacyProductionCache(localCache, STORAGE_KEY);
+  return environmentStorageKey(STORAGE_KEY);
+}
+
 function loadLocalMetadata() {
   try {
-    const raw = tryGetStorageItem(localCache, STORAGE_KEY);
+    const raw = tryGetStorageItem(localCache, localStorageKey());
     return raw ? normalizeDataCenterState(JSON.parse(raw)) : createDefaultDataCenterState();
   } catch {
     return createDefaultDataCenterState();
@@ -64,7 +70,7 @@ export function DataCenterProvider({ children, enabled = true }) {
       if (metadataResult.status === "fulfilled" && metadataResult.value.state) {
         const normalized = normalizeDataCenterState(metadataResult.value.state);
         setState(normalized);
-        persistLocalState(localCache, STORAGE_KEY, persistableMetadata(normalized));
+        persistLocalState(localCache, localStorageKey(), persistableMetadata(normalized));
       } else if (![404, 405, 501].includes(metadataResult.reason?.status)) {
         throw metadataResult.reason;
       }
@@ -110,7 +116,7 @@ export function DataCenterProvider({ children, enabled = true }) {
   }, [refreshConnections]);
 
   useEffect(() => {
-    persistLocalState(localCache, STORAGE_KEY, persistableMetadata(state));
+    persistLocalState(localCache, localStorageKey(), persistableMetadata(state));
     if (!enabled || !dirty.current) return undefined;
     const timer = setTimeout(async () => {
       try {

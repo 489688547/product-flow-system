@@ -240,6 +240,7 @@ Expected: FAIL，因为 adapter 不存在。
 ```text
 orders            #/trade/searchlist/                    昨天事实
 order_items       #/trade/searchlist/                    昨天事实（导出订单明细）
+sales_items       #/report/sale_multidimension_next/     昨天事实（销售主题/按订单商品明细）
 products          #/prod/parallel/                       当前维度
 inventory         #/stock/warehouse_status/              当前快照
 purchases         #/purchase/manager/                    当前及未完结事实
@@ -256,7 +257,7 @@ inventory_cost    #/report/stock_cost_next/              当前快照
 
 - [ ] **Step 4: 先完成订单与销售明细端到端，再逐资源复用**
 
-订单与销售明细必须在真实登录页核对日期控件和官方导出动作；随后按资源表逐项实现。事实日期必须设置完整昨天自然日，不能使用页面默认“近一天”。下载进入 provider waiting 目录，scanner 稳定性检查、归档、脱敏预检和现有 ERP ingest 全部成功后才返回 provider success。
+订单、交易订单明细与销售主题明细必须在真实登录页核对日期控件和官方导出动作；随后按资源表逐项实现。事实日期必须设置完整昨天自然日，不能使用页面默认“近一天”。下载进入 provider waiting 目录，scanner 稳定性检查、业务日期二次核对、归档、脱敏预检和现有 ERP ingest 全部成功后才返回 provider success。
 
 - [ ] **Step 5: 完成人工边界和恢复**
 
@@ -271,6 +272,61 @@ inventory_cost    #/report/stock_cost_next/              当前快照
 Run: `node --test tests/kuaimai-web-collector.test.mjs tests/kuaimai-erp-collection-cli.test.mjs tests/kuaimai-erp-local-archive.test.mjs`
 
 Expected: PASS。
+
+### Task 4.1: 修复快麦异步下载中心交接
+
+**Files:**
+- Modify: `chrome-extension/company-data-collector/providers/kuaimai.js`
+- Modify: `chrome-extension/company-data-collector/content-script.js`
+- Modify: `chrome-extension/company-data-collector/service-worker.js`
+- Modify: `tests/kuaimai-extension-adapter.test.mjs`
+- Modify: `tests/chrome-collector-extension.test.mjs`
+- Modify: `docs/platform/data-acquisition.md`
+- Modify: `.agents/skills/kuaimai-erp-data-collection/SKILL.md`
+
+- [x] **Step 1: 写下载中心失败测试**
+
+覆盖固定下载中心入口、订单与订单明细文件名前缀互斥、当前任务时间窗口、生成中、生成失败、完成行选择，以及扩展不能把下载中心路径或选择器交给远端任务。
+
+adapter 新增并由 content script 消费以下固定接口：
+
+```js
+export const KUAIMAI_DOWNLOAD_CENTER_ROUTE = "/index.html#/index/download_center/";
+export const KUAIMAI_DOWNLOAD_CENTER_SELECTORS = Object.freeze({
+  row: ".m-data-item",
+  exportTime: ".exportTime",
+  content: ".content",
+  status: ".schedule",
+  refresh: ".j-search",
+  download: ".J-download"
+});
+
+export function selectKuaimaiDownloadRow({ resourceType, startedAt, rows }) {
+  // 返回 { state: "ready"|"pending"|"failed"|"missing", rowIndex, errorCode? }
+}
+```
+
+`buildKuaimaiActionPlan(task)` 在已有导出动作后追加 `{ action: "download_from_center", resourceType }`。content script 在点击导出前记录 `exportStartedAt`，执行该动作时只解析固定行字段，并在 `ready` 时点击同一行固定下载控件。
+
+- [x] **Step 2: 运行测试并确认 RED**
+
+Run: `node --test tests/kuaimai-extension-adapter.test.mjs tests/chrome-collector-extension.test.mjs`
+
+Expected: FAIL，因为 adapter 只会在订单页点击导出并等待直接下载。
+
+- [x] **Step 3: 实现最小异步下载流程**
+
+点击订单页官方导出后导航到代码登记的下载中心；最多等待三分钟，每轮用固定查询控件刷新并解析安全任务元数据。只选择当前任务窗口内、资源类型匹配且状态为“导出完成”的最近任务行，然后点击该行固定下载控件。明确失败和等待超时使用不同安全错误码。
+
+- [x] **Step 4: 运行定向测试并确认 GREEN**
+
+Run: `node --test tests/kuaimai-extension-adapter.test.mjs tests/chrome-collector-extension.test.mjs tests/web-data-collector-runtime.test.mjs tests/web-data-collector-download.test.mjs`
+
+Expected: PASS。
+
+- [ ] **Step 5: 更新本机扩展并真实回归**
+
+合并并部署后，把公司 Chrome 加载的未打包扩展更新到已合并版本并点击“重新加载”。重新触发 2026-07-22 的 `orders`、`order_items` 与 `sales_items`，核对下载中心只下载当前任务文件、本机归档成功、D1 任务进入 `success`、游标推进到 2026-07-22，最后刷新数据同步页面。
 
 ---
 

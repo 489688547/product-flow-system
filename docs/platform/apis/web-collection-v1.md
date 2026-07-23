@@ -11,11 +11,11 @@
 - Runner actions on `POST /jobs` require an active `company_web_collection` runner token.
 - User action `POST /jobs` with `action=trigger` requires an active non-readonly company session in 总经办、数据中心 or 运营.
 - `GET /jobs` requires a company session in 总经办、数据中心、运营、供应链 or 财务.
-- Every route requires `PRODUCT_FLOW_DB`.
+- Every route requires the formal control database. Job creation persists the server-resolved target environment and version; browser requests and runners cannot submit a binding or database ID.
 
 ## Provider and task contract
 
-The server accepts only code-registered provider and resource IDs. Kuaimai's canonical sales-detail resource is `order_items`; the legacy `sales_items` ID remains accepted for backwards compatibility but is not scheduled by the MV3 extension. A plan item contains `providerId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie or token field are rejected.
+The server accepts only code-registered provider and resource IDs. Kuaimai currently schedules `orders`, `order_items` and `sales_items`: the first two are trade exports, while `sales_items` is the rich 《销售主题分析-按订单商品明细》 source used for refund- and cost-aware sales facts. A plan item contains `providerId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie or token field are rejected.
 
 Runner actions are:
 
@@ -28,11 +28,11 @@ Runner actions are:
 
 User action is:
 
-- `trigger`: enqueue the fixed `kuaimai/order_items` daily job for `businessDate`. `force=false` is idempotent and never resets an existing job. `force=true` may requeue `waiting_human`, `failed`, `schema_changed` or `success` after the user confirms login; queued or running work is not duplicated. The request cannot select a URL, selector, credential or arbitrary resource.
+- `trigger`: enqueue a fixed Kuaimai daily job for `orders`, `order_items` or `sales_items` and `businessDate`. `force=false` is idempotent and never resets an existing job. `force=true` may requeue `waiting_human`, `failed`, `schema_changed` or `success` after the user confirms login; queued or running work is not duplicated. The request cannot select a URL, selector, credential or arbitrary resource.
 
 ## States, leases and idempotency
 
-States are `queued`, `claimed`, `opening`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency is `providerId:resourceType:businessDate:scheduleVersion`. Only `complete` from `ingesting` advances `(providerId, resourceType)` cursor.
+States are `queued`, `claimed`, `opening`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency includes `providerId:resourceType:businessDate:scheduleVersion` plus the server-owned target environment and version. Only `complete` from `ingesting` advances `(providerId, resourceType)` cursor. Provider facts are projected to the persisted target business database; a stale display version is rejected.
 
 ## Responses
 
@@ -46,6 +46,7 @@ Responses use `{ data, meta }` and `cache-control: no-store`. The list response 
 - `WEB_COLLECTION_TRIGGER_DENIED`: the company session cannot enqueue or retry collection.
 - `WEB_COLLECTION_TRIGGER_INVALID`: the requested provider, resource or business date is outside the fixed user-trigger contract.
 - `WEB_COLLECTION_JOB_INVALID`: provider, resource, date, range, key or forbidden instruction field is invalid.
+- `WEB_COLLECTION_BUSINESS_DATE_MISMATCH`: the downloaded file's parsed first or last business date differs from the job date; the file is not ingested and the cursor does not advance.
 - `WEB_COLLECTION_JOB_NOT_FOUND` / `WEB_COLLECTION_JOB_OWNER_MISMATCH`: missing or wrong runner job.
 - `WEB_COLLECTION_STATE_CONFLICT` / `WEB_COLLECTION_TRANSITION_INVALID`: stale or illegal state update.
 - `WEB_COLLECTION_RUN_INVALID` / `WEB_COLLECTION_NOTIFICATION_INVALID`: invalid completion or notification metadata.

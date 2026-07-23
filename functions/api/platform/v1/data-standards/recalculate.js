@@ -113,7 +113,7 @@ export async function onRequest(context) {
     const actor = dataStandardActor(requireSession(data));
     requireDefinitionView(actor);
     const input = validateInput(await readJson(request));
-    const db = requireDatabase(dataStandardsDatabase(env));
+    const db = requireDatabase(dataStandardsDatabase(env, data));
     await ensureDataStandardsTables(db);
     await ensureSalesTables(db);
     const definitions = includeDependencies(await loadDefinitionDetails(db), input.metricCodes, input.targetVersions, input.to);

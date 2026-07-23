@@ -62,3 +62,54 @@ test("movement, purchase and aftersales resources become idempotent goods-flow e
   assert.equal(aftersale.events[0].sourceReference, "AS-1");
 });
 
+test("rich sales-item exports project daily facts without losing refunds or return costs", () => {
+  const projection = projectKuaimaiErpRecords("sales_items", [
+    record("KM-1::6978705011208", {
+      规格商家编码: "6978705011208",
+      主商家编码: "SPU-1",
+      商品名称: "测试商品",
+      所属平台: "抖店(放心购)",
+      销售数量: "3",
+      退货数量: "1",
+      商品买家已付金额: "59.7",
+      销售金额: "60",
+      销售成本: "24",
+      退货成本: "8",
+      退款金额: "10"
+    }, { occurredAt: "2026-07-22T10:20:30+08:00" }),
+    record("KM-2::6978705011208", {
+      规格商家编码: "6978705011208",
+      所属平台: "抖店(放心购)",
+      销售数量: "2",
+      退货数量: "0",
+      商品买家已付金额: "39.8",
+      销售金额: "40",
+      销售成本: "16",
+      退货成本: "0",
+      退款金额: "0"
+    }, { occurredAt: "2026-07-22T11:20:30+08:00" }),
+    record("KM-3::INTERNAL-SKU", {
+      规格商家编码: "INTERNAL-SKU",
+      所属平台: "天猫",
+      销售数量: "1",
+      销售金额: "20",
+      销售成本: "5",
+      退款金额: "0"
+    }, { occurredAt: "2026-07-22T12:20:30+08:00" })
+  ], { batchId: "batch-sales", now });
+
+  assert.deepEqual(projection.salesDaily, [{
+    code: "6978705011208",
+    date: "2026-07-22",
+    platform: "抖店(放心购)",
+    qty: 4,
+    sales: 99.5,
+    netSales: 90,
+    grossProfit: 58,
+    refund: 10,
+    cost: 32,
+    preShipRefund: 0,
+    postShipRefund: 0
+  }]);
+  assert.equal(projection.exceptions.some(item => item.code === "SALES_CODE_UNMAPPED"), true);
+});

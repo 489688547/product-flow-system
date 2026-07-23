@@ -2,8 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   buildPlanningCandidates,
+  formatPlanningDateRange,
+  movePlanningRange,
   normalizeProductPlans,
   planIntersectsYear,
+  planningDaysFromPixels,
+  resizePlanningRange,
   timelineSegment,
   validateProductPlan
 } from "../src/domain/productPlanning.js";
@@ -100,6 +104,55 @@ test("timeline segments clip cross-year ranges into the visible annual track", (
   assert.ok(segment.left >= 0);
   assert.ok(segment.width > 0);
   assert.ok(segment.left + segment.width <= 100);
+});
+
+test("planning date ranges stay compact in one year and include years when crossing years", () => {
+  assert.equal(formatPlanningDateRange("2026-07-08", "2026-07-28"), "7月8日—28日");
+  assert.equal(formatPlanningDateRange("2026-07-08", "2026-07-08"), "7月8日");
+  assert.equal(formatPlanningDateRange("2026-07-22", "2026-08-25"), "7月22日—8月25日");
+  assert.equal(formatPlanningDateRange("2026-12-15", "2027-02-10"), "2026年12月15日—2027年2月10日");
+  assert.equal(formatPlanningDateRange("invalid", "2026-08-25"), "");
+});
+
+test("planning pointer movement converts track pixels into calendar days for the displayed year", () => {
+  assert.equal(planningDaysFromPixels(100, 1000, 2026), 37);
+  assert.equal(planningDaysFromPixels(100, 1000, 2028), 37);
+  assert.equal(planningDaysFromPixels(-30, 1000, 2026), -11);
+  assert.equal(planningDaysFromPixels(30, 0, 2026), 0);
+});
+
+test("moving a planning range preserves its duration and keeps it intersecting the displayed year", () => {
+  assert.deepEqual(movePlanningRange("2026-07-08", "2026-07-28", 10, 2026), {
+    developmentStart: "2026-07-18",
+    launchDate: "2026-08-07"
+  });
+  assert.deepEqual(movePlanningRange("2026-01-10", "2026-02-10", -100, 2026), {
+    developmentStart: "2025-12-01",
+    launchDate: "2026-01-01"
+  });
+  assert.deepEqual(movePlanningRange("2026-12-10", "2027-01-10", 100, 2026), {
+    developmentStart: "2026-12-31",
+    launchDate: "2027-01-31"
+  });
+});
+
+test("resizing a planning range clamps one endpoint to the same-day minimum and annual track", () => {
+  assert.deepEqual(resizePlanningRange("2026-07-08", "2026-07-28", "start", 30, 2026), {
+    developmentStart: "2026-07-28",
+    launchDate: "2026-07-28"
+  });
+  assert.deepEqual(resizePlanningRange("2026-07-08", "2026-07-28", "end", -30, 2026), {
+    developmentStart: "2026-07-08",
+    launchDate: "2026-07-08"
+  });
+  assert.deepEqual(resizePlanningRange("2026-01-10", "2026-02-10", "start", -30, 2026), {
+    developmentStart: "2026-01-01",
+    launchDate: "2026-02-10"
+  });
+  assert.deepEqual(resizePlanningRange("2026-11-10", "2026-12-10", "end", 40, 2026), {
+    developmentStart: "2026-11-10",
+    launchDate: "2026-12-31"
+  });
 });
 
 test("planning validation requires one ordered development-to-launch period", () => {

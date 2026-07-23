@@ -20,7 +20,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (!ACTIONS.has(action.type)) return jsonResponse({ message: "不支持的绩效动作。" }, 400);
   if (HR_ACTIONS.has(action.type) && !isHr(data.session)) return jsonResponse({ message: "该动作需要人事权限。" }, 403);
   if (MANAGER_ACTIONS.has(action.type) && (!isManager(data.session) || isHr(data.session))) return jsonResponse({ message: "该动作需要直属主管权限，人事仅负责授权和归档。" }, 403);
-  const db = performanceDatabase(env); if (!db) return jsonResponse({ message: "缺少 D1 数据库绑定。" }, 501);
+  const db = performanceDatabase(env, data); if (!db) return jsonResponse({ message: "缺少 D1 数据库绑定。" }, 501);
   try {
     const state = await readPerformanceState(db);
     const assessment = state.assessments.find(item => item.id === action.id);
@@ -29,7 +29,7 @@ export async function onRequest({ request, env, data = {} }) {
     const user = actor(data.session);
     if (action.type === "create_assessment") {
       if (!canManageEmployee(state, data.session, action.record?.employeeId)) return jsonResponse({ message: "只能为人事已授权或钉钉组织范围内的员工建立考核。" }, 403);
-      const operationsDb = operationsDatabase(env);
+      const operationsDb = operationsDatabase(env, data);
       const operationsState = operationsDb ? await readOperationsState(operationsDb) : null;
       const evidence = operationsState ? buildPerformanceEvidence(operationsState, { employeeId: action.record.employeeId, month: action.record.month }) : [];
       const evidenceById = new Map(evidence.map(item => [item.entityId, item]));

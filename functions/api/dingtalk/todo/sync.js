@@ -5,6 +5,12 @@ import {
   syncDingTodoTask
 } from "../_shared/dingtalk.js";
 import { readCompanyState } from "../../state.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
+import { shouldSimulateExternalAction } from "../../platform/_shared/externalActionMode.js";
+import {
+  auditDisplayExternalAction,
+  simulateDingTodoSync
+} from "../../platform/_shared/displayExternalActionAdapter.js";
 
 function requestError(message, status) {
   const error = new Error(message);
@@ -61,11 +67,16 @@ export async function onRequest({ request, env, data = {} }) {
 
   try {
     const body = await request.json().catch(() => ({}));
-    const db = env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB;
+    const db = requestBusinessDatabase({ env, data });
     if (!db) throw requestError("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB。", 501);
     const stored = await readCompanyState(db);
     if (!stored?.state) throw requestError("产品流程共享数据尚未初始化。", 409);
     const authorizedBody = authorizeTaskTodoSyncRequest(body, data.session, stored.state);
+    if (shouldSimulateExternalAction(data)) {
+      const todo = simulateDingTodoSync(authorizedBody);
+      await auditDisplayExternalAction({ env, data, kind: "dingtalk_todo_sync", resultId: todo.id });
+      return jsonResponse({ synced: true, todo });
+    }
     const accessToken = await getDingAccessToken(env);
     const todo = await syncDingTodoTask(accessToken, authorizedBody);
     return jsonResponse({ synced: true, todo });

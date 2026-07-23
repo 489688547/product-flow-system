@@ -17,7 +17,7 @@ export async function onRequest({ request, env, data = {} }) {
     return aiError("仅总经办可测试 AI 模型服务。", 403, "AI_PROVIDER_TEST_DENIED");
   }
   try {
-    const loaded = await loadAiConfiguration(env);
+    const loaded = await loadAiConfiguration(env, data);
     const result = await testProviderConnection({
       config: loaded.provider,
       fetchImpl: env.AI_PROVIDER_FETCH || fetch

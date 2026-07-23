@@ -28,13 +28,21 @@ const body = {
   issues: []
 };
 
-async function call({ session, db, payload = body, headers = {}, method = "POST" } = {}) {
+async function call({ session, db, businessDb, dataEnvironment, payload = body, headers = {}, method = "POST" } = {}) {
   const request = new Request("https://flow.example.com/api/platform/v1/erp-collection/ingest", {
     method,
     headers: { "content-type": "application/json", ...headers },
     body: method === "POST" ? JSON.stringify(payload) : undefined
   });
-  const response = await onRequest({ request, env: db ? { PRODUCT_FLOW_DB: db } : {}, data: session ? { session } : {} });
+  const response = await onRequest({
+    request,
+    env: db ? { PRODUCT_FLOW_DB: db, ...(businessDb ? { DEMO_FLOW_DB: businessDb } : {}) } : {},
+    data: session ? {
+      session,
+      ...(businessDb ? { businessDb } : {}),
+      ...(dataEnvironment ? { dataEnvironment } : {})
+    } : {}
+  });
   return { response, body: await response.json() };
 }
 
@@ -56,6 +64,39 @@ test("ERP collection ingest creates a batch and writes source records", async ()
   assert.equal(db.tables.erp_collection_batches.size, 1);
   assert.equal(db.tables.erp_source_records.size, 1);
   assert.deepEqual(JSON.parse([...db.tables.erp_source_records.values()][0].payload), { sourceOrderId: "order-1001" });
+});
+
+test("ERP collection keeps raw control records in production and persists the selected display target", async () => {
+  const controlDb = createErpCollectionD1Mock();
+  const displayDb = createErpCollectionD1Mock();
+  const result = await call({
+    session: sessions.executive,
+    db: controlDb,
+    businessDb: displayDb,
+    dataEnvironment: { id: "display", version: 7 },
+    headers: { "idempotency-key": "batch-display" }
+  });
+
+  assert.equal(result.response.status, 201);
+  assert.equal(result.body.data.targetEnvironment, "display");
+  assert.equal(result.body.data.targetEnvironmentVersion, 7);
+  assert.equal(controlDb.tables.erp_source_records.size, 1);
+  assert.equal(displayDb.tables.erp_source_records.size, 0);
+  const batch = [...controlDb.tables.erp_collection_batches.values()][0];
+  assert.equal(batch.target_environment, "display");
+  assert.equal(batch.target_environment_version, 7);
+});
+
+test("ERP collection rejects client-selected database targets", async () => {
+  const db = createErpCollectionD1Mock();
+  const result = await call({
+    session: sessions.executive,
+    db,
+    payload: { ...body, targetEnvironment: "display" },
+    headers: { "idempotency-key": "bad-target" }
+  });
+  assert.equal(result.response.status, 400);
+  assert.equal(result.body.error.code, "COLLECTION_TARGET_CLIENT_FORBIDDEN");
 });
 
 test("ERP collection ingest is idempotent and updates a changed source record", async () => {

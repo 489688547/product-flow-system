@@ -20,9 +20,10 @@ function resourceFromName(fileName) {
   if (/供应商/.test(name)) return "suppliers";
   if (/仓库/.test(name)) return "warehouses";
   if (/店铺/.test(name)) return "shops";
+  if (/销售主题|订单商品/.test(name)) return "sales_items";
   if (/sku|规格/.test(name)) return "skus";
   if (/商品|产品/.test(name)) return "products";
-  if (/销售主题|订单商品|明细/.test(name)) return "order_items";
+  if (/明细/.test(name)) return "order_items";
   if (/订单|order/.test(name)) return "orders";
   return "";
 }
@@ -30,7 +31,7 @@ function resourceFromName(fileName) {
 async function identifyAndRead(filePath, resourceType = "") {
   const preferred = resourceType || resourceFromName(path.basename(filePath));
   if (preferred) return { resourceType: preferred, parsed: await readKuaimaiExport(filePath, { resourceType: preferred }) };
-  const candidates = ["orders", "order_items", "products", "skus", "inventory_snapshot", "inventory_movements", "suppliers", "purchase_orders", "aftersales", "shops", "warehouses"];
+  const candidates = ["orders", "order_items", "sales_items", "products", "skus", "inventory_snapshot", "inventory_movements", "suppliers", "purchase_orders", "aftersales", "shops", "warehouses"];
   let lastError;
   for (const candidate of candidates) {
     try {
@@ -158,7 +159,14 @@ export async function scanWaitingDirectory({ root, upload, resourceType = "" }) 
 export async function archiveExistingFile(filePath, { root, resourceType = "", upload = null, onValidated = null } = {}) {
   const layout = await ensureArchiveLayout(root);
   const identified = await identifyAndRead(filePath, resourceType);
-  if (onValidated) await onValidated({ resourceType: identified.resourceType, rowCount: identified.parsed.batch.rowCount });
+  if (onValidated) {
+    await onValidated({
+      resourceType: identified.resourceType,
+      rowCount: identified.parsed.batch.rowCount,
+      rangeStart: identified.parsed.batch.rangeStart,
+      rangeEnd: identified.parsed.batch.rangeEnd
+    });
+  }
   return archiveExistingParsedFile(filePath, identified, { layout, upload });
 }
 

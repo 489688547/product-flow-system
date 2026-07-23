@@ -1,4 +1,5 @@
 import { assertWebCollectionTransition } from "../../../../../../src/domain/webCollection.js";
+import { collectionIdempotencyKey } from "../../../_shared/collectionTarget.js";
 import { routeError } from "./http.js";
 
 const RUNNER_SCOPE = "company_web_collection";
@@ -9,7 +10,10 @@ const PROVIDER_RESOURCES = Object.freeze({
   ]),
   test_fixture: new Set(["sample"])
 });
-const FORBIDDEN_JOB_FIELDS = new Set(["url", "origin", "selector", "selectors", "script", "javascript", "credentials", "cookie", "token"]);
+const FORBIDDEN_JOB_FIELDS = new Set([
+  "url", "origin", "selector", "selectors", "script", "javascript", "credentials", "cookie", "token",
+  "targetenvironment", "targetenvironmentversion", "databaseid", "binding"
+]);
 
 export function webCollectionDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
@@ -115,6 +119,9 @@ function mapJob(row) {
     updatedAt: row.updated_at,
     startedAt: row.started_at || null,
     completedAt: row.completed_at || null
+    ,
+    targetEnvironment: row.target_environment === "display" ? "display" : "production",
+    targetEnvironmentVersion: Math.max(1, Number(row.target_environment_version || 1))
   };
 }
 
@@ -125,22 +132,30 @@ export async function heartbeatRunner(db, runner, input) {
   return { runnerId: runner.id, lastSeenAt: now };
 }
 
-export async function ensureWebCollectionPlan(db, jobs) {
+export async function ensureWebCollectionPlan(db, jobs, target = { environmentId: "production", environmentVersion: 1 }) {
   if (!Array.isArray(jobs) || !jobs.length || jobs.length > 100) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "任务计划必须包含 1 至 100 个资源。");
   const normalized = jobs.map(normalizeJob);
   const now = new Date().toISOString();
   let created = 0;
   const saved = [];
   for (const job of normalized) {
-    let row = await db.prepare("SELECT * FROM web_collection_jobs WHERE idempotency_key = ? LIMIT 1").bind(job.idempotencyKey).first();
+    const idempotencyKey = collectionIdempotencyKey(job.idempotencyKey, target);
+    let row = await db.prepare("SELECT * FROM web_collection_jobs WHERE idempotency_key = ? LIMIT 1").bind(idempotencyKey).first();
+    if (!row && target.environmentId === "production") {
+      row = await db.prepare("SELECT * FROM web_collection_jobs WHERE idempotency_key = ? LIMIT 1")
+        .bind(job.idempotencyKey)
+        .first();
+    }
     if (!row) {
       const id = randomId("web-job");
       await db.prepare(`INSERT INTO web_collection_jobs
         (id, provider_id, resource_type, business_date, range_kind, range_start, range_end, time_zone,
-          schedule_version, idempotency_key, status, selector_version, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+          schedule_version, idempotency_key, status, selector_version, target_environment,
+          target_environment_version, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .bind(id, job.providerId, job.resourceType, job.businessDate, job.rangeKind, job.rangeStart, job.rangeEnd,
-          job.timeZone, job.scheduleVersion, job.idempotencyKey, "queued", job.selectorVersion, now, now).run();
+          job.timeZone, job.scheduleVersion, idempotencyKey, "queued", job.selectorVersion,
+          target.environmentId, target.environmentVersion, now, now).run();
       row = await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(id).first();
       created += 1;
     }
@@ -161,10 +176,10 @@ export async function triggerWebCollectionJob(db, input) {
   const providerId = String(input?.providerId || "").trim();
   const resourceType = String(input?.resourceType || "").trim();
   const businessDate = String(input?.businessDate || "").trim();
-  if (providerId !== "kuaimai" || resourceType !== "order_items" || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
-    throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发快麦订单商品明细采集。");
+  if (providerId !== "kuaimai" || !["orders", "order_items", "sales_items"].includes(resourceType) || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+    throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发已登记的快麦订单、订单商品明细或销售主题明细采集。");
   }
-  const scheduleVersion = "v1";
+  const scheduleVersion = resourceType === "sales_items" ? "v2" : "v1";
   const plan = await ensureWebCollectionPlan(db, [{
     providerId,
     resourceType,

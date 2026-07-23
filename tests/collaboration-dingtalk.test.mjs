@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildCollaborationTodoPayload } from "../src/domain/collaborationNotifications.js";
 import { onRequest as dingTalkRoute } from "../functions/api/platform/v1/collaboration-items/[id]/dingtalk.js";
+import { createDataEnvironmentD1Mock } from "./helpers/data-environment-d1-mock.mjs";
 
 const item = {
   id: "c1",
@@ -73,4 +74,37 @@ test("platform DingTalk endpoint stores safe sync metadata and returns provider 
   assert.equal(failurePayload.error.code, "DINGTALK_TODO_SYNC_FAILED");
   assert.equal(stored.status, "in_progress");
   assert.equal(stored.dingTodo.lastError, "钉钉待办同步失败，请稍后重试。");
+});
+
+test("display collaboration sync stores simulated metadata without calling DingTalk", async () => {
+  let stored = { ...item };
+  const controlDb = createDataEnvironmentD1Mock();
+  const dependencies = {
+    async ensureTables() {},
+    async findItem() { return stored; },
+    async updateItem(_db, next) { stored = next; return true; },
+    async getAccessToken() { throw new Error("provider token must not be requested"); },
+    async syncTodo() { throw new Error("provider must not be called"); }
+  };
+  const response = await dingTalkRoute({
+    request: new Request("https://flow.example.com/api/platform/v1/collaboration-items/c1/dingtalk", {
+      method: "POST",
+      body: JSON.stringify({ version: 2, detailUrl: "https://flow.example.com/#/collaboration/c1" })
+    }),
+    env: { PRODUCT_FLOW_DB: controlDb },
+    data: {
+      session,
+      controlDb,
+      businessDb: {},
+      dataEnvironment: { id: "display", version: 7 },
+      collaborationDingTalkDependencies: dependencies
+    },
+    params: { id: "c1" }
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.match(payload.todo.id, /^display-todo-/);
+  assert.equal(payload.item.dingTodo.lastError, "");
+  assert.equal(controlDb.audits.length, 1);
 });

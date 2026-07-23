@@ -1,7 +1,8 @@
 import { normalizePerformanceState } from "../../../../src/domain/performanceManagement.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 
 const COLLECTIONS = ["templates", "managerAssignments", "assessments", "reviewRequests", "auditLogs"];
-export const performanceDatabase = (env = {}) => env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export const performanceDatabase = (env = {}, data = {}) => requestBusinessDatabase({ env, data });
 
 export async function ensurePerformanceTables(db) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS performance_management_state (
