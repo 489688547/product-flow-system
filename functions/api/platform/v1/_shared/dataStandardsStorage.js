@@ -1,3 +1,5 @@
+import { requestBusinessDatabase } from "../../_shared/dataEnvironment.js";
+
 function storageError(message, code, status = 409) {
   const error = new Error(message);
   error.code = code;
@@ -183,8 +185,8 @@ function mapConstraintError(error) {
   return error;
 }
 
-export function dataStandardsDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function dataStandardsDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureDataStandardsTables(db) {

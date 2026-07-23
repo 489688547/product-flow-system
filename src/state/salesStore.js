@@ -1,13 +1,20 @@
-const DB_NAME = "productFlowSales";
+import { currentDataEnvironment } from "./dataEnvironmentClient.js";
+
+const LEGACY_DB_NAME = "productFlowSales";
+const MIGRATION_MARKER = "productFlowSales:indexeddb-migrated:production";
 // v2: recover databases that were accidentally created without object stores.
 const DB_VERSION = 2;
 const ROW_STORE = "daily";
 const META_STORE = "meta";
 const META_KEY = "sales-meta";
 
-function openLocalDatabase() {
+export function salesDatabaseName(environmentId = currentDataEnvironment().id) {
+  return environmentId === "display" ? "productFlowSales:display" : "productFlowSales:production";
+}
+
+function openDatabase(name) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const request = indexedDB.open(name, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(ROW_STORE)) db.createObjectStore(ROW_STORE, { keyPath: "key" });
@@ -16,6 +23,44 @@ function openLocalDatabase() {
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("本地销售数据库打开失败。"));
   });
+}
+
+async function migrateLegacySalesDatabase(targetDb) {
+  if (currentDataEnvironment().id !== "production") return;
+  try {
+    if (localStorage.getItem(MIGRATION_MARKER) === "1") return;
+    if (typeof indexedDB.databases === "function") {
+      const databases = await indexedDB.databases();
+      if (!databases.some(database => database.name === LEGACY_DB_NAME)) {
+        localStorage.setItem(MIGRATION_MARKER, "1");
+        return;
+      }
+    }
+    const targetCount = await requestAsPromise(targetDb.transaction(ROW_STORE).objectStore(ROW_STORE).count());
+    if (targetCount > 0) {
+      localStorage.setItem(MIGRATION_MARKER, "1");
+      return;
+    }
+    const legacyDb = await openDatabase(LEGACY_DB_NAME);
+    const legacyRows = await requestAsPromise(legacyDb.transaction(ROW_STORE).objectStore(ROW_STORE).getAll());
+    const legacyMeta = await requestAsPromise(legacyDb.transaction(META_STORE).objectStore(META_STORE).get(META_KEY));
+    legacyDb.close();
+    if (legacyRows.length || legacyMeta) {
+      const transaction = targetDb.transaction([ROW_STORE, META_STORE], "readwrite");
+      legacyRows.forEach(row => transaction.objectStore(ROW_STORE).put(row));
+      if (legacyMeta) transaction.objectStore(META_STORE).put(legacyMeta);
+      await transactionDone(transaction, "旧版销售缓存迁移失败。");
+    }
+    localStorage.setItem(MIGRATION_MARKER, "1");
+  } catch {
+    // Migration failure keeps the legacy database untouched and retries next time.
+  }
+}
+
+async function openLocalDatabase() {
+  const db = await openDatabase(salesDatabaseName());
+  await migrateLegacySalesDatabase(db);
+  return db;
 }
 
 function requestAsPromise(request) {

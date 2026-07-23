@@ -61,7 +61,7 @@ export function createSalesRepairRequestHandler(dependencies = defaultSalesRepai
     const body = await request.json().catch(() => null);
     const date = String(body?.date || "");
     if (!body || !validDate(date)) return jsonResponse({ synced: false, message: "自动补拉日期无效。", error: { code: "SALES_REPAIR_DATE_INVALID" } }, 400);
-    const db = salesDatabase(env);
+    const db = salesDatabase(env, data);
     if (!db) return jsonResponse({ synced: false, message: "销售数据存储暂不可用。", error: { code: "DATA_STORAGE_UNAVAILABLE", retryable: true } }, 501);
 
     try {
@@ -96,7 +96,7 @@ export function createSalesRepairRequestHandler(dependencies = defaultSalesRepai
         before: anomaly
       };
       await dependencies.putRun(db, run);
-      const task = dependencies.execute({ db, env, date, run });
+      const task = dependencies.execute({ db, env, date, run, dataEnvironment: data.dataEnvironment });
       if (typeof context.waitUntil === "function") context.waitUntil(task);
       else void task;
       return jsonResponse({ synced: true, scheduled: true, run: publicRun(run), anomaly }, 202);

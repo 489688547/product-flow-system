@@ -1,4 +1,5 @@
 import { detectLatestSalesAnomaly } from "../../../../../../src/domain/dataCenter.js";
+import { scaleSalesFact } from "../../../../../../src/domain/demoSalesTransform.js";
 import { ensureDataCenterTables } from "../../../../data-center/_shared/storage.js";
 import { pullKuaimaiDay, resolveKuaimaiConfig } from "../../../../kuaimai/_shared/kuaimai.js";
 import { ensureSalesTables } from "../../../../sales.js";
@@ -162,7 +163,7 @@ function completedRun(run, patch) {
   return { ...run, ...patch, updatedAt: completedAt, completedAt };
 }
 
-export async function executeSalesRepair({ db, env, date, run }) {
+export async function executeSalesRepair({ db, env, date, run, dataEnvironment }) {
   try {
     const [config, latestDailyFacts, currentRows] = await Promise.all([
       resolveKuaimaiConfig(env),
@@ -171,14 +172,17 @@ export async function executeSalesRepair({ db, env, date, run }) {
     ]);
     if (!config.ready) throw Object.assign(new Error("快麦接口尚未配置，无法自动补拉。"), { code: "SALES_REPAIR_PROVIDER_NOT_CONFIGURED" });
     const pulled = await pullKuaimaiDay(config, { date, pageNo: 1, maxPages: 40 });
+    const candidateRows = dataEnvironment?.id === "display"
+      ? pulled.rows.map(row => scaleSalesFact(row))
+      : pulled.rows;
     const decision = evaluateSalesRepairCandidate({
       latestDailyFacts,
       currentRows,
-      pulledRows: pulled.rows,
+      pulledRows: candidateRows,
       complete: !pulled.hasNext
     });
     if (decision.action === "replace") {
-      await replaceSalesDay(db, { date, rows: pulled.rows, titles: pulled.titles, requestedBy: run.requestedBy });
+      await replaceSalesDay(db, { date, rows: candidateRows, titles: pulled.titles, requestedBy: run.requestedBy });
       return writeSalesRepairRun(db, completedRun(run, {
         status: "success",
         rowCount: pulled.rows.length,

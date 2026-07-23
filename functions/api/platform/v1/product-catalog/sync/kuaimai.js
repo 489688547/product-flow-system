@@ -15,7 +15,7 @@ export async function onRequest({ request, env, data = {} }) {
   try {
     const session = requireCatalogSession(data);
     requireCatalogEditor(session);
-    const db = productCatalogDatabase(env);
+    const db = productCatalogDatabase(env, data);
     if (!db) return errorResponse("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，快麦商品同步暂不可用。", 501, "PRODUCT_CATALOG_STORAGE_UNAVAILABLE");
     const config = await resolveKuaimaiConfig(env);
     if (!config.ready) return errorResponse("缺少快麦商品同步配置。", 400, "KUAIMAI_CONFIG_MISSING");

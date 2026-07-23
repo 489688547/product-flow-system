@@ -37,6 +37,7 @@ function safeProviderError(error) {
 
 export async function invokeAiFeature({
   env = {},
+  data = {},
   session = {},
   appId,
   featureId,
@@ -55,7 +56,7 @@ export async function invokeAiFeature({
   let providerCalled = false;
   try {
     if (env.AI_ASSISTANT_ENABLED !== "1") throw readinessError("AI_DISABLED", "公司 AI 服务尚未启用。");
-    loaded = await loadAiConfiguration(env);
+    loaded = await loadAiConfiguration(env, data);
     if (!loaded.provider.enabled || !loaded.provider.secretConfigured) {
       throw readinessError("AI_PROVIDER_NOT_READY", "模型服务未就绪。");
     }
@@ -66,7 +67,7 @@ export async function invokeAiFeature({
       fetchImpl: env.AI_PROVIDER_FETCH || fetch,
       timeoutMs
     });
-    await writeAiAudit(loaded.db, {
+    await writeAiAudit(loaded.controlDb, {
       requestId: id,
       userId,
       department: session.department,
@@ -80,7 +81,8 @@ export async function invokeAiFeature({
       appId: feature.appId,
       featureId: feature.featureId,
       executionMode: "model",
-      providerCalled: true
+      providerCalled: true,
+      dataEnvironment: loaded.dataEnvironment
     });
     return {
       requestId: id,
@@ -96,7 +98,7 @@ export async function invokeAiFeature({
     const error = safeProviderError(cause);
     if (feature.fallbackMode !== "rule_fallback" || typeof fallback !== "function") throw error;
     const fallbackValue = await fallback();
-    const db = loaded?.db || env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB;
+    const db = loaded?.controlDb || data.controlDb || env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB;
     if (db) {
       await writeAiAudit(db, {
         requestId: id,
@@ -112,7 +114,8 @@ export async function invokeAiFeature({
         appId: feature.appId,
         featureId: feature.featureId,
         executionMode: "rule_fallback",
-        providerCalled
+        providerCalled,
+        dataEnvironment: loaded?.dataEnvironment || (data.dataEnvironment?.id === "display" ? "display" : "production")
       });
     }
     return {

@@ -88,7 +88,7 @@ export async function onRequest({ request, env, data = {} }) {
   const hasRange = Boolean(from || to);
   if (hasRange && !validRange(from, to)) return errorResponse("日期范围无效，请完整选择开始和截止日期。", 400, "DATA_SERVICE_DATE_RANGE_INVALID");
 
-  const db = salesDatabase(env);
+  const db = salesDatabase(env, data);
   if (!db) return errorResponse("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，销售数据服务暂不可用。", 501, "DATA_STORAGE_UNAVAILABLE");
   try {
     await ensureSalesTables(db);

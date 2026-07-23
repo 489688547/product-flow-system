@@ -84,7 +84,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (!validDate(from) || !validDate(to) || fromTime > toTime || (toTime - fromTime) / 86400000 > MAX_RANGE_DAYS) {
     return errorResponse("日期范围无效，最多查询 370 天。", 400, "DATA_DATE_RANGE_INVALID");
   }
-  const db = salesDatabase(env);
+  const db = salesDatabase(env, data);
   if (!db) return errorResponse("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，销售数据暂不可用。", 501, "DATA_STORAGE_UNAVAILABLE");
 
   try {

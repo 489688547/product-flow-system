@@ -1,9 +1,10 @@
 import { mergeCatalogRecords, normalizeCatalogPayload } from "../../../../../../src/domain/productCatalog.js";
+import { requestBusinessDatabase } from "../../../_shared/dataEnvironment.js";
 
 const BATCH_SIZE = 50;
 
-export function productCatalogDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function productCatalogDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureProductCatalogTables(db) {

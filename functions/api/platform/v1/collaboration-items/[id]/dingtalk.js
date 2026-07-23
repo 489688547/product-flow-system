@@ -1,6 +1,11 @@
 import { normalizeCollaborationDraft } from "../../../../../../src/domain/collaboration.js";
 import { buildCollaborationTodoPayload } from "../../../../../../src/domain/collaborationNotifications.js";
 import { getDingAccessToken, syncDingTodoTask } from "../../../../dingtalk/_shared/dingtalk.js";
+import {
+  auditDisplayExternalAction,
+  simulateDingTodoSync
+} from "../../../_shared/displayExternalActionAdapter.js";
+import { shouldSimulateExternalAction } from "../../../_shared/externalActionMode.js";
 import { assertCanRead, collaborationActor } from "../../_shared/collaborationAuthorization.js";
 import { CollaborationHttpError, errorResponse, jsonResponse, methodNotAllowed, optionsResponse, readJson, requireSession, requireWritable } from "../../_shared/collaborationHttp.js";
 import { collaborationDatabase, createActivity, ensureCollaborationTables, findItemById, updateItem } from "../../_shared/collaborationStorage.js";
@@ -30,7 +35,7 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
     const session = requireSession(data);
     requireWritable(session);
     const actor = collaborationActor(session);
-    const db = collaborationDatabase(env);
+    const db = collaborationDatabase(env, data);
     if (!db) throw new CollaborationHttpError(501, "COLLABORATION_STORAGE_UNAVAILABLE", "共享协同数据暂不可用。", undefined, true);
     const deps = dependencies(data);
     await deps.ensureTables(db);
@@ -50,8 +55,17 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
     }
     const now = new Date().toISOString();
     try {
-      const accessToken = await deps.getAccessToken(env);
-      const todo = await deps.syncTodo(accessToken, todoInput);
+      const todo = shouldSimulateExternalAction(data)
+        ? simulateDingTodoSync(todoInput)
+        : await deps.syncTodo(await deps.getAccessToken(env), todoInput);
+      if (todo.simulated) {
+        await auditDisplayExternalAction({
+          env,
+          data,
+          kind: "collaboration_dingtalk_todo",
+          resultId: todo.id
+        });
+      }
       const next = normalizeCollaborationDraft({
         ...item,
         version: item.version + 1,

@@ -19,7 +19,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (request.method === "POST" && !canEditDataCenter(session)) {
     return errorResponse("仅总经办和运营部可维护数据中心元数据。", 403, "PERMISSION_WRITE_DENIED");
   }
-  const db = dataCenterDatabase(env);
+  const db = dataCenterDatabase(env, data);
   if (!db) return errorResponse("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，数据中心元数据暂不可用。", 501, "DATA_STORAGE_UNAVAILABLE");
 
   try {

@@ -41,8 +41,8 @@ function parseQuery(request, actor) {
   };
 }
 
-function requireDatabase(env) {
-  const db = collaborationDatabase(env);
+function requireDatabase(env, data) {
+  const db = collaborationDatabase(env, data);
   if (!db) throw new CollaborationHttpError(501, "COLLABORATION_STORAGE_UNAVAILABLE", "共享协同数据暂不可用。", undefined, true);
   return db;
 }
@@ -53,7 +53,7 @@ export async function onRequest({ request, env, data = {} }) {
   try {
     const session = requireSession(data);
     const actor = collaborationActor(session);
-    const db = requireDatabase(env);
+    const db = requireDatabase(env, data);
     await ensureCollaborationTables(db);
 
     if (request.method === "GET") {

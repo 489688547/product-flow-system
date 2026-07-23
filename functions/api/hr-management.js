@@ -18,7 +18,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (!session) return errorResponse("请先使用钉钉登录。", 401, "AUTH_SESSION_REQUIRED");
   const resource = new URL(request.url).searchParams.get("resource") || "bootstrap";
   if (resource !== "bootstrap") return errorResponse("当前阶段不提供该人事资源。", 404, "HR_RESOURCE_NOT_FOUND");
-  const db = hrDatabase(env);
+  const db = hrDatabase(env, data);
   if (!db) return errorResponse("缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，人事共享数据暂不可用。", 501, "HR_STORAGE_UNAVAILABLE", true);
 
   try {

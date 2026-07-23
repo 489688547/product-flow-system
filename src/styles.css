@@ -853,6 +853,33 @@ main { min-width: 0; overflow-x: hidden; }
 .feature-permission-grid { display: grid; grid-template-columns: repeat(2, minmax(180px, 1fr)); gap: var(--space-3); }
 .feature-permission-grid > label { min-width: 0; display: grid; gap: 6px; color: var(--text-secondary); font-size: 12px; font-weight: 700; }
 .settings-no-access { color: var(--text-tertiary); }
+.data-environment-settings { display: grid; gap: var(--space-3); }
+.data-environment-current { min-height: 34px; padding: 0 11px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-subtle); color: var(--text-secondary); font-size: 12px; white-space: nowrap; }
+.data-environment-current svg { color: var(--accent); }
+.data-environment-current strong { color: var(--text-primary); }
+.data-environment-options { min-width: 0; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--radius-panel); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; }
+.data-environment-option { min-width: 0; min-height: 112px; padding: var(--space-4); display: grid; grid-template-columns: 20px 24px minmax(0, 1fr); align-items: start; gap: 8px; background: var(--surface); cursor: pointer; transition: background var(--transition-fast), box-shadow var(--transition-fast); }
+.data-environment-option + .data-environment-option { border-left: 1px solid var(--border); }
+.data-environment-option:hover { background: var(--surface-subtle); }
+.data-environment-option.selected { position: relative; z-index: 1; background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.data-environment-option.unavailable { cursor: not-allowed; opacity: .62; }
+.data-environment-option input { margin: 3px 0 0; accent-color: var(--accent); }
+.data-environment-option-icon { min-height: 24px; display: grid; place-items: center; color: var(--accent); }
+.data-environment-option > span:last-child { min-width: 0; display: grid; gap: 5px; }
+.data-environment-option strong { color: var(--text-primary); font-size: 14px; }
+.data-environment-option small { color: var(--text-secondary); line-height: 1.55; }
+.data-environment-option em { color: var(--text-tertiary); font-size: 11px; font-style: normal; }
+.data-environment-actions { min-height: 36px; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+.data-environment-help { color: var(--text-tertiary); font-size: 11px; line-height: 1.55; }
+.data-environment-refresh { min-height: 62px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface-subtle); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.data-environment-refresh > span { min-width: 0; display: grid; gap: 4px; }
+.data-environment-refresh strong { color: var(--text-primary); font-size: 13px; }
+.data-environment-refresh small { color: var(--text-tertiary); font-size: 11px; line-height: 1.55; overflow-wrap: anywhere; }
+.data-environment-refresh .btn { flex: 0 0 auto; }
+.data-environment-feedback:empty { display: none; }
+.data-environment-feedback .sales-import-message { margin: 0; }
+.data-environment-settings h2:focus { outline: none; }
+.data-environment-settings h2:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; border-radius: 2px; }
 .settings-task-templates { margin-top: var(--space-3); }
 .settings-template-head { align-items: center; }
 .settings-save-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-2); }
@@ -1642,6 +1669,14 @@ main { min-width: 0; overflow-x: hidden; }
 }
 
 @media (max-width: 760px) {
+  .data-environment-options { grid-template-columns: 1fr; }
+  .data-environment-option + .data-environment-option { border-top: 1px solid var(--border); border-left: 0; }
+  .data-environment-actions { align-items: stretch; flex-direction: column; }
+  .data-environment-actions .btn, .data-environment-actions .disabled-action-tip { width: 100%; }
+  .data-environment-actions .btn { justify-content: center; }
+  .data-environment-refresh { align-items: stretch; flex-direction: column; }
+  .data-environment-refresh .btn, .data-environment-refresh .disabled-action-tip { width: 100%; }
+  .data-environment-refresh .btn { justify-content: center; }
   .local-online-environment {
     margin: 10px 12px 0;
     display: grid;

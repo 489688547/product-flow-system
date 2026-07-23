@@ -24,6 +24,7 @@ import { normalizeProductPlans, validateProductPlan } from "../domain/productPla
 import { createDingTalkTodoRefreshController } from "./dingTalkTodoRefresh.js";
 import { createSharedStateSyncSession } from "./sharedStateSync.js";
 import { productFlowStateFingerprint } from "./productFlowStateFingerprint.js";
+import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 import { getBrowserStorage, persistLocalState, tryGetStorageItem, tryRemoveStorageItem, trySetStorageItem } from "./resilientLocalStorage.js";
 
 const ProductFlowContext = createContext(null);
@@ -31,6 +32,11 @@ const STORAGE_KEY = "productFlowState";
 const DIRTY_STORAGE_KEY = "productFlowStateDirty";
 const RECOVERY_STORAGE_KEY = "productFlowStateRecoveryBackup";
 const localCache = getBrowserStorage("localStorage");
+
+function localKey(baseKey) {
+  migrateLegacyProductionCache(localCache, baseKey);
+  return environmentStorageKey(baseKey);
+}
 
 function isLocalPreview() {
   return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
@@ -43,7 +49,7 @@ function sharedErrorMessage(error, fallback) {
 
 function loadLocalState() {
   try {
-    const raw = tryGetStorageItem(localCache, STORAGE_KEY);
+    const raw = tryGetStorageItem(localCache, localKey(STORAGE_KEY));
     return raw ? normalizeClientState(JSON.parse(raw)) : createDefaultState();
   } catch {
     return createDefaultState();
@@ -52,9 +58,9 @@ function loadLocalState() {
 
 function preserveLocalRecoveryCopy() {
   try {
-    const raw = tryGetStorageItem(localCache, STORAGE_KEY);
+    const raw = tryGetStorageItem(localCache, localKey(STORAGE_KEY));
     if (!raw) return false;
-    return persistLocalState(localCache, RECOVERY_STORAGE_KEY, {
+    return persistLocalState(localCache, localKey(RECOVERY_STORAGE_KEY), {
       savedAt: new Date().toISOString(),
       state: JSON.parse(raw)
     });
@@ -90,8 +96,8 @@ export function ProductFlowProvider({ children }) {
     setState(current => {
       const nextState = typeof updater === "function" ? updater(current) : updater;
       if (nextState === current) return current;
-      persistLocalState(localCache, STORAGE_KEY, nextState);
-      trySetStorageItem(localCache, DIRTY_STORAGE_KEY, "1");
+      persistLocalState(localCache, localKey(STORAGE_KEY), nextState);
+      trySetStorageItem(localCache, localKey(DIRTY_STORAGE_KEY), "1");
       return nextState;
     });
   }, []);
@@ -113,11 +119,11 @@ export function ProductFlowProvider({ children }) {
         const normalized = normalizeClientState(payload.state);
         const remoteState = sharedSyncSession.current.acceptRemote({ ...payload, state: normalized });
         if (alive) {
-          const hadLocalChanges = tryGetStorageItem(localCache, DIRTY_STORAGE_KEY) === "1";
+          const hadLocalChanges = tryGetStorageItem(localCache, localKey(DIRTY_STORAGE_KEY)) === "1";
           const preserved = hadLocalChanges && preserveLocalRecoveryCopy();
           setState(remoteState);
-          persistLocalState(localCache, STORAGE_KEY, remoteState);
-          tryRemoveStorageItem(localCache, DIRTY_STORAGE_KEY);
+          persistLocalState(localCache, localKey(STORAGE_KEY), remoteState);
+          tryRemoveStorageItem(localCache, localKey(DIRTY_STORAGE_KEY));
           setSharedError(preserved ? "发现本机未同步修改，已保留恢复副本并加载线上最新数据。" : "");
         }
       } catch (error) {
@@ -174,14 +180,14 @@ export function ProductFlowProvider({ children }) {
   }, [authUser?.unionId, loading, refreshTaskTodoStatuses, todoRefreshController]);
 
   useEffect(() => {
-    persistLocalState(localCache, STORAGE_KEY, state);
+    persistLocalState(localCache, localKey(STORAGE_KEY), state);
     if (loading || !sharedSyncSession.current.canSave()) return undefined;
     const writeRequest = sharedSyncSession.current.buildWrite(state);
     if (!writeRequest) {
-      tryRemoveStorageItem(localCache, DIRTY_STORAGE_KEY);
+      tryRemoveStorageItem(localCache, localKey(DIRTY_STORAGE_KEY));
       return undefined;
     }
-    trySetStorageItem(localCache, DIRTY_STORAGE_KEY, "1");
+    trySetStorageItem(localCache, localKey(DIRTY_STORAGE_KEY), "1");
     const timer = setTimeout(async () => {
       try {
         const response = await fetch(stateApiUrl, {
@@ -193,7 +199,7 @@ export function ProductFlowProvider({ children }) {
         if (!response.ok || payload.synced === false) throw new Error(payload.message || "共享数据保存失败。");
         sharedSyncSession.current.acceptSaved(payload, state);
         if (latestState.current === state) {
-          tryRemoveStorageItem(localCache, DIRTY_STORAGE_KEY);
+          tryRemoveStorageItem(localCache, localKey(DIRTY_STORAGE_KEY));
         }
         setSharedError("");
       } catch (error) {

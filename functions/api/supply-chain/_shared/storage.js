@@ -1,7 +1,8 @@
 import { SUPPLY_COLLECTIONS, normalizeSupplyChainState } from "../../../../src/domain/supplyChain.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 
-export function supplyDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function supplyDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureSupplyTables(db) {

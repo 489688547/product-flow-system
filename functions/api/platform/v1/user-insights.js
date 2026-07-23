@@ -21,7 +21,7 @@ function queryScope(request) {
 
 async function handleGet(context) {
   const actor = requireInsightActor(context.data);
-  const db = requireD1(context.env);
+  const db = requireD1(context.env, context.data);
   const scope = queryScope(context.request);
   const [categoryMappings, snapshots, entities, ruleSets, competitors, auditLogs, syncRuns] = await Promise.all([
     listInsightRecords(db, "categoryMappings"),
@@ -53,7 +53,7 @@ async function handleGet(context) {
 async function handlePost(context) {
   const actor = requireInsightActor(context.data);
   requireWritable(actor);
-  const db = requireD1(context.env);
+  const db = requireD1(context.env, context.data);
   const body = await readJson(context.request);
   if (body.action !== "retry") throw new UserInsightHttpError(400, "VALIDATION_ACTION_INVALID", "用户洞察操作无效。");
   const scope = body.scope || {};

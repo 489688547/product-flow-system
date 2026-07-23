@@ -92,7 +92,7 @@ export async function onRequest({ request, env, data = {} }) {
     const actor = dataStandardActor(requireSession(data));
     requireDefinitionView(actor);
     const query = parseQuery(request);
-    const db = requireDatabase(dataStandardsDatabase(env));
+    const db = requireDatabase(dataStandardsDatabase(env, data));
     await ensureDataStandardsTables(db);
     let results = await listCurrentResults(db, {
       metricCodes: query.metricCodes,

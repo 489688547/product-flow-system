@@ -1,5 +1,6 @@
 import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
 import { canAccessCompanyPlatform } from "../../src/domain/permissions.js";
+import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
 
 const COLLECTIONS = [
   "strategies",
@@ -25,8 +26,8 @@ const COLLECTIONS = [
   "auditLogs"
 ];
 
-function platformDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+function platformDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 async function ensureTables(db) {
@@ -127,7 +128,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (request.method === "POST" && data.session?.role === "readonly") {
     return jsonResponse({ synced: false, message: "只读账号不能修改战略执行数据。" }, 403);
   }
-  const db = platformDatabase(env);
+  const db = platformDatabase(env, data);
   if (!db) {
     return jsonResponse({
       synced: false,

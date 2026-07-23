@@ -178,7 +178,7 @@ export async function onRequest({ request, env, data = {} }) {
     return jsonResponse({ synced: false, message: "当前部门无权同步钉钉采购与付款审批。" }, 403);
   }
   if (data.session?.role === "readonly") return jsonResponse({ synced: false, message: "只读账号不能执行审批同步。" }, 403);
-  const db = supplyDatabase(env);
+  const db = supplyDatabase(env, data);
   if (!db) return jsonResponse({ synced: false, message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB。" }, 501);
 
   const body = await request.json().catch(() => ({}));

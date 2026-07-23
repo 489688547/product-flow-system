@@ -1,4 +1,5 @@
 import { DATA_CENTER_PERSISTED_COLLECTIONS, normalizeDataCenterState } from "../../../../src/domain/dataCenter.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 
 const TABLES = {
   sources: "data_sources",
@@ -14,8 +15,8 @@ const TABLES = {
 };
 const BATCH_SIZE = 50;
 
-export function dataCenterDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function dataCenterDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function ensureDataCenterTables(db) {

@@ -5,12 +5,12 @@ import { appendAudit, getInsightRecord, listInsightRecords, putInsightRecord } f
 
 async function handleGet(context) {
   requireInsightActor(context.data);
-  return jsonResponse({ synced: true, competitors: await listInsightRecords(requireD1(context.env), "competitors") });
+  return jsonResponse({ synced: true, competitors: await listInsightRecords(requireD1(context.env, context.data), "competitors") });
 }
 
 async function handleCreate(context) {
   const actor = requireInsightActor(context.data);
-  const db = requireD1(context.env);
+  const db = requireD1(context.env, context.data);
   const body = await readJson(context.request);
   const competitor = { ...(body.competitor || {}), status: body.competitor?.status === "core" ? "candidate" : (body.competitor?.status || "candidate") };
   assertRuleOwner(actor, competitor);
@@ -24,7 +24,7 @@ async function handleCreate(context) {
 
 async function handlePatch(context) {
   const actor = requireInsightActor(context.data);
-  const db = requireD1(context.env);
+  const db = requireD1(context.env, context.data);
   const body = await readJson(context.request);
   const current = await getInsightRecord(db, "competitors", body.id);
   if (!current) throw new UserInsightHttpError(404, "COMPETITOR_NOT_FOUND", "竞品候选不存在。");

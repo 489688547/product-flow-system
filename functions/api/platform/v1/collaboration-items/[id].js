@@ -3,8 +3,8 @@ import { CollaborationHttpError, errorResponse, jsonResponse, methodNotAllowed, 
 import { collaborationDatabase, createActivity, ensureCollaborationTables, findItemById, updateItem } from "../_shared/collaborationStorage.js";
 import { validatePatchInput } from "../_shared/collaborationValidation.js";
 
-function database(env) {
-  const db = collaborationDatabase(env);
+function database(env, data) {
+  const db = collaborationDatabase(env, data);
   if (!db) throw new CollaborationHttpError(501, "COLLABORATION_STORAGE_UNAVAILABLE", "共享协同数据暂不可用。", undefined, true);
   return db;
 }
@@ -20,7 +20,7 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
   try {
     const session = requireSession(data);
     const actor = collaborationActor(session);
-    const db = database(env);
+    const db = database(env, data);
     await ensureCollaborationTables(db);
     const item = await findItemById(db, params.id);
     if (!item) throw new CollaborationHttpError(404, "COLLABORATION_ITEM_NOT_FOUND", "协同事项不存在或当前无权查看。");
