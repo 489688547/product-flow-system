@@ -136,16 +136,16 @@
 
 ## 9. AI 控制面与业务面拆分
 
-- [ ] 先增加 Provider 配置在控制库、上下文在展示库测试
-- [ ] AI 配置加载拆分 `controlDb` 与 `businessDb`
-- [ ] Provider 配置、凭证、租约、用量和审计使用控制库
-- [ ] Context builders 使用业务库
-- [ ] Business App Skills 使用业务库
-- [ ] AI 用量/审计增加独立 `data_environment` 字段
-- [ ] 不改变 model/rule_fallback 的 executionMode 语义
-- [ ] 审计不记录 Prompt、回答、上下文、Skill 参数或 Provider 原始响应
-- [ ] 用量页只允许公司聚合，不增加员工排名
-- [ ] 提交 `feat: route AI business context by data environment`
+- [x] 先增加 Provider 配置在控制库、上下文在展示库测试
+- [x] AI 配置加载拆分 `controlDb` 与 `businessDb`
+- [x] Provider 配置、凭证、租约、用量和审计使用控制库
+- [x] Context builders 使用业务库
+- [x] Business App Skills 使用业务库
+- [x] AI 用量/审计增加独立 `data_environment` 字段
+- [x] 不改变 model/rule_fallback 的 executionMode 语义
+- [x] 审计不记录 Prompt、回答、上下文、Skill 参数或 Provider 原始响应
+- [x] 用量页只允许公司聚合，不增加员工排名
+- [x] 提交 `feat: route AI business context by data environment`
 
 ## 10. 规则写回与发布
 

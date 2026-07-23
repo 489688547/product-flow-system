@@ -117,11 +117,11 @@ export async function onRequest({ request, env, data = {} }) {
   let loaded;
   let leaseAcquired = false;
   try {
-    loaded = await loadAiConfiguration(env);
+    loaded = await loadAiConfiguration(env, data);
     if (!loaded.provider.enabled || !loaded.provider.secretConfigured) {
       throw Object.assign(new Error("模型服务未就绪。"), { code: "AI_PROVIDER_NOT_READY", status: 503, retryable: false });
     }
-    leaseAcquired = await acquireAiLease(loaded.db, userId, id);
+    leaseAcquired = await acquireAiLease(loaded.controlDb, userId, id);
     if (!leaseAcquired) return aiError("已有回答正在生成。", 409, "AI_REQUEST_IN_FLIGHT", false, id);
 
     const access = resolveAiDataAccess({
@@ -139,7 +139,7 @@ export async function onRequest({ request, env, data = {} }) {
     const useRoutedSkills = routedSkillIds.length > 0;
     const useSkills = useNativeSkills || useRoutedSkills;
     const context = useSkills ? null : await buildCompanyContext({
-      db: loaded.db,
+      db: loaded.businessDb,
       access,
       question: messages.at(-1).content
     });
@@ -163,7 +163,7 @@ export async function onRequest({ request, env, data = {} }) {
         const sources = [...sourceMap.values()];
         const sourceFreshness = Object.fromEntries(sources.map(source => [source.domainId, source.updatedAt || ""]));
         finishPromise = Promise.all([
-          writeAiAudit(loaded.db, {
+          writeAiAudit(loaded.controlDb, {
             requestId: id,
             userId,
             department: data.session.department,
@@ -181,9 +181,10 @@ export async function onRequest({ request, env, data = {} }) {
             appId: ASSISTANT_FEATURE.appId,
             featureId: ASSISTANT_FEATURE.featureId,
             executionMode: "model",
-            providerCalled: true
+            providerCalled: true,
+            dataEnvironment: loaded.dataEnvironment
           }),
-          releaseAiLease(loaded.db, userId, id)
+          releaseAiLease(loaded.controlDb, userId, id)
         ]).catch(() => {}).finally(() => request.signal.removeEventListener("abort", abortFromRequest));
       }
       return finishPromise;
@@ -228,7 +229,7 @@ export async function onRequest({ request, env, data = {} }) {
             };
             enqueue(skillEvent.type, payload);
             if (skillEvent.type !== "skill_started") {
-              await writeAiSkillAudit(loaded.db, {
+              await writeAiSkillAudit(loaded.controlDb, {
                 requestId: id,
                 callId: skillEvent.callId,
                 skillId: skillEvent.skillId,
@@ -236,12 +237,13 @@ export async function onRequest({ request, env, data = {} }) {
                 argumentSummary: skillEvent.argumentSummary,
                 resultCount: payload.recordCount,
                 latencyMs: payload.latencyMs,
-                resultCode: skillEvent.type === "skill_completed" ? "AI_SKILL_COMPLETED" : skillEvent.code || "AI_SKILL_FAILED"
+                resultCode: skillEvent.type === "skill_completed" ? "AI_SKILL_COMPLETED" : skillEvent.code || "AI_SKILL_FAILED",
+                dataEnvironment: loaded.dataEnvironment
               });
             }
           };
           const executeReadSkill = call => executeSkill({
-            db: loaded.db,
+            db: loaded.businessDb,
             session: data.session,
             access,
             skillId: call.skillId,
@@ -312,7 +314,7 @@ export async function onRequest({ request, env, data = {} }) {
       }
     });
   } catch (error) {
-    if (leaseAcquired && loaded?.db) await releaseAiLease(loaded.db, userId, id).catch(() => {});
+    if (leaseAcquired && loaded?.controlDb) await releaseAiLease(loaded.controlDb, userId, id).catch(() => {});
     return aiError(error.message || "公司 AI 总助暂不可用。", error.status || 500, error.code || "AI_CHAT_FAILED", Boolean(error.retryable), id);
   }
 }

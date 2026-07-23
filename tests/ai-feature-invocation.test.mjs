@@ -97,6 +97,39 @@ test("shared feature invocation records Provider tokens and server attribution",
   assert.deepEqual(db.audits[0].slice(-4), ["ecommerce-operations", "plan-review", "model", 1]);
 });
 
+test("shared feature invocation audits the selected environment only in the control database", async () => {
+  const { invokeAiFeature } = await import(invokeUrl);
+  const controlDb = createAiD1Mock({ providerEnabled: true });
+  const businessDb = createAiD1Mock();
+  const result = await invokeAiFeature({
+    env: {
+      PRODUCT_FLOW_DB: controlDb,
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: "test-key",
+      AI_PROVIDER_FETCH: async () => new Response([
+        "event: response.output_text.delta\ndata: {\"delta\":\"展示环境建议\"}\n\n",
+        "event: response.completed\ndata: {\"response\":{\"usage\":{\"input_tokens\":4,\"output_tokens\":2}}}\n\n"
+      ].join(""), { status: 200 })
+    },
+    data: {
+      controlDb,
+      businessDb,
+      dataEnvironment: { id: "display", version: 8 }
+    },
+    session: { userId: "operator-1", department: "运营部" },
+    appId: "ecommerce-operations",
+    featureId: "plan-review",
+    systemInstruction: "只提供建议。",
+    userInput: "安全方案摘要",
+    fallback: () => ({ mode: "rule_fallback" })
+  });
+
+  assert.equal(result.mode, "model");
+  assert.equal(controlDb.audits.length, 1);
+  assert.equal(businessDb.audits.length, 0);
+  assert.equal(controlDb.audits[0].includes("display"), true);
+});
+
 test("shared feature invocation records one zero-token rule fallback when Provider is unavailable", async () => {
   const { invokeAiFeature } = await import(invokeUrl);
   const db = createAiD1Mock({ providerEnabled: true });

@@ -11,7 +11,7 @@ export async function onRequest({ request, env, data = {} }) {
     return jsonResponse({ enabled: false, ready: false, provider: null, allowedDomains: [], blockedDomains: [] });
   }
   try {
-    const { stored, provider } = await loadAiConfiguration(env);
+    const { stored, provider } = await loadAiConfiguration(env, data);
     const access = resolveAiDataAccess({
       session: data.session,
       policies: stored.state.aiDataPolicies,

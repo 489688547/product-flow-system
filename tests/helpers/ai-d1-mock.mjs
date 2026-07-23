@@ -14,7 +14,12 @@ const TABLE_TO_COLLECTION = {
   data_ai_policies: "aiDataPolicies"
 };
 
-export function createAiD1Mock({ providerEnabled = false, providerSkillsSupported = false } = {}) {
+export function createAiD1Mock({
+  providerEnabled = false,
+  providerSkillsSupported = false,
+  projectId = "project-1",
+  projectTitle = "重点项目"
+} = {}) {
   const records = new Map();
   const meta = new Map();
   const audits = [];
@@ -80,7 +85,13 @@ export function createAiD1Mock({ providerEnabled = false, providerSkillsSupporte
           const table = Object.keys(TABLE_TO_COLLECTION).find(name => new RegExp(`from ${name}`, "i").test(sql));
           if (table) return { results: [...records.values()].filter(row => row.entity_type === TABLE_TO_COLLECTION[table]) };
           if (/from product_sales_daily/i.test(sql)) return { results: [] };
-          if (/from platform_records/i.test(sql)) return { results: [{ entity_type: "projects", id: "project-1", payload: JSON.stringify({ id: "project-1", title: "重点项目", status: "at_risk", department: "总经办" }), updated_at: "2026-07-18T00:00:00Z", updated_by: "test" }] };
+          if (/from platform_records/i.test(sql)) return { results: [{
+            entity_type: "projects",
+            id: projectId,
+            payload: JSON.stringify({ id: projectId, title: projectTitle, status: "at_risk", department: "总经办" }),
+            updated_at: "2026-07-18T00:00:00Z",
+            updated_by: "test"
+          }] };
           if (/from product_flow_state_parts|supply_chain_records/i.test(sql)) return { results: [] };
           return { results: [] };
         },

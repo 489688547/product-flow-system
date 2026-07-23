@@ -15,6 +15,7 @@ export async function ensureAiAuditTables(db) {
     latency_ms INTEGER NOT NULL DEFAULT 0,
     result_code TEXT NOT NULL,
     completed INTEGER NOT NULL DEFAULT 0,
+    data_environment TEXT NOT NULL DEFAULT 'production',
     app_id TEXT NOT NULL DEFAULT 'company-ai-assistant',
     feature_id TEXT NOT NULL DEFAULT 'assistant-chat',
     execution_mode TEXT NOT NULL DEFAULT 'model',
@@ -31,6 +32,7 @@ export async function ensureAiAuditTables(db) {
     skill_id TEXT NOT NULL,
     app_id TEXT NOT NULL,
     argument_summary TEXT NOT NULL DEFAULT '[]',
+    data_environment TEXT NOT NULL DEFAULT 'production',
     result_count INTEGER NOT NULL DEFAULT 0,
     latency_ms INTEGER NOT NULL DEFAULT 0,
     result_code TEXT NOT NULL,
@@ -43,14 +45,15 @@ export async function writeAiSkillAudit(db, record = {}) {
   await ensureAiAuditTables(db);
   const argumentSummary = safeStringList(record.argumentSummary).slice(0, 20);
   await db.prepare(`INSERT INTO ai_skill_audit
-    (request_id, call_id, skill_id, app_id, argument_summary, result_count, latency_ms, result_code, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+    (request_id, call_id, skill_id, app_id, argument_summary, data_environment, result_count, latency_ms, result_code, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .bind(
       String(record.requestId || "").slice(0, 120),
       String(record.callId || "").slice(0, 120),
       String(record.skillId || "").slice(0, 120),
       String(record.appId || "unknown").slice(0, 80),
       JSON.stringify(argumentSummary),
+      record.dataEnvironment === "display" ? "display" : "production",
       Math.max(0, Number(record.resultCount) || 0),
       Math.max(0, Number(record.latencyMs) || 0),
       String(record.resultCode || "AI_SKILL_UNKNOWN").slice(0, 80),
@@ -100,8 +103,8 @@ export async function writeAiAudit(db, record = {}) {
   await db.prepare(`INSERT INTO ai_usage_audit
     (request_id, created_at, user_id, department, provider_id, model, allowed_domains,
      blocked_domains, domain_counts, source_freshness, input_tokens, output_tokens,
-     latency_ms, result_code, completed, app_id, feature_id, execution_mode, provider_called)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+     latency_ms, result_code, completed, data_environment, app_id, feature_id, execution_mode, provider_called)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
     .bind(
       String(record.requestId || "").slice(0, 120),
       String(record.createdAt || new Date().toISOString()).slice(0, 40),
@@ -118,6 +121,7 @@ export async function writeAiAudit(db, record = {}) {
       Math.max(0, Number(record.latencyMs) || 0),
       String(record.resultCode || "AI_UNKNOWN").slice(0, 80),
       record.completed === true || record.streamInterrupted === false ? 1 : 0,
+      record.dataEnvironment === "display" ? "display" : "production",
       String(record.appId || "company-ai-assistant").slice(0, 80),
       String(record.featureId || "assistant-chat").slice(0, 80),
       record.executionMode === "rule_fallback" ? "rule_fallback" : "model",
