@@ -155,7 +155,11 @@ export function withDataEnvironmentHeaders(response, dataEnvironment) {
 }
 
 export function dataEnvironmentErrorResponse(error) {
-  const known = error instanceof DataEnvironmentError;
+  const known = error instanceof DataEnvironmentError || Boolean(
+    error
+    && Number.isInteger(error.status)
+    && /^[A-Z0-9_]+$/.test(String(error.code || ""))
+  );
   const status = known ? error.status : 500;
   const message = known ? error.message : "数据环境处理失败，请稍后重试。";
   const requestId = crypto.randomUUID?.() || `req_${Date.now().toString(36)}`;

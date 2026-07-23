@@ -68,7 +68,7 @@
 - [x] 销售 IndexedDB 按环境使用不同数据库名
 - [x] 旧缓存只迁移到正式环境一次
 - [x] 实现设置页数据环境卡片
-- [ ] 展示刷新状态支持恢复、失败和重试
+- [x] 展示刷新状态支持恢复、失败和重试
 - [x] 普通业务页面不增加展示标签
 - [ ] 完成键盘、焦点、空、错误、禁用、响应式和 WebView 验收
 - [x] 提交 `feat: add display database settings`
@@ -91,18 +91,18 @@
 
 ## 6. 单展示库刷新任务
 
-- [ ] 先增加刷新状态机、失败阻断和幂等测试
-- [ ] 实现 preflight、clear、copy、transform、recalculate、validate、activate
-- [ ] 每个 step 有时间预算、租约、游标和原子推进
-- [ ] 同一时间只允许一个刷新任务
-- [ ] 刷新开始立即将展示环境置为维护
-- [ ] 浏览器关闭后任务可恢复
-- [ ] 重复 step 不重复写、不产生四倍
-- [ ] 校验失败后展示环境保持不可用
-- [ ] 成功后环境版本递增并恢复 ready
-- [ ] 实现刷新创建、查询和 step API
-- [ ] 设置页轮询并继续任务
-- [ ] 提交 `feat: refresh the display database safely`
+- [x] 先增加刷新状态机、失败阻断和幂等测试
+- [x] 实现 preflight、clear、copy、transform、recalculate、validate、activate
+- [x] 每个 step 有时间预算、租约、游标和原子推进
+- [x] 同一时间只允许一个刷新任务
+- [x] 刷新开始立即将展示环境置为维护
+- [x] 浏览器关闭后任务可恢复
+- [x] 重复 step 不重复写、不产生四倍
+- [x] 校验失败后展示环境保持不可用
+- [x] 成功后环境版本递增并恢复 ready
+- [x] 实现刷新创建、查询和 step API
+- [x] 设置页轮询并继续任务
+- [x] 提交 `feat: refresh the display database safely`
 
 ## 7. 真实采集目标路由
 

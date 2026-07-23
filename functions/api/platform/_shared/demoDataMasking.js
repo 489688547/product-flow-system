@@ -30,15 +30,22 @@ function bytesToHex(bytes) {
   return [...bytes].map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
+let cachedKeyValue = "";
+let cachedCryptoKey = null;
+
 async function hmac(value, { key, namespace = "demo" }) {
   const safeKey = assertMaskingKey(key);
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(safeKey),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
+  if (cachedKeyValue !== safeKey || !cachedCryptoKey) {
+    cachedKeyValue = safeKey;
+    cachedCryptoKey = crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(safeKey),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+  }
+  const cryptoKey = await cachedCryptoKey;
   const signature = await crypto.subtle.sign(
     "HMAC",
     cryptoKey,
@@ -58,7 +65,10 @@ function digitsFromHex(value, length) {
 
 async function maskValue(value, kind, options) {
   if (value === null || value === undefined || value === "") return value;
-  const token = await hmac(value, options);
+  const token = await hmac(value, {
+    ...options,
+    namespace: `personal.${kind}`
+  });
   if (kind === "phone") return `1${digitsFromHex(token, 10)}`;
   if (kind === "email") return `user-${token.slice(0, 12)}@example.invalid`;
   if (kind === "name") return `成员-${token.slice(0, 8).toUpperCase()}`;

@@ -12,7 +12,12 @@ test("demo data environment migration creates the governed control plane", () =>
     "data_environment_grants",
     "demo_data_environment_state",
     "demo_data_refresh_jobs",
-    "data_environment_audit"
+    "data_environment_audit",
+    "platform_records",
+    "brand_content_state",
+    "product_sales_daily",
+    "product_sales_meta",
+    "supply_chain_records"
   ]) {
     assert.match(sql, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`));
   }

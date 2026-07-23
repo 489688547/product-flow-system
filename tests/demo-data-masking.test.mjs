@@ -56,3 +56,20 @@ test("personal JSON recursively masks known personal fields but keeps business v
   assert.notEqual(output.customer.phone, "13800138000");
   assert.match(output.customer.privateEmail, /@example\.invalid$/);
 });
+
+test("the same identity stays referentially consistent across tables and fields", async () => {
+  const options = { key: "demo-masking-key-for-tests" };
+  const item = await maskDemoRecord(
+    { id: "item-1", owner_user_id: "user-123" },
+    { maskFields: { owner_user_id: "identity" } },
+    { ...options, namespace: "collaboration_items.item-1" }
+  );
+  const participant = await maskDemoRecord(
+    { subject_type: "user", subject_id: "user-123", item_id: "item-1" },
+    { maskFields: { subject_id: "identity" } },
+    { ...options, namespace: "collaboration_participants.user-123" }
+  );
+
+  assert.equal(item.owner_user_id, participant.subject_id);
+  assert.notEqual(item.owner_user_id, "user-123");
+});

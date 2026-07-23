@@ -47,18 +47,24 @@ CREATE TABLE IF NOT EXISTS demo_data_refresh_jobs (
   source_version TEXT NOT NULL,
   rule_version TEXT NOT NULL,
   counts_json TEXT NOT NULL DEFAULT '{}',
+  validation_json TEXT NOT NULL DEFAULT '{}',
   last_error_code TEXT,
   lease_expires_at TEXT,
   actor_id TEXT NOT NULL,
   created_at TEXT NOT NULL,
   started_at TEXT,
   finished_at TEXT,
+  updated_at TEXT NOT NULL,
   CHECK (status IN ('queued', 'running', 'succeeded', 'failed')),
   CHECK (stage IN ('preflight', 'clear', 'copy', 'transform', 'recalculate', 'validate', 'activate'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_demo_data_refresh_jobs_status
   ON demo_data_refresh_jobs(status, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_demo_data_refresh_jobs_single_active
+  ON demo_data_refresh_jobs ((1))
+  WHERE status IN ('queued', 'running');
 
 CREATE TABLE IF NOT EXISTS data_environment_audit (
   id TEXT PRIMARY KEY,
@@ -74,6 +80,65 @@ CREATE TABLE IF NOT EXISTS data_environment_audit (
 
 CREATE INDEX IF NOT EXISTS idx_data_environment_audit_created
   ON data_environment_audit(created_at DESC);
+
+-- Runtime-created business tables must also exist in a newly created display
+-- database before the first governed refresh.
+CREATE TABLE IF NOT EXISTS platform_records (
+  entity_type TEXT NOT NULL,
+  id TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT,
+  PRIMARY KEY (entity_type, id)
+);
+
+CREATE TABLE IF NOT EXISTS platform_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS brand_content_state (
+  id TEXT PRIMARY KEY,
+  version INTEGER NOT NULL,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS product_sales_daily (
+  code TEXT NOT NULL,
+  date TEXT NOT NULL,
+  platform TEXT NOT NULL,
+  qty REAL NOT NULL DEFAULT 0,
+  sales REAL NOT NULL DEFAULT 0,
+  net_sales REAL NOT NULL DEFAULT 0,
+  gross_profit REAL NOT NULL DEFAULT 0,
+  refund REAL NOT NULL DEFAULT 0,
+  cost REAL NOT NULL DEFAULT 0,
+  pre_ship_refund REAL NOT NULL DEFAULT 0,
+  post_ship_refund REAL NOT NULL DEFAULT 0,
+  PRIMARY KEY (code, date, platform)
+);
+
+CREATE TABLE IF NOT EXISTS product_sales_meta (
+  id TEXT PRIMARY KEY,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS supply_chain_records (
+  entity_type TEXT NOT NULL,
+  id TEXT NOT NULL,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT,
+  PRIMARY KEY (entity_type, id)
+);
+
+CREATE TABLE IF NOT EXISTS supply_chain_meta (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 
 ALTER TABLE web_collection_jobs
   ADD COLUMN target_environment TEXT NOT NULL DEFAULT 'production'

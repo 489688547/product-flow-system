@@ -11,10 +11,26 @@ const settingsPath = resolve(root, "src/features/settings/DataEnvironmentSetting
 
 test("data environment API loads and switches through the safe control route", async () => {
   assert.equal(existsSync(apiPath), true);
-  const { loadDataEnvironment, switchDataEnvironment } = await import(apiPath);
+  const {
+    createDisplayRefresh,
+    loadDataEnvironment,
+    loadDisplayRefresh,
+    runDisplayRefreshStep,
+    switchDataEnvironment
+  } = await import(apiPath);
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     calls.push({ url, options });
+    if (url.includes("/refresh")) {
+      return new Response(JSON.stringify({
+        job: {
+          id: "job-1",
+          status: url.endsWith("/step") ? "running" : "queued",
+          stage: "preflight",
+          terminal: false
+        }
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }
     return new Response(JSON.stringify({
       current: { id: options.method === "PUT" ? "display" : "production", version: options.method === "PUT" ? 7 : 1 },
       display: { enabled: true, status: "ready", version: 7 },
@@ -24,9 +40,15 @@ test("data environment API loads and switches through the safe control route", a
 
   assert.equal((await loadDataEnvironment(fetchImpl)).current.id, "production");
   assert.equal((await switchDataEnvironment("display", fetchImpl)).current.id, "display");
+  assert.equal((await createDisplayRefresh(fetchImpl)).job.id, "job-1");
+  assert.equal((await loadDisplayRefresh("job-1", fetchImpl)).job.status, "queued");
+  assert.equal((await runDisplayRefreshStep("job-1", fetchImpl)).job.status, "running");
   assert.deepEqual(calls.map(call => [call.url, call.options.method || "GET"]), [
     ["/api/platform/v1/data-environment", "GET"],
-    ["/api/platform/v1/data-environment", "PUT"]
+    ["/api/platform/v1/data-environment", "PUT"],
+    ["/api/platform/v1/data-environment/refresh", "POST"],
+    ["/api/platform/v1/data-environment/refresh/job-1", "GET"],
+    ["/api/platform/v1/data-environment/refresh/job-1/step", "POST"]
   ]);
   assert.equal(JSON.parse(calls[1].options.body).environmentId, "display");
   assert.equal(calls[1].options.credentials, "include");
@@ -86,6 +108,8 @@ test("authenticated app gates business providers behind the environment provider
   assert.match(settings, /正式数据库/);
   assert.match(settings, /展示数据库/);
   assert.match(settings, /只有当前账号的当前浏览器/);
+  assert.match(settings, /更新展示数据库/);
+  assert.match(settings, /继续更新/);
   assert.match(settings, /aria-live/);
 });
 

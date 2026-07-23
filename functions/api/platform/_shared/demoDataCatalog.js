@@ -19,54 +19,138 @@ const BUSINESS_TABLES = [
   table("data_metric_results", "recalculate", ["id"], 12),
   table("data_metric_calculation_runs", "recalculate", ["id"], 13),
 
-  table("product_flow_state", "mask", ["id"], 20, { required: true, maskJsonFields: ["payload"] }),
-  table("product_flow_state_parts", "mask", ["state_id", "part_key", "part_index"], 21, { required: true, maskJsonFields: ["payload"] }),
-  table("platform_records", "mask", ["entity_type", "id"], 22, { maskJsonFields: ["payload"] }),
+  table("product_flow_state", "mask", ["id"], 20, {
+    required: true,
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("product_flow_state_parts", "mask", ["state_id", "part_key", "part_index"], 21, {
+    required: true,
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("platform_records", "mask", ["entity_type", "id"], 22, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
   table("platform_meta", "copy", ["key"], 23),
-  table("brand_content_state", "mask", ["id"], 24, { maskJsonFields: ["payload"] }),
+  table("brand_content_state", "mask", ["id"], 24, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
 
-  table("product_catalog_items", "copy", ["id"], 30),
-  table("product_catalog_skus", "copy", ["id"], 31),
-  table("product_catalog_components", "copy", ["id"], 32),
-  table("product_catalog_sync_runs", "copy", ["id"], 33),
+  table("product_catalog_items", "mask", ["id"], 30, { maskFields: { updated_by: "identity" } }),
+  table("product_catalog_skus", "mask", ["id"], 31, { maskFields: { updated_by: "identity" } }),
+  table("product_catalog_components", "mask", ["id"], 32, { maskFields: { updated_by: "identity" } }),
+  table("product_catalog_sync_runs", "mask", ["id"], 33, { maskFields: { updated_by: "identity" } }),
   table("product_catalog_meta", "copy", ["key"], 34),
   table("product_sales_daily", "transform_sales", ["code", "date", "platform"], 35, { required: true, batchSize: 250 }),
   table("product_sales_meta", "copy", ["id"], 36, { required: true }),
 
-  table("data_sources", "copy", ["entity_type", "id"], 40),
-  table("data_sync_runs", "copy", ["entity_type", "id"], 41),
-  table("data_source_files", "copy", ["entity_type", "id"], 42),
-  table("data_dimension_mappings", "copy", ["entity_type", "id"], 43),
-  table("data_quality_issues", "copy", ["entity_type", "id"], 44),
+  table("data_sources", "mask", ["entity_type", "id"], 40, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("data_sync_runs", "mask", ["entity_type", "id"], 41, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("data_source_files", "mask", ["entity_type", "id"], 42, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("data_dimension_mappings", "mask", ["entity_type", "id"], 43, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("data_quality_issues", "mask", ["entity_type", "id"], 44, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
   table("data_center_meta", "copy", ["key"], 45),
 
-  table("ecommerce_operation_records", "mask", ["entity_type", "id"], 50, { maskJsonFields: ["payload"] }),
+  table("ecommerce_operation_records", "mask", ["entity_type", "id"], 50, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
   table("ecommerce_operation_meta", "copy", ["key"], 51),
-  table("ecommerce_operation_state", "mask", ["id"], 52, { maskJsonFields: ["payload"] }),
-  table("performance_management_records", "mask", ["entity_type", "id"], 53, { maskJsonFields: ["payload"] }),
+  table("ecommerce_operation_state", "mask", ["id"], 52, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("performance_management_records", "mask", ["entity_type", "id"], 53, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
   table("performance_management_meta", "copy", ["key"], 54),
-  table("performance_management_state", "mask", ["id"], 55, { maskJsonFields: ["payload"] }),
+  table("performance_management_state", "mask", ["id"], 55, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
 
-  table("supply_chain_records", "mask", ["entity_type", "id"], 60, { maskJsonFields: ["payload"] }),
+  table("supply_chain_records", "mask", ["entity_type", "id"], 60, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
   table("supply_chain_meta", "copy", ["key"], 61),
-  table("goods_flow_events", "copy", ["id"], 62),
+  table("goods_flow_events", "mask", ["id"], 62, {
+    maskFields: { created_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
   table("goods_flow_inventory_daily", "copy", ["id"], 63),
-  table("goods_flow_stocktakes", "copy", ["id"], 64),
+  table("goods_flow_stocktakes", "mask", ["id"], 64, {
+    maskFields: {
+      submitted_by: "identity",
+      difference_confirmed_by: "identity",
+      amount_confirmed_by: "identity"
+    }
+  }),
   table("goods_flow_stocktake_lines", "copy", ["stocktake_id", "sku_id", "warehouse_id"], 65),
-  table("goods_flow_receivable_terms", "copy", ["id"], 66),
+  table("goods_flow_receivable_terms", "mask", ["id"], 66, {
+    maskFields: { created_by: "identity" }
+  }),
   table("goods_flow_ccc_monthly", "recalculate", ["id"], 67),
-  table("goods_flow_exceptions", "copy", ["id"], 68),
+  table("goods_flow_exceptions", "mask", ["id"], 68, {
+    maskFields: { resolved_by: "identity" },
+    maskJsonFields: ["details"]
+  }),
 
-  table("collaboration_items", "mask", ["id"], 70, { maskJsonFields: ["payload"] }),
-  table("collaboration_participants", "copy", ["subject_type", "subject_id", "item_id"], 71),
+  table("collaboration_items", "mask", ["id"], 70, {
+    maskFields: {
+      requester_user_id: "identity",
+      owner_user_id: "identity"
+    },
+    maskJsonFields: ["payload"]
+  }),
+  table("collaboration_participants", "mask", ["subject_type", "subject_id", "item_id"], 71, {
+    maskFields: { subject_id: "identity" }
+  }),
   table("collaboration_activities", "mask", ["id"], 72, { maskJsonFields: ["payload"] }),
 
-  table("user_insight_category_mappings", "mask", ["id"], 80, { maskJsonFields: ["payload"] }),
-  table("user_insight_rules", "mask", ["id"], 81, { maskJsonFields: ["payload"] }),
-  table("user_insight_snapshots", "mask", ["id"], 82, { maskJsonFields: ["payload"] }),
-  table("user_insight_entities", "mask", ["id"], 83, { maskJsonFields: ["payload"] }),
-  table("user_insight_competitors", "mask", ["id"], 84, { maskJsonFields: ["payload"] }),
-  table("user_insight_sync_runs", "mask", ["id"], 85, { maskJsonFields: ["payload"] }),
+  table("user_insight_category_mappings", "mask", ["id"], 80, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("user_insight_rules", "mask", ["id"], 81, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("user_insight_snapshots", "mask", ["id"], 82, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("user_insight_entities", "mask", ["id"], 83, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("user_insight_competitors", "mask", ["id"], 84, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("user_insight_sync_runs", "mask", ["id"], 85, {
+    maskFields: { updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
   table("user_insight_meta", "copy", ["key"], 86),
 
   table("hr_employees", "mask", ["id"], 90, {

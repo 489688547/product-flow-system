@@ -38,9 +38,12 @@ export function DataEnvironmentSettings() {
     display,
     permissions,
     switching,
+    refreshingDisplay,
+    refreshJob,
     error,
     lastSwitchAt,
-    switchEnvironment
+    switchEnvironment,
+    refreshDisplay
   } = useDataEnvironment();
   const [selected, setSelected] = useState(current.id);
   const [notice, setNotice] = useState("");
@@ -69,6 +72,25 @@ export function DataEnvironmentSettings() {
       setLocalError(switchError?.message || "数据环境切换失败，请重试。");
     }
   }
+
+  async function updateDisplay() {
+    if (refreshingDisplay) return;
+    setNotice("");
+    setLocalError("");
+    try {
+      const job = await refreshDisplay();
+      if (job?.status === "succeeded") setNotice("展示数据库已更新，可以开始使用。");
+    } catch (refreshError) {
+      setLocalError(refreshError?.message || "展示数据库更新失败，请重试。");
+    }
+  }
+
+  const activeRefresh = display.status === "refreshing" || (refreshJob && !refreshJob.terminal);
+  const refreshLabel = refreshingDisplay
+    ? "正在更新…"
+    : activeRefresh
+      ? "继续更新"
+      : "更新展示数据库";
 
   return (
     <section className="section-panel data-environment-settings" aria-labelledby="data-environment-title">
@@ -122,6 +144,24 @@ export function DataEnvironmentSettings() {
           onClick={confirmSwitch}
         >
           {switching ? "正在切换…" : "确认切换"}
+        </Button>
+      </div>
+      <div className="data-environment-refresh">
+        <span>
+          <strong>展示数据更新</strong>
+          <small>
+            {activeRefresh
+              ? `正在处理${refreshJob?.currentTable ? `：${refreshJob.currentTable}` : "，可以继续完成"}`
+              : "从正式数据库重新生成一份展示数据；更新期间展示数据库暂不可用。"}
+          </small>
+        </span>
+        <Button
+          variant="secondary"
+          disabled={refreshingDisplay || switching}
+          disabledReason={refreshingDisplay ? "展示数据库正在更新" : ""}
+          onClick={updateDisplay}
+        >
+          {refreshLabel}
         </Button>
       </div>
       <div className="data-environment-feedback" aria-live="polite">

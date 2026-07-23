@@ -34,3 +34,27 @@ export async function switchDataEnvironment(environmentId, fetchImpl = fetch) {
     body: JSON.stringify({ environmentId })
   }));
 }
+
+export async function createDisplayRefresh(fetchImpl = fetch) {
+  return payloadFrom(await fetchImpl(`${DATA_ENVIRONMENT_API}/refresh`, {
+    method: "POST",
+    credentials: "include",
+    headers: { accept: "application/json" }
+  }));
+}
+
+export async function loadDisplayRefresh(jobId, fetchImpl = fetch) {
+  return payloadFrom(await fetchImpl(`${DATA_ENVIRONMENT_API}/refresh/${encodeURIComponent(jobId)}`, {
+    method: "GET",
+    credentials: "include",
+    headers: { accept: "application/json" }
+  }));
+}
+
+export async function runDisplayRefreshStep(jobId, fetchImpl = fetch) {
+  return payloadFrom(await fetchImpl(`${DATA_ENVIRONMENT_API}/refresh/${encodeURIComponent(jobId)}/step`, {
+    method: "POST",
+    credentials: "include",
+    headers: { accept: "application/json" }
+  }));
+}

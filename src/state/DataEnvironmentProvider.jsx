@@ -1,6 +1,12 @@
 import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useAuth } from "./AuthProvider.jsx";
-import { loadDataEnvironment, switchDataEnvironment } from "./dataEnvironmentApi.js";
+import {
+  createDisplayRefresh,
+  loadDataEnvironment,
+  loadDisplayRefresh,
+  runDisplayRefreshStep,
+  switchDataEnvironment as requestDataEnvironmentSwitch
+} from "./dataEnvironmentApi.js";
 import { activateDataEnvironment } from "./dataEnvironmentClient.js";
 
 const DataEnvironmentContext = createContext(null);
@@ -40,6 +46,8 @@ export function DataEnvironmentProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [lastSwitchAt, setLastSwitchAt] = useState(0);
+  const [refreshJob, setRefreshJob] = useState(null);
+  const [refreshingDisplay, setRefreshingDisplay] = useState(false);
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
@@ -56,6 +64,13 @@ export function DataEnvironmentProvider({ children }) {
       const next = normalizeEnvironment(await loadDataEnvironment());
       activateDataEnvironment(next.current);
       setEnvironment(next);
+      if (next.display.activeJobId) {
+        loadDisplayRefresh(next.display.activeJobId)
+          .then(payload => setRefreshJob(payload.job || null))
+          .catch(() => setRefreshJob(null));
+      } else {
+        setRefreshJob(null);
+      }
       setError("");
       setReady(true);
       return next;
@@ -76,7 +91,7 @@ export function DataEnvironmentProvider({ children }) {
     setSwitching(true);
     setError("");
     try {
-      const next = normalizeEnvironment(await switchDataEnvironment(environmentId));
+      const next = normalizeEnvironment(await requestDataEnvironmentSwitch(environmentId));
       activateDataEnvironment(next.current);
       setEnvironment(next);
       setLastSwitchAt(Date.now());
@@ -89,15 +104,52 @@ export function DataEnvironmentProvider({ children }) {
     }
   }, [environment]);
 
+  const refreshDisplay = useCallback(async () => {
+    if (refreshingDisplay) return refreshJob;
+    setRefreshingDisplay(true);
+    setError("");
+    try {
+      let job = refreshJob;
+      if (!job || job.terminal) {
+        const created = await createDisplayRefresh();
+        job = created.job;
+        setRefreshJob(job);
+      }
+      while (!job.terminal) {
+        const result = await runDisplayRefreshStep(job.id);
+        job = result.job;
+        setRefreshJob(job);
+        if (job.busy) {
+          await new Promise(resolve => window.setTimeout(resolve, 350));
+        }
+      }
+      const payload = environment.current.id === "display" && job.status === "succeeded"
+        ? await requestDataEnvironmentSwitch("display")
+        : await loadDataEnvironment();
+      const next = normalizeEnvironment(payload);
+      activateDataEnvironment(next.current);
+      setEnvironment(next);
+      return job;
+    } catch (refreshError) {
+      setError(refreshError?.message || "展示数据库更新失败，请重试。");
+      throw refreshError;
+    } finally {
+      setRefreshingDisplay(false);
+    }
+  }, [environment.current.id, refreshJob, refreshingDisplay]);
+
   const value = useMemo(() => ({
     ...environment,
     loading,
     switching,
+    refreshingDisplay,
+    refreshJob,
     error,
     lastSwitchAt,
     refresh,
-    switchEnvironment
-  }), [environment, error, lastSwitchAt, loading, refresh, switchEnvironment, switching]);
+    switchEnvironment,
+    refreshDisplay
+  }), [environment, error, lastSwitchAt, loading, refresh, refreshDisplay, refreshJob, refreshingDisplay, switchEnvironment, switching]);
 
   if (loading) {
     return (
