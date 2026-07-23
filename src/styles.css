@@ -87,7 +87,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 14px; color: var(--text-primary); }
 .brand small { margin-top: 1px; color: var(--text-tertiary); }
-.sidebar nav { min-height: 0; flex: 1; display: grid; align-content: start; gap: var(--space-1); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.sidebar nav { min-height: 0; flex: 1; display: grid; align-content: start; gap: var(--space-1); overflow-y: auto; scrollbar-width: thin; }
 .sidebar nav button { position: relative; height: 40px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); display: flex; align-items: center; gap: 9px; padding: 0 10px; text-align: left; transition: color var(--transition-fast), background-color var(--transition-fast); }
 .sidebar nav button::before { content: ""; position: absolute; left: 0; width: 3px; height: 16px; border-radius: 3px; background: transparent; }
 .sidebar nav button:hover { background: var(--surface-subtle); color: var(--text-primary); }
@@ -261,7 +261,7 @@ main { min-width: 0; overflow-x: hidden; }
 .status-strip button strong { font-size: 13px; font-variant-numeric: tabular-nums; }
 .status-strip button span { font-size: 13px; font-weight: 650; }
 
-.table-wrap { min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior: contain; }
+.table-wrap { min-width: 0; max-width: 100%; overflow-x: auto; overscroll-behavior-x: contain; }
 .data-table { width: 100%; min-width: var(--table-min-width); border-collapse: collapse; table-layout: auto; }
 .data-table th { height: 44px; padding: 0 12px; background: var(--surface-subtle); color: var(--text-tertiary); font-size: 11px; font-weight: 700; letter-spacing: .04em; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .data-table tbody td { height: 54px; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; color: var(--text-secondary); }
