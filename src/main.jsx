@@ -17,6 +17,7 @@ import { CollaborationProvider } from "./state/CollaborationProvider.jsx";
 import { AiAssistantProvider } from "./state/AiAssistantProvider.jsx";
 import { installDeploymentRecovery } from "./state/deploymentRecovery.js";
 import { ProductCatalogProvider } from "./state/ProductCatalogProvider.jsx";
+import { ApplicationErrorBoundary } from "./ui/ApplicationErrorBoundary.jsx";
 import App from "./App.jsx";
 import "./styles.css";
 import "./features/brand-content/brand-content.css";
@@ -63,10 +64,12 @@ installDeploymentRecovery();
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <AuthProvider>
-      <AuthGate>
-        <AuthenticatedApp />
-      </AuthGate>
-    </AuthProvider>
+    <ApplicationErrorBoundary>
+      <AuthProvider>
+        <AuthGate>
+          <AuthenticatedApp />
+        </AuthGate>
+      </AuthProvider>
+    </ApplicationErrorBoundary>
   </React.StrictMode>
 );
