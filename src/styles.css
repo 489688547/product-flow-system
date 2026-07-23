@@ -1202,6 +1202,7 @@ main { min-width: 0; overflow-x: hidden; }
 .planning-year-picker button:hover { color: var(--text-primary); background: var(--surface-hover); }
 .planning-year-picker strong { min-width: 92px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 13px; }
 .planning-demand-tray, .planning-timeline-section { border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.planning-timeline-section { overflow: hidden; }
 .planning-section-heading { min-height: 58px; padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); border-bottom: 1px solid var(--border); }
 .planning-section-heading p { margin-top: 2px; font-size: 12px; }
 .planning-section-heading > span { flex: 0 0 auto; color: var(--text-tertiary); font-size: 12px; font-weight: 650; }
@@ -1232,22 +1233,31 @@ main { min-width: 0; overflow-x: hidden; }
 .planning-product-column { position: sticky; left: 0; z-index: 3; min-width: 0; padding: 0 var(--space-3); display: flex; align-items: center; background: inherit; border-right: 1px solid var(--border); }
 .planning-month-header, .planning-month-cells { display: grid; grid-template-columns: repeat(12, minmax(68px, 1fr)); }
 .planning-month-header span { display: grid; place-items: center; border-right: 1px solid var(--border); white-space: nowrap; }
-.planning-timeline-row { min-height: 62px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.planning-timeline-row:last-child { border-bottom: 0; }
-.planning-product-info { gap: var(--space-2); }
+.planning-timeline-row { min-height: 72px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.planning-product-info { gap: var(--space-2); padding-top: var(--space-2); padding-bottom: var(--space-2); }
 .planning-product-info img { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 7px; object-fit: cover; background: var(--surface-subtle); }
 .planning-product-info > div { min-width: 0; display: grid; justify-items: start; gap: 3px; }
 .planning-product-info strong { display: block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .planning-product-info small { margin-top: 2px; display: flex; align-items: center; gap: 3px; color: var(--warning); }
-.planning-track { position: relative; min-width: 0; min-height: 62px; }
+.planning-track { position: relative; min-width: 0; min-height: 72px; }
 .planning-month-cells { position: absolute; inset: 0; }
 .planning-month-drop { border-right: 1px solid var(--border); transition: background-color var(--transition-fast); }
 .planning-month-drop:hover { background: var(--accent-soft); }
-.planning-bar { position: absolute; z-index: 2; height: 26px; min-width: 30px; padding: 0 8px; border: 0; border-radius: 6px; display: flex; align-items: center; gap: 7px; overflow: hidden; color: white; box-shadow: 0 1px 2px oklch(22% .03 258 / .12); transition: filter var(--transition-fast), transform var(--transition-fast); }
-.planning-bar:hover { filter: brightness(.96); transform: translateY(-1px); }
-.planning-bar span { flex: 0 0 auto; font-size: 11px; font-weight: 750; }
-.planning-bar small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: inherit; opacity: .88; }
-.planning-bar.period { top: 18px; background: var(--accent); }
+.planning-bar { position: absolute; z-index: 2; height: 34px; min-width: 2px; padding: 0; border: 0; border-radius: 4px; display: block; overflow: visible; color: var(--accent); background: transparent; touch-action: pan-y; }
+.planning-bar:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.planning-bar.period { top: 50%; transform: translateY(-50%); background: transparent; }
+.planning-range-bar::before { position: absolute; right: 0; bottom: 4px; left: 0; height: 8px; border-radius: 4px; background: var(--accent); box-shadow: 0 1px 2px oklch(22% .03 258 / .12); transition: filter var(--transition-fast); content: ""; }
+.planning-range-bar:hover::before { filter: brightness(.94); }
+.planning-range-bar.is-editable { cursor: grab; }
+.planning-range-bar.is-dragging { cursor: grabbing; }
+.planning-range-bar.is-dragging::before { filter: brightness(.88); }
+.planning-range-label { position: absolute; z-index: 2; bottom: 15px; left: 0; width: max-content; padding: 0 3px; border-radius: 3px; white-space: nowrap; color: var(--text-primary); background: var(--surface); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 17px; pointer-events: none; }
+.planning-range-bar.label-align-end .planning-range-label { right: 0; left: auto; }
+.planning-range-handle { position: absolute; z-index: 1; top: 0; bottom: 0; width: 12px; cursor: ew-resize; touch-action: pan-y; }
+.planning-range-handle.start { left: 0; }
+.planning-range-handle.end { right: 0; }
+.planning-range-handle::after { position: absolute; bottom: 5px; left: 5px; width: 2px; height: 6px; border-radius: 1px; background: var(--surface); opacity: 0; transition: opacity var(--transition-fast); content: ""; }
+.planning-range-bar:hover .planning-range-handle::after, .planning-range-handle:hover::after, .planning-range-bar.is-dragging .planning-range-handle::after { opacity: .72; }
 .planning-empty-row .planning-product-column { color: var(--text-tertiary); font-size: 12px; }
 .planning-empty-row .planning-track p { position: absolute; z-index: 1; inset: 0; margin: 0; display: grid; place-items: center; pointer-events: none; color: var(--text-tertiary); font-size: 12px; }
 .planning-modal-product { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
@@ -1263,6 +1273,10 @@ main { min-width: 0; overflow-x: hidden; }
 @media (max-width: 900px) {
   .planning-section-heading { align-items: flex-start; }
   .planning-date-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .planning-bar, .planning-range-handle::after { transition: none; }
 }
 
 @media (max-width: 640px) {
