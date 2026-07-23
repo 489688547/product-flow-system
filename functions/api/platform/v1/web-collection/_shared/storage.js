@@ -237,7 +237,9 @@ export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } =
   const now = new Date();
   const lease = new Date(now.getTime() + seconds * 1000).toISOString();
   const row = await db.prepare(`SELECT * FROM web_collection_jobs
-    WHERE status = 'queued' OR (status = 'claimed' AND lease_expires_at < ?)
+    WHERE status = 'queued'
+      OR (status IN ('claimed', 'opening', 'exporting', 'downloading', 'validating', 'ingesting')
+        AND lease_expires_at < ? AND attempt < 3)
     ORDER BY business_date, created_at LIMIT 1`).bind(now.toISOString()).first();
   if (!row) return { job: null };
   await db.prepare(`UPDATE web_collection_jobs SET status = 'claimed', stage = 'claimed', runner_id = ?,
