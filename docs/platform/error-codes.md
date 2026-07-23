@@ -59,6 +59,7 @@
 | `DATA_CONNECTION_` | 实例级数据连接错误 | `DATA_CONNECTION_UNEXPECTED` |
 | `BROWSER_AGENT_` | 公司 Mac 采集任务错误 | `BROWSER_AGENT_TASK_FAILED` |
 | `ENVIRONMENT_` | 环境能力、生成清单和生产就绪 | `ENVIRONMENT_READINESS_FAILED` |
+| `DATA_ENVIRONMENT_` | 正式/展示业务数据库选择、版本和刷新状态 | `DATA_ENVIRONMENT_VERSION_CONFLICT` |
 | `PRODUCTION_` | 跨环境生产数据令牌、解锁、冲突、快照和回滚 | `PRODUCTION_WRITE_LOCKED` |
 | `LOCAL_ONLINE_` | 本地线上账号配置、数据库与运行时 | `LOCAL_ONLINE_TOKEN_REQUIRED` |
 | `AI_` | 公司 AI 总助、数据权限、Provider 和流式响应 | `AI_PROVIDER_RATE_LIMITED` |
@@ -226,6 +227,13 @@
 - `KUAIMAI_PRODUCT_SYNC_FAILED`：快麦拒绝、超时或返回失败，可按 `retryable` 判断重试。
 生产数据与环境 API 使用：
 
+- `DATA_ENVIRONMENT_PERMISSION_DENIED`：当前身份不是 active executive，不能查看或修改数据环境，HTTP 403。
+- `DATA_ENVIRONMENT_INVALID`：请求试图选择 `production|display` 之外的环境，HTTP 400。
+- `DATA_ENVIRONMENT_BINDING_MISSING`：正式或展示 D1 绑定缺失；响应不包含数据库 ID。
+- `DATA_ENVIRONMENT_DISABLED` / `DATA_ENVIRONMENT_NOT_READY`：展示环境被关闭或尚未成功生成，HTTP 503。
+- `DATA_ENVIRONMENT_MAINTENANCE`：唯一展示库正在原地刷新，所有展示业务读写暂时拒绝，HTTP 503。
+- `DATA_ENVIRONMENT_REFRESH_FAILED`：最近刷新失败，展示业务保持不可用，需在设置中重新生成，HTTP 503。
+- `DATA_ENVIRONMENT_VERSION_CONFLICT`：标签页、授权或写请求仍使用旧环境版本，HTTP 409。
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。
 - `PRODUCTION_ROLE_REQUIRED`：令牌对应的钉钉稳定身份不再是 active executive。
 - `PRODUCTION_CAPABILITY_REQUIRED`：个人令牌没有所需的 read 或 write 能力。

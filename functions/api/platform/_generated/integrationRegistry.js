@@ -345,6 +345,7 @@ const integrationRegistry = {
         "本地线上账号运行",
         "回滚",
         "环境就绪检查",
+        "正式与展示业务数据库路由",
         "生产数据网关",
         "凭证加密服务",
         "加密平台连接",
@@ -400,6 +401,7 @@ const integrationRegistry = {
         "dash.cloudflare.com"
       ],
       "apiRoutes": [
+        "/api/platform/v1/data-environment",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/credential-vault",
@@ -441,7 +443,7 @@ const integrationRegistry = {
         {
           "platformId": "cloudflare-d1",
           "type": "binds",
-          "description": "Pages Functions 通过 PRODUCT_FLOW_DB 绑定访问 D1。"
+          "description": "Pages Functions 通过 PRODUCT_FLOW_DB 控制/正式绑定和独立 DEMO_FLOW_DB 展示业务绑定访问 D1。"
         }
       ]
     },
@@ -454,6 +456,8 @@ const integrationRegistry = {
         "共享状态持久化",
         "共享状态原子比较并写入",
         "共享状态写前快照与审计",
+        "正式与展示业务数据库隔离",
+        "浏览器级数据环境授权",
         "登录会话",
         "组织数据",
         "销售聚合",
@@ -497,6 +501,8 @@ const integrationRegistry = {
         "数据库",
         "落库",
         "PRODUCT_FLOW_DB",
+        "DEMO_FLOW_DB",
+        "展示数据库",
         "持久化"
       ],
       "codePaths": [
@@ -543,7 +549,8 @@ const integrationRegistry = {
         "migrations/0006_product_catalog_components.sql"
       ],
       "envVars": [
-        "PRODUCT_FLOW_DB"
+        "PRODUCT_FLOW_DB",
+        "DEMO_FLOW_DB"
       ],
       "domains": [
         "api.cloudflare.com",
@@ -566,6 +573,7 @@ const integrationRegistry = {
         "/api/ecommerce-operations",
         "/api/performance-management",
         "/api/hr-management",
+        "/api/platform/v1/data-environment",
         "/api/platform/v1/environment-readiness",
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/credential-vault",

@@ -28,18 +28,18 @@
 
 ## 2. 数据环境控制面与 API
 
-- [ ] 先增加默认正式、展示 ready、维护拒绝、版本冲突测试
-- [ ] 实现随机 HttpOnly 环境授权和哈希存储
-- [ ] 实现环境状态、授权和无秘密审计存储
-- [ ] 实现 `controlDatabase`、`resolveDataEnvironment`、`businessDatabase`
-- [ ] 认证后注入 `controlDb`、`businessDb` 和环境版本
-- [ ] 业务写请求校验环境版本
-- [ ] 业务响应输出安全环境 Header
-- [ ] 实现数据环境 GET/PUT API
-- [ ] 验证非最高权限、未知环境、未就绪展示环境均被拒绝
-- [ ] 更新 API 目录和错误码
-- [ ] 通过 Pages Functions 兼容测试
-- [ ] 提交 `feat: add governed data environment routing`
+- [x] 先增加默认正式、展示 ready、维护拒绝、版本冲突测试
+- [x] 实现随机 HttpOnly 环境授权和哈希存储
+- [x] 实现环境状态、授权和无秘密审计存储
+- [x] 实现 `controlDatabase`、`resolveDataEnvironment`、`businessDatabase`
+- [x] 认证后注入 `controlDb`、`businessDb` 和环境版本
+- [x] 业务写请求校验环境版本
+- [x] 业务响应输出安全环境 Header
+- [x] 实现数据环境 GET/PUT API
+- [x] 验证非最高权限、未知环境、未就绪展示环境均被拒绝
+- [x] 更新 API 目录和错误码
+- [x] 通过 Pages Functions 兼容测试
+- [x] 提交 `feat: add governed data environment routing`
 
 ## 3. 全系统业务库存储改造
 
