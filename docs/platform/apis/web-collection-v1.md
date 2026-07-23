@@ -10,7 +10,7 @@
 - The runner token is returned once, stored only in macOS Keychain and sent as `Authorization: Bearer`. D1 stores only SHA-256.
 - `POST /jobs` requires an active `company_web_collection` runner token.
 - `GET /jobs` requires a company session in 总经办、数据中心、运营、供应链 or 财务.
-- Every route requires `PRODUCT_FLOW_DB`.
+- Every route requires the formal control database. Job creation persists the server-resolved target environment and version; browser requests and runners cannot submit a binding or database ID.
 
 ## Provider and task contract
 
@@ -27,7 +27,7 @@ Runner actions are:
 
 ## States, leases and idempotency
 
-States are `queued`, `claimed`, `opening`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency is `providerId:resourceType:businessDate:scheduleVersion`. Only `complete` from `ingesting` advances `(providerId, resourceType)` cursor.
+States are `queued`, `claimed`, `opening`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency includes `providerId:resourceType:businessDate:scheduleVersion` plus the server-owned target environment and version. Only `complete` from `ingesting` advances `(providerId, resourceType)` cursor. Provider facts are projected to the persisted target business database; a stale display version is rejected.
 
 ## Responses
 

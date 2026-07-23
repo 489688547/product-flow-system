@@ -234,6 +234,12 @@
 - `DATA_ENVIRONMENT_MAINTENANCE`：唯一展示库正在原地刷新，所有展示业务读写暂时拒绝，HTTP 503。
 - `DATA_ENVIRONMENT_REFRESH_FAILED`：最近刷新失败，展示业务保持不可用，需在设置中重新生成，HTTP 503。
 - `DATA_ENVIRONMENT_VERSION_CONFLICT`：标签页、授权或写请求仍使用旧环境版本，HTTP 409。
+- `DEMO_DATA_REFRESH_NOT_FOUND`：展示数据库更新任务不存在，HTTP 404。
+- `DEMO_DATA_REFRESH_STATE_INVALID`：更新任务不在可续跑状态，HTTP 409。
+- `DEMO_MASKING_KEY_MISSING`：服务端脱敏密钥缺失或强度不足，更新在复制前阻止，HTTP 503。
+- `DEMO_DATA_REQUIRED_TABLE_MISSING` / `DEMO_DATA_SCHEMA_MISMATCH`：正式或展示库缺少必需业务表，或两库结构不一致。
+- `DEMO_DATA_SOURCE_KEY_INVALID`：来源业务表存在空标识或重复主键，无法确定性复制。
+- `DEMO_DATA_VALIDATION_FAILED`：覆盖、销售两倍或业务恒等式校验失败；展示环境不会启用。
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。
 - `PRODUCTION_ROLE_REQUIRED`：令牌对应的钉钉稳定身份不再是 active executive。
 - `PRODUCTION_CAPABILITY_REQUIRED`：个人令牌没有所需的 read 或 write 能力。

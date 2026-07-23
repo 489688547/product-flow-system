@@ -9,7 +9,7 @@
 - Manual calls require the existing authenticated organization session. The installed collector uses a fixed-scope `kuaimai_erp_ingest` token created by an executive session; plaintext is returned once and stored only in macOS Keychain, while D1 stores its SHA-256 hash.
 - Rejects read-only identities.
 - Write access is limited to 总经办、数据中心/数据部、供应链和财务.
-- Requires the `PRODUCT_FLOW_DB` D1 binding and an `Idempotency-Key` header.
+- Requires the formal control D1 plus the middleware-selected business D1 and an `Idempotency-Key` header. The control batch persists the server-resolved target environment and version; client payloads cannot choose a binding or database ID.
 
 ## Request
 
@@ -25,6 +25,8 @@ Orders and order items require a valid business occurrence timestamp. Kuaimai us
 ## Response
 
 HTTP `201` returns `data.archiveId`, `data.batchId`, normalized batch status and `counts` for inserted, updated, unchanged and issue rows. Repeating the same file hash, idempotent chunk or unchanged source row does not create another fact.
+
+Archive metadata, runner authorization and collection batch control stay in the formal control database. Standard business projections use the target environment persisted on the control job. Display-target sales facts pass through the shared two-times transformation; a stale display version fails before projection writes.
 
 `POST /api/platform/v1/erp-collection/runners` creates the one-time fixed-scope token and requires either an executive company session or the existing server-only production personal token resolved to an active executive identity. The personal token is used only during installation and never enters LaunchAgent configuration. `GET /api/platform/v1/erp-collection/archives` returns safe archive and batch metadata to authorized company users; it never returns an absolute local path.
 

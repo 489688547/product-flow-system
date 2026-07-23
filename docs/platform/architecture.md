@@ -24,6 +24,9 @@
 - `functions/api/platform/v1/environment-readiness.js`：按环境能力清单执行脱敏就绪检查。
 - `functions/api/platform/_shared/dataEnvironment.js`：认证后统一解析正式或展示业务库；业务模块不得自行选择 D1 binding。
 - `functions/api/platform/_shared/demoDataCatalog.js`：展示库复制白名单、顺序、批量与转换策略；未知表默认不复制。
+- `functions/api/platform/_shared/demoDataRefresh.js`：单展示库的分步刷新、租约、游标、幂等、校验和启用。
+- `functions/api/platform/_shared/collectionTarget.js`：把服务端选定的数据环境与版本固化到采集控制任务。
+- `functions/api/platform/_shared/displayExternalActionAdapter.js`：展示环境外部写模拟与无秘密控制审计。
 - `functions/api/platform/v1/production-data/`：个人令牌、短时解锁、版本冲突、快照、审计和回滚边界。
 
 ## 数据流
@@ -31,6 +34,8 @@
 浏览器先完成钉钉身份认证，再读取产品共享状态或公司平台状态。产品全周期整状态同步必须先取得服务器 `updatedAt` 基线；本地缓存只用于首屏和人工恢复，不能在启动时自动上传。客户端比较排除组织缓存刷新时间的规范化业务指纹，无业务变化时不保存。服务端验证会话与写权限，先保存写前快照与审计，再用单个 D1 原子批次比较并推进修订清单、替换全部状态分片；缺少、落后或被并发推进的基线返回 409。外部平台调用由对应适配层完成。客户端不得持有服务端密钥。
 
 最高权限账号可以在设置中为当前浏览器切换正式与展示业务库。会话、权限、平台凭证、AI Provider 配置、个人令牌和环境授权始终留在正式控制库；业务状态由中间件注入的 `businessDb` 决定。切换后前端中止旧请求、按环境隔离缓存，并给写请求携带环境版本。展示库刷新只复制目录白名单：个人敏感字段先用服务端 `DEMO_DATA_MASKING_KEY` 做确定性脱敏，销售可加总事实统一乘二，派生比例和均值重新计算；凭证、令牌、会话、控制审计和未知表一律跳过。
+
+采集控制记录始终写正式控制库，并固化服务端解析出的目标环境和版本；ERP 文件、网页采集和销售修复只把业务投影写入目标业务库。展示环境的外部写请求经过同一业务校验后由共享模拟器返回兼容结果，不解析真实写入凭据。AI Provider、租约、Token 和 Skill 次数记录在控制库，Context builders 与业务 Skills 读取 `businessDb`，审计用独立 `data_environment` 字段标记来源而不改变 `model|rule_fallback` 语义。
 
 完整本地开发通过 `npm start` 同时运行 Vite 与 Wrangler Pages Functions。浏览器只访问 Vite `127.0.0.1:8127`，页面保留热更新，所有 `/api` 请求代理到内部 Wrangler `127.0.0.1:8132`。Wrangler 从被忽略的 `.env` 读取个人令牌并远程绑定生产 D1；API 中间件仅在回环主机和显式开关下校验令牌哈希、能力与 active executive 组织身份，再注入真实线上会话。之后数据与钉钉、快麦等外部动作进入同一套正式路由、权限和适配器。令牌不得进入浏览器；硬编码本地身份和第二套本地业务 API 都不是支持的完整运行时。
 

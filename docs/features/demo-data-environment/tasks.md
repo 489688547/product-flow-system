@@ -149,13 +149,13 @@
 
 ## 10. 规则写回与发布
 
-- [ ] 更新 `AGENTS.md`
-- [ ] 更新产品规则和 `DESIGN.md`
-- [ ] 更新平台架构、中间件、API 和错误码
-- [ ] 更新集成注册表和环境能力清单
-- [ ] 新增展示数据环境 ADR
-- [ ] 清除治理检查全部临时 allowlist
-- [ ] 逐条审计所有 `PRODUCT_FLOW_DB` 和 `DEMO_FLOW_DB` 引用
+- [x] 更新 `AGENTS.md`
+- [x] 更新产品规则和 `DESIGN.md`
+- [x] 更新平台架构、中间件、API 和错误码
+- [x] 更新集成注册表和环境能力清单
+- [x] 新增展示数据环境 ADR
+- [x] 清除治理检查全部临时 allowlist
+- [x] 逐条审计所有 `PRODUCT_FLOW_DB` 和 `DEMO_FLOW_DB` 引用
 - [ ] 运行 `npm run lint`
 - [ ] 运行 `npm run check:governance`
 - [ ] 运行 `npm run check:integrations`

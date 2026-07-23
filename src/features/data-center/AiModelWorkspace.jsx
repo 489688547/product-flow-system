@@ -46,6 +46,10 @@ function usedAt(value) {
   }).format(date);
 }
 
+function environmentLabel(value) {
+  return value === "display" ? "展示库" : "正式库";
+}
+
 function AiUsageSummary({ summary = EMPTY_SUMMARY, loading = false }) {
   const items = [
     ["模型调用", count(summary.providerCalls), "次 Provider 请求"],
@@ -62,11 +66,11 @@ function AiUsageSummary({ summary = EMPTY_SUMMARY, loading = false }) {
 }
 
 function featureRows(features = []) {
-  return features.map((item, index) => ({ ...item, id: `${item.appId}:${item.featureId}:${item.providerId || "none"}:${item.model || "none"}:${index}` }));
+  return features.map((item, index) => ({ ...item, id: `${item.appId}:${item.featureId}:${item.dataEnvironment || "production"}:${item.providerId || "none"}:${item.model || "none"}:${index}` }));
 }
 
 function skillRows(skills = []) {
-  return skills.map((item, index) => ({ ...item, id: `${item.callerAppId}:${item.callerFeatureId}:${item.skillId}:${item.sourceAppId}:${index}` }));
+  return skills.map((item, index) => ({ ...item, id: `${item.callerAppId}:${item.callerFeatureId}:${item.dataEnvironment || "production"}:${item.skillId}:${item.sourceAppId}:${index}` }));
 }
 
 function AiUsageTables({ data, loading }) {
@@ -74,9 +78,10 @@ function AiUsageTables({ data, loading }) {
   const skills = useMemo(() => skillRows(data?.skills), [data?.skills]);
   return <>
     <section className="section-panel ai-usage-section" aria-labelledby="ai-feature-usage-title" aria-busy={loading}>
-      <div className="section-head"><div><h2 id="ai-feature-usage-title">App 与功能用量</h2><p>按 App、功能、Provider 和模型拆分，已登记但未使用的功能也会保留。</p></div>{loading ? <span className="status-badge neutral">正在刷新</span> : null}</div>
-      <DataTable className="ai-feature-usage-table" minWidth={1080} columns={[
+      <div className="section-head"><div><h2 id="ai-feature-usage-title">App 与功能用量</h2><p>按 App、功能、数据环境、Provider 和模型拆分，已登记但未使用的功能也会保留。</p></div>{loading ? <span className="status-badge neutral">正在刷新</span> : null}</div>
+      <DataTable className="ai-feature-usage-table" minWidth={1160} columns={[
         { key: "feature", header: "App / 功能", render: row => <span className="ai-usage-primary-cell"><strong>{row.appName}</strong><small>{row.featureName} · {row.featureId}</small>{!row.providerCalls && row.historyNote ? <em>{row.historyNote}</em> : null}</span> },
+        { key: "environment", header: "数据环境", render: row => <span className="status-badge neutral">{environmentLabel(row.dataEnvironment)}</span> },
         { key: "model", header: "Provider / 模型", render: row => row.providerCalls ? <span className="ai-usage-primary-cell"><strong>{row.providerId || "—"}</strong><small>{row.model || "—"}</small></span> : "—" },
         { key: "calls", header: "模型调用", render: row => row.providerCalls ? count(row.providerCalls) : <span className="status-badge neutral">暂无调用</span> },
         { key: "input", header: "输入 Token", render: row => count(row.inputTokens) },
@@ -89,9 +94,10 @@ function AiUsageTables({ data, loading }) {
     </section>
     <section className="section-panel ai-usage-section" aria-labelledby="ai-skill-usage-title" aria-busy={loading}>
       <div className="section-head"><div><h2 id="ai-skill-usage-title">Skill 用量</h2><p>只统计受控 Skill 的调用结果，不展示查询参数和业务内容。</p></div></div>
-      <DataTable className="ai-skill-usage-table" minWidth={920} columns={[
+      <DataTable className="ai-skill-usage-table" minWidth={1000} columns={[
         { key: "caller", header: "调用方", render: row => <span className="ai-usage-primary-cell"><strong>{row.callerAppName}</strong><small>{row.callerFeatureName}</small></span> },
         { key: "skill", header: "Skill", render: row => <span className="ai-usage-primary-cell"><strong>{row.skillName}</strong><small>{row.skillId}</small></span> },
+        { key: "environment", header: "数据环境", render: row => <span className="status-badge neutral">{environmentLabel(row.dataEnvironment)}</span> },
         { key: "source", header: "数据来源", render: row => row.sourceAppId },
         { key: "calls", header: "调用次数", render: row => count(row.calls) },
         { key: "result", header: "成功 / 失败", render: row => `${count(row.successes)} / ${count(row.failures)}` },
