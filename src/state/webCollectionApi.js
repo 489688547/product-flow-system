@@ -25,7 +25,8 @@ export async function loadWebCollectionStatus(fetchImpl = fetch) {
   };
 }
 
-export async function triggerKuaimaiSalesCollection({ date, force = false }, fetchImpl = fetch) {
+export async function triggerKuaimaiSalesCollection({ date, resourceType = "order_items", force = false }, fetchImpl = fetch) {
+  const safeResourceType = ["orders", "order_items", "sales_items"].includes(resourceType) ? resourceType : "order_items";
   const response = await fetchImpl("/api/platform/v1/web-collection/jobs", {
     method: "POST",
     credentials: "include",
@@ -33,7 +34,7 @@ export async function triggerKuaimaiSalesCollection({ date, force = false }, fet
     body: JSON.stringify({
       action: "trigger",
       providerId: "kuaimai",
-      resourceType: "order_items",
+      resourceType: safeResourceType,
       businessDate: date,
       force: Boolean(force)
     })

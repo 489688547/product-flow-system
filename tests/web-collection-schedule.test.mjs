@@ -7,8 +7,10 @@ import {
   createDailyPlan,
   nextCursorForSuccessfulJob,
   notificationIntents,
+  webCollectionRetryDecision,
   webCollectionJobKey
 } from "../src/domain/webCollection.js";
+import { WEB_COLLECTION_ADAPTERS } from "../scripts/web-data-collector/providers/index.mjs";
 
 const kuaimai = {
   id: "kuaimai",
@@ -54,6 +56,41 @@ test("disabled adapters and resources are not scheduled", () => {
     now: "2026-07-22T05:01:00+08:00"
   });
   assert.deepEqual(plan, []);
+});
+
+test("transient failures retry after bounded backoff while human states and exhausted jobs stop", () => {
+  const now = new Date("2026-07-23T10:00:00.000Z");
+  assert.deepEqual(webCollectionRetryDecision({
+    status: "failed",
+    attempt: 1,
+    errorCode: "EXTENSION_DOWNLOAD_TIMEOUT",
+    updatedAt: "2026-07-23T09:54:59.000Z"
+  }, { now }), { retry: true, delayMinutes: 5 });
+  assert.deepEqual(webCollectionRetryDecision({
+    status: "failed",
+    attempt: 2,
+    errorCode: "WEB_COLLECTION_LOCAL_PROCESSING_FAILED",
+    updatedAt: "2026-07-23T09:50:00.000Z"
+  }, { now }), { retry: false, delayMinutes: 15 });
+  assert.deepEqual(webCollectionRetryDecision({
+    status: "failed",
+    attempt: 3,
+    errorCode: "EXTENSION_DOWNLOAD_TIMEOUT",
+    updatedAt: "2026-07-23T09:00:00.000Z"
+  }, { now }), { retry: false, delayMinutes: null });
+  assert.deepEqual(webCollectionRetryDecision({
+    status: "waiting_human",
+    attempt: 1,
+    errorCode: "KUAIMAI_LOGIN_REQUIRED",
+    updatedAt: "2026-07-23T09:00:00.000Z"
+  }, { now }), { retry: false, delayMinutes: null });
+});
+
+test("a repaired sales adapter publishes a new schedule version instead of mutating old failed jobs", () => {
+  const plan = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-23T05:01:00+08:00" });
+  const sales = plan.find(job => job.resourceType === "sales_items");
+  assert.equal(sales.scheduleVersion, "v3");
+  assert.equal(sales.idempotencyKey, "kuaimai:sales_items:2026-07-22:v3");
 });
 
 test("state transitions reject skipped stages and terminal recovery", () => {

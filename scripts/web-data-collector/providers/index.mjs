@@ -5,7 +5,7 @@ export const WEB_COLLECTION_ADAPTERS = Object.freeze([
     resources: Object.freeze([
       Object.freeze({ type: "orders", rangeKind: "daily_fact", scheduleVersion: "v1" }),
       Object.freeze({ type: "order_items", rangeKind: "daily_fact", scheduleVersion: "v1" }),
-      Object.freeze({ type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v2" })
+      Object.freeze({ type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v3" })
     ])
   })
 ]);

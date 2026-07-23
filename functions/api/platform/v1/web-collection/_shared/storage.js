@@ -1,4 +1,4 @@
-import { assertWebCollectionTransition } from "../../../../../../src/domain/webCollection.js";
+import { assertWebCollectionTransition, webCollectionRetryDecision } from "../../../../../../src/domain/webCollection.js";
 import { collectionIdempotencyKey } from "../../../_shared/collectionTarget.js";
 import { routeError } from "./http.js";
 
@@ -135,7 +135,8 @@ export async function heartbeatRunner(db, runner, input) {
 export async function ensureWebCollectionPlan(db, jobs, target = { environmentId: "production", environmentVersion: 1 }) {
   if (!Array.isArray(jobs) || !jobs.length || jobs.length > 100) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "任务计划必须包含 1 至 100 个资源。");
   const normalized = jobs.map(normalizeJob);
-  const now = new Date().toISOString();
+  const current = new Date();
+  const now = current.toISOString();
   let created = 0;
   const saved = [];
   for (const job of normalized) {
@@ -158,6 +159,12 @@ export async function ensureWebCollectionPlan(db, jobs, target = { environmentId
           target.environmentId, target.environmentVersion, now, now).run();
       row = await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(id).first();
       created += 1;
+    } else if (webCollectionRetryDecision(mapJob(row), { now: current }).retry) {
+      await db.prepare(`UPDATE web_collection_jobs SET status = 'queued', stage = 'queued', runner_id = NULL,
+        lease_expires_at = NULL, error_code = NULL, error_summary = NULL, started_at = NULL, completed_at = NULL,
+        updated_at = ? WHERE id = ?`)
+        .bind(now, row.id).run();
+      row = await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(row.id).first();
     }
     saved.push(mapJob(row));
   }
@@ -179,7 +186,7 @@ export async function triggerWebCollectionJob(db, input) {
   if (providerId !== "kuaimai" || !["orders", "order_items", "sales_items"].includes(resourceType) || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
     throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发已登记的快麦订单、订单商品明细或销售主题明细采集。");
   }
-  const scheduleVersion = resourceType === "sales_items" ? "v2" : "v1";
+  const scheduleVersion = resourceType === "sales_items" ? "v3" : "v1";
   const plan = await ensureWebCollectionPlan(db, [{
     providerId,
     resourceType,

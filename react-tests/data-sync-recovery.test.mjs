@@ -25,7 +25,7 @@ test("web collection status client reads the existing safe control-plane payload
   assert.deepEqual(status.jobs, []);
 });
 
-test("sales recovery client can auto-enqueue and manually requeue the Chrome job", async () => {
+test("sales recovery client can auto-enqueue and manually requeue the exact Chrome resource", async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
@@ -34,7 +34,7 @@ test("sales recovery client can auto-enqueue and manually requeue the Chrome job
     }), { status: 200, headers: { "content-type": "application/json" } });
   };
   await triggerKuaimaiSalesCollection({ date: "2026-07-22" }, fetchImpl);
-  await triggerKuaimaiSalesCollection({ date: "2026-07-22", force: true }, fetchImpl);
+  await triggerKuaimaiSalesCollection({ date: "2026-07-22", resourceType: "sales_items", force: true }, fetchImpl);
   assert.equal(calls[0].url, "/api/platform/v1/web-collection/jobs");
   assert.equal(calls[0].options.credentials, "include");
   assert.deepEqual(JSON.parse(calls[0].options.body), {
@@ -44,7 +44,13 @@ test("sales recovery client can auto-enqueue and manually requeue the Chrome job
     businessDate: "2026-07-22",
     force: false
   });
-  assert.equal(JSON.parse(calls[1].options.body).force, true);
+  assert.deepEqual(JSON.parse(calls[1].options.body), {
+    action: "trigger",
+    providerId: "kuaimai",
+    resourceType: "sales_items",
+    businessDate: "2026-07-22",
+    force: true
+  });
 });
 
 test("sales recovery selects the exact Kuaimai order-item job and reports Chrome progress", () => {
