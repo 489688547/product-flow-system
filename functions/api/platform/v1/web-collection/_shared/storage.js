@@ -125,6 +125,28 @@ function mapJob(row) {
   };
 }
 
+function mapRun(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    runnerId: row.runner_id,
+    attempt: Number(row.attempt || 0),
+    status: row.status,
+    stage: row.stage,
+    batchId: row.batch_id || null,
+    archiveId: row.archive_id || null,
+    rowCount: row.row_count === null || row.row_count === undefined
+      ? null
+      : Number.isFinite(Number(row.row_count)) ? Number(row.row_count) : null,
+    errorCode: row.error_code || null,
+    errorSummary: row.error_summary || null,
+    startedAt: row.started_at,
+    completedAt: row.completed_at || null,
+    createdAt: row.created_at
+  };
+}
+
 export async function heartbeatRunner(db, runner, input) {
   const now = new Date().toISOString();
   await db.prepare(`UPDATE web_collection_runners SET version = ?, chrome_status = ?, current_job_id = ?, last_seen_at = ? WHERE id = ?`)
@@ -186,7 +208,7 @@ export async function triggerWebCollectionJob(db, input) {
   if (providerId !== "kuaimai" || !["orders", "order_items", "sales_items"].includes(resourceType) || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
     throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发已登记的快麦订单、订单商品明细或销售主题明细采集。");
   }
-  const scheduleVersion = resourceType === "sales_items" ? "v3" : "v1";
+  const scheduleVersion = resourceType === "sales_items" ? "v3" : resourceType === "orders" ? "v2" : "v1";
   const plan = await ensureWebCollectionPlan(db, [{
     providerId,
     resourceType,
@@ -242,10 +264,23 @@ export async function transitionWebCollectionJob(db, runner, input) {
   }
   const now = new Date().toISOString();
   const release = ["failed", "waiting_human", "schema_changed"].includes(input.status);
-  await db.prepare(`UPDATE web_collection_jobs SET status = ?, stage = ?, error_code = ?, error_summary = ?,
-    lease_expires_at = ?, updated_at = ? WHERE id = ?`)
-    .bind(input.status, String(input.stage || input.status).slice(0, 60), input.errorCode ? String(input.errorCode).slice(0, 80) : null,
-      safeErrorSummary(input.errorSummary), release ? null : row.lease_expires_at, now, row.id).run();
+  const stage = String(input.stage || input.status).slice(0, 60);
+  const errorCode = input.errorCode ? String(input.errorCode).slice(0, 80) : null;
+  const errorSummary = safeErrorSummary(input.errorSummary);
+  const statements = [
+    db.prepare(`UPDATE web_collection_jobs SET status = ?, stage = ?, error_code = ?, error_summary = ?,
+      lease_expires_at = ?, updated_at = ? WHERE id = ?`)
+      .bind(input.status, stage, errorCode, errorSummary, release ? null : row.lease_expires_at, now, row.id)
+  ];
+  if (release) {
+    statements.push(db.prepare(`INSERT INTO web_collection_runs
+      (id, job_id, runner_id, attempt, status, stage, batch_id, archive_id, file_hash, row_count,
+        error_code, error_summary, started_at, completed_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(randomId("web-run"), row.id, runner.id, Number(row.attempt || 1), input.status, stage,
+        null, null, null, null, errorCode, errorSummary, row.started_at || now, now, now));
+  }
+  await db.batch(statements);
   return { job: mapJob(await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(row.id).first()) };
 }
 
@@ -300,10 +335,13 @@ export async function recordWebCollectionNotification(db, runner, input) {
 
 export async function listWebCollectionStatus(db, { limit = 100 } = {}) {
   const safeLimit = Math.min(300, Math.max(1, Number(limit) || 100));
-  const [runners, jobs, cursors, notifications] = await Promise.all([
+  const [runners, jobs, runs, cursors, notifications] = await Promise.all([
     db.prepare(`SELECT id, name, status, version, chrome_status, current_job_id, last_seen_at, created_at
       FROM web_collection_runners ORDER BY created_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT * FROM web_collection_jobs ORDER BY business_date DESC, created_at DESC LIMIT ?`).bind(safeLimit).all(),
+    db.prepare(`SELECT id, job_id, runner_id, attempt, status, stage, batch_id, archive_id, row_count,
+      error_code, error_summary, started_at, completed_at, created_at
+      FROM web_collection_runs ORDER BY created_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT provider_id, resource_type, business_date, job_id, run_id, batch_id, completed_at, updated_at
       FROM web_collection_cursors ORDER BY updated_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT id, job_id, runner_id, kind, dedupe_key, result, sent_at
@@ -312,6 +350,7 @@ export async function listWebCollectionStatus(db, { limit = 100 } = {}) {
   return {
     runners: (runners?.results || []).map(row => ({ id: row.id, name: row.name, status: row.status, version: row.version || null, chromeStatus: row.chrome_status || null, currentJobId: row.current_job_id || null, lastSeenAt: row.last_seen_at || null, createdAt: row.created_at })),
     jobs: (jobs?.results || []).map(mapJob),
+    runs: (runs?.results || []).map(mapRun),
     cursors: (cursors?.results || []).map(row => ({ providerId: row.provider_id, resourceType: row.resource_type, businessDate: row.business_date, jobId: row.job_id, runId: row.run_id, batchId: row.batch_id || null, completedAt: row.completed_at, updatedAt: row.updated_at })),
     notifications: (notifications?.results || []).map(row => ({ id: row.id, jobId: row.job_id || null, runnerId: row.runner_id, kind: row.kind, dedupeKey: row.dedupe_key, result: row.result, sentAt: row.sent_at }))
   };

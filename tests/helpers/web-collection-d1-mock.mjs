@@ -50,6 +50,7 @@ export function createWebCollectionD1Mock() {
       async all() {
         if (query.includes("from web_collection_runners")) return { results: [...tables.web_collection_runners.values()] };
         if (query.includes("from web_collection_jobs")) return { results: [...tables.web_collection_jobs.values()] };
+        if (query.includes("from web_collection_runs")) return { results: [...tables.web_collection_runs.values()] };
         if (query.includes("from web_collection_cursors")) return { results: [...tables.web_collection_cursors.values()] };
         if (query.includes("from web_collection_notifications")) return { results: [...tables.web_collection_notifications.values()] };
         return { results: [] };
@@ -116,11 +117,15 @@ export function createWebCollectionD1Mock() {
           return { success: true };
         }
         if (query.startsWith("insert into web_collection_runs")) {
-          const [id, jobId, runnerId, attempt, status, stage, batchId, archiveId, fileHash, rowCount, startedAt, completedAt, createdAt] = state.values;
+          const hasErrors = query.includes("error_code");
+          const [id, jobId, runnerId, attempt, status, stage, batchId, archiveId, fileHash, rowCount] = state.values;
+          const [errorCode, errorSummary, startedAt, completedAt, createdAt] = hasErrors
+            ? state.values.slice(10)
+            : [null, null, ...state.values.slice(10)];
           tables.web_collection_runs.set(id, {
             id, job_id: jobId, runner_id: runnerId, attempt, status, stage, batch_id: batchId,
             archive_id: archiveId, file_hash: fileHash, row_count: rowCount, started_at: startedAt,
-            completed_at: completedAt, created_at: createdAt
+            error_code: errorCode, error_summary: errorSummary, completed_at: completedAt, created_at: createdAt
           });
           return { success: true };
         }

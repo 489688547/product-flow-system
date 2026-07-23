@@ -95,6 +95,7 @@ test("collector token can ingest an archive and archives endpoint omits absolute
       sourceFileName: "交易订单.xlsx",
       contentHash: fileHash,
       rowCount: 1,
+      status: "partial",
       collectedAt: "2026-07-22T08:00:00.000Z"
     },
     records: [{
