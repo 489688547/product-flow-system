@@ -19,14 +19,14 @@
   - 验证：`node --test react-tests/product-planning.test.mjs`，9/9 通过。
   - 提交：`feat(planning): add timeline date calculations`。
 
-- [ ] 可拖动时间条交互
+- [x] 可拖动时间条交互
   - 依赖：日期展示与拖动领域规则。
   - 文件：`src/features/planning/PlanningRangeBar.jsx`、`react-tests/react-app.test.mjs`。
   - 输入：规划、年度、编辑权限和两个回调。
   - 输出：日期预览、一次拖动变更或精确编辑动作。
   - 失败测试：`node --test react-tests/react-app.test.mjs`，组件契约不存在。
   - 实现步骤：Pointer capture；4px 阈值；中心/边缘模式；取消恢复；键盘回退；可访问名称。
-  - 验证：UI 契约测试通过。
+  - 验证：`node --test react-tests/react-app.test.mjs`，42/42 通过。
   - 提交：`feat(planning): add draggable timeline range`。
 
 - [ ] 页面接线、视觉收口和持久规则

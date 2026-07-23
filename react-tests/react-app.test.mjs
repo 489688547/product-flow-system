@@ -179,6 +179,26 @@ test("annual product planning uses one development-to-launch period and overwrit
   assert.match(styles, /grid-template-columns: repeat\(12, minmax\(68px, 1fr\)\)/);
 });
 
+test("planning range bar separates precise editing from cancellable pointer dragging", () => {
+  const rangeBar = read("src/features/planning/PlanningRangeBar.jsx");
+
+  assert.match(rangeBar, /export function PlanningRangeBar/);
+  assert.match(rangeBar, /DRAG_THRESHOLD_PX = 4/);
+  assert.match(rangeBar, /setPointerCapture/);
+  assert.match(rangeBar, /releasePointerCapture/);
+  assert.match(rangeBar, /onPointerCancel=/);
+  assert.match(rangeBar, /onLostPointerCapture=/);
+  assert.match(rangeBar, /event\.key === "Enter" \|\| event\.key === " "/);
+  assert.match(rangeBar, /formatPlanningDateRange/);
+  assert.match(rangeBar, /planningDaysFromPixels/);
+  assert.match(rangeBar, /movePlanningRange/);
+  assert.match(rangeBar, /resizePlanningRange/);
+  assert.match(rangeBar, /aria-label=/);
+  assert.match(rangeBar, /data-range-edge="start"/);
+  assert.match(rangeBar, /data-range-edge="end"/);
+  assert.match(rangeBar, /onChange\(nextDates\)/);
+});
+
 test("dashboard uses aligned section headers plus reusable product thumbnails in task and risk rows", () => {
   const dashboard = read("src/features/dashboard/DashboardPage.jsx");
   const styles = read("src/styles.css");
