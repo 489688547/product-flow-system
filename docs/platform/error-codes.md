@@ -240,6 +240,8 @@
 - `DEMO_DATA_REFRESH_STATE_INVALID`：更新任务不在可续跑状态，HTTP 409。
 - `DEMO_MASKING_KEY_MISSING`：服务端脱敏密钥缺失或强度不足，更新在复制前阻止，HTTP 503。
 - `DEMO_DATA_REQUIRED_TABLE_MISSING` / `DEMO_DATA_SCHEMA_MISMATCH`：正式或展示库缺少必需业务表，或两库结构不一致。
+- `DEMO_DATA_REFRESH_RETRYABLE`：刷新步骤遇到 D1 网络、连接或超时类瞬时错误，服务端保留当前游标并自动重试。
+- `DEMO_DATA_REFRESH_RETRY_EXHAUSTED`：同一刷新步骤连续 3 次遇到瞬时存储错误，任务停止且展示库保持不可用。
 - `DEMO_DATA_SOURCE_KEY_INVALID`：来源业务表存在空标识或重复主键，无法确定性复制。
 - `DEMO_DATA_VALIDATION_FAILED`：覆盖、销售两倍或业务恒等式校验失败；展示环境不会启用。
 - `PRODUCTION_TOKEN_REQUIRED` / `PRODUCTION_TOKEN_INVALID`：个人令牌缺失、无效、过期或已撤销。

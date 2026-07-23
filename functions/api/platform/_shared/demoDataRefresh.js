@@ -13,6 +13,7 @@ import {
 const ACTIVE_STATUSES = new Set(["queued", "running"]);
 const TERMINAL_STATUSES = new Set(["succeeded", "failed"]);
 const LEASE_MILLISECONDS = 30_000;
+const MAX_TRANSIENT_ATTEMPTS = 3;
 
 export class DemoDataRefreshError extends Error {
   constructor(code, message, status = 500, retryable = false) {
@@ -127,8 +128,16 @@ function progressPatch(stage, index, entry, counts, cursor = {}) {
     stage,
     currentTable: entry?.table || "",
     cursor: { index, ...cursor },
-    counts
+    counts,
+    lastErrorCode: ""
   };
+}
+
+function isTransientStorageError(error) {
+  if (error?.retryable === true) return true;
+  if (error instanceof DemoDataRefreshError) return false;
+  return /D1_ERROR|network|connection|fetch failed|timeout|temporar/i
+    .test(String(error?.message || ""));
 }
 
 async function processPreflight({ job, data }) {
@@ -248,6 +257,27 @@ export async function runDisplayRefreshStep({
     }
     return publicJob(await repository.saveJob(jobId, patch, now));
   } catch (error) {
+    if (isTransientStorageError(error)) {
+      const retryCount = Number(job.cursor?.retryCount || 0) + 1;
+      if (retryCount < MAX_TRANSIENT_ATTEMPTS) {
+        const retrying = await repository.saveJob(jobId, {
+          status: "running",
+          cursor: { ...(job.cursor || {}), retryCount },
+          lastErrorCode: "DEMO_DATA_REFRESH_RETRYABLE"
+        }, now);
+        return publicJob(retrying, {
+          message: "展示数据库暂时连接失败，任务将自动重试。",
+          retryable: true
+        });
+      }
+      const failed = await repository.failJob(
+        jobId,
+        "DEMO_DATA_REFRESH_RETRY_EXHAUSTED",
+        { valid: false },
+        now
+      );
+      return publicJob(failed);
+    }
     const code = error?.code || "DEMO_DATA_REFRESH_FAILED";
     const failed = await repository.failJob(jobId, code, { valid: false }, now);
     return publicJob(failed, {
