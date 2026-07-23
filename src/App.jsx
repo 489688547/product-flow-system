@@ -201,12 +201,6 @@ export default function App() {
     setExpandedAppGroup(expandedGroupForScreen(visibleNavigation, activeScreen));
   }, [activeScreen, visibleNavigation]);
   useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      document.querySelector(".sidebar nav button.active")?.scrollIntoView({ block: "nearest" });
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [activeScreen, expandedAppGroup]);
-  useEffect(() => {
     if (!accountMenuOpen) return undefined;
     const close = event => {
       if (event.key === "Escape" || !accountMenuRef.current?.contains(event.target)) setAccountMenuOpen(false);

@@ -81,13 +81,13 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .skip-link { position: fixed; left: var(--space-3); top: var(--space-3); z-index: 120; transform: translateY(-160%); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); background: var(--text-primary); color: white; text-decoration: none; }
 .skip-link:focus { transform: translateY(0); }
 .app-shell { min-height: 100dvh; display: grid; grid-template-columns: 176px minmax(0, 1fr); }
-.sidebar { position: sticky; top: 0; height: 100dvh; background: rgba(255, 255, 255, .86); color: var(--text-secondary); padding: var(--space-4) 10px; display: flex; flex-direction: column; gap: var(--space-4); border-right: 1px solid var(--border); }
+.sidebar { min-height: 100dvh; background: rgba(255, 255, 255, .86); color: var(--text-secondary); padding: var(--space-4) 10px; display: flex; flex-direction: column; gap: var(--space-4); border-right: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 10px; padding: var(--space-2); }
 .brand > span { width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; background: var(--accent); color: white; font-size: 15px; font-weight: 800; box-shadow: var(--shadow-sm); }
 .brand strong, .brand small { display: block; }
 .brand strong { font-size: 14px; color: var(--text-primary); }
 .brand small { margin-top: 1px; color: var(--text-tertiary); }
-.sidebar nav { min-height: 0; flex: 1; display: grid; align-content: start; gap: var(--space-1); overflow-y: auto; scrollbar-width: thin; }
+.sidebar nav { flex: 1; display: grid; align-content: start; gap: var(--space-1); scrollbar-width: thin; }
 .sidebar nav button { position: relative; height: 40px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); display: flex; align-items: center; gap: 9px; padding: 0 10px; text-align: left; transition: color var(--transition-fast), background-color var(--transition-fast); }
 .sidebar nav button::before { content: ""; position: absolute; left: 0; width: 3px; height: 16px; border-radius: 3px; background: transparent; }
 .sidebar nav button:hover { background: var(--surface-subtle); color: var(--text-primary); }
