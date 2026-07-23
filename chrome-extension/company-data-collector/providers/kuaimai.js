@@ -7,6 +7,10 @@ export const KUAIMAI_ORDER_ROUTE = "/index.html#/trade/searchlist/";
 
 export const KUAIMAI_DOWNLOAD_CENTER_ROUTE = "/index.html#/index/download_center/";
 
+export const KUAIMAI_DOWNLOAD_ORIGINS = Object.freeze([
+  "https://erp-tmp-new.oss-cn-zhangjiakou.aliyuncs.com"
+]);
+
 export const KUAIMAI_DOWNLOAD_CENTER_SELECTORS = Object.freeze({
   row: ".m-data-item",
   exportTime: ".exportTime",
@@ -176,7 +180,8 @@ export const kuaimaiResources = Object.freeze({
     rangeKind: "daily_fact",
     scheduleVersion: "v1",
     downloadExtensions: [".xlsx", ".xls", ".csv"],
-    downloadFilePrefixes: ["快麦ERP交易订单导出"]
+    downloadFilePrefixes: ["快麦ERP交易订单导出"],
+    downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
   }),
   order_items: Object.freeze({
     providerId: "kuaimai",
@@ -186,6 +191,7 @@ export const kuaimaiResources = Object.freeze({
     rangeKind: "daily_fact",
     scheduleVersion: "v1",
     downloadExtensions: [".xlsx", ".xls", ".csv"],
-    downloadFilePrefixes: ["快麦ERP交易订单明细导出"]
+    downloadFilePrefixes: ["快麦ERP交易订单明细导出"],
+    downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
   })
 });

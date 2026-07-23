@@ -75,6 +75,12 @@ test("Kuaimai order item task uses the registered detail export", async () => {
   assert.deepEqual(plan.at(-1), { action: "download_from_center", resourceType: "order_items" });
   assert.deepEqual(kuaimaiResources.orders.downloadFilePrefixes, ["快麦ERP交易订单导出"]);
   assert.deepEqual(kuaimaiResources.order_items.downloadFilePrefixes, ["快麦ERP交易订单明细导出"]);
+  assert.deepEqual(kuaimaiResources.orders.downloadOrigins, [
+    "https://erp-tmp-new.oss-cn-zhangjiakou.aliyuncs.com"
+  ]);
+  assert.deepEqual(kuaimaiResources.order_items.downloadOrigins, [
+    "https://erp-tmp-new.oss-cn-zhangjiakou.aliyuncs.com"
+  ]);
 });
 
 test("Kuaimai download center selects only the current task resource and time window", async () => {

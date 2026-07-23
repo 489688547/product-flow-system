@@ -16,6 +16,18 @@ function matchesRegisteredDownload(resource, item) {
     && resource.downloadFilePrefixes.some(prefix => fileName.startsWith(prefix));
 }
 
+function registeredDirectDownload(resource, value) {
+  try {
+    const url = new URL(String(value || ""));
+    if (!resource.downloadOrigins.includes(url.origin)) return null;
+    const fileName = decodeURIComponent(safeBaseName(url.pathname));
+    if (!matchesRegisteredDownload(resource, { filename: fileName })) return null;
+    return { url: url.href, fileName };
+  } catch {
+    return null;
+  }
+}
+
 async function bridgeConfiguration() {
   const stored = await chrome.storage.local.get(["bridgeUrl", "pairingKey"]);
   return {
@@ -118,8 +130,30 @@ async function findRecentDownload(resource, startedAt) {
   return downloads.find(item => matchesRegisteredDownload(resource, item));
 }
 
-async function waitForDownload(resource, startedAt) {
-  let candidate = await findRecentDownload(resource, startedAt);
+async function startRegisteredDirectDownload(resource, tabId, startedAt) {
+  const deadline = Date.now() + 3000;
+  do {
+    const existing = await findRecentDownload(resource, startedAt);
+    if (existing) return existing;
+    const tab = await chrome.tabs.get(tabId);
+    const direct = registeredDirectDownload(resource, tab.url);
+    if (direct) {
+      const id = await chrome.downloads.download({
+        url: direct.url,
+        filename: direct.fileName,
+        conflictAction: "uniquify",
+        saveAs: false
+      });
+      const [download] = await chrome.downloads.search({ id });
+      return download || null;
+    }
+    await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  return null;
+}
+
+async function waitForDownload(resource, tabId, startedAt) {
+  let candidate = await startRegisteredDirectDownload(resource, tabId, startedAt);
   if (!candidate) {
     candidate = await new Promise(resolve => {
       const timeout = setTimeout(() => {
@@ -190,7 +224,7 @@ async function executeTask(task) {
     await reportTaskResult(task, result || { status: "failed", stage: "opening", errorCode: "EXTENSION_NO_PAGE_RESPONSE" });
     return;
   }
-  const download = await waitForDownload(resource, startedAt);
+  const download = await waitForDownload(resource, tab.id, startedAt);
   if (!download) {
     await reportTaskResult(task, { status: "failed", stage: "downloading", errorCode: "EXTENSION_DOWNLOAD_TIMEOUT" });
     return;
@@ -220,12 +254,20 @@ async function poll() {
   }
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
+async function ensurePollAlarm() {
+  const alarm = await chrome.alarms.get(POLL_ALARM);
+  if (alarm?.periodInMinutes === 1) return;
   await chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
+}
+
+void ensurePollAlarm();
+
+chrome.runtime.onInstalled.addListener(async () => {
+  await ensurePollAlarm();
   await poll();
 });
 chrome.runtime.onStartup.addListener(async () => {
-  await chrome.alarms.create(POLL_ALARM, { periodInMinutes: 1 });
+  await ensurePollAlarm();
   await poll();
 });
 chrome.alarms.onAlarm.addListener(alarm => {
