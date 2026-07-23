@@ -96,7 +96,7 @@ export function createSalesRepairRequestHandler(dependencies = defaultSalesRepai
         before: anomaly
       };
       await dependencies.putRun(db, run);
-      const task = dependencies.execute({ db, env, date, run });
+      const task = dependencies.execute({ db, env, date, run, dataEnvironment: data.dataEnvironment });
       if (typeof context.waitUntil === "function") context.waitUntil(task);
       else void task;
       return jsonResponse({ synced: true, scheduled: true, run: publicRun(run), anomaly }, 202);

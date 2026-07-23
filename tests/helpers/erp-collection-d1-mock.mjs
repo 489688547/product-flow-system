@@ -61,7 +61,7 @@ export function createErpCollectionD1Mock() {
       },
       async run() {
         if (query.startsWith("insert into erp_collection_batches")) {
-          const [id, platformId, resourceType, sourceFileName, contentHash, schemaVersion, rangeStart, rangeEnd, rowCount, status, collectedAt, importedAt, importedBy, summary, createdAt, updatedAt, archiveId] = state.values;
+          const [id, platformId, resourceType, sourceFileName, contentHash, schemaVersion, rangeStart, rangeEnd, rowCount, status, collectedAt, importedAt, importedBy, summary, createdAt, updatedAt, archiveId, targetEnvironment, targetEnvironmentVersion] = state.values;
           const existing = [...tables.erp_collection_batches.values()].find(row => row.platform_id === platformId && row.resource_type === resourceType && row.content_hash === contentHash);
           const row = {
             id: existing?.id || id,
@@ -80,7 +80,9 @@ export function createErpCollectionD1Mock() {
             summary,
             created_at: existing?.created_at || createdAt,
             updated_at: updatedAt,
-            archive_id: archiveId || null
+            archive_id: archiveId || null,
+            target_environment: targetEnvironment,
+            target_environment_version: targetEnvironmentVersion
           };
           tables.erp_collection_batches.set(row.id, row);
           return { success: true };

@@ -7,7 +7,7 @@ import { createWebCollectionD1Mock } from "./helpers/web-collection-d1-mock.mjs"
 
 const executive = { userId: "exec-1", name: "负责人", role: "executive", department: "总经办" };
 
-async function jsonCall(handler, url, { method = "GET", db, session, token, body } = {}) {
+async function jsonCall(handler, url, { method = "GET", db, session, dataEnvironment, token, body } = {}) {
   const request = new Request(url, {
     method,
     headers: {
@@ -16,7 +16,11 @@ async function jsonCall(handler, url, { method = "GET", db, session, token, body
     },
     body: body ? JSON.stringify(body) : undefined
   });
-  const response = await handler({ request, env: db ? { PRODUCT_FLOW_DB: db } : {}, data: session ? { session } : {} });
+  const response = await handler({
+    request,
+    env: db ? { PRODUCT_FLOW_DB: db } : {},
+    data: session ? { session, ...(dataEnvironment ? { dataEnvironment } : {}) } : {}
+  });
   return { response, body: await response.json() };
 }
 
@@ -76,6 +80,41 @@ test("runner heartbeats and ensures a plan without accepting remote browser inst
   });
   assert.equal(rejected.response.status, 400);
   assert.equal(rejected.body.error.code, "WEB_COLLECTION_JOB_INVALID");
+});
+
+test("an executive-created plan persists the server-selected environment and isolates idempotency", async () => {
+  const db = createWebCollectionD1Mock();
+  const job = {
+    providerId: "kuaimai",
+    resourceType: "orders",
+    businessDate: "2026-07-21",
+    rangeKind: "daily_fact",
+    range: { start: "2026-07-21T00:00:00+08:00", end: "2026-07-21T23:59:59+08:00", timeZone: "Asia/Shanghai" },
+    scheduleVersion: "v1",
+    idempotencyKey: "kuaimai:orders:2026-07-21:v1"
+  };
+  const display = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: executive,
+    dataEnvironment: { id: "display", version: 7 },
+    body: { action: "ensure_plan", jobs: [job] }
+  });
+  const production = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: executive,
+    dataEnvironment: { id: "production", version: 1 },
+    body: { action: "ensure_plan", jobs: [job] }
+  });
+
+  assert.equal(display.response.status, 200);
+  assert.equal(production.response.status, 200);
+  assert.equal(db.tables.web_collection_jobs.size, 2);
+  const targets = [...db.tables.web_collection_jobs.values()]
+    .map(row => `${row.target_environment}:${row.target_environment_version}`)
+    .sort();
+  assert.deepEqual(targets, ["display:7", "production:1"]);
 });
 
 test("control plane accepts the canonical Kuaimai order_items resource used by the extension and parser", async () => {

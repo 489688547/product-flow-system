@@ -106,18 +106,18 @@
 
 ## 7. 真实采集目标路由
 
-- [ ] 先增加任务目标、展示转换和幂等隔离测试
-- [ ] Web collection 创建任务时保存服务端目标环境和版本
-- [ ] ERP collection 创建任务时保存服务端目标环境和版本
-- [ ] Runner 控制记录继续使用正式控制库
-- [ ] Runner 根据服务端任务解析目标业务库
-- [ ] 调用方不能指定绑定名或 D1 ID
-- [ ] 展示环境版本变化时暂停旧任务
-- [ ] 采集幂等键包含环境和环境版本
-- [ ] 展示销售写入复用共享两倍转换器
-- [ ] 退款丰富事实继续受 repair safeguard 保护
-- [ ] 快麦文案与注册表保持官方文件/浏览器采集现状
-- [ ] 提交 `feat: route data acquisition to selected environment`
+- [x] 先增加任务目标、展示转换和幂等隔离测试
+- [x] Web collection 创建任务时保存服务端目标环境和版本
+- [x] ERP collection 创建任务时保存服务端目标环境和版本
+- [x] Runner 控制记录继续使用正式控制库
+- [x] Runner 根据服务端任务解析目标业务库
+- [x] 调用方不能指定绑定名或 D1 ID
+- [x] 展示环境版本变化时暂停旧任务
+- [x] 采集幂等键包含环境和环境版本
+- [x] 展示销售写入复用共享两倍转换器
+- [x] 退款丰富事实继续受 repair safeguard 保护
+- [x] 快麦文案与注册表保持官方文件/浏览器采集现状
+- [x] 提交 `feat: route data acquisition to selected environment`
 
 ## 8. 展示环境外部写模拟
 

@@ -1,4 +1,5 @@
 import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
+import { scaleSalesFact } from "../../src/domain/demoSalesTransform.js";
 
 const META_ID = "sales-meta";
 // Cloudflare D1 allows at most 100 bound parameters per statement; 9 rows × 11 columns = 99.
@@ -153,7 +154,10 @@ export async function onRequest({ request, env, data = {} }) {
     }
     if (request.method === "POST") {
       const body = await request.json().catch(() => ({}));
-      const rows = (Array.isArray(body.rows) ? body.rows : []).filter(validRow);
+      const sourceRows = (Array.isArray(body.rows) ? body.rows : []).filter(validRow);
+      const rows = data.dataEnvironment?.id === "display"
+        ? sourceRows.map(row => scaleSalesFact(row))
+        : sourceRows;
       if (!rows.length) return jsonResponse({ synced: false, message: "没有可保存的销售数据行。" }, 400);
       const monthRows = {};
       rows.forEach(row => {
