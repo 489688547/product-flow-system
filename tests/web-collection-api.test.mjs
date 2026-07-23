@@ -238,6 +238,35 @@ test("failed task does not advance cursor and notification dedupe is durable", a
   assert.equal(db.tables.web_collection_notifications.size, 1);
 });
 
+test("runner reclaims an expired non-terminal stage after a local crash", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const token = registration.body.data.token;
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "ensure_plan", jobs: [{
+      providerId: "kuaimai", resourceType: "orders", businessDate: "2026-07-21", rangeKind: "daily_fact",
+      range: { start: "2026-07-21T00:00:00+08:00", end: "2026-07-21T23:59:59+08:00", timeZone: "Asia/Shanghai" },
+      scheduleVersion: "v2", idempotencyKey: "kuaimai:orders:2026-07-21:v2"
+    }] }
+  });
+  const first = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "claim" }
+  });
+  const jobId = first.body.data.job.id;
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "transition", jobId, from: "claimed", status: "opening", stage: "opening" }
+  });
+  db.tables.web_collection_jobs.get(jobId).lease_expires_at = "2026-07-20T00:00:00.000Z";
+
+  const reclaimed = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "claim" }
+  });
+  assert.equal(reclaimed.response.status, 200);
+  assert.equal(reclaimed.body.data.job.id, jobId);
+  assert.equal(reclaimed.body.data.job.status, "claimed");
+  assert.equal(reclaimed.body.data.job.attempt, 2);
+});
+
 test("company session reads safe status while unauthenticated callers are rejected", async () => {
   const db = createWebCollectionD1Mock();
   const denied = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", { db });

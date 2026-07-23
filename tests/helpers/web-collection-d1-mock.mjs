@@ -31,8 +31,13 @@ export function createWebCollectionD1Mock() {
         }
         if (query.includes("from web_collection_jobs") && query.includes("status = 'queued'")) {
           const [now] = state.values;
+          const recoverable = new Set(["claimed", "opening", "exporting", "downloading", "validating", "ingesting"]);
           return [...tables.web_collection_jobs.values()]
-            .filter(row => row.status === "queued" || (row.status === "claimed" && row.lease_expires_at < now))
+            .filter(row => row.status === "queued" || (
+              recoverable.has(row.status)
+              && row.lease_expires_at < now
+              && Number(row.attempt || 0) < 3
+            ))
             .sort((left, right) => `${left.business_date}:${left.created_at}`.localeCompare(`${right.business_date}:${right.created_at}`))[0] || null;
         }
         if (query.includes("from web_collection_notifications") && query.includes("dedupe_key = ?")) {
