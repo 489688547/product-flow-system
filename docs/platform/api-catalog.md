@@ -28,7 +28,8 @@
 | `/api/data-center` | 读取和保存数据中心安全元数据 | 指定部门可读；仅总经办和运营部可写；拒绝只读身份；D1 分实体表存储 |
 | `/api/data-center/sales` | 按日期读取数据中心销售事实 | 需要公司会话；最长 370 天；订单创建时间；上海时区；排除“其它” |
 | `/api/platform/v1/data-services/sales` | 发现销售数据覆盖范围并按日期读取经营汇总 | 需要公司会话；无日期时返回可用月份；完整日期时返回单行汇总；订单创建时间；上海时区；排除“其它” |
-| `/api/platform/v1/data-services/sales-repair` | 对最新销售日完整性异常执行快麦自动补拉 | 仅总经办或运营部非只读身份；服务端复核；同日最多两次；完整分页后才写入；富退款事实转官方文件重导 |
+| `/api/platform/v1/data-services/sales-repair` | 兼容保留的快麦 API 销售修复路由 | 当前产品停用且不从前端调用；最新日异常改由 Chrome 采集状态与官方文件导入闭环 |
+| `/api/platform/v1/web-collection/jobs` | 读取公司 Mac Chrome 采集状态，或排队固定快麦订单商品明细任务 | GET 需数据中心相关公司会话；runner 动作需设备令牌；用户 `trigger` 仅总经办、数据中心、运营非只读身份，按日期幂等且不接收网页地址、凭据或脚本 |
 | `/api/data-center/connectors` | 读取和维护连接器实例与内部保险箱非敏感元数据 | 数据中心授权部门可读；运营可维护非店铺连接器；仅总经办维护内部保险箱、归档并销毁已退役店铺凭证 |
 | `/api/ecommerce-operations` | 读取可见的店铺经营状态 | 需要公司会话和授权部门；D1 分实体存储 |
 | `/api/ecommerce-operations/actions` | 提交重点产品、方案、执行、协同和复盘动作 | 服务端校验角色、状态与版本；拒绝只读身份 |
@@ -150,7 +151,7 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 `POST /api/platform/v1/product-catalog/import` 接收 `{ source, fileName, items, errors }`。客户端只提交已标准化商品与异常摘要，不提交原始文件内容；服务端按主商家编码和规格商家编码幂等合并。`POST /api/platform/v1/product-catalog/sync/kuaimai` 接收可选 `{ cursor }`：游标 0 完整读取 `item.list.query` 并先归并为唯一商品，后续游标复用已落库共享目录，不重复拉取和重写整表；组合候选按稳定 ERP 商品身份排序，每批最多读取 30 个 `item.single.get` 详情，详情请求最多 5 路并发，返回 `complete`、`nextCursor`、`progress` 和安全失败摘要。成功详情按父商品成组替换组件；失败详情保留旧关系。
 
-快麦 API 与商品档案导出覆盖范围不同，自动同步不把 API 未返回的文件补齐商品标记为删除。订单日同步按快麦官方 `timeType=created` 查询并用响应 `created` 归日。回滚销量视图不删除目录或 `product_sales_daily`；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。销量查询按日期、编码和平台聚合，最大范围 370 天，不新增销售复制表。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_SALES_RANGE_INVALID`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`、`KUAIMAI_CONFIG_MISSING`、`KUAIMAI_PRODUCT_SYNC_INCOMPLETE`、`KUAIMAI_PRODUCT_SYNC_CURSOR_STALE`、`KUAIMAI_PRODUCT_SYNC_FAILED`。
+快麦开放平台 API 当前未打通，商品页不提供 API 同步操作；商品档案使用 ERP 官方文件导入，销售异常读取 Chrome 采集控制面并以官方销售报表兜底。历史 API 路由和错误码仅为兼容保留，不构成当前可用能力。回滚销量视图不删除目录或 `product_sales_daily`；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。销量查询按日期、编码和平台聚合，最大范围 370 天，不新增销售复制表。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_SALES_RANGE_INVALID`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`。
 
 `GET /api/data-center/connectors` 返回 `{ connectors, vaultItems }`。财务、产品、供应链和运营只能读取连接器；内部保险箱元数据仅向总经办返回。`PUT` 使用 `{ expectedVersion, instance }` 保存连接器，或由总经办使用 `{ expectedVersion, vaultItem }` 保存内部保险箱条目。敏感值不得出现在请求中，只能提交 `credentialEntryId` 引用；新配置固定为 `pending_validation`，客户端提交 `healthy` 不生效。归档使用 `{ action: "archive", id, expectedVersion }` 且仅总经办可执行。所有修改使用乐观版本并在 `data_audit_logs` 只记录动作和变更字段名。
 

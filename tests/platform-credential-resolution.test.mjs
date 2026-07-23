@@ -41,7 +41,7 @@ test("DingTalk runtime and public login config prefer the managed company connec
   assert.equal(JSON.stringify(publicConfig).includes("vault-ding-secret"), false);
 });
 
-test("Kuaimai runtime prefers the managed company connection", async () => {
+test("historical Kuaimai credentials remain resolvable outside the disabled product configuration UI", async () => {
   const db = createPlatformCredentialD1Mock();
   const key = masterKey();
   await seed(db, key, "kuaimai", {

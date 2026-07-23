@@ -1,6 +1,7 @@
 import { routeError } from "./http.js";
 
 const VIEW_DEPARTMENTS = new Set(["总经办", "数据中心", "数据部", "运营", "运营部", "供应链", "供应链部", "财务", "财务部"]);
+const TRIGGER_DEPARTMENTS = new Set(["总经办", "数据中心", "数据部", "运营", "运营部"]);
 
 export function authorizeWebCollectionView(session) {
   if (!session) throw routeError(401, "AUTH_SESSION_REQUIRED", "请先使用钉钉登录。");
@@ -13,5 +14,18 @@ export function authorizeWebCollectionView(session) {
 export function authorizeWebCollectionAdmin(session) {
   const actor = authorizeWebCollectionView(session);
   if (session?.role !== "executive") throw routeError(403, "WEB_COLLECTION_RUNNER_REGISTER_DENIED", "仅总经办可登记采集设备。");
+  return { ...actor, userId: String(session.userId || session.id || "").slice(0, 160) };
+}
+
+export function authorizeWebCollectionTrigger(session) {
+  const actor = authorizeWebCollectionView(session);
+  const departments = String(session?.department || session?.departmentName || "")
+    .split(/[\/,，、]/)
+    .map(value => value.trim())
+    .filter(Boolean);
+  if (session?.role === "readonly" || session?.readonly === true
+    || (session?.role !== "executive" && !departments.some(department => TRIGGER_DEPARTMENTS.has(department)))) {
+    throw routeError(403, "WEB_COLLECTION_TRIGGER_DENIED", "当前账号无权触发网页采集任务。");
+  }
   return { ...actor, userId: String(session.userId || session.id || "").slice(0, 160) };
 }

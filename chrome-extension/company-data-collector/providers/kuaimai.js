@@ -12,7 +12,8 @@ export const KUAIMAI_SELECTORS = Object.freeze({
   endTime: ".order-time-search-vue-container input[placeholder='结束时间']",
   selectOption: ".el-select-dropdown__item",
   queryButton: "button.btn.btn-primary[type='submit']",
-  exportLink: ".J_Click.toolbar-menu_item"
+  exportLink: ".J_Click.toolbar-menu_item",
+  exportConfirmButton: ".modal-dialog button, .el-dialog button"
 });
 
 export function matchesKuaimaiControlText(text, label) {
@@ -88,9 +89,15 @@ export function buildKuaimaiActionPlan(task) {
     { action: "select_time_basis", value: "下单时间" },
     { action: "set_start_time", value: `${businessDate} 00:00:00` },
     { action: "set_end_time", value: `${businessDate} 23:59:59` },
+    {
+      action: "verify_time_range",
+      startValue: `${businessDate} 00:00:00`,
+      endValue: `${businessDate} 23:59:59`
+    },
     { action: "submit_query" },
     { action: "wait_for_results" },
-    { action: exportAction }
+    { action: exportAction },
+    { action: "confirm_export" }
   ];
 }
 
