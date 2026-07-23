@@ -12,7 +12,7 @@ import {
 } from "../functions/api/platform/_shared/demoDataCatalog.js";
 import { scaleSalesFact } from "../src/domain/demoSalesTransform.js";
 
-function memoryRefreshHarness({ failValidation = false } = {}) {
+function memoryRefreshHarness({ failValidation = false, transientPreflightFailures = 0 } = {}) {
   const state = {
     status: "ready",
     version: 7,
@@ -29,6 +29,7 @@ function memoryRefreshHarness({ failValidation = false } = {}) {
     ["product_sales_meta", [{ id: "company", payload: "{}", updated_at: "2026-07-23T00:00:00.000Z" }]]
   ]);
   let leaseHeld = false;
+  let remainingTransientPreflightFailures = transientPreflightFailures;
 
   const repository = {
     async findActiveJob() {
@@ -77,6 +78,10 @@ function memoryRefreshHarness({ failValidation = false } = {}) {
 
   const data = {
     async preflightTable(entry) {
+      if (remainingTransientPreflightFailures > 0) {
+        remainingTransientPreflightFailures -= 1;
+        throw new Error("D1_ERROR: Network connection lost.");
+      }
       return { available: sourceRows.has(entry.table), count: sourceRows.get(entry.table)?.length || 0 };
     },
     async clearTable(entry) {
@@ -160,6 +165,60 @@ test("validation failure keeps the display environment unavailable", async () =>
   assert.equal(result.status, "failed");
   assert.equal(harness.state.status, "failed");
   assert.equal(harness.state.version, 7);
+});
+
+test("a transient D1 preflight failure retries the same step instead of failing the refresh", async () => {
+  const harness = memoryRefreshHarness({ transientPreflightFailures: 1 });
+  const job = await createDisplayRefreshJob({
+    repository: harness.repository,
+    actorId: "executive-1",
+    sourceVersion: "source-1"
+  });
+
+  const retrying = await runDisplayRefreshStep({
+    repository: harness.repository,
+    data: harness.data,
+    jobId: job.id,
+    maskingKey: "test-masking-key-123456"
+  });
+
+  assert.equal(retrying.status, "running");
+  assert.equal(retrying.terminal, false);
+  assert.equal(retrying.retryable, true);
+  assert.equal(retrying.cursor.index, 0);
+  assert.equal(retrying.cursor.retryCount, 1);
+
+  const result = await runToTerminal({
+    repository: harness.repository,
+    data: harness.data,
+    jobId: job.id,
+    maskingKey: "test-masking-key-123456"
+  });
+  assert.equal(result.status, "succeeded");
+  assert.equal(harness.state.status, "ready");
+});
+
+test("three consecutive transient D1 failures stop the refresh instead of retrying forever", async () => {
+  const harness = memoryRefreshHarness({ transientPreflightFailures: 3 });
+  const job = await createDisplayRefreshJob({
+    repository: harness.repository,
+    actorId: "executive-1",
+    sourceVersion: "source-1"
+  });
+  const input = {
+    repository: harness.repository,
+    data: harness.data,
+    jobId: job.id,
+    maskingKey: "test-masking-key-123456"
+  };
+
+  assert.equal((await runDisplayRefreshStep(input)).status, "running");
+  assert.equal((await runDisplayRefreshStep(input)).status, "running");
+  const failed = await runDisplayRefreshStep(input);
+
+  assert.equal(failed.status, "failed");
+  assert.equal(failed.lastErrorCode, "DEMO_DATA_REFRESH_RETRY_EXHAUSTED");
+  assert.equal(harness.state.status, "failed");
 });
 
 test("repeated and resumed steps remain idempotent instead of producing four times sales", async () => {
