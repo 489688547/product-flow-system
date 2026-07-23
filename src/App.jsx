@@ -68,7 +68,7 @@ const DATA_CENTER_NAV = [
   ["data-products", "商品主数据", PackageSearch, "数据中心", "products"],
   ["data-sources", "数据接入", Plug, "数据中心", "sources"],
   ["data-metrics", "数据口径", Ruler, "数据中心", "metrics"],
-  ["data-sync", "同步记录", FileClock, "数据中心", "sync"],
+  ["data-sync", "数据同步", FileClock, "数据中心", "sync"],
   ["data-services", "AI 大模型", Bot, "数据中心", "services"],
   ["data-settings", "设置", Settings, "数据中心", "settings"]
 ];
@@ -272,7 +272,7 @@ export default function App() {
     "content-settings": <BrandContentSettingsPage />,
     handbook: <HandbookPage selectedSlug={routeDetail} sessionUser={sessionUser} onSelectDocument={slug => showScreen("handbook", slug)} />,
     issues: <IssuePage />,
-    settings: <SettingsPage />
+    settings: <SettingsPage detail={routeDetail} />
   };
   const supplySection = SUPPLY_CHAIN_SCREEN_TO_SECTION.get(activeScreen);
   const dataSection = DATA_CENTER_SCREEN_TO_SECTION.get(activeScreen);
@@ -337,7 +337,7 @@ export default function App() {
         </header>
         <LocalOnlineEnvironmentBanner sessionUser={sessionUser} />
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
-          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} dataAccessCategory={dataSection === "sources" ? routeDetail : ""} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
+          {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} dataAccessCategory={dataSection === "sources" ? routeDetail : ""} syncFocus={dataSection === "sync" ? routeDetail : ""} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>
       </main>
       <AiAssistantPanel active={activeScreen !== "ai-assistant"} triggerRef={aiTriggerRef} appHint={{ screen: activeScreen, detail: routeDetail }} />

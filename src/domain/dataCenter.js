@@ -446,13 +446,24 @@ function median(values) {
   return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
 }
 
-export function detectLatestSalesAnomaly(latestDailyFacts = [], threshold = 0.25) {
+export function detectLatestSalesAnomaly(latestDailyFacts = [], threshold = 0.25, targetBusinessDate = "") {
   const facts = latestDailyFacts
     .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(String(item?.date || "")))
     .map(item => ({ date: String(item.date), sales: number(item.sales), qty: number(item.qty) }))
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(-8);
   const latest = facts.at(-1);
+  const targetDate = /^\d{4}-\d{2}-\d{2}$/.test(String(targetBusinessDate || "")) ? String(targetBusinessDate) : "";
+  if (targetDate && (!latest || latest.date < targetDate)) {
+    return {
+      status: "anomaly",
+      code: "SALES_TARGET_DAY_MISSING",
+      date: targetDate,
+      latestTrustedDate: latest?.date || "",
+      baselineDays: facts.length,
+      threshold
+    };
+  }
   if (!latest) return { status: "empty", code: "SALES_COMPLETENESS_NO_DATA", date: "", baselineDays: 0, threshold };
   const baseline = facts.slice(0, -1).slice(-7);
   if (baseline.length < 3) {

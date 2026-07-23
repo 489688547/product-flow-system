@@ -33,9 +33,8 @@ export function ErpAccessWorkspace({
 }) {
   const [detailOpen, setDetailOpen] = useState(false);
   const instances = connectorInstances.filter(item => item.connectorId === "kuaimai-erp");
-  const connection = platformController.connections.find(item => item.platformId === "kuaimai");
   const [status, statusTone] = summarizeErpAccessHealth({
-    connection,
+    connection: null,
     instances,
     loading: platformController.loading,
     error: platformController.error
@@ -56,11 +55,11 @@ export function ErpAccessWorkspace({
           description="订单、商品、库存与销售数据"
           status={status}
           statusTone={statusTone}
-          meta={[`${instances.length} 个同步连接`, connection?.verifiedAt ? "平台连接已验证" : "平台连接待验证"]}
+          meta={[`${instances.length} 个同步连接`, "Chrome 插件 / 官方文件", "API 未打通"]}
           onOpen={() => setDetail(true)}
           actionLabel="管理"
         >
-          <p>统一维护公司 API 连接和业务数据同步，不再分散到两个入口。</p>
+          <p>当前通过公司 Mac 的 Chrome 插件和快麦官方文件采集；开放平台 API 暂不使用。</p>
         </DataAccessCard>
       </div>
     );
@@ -90,7 +89,7 @@ export function ErpAccessWorkspace({
               </button>
             ))}
           </div>
-        ) : <div className="empty-state compact-empty">还没有快麦同步连接。完成平台连接后，可按数据范围添加同步。</div>}
+        ) : <div className="empty-state compact-empty">还没有快麦同步连接。请先启动公司 Mac 的 Chrome 插件，或使用快麦官方文件导入。</div>}
       </section>
     </div>
   );

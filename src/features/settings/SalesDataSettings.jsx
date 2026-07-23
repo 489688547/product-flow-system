@@ -151,7 +151,7 @@ export function SalesDataSettings({ canEdit = false, currentUser }) {
   ];
 
   return (
-    <section className="section-panel settings-sales-data">
+    <section id="settings-sales-data" className="section-panel settings-sales-data" tabIndex={-1}>
       <div className="section-head settings-template-head">
         <div>
           <h2>销售数据源</h2>

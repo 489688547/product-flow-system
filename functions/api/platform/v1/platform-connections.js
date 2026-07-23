@@ -1,6 +1,7 @@
 import { canManagePlatformConnections } from "../../../../src/domain/permissions.js";
 import {
   PLATFORM_CONNECTION_DEFINITIONS,
+  platformConnectionDefinition,
   platformEnvironmentValues,
   platformRequiredFields
 } from "../../../../src/domain/platformConnections.js";
@@ -63,7 +64,7 @@ async function connectionSummaries(env, metadataRows) {
   const rows = new Map(metadataRows.map(row => [row.platformId, row]));
   return Promise.all(PLATFORM_CONNECTION_DEFINITIONS.map(async definition => {
     const row = rows.get(definition.id);
-    if (!definition.available) {
+    if (!definition.available || definition.configurable === false) {
       return {
         platformId: definition.id,
         status: "unavailable",
@@ -133,6 +134,13 @@ export async function handlePlatformConnectionsRequest(context, dependencies = {
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) {
       const error = new Error("平台连接请求格式不正确。");
+      error.code = "PLATFORM_CONNECTION_INVALID";
+      error.status = 400;
+      throw error;
+    }
+    const definition = platformConnectionDefinition(body.platformId);
+    if (!definition?.available || definition.configurable === false) {
+      const error = new Error(definition?.disabledReason || "该平台尚未开放连接配置。");
       error.code = "PLATFORM_CONNECTION_INVALID";
       error.status = 400;
       throw error;

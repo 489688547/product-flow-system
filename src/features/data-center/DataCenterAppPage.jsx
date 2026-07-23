@@ -1,6 +1,6 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS, detectLatestSalesAnomaly, previousDataCenterRange } from "../../domain/dataCenter.js";
+import { useEffect, useMemo, useRef } from "react";
+import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS, defaultDataCenterRange, detectLatestSalesAnomaly, previousDataCenterRange } from "../../domain/dataCenter.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
 import { useAuth } from "../../state/AuthProvider.jsx";
@@ -12,7 +12,7 @@ import { ProductCatalogWorkspace } from "./ProductCatalogWorkspace.jsx";
 import { useDataStandards } from "../../state/DataStandardsProvider.jsx";
 import { DataStandardsWorkspace } from "./data-standards/DataStandardsWorkspace.jsx";
 import { AiModelWorkspace } from "./AiModelWorkspace.jsx";
-import { requestSalesRepair } from "../../state/dataCenterApi.js";
+import { triggerKuaimaiSalesCollection } from "../../state/webCollectionApi.js";
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据、趋势和平台分布。"],
@@ -20,7 +20,7 @@ const SECTION_META = {
   products: ["商品主数据", "统一维护 ERP 商品、SKU、69 码及跨 App 关联。"],
   sources: ["数据接入", "统一管理电商平台、ERP 与公司数据。"],
   metrics: ["数据口径", "维护公司统一的定义、公式、版本和责任部门。"],
-  sync: ["同步记录", "查看采集结果、数据质量和待处理异常。"],
+  sync: ["数据同步", "查看采集结果、数据质量和待处理异常。"],
   services: ["AI 大模型", "查看各业务 App 的模型与 Skill 使用情况，统一管理公司 AI 服务。"],
   settings: ["设置", "维护时区、截止时间和保留策略。"]
 };
@@ -33,11 +33,11 @@ function formatChineseDate(value) {
   return match ? `${match[1]}年${Number(match[2])}月${Number(match[3])}日` : "";
 }
 
-export function DataCenterAppPage({ section = "overview", dataAccessCategory = "" }) {
+export function DataCenterAppPage({ section = "overview", dataAccessCategory = "", syncFocus = "" }) {
   const { user } = useAuth();
-  const { state, range, setRange, salesRows, salesMeta, loading, error, refresh } = useDataCenter();
-  const [repairRunState, setRepairRunState] = useState(null);
-  const repairTracking = useRef({ date: "", requests: 0, polls: 0 });
+  const { state, range, setRange, salesRows, salesMeta, loading, error } = useDataCenter();
+  const automaticCollectionDates = useRef(new Set());
+  const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
   const {
     results,
     run,
@@ -61,34 +61,25 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
     .map(result => [result.metricCode, Number(result.version)])), [range.from, range.to, results]);
   const comparisonVersionsReady = overviewMetricCodes.every(metricCode => comparisonTargetVersions[metricCode] >= 1);
   const comparisonVersionKey = overviewMetricCodes.map(metricCode => `${metricCode}:${comparisonTargetVersions[metricCode] || ""}`).join("|");
-  const latestSalesAnomaly = useMemo(() => detectLatestSalesAnomaly(salesMeta.latestDailyFacts || []), [salesMeta.latestDailyFacts]);
-  const persistedRepairRun = useMemo(() => state.syncRuns
-    .filter(item => item.id === `kuaimai-sales-repair:${latestSalesAnomaly.date}:sales-completeness-v1`)
-    .sort((left, right) => String(right.updatedAt || right.completedAt || right.startedAt || "").localeCompare(String(left.updatedAt || left.completedAt || left.startedAt || "")))[0] || null,
-  [latestSalesAnomaly.date, state.syncRuns]);
-  const repairRun = useMemo(() => [persistedRepairRun, repairRunState].filter(Boolean)
-    .sort((left, right) => String(right.updatedAt || right.completedAt || right.startedAt || "").localeCompare(String(left.updatedAt || left.completedAt || left.startedAt || "")))[0] || null,
-  [persistedRepairRun, repairRunState]);
-  const canRepairSales = user?.role !== "readonly" && (user?.role === "executive" || String(user?.department || user?.departmentName || "")
-    .split(/\s*(?:\/|、|,|，|;|；|\|)\s*/).some(item => ["总经办", "运营部", "运营"].includes(item)));
+  const targetBusinessDate = defaultDataCenterRange().to;
+  const latestSalesAnomaly = useMemo(() => detectLatestSalesAnomaly(
+    salesMeta.latestDailyFacts || [],
+    0.25,
+    range.to === targetBusinessDate ? targetBusinessDate : ""
+  ), [range.to, salesMeta.latestDailyFacts, targetBusinessDate]);
   const quality = useMemo(() => ({
     ...buildDataQualitySummary({ state, salesMeta, salesRows }),
-    latestSalesAnomaly,
-    repairRun
-  }), [latestSalesAnomaly, repairRun, salesMeta, salesRows, state]);
+    latestSalesAnomaly
+  }), [latestSalesAnomaly, salesMeta, salesRows, state]);
   const dataHealthIssueCount = quality.openIssues + quality.unmappedProducts + quality.syncAttentionCount;
   const latestDataDate = formatChineseDate(quality.latestDataDate);
   const dataHealthUnavailable = Boolean(error || metricError || comparisonError);
-  const repairRunning = latestSalesAnomaly.status === "anomaly" && repairRun?.status === "running";
-  const repairExhausted = latestSalesAnomaly.status === "anomaly" && (repairRun?.status === "manual_required" || repairRun?.status === "success" || Number(repairRun?.attempts) >= 2);
   const completenessVerified = latestSalesAnomaly.status === "healthy";
   const dataHealthOkay = Boolean(latestDataDate) && completenessVerified && !dataHealthUnavailable && dataHealthIssueCount === 0;
   const dataHealthLabel = latestSalesAnomaly.status === "anomaly"
-    ? repairRunning
-      ? `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据异常 · 自动补拉中`
-      : repairExhausted
-        ? `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}自动补拉失败 · 处理数据异常`
-        : `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据疑似不完整 · 正在自动处理`
+    ? latestSalesAnomaly.code === "SALES_TARGET_DAY_MISSING"
+      ? `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据未同步 · 去处理`
+      : `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据疑似不完整 · 去处理`
     : dataHealthOkay
       ? `✅ 数据截取到 ${latestDataDate}`
       : dataHealthUnavailable
@@ -105,34 +96,13 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
   }, [comparisonRange.from, comparisonRange.to, comparisonVersionKey, comparisonVersionsReady, range.from, range.to, scheduleComparisonResults, scheduleEnsureResults, section]);
   useEffect(() => {
     const date = latestSalesAnomaly.date;
-    if (repairTracking.current.date !== date) repairTracking.current = { date, requests: 0, polls: 0 };
-    if (section !== "overview" || legacyOverviewRollback || !canRepairSales || salesMeta.local || latestSalesAnomaly.status !== "anomaly") return undefined;
-    if (repairRun?.status === "manual_required" || repairRun?.status === "success" || Number(repairRun?.attempts) >= 2) return undefined;
-    if (repairRun?.status === "running") {
-      if (repairTracking.current.polls >= 12) return undefined;
-      const timer = setTimeout(() => {
-        repairTracking.current.polls += 1;
-        refresh();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-    if (repairTracking.current.requests >= 2) return undefined;
-    let active = true;
-    repairTracking.current.requests += 1;
-    requestSalesRepair(date).then(payload => {
-      if (!active) return;
-      if (payload.run) setRepairRunState({ ...payload.run, updatedAt: payload.run.updatedAt || new Date().toISOString() });
-      const timer = setTimeout(refresh, 2000);
-      repairTracking.current.refreshTimer = timer;
-    }).catch(requestError => {
-      if (!active) return;
-      setRepairRunState({ date, status: "failed", attempts: repairTracking.current.requests, message: requestError.message, updatedAt: new Date().toISOString() });
+    if (section !== "overview" || !canEdit || loading || error || latestSalesAnomaly.status !== "anomaly" || !date
+      || automaticCollectionDates.current.has(date)) return;
+    automaticCollectionDates.current.add(date);
+    triggerKuaimaiSalesCollection({ date, force: false }).catch(() => {
+      // The recovery workspace presents the actionable status and allows an explicit retry.
     });
-    return () => {
-      active = false;
-      if (repairTracking.current.refreshTimer) clearTimeout(repairTracking.current.refreshTimer);
-    };
-  }, [canRepairSales, latestSalesAnomaly.date, latestSalesAnomaly.status, refresh, repairRun?.attempts, repairRun?.status, salesMeta.local, section]);
+  }, [canEdit, error, latestSalesAnomaly.date, latestSalesAnomaly.status, loading, section]);
   const retryMetricResults = async () => {
     try {
       const current = await ensureResults(range, overviewMetricCodes);
@@ -144,7 +114,6 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
       // Errors stay visible through the provider state and can be retried from the cards.
     }
   };
-  const canEdit = user?.role !== "readonly" && (canAccessCompanyPlatform(user) || String(user?.department || "") === "运营部");
   const canManageConnections = canManagePlatformConnections(user);
   const canManage = user?.role !== "readonly" && canAccessCompanyPlatform(user);
   const content = {
@@ -153,14 +122,14 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
     products: <ProductCatalogWorkspace canEdit={canEdit} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManageConnections} initialCategory={dataAccessCategory} />,
     metrics: <DataStandardsWorkspace />,
-    sync: <SyncRunsWorkspace quality={quality} />,
+    sync: <SyncRunsWorkspace quality={quality} focusTarget={syncFocus} canTrigger={canEdit} />,
     services: <AiModelWorkspace />,
     settings: <DataCenterSettingsWorkspace canEdit={canEdit} />
   };
   return (
     <section className="page data-center-page">
       <PageHeader title={title} description={description} identity={section === "services" ? "服务端统一调用 · 不展示个人排行 · 内容不入审计" : section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : undefined}>
-        {section === "overview" ? <a className={`data-health-link ${dataHealthOkay ? "success" : "warning"}`} href="#data-sync" aria-label={`${dataHealthLabel}，查看同步记录`}>{dataHealthLabel}</a> : null}
+        {section === "overview" ? <a className={`data-health-link ${dataHealthOkay ? "success" : "warning"}`} href={latestSalesAnomaly.status === "anomaly" ? "#data-sync/kuaimai-sales" : "#data-sync"} aria-label={`${dataHealthLabel}，查看同步记录`}>{dataHealthLabel}</a> : null}
       </PageHeader>
       {section !== "services" && error ? <div className="section-panel" role="status">{error}</div> : null}
       {section !== "services" && loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}

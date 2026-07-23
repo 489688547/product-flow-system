@@ -51,9 +51,14 @@ test("platform credential vault declares its root secret migration and affected 
   assert.match(revealMigration, /ADD COLUMN purpose TEXT NOT NULL DEFAULT ''/);
 
   const kuaimai = manifest.capabilities.find(entry => entry.id === "kuaimai-sales-sync");
+  assert.deepEqual(kuaimai.requiredIn, []);
   assert.equal(kuaimai.envVars.includes("KUAIMAI_ACCESS_TOKEN"), true);
   assert.equal(kuaimai.tables.includes("data_sync_runs"), true);
-  assert.match(kuaimai.description, /自动补拉/);
+  assert.match(kuaimai.description, /当前产品不调用快麦开放平台 API/);
+
+  const chromeCollection = manifest.capabilities.find(entry => entry.id === "company-web-data-collection");
+  assert.deepEqual(chromeCollection.requiredIn, ["preview", "production"]);
+  assert.match(chromeCollection.description, /异常.*幂等排队/);
 
   const registry = JSON.parse(readFileSync(resolve(root, "docs/platform/integration-registry.json"), "utf8"));
   const kuaimaiRegistry = registry.platforms.find(entry => entry.id === "kuaimai");

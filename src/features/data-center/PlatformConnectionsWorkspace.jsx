@@ -83,7 +83,7 @@ function RevealedConnectionField({ field, value }) {
 }
 
 function statusText(connection, definition) {
-  if (!definition.available) return STATUS_LABELS.unavailable;
+  if (!definition.available || definition.configurable === false) return definition.unavailableLabel || STATUS_LABELS.unavailable;
   return STATUS_LABELS[connection?.status] || STATUS_LABELS.unconfigured;
 }
 
@@ -93,7 +93,7 @@ function PlatformConnectionList({ definitions, connections, onSelect, buttonRefs
     <div className="platform-connection-list" aria-label="公司平台连接">
       {definitions.map(definition => {
         const connection = byId.get(definition.id);
-        const unavailable = !definition.available;
+        const unavailable = !definition.available || definition.configurable === false;
         return (
           <button
             type="button"
@@ -394,7 +394,7 @@ export function PlatformConnectionsWorkspace({
   if (error && !connections.length) {
     return <div className="platform-connections-error" role="alert"><AlertTriangle size={20} aria-hidden="true" /><div><strong>平台连接暂不可用</strong><p>{error}</p><Button onClick={() => refresh?.().catch(() => {})}><RefreshCw size={16} />重新加载</Button></div></div>;
   }
-  if (definition?.available) {
+  if (definition?.available && definition.configurable !== false) {
     return <PlatformConnectionForm
       definition={definition}
       connection={connection}

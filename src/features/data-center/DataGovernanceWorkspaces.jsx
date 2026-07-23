@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { FileUp, MonitorCheck, RefreshCw } from "lucide-react";
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { loadErpArchives } from "../../state/erpCollectionApi.js";
+import { loadWebCollectionStatus, triggerKuaimaiSalesCollection } from "../../state/webCollectionApi.js";
+import { buildKuaimaiSalesRecovery } from "../../domain/dataSyncRecovery.js";
 import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapters.js";
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
@@ -18,11 +20,31 @@ export function DataSourcesWorkspace({ canEdit, canManage, canManagePlatform, in
   return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManagePlatform} initialCategory={initialCategory} />;
 }
 
-export function SyncRunsWorkspace({ quality }) {
+const EMPTY_WEB_COLLECTION_STATUS = Object.freeze({ runners: [], jobs: [], runs: [], cursors: [], notifications: [] });
+
+export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = false }) {
   const { state, refresh } = useDataCenter();
+  const anomalyRef = useRef(null);
   const [archives, setArchives] = useState([]);
   const [archiveLoading, setArchiveLoading] = useState(true);
   const [archiveError, setArchiveError] = useState("");
+  const [webCollection, setWebCollection] = useState(EMPTY_WEB_COLLECTION_STATUS);
+  const [webCollectionLoading, setWebCollectionLoading] = useState(true);
+  const [webCollectionError, setWebCollectionError] = useState("");
+  const [triggering, setTriggering] = useState(false);
+  const [triggerMessage, setTriggerMessage] = useState("");
+  const [triggerError, setTriggerError] = useState("");
+  const refreshWebCollection = useCallback(async () => {
+    setWebCollectionLoading(true);
+    try {
+      setWebCollection(await loadWebCollectionStatus());
+      setWebCollectionError("");
+    } catch (error) {
+      setWebCollectionError(error.message || "Chrome 采集状态读取失败。");
+    } finally {
+      setWebCollectionLoading(false);
+    }
+  }, []);
   useEffect(() => {
     let active = true;
     setArchiveLoading(true);
@@ -34,22 +56,70 @@ export function SyncRunsWorkspace({ quality }) {
       .finally(() => active && setArchiveLoading(false));
     return () => { active = false; };
   }, []);
+  useEffect(() => {
+    refreshWebCollection();
+  }, [refreshWebCollection]);
   const cards = [["待处理问题", quality.openIssues], ["待确认商品映射", quality.unmappedProducts], ["本期口径排除", quality.excludedRows]];
   const salesAnomaly = quality.latestSalesAnomaly;
-  const repairRun = quality.repairRun;
-  const salesRepairMessage = repairRun?.status === "running"
-    ? `系统正在自动补拉，已开始第 ${repairRun.attempts || 1} 次尝试。`
-    : repairRun?.status === "manual_required"
-      ? "当天已有更完整的退款明细，请重新导入快麦官方文件。"
-      : Number(repairRun?.attempts) >= 2
-        ? "自动补拉已连续失败，请检查快麦连接或重新导入快麦官方文件。"
-        : "系统将先自动补拉；补拉失败后再转人工处理。";
+  const targetDayMissing = salesAnomaly?.code === "SALES_TARGET_DAY_MISSING";
+  const salesRecovery = useMemo(() => buildKuaimaiSalesRecovery({
+    date: salesAnomaly?.date,
+    runners: webCollection.runners,
+    jobs: webCollection.jobs,
+    loading: webCollectionLoading,
+    error: webCollectionError
+  }), [salesAnomaly?.date, webCollection.jobs, webCollection.runners, webCollectionError, webCollectionLoading]);
+  useEffect(() => {
+    if (focusTarget !== "kuaimai-sales" || salesAnomaly?.status !== "anomaly") return;
+    const frame = requestAnimationFrame(() => {
+      anomalyRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+      anomalyRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [focusTarget, salesAnomaly?.date, salesAnomaly?.status]);
+  const refreshStatus = async () => {
+    await Promise.allSettled([refresh(), refreshWebCollection()]);
+  };
+  const retriggerCollection = async () => {
+    if (!salesAnomaly?.date || triggering) return;
+    setTriggering(true);
+    setTriggerMessage("");
+    setTriggerError("");
+    try {
+      const result = await triggerKuaimaiSalesCollection({ date: salesAnomaly.date, force: true });
+      setTriggerMessage(result.requeued
+        ? "采集任务已重新排队，Chrome 插件将在下一轮轮询时领取。"
+        : "采集任务已在队列中，Chrome 插件将在下一轮轮询时领取。");
+      await refreshWebCollection();
+    } catch (error) {
+      setTriggerError(error.message || "Chrome 采集任务触发失败。");
+    } finally {
+      setTriggering(false);
+    }
+  };
+  const primaryAction = salesRecovery.primaryAction || { type: "refresh", label: "刷新状态" };
+  const primaryActionAllowed = primaryAction.type !== "retrigger" || canTrigger;
+  const primaryActionBusy = primaryAction.type === "retrigger" ? triggering : webCollectionLoading;
+  const runPrimaryAction = primaryAction.type === "retrigger" ? retriggerCollection : refreshStatus;
   return <div className="data-workspace data-sync-workspace">
     <div className="data-sync-status-bar">
       <div className="data-quality-summary" aria-label="数据质量摘要">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
-      <Button onClick={refresh}><RefreshCw size={16} />刷新状态</Button>
+      <Button onClick={refreshStatus}><RefreshCw size={16} />刷新状态</Button>
     </div>
-    {salesAnomaly?.status === "anomaly" ? <section className="section-panel" role="alert"><div className="section-head"><div><h2>{salesAnomaly.date} 销售数据疑似不完整</h2><p>GMV 为近 7 个有效日中位数的 {(salesAnomaly.salesRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，销量为 {(salesAnomaly.qtyRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，均低于 25% 警戒线。</p></div><span className={`status-badge ${repairRun?.status === "running" ? "warning" : "danger"}`}>{statusLabel(repairRun?.status || "pending_validation")}</span></div><p className="sales-service-message danger">{salesRepairMessage}</p></section> : null}
+    {salesAnomaly?.status === "anomaly" ? <section id="kuaimai-sales-recovery" className={`section-panel data-sync-recovery ${salesRecovery.tone}`} role="alert" tabIndex={-1} ref={anomalyRef}>
+      <div className="section-head"><div><h2>{salesAnomaly.date} {targetDayMissing ? "销售数据尚未同步" : "销售数据疑似不完整"}</h2><p>{targetDayMissing
+        ? `截至目前尚未读取到该业务日的订单创建时间销售事实${salesAnomaly.latestTrustedDate ? `，最近可信日期为 ${salesAnomaly.latestTrustedDate}` : ""}；系统已自动排队 Chrome 采集任务。`
+        : `GMV 为近 7 个有效日中位数的 ${(salesAnomaly.salesRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，销量为 ${(salesAnomaly.qtyRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，均低于 25% 警戒线。`}</p></div><span className={`status-badge ${salesRecovery.tone}`}>{salesRecovery.label}</span></div>
+      <div className="data-sync-recovery-body">
+        <div><strong>{salesRecovery.title}</strong><p>{salesRecovery.instruction}</p><small>{salesRecovery.runner ? `${salesRecovery.runner.name || "公司 Mac"} · Chrome ${salesRecovery.runner.chromeStatus || "状态未知"} · 最近在线 ${salesRecovery.runner.lastSeenAt || "—"}` : "尚未读取到公司 Mac 采集设备"}</small>{salesRecovery.job ? <small>任务 {salesRecovery.job.resourceType || "order_items"} · 阶段 {salesRecovery.job.stage || salesRecovery.job.status || "—"} · 第 {Number(salesRecovery.job.attempt) || 1} 次</small> : null}{triggerMessage ? <p className="data-sync-trigger-message" role="status">{triggerMessage}</p> : null}{triggerError ? <p className="data-sync-trigger-message danger" role="alert">{triggerError}</p> : null}</div>
+        <div className="data-sync-recovery-actions">
+          {primaryActionAllowed ? <Button variant="primary" disabled={primaryActionBusy} onClick={runPrimaryAction}><RefreshCw size={16} aria-hidden="true" />{primaryActionBusy ? (primaryAction.type === "retrigger" ? "正在触发…" : "正在检测…") : primaryAction.label}</Button> : null}
+          {salesRecovery.showKuaimaiLogin ? <a className="btn" href="https://erpb.superboss.cc/index.html#/trade/searchlist/" target="_blank" rel="noreferrer"><MonitorCheck size={16} aria-hidden="true" />打开快麦 ERP</a> : null}
+          {salesRecovery.showConnectorLink ? <a className="btn" href="#data-sources/erp"><MonitorCheck size={16} aria-hidden="true" />采集器设置</a> : null}
+          <a className="btn" href="#settings/sales-data"><FileUp size={16} aria-hidden="true" />导入官方销售报表</a>
+        </div>
+      </div>
+    </section> : null}
     <section className="section-panel"><div className="section-head"><div><h2>快麦原始归档</h2><p>公司 Mac 保存原文件，线上只显示安全清单和入库状态；归档成功不等于已经入库。</p></div><span className={`status-badge ${archiveError ? "danger" : archives.length ? "success" : "neutral"}`}>{archiveLoading ? "读取中" : archiveError ? "读取失败" : archives.length ? `${archives.length} 个归档文件` : "等待导出"}</span></div>
       {archiveError ? <div className="sales-service-message danger" role="alert">{archiveError}</div> : null}
       {!archiveLoading && !archiveError ? <DataTable minWidth={760} columns={[
