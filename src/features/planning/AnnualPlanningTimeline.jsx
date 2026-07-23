@@ -1,17 +1,13 @@
 import { AlertTriangle } from "lucide-react";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { generateProductCover } from "../../domain/productFlow.js";
-import { planIntersectsYear, timelineSegment } from "../../domain/productPlanning.js";
+import { planIntersectsYear } from "../../domain/productPlanning.js";
 import { isProductOwnedBy } from "../../domain/productOwnership.js";
 import { ProductOwnershipBadge } from "../../ui/ProductOwnershipBadge.jsx";
+import { PlanningRangeBar } from "./PlanningRangeBar.jsx";
 import { PRODUCT_DEMAND_DRAG_TYPE } from "./PlanningDemandTray.jsx";
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => `${index + 1}月`);
-
-function formatMonthDay(value) {
-  const [month, day] = String(value || "").slice(5).split("-").map(Number);
-  return month && day ? `${month}月${day}日` : "";
-}
 
 function TimelineDropCells({ canEdit, onDropDemand }) {
   return (
@@ -38,28 +34,12 @@ function TimelineDropCells({ canEdit, onDropDemand }) {
   );
 }
 
-function PlanningBar({ type, label, segment, onClick, canEdit }) {
-  if (!segment.visible) return null;
-  return (
-    <button
-      type="button"
-      className={`planning-bar ${type}`}
-      style={{ left: `${segment.left}%`, width: `${segment.width}%` }}
-      title={`${label}：${segment.start} 至 ${segment.end}${canEdit ? "，点击编辑" : ""}`}
-      onClick={onClick}
-    >
-      <span>{label}</span>
-      <small>{formatMonthDay(segment.start)} 至 {formatMonthDay(segment.end)}</small>
-    </button>
-  );
-}
-
 function levelTone(level) {
   const prefix = String(level || "").trim().slice(0, 2).toLowerCase();
   return ["p0", "p1", "p2", "p3"].includes(prefix) ? prefix : "pending";
 }
 
-export function AnnualPlanningTimeline({ year, plans, demands, currentUser, canEdit, onDropDemand, onEditPlan }) {
+export function AnnualPlanningTimeline({ year, plans, demands, currentUser, canEdit, onDropDemand, onEditPlan, onChangePlanDates }) {
   const demandMap = new Map(demands.map(demand => [demand.id, demand]));
   const visiblePlans = plans.filter(plan => planIntersectsYear(plan, year));
 
@@ -100,7 +80,13 @@ export function AnnualPlanningTimeline({ year, plans, demands, currentUser, canE
                 </div>
                 <div className="planning-track">
                   <TimelineDropCells canEdit={canEdit} onDropDemand={onDropDemand} />
-                  <PlanningBar type="period" label="开发至上线" segment={timelineSegment(plan.developmentStart, plan.launchDate, year)} canEdit={canEdit} onClick={() => onEditPlan(plan)} />
+                  <PlanningRangeBar
+                    plan={plan}
+                    year={year}
+                    canEdit={canEdit}
+                    onEdit={() => onEditPlan(plan)}
+                    onChange={dates => onChangePlanDates(plan.id, dates)}
+                  />
                 </div>
               </div>
             );

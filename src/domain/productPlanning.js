@@ -2,6 +2,7 @@ import { visibleDemandPool } from "./productFlow.js";
 import { normalizeExpectedLaunchMonth } from "./expectedLaunch.js";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const DAY_MS = 86400000;
 
 function cleanDate(value) {
   const date = String(value || "").trim();
@@ -20,6 +21,22 @@ function firstCleanDate(...values) {
     if (date) return date;
   }
   return "";
+}
+
+function dateTime(value) {
+  return Date.parse(`${value}T00:00:00Z`);
+}
+
+function addCalendarDays(value, days) {
+  return new Date(dateTime(value) + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+function calendarDaysBetween(from, to) {
+  return Math.round((dateTime(to) - dateTime(from)) / DAY_MS);
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function productManagerIdentity(product = {}) {
@@ -138,6 +155,79 @@ export function planIntersectsYear(plan, year) {
   return rangeIntersectsYear(plan?.developmentStart, plan?.launchDate, numericYear);
 }
 
+export function formatPlanningDateRange(start, end) {
+  const rangeStart = cleanDate(start);
+  const rangeEnd = cleanDate(end);
+  if (!rangeStart || !rangeEnd || rangeEnd < rangeStart) return "";
+  const [startYear, startMonth, startDay] = rangeStart.split("-").map(Number);
+  const [endYear, endMonth, endDay] = rangeEnd.split("-").map(Number);
+  if (startYear !== endYear) {
+    return `${startYear}年${startMonth}月${startDay}日—${endYear}年${endMonth}月${endDay}日`;
+  }
+  if (startMonth !== endMonth) {
+    return `${startMonth}月${startDay}日—${endMonth}月${endDay}日`;
+  }
+  if (startDay === endDay) return `${startMonth}月${startDay}日`;
+  return `${startMonth}月${startDay}日—${endDay}日`;
+}
+
+export function planningDaysFromPixels(pixelDelta, trackWidth, year) {
+  const numericYear = Number(year);
+  const width = Number(trackWidth);
+  const delta = Number(pixelDelta);
+  if (!Number.isInteger(numericYear) || !Number.isFinite(width) || width <= 0 || !Number.isFinite(delta)) return 0;
+  const daysInYear = (Date.UTC(numericYear + 1, 0, 1) - Date.UTC(numericYear, 0, 1)) / DAY_MS;
+  return Math.round((delta / width) * daysInYear);
+}
+
+export function movePlanningRange(start, end, deltaDays, year) {
+  const rangeStart = cleanDate(start);
+  const rangeEnd = cleanDate(end);
+  const numericYear = Number(year);
+  if (!rangeStart || !rangeEnd || rangeEnd < rangeStart || !Number.isInteger(numericYear) || !rangeIntersectsYear(rangeStart, rangeEnd, numericYear)) {
+    return { developmentStart: rangeStart, launchDate: rangeEnd };
+  }
+  const yearStart = `${numericYear}-01-01`;
+  const yearEnd = `${numericYear}-12-31`;
+  const requestedDelta = Number.isFinite(Number(deltaDays)) ? Math.trunc(Number(deltaDays)) : 0;
+  const minimumDelta = calendarDaysBetween(rangeEnd, yearStart);
+  const maximumDelta = calendarDaysBetween(rangeStart, yearEnd);
+  const appliedDelta = clamp(requestedDelta, minimumDelta, maximumDelta);
+  return {
+    developmentStart: addCalendarDays(rangeStart, appliedDelta),
+    launchDate: addCalendarDays(rangeEnd, appliedDelta)
+  };
+}
+
+export function resizePlanningRange(start, end, edge, deltaDays, year) {
+  const rangeStart = cleanDate(start);
+  const rangeEnd = cleanDate(end);
+  const numericYear = Number(year);
+  if (!rangeStart || !rangeEnd || rangeEnd < rangeStart || !Number.isInteger(numericYear)) {
+    return { developmentStart: rangeStart, launchDate: rangeEnd };
+  }
+  const yearStart = `${numericYear}-01-01`;
+  const yearEnd = `${numericYear}-12-31`;
+  const requestedDelta = Number.isFinite(Number(deltaDays)) ? Math.trunc(Number(deltaDays)) : 0;
+  if (edge === "start") {
+    const latestStart = rangeEnd < yearEnd ? rangeEnd : yearEnd;
+    const requestedStart = addCalendarDays(rangeStart, requestedDelta);
+    return {
+      developmentStart: requestedStart < yearStart ? yearStart : (requestedStart > latestStart ? latestStart : requestedStart),
+      launchDate: rangeEnd
+    };
+  }
+  if (edge === "end") {
+    const earliestEnd = rangeStart > yearStart ? rangeStart : yearStart;
+    const requestedEnd = addCalendarDays(rangeEnd, requestedDelta);
+    return {
+      developmentStart: rangeStart,
+      launchDate: requestedEnd < earliestEnd ? earliestEnd : (requestedEnd > yearEnd ? yearEnd : requestedEnd)
+    };
+  }
+  return { developmentStart: rangeStart, launchDate: rangeEnd };
+}
+
 export function timelineSegment(start, end, year) {
   const numericYear = Number(year);
   const rangeStart = cleanDate(start);
@@ -152,7 +242,7 @@ export function timelineSegment(start, end, year) {
   const startTime = Date.parse(`${yearStart}T00:00:00Z`);
   const endTime = Date.parse(`${numericYear + 1}-01-01T00:00:00Z`);
   const visibleStartTime = Date.parse(`${visibleStart}T00:00:00Z`);
-  const visibleEndExclusive = Date.parse(`${visibleEnd}T00:00:00Z`) + 86400000;
+  const visibleEndExclusive = Date.parse(`${visibleEnd}T00:00:00Z`) + DAY_MS;
   const duration = endTime - startTime;
   const left = ((visibleStartTime - startTime) / duration) * 100;
   const width = Math.min(100 - left, ((visibleEndExclusive - visibleStartTime) / duration) * 100);

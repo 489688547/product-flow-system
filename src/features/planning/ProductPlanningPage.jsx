@@ -75,6 +75,7 @@ export function ProductPlanningPage({ onOpenProgress }) {
     const demand = planningRecords.find(item => item.id === plan.demandId || (plan.demandSnapshot?.productId && item.productId === plan.demandSnapshot.productId)) || null;
     setPlanModal({ demand, plan, initialDates: null });
   };
+  const changePlanDates = (planId, dates) => updateProductPlan(planId, dates);
   const savePlan = form => {
     const demandSnapshot = {
       name: planModal.demand?.name || planModal.plan?.demandSnapshot?.name,
@@ -108,7 +109,7 @@ export function ProductPlanningPage({ onOpenProgress }) {
         <Button variant="primary" disabled={!canEdit} disabledReason="只有产品部和总经办可以添加需求机会" onClick={() => setDemandModalOpen(true)}><Plus size={16} aria-hidden="true" />添加需求机会</Button>
       </PageHeader>
       <PlanningDemandTray demands={candidates} currentUser={currentUser} canEdit={canEdit} onArrange={openNewPlan} onOpenProgress={onOpenProgress} />
-      <AnnualPlanningTimeline year={year} plans={state.productPlans || []} demands={planningRecords} currentUser={currentUser} canEdit={canEdit} onDropDemand={openDroppedDemand} onEditPlan={openExistingPlan} />
+      <AnnualPlanningTimeline year={year} plans={state.productPlans || []} demands={planningRecords} currentUser={currentUser} canEdit={canEdit} onDropDemand={openDroppedDemand} onEditPlan={openExistingPlan} onChangePlanDates={changePlanDates} />
       <DemandModal open={demandModalOpen} currentUser={currentUser} orgCache={orgCache} onClose={() => setDemandModalOpen(false)} onSave={saveDemand} />
       <ProductPlanModal
         open={Boolean(planModal)}
