@@ -102,7 +102,12 @@ test("Kuaimai order item task uses the registered detail export", async () => {
 });
 
 test("Kuaimai sales-item task uses the rich sales report and creation-time controls", async () => {
-  const { buildKuaimaiActionPlan, buildKuaimaiTaskUrl, kuaimaiResources } = await import(adapterUrl);
+  const {
+    buildKuaimaiActionPlan,
+    buildKuaimaiTaskUrl,
+    KUAIMAI_SALES_SELECTORS,
+    kuaimaiResources
+  } = await import(adapterUrl);
   const task = {
     jobId: "job-sales",
     providerId: "kuaimai",
@@ -128,6 +133,7 @@ test("Kuaimai sales-item task uses the rich sales report and creation-time contr
   ]);
   assert.equal(kuaimaiResources.sales_items.route, "/index.html#/report/sale_multidimension_next/");
   assert.deepEqual(kuaimaiResources.sales_items.downloadFilePrefixes, ["销售主题分析-按订单商品明细-"]);
+  assert.match(KUAIMAI_SALES_SELECTORS.dialogButton, /\.el-message-box button/);
 });
 
 test("Kuaimai download center selects only the current task resource and time window", async () => {

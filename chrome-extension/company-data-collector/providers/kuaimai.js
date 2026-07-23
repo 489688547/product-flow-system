@@ -42,7 +42,7 @@ export const KUAIMAI_SALES_SELECTORS = Object.freeze({
   reportTab: ".el-tabs__item",
   calculateButton: "button",
   exportButton: "button",
-  dialogButton: ".el-dialog button",
+  dialogButton: ".el-dialog button, .el-message-box button",
   upgradeDialog: ".el-dialog"
 });
 
