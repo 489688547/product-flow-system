@@ -83,7 +83,7 @@ export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, 
   let listeningPort = null;
   const handler = async (request, response) => {
     const requestOrigin = String(request.headers.origin || "");
-    if (requestOrigin !== allowedOrigin) {
+    if (requestOrigin && requestOrigin !== allowedOrigin) {
       json(response, 403, { error: { code: "BRIDGE_ORIGIN_FORBIDDEN" } }, allowedOrigin);
       return;
     }

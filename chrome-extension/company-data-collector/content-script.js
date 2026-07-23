@@ -10,6 +10,14 @@ function exactTextElement(selector, value, matchesText) {
 }
 
 function dispatchValue(input, value) {
+  input.focus();
+  input.select();
+  const inserted = document.execCommand("insertText", false, value);
+  if (inserted && input.value === value) {
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.blur();
+    return;
+  }
   const prototype = input instanceof HTMLTextAreaElement
     ? HTMLTextAreaElement.prototype
     : HTMLInputElement.prototype;
@@ -18,7 +26,7 @@ function dispatchValue(input, value) {
   setter.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
-  input.dispatchEvent(new Event("blur", { bubbles: true }));
+  input.blur();
 }
 
 function findRequired(selector, code) {
@@ -54,27 +62,56 @@ async function runKuaimaiAction(action, selectors, matchesText) {
       const option = exactTextElement(selectors.selectOption, action.value, matchesText);
       if (!option) throw Object.assign(new Error("创建时间选项不可用。"), { code: "KUAIMAI_CREATION_TIME_OPTION_MISSING" });
       option.click();
-      await wait(100);
+      await wait(300);
       return;
     }
-    case "set_start_time":
+    case "set_start_time": {
       dispatchValue(findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING"), action.value);
+      await wait(150);
       return;
-    case "set_end_time":
+    }
+    case "set_end_time": {
       dispatchValue(findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING"), action.value);
+      await wait(150);
       return;
-    case "submit_query":
-      exactTextElement(selectors.queryButton, "查询", matchesText)?.click();
+    }
+    case "verify_time_range": {
+      await wait(250);
+      const startTime = findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING");
+      const endTime = findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING");
+      if (startTime.value !== action.startValue || endTime.value !== action.endValue) {
+        throw Object.assign(new Error("创建时间范围未生效。"), { code: "KUAIMAI_TIME_RANGE_NOT_APPLIED" });
+      }
       return;
+    }
+    case "submit_query": {
+      const button = exactTextElement(selectors.queryButton, "查询", matchesText);
+      if (!button) throw Object.assign(new Error("查询按钮不可用。"), { code: "KUAIMAI_QUERY_BUTTON_MISSING" });
+      button.click();
+      return;
+    }
     case "wait_for_results":
       await wait(1200);
       return;
-    case "export_orders":
-      exactTextElement(selectors.exportLink, "导出订单", matchesText)?.click();
+    case "export_orders": {
+      const link = exactTextElement(selectors.exportLink, "导出订单", matchesText);
+      if (!link) throw Object.assign(new Error("导出订单入口不可用。"), { code: "KUAIMAI_EXPORT_ORDERS_MISSING" });
+      link.click();
       return;
-    case "export_order_items":
-      exactTextElement(selectors.exportLink, "导出订单明细", matchesText)?.click();
+    }
+    case "export_order_items": {
+      const link = exactTextElement(selectors.exportLink, "导出订单明细", matchesText);
+      if (!link) throw Object.assign(new Error("导出订单明细入口不可用。"), { code: "KUAIMAI_EXPORT_ORDER_ITEMS_MISSING" });
+      link.click();
       return;
+    }
+    case "confirm_export": {
+      await wait(300);
+      const button = exactTextElement(selectors.exportConfirmButton, "立即导出", matchesText);
+      if (!button) throw Object.assign(new Error("立即导出按钮不可用。"), { code: "KUAIMAI_EXPORT_CONFIRM_MISSING" });
+      button.click();
+      return;
+    }
     default:
       throw Object.assign(new Error("页面动作未登记。"), { code: "EXTENSION_ACTION_NOT_REGISTERED" });
   }

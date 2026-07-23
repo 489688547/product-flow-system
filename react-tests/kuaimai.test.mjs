@@ -97,13 +97,15 @@ test("pullKuaimaiDay paginates orders and reports continuation page", async () =
   assert.ok(calls.filter(method => method === "erp.shop.list.query").length >= 1);
 });
 
-test("kuaimai endpoints and settings panel are wired in", () => {
+test("legacy kuaimai endpoints remain compatible while the product marks the API unavailable", () => {
   assert.match(read("functions/api/kuaimai/status.js"), /open\.system\.time\.get/);
   assert.match(read("functions/api/kuaimai/refresh.js"), /refreshKuaimaiSession/);
   assert.match(read("functions/api/kuaimai/pull.js"), /pullKuaimaiDay/);
   const panel = read("src/features/settings/KuaimaiSyncSettings.jsx");
-  assert.match(panel, /\/api\/kuaimai\/status/);
-  assert.match(panel, /replaceScope: "dates"/);
+  assert.match(panel, /快麦开放平台 API/);
+  assert.match(panel, /未打通/);
+  assert.match(panel, /Chrome 插件 \/ 官方文件/);
+  assert.doesNotMatch(panel, /fetch\(|\/api\/kuaimai\//);
   const settings = read("src/features/settings/SettingsPage.jsx");
   assert.match(settings, /KuaimaiSyncSettings/);
   const store = read("src/state/salesStore.js");

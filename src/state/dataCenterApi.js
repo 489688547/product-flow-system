@@ -6,6 +6,20 @@ function validDate(value) {
   return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) === value;
 }
 
+function latestDailyFacts(rows, limit = 8) {
+  const dailyFacts = new Map();
+  rows.forEach(row => {
+    if (!validDate(String(row?.date || ""))) return;
+    const current = dailyFacts.get(row.date) || { date: row.date, sales: 0, qty: 0 };
+    current.sales += Number(row.sales) || 0;
+    current.qty += Number(row.qty) || 0;
+    dailyFacts.set(row.date, current);
+  });
+  return [...dailyFacts.values()]
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .slice(-limit);
+}
+
 export function dataCenterRangeFromSearch(search, fallback) {
   const params = new URLSearchParams(String(search || ""));
   const from = String(params.get("from") || "");
@@ -20,10 +34,6 @@ export function dataCenterApiUrl() {
 export function dataCenterSalesApiUrl({ from, to }) {
   const params = new URLSearchParams({ from: String(from || ""), to: String(to || "") });
   return `/api/data-center/sales?${params}`;
-}
-
-export function salesRepairApiUrl() {
-  return "/api/platform/v1/data-services/sales-repair";
 }
 
 async function payloadFor(response, fallbackMessage, { allowUnsynced = false } = {}) {
@@ -73,19 +83,30 @@ export async function loadDataCenterSales({ from, to, codes = [], fetchImpl = fe
       return {
         rows,
         local: true,
-        meta: { from, to, rowCount: rows.length, timeBasis: "create_time", timezone: "Asia/Shanghai", excludeOther: true, lastSuccessfulSyncAt: "", latestDataDate }
+        meta: {
+          from,
+          to,
+          rowCount: rows.length,
+          timeBasis: "create_time",
+          timezone: "Asia/Shanghai",
+          excludeOther: true,
+          lastSuccessfulSyncAt: "",
+          latestDataDate,
+          latestDailyFacts: latestDailyFacts(rows)
+        }
       };
     }
     const payload = await payloadFor(response, "数据中心销售数据加载失败。");
-    return { rows: payload.rows || [], meta: payload.meta || {}, local: false };
+    const rows = payload.rows || [];
+    const meta = payload.meta || {};
+    return {
+      rows,
+      meta: {
+        ...meta,
+        latestDataDate: meta.latestDataDate || rows.reduce((latest, row) => row.date > latest ? row.date : latest, ""),
+        latestDailyFacts: Array.isArray(meta.latestDailyFacts) ? meta.latestDailyFacts : latestDailyFacts(rows)
+      },
+      local: false
+    };
   });
-}
-
-export async function requestSalesRepair(date, fetchImpl = fetch) {
-  const response = await fetchImpl(salesRepairApiUrl(), {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ date })
-  });
-  return payloadFor(response, "销售数据自动补拉任务创建失败。");
 }

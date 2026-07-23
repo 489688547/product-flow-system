@@ -65,6 +65,15 @@ test("loopback bridge exposes only the safe extension task projection", async ()
   });
 });
 
+test("loopback bridge accepts origin-less MV3 service-worker requests with the pairing key", async () => {
+  await withBridge(async ({ baseUrl }) => {
+    const response = await fetch(`${baseUrl}/v1/tasks/next`, {
+      headers: { "X-Collector-Pairing-Key": pairingKey }
+    });
+    assert.equal(response.status, 200);
+  });
+});
+
 test("loopback bridge accepts safe results and rejects sensitive or path data", async () => {
   await withBridge(async ({ baseUrl, submitted }) => {
     const accepted = await fetch(`${baseUrl}/v1/tasks/job-1/result`, {

@@ -165,16 +165,12 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     identityLabel: "ERP 账号名称",
     description: "订单、商品、库存与销售文件",
     logo: "kuaimai",
-    methods: ["api", "browser", "export"],
+    methods: ["browser", "export"],
     accountTypes: ["erp"],
     datasets: ["orders", "products", "inventory", "sales"],
     fields: [
       field("loginAccount", "ERP 账号", "text", { sensitive: true, methods: ["browser"] }),
-      field("password", "ERP 密码", "password", { sensitive: true, methods: ["browser"] }),
-      field("appKey", "App Key", "text", { methods: ["api"] }),
-      field("appSecret", "App Secret", "secret", { sensitive: true, methods: ["api"] }),
-      field("accessToken", "Access Token", "secret", { sensitive: true, methods: ["api"] }),
-      field("refreshToken", "Refresh Token", "secret", { sensitive: true, methods: ["api"] })
+      field("password", "ERP 密码", "password", { sensitive: true, methods: ["browser"] })
     ]
   })
 ]);

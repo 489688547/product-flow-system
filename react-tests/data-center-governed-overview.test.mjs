@@ -90,7 +90,7 @@ test("trend keeps selected empty dates visible and shows hover details outside t
 
 test("overview header links freshness health to sync records and removes the identity slogan", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
-  assert.match(page, /href="#data-sync"/);
+  assert.match(page, /"#data-sync"/);
   assert.match(page, /数据截取到/);
   assert.match(page, /数据同步有/);
   assert.match(page, /数据读取异常/);
@@ -99,14 +99,16 @@ test("overview header links freshness health to sync records and removes the ide
   assert.doesNotMatch(page, /统一口径 · 可追溯 · 截止昨天/);
 });
 
-test("overview automatically repairs a latest-day completeness warning before escalating it", () => {
+test("overview routes a latest-day completeness warning to Chrome recovery without calling Kuaimai API", () => {
   const page = read("src/features/data-center/DataCenterAppPage.jsx");
-  const api = read("src/state/dataCenterApi.js");
   assert.match(page, /detectLatestSalesAnomaly/);
-  assert.match(page, /requestSalesRepair/);
+  assert.match(page, /defaultDataCenterRange/);
+  assert.match(page, /range\.to === targetBusinessDate/);
+  assert.match(page, /SALES_TARGET_DAY_MISSING/);
   assert.match(page, /salesMeta\.latestDailyFacts/);
-  assert.match(page, /自动补拉中/);
-  assert.match(page, /自动补拉失败/);
-  assert.match(page, /repairRun\?\.attempts/);
-  assert.match(api, /\/api\/platform\/v1\/data-services\/sales-repair/);
+  assert.match(page, /"#data-sync\/kuaimai-sales"/);
+  assert.match(page, /去处理/);
+  assert.match(page, /triggerKuaimaiSalesCollection/);
+  assert.match(page, /force:\s*false/);
+  assert.doesNotMatch(page, /requestSalesRepair|sales-repair|自动补拉/);
 });

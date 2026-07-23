@@ -56,6 +56,23 @@ test("latest sales completeness does not infer an anomaly without three baseline
   });
 });
 
+test("yesterday is a collection anomaly when the latest trusted sales fact is older", () => {
+  const facts = [
+    { date: "2026-07-18", sales: 157217, qty: 10335 },
+    { date: "2026-07-19", sales: 153013, qty: 10144 },
+    { date: "2026-07-20", sales: 148896, qty: 10191 },
+    { date: "2026-07-21", sales: 141771, qty: 10082 }
+  ];
+  assert.deepEqual(detectLatestSalesAnomaly(facts, 0.25, "2026-07-22"), {
+    status: "anomaly",
+    code: "SALES_TARGET_DAY_MISSING",
+    date: "2026-07-22",
+    latestTrustedDate: "2026-07-21",
+    baselineDays: 4,
+    threshold: 0.25
+  });
+});
+
 test("data center keeps legacy metric definitions read-only and out of generic persistence", () => {
   assert.ok(createDefaultDataCenterState().metricDefinitions.length > 0);
   assert.ok(!DATA_CENTER_PERSISTED_COLLECTIONS.includes("metricDefinitions"));
