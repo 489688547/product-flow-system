@@ -1,5 +1,6 @@
 import {
   buildKuaimaiActionPlan,
+  buildKuaimaiTaskUrl,
   classifyKuaimaiPage,
   kuaimaiResources
 } from "./kuaimai.js";
@@ -19,6 +20,7 @@ const providers = Object.freeze({
     id: "kuaimai",
     resources: kuaimaiResources,
     classifyPage: classifyKuaimaiPage,
+    buildTaskUrl: buildKuaimaiTaskUrl,
     buildActionPlan: buildKuaimaiActionPlan
   })
 });
@@ -68,6 +70,13 @@ export function registeredTaskRuntime(task) {
     resource: registeredResource(task.providerId, task.resourceType),
     actionPlan: provider.buildActionPlan(task)
   };
+}
+
+export function registeredTaskUrl(task) {
+  assertRegisteredTask(task);
+  const provider = registeredProvider(task.providerId);
+  const resource = registeredResource(task.providerId, task.resourceType);
+  return provider.buildTaskUrl(`${resource.origin}${resource.route}`, task);
 }
 
 export const registeredProviders = providers;

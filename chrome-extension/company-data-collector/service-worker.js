@@ -1,4 +1,8 @@
-import { assertRegisteredTask, registeredResource } from "./providers/registry.js";
+import {
+  assertRegisteredTask,
+  registeredResource,
+  registeredTaskUrl
+} from "./providers/registry.js";
 
 const DEFAULT_BRIDGE_URL = "http://127.0.0.1:17653";
 const POLL_ALARM = "company-data-collector-poll";
@@ -103,13 +107,12 @@ async function reportTaskResult(task, result) {
   if (!response.ok) throw Object.assign(new Error("本机执行器未接受任务结果。"), { code: `BRIDGE_RESULT_HTTP_${response.status}` });
 }
 
-async function ensureProviderTab(resource) {
+async function ensureProviderTab(resource, targetUrl) {
   const matches = await chrome.tabs.query({ url: [`${resource.origin}/*`] });
-  const targetUrl = `${resource.origin}${resource.route}`;
   let tab = matches.find(candidate => candidate.url?.includes(resource.route));
   if (!tab) tab = matches[0];
   if (!tab) tab = await chrome.tabs.create({ url: targetUrl, active: false });
-  else if (!tab.url?.includes(resource.route)) {
+  else if (tab.url !== targetUrl) {
     tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
   }
   tab = await waitForTabComplete(tab.id);
@@ -200,10 +203,11 @@ async function waitForDownload(resource, tabId, startedAt) {
 async function executeTask(task) {
   assertRegisteredTask(task);
   const resource = registeredResource(task.providerId, task.resourceType);
+  const taskUrl = registeredTaskUrl(task);
   await chrome.storage.local.set({ [ACTIVE_JOB_KEY]: task });
   let tab;
   try {
-    tab = await ensureProviderTab(resource);
+    tab = await ensureProviderTab(resource, taskUrl);
   } catch (error) {
     await reportTaskResult(task, {
       status: "failed",

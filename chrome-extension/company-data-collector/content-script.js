@@ -12,27 +12,6 @@ function exactTextElement(selector, value, matchesText) {
   );
 }
 
-function dispatchValue(input, value) {
-  input.focus();
-  input.select();
-  const inserted = document.execCommand("insertText", false, value);
-  if (inserted && input.value === value) {
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-    input.dispatchEvent(new Event("change", { bubbles: true }));
-    input.blur();
-    return;
-  }
-  const prototype = input instanceof HTMLTextAreaElement
-    ? HTMLTextAreaElement.prototype
-    : HTMLInputElement.prototype;
-  const setter = Object.getOwnPropertyDescriptor(prototype, "value")?.set;
-  if (!setter) throw Object.assign(new Error("输入控件不可写。"), { code: "KUAIMAI_INPUT_UNAVAILABLE" });
-  setter.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.dispatchEvent(new Event("change", { bubbles: true }));
-  input.blur();
-}
-
 function findRequired(selector, code) {
   const element = document.querySelector(selector);
   if (!element) throw Object.assign(new Error("页面控件不可用。"), { code });
@@ -165,42 +144,15 @@ async function downloadFromKuaimaiCenter({
 
 async function runKuaimaiAction(action, selectors, matchesText, context) {
   switch (action.action) {
-    case "select_time_basis": {
-      const input = findRequired(selectors.timeBasis, "KUAIMAI_TIME_BASIS_MISSING");
-      input.click();
-      await wait(120);
-      const option = exactTextElement(selectors.selectOption, action.value, matchesText);
-      if (!option) throw Object.assign(new Error("创建时间选项不可用。"), { code: "KUAIMAI_CREATION_TIME_OPTION_MISSING" });
-      option.click();
-      context.expectedTimeBasis = action.value;
-      await wait(300);
-      return;
-    }
-    case "set_start_time": {
-      dispatchValue(findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING"), action.value);
-      context.expectedStartTime = action.value;
-      await wait(150);
-      return;
-    }
-    case "set_end_time": {
-      dispatchValue(findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING"), action.value);
-      context.expectedEndTime = action.value;
-      await wait(150);
-      return;
-    }
     case "verify_time_range": {
-      await wait(250);
+      context.expectedTimeBasis = action.timeBasis;
+      context.expectedStartTime = action.startValue;
+      context.expectedEndTime = action.endValue;
       assertAppliedKuaimaiRange(selectors, context);
       return;
     }
-    case "submit_query": {
-      const button = exactTextElement(selectors.queryButton, "查询", matchesText);
-      if (!button) throw Object.assign(new Error("查询按钮不可用。"), { code: "KUAIMAI_QUERY_BUTTON_MISSING" });
-      button.click();
-      return;
-    }
     case "wait_for_results":
-      await wait(1200);
+      await wait(3000);
       assertAppliedKuaimaiRange(selectors, context);
       return;
     case "export_orders": {

@@ -142,6 +142,28 @@ function assertBusinessDate(value) {
   return businessDate;
 }
 
+export function buildKuaimaiTaskUrl(baseUrl, task) {
+  const businessDate = assertBusinessDate(task?.businessDate);
+  if (!validOrigin(baseUrl)) {
+    const error = new Error("快麦任务地址不在登记域名内。");
+    error.code = "KUAIMAI_ORIGIN_BLOCKED";
+    throw error;
+  }
+  const startTime = Date.parse(`${businessDate}T00:00:00+08:00`);
+  const endTime = Date.parse(`${businessDate}T23:59:59+08:00`);
+  const url = new URL(baseUrl);
+  const query = new URLSearchParams([
+    ["pageNo", "1"],
+    ["timeType", "created"],
+    ["startTime", String(startTime)],
+    ["endTime", String(endTime)],
+    ["field", "created"],
+    ["_emitFrom", "search"]
+  ]);
+  url.hash = `#/trade/searchlist/?${query}`;
+  return url.href;
+}
+
 export function buildKuaimaiActionPlan(task) {
   const businessDate = assertBusinessDate(task?.businessDate);
   const exportAction = task?.resourceType === "orders"
@@ -155,15 +177,12 @@ export function buildKuaimaiActionPlan(task) {
     throw error;
   }
   return [
-    { action: "select_time_basis", value: "下单时间" },
-    { action: "set_start_time", value: `${businessDate} 00:00:00` },
-    { action: "set_end_time", value: `${businessDate} 23:59:59` },
     {
       action: "verify_time_range",
+      timeBasis: "下单时间",
       startValue: `${businessDate} 00:00:00`,
       endValue: `${businessDate} 23:59:59`
     },
-    { action: "submit_query" },
     { action: "wait_for_results" },
     { action: exportAction },
     { action: "confirm_export" },

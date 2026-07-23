@@ -33,25 +33,43 @@ test("Kuaimai adapter classifies login, human verification, ready and schema cha
 });
 
 test("Kuaimai orders use order creation time and yesterday full Shanghai day", async () => {
-  const { buildKuaimaiActionPlan } = await import(adapterUrl);
+  const { buildKuaimaiActionPlan, buildKuaimaiTaskUrl } = await import(adapterUrl);
   const task = { jobId: "job-1", providerId: "kuaimai", resourceType: "orders", businessDate: "2026-07-21" };
   const plan = buildKuaimaiActionPlan(task);
 
+  assert.equal(
+    buildKuaimaiTaskUrl("https://erpb.superboss.cc/index.html#/trade/searchlist/", task),
+    "https://erpb.superboss.cc/index.html#/trade/searchlist/?pageNo=1&timeType=created&startTime=1784563200000&endTime=1784649599000&field=created&_emitFrom=search"
+  );
   assert.deepEqual(plan, [
-    { action: "select_time_basis", value: "下单时间" },
-    { action: "set_start_time", value: "2026-07-21 00:00:00" },
-    { action: "set_end_time", value: "2026-07-21 23:59:59" },
     {
       action: "verify_time_range",
+      timeBasis: "下单时间",
       startValue: "2026-07-21 00:00:00",
       endValue: "2026-07-21 23:59:59"
     },
-    { action: "submit_query" },
     { action: "wait_for_results" },
     { action: "export_orders" },
     { action: "confirm_export" },
     { action: "download_from_center", resourceType: "orders" }
   ]);
+});
+
+test("Kuaimai task URL rejects unregistered origins and invalid business dates", async () => {
+  const { buildKuaimaiTaskUrl } = await import(adapterUrl);
+  const task = { jobId: "job-1", providerId: "kuaimai", resourceType: "orders", businessDate: "2026-07-21" };
+
+  assert.throws(
+    () => buildKuaimaiTaskUrl("https://evil.example/index.html#/trade/searchlist/", task),
+    error => error?.code === "KUAIMAI_ORIGIN_BLOCKED"
+  );
+  assert.throws(
+    () => buildKuaimaiTaskUrl("https://erpb.superboss.cc/index.html#/trade/searchlist/", {
+      ...task,
+      businessDate: "2026-02-30"
+    }),
+    error => error?.code === "EXTENSION_TASK_BUSINESS_DATE_INVALID"
+  );
 });
 
 test("Kuaimai control matcher tolerates the live leading icon without confusing detail export", async () => {

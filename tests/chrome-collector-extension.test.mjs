@@ -51,8 +51,8 @@ test("Kuaimai async exports are completed through the bundled download center ad
   assert.match(contentScript, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
   assert.match(contentScript, /assertAppliedKuaimaiRange/);
   assert.match(contentScript, /openKuaimaiExportDialog/);
-  assert.match(contentScript, /inserted[\s\S]*dispatchEvent\(new Event\("input"/);
   assert.match(serviceWorker, /downloadFilePrefixes/);
+  assert.match(serviceWorker, /registeredTaskUrl/);
   assert.match(serviceWorker, /probeContentScript/);
   assert.match(serviceWorker, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
   assert.match(serviceWorker, /chrome\.tabs\.reload\(tab\.id\)/);
@@ -63,10 +63,19 @@ test("Kuaimai async exports are completed through the bundled download center ad
 });
 
 test("extension task contract only allows registered provider resources", async () => {
-  const { assertRegisteredTask, registeredResource } = await import(new URL("providers/registry.js", extensionRoot));
+  const { assertRegisteredTask, registeredResource, registeredTaskUrl } = await import(new URL("providers/registry.js", extensionRoot));
 
   assert.equal(registeredResource("kuaimai", "orders").providerId, "kuaimai");
   assert.equal(registeredResource("kuaimai", "order_items").resourceType, "order_items");
+  assert.match(
+    registeredTaskUrl({
+      jobId: "job-1",
+      providerId: "kuaimai",
+      resourceType: "orders",
+      businessDate: "2026-07-21"
+    }),
+    /startTime=1784563200000&endTime=1784649599000/
+  );
   assert.throws(
     () => assertRegisteredTask({ jobId: "job-1", providerId: "unknown", resourceType: "orders", businessDate: "2026-07-21" }),
     error => error?.code === "EXTENSION_TASK_NOT_REGISTERED"
