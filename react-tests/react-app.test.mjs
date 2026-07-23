@@ -781,7 +781,7 @@ test("visual system uses a lighter collaboration-tool shell instead of dark admi
   assert.match(styles, /\.sidebar\s*\{[\s\S]*background: rgba\(255, 255, 255, \.86\);/);
   assert.match(styles, /\.sidebar nav button\.active\s*\{[\s\S]*background: var\(--primary-soft\);[\s\S]*color: var\(--primary\);/);
   assert.match(styles, /\.page\s*\{[\s\S]*padding: 22px 26px;/);
-  assert.match(styles, /\.section-panel, \.table-wrap, \.product-card, \.file-tile\s*\{[\s\S]*box-shadow: none;/);
+  assert.match(styles, /\.section-panel, \.table-wrap, \.product-card, \.file-tile\s*\{[\s\S]*box-shadow: var\(--shadow-sm\);/);
   assert.match(app, /currentUser/);
   assert.match(app, /currentUser\?\.name/);
 });
