@@ -114,7 +114,7 @@ test("data center has restrained responsive layouts and visible focus states", (
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.date-range-picker-field/);
   assert.match(styles, /@media \(max-width: 640px\)[\s\S]*\.date-range-picker-menu/);
   assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.data-mini-trend/);
-  assert.match(styles, /\.data-trend-tooltip/);
+  assert.match(styles, /\.data-trend-detail/);
   assert.match(styles, /\.data-trend-day:focus/);
   assert.doesNotMatch(styles, /\.data-analysis-toolbar/);
   assert.doesNotMatch(styles, /\.data-analysis-series/);

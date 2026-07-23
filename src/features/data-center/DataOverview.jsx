@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, PackageCheck, Percent, RefreshCw, TrendingUp, WalletCards } from "lucide-react";
 import { compareDataCenterMetric, dataCenterPresetRange, DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
 import { Button } from "../../ui/Button.jsx";
@@ -71,32 +72,43 @@ function grossMarginRate(row) {
 }
 
 function trendDayLabel(row) {
+  if (row.hasData === false) return `${row.date}，暂无销售数据`;
   const rate = grossMarginRate(row);
   const platforms = row.platforms.map(item => `${item.platform} GMV ${money(item.sales)}`).join("，");
   return `${row.date}，GMV ${money(row.sales)}，销售数量 ${number(row.qty)}，毛利率 ${rate == null ? "暂无结果" : `${number(rate)}%`}，${platforms}`;
 }
 
 function Trend({ rows }) {
+  const [activeDate, setActiveDate] = useState("");
+  const activeRow = rows.find(row => row.date === activeDate);
+  const activeRate = activeRow ? grossMarginRate(activeRow) : null;
   const maximum = Math.max(...rows.map(row => row.sales), 1);
   return (
-    <div className="data-mini-trend" role="list" aria-label="按订单创建时间统计的每日 GMV 趋势">
-      {rows.map(row => {
-        const rate = grossMarginRate(row);
-        const tooltipId = `trend-${row.date}`;
-        return <div className="data-trend-day" role="listitem" tabIndex={0} key={row.date} aria-label={trendDayLabel(row)} aria-describedby={tooltipId}>
-          <i style={{ height: `${Math.max(4, row.sales / maximum * 100)}%` }} aria-hidden="true" />
+    <div className="data-trend-figure">
+      <div className={`data-trend-detail${activeRow ? " is-visible" : ""}`} id="data-trend-detail" role="tooltip" aria-live="polite">
+        {activeRow ? <><strong>{activeRow.date}</strong>{activeRow.hasData !== false ? <><dl>
+          <div><dt>GMV</dt><dd>{money(activeRow.sales)}</dd></div>
+          <div><dt>销售数量</dt><dd>{number(activeRow.qty)}</dd></div>
+          <div><dt>毛利率</dt><dd>{activeRate == null ? "暂无结果" : `${number(activeRate)}%`}</dd></div>
+        </dl><ul>{activeRow.platforms.map(item => <li key={item.platform}><span>{item.platform}</span><b>{money(item.sales)}</b></li>)}</ul></> : <span>暂无销售数据</span>}</> : <span>悬停或聚焦日期查看明细</span>}
+      </div>
+      <div className="data-mini-trend" role="list" aria-label="按订单创建时间统计的每日 GMV 趋势">
+        {rows.map(row => <div
+          className="data-trend-day"
+          role="listitem"
+          tabIndex={0}
+          key={row.date}
+          aria-label={trendDayLabel(row)}
+          aria-describedby="data-trend-detail"
+          onMouseEnter={() => setActiveDate(row.date)}
+          onMouseLeave={() => setActiveDate("")}
+          onFocus={() => setActiveDate(row.date)}
+          onBlur={() => setActiveDate("")}
+        >
+          <i className={row.hasData === false ? "is-empty" : undefined} style={row.hasData === false ? undefined : { height: `${Math.max(4, row.sales / maximum * 100)}%` }} aria-hidden="true" />
           <span>{row.date.slice(5)}</span>
-          <div className="data-trend-tooltip" id={tooltipId} role="tooltip">
-            <strong>{row.date}</strong>
-            <dl>
-              <div><dt>GMV</dt><dd>{money(row.sales)}</dd></div>
-              <div><dt>销售数量</dt><dd>{number(row.qty)}</dd></div>
-              <div><dt>毛利率</dt><dd>{rate == null ? "暂无结果" : `${number(rate)}%`}</dd></div>
-            </dl>
-            <ul>{row.platforms.map(item => <li key={item.platform}><span>{item.platform}</span><b>{money(item.sales)}</b></li>)}</ul>
-          </div>
-        </div>;
-      })}
+        </div>)}
+      </div>
     </div>
   );
 }
@@ -138,7 +150,7 @@ export function DataOverview({ factViews, range, setRange, metricResults = [], m
         return <article key={metric.metricCode}><Icon size={18} /><span>{metric.label}</span><strong>{formatMetric(result?.value, metric.format)}</strong><MetricComparison current={result} previous={previous} metric={metric} loading={comparisonUpdating} error={comparisonError} compatibilityRollback={compatibilityRollback} />{!result || coverageRate < 1 ? <small className="data-kpi-meta">{result ? <span className="text-warning">覆盖率 {Math.round((coverageRate || 0) * 100)}%</span> : <span>{resultReason(reasonCode)}</span>}</small> : null}</article>;
       })}</div>
       <div className="data-overview-grid">
-        <section className="section-panel data-trend-panel"><div className="section-head"><div><h2>经营趋势</h2><p>{range.from} 至 {range.to}，按日 GMV。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>
+        <section className="section-panel data-trend-panel"><div className="section-head"><div><h2>经营趋势</h2><p>{range.from} 至 {range.to}，按日 GMV。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.trendByDay || factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>
         <section className="section-panel"><div className="section-head"><div><h2>平台分布</h2><p>按 GMV 查看当前日期范围的平台占比。</p></div></div><div className="data-contribution-list">{factViews.byPlatform.slice(0, 6).map(row => { const share = totalGmv ? row.sales / totalGmv * 100 : 0; return <div key={row.platform}><span><strong>{row.platform}</strong><small>{number(share)}%</small></span><i><b style={{ width: `${share}%` }} /></i><em>{money(row.sales)}</em></div>; })}{!factViews.byPlatform.length ? <div className="empty-state compact-empty">暂无平台数据。</div> : null}</div></section>
       </div>
     </div>
