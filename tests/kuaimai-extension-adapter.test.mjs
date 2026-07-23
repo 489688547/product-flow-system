@@ -33,7 +33,12 @@ test("Kuaimai adapter classifies login, human verification, ready and schema cha
 });
 
 test("Kuaimai orders use order creation time and yesterday full Shanghai day", async () => {
-  const { buildKuaimaiActionPlan, buildKuaimaiTaskUrl } = await import(adapterUrl);
+  const {
+    buildKuaimaiActionPlan,
+    buildKuaimaiTaskUrl,
+    KUAIMAI_ORDER_EXPORT_FIELDS,
+    kuaimaiResources
+  } = await import(adapterUrl);
   const task = { jobId: "job-1", providerId: "kuaimai", resourceType: "orders", businessDate: "2026-07-21" };
   const plan = buildKuaimaiActionPlan(task);
 
@@ -50,9 +55,20 @@ test("Kuaimai orders use order creation time and yesterday full Shanghai day", a
     },
     { action: "wait_for_results" },
     { action: "export_orders" },
+    { action: "select_order_export_fields", fields: KUAIMAI_ORDER_EXPORT_FIELDS },
     { action: "confirm_export" },
     { action: "download_from_center", resourceType: "orders" }
   ]);
+  assert.equal(kuaimaiResources.orders.scheduleVersion, "v2");
+  assert.ok(KUAIMAI_ORDER_EXPORT_FIELDS.includes("平台"));
+  assert.ok(KUAIMAI_ORDER_EXPORT_FIELDS.includes("店铺"));
+  assert.ok(KUAIMAI_ORDER_EXPORT_FIELDS.includes("仓库"));
+  assert.ok(KUAIMAI_ORDER_EXPORT_FIELDS.includes("订单状态"));
+  assert.ok(KUAIMAI_ORDER_EXPORT_FIELDS.includes("订单应付金额"));
+  assert.ok(KUAIMAI_ORDER_EXPORT_FIELDS.includes("下单时间"));
+  assert.ok(KUAIMAI_ORDER_EXPORT_FIELDS.includes("订单成本"));
+  assert.equal(KUAIMAI_ORDER_EXPORT_FIELDS.includes("手机"), false);
+  assert.equal(KUAIMAI_ORDER_EXPORT_FIELDS.includes("详细地址"), false);
 });
 
 test("Kuaimai task URL rejects unregistered origins and invalid business dates", async () => {

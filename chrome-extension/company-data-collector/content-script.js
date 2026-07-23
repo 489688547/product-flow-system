@@ -63,6 +63,56 @@ async function openKuaimaiExportDialog({
   });
 }
 
+function normalizeControlLabel(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function findDialogCheckbox(dialog, field) {
+  const expected = normalizeControlLabel(field);
+  const labels = Array.from(dialog.querySelectorAll("label"));
+  const label = labels.find(candidate => normalizeControlLabel(candidate.textContent) === expected);
+  if (label) {
+    const nested = label.querySelector("input[type='checkbox']");
+    if (nested) return { input: nested, control: label };
+    const targetId = label.getAttribute("for");
+    if (targetId) {
+      const linked = dialog.querySelector(`#${CSS.escape(targetId)}`);
+      if (linked?.matches("input[type='checkbox']")) return { input: linked, control: label };
+    }
+  }
+  const input = Array.from(dialog.querySelectorAll("input[type='checkbox']")).find(candidate =>
+    normalizeControlLabel(candidate.getAttribute("aria-label")) === expected
+  );
+  return input ? { input, control: input } : null;
+}
+
+async function selectKuaimaiOrderExportFields(fields, selectors, matchesText) {
+  const confirmation = exactTextElement(selectors.exportConfirmButton, "立即导出", matchesText);
+  const dialog = confirmation?.closest(selectors.exportDialog);
+  if (!confirmation || !dialog) {
+    throw Object.assign(new Error("订单导出配置弹窗不可用。"), {
+      code: "KUAIMAI_EXPORT_DIALOG_MISSING"
+    });
+  }
+  for (const field of fields || []) {
+    const checkbox = findDialogCheckbox(dialog, field);
+    if (!checkbox) {
+      throw Object.assign(new Error("订单导出字段不可用。"), {
+        code: "KUAIMAI_EXPORT_FIELD_MISSING"
+      });
+    }
+    if (!checkbox.input.checked) {
+      checkbox.control.click();
+      await wait(20);
+    }
+    if (!checkbox.input.checked) {
+      throw Object.assign(new Error("订单导出字段未生效。"), {
+        code: "KUAIMAI_EXPORT_FIELD_NOT_SELECTED"
+      });
+    }
+  }
+}
+
 async function pageProbe(selectors, matchesText) {
   const bodyText = String(document.body?.innerText || "");
   const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
@@ -311,6 +361,9 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       });
       return;
     }
+    case "select_order_export_fields":
+      await selectKuaimaiOrderExportFields(action.fields, selectors, matchesText);
+      return;
     case "confirm_export": {
       const button = exactTextElement(selectors.exportConfirmButton, "立即导出", matchesText);
       if (!button) throw Object.assign(new Error("立即导出按钮不可用。"), { code: "KUAIMAI_EXPORT_CONFIRM_MISSING" });
