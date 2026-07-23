@@ -17,6 +17,7 @@ function dispatchValue(input, value) {
   input.select();
   const inserted = document.execCommand("insertText", false, value);
   if (inserted && input.value === value) {
+    input.dispatchEvent(new Event("input", { bubbles: true }));
     input.dispatchEvent(new Event("change", { bubbles: true }));
     input.blur();
     return;
@@ -42,6 +43,45 @@ function findRequiredTextElement(selector, value, matchesText, code) {
   const element = exactTextElement(selector, value, matchesText);
   if (!element) throw Object.assign(new Error("页面控件不可用。"), { code });
   return element;
+}
+
+function assertAppliedKuaimaiRange(selectors, context) {
+  const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_TIME_BASIS_MISSING");
+  const startTime = findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING");
+  const endTime = findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING");
+  if (
+    timeBasis.value !== context.expectedTimeBasis
+    || startTime.value !== context.expectedStartTime
+    || endTime.value !== context.expectedEndTime
+  ) {
+    throw Object.assign(new Error("创建时间范围未生效。"), {
+      code: "KUAIMAI_TIME_RANGE_NOT_APPLIED"
+    });
+  }
+}
+
+async function openKuaimaiExportDialog({
+  label,
+  missingCode,
+  selectors,
+  matchesText
+}) {
+  const deadline = Date.now() + 5000;
+  do {
+    const confirmation = exactTextElement(
+      selectors.exportConfirmButton,
+      "立即导出",
+      matchesText
+    );
+    if (confirmation) return;
+    const link = exactTextElement(selectors.exportLink, label, matchesText);
+    if (!link) throw Object.assign(new Error("导出入口不可用。"), { code: missingCode });
+    link.click();
+    await wait(500);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("立即导出按钮不可用。"), {
+    code: "KUAIMAI_EXPORT_CONFIRM_MISSING"
+  });
 }
 
 async function pageProbe(selectors, matchesText) {
@@ -132,26 +172,25 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       const option = exactTextElement(selectors.selectOption, action.value, matchesText);
       if (!option) throw Object.assign(new Error("创建时间选项不可用。"), { code: "KUAIMAI_CREATION_TIME_OPTION_MISSING" });
       option.click();
+      context.expectedTimeBasis = action.value;
       await wait(300);
       return;
     }
     case "set_start_time": {
       dispatchValue(findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING"), action.value);
+      context.expectedStartTime = action.value;
       await wait(150);
       return;
     }
     case "set_end_time": {
       dispatchValue(findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING"), action.value);
+      context.expectedEndTime = action.value;
       await wait(150);
       return;
     }
     case "verify_time_range": {
       await wait(250);
-      const startTime = findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING");
-      const endTime = findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING");
-      if (startTime.value !== action.startValue || endTime.value !== action.endValue) {
-        throw Object.assign(new Error("创建时间范围未生效。"), { code: "KUAIMAI_TIME_RANGE_NOT_APPLIED" });
-      }
+      assertAppliedKuaimaiRange(selectors, context);
       return;
     }
     case "submit_query": {
@@ -162,21 +201,27 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
     }
     case "wait_for_results":
       await wait(1200);
+      assertAppliedKuaimaiRange(selectors, context);
       return;
     case "export_orders": {
-      const link = exactTextElement(selectors.exportLink, "导出订单", matchesText);
-      if (!link) throw Object.assign(new Error("导出订单入口不可用。"), { code: "KUAIMAI_EXPORT_ORDERS_MISSING" });
-      link.click();
+      await openKuaimaiExportDialog({
+        label: "导出订单",
+        missingCode: "KUAIMAI_EXPORT_ORDERS_MISSING",
+        selectors,
+        matchesText
+      });
       return;
     }
     case "export_order_items": {
-      const link = exactTextElement(selectors.exportLink, "导出订单明细", matchesText);
-      if (!link) throw Object.assign(new Error("导出订单明细入口不可用。"), { code: "KUAIMAI_EXPORT_ORDER_ITEMS_MISSING" });
-      link.click();
+      await openKuaimaiExportDialog({
+        label: "导出订单明细",
+        missingCode: "KUAIMAI_EXPORT_ORDER_ITEMS_MISSING",
+        selectors,
+        matchesText
+      });
       return;
     }
     case "confirm_export": {
-      await wait(300);
       const button = exactTextElement(selectors.exportConfirmButton, "立即导出", matchesText);
       if (!button) throw Object.assign(new Error("立即导出按钮不可用。"), { code: "KUAIMAI_EXPORT_CONFIRM_MISSING" });
       context.exportStartedAt = Date.now();

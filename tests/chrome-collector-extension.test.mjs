@@ -49,6 +49,9 @@ test("Kuaimai async exports are completed through the bundled download center ad
   assert.match(contentScript, /waitForKuaimaiOrderPage/);
   assert.match(contentScript, /KUAIMAI_DOWNLOAD_CENTER_TIMEOUT/);
   assert.match(contentScript, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
+  assert.match(contentScript, /assertAppliedKuaimaiRange/);
+  assert.match(contentScript, /openKuaimaiExportDialog/);
+  assert.match(contentScript, /inserted[\s\S]*dispatchEvent\(new Event\("input"/);
   assert.match(serviceWorker, /downloadFilePrefixes/);
   assert.match(serviceWorker, /probeContentScript/);
   assert.match(serviceWorker, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
