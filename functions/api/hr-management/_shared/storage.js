@@ -1,4 +1,5 @@
 import { normalizeHrManagementState } from "../../../../src/domain/hrManagement.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 
 export const HR_TABLES = {
   employees: "hr_employees",
@@ -12,8 +13,8 @@ export const HR_TABLES = {
   auditLogs: "hr_audit_logs"
 };
 
-export function hrDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function hrDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 async function readMeta(db, key) {

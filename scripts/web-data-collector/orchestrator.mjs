@@ -92,6 +92,7 @@ export function createWebCollectorOrchestrator({ api, processDownload, notify = 
         await transition(current, "downloading"); current = "downloading";
         await transition(current, "validating"); current = "validating";
         const processed = await processDownload({
+          jobId: activeJob.id,
           fileName: result.fileName,
           resourceType: activeJob.resourceType,
           businessDate: activeJob.businessDate,

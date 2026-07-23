@@ -1,11 +1,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { loadAiStatus, sendAiChat } from "./aiAssistantApi.js";
 import { sanitizeAiSkillActivity, upsertAiSkillActivity } from "./aiAssistantActivity.js";
+import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 import { getBrowserStorage, persistLocalState, tryGetStorageItem, tryRemoveStorageItem } from "./resilientLocalStorage.js";
 
 const AiAssistantContext = createContext(null);
 const STORAGE_KEY = "companyAiAssistantSessionV1";
 const sessionCache = getBrowserStorage("sessionStorage");
+
+function sessionStorageKey() {
+  migrateLegacyProductionCache(sessionCache, STORAGE_KEY);
+  return environmentStorageKey(STORAGE_KEY);
+}
 
 function id() {
   return globalThis.crypto?.randomUUID?.() || `ai_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -13,7 +19,7 @@ function id() {
 
 function loadSession() {
   try {
-    const value = JSON.parse(tryGetStorageItem(sessionCache, STORAGE_KEY) || "{}");
+    const value = JSON.parse(tryGetStorageItem(sessionCache, sessionStorageKey()) || "{}");
     return Array.isArray(value.messages) ? value.messages.slice(-12).map(message => ({
       ...message,
       skillActivity: sanitizeAiSkillActivity(message.skillActivity)
@@ -46,7 +52,7 @@ export function AiAssistantProvider({ children }) {
   }, [refreshStatus]);
 
   useEffect(() => {
-    persistLocalState(sessionCache, STORAGE_KEY, { messages: messages.slice(-12) });
+    persistLocalState(sessionCache, sessionStorageKey(), { messages: messages.slice(-12) });
   }, [messages]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
@@ -112,7 +118,7 @@ export function AiAssistantProvider({ children }) {
   const clear = useCallback(() => {
     stop();
     setMessages([]);
-    tryRemoveStorageItem(sessionCache, STORAGE_KEY);
+    tryRemoveStorageItem(sessionCache, sessionStorageKey());
     setError(null);
   }, [stop]);
 

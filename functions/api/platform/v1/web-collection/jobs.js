@@ -1,4 +1,9 @@
-import { authorizeWebCollectionTrigger, authorizeWebCollectionView } from "./_shared/authorization.js";
+import {
+  authorizeWebCollectionAdmin,
+  authorizeWebCollectionTrigger,
+  authorizeWebCollectionView
+} from "./_shared/authorization.js";
+import { collectionTargetFromRequestData } from "../../_shared/collectionTarget.js";
 import { errorResponse, requestId, routeError, successResponse } from "./_shared/http.js";
 import {
   authenticateWebCollectionRunner,
@@ -30,11 +35,18 @@ export async function onRequest({ request, env, data = {} }) {
       authorizeWebCollectionTrigger(data.session);
       return successResponse(await triggerWebCollectionJob(db, body), id);
     }
-    const runner = await authenticateWebCollectionRunner(db, request);
+    const sessionCreatesPlan = body?.action === "ensure_plan" && data.session;
+    const runner = sessionCreatesPlan
+      ? { id: `session:${authorizeWebCollectionAdmin(data.session).actor || data.session.userId}` }
+      : await authenticateWebCollectionRunner(db, request);
     let result;
     switch (body?.action) {
       case "heartbeat": result = await heartbeatRunner(db, runner, body); break;
-      case "ensure_plan": result = await ensureWebCollectionPlan(db, body.jobs); break;
+      case "ensure_plan": result = await ensureWebCollectionPlan(
+        db,
+        body.jobs,
+        sessionCreatesPlan ? collectionTargetFromRequestData(data) : undefined
+      ); break;
       case "claim": result = await claimWebCollectionJob(db, runner, body); break;
       case "transition": result = await transitionWebCollectionJob(db, runner, body); break;
       case "complete": result = await completeWebCollectionJob(db, runner, body); break;

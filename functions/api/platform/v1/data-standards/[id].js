@@ -33,7 +33,7 @@ export async function onRequest({ request, env, data = {}, params = {} }) {
     const session = requireSession(data);
     const actor = dataStandardActor(session);
     requireDefinitionView(actor);
-    const db = requireDatabase(dataStandardsDatabase(env));
+    const db = requireDatabase(dataStandardsDatabase(env, data));
     await ensureDataStandardsTables(db);
     const existing = await getDefinitionDetail(db, String(params.id || ""));
     if (!existing) throw missing();

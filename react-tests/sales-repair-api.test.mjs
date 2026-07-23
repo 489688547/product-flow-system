@@ -17,15 +17,17 @@ function request(date = "2026-07-21") {
 
 function dependencies(overrides = {}) {
   const writes = [];
+  const executionInputs = [];
   let executions = 0;
   return {
     writes,
+    executionInputs,
     get executions() { return executions; },
     ensure: async () => {},
     latestFacts: async () => anomalyFacts,
     getRun: async () => null,
     putRun: async (_db, run) => { writes.push(run); },
-    execute: async () => { executions += 1; },
+    execute: async input => { executions += 1; executionInputs.push(input); },
     ...overrides
   };
 }
@@ -49,7 +51,10 @@ test("sales repair API rechecks the anomaly and schedules one idempotent backgro
   const response = await handler({
     request: request(),
     env: { PRODUCT_FLOW_DB: {} },
-    data: { session: { name: "运营主管", userId: "u-1", department: "运营部" } },
+    data: {
+      session: { name: "运营主管", userId: "u-1", department: "运营部" },
+      dataEnvironment: { id: "display", version: 7 }
+    },
     waitUntil: promise => waits.push(promise)
   });
   const payload = await response.json();
@@ -60,6 +65,7 @@ test("sales repair API rechecks the anomaly and schedules one idempotent backgro
   assert.equal(waits.length, 1);
   await waits[0];
   assert.equal(deps.executions, 1);
+  assert.deepEqual(deps.executionInputs[0].dataEnvironment, { id: "display", version: 7 });
 });
 
 test("sales repair API does not reschedule a running or exhausted date", async () => {

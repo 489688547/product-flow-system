@@ -1,3 +1,5 @@
+import { requestBusinessDatabase } from "../../../_shared/dataEnvironment.js";
+
 function text(value) {
   return String(value ?? "").trim();
 }
@@ -29,8 +31,8 @@ function resultRows(result) {
   return Array.isArray(result?.results) ? result.results : [];
 }
 
-export function goodsFlowDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+export function goodsFlowDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 export async function appendGoodsFlowEvents(db, events = []) {

@@ -8,12 +8,13 @@ import {
   saveProductionSnapshot,
   startProductionAudit
 } from "./platform/_shared/productionDataAccess.js";
+import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
 
 const STATE_ID = "company";
 const MAX_PART_BYTES = 1_000_000;
 
-function stateDatabase(env = {}) {
-  return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
+function stateDatabase(env = {}, data = {}) {
+  return requestBusinessDatabase({ env, data });
 }
 
 function stateError(message, status, code, retryable = false) {
@@ -206,7 +207,7 @@ export async function onRequest({ request, env, data = {} }) {
     return jsonResponse({ synced: false, message: "只读账号不能修改公司共享数据。" }, 403);
   }
 
-  const db = stateDatabase(env);
+  const db = stateDatabase(env, data);
   if (!db) {
     return jsonResponse({
       synced: false,

@@ -29,6 +29,7 @@ const REQUIRED_PRODUCTION_TABLES = [
   "data_connection_audit"
 ];
 const TEST_PLATFORM_MASTER_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+const TEST_DEMO_MASKING_KEY = "test-demo-masking-key-with-enough-entropy";
 const HR_CORE_TABLES = [
   "hr_employees",
   "hr_assignments",
@@ -68,6 +69,18 @@ const WEB_COLLECTION_TABLES = [
   "web_collection_runs",
   "web_collection_cursors",
   "web_collection_notifications"
+];
+const DATA_ENVIRONMENT_CONTROL_TABLES = [
+  "data_environment_grants",
+  "demo_data_environment_state",
+  "demo_data_refresh_jobs",
+  "data_environment_audit"
+];
+const DISPLAY_REQUIRED_TABLES = [
+  "product_flow_state",
+  "product_flow_state_parts",
+  "product_sales_daily",
+  "product_sales_meta"
 ];
 
 async function loadRoute() {
@@ -159,15 +172,17 @@ test("environment readiness reports missing production bindings and variables wi
 
 test("warning capabilities do not block an otherwise ready production environment", async () => {
   const { onRequest } = await loadRoute();
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES, ...DATA_ENVIRONMENT_CONTROL_TABLES];
   const response = await onRequest({
     request: request(),
     env: {
       RUNTIME_ENV: "production",
       PRODUCT_FLOW_DB: createTableDb(tables),
+      DEMO_FLOW_DB: createTableDb(DISPLAY_REQUIRED_TABLES),
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
-      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY
+      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
     },
     data: { session: { name: "员工", role: "product", department: "产品部" } }
   });
@@ -195,7 +210,7 @@ test("a server-only production data token can read readiness without an employee
   const bytes = new TextEncoder().encode(rawToken);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const tokenHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES, ...DATA_ENVIRONMENT_CONTROL_TABLES];
   const db = {
     prepare(sql) {
       const statement = {
@@ -222,12 +237,49 @@ test("a server-only production data token can read readiness without an employee
     env: {
       RUNTIME_ENV: "production",
       PRODUCT_FLOW_DB: db,
+      DEMO_FLOW_DB: createTableDb(DISPLAY_REQUIRED_TABLES),
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
-      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY
+      PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
     },
     data: {}
   });
   assert.equal(response.status, 200);
   assert.equal((await response.json()).ready, true);
+});
+
+test("readiness checks display tables against DEMO_FLOW_DB instead of the control database", async () => {
+  const { inspectEnvironmentReadiness } = await import(
+    resolve("functions/api/platform/_shared/environmentReadiness.js")
+  );
+  const manifest = {
+    capabilities: [{
+      id: "display-data-environment",
+      name: "展示数据库环境",
+      description: "双库就绪合同",
+      platforms: ["cloudflare-d1"],
+      requiredIn: ["production"],
+      level: "blocking",
+      envVars: [],
+      bindings: ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"],
+      tables: [],
+      bindingTables: {
+        PRODUCT_FLOW_DB: ["data_environment_grants"],
+        DEMO_FLOW_DB: ["product_flow_state", "product_sales_daily"]
+      }
+    }]
+  };
+
+  const result = await inspectEnvironmentReadiness({
+    env: {
+      RUNTIME_ENV: "production",
+      PRODUCT_FLOW_DB: createTableDb(["data_environment_grants"]),
+      DEMO_FLOW_DB: createTableDb(["product_flow_state"])
+    },
+    manifest
+  });
+
+  assert.equal(result.ready, false);
+  assert.deepEqual(result.capabilities[0].missing, ["DEMO_FLOW_DB:product_sales_daily"]);
 });

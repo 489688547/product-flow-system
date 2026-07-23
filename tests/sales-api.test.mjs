@@ -5,6 +5,7 @@ import { onRequest } from "../functions/api/sales.js";
 
 function createDb() {
   const batchSizes = [];
+  const batches = [];
   const prepare = sql => ({
     sql,
     bindings: [],
@@ -24,9 +25,11 @@ function createDb() {
   });
   return {
     batchSizes,
+    batches,
     prepare,
     async batch(statements) {
       batchSizes.push(statements.length);
+      batches.push(statements);
       return statements.map(() => ({ success: true }));
     }
   };
@@ -57,4 +60,58 @@ test("sales import batches a full month without dozens of D1 round trips", async
   assert.equal(response.status, 200);
   assert.deepEqual(db.batchSizes, [250, 250]);
   assert.deepEqual((await response.json()).months, ["2026-05"]);
+});
+
+test("display sales imports use the shared two-times fact transformer", async () => {
+  const db = createDb();
+  const response = await onRequest({
+    request: new Request("https://example.test/api/sales", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        rows: [{
+          code: "6900000000000",
+          date: "2026-07-22",
+          platform: "天猫",
+          qty: 3,
+          sales: 90,
+          netSales: 81,
+          grossProfit: 51,
+          refund: 9,
+          cost: 30
+        }]
+      })
+    }),
+    env: { PRODUCT_FLOW_DB: {} },
+    data: {
+      businessDb: db,
+      dataEnvironment: { id: "display", version: 7 }
+    }
+  });
+  const insert = db.batches.flat().find(statement => /INSERT INTO product_sales_daily/.test(statement.sql));
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(insert.bindings.slice(3, 9), [6, 180, 162, 102, 18, 60]);
+});
+
+test("sales routes use the selected business database without touching production", async () => {
+  const displayDb = createDb();
+  const productionDb = {
+    prepare() {
+      throw new Error("production database must not be touched");
+    }
+  };
+
+  const response = await onRequest({
+    request: new Request("https://example.test/api/sales"),
+    env: { PRODUCT_FLOW_DB: productionDb },
+    data: { businessDb: displayDb }
+  });
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), {
+    synced: true,
+    imports: [],
+    titles: {}
+  });
 });

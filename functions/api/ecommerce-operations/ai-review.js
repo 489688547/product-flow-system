@@ -26,6 +26,7 @@ export async function onRequest({ request, env, data = {} }) {
   try {
     const result = await invokeAiFeature({
       env,
+      data,
       session: data.session,
       appId: "ecommerce-operations",
       featureId: "plan-review",

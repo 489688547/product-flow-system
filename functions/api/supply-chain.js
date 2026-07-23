@@ -81,7 +81,7 @@ export async function onRequest({ request, env, data = {} }) {
   if (request.method === "POST" && session.role === "readonly") {
     return jsonResponse({ synced: false, message: "只读账号不能修改供应链数据。" }, 403);
   }
-  const db = supplyDatabase(env);
+  const db = supplyDatabase(env, data);
   if (!db) {
     return jsonResponse({ synced: false, message: "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB，当前只能使用本地浏览器缓存。" }, 501);
   }

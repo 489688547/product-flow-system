@@ -5,9 +5,9 @@ import { brandContentApiUrl } from "../src/state/brandContentApi.js";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("brand content API URL uses production data during local preview", () => {
-  assert.equal(brandContentApiUrl("localhost"), "https://product-flow-system.pages.dev/api/brand-content");
-  assert.equal(brandContentApiUrl("127.0.0.1"), "https://product-flow-system.pages.dev/api/brand-content");
+test("brand content API URL uses the governed same-origin runtime in every environment", () => {
+  assert.equal(brandContentApiUrl("localhost"), "/api/brand-content");
+  assert.equal(brandContentApiUrl("127.0.0.1"), "/api/brand-content");
   assert.equal(brandContentApiUrl("product-flow-system.pages.dev"), "/api/brand-content");
 });
 
@@ -16,7 +16,8 @@ test("brand content client keeps calls behind one state boundary", () => {
   assert.match(provider, /export function BrandContentProvider/);
   assert.match(provider, /export function useBrandContent/);
   assert.match(provider, /brandContentApiUrl/);
-  assert.match(provider, /createDefaultBrandContentState/);
+  assert.match(provider, /createEmptyBrandContentState/);
+  assert.match(provider, /environmentStorageKey/);
   assert.match(provider, /reduceBrandContentState/);
   assert.doesNotMatch(provider, /business\.oceanengine|xiaohongshu\.com|smb:\/\//i);
 });

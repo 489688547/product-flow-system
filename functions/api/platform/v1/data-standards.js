@@ -23,7 +23,7 @@ export async function onRequest({ request, env, data = {} }) {
     const session = requireSession(data);
     const actor = dataStandardActor(session);
     requireDefinitionView(actor);
-    const db = requireDatabase(dataStandardsDatabase(env));
+    const db = requireDatabase(dataStandardsDatabase(env, data));
     await ensureDataStandardsTables(db);
     if (request.method === "GET") {
       const definitions = await listDefinitions(db, validateListQuery(request));

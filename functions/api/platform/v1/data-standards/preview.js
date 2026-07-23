@@ -42,7 +42,7 @@ export async function onRequest({ request, env, data = {} }) {
     const body = await readJson(request);
     const from = String(body.from || "");
     const to = String(body.to || "");
-    db = requireDatabase(dataStandardsDatabase(env));
+    db = requireDatabase(dataStandardsDatabase(env, data));
     await ensureDataStandardsTables(db);
     auditContext = { definitionId: `preview:${String(body.metricCode || "unknown").slice(0, 120)}`, from, to };
     validateRange(from, to);

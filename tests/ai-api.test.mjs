@@ -221,6 +221,51 @@ test("chat emits governed metadata finance exclusion sources and completion", as
   assert.equal(db.leases.size, 0);
 });
 
+test("chat keeps AI control state in production and reads business context from the selected database", async () => {
+  const { onRequest: chatRequest } = await import(chatUrl);
+  const controlDb = createAiD1Mock({
+    providerEnabled: true,
+    projectId: "production-project",
+    projectTitle: "正式库项目"
+  });
+  const businessDb = createAiD1Mock({
+    projectId: "display-project",
+    projectTitle: "展示库项目"
+  });
+  const response = await chatRequest({
+    request: new Request("https://flow.example.com/api/platform/v1/ai/chat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "哪些项目有风险？" }] })
+    }),
+    env: {
+      PRODUCT_FLOW_DB: controlDb,
+      AI_ASSISTANT_ENABLED: "1",
+      LINGSUAN_API_KEY: fakeSecret,
+      AI_PROVIDER_FETCH: async (_url, init) => {
+        assert.match(init.body, /展示库项目|display-project/);
+        assert.doesNotMatch(init.body, /正式库项目|production-project/);
+        return new Response([
+          "event: response.output_text.delta\ndata: {\"delta\":\"展示库项目需要关注\"}\n\n",
+          "event: response.completed\ndata: {\"response\":{\"output\":[],\"usage\":{\"input_tokens\":7,\"output_tokens\":3}}}\n\n"
+        ].join(""), { status: 200 });
+      }
+    },
+    data: {
+      session: executive,
+      controlDb,
+      businessDb,
+      dataEnvironment: { id: "display", version: 8 }
+    }
+  });
+
+  assert.equal(response.status, 200);
+  await response.text();
+  assert.equal(controlDb.audits.length, 1);
+  assert.equal(businessDb.audits.length, 0);
+  assert.equal(controlDb.audits[0].includes("display"), true);
+});
+
 test("chat lets the Provider call authorized read-only App Skills and audits metadata only", async () => {
   const { onRequest: chatRequest } = await import(chatUrl);
   const db = createAiD1Mock({ providerEnabled: true, providerSkillsSupported: true });

@@ -5,14 +5,14 @@ import { appendAudit, listInsightRecords, putInsightRecord } from "./_shared/sto
 
 async function handleGet(context) {
   requireInsightActor(context.data);
-  const db = requireD1(context.env);
+  const db = requireD1(context.env, context.data);
   return jsonResponse({ synced: true, mappings: await listInsightRecords(db, "categoryMappings") });
 }
 
 async function handleWrite(context) {
   const actor = requireInsightActor(context.data);
   assertCategoryManager(actor);
-  const db = requireD1(context.env);
+  const db = requireD1(context.env, context.data);
   const body = await readJson(context.request);
   const source = body.mapping || {};
   let mapping;

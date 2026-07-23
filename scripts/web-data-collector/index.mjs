@@ -63,7 +63,7 @@ async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
 
 async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
   const erpToken = await readErpCollectorToken();
-  return async ({ fileName, resourceType, onValidated }) => {
+  return async ({ jobId, fileName, resourceType, onValidated }) => {
     const filePath = await resolveSafeDownload({ directory: downloadsDirectory, fileName });
     const archived = await archiveExistingFile(filePath, {
       root,
@@ -71,7 +71,10 @@ async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
       onValidated,
       upload: collection => uploadErpCollection(collection, {
         baseUrl,
-        headers: { authorization: `Bearer ${erpToken}` }
+        headers: {
+          authorization: `Bearer ${erpToken}`,
+          "x-web-collection-job-id": jobId
+        }
       })
     });
     return {
