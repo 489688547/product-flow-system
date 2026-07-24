@@ -3,17 +3,27 @@ import { scaleSalesFact } from "../../../../../../src/domain/demoSalesTransform.
 import { ensureDataCenterTables } from "../../../../data-center/_shared/storage.js";
 import { pullKuaimaiDay, resolveKuaimaiConfig } from "../../../../kuaimai/_shared/kuaimai.js";
 import { ensureSalesTables } from "../../../../sales.js";
+import {
+  SALES_REPAIR_ENTITY_TYPE,
+  SALES_REPAIR_RULE_VERSION,
+  repairRunId,
+  readSalesRepairRun,
+  writeSalesRepairRun
+} from "./salesRepairResolution.js";
 
-export const SALES_REPAIR_RULE_VERSION = "sales-completeness-v1";
-export const SALES_REPAIR_ENTITY_TYPE = "systemSyncRuns";
+// 修复任务读写与结案共享边界已下沉到 salesRepairResolution.js，
+// 这里保持既有导入路径兼容，避免调用方跟随迁移。
+export {
+  SALES_REPAIR_ENTITY_TYPE,
+  SALES_REPAIR_RULE_VERSION,
+  repairRunId,
+  readSalesRepairRun,
+  writeSalesRepairRun
+};
 
 function amount(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
-}
-
-export function repairRunId(date) {
-  return `kuaimai-sales-repair:${date}:${SALES_REPAIR_RULE_VERSION}`;
 }
 
 export function summarizeRepairRows(rows = []) {
@@ -59,25 +69,6 @@ export async function readLatestDailyFacts(db) {
     WHERE TRIM(COALESCE(platform, '')) NOT IN ('', '其它', '其他', '未知', '未知平台')
     GROUP BY date ORDER BY date DESC LIMIT 8`).all();
   return (result?.results || []).map(row => ({ date: String(row.date || ""), sales: amount(row.sales), qty: amount(row.qty) })).reverse();
-}
-
-export async function readSalesRepairRun(db, date) {
-  const row = await db.prepare("SELECT payload FROM data_sync_runs WHERE entity_type = ? AND id = ?")
-    .bind(SALES_REPAIR_ENTITY_TYPE, repairRunId(date)).first();
-  try {
-    return row?.payload ? JSON.parse(row.payload) : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function writeSalesRepairRun(db, run) {
-  const timestamp = run.updatedAt || new Date().toISOString();
-  await db.prepare(`INSERT INTO data_sync_runs (entity_type, id, payload, updated_at, updated_by)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(entity_type, id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at, updated_by = excluded.updated_by`)
-    .bind(SALES_REPAIR_ENTITY_TYPE, run.id, JSON.stringify(run), timestamp, run.requestedBy || "系统自动修复").run();
-  return run;
 }
 
 async function readDayRows(db, date) {

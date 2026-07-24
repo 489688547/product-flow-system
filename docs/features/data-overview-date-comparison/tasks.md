@@ -86,3 +86,13 @@
   - 输出：范围内空日仍显示日期且无蓝柱；悬停或聚焦明细固定显示在图表外，不遮挡柱体。
   - 失败测试：趋势只返回有事实日期，页面仍在每个柱体上绝对定位明细浮层。
   - 验证：趋势与数据中心聚焦测试 30 项通过；完整 `npm test`、`npm run lint`、治理/集成/环境能力检查和生产构建通过。隔离本地 D1 页面以 2026-07-01 至 2026-07-22 验收：22 个自然日均存在，7 月 22 日日期保留且蓝柱高度为 0；有数据和空日明细均可通过键盘聚焦显示。1440/640/390px 下详情区与图表保持 8px 间距、页面无横向溢出，详情区 `pointer-events: none`。
+
+- [x] 官方导入后销售修复记录自动结案
+  - 依赖：最新销售日异常自动补拉闭环已交付；产品负责人确认结案复用同一 25% 复核口径。
+  - 文件：`functions/api/platform/v1/data-services/_shared/salesRepairResolution.js`、`functions/api/platform/v1/data-services/_shared/salesRepair.js`、`functions/api/sales.js`、`functions/api/platform/v1/erp-collection/_shared/storage.js`、`react-tests/sales-repair-resolution.test.mjs`、本功能四份文档、`docs/platform/apis/sales-data-repair-v1.md`、`docs/platform/integration-registry.json` 及重新生成的平台清单。
+  - 输入：未结的 `manual_required`/`failed` 修复任务、官方文件或采集导入写入的销售事实日期。
+  - 输出：复核 healthy 的日期任务自动结案为 `success` 并标记 `resolution: "official_import_recheck"`；导入响应与采集 summary 报告 `repairRunsResolved`；页头徽章不再计入已结案来源。
+  - 失败测试：结案共享模块不存在导致测试导入失败；结案、保持未结、无关记录跳过、两个导入入口、结案失败不影响导入的断言先行失败。
+  - 实现步骤：先共享结案模块并下沉任务读写，再接入官方导入与采集存储两个入口，全部 try/catch 兜底并写回文档与注册表。
+  - 验证：`node --test react-tests/sales-repair-resolution.test.mjs` 8 项通过；`tests/sales-api.test.mjs`、`react-tests/sales-repair.test.mjs`、`tests/kuaimai-erp-collection-api.test.mjs`、`tests/cloudflare-pages-compat.test.mjs` 保持通过；`npm run lint`、`npm run check:governance`、`npm run check:integrations`、`npm run check:environment-capabilities`、`npm test`、`npm run build` 全绿。
+  - 提交：结案模块、导入接入、文档与注册表更新。

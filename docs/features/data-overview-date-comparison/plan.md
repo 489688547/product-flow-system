@@ -510,3 +510,14 @@ git commit -m "feat: add data overview period comparison"
 - `docs/platform/`、集成注册表和环境能力清单：写回共享 API、快麦与 D1 能力变化并重新生成清单。
 - TDD 顺序：领域判定失败测试 → API 摘要失败测试 → 修复鉴权/幂等/失败安全测试 → UI 自动触发测试 → 最小实现 → 聚焦及全量门禁。
 - 数据迁移：不新增表；复用现有 `data_sync_runs`。失败和回滚均保留旧销售事实，追加式任务记录可保留。
+
+## 官方导入后自动结案增量实施计划
+
+- `functions/api/platform/v1/data-services/_shared/salesRepairResolution.js`（新增）：修复任务常量、`repairRunId`、`readSalesRepairRun`、`writeSalesRepairRun` 与 `resolveRepairedSalesDays(db, { dates, resolvedBy })`。模块只依赖 `src/domain/dataCenter.js`，不引入 `functions/api/sales.js`，避免与导入路由形成循环依赖。
+- `functions/api/platform/v1/data-services/_shared/salesRepair.js`：任务读写函数与常量下沉到 resolution 模块，原路径 re-export 保持既有导入兼容。
+- `functions/api/sales.js`：POST 两个导入分支（`replaceScope=dates` 与整月覆盖）写库成功后，用本次行的去重日期 best-effort 调用结案；响应增加 `repairRunsResolved`。
+- `functions/api/platform/v1/erp-collection/_shared/storage.js`：销售事实写入业务库成功后复核受影响日期；返回 summary 增加 `repairRunsResolved`。后续新增的本机聚合 facts 分块上传路径沿用同一边界：整批重写与单包直接复核，分块插入只在最终包复核。
+- 结案口径：该日及之前最近 8 个有效日聚合 + `detectLatestSalesAnomaly`；`healthy` 才结案为 `success`，提示“官方文件导入后复核通过，自动结案。”，追加 `resolution: "official_import_recheck"` 与复核结果 `after`；否则保持原状。
+- 失败隔离：结案查询或写入抛错只记录服务端日志，导入响应照常成功且 `repairRunsResolved` 为 0。
+- 数据迁移：不新增表、列或索引；复用 `data_sync_runs` 与既有任务 id。回滚：回退代码后未结案记录保持原状态，已结案记录是合法 `success` 任务，无需数据恢复。
+- TDD 顺序：先写结案、保持未结、异常隔离与导入接入失败测试并确认失败，再实现共享模块与接入点，最后运行完整 Definition of Done。

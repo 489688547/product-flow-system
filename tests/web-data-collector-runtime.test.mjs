@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { assertBusinessDateMatchesRange } from "../scripts/web-data-collector/index.mjs";
+import {
+  assertBusinessDateMatchesRange,
+  createCommerceFactUploader
+} from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
+import {
+  WEB_COLLECTION_ADAPTERS,
+  createProviderProcessorRegistry
+} from "../scripts/web-data-collector/providers/index.mjs";
+import { createDouyinProcessor } from "../scripts/web-data-collector/providers/douyin/index.mjs";
 
 function apiDouble(job) {
   const calls = [];
@@ -40,6 +48,37 @@ test("orchestrator schedules all extension-implemented Kuaimai resources after 0
   assert.deepEqual(plan.map(item => item.businessDate), ["2026-07-21", "2026-07-21", "2026-07-21"]);
 });
 
+test("orchestrator prefers the server-owned registered-store plan", async () => {
+  const api = apiDouble(job);
+  api.ensureRegisteredPlan = async () => {
+    api.calls.push(["ensureRegisteredPlan"]);
+    return { jobs: [{ providerId: "douyin-ecommerce", storeId: "store-a" }] };
+  };
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({})
+  });
+
+  const result = await orchestrator.prepare({ now: "2026-07-22T05:01:00+08:00" });
+  assert.equal(api.calls.some(([name]) => name === "ensureRegisteredPlan"), true);
+  assert.deepEqual(result.jobs, [{ providerId: "douyin-ecommerce", storeId: "store-a" }]);
+});
+
+test("provider processor registry resolves Kuaimai and Douyin and fails closed for unknown providers", () => {
+  const registry = createProviderProcessorRegistry([
+    { id: "kuaimai", process: async () => ({}) },
+    { id: "douyin-ecommerce", process: async () => ({}) }
+  ]);
+
+  assert.equal(registry.require("kuaimai").id, "kuaimai");
+  assert.equal(registry.require("douyin-ecommerce").id, "douyin-ecommerce");
+  assert.throws(
+    () => registry.require("unknown"),
+    error => error?.code === "PROCESSOR_NOT_REGISTERED"
+  );
+  assert.equal(WEB_COLLECTION_ADAPTERS.some(adapter => adapter.id === "kuaimai"), true);
+});
+
 test("download validation rejects a parsed range from another business date", () => {
   assert.doesNotThrow(() => assertBusinessDateMatchesRange({
     businessDate: "2026-07-22",
@@ -54,6 +93,27 @@ test("download validation rejects a parsed range from another business date", ()
     }),
     error => error?.code === "WEB_COLLECTION_BUSINESS_DATE_MISMATCH"
   );
+});
+
+test("commerce fact uploader uses the runner grant and fixed ingest route", async () => {
+  const requests = [];
+  const upload = createCommerceFactUploader({
+    baseUrl: "https://flow.example.com/",
+    runnerToken: `wdc_${"a".repeat(48)}`,
+    fetchImpl: async (url, options) => {
+      requests.push({ url, options });
+      return new Response(JSON.stringify({ data: { status: "completed", completedCount: 1 } }), {
+        status: 201,
+        headers: { "content-type": "application/json" }
+      });
+    }
+  });
+  const result = await upload({ jobId: "job-1", facts: [] });
+
+  assert.equal(requests[0].url, "https://flow.example.com/api/platform/v1/commerce-facts/ingest");
+  assert.equal(requests[0].options.headers.authorization, `Bearer wdc_${"a".repeat(48)}`);
+  assert.deepEqual(JSON.parse(requests[0].options.body), { jobId: "job-1", facts: [] });
+  assert.equal(result.completedCount, 1);
 });
 
 test("orchestrator returns a safe task and completes only after archive ingest", async () => {
@@ -143,4 +203,88 @@ test("orchestrator does not hand out the active job again while a download is be
   assert.equal(await orchestrator.nextTask(), null);
   release();
   await resultPromise;
+});
+
+test("Douyin captured store facts are validated and completed as one immutable batch", async () => {
+  const uploads = [];
+  const processor = createDouyinProcessor({
+    uploadFactChunk: async input => {
+      uploads.push(input);
+      return { completedCount: input.expectedCount };
+    }
+  });
+  const captured = {
+    kind: "captured",
+    resourceType: "store_daily",
+    facts: {
+      transactionAmount: 100,
+      transactionOrderCount: 2,
+      transactionBuyerCount: 2,
+      userPaymentAmount: 90,
+      settlementAmount: null,
+      refundAmountByPaymentDate: null,
+      refundAmountByRefundDate: 5,
+      refundOrderCountByPaymentDate: null,
+      refundOrderCountByRefundDate: 1,
+      productExposureUsers: 1000,
+      productClickUsers: 100
+    },
+    pageType: "shop_compass_overview",
+    selectorVersion: "2026-07-24"
+  };
+
+  const processed = await processor.process({
+    job: {
+      id: "douyin-job-1",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23"
+    },
+    result: captured
+  });
+
+  assert.equal(processed.rowCount, 1);
+  assert.equal(processed.confidence, "medium");
+  assert.equal(uploads.length, 2);
+  assert.equal(uploads[0].facts[0].storeId, "store-a");
+  assert.equal(uploads[1].complete, true);
+});
+
+test("processor failure records a failed transition and never completes the job", async () => {
+  const douyinJob = {
+    id: "douyin-job-2",
+    providerId: "douyin-ecommerce",
+    storeId: "store-a",
+    resourceType: "product_daily",
+    businessDate: "2026-07-23",
+    scheduleVersion: "v1"
+  };
+  const api = apiDouble(douyinJob);
+  const processors = createProviderProcessorRegistry([{
+    id: "douyin-ecommerce",
+    async process() {
+      throw Object.assign(new Error("parse failed"), { code: "DOUYIN_REPORT_SCHEMA_CHANGED" });
+    }
+  }]);
+  const orchestrator = createWebCollectorOrchestrator({ api, processors });
+  await orchestrator.nextTask();
+
+  await assert.rejects(
+    () => orchestrator.submitResult({
+      kind: "downloaded",
+      jobId: "douyin-job-2",
+      downloadId: 9,
+      safeFileName: "商品报表.xlsx",
+      pageType: "shop_compass_product",
+      reportVersion: "douyin-product-v1"
+    }),
+    error => error?.code === "DOUYIN_REPORT_SCHEMA_CHANGED"
+  );
+
+  assert.equal(api.calls.some(([name]) => name === "complete"), false);
+  assert.equal(
+    api.calls.filter(([name]) => name === "transition").at(-1)[1].status,
+    "failed"
+  );
 });

@@ -48,6 +48,7 @@ function usesHandlerBearerAuth(path) {
     || path === "/api/platform/v1/user-insights/ingest"
     || path === "/api/platform/v1/erp-collection/archives"
     || path === "/api/platform/v1/erp-collection/ingest"
+    || path === "/api/platform/v1/commerce-facts/ingest"
     || path === "/api/platform/v1/web-collection/jobs"
     || path.startsWith("/api/platform/v1/browser-agent/");
 }

@@ -84,7 +84,7 @@ test("new connector instances cannot forge a healthy connection", () => {
 test("connector definitions expose only supported platform-specific methods", () => {
   assert.deepEqual(connectorDefinition("kuaimai-erp").methods, ["browser", "export"]);
   assert.equal(connectorDefinition("kuaimai-erp").fields.some(field => field.methods?.includes("api")), false);
-  assert.deepEqual(connectorDefinition("douyin-ecommerce").methods, ["export"]);
+  assert.deepEqual(connectorDefinition("douyin-ecommerce").methods, ["browser"]);
   assert.throws(() => connectorDefinition("unknown-platform"), /未知连接器/);
 });
 
@@ -101,6 +101,6 @@ test("capture method is inferred from configured credentials", () => {
   assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { appSecret: "secret" } }), "api");
   assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { password: "secret" } }), "browser");
   assert.equal(inferConnectorCaptureMethod("oceanengine", { secretPayload: { appSecret: "api", password: "web" } }), "api");
-  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {} }), "export");
-  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {}, existingMethod: "browser" }), "export");
+  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {} }), "browser");
+  assert.equal(inferConnectorCaptureMethod("douyin-ecommerce", { secretPayload: {}, existingMethod: "browser" }), "browser");
 });

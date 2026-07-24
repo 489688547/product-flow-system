@@ -258,7 +258,12 @@ export async function onRequest({ request, env, data = {} }) {
         ...meta.imports.filter(item => !item.months?.some(month => months.includes(month)))
       ].slice(0, 60);
       await writeMeta(db, meta);
-      const repairRunsResolved = await resolveRepairRunsBestEffort(db, [...new Set(rows.map(row => String(row.date)))], body.importedBy);
+      // 整月覆盖分支受影响日期即本次行的去重日期（replaceScope=dates 分支已在上面结案）。
+      const repairRunsResolved = await resolveRepairRunsBestEffort(
+        db,
+        [...new Set(rows.map(row => String(row.date)))],
+        body.importedBy
+      );
       return jsonResponse({ synced: true, months, rows: rows.length, importedAt, repairRunsResolved });
     }
     if (request.method === "DELETE") {

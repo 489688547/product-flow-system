@@ -12,6 +12,11 @@ const COLLECTOR_TAB_KEY = "collectorTabId";
 const TAB_LOAD_TIMEOUT_MS = 30000;
 const CONTENT_SCRIPT_PROBE_TIMEOUT_MS = 10000;
 const KEEP_ALIVE_INTERVAL_MS = 20000;
+const DOUYIN_DISCOVERY_URL = "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools";
+const DOUYIN_DISCOVERY_TAB_KEY = "douyinDiscoveryTabId";
+const DOUYIN_DISCOVERY_AT_KEY = "lastDouyinDiscoveryAt";
+const DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const DOUYIN_DISCOVERY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 let polling = false;
 
 function safeBaseName(value) {
@@ -101,8 +106,6 @@ async function waitForContentScript(tabId, timeoutMs) {
 async function reportTaskResult(task, result) {
   const payload = {
     jobId: task.jobId,
-    providerId: task.providerId,
-    resourceType: task.resourceType,
     ...result
   };
   const response = await bridgeFetch(`/v1/tasks/${encodeURIComponent(task.jobId)}/result`, {
@@ -167,6 +170,68 @@ export async function ensureProviderTab(resource, targetUrl) {
 function downloadStartTime(item) {
   const parsed = Date.parse(String(item?.startTime || ""));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+async function discoveryTab() {
+  const stored = await chrome.storage.local.get([DOUYIN_DISCOVERY_TAB_KEY]);
+  const storedId = Number(stored[DOUYIN_DISCOVERY_TAB_KEY]);
+  if (Number.isSafeInteger(storedId)) {
+    try {
+      const tab = await chrome.tabs.get(storedId);
+      if (tab.url?.startsWith("https://fxg.jinritemai.com/")) {
+        return tab.url === DOUYIN_DISCOVERY_URL
+          ? waitForTabComplete(tab.id)
+          : waitForTabComplete((await chrome.tabs.update(tab.id, { url: DOUYIN_DISCOVERY_URL, active: false })).id);
+      }
+    } catch {
+      await chrome.storage.local.remove(DOUYIN_DISCOVERY_TAB_KEY);
+    }
+  }
+  const matches = await chrome.tabs.query({ url: ["https://fxg.jinritemai.com/*"] });
+  const exact = matches.find(tab => tab.url === DOUYIN_DISCOVERY_URL);
+  if (exact) return waitForTabComplete(exact.id);
+  const created = await chrome.tabs.create({ url: DOUYIN_DISCOVERY_URL, active: false });
+  await chrome.storage.local.set({ [DOUYIN_DISCOVERY_TAB_KEY]: created.id });
+  return waitForTabComplete(created.id);
+}
+
+async function discoverDouyinStore() {
+  const stored = await chrome.storage.local.get([DOUYIN_DISCOVERY_AT_KEY, "lastDouyinDiscoveryOk"]);
+  const lastAttempt = Date.parse(String(stored[DOUYIN_DISCOVERY_AT_KEY] || ""));
+  const interval = stored.lastDouyinDiscoveryOk
+    ? DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS
+    : DOUYIN_DISCOVERY_RETRY_INTERVAL_MS;
+  if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < interval) return false;
+  const attemptedAt = new Date().toISOString();
+  await chrome.storage.local.set({ [DOUYIN_DISCOVERY_AT_KEY]: attemptedAt });
+  const tab = await discoveryTab();
+  if (!await waitForContentScript(tab.id, 3000)) {
+    await chrome.storage.local.set({ lastDouyinDiscoveryOk: false, lastBridgeError: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE" });
+    return false;
+  }
+  const identity = await chrome.tabs.sendMessage(tab.id, { type: "DISCOVER_DOUYIN_STORE" });
+  if (identity?.kind !== "store_identity") {
+    await chrome.storage.local.set({
+      lastDouyinDiscoveryOk: false,
+      lastBridgeError: identity?.errorCode || "DOUYIN_STORE_IDENTITY_FAILED"
+    });
+    return false;
+  }
+  const response = await bridgeFetch("/v1/providers/douyin-ecommerce/stores/identify", {
+    method: "POST",
+    body: JSON.stringify({
+      providerId: identity.providerId,
+      storeId: identity.storeId,
+      storeName: identity.storeName
+    })
+  });
+  if (!response.ok) {
+    throw Object.assign(new Error("本机执行器未接受店铺身份。"), {
+      code: `BRIDGE_STORE_HTTP_${response.status}`
+    });
+  }
+  await chrome.storage.local.set({ lastDouyinDiscoveryOk: true, lastBridgeError: null });
+  return true;
 }
 
 // 只接受本次导出开始之后创建、且文件名匹配登记的下载；多个候选取时间
@@ -272,11 +337,12 @@ async function runRegisteredBridgeTask(task) {
   try {
     tab = await ensureProviderTab(resource, taskUrl);
   } catch (error) {
-    await reportTaskResult(task, {
-      status: "failed",
-      stage: "opening",
-      errorCode: error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
-    });
+      await reportTaskResult(task, {
+        kind: "failed",
+        errorCode: error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE",
+        safeSummary: "页面采集脚本不可用，请重载公司采集扩展后重试。",
+        stage: "opening"
+      });
     return;
   }
   const startedAt = Date.now();
@@ -284,25 +350,69 @@ async function runRegisteredBridgeTask(task) {
   try {
     result = await chrome.tabs.sendMessage(tab.id, { type: "RUN_REGISTERED_TASK", task });
   } catch {
-    await reportTaskResult(task, { status: "failed", stage: "opening", errorCode: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE" });
+    await reportTaskResult(task, {
+      kind: "failed",
+      errorCode: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE",
+      safeSummary: "页面采集脚本不可用，请重载公司采集扩展后重试。",
+      stage: "opening"
+    });
+    return;
+  }
+  if (result?.kind === "captured") {
+    if (task.providerId !== "douyin-ecommerce" || task.resourceType !== "store_daily") {
+      await reportTaskResult(task, {
+        kind: "failed",
+        errorCode: "EXTENSION_CAPTURE_RESOURCE_INVALID",
+        safeSummary: "页面读数资源与任务不匹配。",
+        stage: "collecting"
+      });
+      return;
+    }
+    await reportTaskResult(task, {
+      kind: "captured",
+      resourceType: "store_daily",
+      facts: result.facts,
+      pageType: result.pageType,
+      selectorVersion: result.selectorVersion
+    });
     return;
   }
   if (result?.status !== "exporting") {
-    await reportTaskResult(task, result || { status: "failed", stage: "opening", errorCode: "EXTENSION_NO_PAGE_RESPONSE" });
+    const status = result?.status || result?.kind;
+    const waiting = ["waiting_login", "waiting_human"].includes(status);
+    const schemaChanged = status === "schema_changed";
+    await reportTaskResult(task, waiting ? {
+      kind: "waiting_human",
+      errorCode: result?.errorCode || "EXTENSION_PAGE_NOT_READY",
+      safeSummary: result?.safeSummary || "请在公司 Chrome 完成登录或安全验证后重试。"
+    } : {
+      kind: schemaChanged ? "schema_changed" : "failed",
+      errorCode: result?.errorCode || "EXTENSION_NO_PAGE_RESPONSE",
+      safeSummary: result?.safeSummary || (schemaChanged
+        ? "平台页面结构已变化，采集已停止，请检查适配器。"
+        : "平台页面采集失败，请检查登录状态和页面可用性后重试。"),
+      stage: result?.stage || "opening"
+    });
     return;
   }
   // 下载匹配锚定内容脚本记录的导出点击时间；老版内容脚本缺省时退回任务开始时间。
   const exportStartedAt = Number(result?.exportStartedAt) > 0 ? Number(result.exportStartedAt) : startedAt;
   const download = await waitForDownload(resource, tab.id, exportStartedAt);
   if (!download) {
-    await reportTaskResult(task, { status: "failed", stage: "downloading", errorCode: "EXTENSION_DOWNLOAD_TIMEOUT" });
+    await reportTaskResult(task, {
+      kind: "failed",
+      errorCode: "EXTENSION_DOWNLOAD_TIMEOUT",
+      safeSummary: "官方报表下载超时，请稍后重试。",
+      stage: "downloading"
+    });
     return;
   }
   await reportTaskResult(task, {
-    status: "downloaded",
-    stage: "downloading",
+    kind: "downloaded",
     downloadId: download.id,
-    fileName: safeBaseName(download.filename)
+    safeFileName: safeBaseName(download.filename),
+    pageType: result.pageType || `${task.providerId.replace(/[^a-z0-9]+/gi, "_")}_${task.resourceType}`,
+    reportVersion: result.reportVersion || `${task.providerId.replace(/[^a-z0-9]+/gi, "_")}_${resource.scheduleVersion || "v1"}`
   });
 }
 
@@ -312,7 +422,11 @@ async function poll() {
   try {
     const response = await bridgeFetch("/v1/tasks/next");
     if (!response.ok) throw Object.assign(new Error("本机执行器连接失败。"), { code: `BRIDGE_HTTP_${response.status}` });
-    const { task } = await response.json();
+    let { task } = await response.json();
+    if (!task && await discoverDouyinStore()) {
+      const refreshed = await bridgeFetch("/v1/tasks/next");
+      if (refreshed.ok) ({ task } = await refreshed.json());
+    }
     if (task) await executeTask(task);
     await chrome.storage.local.set({ lastBridgeAt: new Date().toISOString(), lastBridgeError: null });
   } catch (error) {

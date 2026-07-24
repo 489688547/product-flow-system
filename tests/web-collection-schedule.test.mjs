@@ -47,6 +47,24 @@ test("late Mac startup produces the same idempotent catch-up plan", () => {
   assert.deepEqual(late.map(webCollectionJobKey), first.map(webCollectionJobKey));
 });
 
+test("store-scoped adapters create isolated daily jobs for every registered store", () => {
+  const douyin = {
+    id: "douyin-ecommerce",
+    stores: [{ id: "store-a" }, { id: "store-b" }],
+    resources: [{ type: "product_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }]
+  };
+  const plan = createDailyPlan({ adapters: [douyin], now: "2026-07-22T05:01:00+08:00" });
+
+  assert.deepEqual(plan.map(job => [job.storeId, job.businessDate]), [
+    ["store-a", "2026-07-21"],
+    ["store-b", "2026-07-21"]
+  ]);
+  assert.deepEqual(plan.map(webCollectionJobKey), [
+    "douyin-ecommerce:store-a:product_daily:2026-07-21:v1",
+    "douyin-ecommerce:store-b:product_daily:2026-07-21:v1"
+  ]);
+});
+
 test("disabled adapters and resources are not scheduled", () => {
   const plan = createDailyPlan({
     adapters: [
@@ -111,6 +129,7 @@ test("only a successful run advances the resource cursor", () => {
     completedAt: "2026-07-22T05:20:00.000Z"
   }), {
     providerId: "kuaimai",
+    storeId: "",
     resourceType: "orders",
     businessDate: "2026-07-21",
     jobId: "job-1",
@@ -134,4 +153,22 @@ test("notifications emit first failure once and one 06:30 summary", () => {
   assert.equal(summary[0].kind, "daily_summary");
   assert.equal(summary[0].count, 2);
   assert.match(summary[0].dedupeKey, /^2026-07-22:daily-summary$/);
+});
+
+test("failure notifications remain isolated by store", () => {
+  const jobs = ["store-a", "store-b"].map((storeId, index) => ({
+    id: `job-${index}`,
+    providerId: "douyin-ecommerce",
+    storeId,
+    resourceType: "product_daily",
+    businessDate: "2026-07-23",
+    status: "failed",
+    stage: "exporting",
+    errorCode: "DOUYIN_EXPORT_TIMEOUT"
+  }));
+  const intents = notificationIntents({ jobs, now: "2026-07-24T05:30:00+08:00" });
+
+  assert.equal(intents.length, 2);
+  assert.equal(new Set(intents.map(item => item.dedupeKey)).size, 2);
+  assert.deepEqual(intents.map(item => item.storeId), ["store-a", "store-b"]);
 });

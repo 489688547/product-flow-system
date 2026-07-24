@@ -4,27 +4,35 @@ import { createServer } from "node:http";
 const SAFE_TASK_FIELDS = Object.freeze([
   "jobId",
   "providerId",
+  "storeId",
   "resourceType",
   "businessDate",
   "status",
   "attempt",
   "scheduleVersion"
 ]);
-const SAFE_RESULT_FIELDS = new Set([
-  "jobId",
-  "providerId",
-  "resourceType",
-  "status",
-  "stage",
-  "downloadId",
-  "fileName",
-  "rowCount",
-  "errorCode",
-  "errorSummary",
-  "startedAt",
-  "completedAt"
+const STORE_DAILY_FACT_KEYS = Object.freeze([
+  "transactionAmount",
+  "transactionOrderCount",
+  "transactionBuyerCount",
+  "userPaymentAmount",
+  "settlementAmount",
+  "refundAmountByPaymentDate",
+  "refundAmountByRefundDate",
+  "refundOrderCountByPaymentDate",
+  "refundOrderCountByRefundDate",
+  "productExposureUsers",
+  "productClickUsers"
 ]);
-const FORBIDDEN_FIELD_PATTERN = /(password|passwd|secret|cookie|token|authorization|credential|otp|captcha|html|page|screenshot|selector|script|url|path)/i;
+const RESULT_FIELDS = Object.freeze({
+  downloaded: new Set(["kind", "jobId", "downloadId", "safeFileName", "pageType", "reportVersion"]),
+  captured: new Set(["kind", "jobId", "resourceType", "facts", "pageType", "selectorVersion"]),
+  waiting_human: new Set(["kind", "jobId", "errorCode", "safeSummary"]),
+  failed: new Set(["kind", "jobId", "errorCode", "safeSummary", "stage"]),
+  schema_changed: new Set(["kind", "jobId", "errorCode", "safeSummary", "stage"])
+});
+const SAFE_CODE = /^[A-Z0-9_]{3,80}$/;
+const SAFE_LABEL = /^[a-zA-Z0-9_-]{1,80}$/;
 
 function json(response, status, body, origin) {
   response.writeHead(status, {
@@ -47,19 +55,62 @@ function safeTaskProjection(task) {
   return Object.fromEntries(SAFE_TASK_FIELDS.filter(field => task[field] !== undefined).map(field => [field, task[field]]));
 }
 
+function validateStoreIdentity(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("STORE_IDENTITY_INVALID");
+  const allowed = new Set(["providerId", "storeId", "storeName"]);
+  if (Object.keys(value).some(field => !allowed.has(field))) throw new Error("STORE_IDENTITY_UNSAFE_FIELD");
+  const providerId = String(value.providerId || "");
+  const storeId = String(value.storeId || "");
+  const storeName = String(value.storeName || "").trim();
+  if (
+    providerId !== "douyin-ecommerce"
+    || !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)
+    || !storeName
+    || storeName.length > 120
+    || /[\u0000-\u001f\u007f]/.test(storeName)
+  ) {
+    throw new Error("STORE_IDENTITY_INVALID");
+  }
+  return { providerId, storeId, storeName };
+}
+
 function validateResult(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("RESULT_INVALID");
-  for (const field of Object.keys(value)) {
-    if (!SAFE_RESULT_FIELDS.has(field) || FORBIDDEN_FIELD_PATTERN.test(field)) throw new Error("RESULT_UNSAFE_FIELD");
-  }
+  const allowed = RESULT_FIELDS[value.kind];
+  if (!allowed) throw new Error("RESULT_KIND_INVALID");
+  if (Object.keys(value).some(field => !allowed.has(field))) throw new Error("RESULT_UNSAFE_FIELD");
   if (!/^[-_a-zA-Z0-9]{1,128}$/.test(String(value.jobId || ""))) throw new Error("RESULT_JOB_ID_INVALID");
-  if (value.fileName !== undefined) {
-    const fileName = String(value.fileName || "");
+  if (value.kind === "downloaded") {
+    const fileName = String(value.safeFileName || "");
     if (!fileName || fileName.includes("/") || fileName.includes("\\") || fileName === "." || fileName === "..") {
       throw new Error("RESULT_FILE_NAME_INVALID");
     }
+    if (!Number.isSafeInteger(value.downloadId) || value.downloadId < 0) throw new Error("RESULT_DOWNLOAD_ID_INVALID");
+    if (!SAFE_LABEL.test(String(value.pageType || "")) || !SAFE_LABEL.test(String(value.reportVersion || ""))) {
+      throw new Error("RESULT_REPORT_IDENTITY_INVALID");
+    }
   }
-  if (value.errorSummary !== undefined && String(value.errorSummary).length > 240) throw new Error("RESULT_SUMMARY_TOO_LONG");
+  if (value.kind === "captured") {
+    if (value.resourceType !== "store_daily") throw new Error("RESULT_CAPTURE_RESOURCE_INVALID");
+    if (!SAFE_LABEL.test(String(value.pageType || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(value.selectorVersion || ""))) {
+      throw new Error("RESULT_CAPTURE_IDENTITY_INVALID");
+    }
+    if (!value.facts || typeof value.facts !== "object" || Array.isArray(value.facts)) {
+      throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+    }
+    const keys = Object.keys(value.facts);
+    if (keys.length !== STORE_DAILY_FACT_KEYS.length || keys.some(key => !STORE_DAILY_FACT_KEYS.includes(key))) {
+      throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+    }
+    if (keys.some(key => value.facts[key] !== null && !Number.isFinite(value.facts[key]))) {
+      throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+    }
+  }
+  if (["waiting_human", "failed", "schema_changed"].includes(value.kind)) {
+    if (!SAFE_CODE.test(String(value.errorCode || ""))) throw new Error("RESULT_ERROR_CODE_INVALID");
+    if (!String(value.safeSummary || "") || String(value.safeSummary).length > 240) throw new Error("RESULT_SUMMARY_TOO_LONG");
+    if (value.stage !== undefined && !SAFE_LABEL.test(String(value.stage))) throw new Error("RESULT_STAGE_INVALID");
+  }
   return Object.fromEntries(Object.entries(value));
 }
 
@@ -74,10 +125,14 @@ async function readJson(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
-export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, submitResult }) {
+export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, submitResult, registerStore }) {
   if (!/^chrome-extension:\/\/[a-p]{32}$/.test(String(allowedOrigin || ""))) throw new Error("BRIDGE_ORIGIN_INVALID");
   if (!/^wcp_[a-f0-9]{48}$/i.test(String(pairingKey || ""))) throw new Error("BRIDGE_PAIRING_KEY_INVALID");
-  if (typeof getNextTask !== "function" || typeof submitResult !== "function") throw new Error("BRIDGE_HANDLERS_REQUIRED");
+  if (
+    typeof getNextTask !== "function"
+    || typeof submitResult !== "function"
+    || typeof registerStore !== "function"
+  ) throw new Error("BRIDGE_HANDLERS_REQUIRED");
 
   let server;
   let listeningPort = null;
@@ -110,6 +165,11 @@ export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, 
       }
       if (request.method === "GET" && url.pathname === "/v1/tasks/next") {
         json(response, 200, { task: safeTaskProjection(await getNextTask()) }, allowedOrigin);
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/v1/providers/douyin-ecommerce/stores/identify") {
+        await registerStore(validateStoreIdentity(await readJson(request)));
+        json(response, 202, { accepted: true }, allowedOrigin);
         return;
       }
       const resultRoute = url.pathname.match(/^\/v1\/tasks\/([-_a-zA-Z0-9]{1,128})\/result$/);

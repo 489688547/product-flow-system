@@ -25,4 +25,5 @@ test("desktop collapses App children while mobile restores the flat authorized n
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.sidebar-group-toggle svg/);
   assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.sidebar-app-group\s*,\s*\.sidebar-group-items\s*\{[^}]*display:\s*contents/s);
   assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.sidebar-app-group\.collapsible:not\(\.expanded\) \.sidebar-nav-item:not\(:first-child\)\s*\{[^}]*display:\s*grid/s);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.sidebar\s*\{[^}]*min-height:\s*0/s);
 });

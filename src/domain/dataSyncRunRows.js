@@ -3,7 +3,11 @@ const TERMINAL_JOB_STATES = new Set(["success", "failed", "waiting_human", "sche
 const RESOURCE_LABELS = Object.freeze({
   orders: "订单",
   order_items: "订单商品明细",
-  sales_items: "销售主题明细"
+  sales_items: "销售主题明细",
+  store_daily: "店铺每日",
+  product_daily: "商品每日",
+  live_daily: "直播每日",
+  video_daily: "短视频每日"
 });
 
 function safeDate(value) {
@@ -16,7 +20,11 @@ function timestamp(row) {
 }
 
 function sourceName(job) {
-  const provider = job?.providerId === "kuaimai" ? "快麦 ERP" : String(job?.providerId || "网页采集");
+  const provider = job?.providerId === "kuaimai"
+    ? "快麦 ERP"
+    : job?.providerId === "douyin-ecommerce"
+      ? "抖店罗盘"
+      : String(job?.providerId || "网页采集");
   const resource = RESOURCE_LABELS[job?.resourceType] || String(job?.resourceType || "未知资源");
   return `${provider} · ${resource}`;
 }

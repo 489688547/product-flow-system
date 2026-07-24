@@ -31,7 +31,8 @@ const STATUS_LABELS = {
   pending_validation: "等待首次验证",
   healthy: "已接通",
   unconfigured: "尚未添加连接",
-  disabled: "已停用"
+  disabled: "已停用",
+  unavailable: "尚未接入"
 };
 
 function summaryStatus(instances) {
@@ -47,14 +48,21 @@ export function ConnectorCatalog({
   onManage,
   waitingForSamples = () => false,
   pendingMessage = "",
-  pendingActionLabel = "等待文件样例"
+  pendingActionLabel = "等待文件样例",
+  providerReadiness = {}
 }) {
   return (
     <div className="data-access-grid connector-catalog-grid">
       {definitions.map(definition => {
         const samplePending = waitingForSamples(definition.id);
-        const configured = samplePending ? [] : instances.filter(item => item.connectorId === definition.id);
-        const status = samplePending ? "sample_pending" : summaryStatus(configured);
+        const readiness = providerReadiness[definition.id];
+        const fixedUnavailable = readiness?.status === "unavailable";
+        const configured = samplePending || definition.id === "douyin-ecommerce"
+          ? []
+          : instances.filter(item => item.connectorId === definition.id);
+        const status = samplePending
+          ? "sample_pending"
+          : readiness?.status || summaryStatus(configured);
         return (
           <article className={`connector-card status-${status}`} key={definition.id}>
             <div className="connector-card-head">
@@ -63,8 +71,24 @@ export function ConnectorCatalog({
               <em>{samplePending ? "等待文件样例" : STATUS_LABELS[status]}</em>
             </div>
             <div className="connector-methods" aria-label={`${definition.name}支持的接入方式`}>
-              {definition.methods.map(method => <span key={method}>{METHOD_LABELS[method]}</span>)}
+              {definition.methods.map(method => <span key={method}>{definition.id === "douyin-ecommerce" && method === "browser" ? "Chrome 官方报表采集" : METHOD_LABELS[method]}</span>)}
             </div>
+            {definition.collectionResources?.length ? <div className="connector-methods" aria-label="抖店采集资源">
+              {definition.collectionResources.map(resource => {
+                const resourceState = readiness?.resources?.find(item => item.type === resource.type);
+                return <span key={resource.type}>{resource.label}{resourceState?.status === "success" ? " · 已完成" : ""}</span>;
+              })}
+            </div> : null}
+            {definition.id === "douyin-ecommerce" && readiness?.stores?.length ? (
+              <ul className="connector-instance-list" aria-label="已识别抖店店铺">
+                {readiness.stores.slice(0, 3).map(store => (
+                  <li key={store.storeId}>
+                    <span><b>{store.storeName}</b><small>店铺 ID {store.storeId}</small></span>
+                    <em>{store.status === "connected" ? "已识别" : "已停用"}</em>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {configured.length ? (
               <ul className="connector-instance-list">
                 {configured.slice(0, 3).map(instance => (
@@ -80,16 +104,29 @@ export function ConnectorCatalog({
                   </li>
                 ))}
               </ul>
-            ) : <p>{samplePending ? pendingMessage : "配置保存后先进入待验证，不会直接标记为已接通。"}</p>}
-            <button
+            ) : <p>{samplePending
+              ? pendingMessage
+              : fixedUnavailable
+                ? "尚未接入；不会把广告消耗、ROI 或素材数据返回为 0。"
+                : readiness?.error
+                  ? readiness.error
+                  : definition.id === "douyin-ecommerce"
+                    ? "只有四类资源完成真实批次后才显示已接通；登录或验证失败会进入数据同步记录。"
+                    : "配置保存后先进入待验证，不会直接标记为已接通。"}</p>}
+            {definition.id === "douyin-ecommerce" ? <a
+              className="connector-add-action"
+              href="https://fxg.jinritemai.com/"
+              target="_blank"
+              rel="noreferrer"
+            ><Plus size={15} />打开抖店处理</a> : <button
               className="connector-add-action"
               type="button"
-              disabled={samplePending || !canEdit}
-              title={samplePending ? pendingMessage : (!canEdit ? "当前账号没有数据接入编辑权限" : undefined)}
+              disabled={samplePending || fixedUnavailable || !canEdit}
+              title={samplePending ? pendingMessage : fixedUnavailable ? "尚未接入" : (!canEdit ? "当前账号没有数据接入编辑权限" : undefined)}
               onClick={() => onAdd(definition)}
             >
-              <Plus size={15} />{samplePending ? pendingActionLabel : "添加连接"}
-            </button>
+              <Plus size={15} />{samplePending ? pendingActionLabel : fixedUnavailable ? "尚未接入" : "添加连接"}
+            </button>}
           </article>
         );
       })}

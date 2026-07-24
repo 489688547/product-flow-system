@@ -142,6 +142,110 @@ test("control plane accepts the canonical Kuaimai order_items resource used by t
   assert.equal(result.body.data.jobs[0].resourceType, "order_items");
 });
 
+test("control plane keeps same-day Douyin jobs isolated by store", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const token = registration.body.data.token;
+  const makeJob = storeId => ({
+    providerId: "douyin-ecommerce",
+    storeId,
+    resourceType: "product_daily",
+    businessDate: "2026-07-23",
+    rangeKind: "daily_fact",
+    range: { start: "2026-07-23T00:00:00+08:00", end: "2026-07-23T23:59:59+08:00", timeZone: "Asia/Shanghai" },
+    scheduleVersion: "v1",
+    idempotencyKey: `douyin-ecommerce:${storeId}:product_daily:2026-07-23:v1`
+  });
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token,
+    body: { action: "ensure_plan", jobs: [makeJob("store-a"), makeJob("store-b")] }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.created, 2);
+  assert.deepEqual(result.body.data.jobs.map(job => job.storeId), ["store-a", "store-b"]);
+  assert.equal(db.tables.web_collection_jobs.size, 2);
+
+  const unsafe = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token,
+    body: { action: "ensure_plan", jobs: [makeJob("../unsafe")] }
+  });
+  assert.equal(unsafe.response.status, 400);
+  assert.equal(unsafe.body.error.code, "WEB_COLLECTION_JOB_INVALID");
+});
+
+test("runner registers a safely discovered Douyin store before creating its daily tasks", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const identified = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: registration.body.data.token,
+    body: {
+      action: "register_store",
+      providerId: "douyin-ecommerce",
+      storeId: "90862283",
+      storeName: "TIYES提野星宠物用品旗舰店"
+    }
+  });
+
+  assert.equal(identified.response.status, 200);
+  assert.deepEqual(identified.body.data.store, {
+    providerId: "douyin-ecommerce",
+    storeId: "90862283",
+    storeName: "TIYES提野星宠物用品旗舰店",
+    status: "connected",
+    lastSeenAt: identified.body.data.store.lastSeenAt
+  });
+  assert.equal(db.tables.web_collection_stores.get("douyin-ecommerce:90862283").runner_id, registration.body.data.id);
+
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: registration.body.data.token,
+    body: { action: "ensure_registered_plan" }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.jobs.filter(job => job.providerId === "kuaimai").length, 3);
+  assert.equal(result.body.data.jobs.filter(job => job.providerId === "douyin-ecommerce").length, 4);
+  assert.deepEqual(
+    result.body.data.jobs
+      .filter(job => job.providerId === "douyin-ecommerce")
+      .map(job => job.storeId),
+    ["90862283", "90862283", "90862283", "90862283"]
+  );
+
+  const status = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    db,
+    session: executive
+  });
+  assert.equal(status.body.data.stores[0].storeName, "TIYES提野星宠物用品旗舰店");
+});
+
+test("runner store registration rejects unknown providers and unsafe identity fields", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  for (const body of [
+    { action: "register_store", providerId: "unknown", storeId: "90862283", storeName: "旗舰店" },
+    { action: "register_store", providerId: "douyin-ecommerce", storeId: "../90862283", storeName: "旗舰店" },
+    { action: "register_store", providerId: "douyin-ecommerce", storeId: "90862283", storeName: "x\n恶意字段" }
+  ]) {
+    const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+      method: "POST",
+      db,
+      token: registration.body.data.token,
+      body
+    });
+    assert.equal(result.response.status, 400);
+    assert.equal(result.body.error.code, "WEB_COLLECTION_STORE_INVALID");
+  }
+});
+
 test("claim lease, legal transitions, completion and cursor are atomic from the runner perspective", async () => {
   const db = createWebCollectionD1Mock();
   const registration = await register(db);
@@ -256,6 +360,9 @@ test("runner reclaims an expired non-terminal stage after a local crash", async 
   await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
     method: "POST", db, token, body: { action: "transition", jobId, from: "claimed", status: "opening", stage: "opening" }
   });
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "transition", jobId, from: "opening", status: "collecting", stage: "collecting" }
+  });
   db.tables.web_collection_jobs.get(jobId).lease_expires_at = "2026-07-20T00:00:00.000Z";
 
   const reclaimed = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
@@ -322,6 +429,29 @@ test("authorized operator triggers the repaired Kuaimai orders schedule", async 
 
   assert.equal(result.response.status, 200);
   assert.equal(result.body.data.job.idempotencyKey, "kuaimai:orders:2026-07-22:v2:env:production:v1");
+});
+
+test("authorized operator triggers a registered Douyin store resource", async () => {
+  const db = createWebCollectionD1Mock();
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    body: {
+      action: "trigger",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23"
+    }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.job.storeId, "store-a");
+  assert.equal(
+    result.body.data.job.idempotencyKey,
+    "douyin-ecommerce:store-a:store_daily:2026-07-23:v1:env:production:v1"
+  );
 });
 
 test("manual confirmation requeues a Kuaimai job after login is restored", async () => {

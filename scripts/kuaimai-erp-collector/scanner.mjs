@@ -22,6 +22,8 @@ function resourceFromName(fileName) {
   if (/店铺/.test(name)) return "shops";
   if (/销售主题|订单商品/.test(name)) return "sales_items";
   if (/sku|规格/.test(name)) return "skus";
+  if (/组合装/.test(name)) return "product_combinations";
+  if (/套件/.test(name)) return "product_kits";
   if (/商品|产品/.test(name)) return "products";
   if (/明细/.test(name)) return "order_items";
   if (/订单|order/.test(name)) return "orders";
@@ -31,7 +33,7 @@ function resourceFromName(fileName) {
 async function identifyAndRead(filePath, resourceType = "") {
   const preferred = resourceType || resourceFromName(path.basename(filePath));
   if (preferred) return { resourceType: preferred, parsed: await readKuaimaiExport(filePath, { resourceType: preferred }) };
-  const candidates = ["orders", "order_items", "sales_items", "products", "skus", "inventory_snapshot", "inventory_movements", "suppliers", "purchase_orders", "aftersales", "shops", "warehouses"];
+  const candidates = ["orders", "order_items", "sales_items", "product_kits", "product_combinations", "products", "skus", "inventory_snapshot", "inventory_movements", "suppliers", "purchase_orders", "aftersales", "shops", "warehouses"];
   let lastError;
   for (const candidate of candidates) {
     try {

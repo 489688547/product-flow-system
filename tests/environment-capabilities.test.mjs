@@ -58,6 +58,13 @@ test("platform credential vault declares its root secret migration and affected 
 
   const chromeCollection = manifest.capabilities.find(entry => entry.id === "company-web-data-collection");
   assert.deepEqual(chromeCollection.requiredIn, ["preview", "production"]);
+  assert.deepEqual(chromeCollection.platforms, [
+    "cloudflare-pages",
+    "cloudflare-d1",
+    "kuaimai",
+    "douyin-ecommerce",
+    "erp-file-import"
+  ]);
   assert.match(chromeCollection.description, /异常.*幂等排队/);
 
   const registry = JSON.parse(readFileSync(resolve(root, "docs/platform/integration-registry.json"), "utf8"));
@@ -159,4 +166,42 @@ test("environment capability validation rejects secret values and unknown platfo
   const errors = validateEnvironmentCapabilities(invalid, registry);
   assert.equal(errors.some(error => error.includes("未知平台")), true);
   assert.equal(errors.some(error => error.includes("变量名")), true);
+});
+
+test("Douyin Compass collection declares control and business D1 boundaries without a new secret", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const capability = manifest.capabilities.find(entry => entry.id === "douyin-compass-collection");
+
+  assert.ok(capability, "Douyin Compass collection capability must be declared");
+  assert.deepEqual(capability.platforms, [
+    "douyin-ecommerce",
+    "erp-file-import",
+    "cloudflare-pages",
+    "cloudflare-d1"
+  ]);
+  assert.deepEqual(capability.requiredIn, ["preview", "production"]);
+  assert.deepEqual(capability.envVars, []);
+  assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"]);
+  assert.deepEqual(capability.bindingTables.PRODUCT_FLOW_DB, [
+    "web_collection_runners",
+    "web_collection_stores",
+    "web_collection_jobs",
+    "web_collection_runs",
+    "web_collection_cursors",
+    "web_collection_notifications",
+    "commerce_fact_batches",
+    "commerce_store_daily_facts",
+    "commerce_product_daily_facts",
+    "commerce_live_daily_facts",
+    "commerce_video_daily_facts"
+  ]);
+  assert.deepEqual(capability.bindingTables.DEMO_FLOW_DB, [
+    "commerce_fact_batches",
+    "commerce_store_daily_facts",
+    "commerce_product_daily_facts",
+    "commerce_live_daily_facts",
+    "commerce_video_daily_facts"
+  ]);
+  assert.match(capability.description, /账号密码登录保持退役/);
+  assert.match(capability.description, /已登录 Chrome/);
 });

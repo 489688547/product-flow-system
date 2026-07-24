@@ -65,10 +65,18 @@ const GOODS_FLOW_TABLES = [
 
 const WEB_COLLECTION_TABLES = [
   "web_collection_runners",
+  "web_collection_stores",
   "web_collection_jobs",
   "web_collection_runs",
   "web_collection_cursors",
   "web_collection_notifications"
+];
+const COMMERCE_FACT_TABLES = [
+  "commerce_fact_batches",
+  "commerce_store_daily_facts",
+  "commerce_product_daily_facts",
+  "commerce_live_daily_facts",
+  "commerce_video_daily_facts"
 ];
 const DATA_ENVIRONMENT_CONTROL_TABLES = [
   "data_environment_grants",
@@ -80,7 +88,8 @@ const DISPLAY_REQUIRED_TABLES = [
   "product_flow_state",
   "product_flow_state_parts",
   "product_sales_daily",
-  "product_sales_meta"
+  "product_sales_meta",
+  ...COMMERCE_FACT_TABLES
 ];
 
 async function loadRoute() {
@@ -172,7 +181,7 @@ test("environment readiness reports missing production bindings and variables wi
 
 test("warning capabilities do not block an otherwise ready production environment", async () => {
   const { onRequest } = await loadRoute();
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES, ...DATA_ENVIRONMENT_CONTROL_TABLES];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES, ...COMMERCE_FACT_TABLES, ...DATA_ENVIRONMENT_CONTROL_TABLES];
   const response = await onRequest({
     request: request(),
     env: {
@@ -210,7 +219,7 @@ test("a server-only production data token can read readiness without an employee
   const bytes = new TextEncoder().encode(rawToken);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   const tokenHash = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
-  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES, ...DATA_ENVIRONMENT_CONTROL_TABLES];
+  const tables = [...REQUIRED_PRODUCTION_TABLES, ...businessDataTables, ...HR_CORE_TABLES, ...USER_INSIGHT_TABLES, ...GOODS_FLOW_TABLES, ...WEB_COLLECTION_TABLES, ...COMMERCE_FACT_TABLES, ...DATA_ENVIRONMENT_CONTROL_TABLES];
   const db = {
     prepare(sql) {
       const statement = {
