@@ -537,6 +537,25 @@ test("API middleware lets ERP archive and ingest routes validate collector token
   }
 });
 
+test("API middleware lets commerce fact ingest validate the web collection runner token", async () => {
+  let continued = false;
+  const response = await apiMiddleware({
+    request: new Request("https://flow.example.com/api/platform/v1/commerce-facts/ingest", {
+      method: "POST",
+      headers: { authorization: "Bearer runner-token" }
+    }),
+    env: {},
+    data: {},
+    next: async () => {
+      continued = true;
+      return Response.json({ ok: true });
+    }
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(continued, true);
+});
+
 async function localOnlineEnv({ capabilities = ["read", "write"] } = {}) {
   const db = createAuthD1Mock();
   await upsertOrgMembers(db, {
