@@ -16,6 +16,15 @@ const FEATURES = Object.freeze([
     supportsSkills: false,
     fallbackMode: "rule_fallback",
     historyNote: "统一接入前暂无统计"
+  }),
+  Object.freeze({
+    appId: "company-platform",
+    appName: "公司平台",
+    featureId: "development-backlog-draft",
+    featureName: "研发待办草稿",
+    supportsSkills: false,
+    fallbackMode: "none",
+    historyNote: ""
   })
 ]);
 

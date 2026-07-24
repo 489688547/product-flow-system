@@ -133,7 +133,7 @@ test("AI usage report returns registered zero-use features and safe storage erro
   const empty = await onRequest(context({ db: usageDb() }));
   const emptyPayload = await empty.json();
   assert.equal(empty.status, 200);
-  assert.equal(emptyPayload.features.length, 2);
+  assert.equal(emptyPayload.features.length, 3);
   assert.ok(emptyPayload.features.every(row => row.providerCalls === 0 && row.successRate === null));
   assert.equal(emptyPayload.features.find(row => row.featureId === "plan-review").historyNote, "统一接入前暂无统计");
   assert.deepEqual(emptyPayload.skills, []);
