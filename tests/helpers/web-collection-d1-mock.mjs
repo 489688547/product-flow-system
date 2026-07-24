@@ -5,7 +5,7 @@ export function createWebCollectionD1Mock() {
     web_collection_runs: new Map(),
     web_collection_cursors: new Map(),
     web_collection_notifications: new Map(),
-    data_connection_shops: new Map(),
+    web_collection_stores: new Map(),
     production_data_access_tokens: new Map(),
     product_flow_org_members: new Map()
   };
@@ -59,7 +59,7 @@ export function createWebCollectionD1Mock() {
         if (query.includes("from web_collection_runs")) return { results: [...tables.web_collection_runs.values()] };
         if (query.includes("from web_collection_cursors")) return { results: [...tables.web_collection_cursors.values()] };
         if (query.includes("from web_collection_notifications")) return { results: [...tables.web_collection_notifications.values()] };
-        if (query.includes("from data_connection_shops")) return { results: [...tables.data_connection_shops.values()] };
+        if (query.includes("from web_collection_stores")) return { results: [...tables.web_collection_stores.values()] };
         return { results: [] };
       },
       async run() {
@@ -68,6 +68,23 @@ export function createWebCollectionD1Mock() {
           tables.web_collection_runners.set(id, {
             id, name, token_hash: tokenHash, scope, status, version: null, chrome_status: null,
             current_job_id: null, last_seen_at: null, created_at: createdAt, created_by: createdBy
+          });
+          return { success: true };
+        }
+        if (query.startsWith("insert into web_collection_stores")) {
+          const [id, providerId, storeId, storeName, runnerId, lastSeenAt, createdAt, updatedAt] = state.values;
+          const key = `${providerId}:${storeId}`;
+          const current = tables.web_collection_stores.get(key);
+          tables.web_collection_stores.set(key, {
+            id: current?.id || id,
+            provider_id: providerId,
+            store_id: storeId,
+            store_name: storeName,
+            status: "connected",
+            runner_id: runnerId,
+            last_seen_at: lastSeenAt,
+            created_at: current?.created_at || createdAt,
+            updated_at: updatedAt
           });
           return { success: true };
         }

@@ -28,7 +28,7 @@ export function DataSourcesWorkspace({ canEdit, canManage, canManagePlatform, in
   return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManagePlatform} initialCategory={initialCategory} />;
 }
 
-const EMPTY_WEB_COLLECTION_STATUS = Object.freeze({ runners: [], jobs: [], runs: [], cursors: [], notifications: [] });
+const EMPTY_WEB_COLLECTION_STATUS = Object.freeze({ runners: [], stores: [], jobs: [], runs: [], cursors: [], notifications: [] });
 
 export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = false }) {
   const { state, refresh } = useDataCenter();
@@ -86,6 +86,9 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
   }), [state.syncRuns, webCollection.jobs, webCollection.runs]);
   const douyinStoreIds = useMemo(() => {
     const ids = new Set();
+    webCollection.stores.forEach(store => {
+      if (store.providerId === "douyin-ecommerce" && store.storeId) ids.add(store.storeId);
+    });
     webCollection.jobs.forEach(job => {
       if (job.providerId === "douyin-ecommerce" && job.storeId) ids.add(job.storeId);
     });
@@ -93,7 +96,12 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
       if (cursor.providerId === "douyin-ecommerce" && cursor.storeId) ids.add(cursor.storeId);
     });
     return [...ids].sort();
-  }, [webCollection.cursors, webCollection.jobs]);
+  }, [webCollection.cursors, webCollection.jobs, webCollection.stores]);
+  const douyinStoreNames = useMemo(() => new Map(
+    webCollection.stores
+      .filter(store => store.providerId === "douyin-ecommerce")
+      .map(store => [store.storeId, store.storeName])
+  ), [webCollection.stores]);
   const douyinResourceRows = useMemo(() => {
     const storeIds = douyinStoreIds.length ? douyinStoreIds : [""];
     return storeIds.flatMap(storeId => buildDouyinCollectionRecovery({
@@ -101,8 +109,12 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
       runners: webCollection.runners,
       jobs: webCollection.jobs,
       cursors: webCollection.cursors
-    }).resources.map(resource => ({ ...resource, storeId })));
-  }, [douyinStoreIds, webCollection.cursors, webCollection.jobs, webCollection.runners]);
+    }).resources.map(resource => ({
+      ...resource,
+      storeId,
+      storeName: douyinStoreNames.get(storeId) || ""
+    })));
+  }, [douyinStoreIds, douyinStoreNames, webCollection.cursors, webCollection.jobs, webCollection.runners]);
   useEffect(() => {
     if (focusTarget !== "kuaimai-sales" || salesAnomaly?.status !== "anomaly") return;
     const frame = requestAnimationFrame(() => {
@@ -182,7 +194,7 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
       <div className="section-head"><div><h2>抖店 Chrome 官方报表采集</h2><p>每天 05:00 后按已登记店铺采集昨天的四类资源；失败会留记录，不会覆盖上次可信批次。</p></div><a className="btn" href="https://fxg.jinritemai.com/" target="_blank" rel="noreferrer"><MonitorCheck size={16} aria-hidden="true" />打开抖店处理</a></div>
       {douyinTriggerMessage ? <p className="data-sync-trigger-message" role="status">{douyinTriggerMessage}</p> : null}
       <DataTable minWidth={760} columns={[
-        { key: "store", header: "店铺", render: row => row.storeId || "尚未识别" },
+        { key: "store", header: "店铺", render: row => row.storeName ? <span><strong>{row.storeName}</strong><small>店铺 ID {row.storeId}</small></span> : row.storeId || "尚未识别" },
         { key: "resource", header: "资源", render: row => row.label },
         { key: "date", header: "业务日期", render: row => row.businessDate || "—" },
         { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : ["failed", "waiting_human", "schema_changed"].includes(row.status) ? "danger" : "warning"}`}>{row.status === "unavailable" ? "尚未完成真实采集" : statusLabel(row.status)}</span> },

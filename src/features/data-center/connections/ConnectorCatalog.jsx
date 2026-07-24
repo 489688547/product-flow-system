@@ -79,6 +79,16 @@ export function ConnectorCatalog({
                 return <span key={resource.type}>{resource.label}{resourceState?.status === "success" ? " · 已完成" : ""}</span>;
               })}
             </div> : null}
+            {definition.id === "douyin-ecommerce" && readiness?.stores?.length ? (
+              <ul className="connector-instance-list" aria-label="已识别抖店店铺">
+                {readiness.stores.slice(0, 3).map(store => (
+                  <li key={store.storeId}>
+                    <span><b>{store.storeName}</b><small>店铺 ID {store.storeId}</small></span>
+                    <em>{store.status === "connected" ? "已识别" : "已停用"}</em>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             {configured.length ? (
               <ul className="connector-instance-list">
                 {configured.slice(0, 3).map(instance => (

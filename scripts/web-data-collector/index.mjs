@@ -168,6 +168,7 @@ async function serve({ root, baseUrl, downloadsDirectory }) {
     allowedOrigin: EXTENSION_ORIGIN,
     pairingKey,
     getNextTask: () => orchestrator.nextTask(),
+    registerStore: store => orchestrator.registerStore(store),
     submitResult: result => {
       void orchestrator.submitResult(result).catch(() => {});
     }

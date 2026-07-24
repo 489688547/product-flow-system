@@ -71,6 +71,7 @@ test("Kuaimai async exports are completed through the bundled download center ad
 test("Douyin content execution supports safe capture and official downloads only", async () => {
   const manifest = JSON.parse(await readFile(new URL("manifest.json", extensionRoot), "utf8"));
   const contentScript = await readFile(new URL("douyin-content-script.js", extensionRoot), "utf8");
+  const adapter = await readFile(new URL("providers/douyin.js", extensionRoot), "utf8");
   const executor = await readFile(new URL("providers/executors/douyin.js", extensionRoot), "utf8");
   const serviceWorker = await readFile(new URL("service-worker.js", extensionRoot), "utf8");
 
@@ -85,10 +86,39 @@ test("Douyin content execution supports safe capture and official downloads only
   assert.match(executor, /download_official_report|clickOfficialReport/);
   assert.match(executor, /captureStoreOverview/);
   assert.match(executor, /DOUYIN_HUMAN_VERIFICATION_REQUIRED|classifyDouyinPage/);
+  assert.match(executor, /近1天/);
+  assert.match(executor, /userName/);
+  assert.match(executor, /data-card-wrapper/);
+  assert.match(executor, /短视频明细/);
+  assert.match(adapter, /route:\s*"\/shop\/merchandise-traffic"/);
+  assert.match(adapter, /route:\s*"\/shop\/live-overview"/);
+  assert.match(adapter, /route:\s*"\/shop\/video\/overview"/);
   assert.match(serviceWorker, /result\?\.kind === "captured"/);
   assert.match(serviceWorker, /safeFileName/);
   assert.doesNotMatch(executor, /chrome\.(cookies|debugger|webRequest)/);
   assert.doesNotMatch(executor, /task\.(url|selector|script)/);
+});
+
+test("Douyin visible-number parsing only applies the unit attached to the primary value", async () => {
+  const {
+    parseDouyinStoreIdentityText,
+    parseVisibleNumber
+  } = await import(new URL("providers/executors/douyin.js", extensionRoot));
+
+  assert.equal(parseVisibleNumber("¥63,750.34 较上期 7.35% 同行顶尖 ¥4.35万"), 63_750.34);
+  assert.equal(parseVisibleNumber("33.15万 较上期 64.97% 同行标杆 19.22万"), 331_500);
+  assert.equal(parseVisibleNumber("-"), null);
+  assert.deepEqual(
+    parseDouyinStoreIdentityText(
+      "店铺管理\nTIYES提野星宠物用品旗舰店\n正常营业\n2023年03月15日开店\n店铺ID: 90862283"
+    ),
+    {
+      providerId: "douyin-ecommerce",
+      storeId: "90862283",
+      storeName: "TIYES提野星宠物用品旗舰店"
+    }
+  );
+  assert.equal(parseDouyinStoreIdentityText("抖店首页\n尚未进入店铺管理"), null);
 });
 
 test("extension task contract only allows registered provider resources", async () => {

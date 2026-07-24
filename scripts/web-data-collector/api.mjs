@@ -31,6 +31,7 @@ export function createWebCollectionApi({ baseUrl, token, fetchImpl = nodeRequest
 
   return Object.freeze({
     heartbeat: input => action({ action: "heartbeat", ...input }),
+    registerStore: input => action({ action: "register_store", ...input }),
     ensurePlan: jobs => action({ action: "ensure_plan", jobs }),
     ensureRegisteredPlan: () => action({ action: "ensure_registered_plan" }),
     claim: (leaseSeconds = 300) => action({ action: "claim", leaseSeconds }),

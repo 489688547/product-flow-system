@@ -188,6 +188,42 @@ export async function heartbeatRunner(db, runner, input) {
   return { runnerId: runner.id, lastSeenAt: now };
 }
 
+function normalizeStoreIdentity(input) {
+  const providerId = String(input?.providerId || "").trim();
+  const storeId = String(input?.storeId || "").trim();
+  const storeName = String(input?.storeName || "").trim();
+  if (
+    providerId !== "douyin-ecommerce"
+    || !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)
+    || !storeName
+    || storeName.length > 120
+    || /[\u0000-\u001f\u007f]/.test(storeName)
+  ) {
+    throw routeError(400, "WEB_COLLECTION_STORE_INVALID", "店铺身份无效或平台尚未登记。");
+  }
+  return { providerId, storeId, storeName };
+}
+
+export async function registerWebCollectionStore(db, runner, input) {
+  const store = normalizeStoreIdentity(input);
+  const now = new Date().toISOString();
+  await db.prepare(`INSERT INTO web_collection_stores
+    (id, provider_id, store_id, store_name, status, runner_id, last_seen_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'connected', ?, ?, ?, ?)
+    ON CONFLICT(provider_id, store_id) DO UPDATE SET store_name = excluded.store_name,
+      status = 'connected', runner_id = excluded.runner_id, last_seen_at = excluded.last_seen_at,
+      updated_at = excluded.updated_at`)
+    .bind(randomId("web-store"), store.providerId, store.storeId, store.storeName, runner.id, now, now, now)
+    .run();
+  return {
+    store: {
+      ...store,
+      status: "connected",
+      lastSeenAt: now
+    }
+  };
+}
+
 export async function ensureWebCollectionPlan(db, jobs, target = { environmentId: "production", environmentVersion: 1 }) {
   if (!Array.isArray(jobs) || !jobs.length || jobs.length > 100) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "任务计划必须包含 1 至 100 个资源。");
   const normalized = jobs.map(normalizeJob);
@@ -234,12 +270,12 @@ export async function ensureRegisteredWebCollectionPlan(
     target = { environmentId: "production", environmentVersion: 1 }
   } = {}
 ) {
-  const shopResult = await db.prepare(`SELECT shop_id, shop_name FROM data_connection_shops
-    WHERE platform_id = 'douyin-ecommerce' AND status = 'connected'
+  const shopResult = await db.prepare(`SELECT store_id, store_name FROM web_collection_stores
+    WHERE provider_id = 'douyin-ecommerce' AND status = 'connected'
     ORDER BY updated_at DESC`).all();
   const stores = (shopResult?.results || [])
-    .filter(row => /^[-_a-zA-Z0-9]{1,128}$/.test(String(row.shop_id || "")))
-    .map(row => ({ id: row.shop_id }));
+    .filter(row => /^[-_a-zA-Z0-9]{1,128}$/.test(String(row.store_id || "")))
+    .map(row => ({ id: row.store_id }));
   const jobs = createDailyPlan({
     now,
     adapters: [
@@ -426,9 +462,11 @@ export async function recordWebCollectionNotification(db, runner, input) {
 
 export async function listWebCollectionStatus(db, { limit = 100 } = {}) {
   const safeLimit = Math.min(300, Math.max(1, Number(limit) || 100));
-  const [runners, jobs, runs, cursors, notifications] = await Promise.all([
+  const [runners, stores, jobs, runs, cursors, notifications] = await Promise.all([
     db.prepare(`SELECT id, name, status, version, chrome_status, current_job_id, last_seen_at, created_at
       FROM web_collection_runners ORDER BY created_at DESC LIMIT ?`).bind(safeLimit).all(),
+    db.prepare(`SELECT provider_id, store_id, store_name, status, runner_id, last_seen_at, updated_at
+      FROM web_collection_stores ORDER BY updated_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT * FROM web_collection_jobs ORDER BY business_date DESC, created_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT id, job_id, runner_id, attempt, status, stage, batch_id, archive_id, row_count,
       error_code, error_summary, started_at, completed_at, created_at
@@ -440,6 +478,15 @@ export async function listWebCollectionStatus(db, { limit = 100 } = {}) {
   ]);
   return {
     runners: (runners?.results || []).map(row => ({ id: row.id, name: row.name, status: row.status, version: row.version || null, chromeStatus: row.chrome_status || null, currentJobId: row.current_job_id || null, lastSeenAt: row.last_seen_at || null, createdAt: row.created_at })),
+    stores: (stores?.results || []).map(row => ({
+      providerId: row.provider_id,
+      storeId: row.store_id,
+      storeName: row.store_name,
+      status: row.status,
+      runnerId: row.runner_id,
+      lastSeenAt: row.last_seen_at,
+      updatedAt: row.updated_at
+    })),
     jobs: (jobs?.results || []).map(mapJob),
     runs: (runs?.results || []).map(mapRun),
     cursors: (cursors?.results || []).map(row => ({

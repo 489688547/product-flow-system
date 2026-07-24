@@ -232,6 +232,7 @@ const CONTROL_TABLES = [
   "erp_file_archives",
   "erp_source_records",
   "web_collection_runners",
+  "web_collection_stores",
   "web_collection_jobs",
   "web_collection_runs",
   "web_collection_cursors",

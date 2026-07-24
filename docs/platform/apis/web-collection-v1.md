@@ -15,7 +15,7 @@
 
 ## Provider and task contract
 
-The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `data_connection_shops.shop_id`. The server, not the runner, resolves that store directory. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie or token field are rejected.
+The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `web_collection_stores.store_id`. The paired extension may register a Douyin store only after reading the fixed shop-management page; the bridge and runner accept exactly `providerId`, stable `storeId` and `storeName`. The server, not the runner, resolves that store directory. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie, token or page body field are rejected.
 
 Runner actions are:
 

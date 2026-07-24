@@ -90,6 +90,11 @@ export function createWebCollectorOrchestrator({
       await transition("claimed", "opening");
       return safeTask(activeJob);
     },
+    async registerStore(input) {
+      const result = await api.registerStore(input);
+      await api.ensureRegisteredPlan();
+      return result;
+    },
     async submitResult(result) {
       if (!activeJob || result?.jobId !== activeJob.id) {
         const error = new Error("插件结果与当前任务不匹配。");

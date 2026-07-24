@@ -8,6 +8,7 @@ const pairingKey = `wcp_${"a".repeat(48)}`;
 async function withBridge(callback) {
   const { createCollectorBridge } = await import("../scripts/web-data-collector/bridge.mjs");
   const submitted = [];
+  const stores = [];
   const bridge = createCollectorBridge({
     allowedOrigin,
     pairingKey,
@@ -22,11 +23,12 @@ async function withBridge(callback) {
       selector: "body",
       token: "must-not-leak"
     }),
-    submitResult: async result => submitted.push(result)
+    submitResult: async result => submitted.push(result),
+    registerStore: async store => stores.push(store)
   });
   await bridge.listen({ port: 0 });
   try {
-    await callback({ bridge, baseUrl: `http://127.0.0.1:${bridge.port}`, submitted });
+    await callback({ bridge, baseUrl: `http://127.0.0.1:${bridge.port}`, submitted, stores });
   } finally {
     await bridge.close();
   }
@@ -47,6 +49,38 @@ test("loopback bridge rejects foreign origins and missing pairing keys", async (
 
     const unpaired = await fetch(`${baseUrl}/v1/tasks/next`, { headers: { Origin: allowedOrigin } });
     assert.equal(unpaired.status, 401);
+  });
+});
+
+test("loopback bridge accepts only a bounded Douyin store identity", async () => {
+  await withBridge(async ({ baseUrl, stores }) => {
+    const accepted = await fetch(`${baseUrl}/v1/providers/douyin-ecommerce/stores/identify`, {
+      method: "POST",
+      headers: { ...headers(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        providerId: "douyin-ecommerce",
+        storeId: "90862283",
+        storeName: "TIYES提野星宠物用品旗舰店"
+      })
+    });
+    assert.equal(accepted.status, 202);
+    assert.deepEqual(stores, [{
+      providerId: "douyin-ecommerce",
+      storeId: "90862283",
+      storeName: "TIYES提野星宠物用品旗舰店"
+    }]);
+
+    const unsafe = await fetch(`${baseUrl}/v1/providers/douyin-ecommerce/stores/identify`, {
+      method: "POST",
+      headers: { ...headers(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        providerId: "douyin-ecommerce",
+        storeId: "90862283",
+        storeName: "旗舰店",
+        cookie: "secret"
+      })
+    });
+    assert.equal(unsafe.status, 400);
   });
 });
 

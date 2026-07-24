@@ -1,4 +1,4 @@
-# Douyin Compass Collection Implementation Plan
+# 抖店罗盘经营数据采集实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -904,4 +904,3 @@ node --env-file=.env scripts/check-deployed-readiness.mjs \
 ```
 
 Verify production loads without a white screen, the data-access Douyin card is truthful, sync records show success and failure, and the authenticated commerce facts API returns completed batches only.
-

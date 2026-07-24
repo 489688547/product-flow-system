@@ -96,6 +96,35 @@ test("store, live and video reports normalize amounts, durations and Shanghai ti
   assert.equal(video.facts[0].playCount, 1000);
 });
 
+test("real Compass v2 headers derive the selected day and stable live session identity", async () => {
+  const product = await readDouyinReport(fixture("商品卡列表数据_2026_07_23~2026_07_23.csv"), {
+    resourceType: "product_daily",
+    businessDate: "2026-07-23",
+    storeId: "store-a"
+  });
+  const live = await readDouyinReport(fixture("直播明细_全部账号_20260723_20260723.csv"), {
+    resourceType: "live_daily",
+    businessDate: "2026-07-23",
+    storeId: "store-a"
+  });
+  const video = await readDouyinReport(fixture("视频详情数据_20260723_20260723.csv"), {
+    resourceType: "video_daily",
+    businessDate: "2026-07-23",
+    storeId: "store-a"
+  });
+
+  assert.equal(product.reportVersion, "douyin-product-v2");
+  assert.equal(product.facts[0].businessDate, "2026-07-23");
+  assert.equal(product.facts[0].transactionAmount, 2311.1);
+  assert.equal(product.facts[0].userPaymentAmount, 2311.1);
+  assert.equal(live.reportVersion, "douyin-live-v2");
+  assert.match(live.facts[0].liveSessionId, /^live-[a-f0-9]{24}$/);
+  assert.equal(live.facts[0].durationSeconds, 57_300);
+  assert.equal(video.reportVersion, "douyin-video-v2");
+  assert.equal(video.facts[0].playCount, 4769);
+  assert.equal(video.facts[0].transactionAmount, 682.8);
+});
+
 test("wrong business date and missing required columns fail before upload", async () => {
   await assert.rejects(
     () => readDouyinReport(fixture("store-daily.csv"), {
@@ -116,6 +145,15 @@ test("wrong business date and missing required columns fail before upload", asyn
       storeId: "store-a"
     }),
     error => error?.code === "DOUYIN_REQUIRED_FIELDS_MISSING"
+  );
+
+  await assert.rejects(
+    () => readDouyinReport(fixture("视频详情数据_20260723_20260723.csv"), {
+      resourceType: "video_daily",
+      businessDate: "2026-07-22",
+      storeId: "store-a"
+    }),
+    error => error?.code === "DOUYIN_VIDEO_DATE_RANGE_NOT_APPLIED"
   );
 });
 

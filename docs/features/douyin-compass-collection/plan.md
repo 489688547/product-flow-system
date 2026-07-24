@@ -9,6 +9,7 @@
 ## 架构与接口
 
 - 控制面：`/api/platform/v1/web-collection` 保存 store-scoped job/run/cursor、目标环境和版本。
+- 店铺目录：插件只在固定抖店管理页识别稳定店铺 ID 和显示名，本机 bridge 调用 runner 鉴权的 `register_store`，保存到 `web_collection_stores` 后才生成任务。
 - 浏览器：MV3 adapter 只接受固定 provider/resource/store/date 任务，在允许来源执行官方导出或 `store_daily` 安全读数。
 - 本机：provider processor 识别下载、归档原文件、解析和预检，并调用标准事实 ingest。
 - 写入：`POST /api/platform/v1/commerce-facts/ingest` 校验 runner、job grant、目标环境版本、store/date/resource/schema 和批次。
@@ -21,7 +22,7 @@
 
 - 重建 `web_collection_cursors` 唯一键为 `provider_id + store_id + resource_type`，兼容旧 Kuaimai 空 storeId。
 - `web_collection_jobs` 增加 `store_id`；空 storeId 保持原 Kuaimai job key，Douyin job key包含 storeId。
-- 新增 `commerce_fact_batches` 及四张 `commerce_*_daily_facts` 业务表。
+- 新增控制面 `web_collection_stores`，以及 `commerce_fact_batches` 和四张 `commerce_*_daily_facts` 业务表。
 - 批次元数据登记 `copy` 展示策略；四张事实表登记 `transform_sales`，只复制变换后的原子经营数值并在读取层重算比例。
 - 预计日容量主要由商品/直播/视频明细决定；事实按完成批次保留，后续用受控保留策略清理 superseded 批次。
 
@@ -43,6 +44,7 @@
 
 - Kuaimai 的 provider/resource/job key、下载流程和现有测试保持兼容。
 - 未登记 provider、resource、task 字段、host、页面、selector version 全部 fail closed。
+- 店铺发现 payload 只允许 `providerId/storeId/storeName`，不允许链接、页面正文、凭据或自定义来源。
 - 插件不新增 Cookies、History、WebRequest、Debugger、Native Messaging 或密码权限。
 - 任务和 payload 不能选择 binding/database ID；服务端从 job 的目标环境和版本解析业务数据库。
 - `captured` 只允许 `store_daily` 的固定字段 schema，不接受任意 JSON、页面文本或 HTML。

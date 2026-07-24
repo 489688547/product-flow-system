@@ -55,6 +55,25 @@ function safeTaskProjection(task) {
   return Object.fromEntries(SAFE_TASK_FIELDS.filter(field => task[field] !== undefined).map(field => [field, task[field]]));
 }
 
+function validateStoreIdentity(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("STORE_IDENTITY_INVALID");
+  const allowed = new Set(["providerId", "storeId", "storeName"]);
+  if (Object.keys(value).some(field => !allowed.has(field))) throw new Error("STORE_IDENTITY_UNSAFE_FIELD");
+  const providerId = String(value.providerId || "");
+  const storeId = String(value.storeId || "");
+  const storeName = String(value.storeName || "").trim();
+  if (
+    providerId !== "douyin-ecommerce"
+    || !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)
+    || !storeName
+    || storeName.length > 120
+    || /[\u0000-\u001f\u007f]/.test(storeName)
+  ) {
+    throw new Error("STORE_IDENTITY_INVALID");
+  }
+  return { providerId, storeId, storeName };
+}
+
 function validateResult(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("RESULT_INVALID");
   const allowed = RESULT_FIELDS[value.kind];
@@ -106,10 +125,14 @@ async function readJson(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
-export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, submitResult }) {
+export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, submitResult, registerStore }) {
   if (!/^chrome-extension:\/\/[a-p]{32}$/.test(String(allowedOrigin || ""))) throw new Error("BRIDGE_ORIGIN_INVALID");
   if (!/^wcp_[a-f0-9]{48}$/i.test(String(pairingKey || ""))) throw new Error("BRIDGE_PAIRING_KEY_INVALID");
-  if (typeof getNextTask !== "function" || typeof submitResult !== "function") throw new Error("BRIDGE_HANDLERS_REQUIRED");
+  if (
+    typeof getNextTask !== "function"
+    || typeof submitResult !== "function"
+    || typeof registerStore !== "function"
+  ) throw new Error("BRIDGE_HANDLERS_REQUIRED");
 
   let server;
   let listeningPort = null;
@@ -142,6 +165,11 @@ export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, 
       }
       if (request.method === "GET" && url.pathname === "/v1/tasks/next") {
         json(response, 200, { task: safeTaskProjection(await getNextTask()) }, allowedOrigin);
+        return;
+      }
+      if (request.method === "POST" && url.pathname === "/v1/providers/douyin-ecommerce/stores/identify") {
+        await registerStore(validateStoreIdentity(await readJson(request)));
+        json(response, 202, { accepted: true }, allowedOrigin);
         return;
       }
       const resultRoute = url.pathname.match(/^\/v1\/tasks\/([-_a-zA-Z0-9]{1,128})\/result$/);

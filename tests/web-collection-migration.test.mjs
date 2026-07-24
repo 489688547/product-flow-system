@@ -45,6 +45,7 @@ test("Douyin migration scopes jobs and cursors by store and creates typed commer
   assert.match(douyinMigration, /ALTER TABLE web_collection_jobs\s+ADD COLUMN store_id TEXT NOT NULL DEFAULT ''/i);
   assert.match(douyinMigration, /UNIQUE\s*\(provider_id,\s*store_id,\s*resource_type\)/i);
   for (const table of [
+    "web_collection_stores",
     "commerce_fact_batches",
     "commerce_store_daily_facts",
     "commerce_product_daily_facts",

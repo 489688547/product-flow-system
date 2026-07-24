@@ -79,21 +79,21 @@ test("connection API preserves stable server error codes", async () => {
   );
 });
 
-test("existing store metadata is normalized to file import when no secret changes", async () => {
+test("existing Douyin store metadata stays on pre-authenticated browser collection without secrets", async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, body: JSON.parse(options.body) });
     return jsonResponse({ synced: true, instance: { ...JSON.parse(options.body).instance, version: 3 } });
   };
   const saved = await persistConnectorConnection({
-    instance: { id: "shop-1", connectorId: "douyin-ecommerce", name: "新名称", captureMethod: "export", version: 2 },
+    instance: { id: "shop-1", connectorId: "douyin-ecommerce", name: "新名称", captureMethod: "browser", version: 2 },
     secretPayload: {},
     vaultEntries: []
   }, fetchImpl);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].url, "/api/data-center/connectors");
   assert.equal(calls[0].body.expectedVersion, 2);
-  assert.equal(calls[0].body.instance.captureMethod, "export");
+  assert.equal(calls[0].body.instance.captureMethod, "browser");
   assert.equal(saved.version, 3);
 });
 

@@ -7,6 +7,11 @@ import {
 const DEFAULT_BRIDGE_URL = "http://127.0.0.1:17653";
 const POLL_ALARM = "company-data-collector-poll";
 const ACTIVE_JOB_KEY = "activeJob";
+const DOUYIN_DISCOVERY_URL = "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools";
+const DOUYIN_DISCOVERY_TAB_KEY = "douyinDiscoveryTabId";
+const DOUYIN_DISCOVERY_AT_KEY = "lastDouyinDiscoveryAt";
+const DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const DOUYIN_DISCOVERY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 let polling = false;
 
 function safeBaseName(value) {
@@ -124,6 +129,68 @@ async function ensureProviderTab(resource, targetUrl) {
     });
   }
   return tab;
+}
+
+async function discoveryTab() {
+  const stored = await chrome.storage.local.get([DOUYIN_DISCOVERY_TAB_KEY]);
+  const storedId = Number(stored[DOUYIN_DISCOVERY_TAB_KEY]);
+  if (Number.isSafeInteger(storedId)) {
+    try {
+      const tab = await chrome.tabs.get(storedId);
+      if (tab.url?.startsWith("https://fxg.jinritemai.com/")) {
+        return tab.url === DOUYIN_DISCOVERY_URL
+          ? waitForTabComplete(tab.id)
+          : waitForTabComplete((await chrome.tabs.update(tab.id, { url: DOUYIN_DISCOVERY_URL, active: false })).id);
+      }
+    } catch {
+      await chrome.storage.local.remove(DOUYIN_DISCOVERY_TAB_KEY);
+    }
+  }
+  const matches = await chrome.tabs.query({ url: ["https://fxg.jinritemai.com/*"] });
+  const exact = matches.find(tab => tab.url === DOUYIN_DISCOVERY_URL);
+  if (exact) return waitForTabComplete(exact.id);
+  const created = await chrome.tabs.create({ url: DOUYIN_DISCOVERY_URL, active: false });
+  await chrome.storage.local.set({ [DOUYIN_DISCOVERY_TAB_KEY]: created.id });
+  return waitForTabComplete(created.id);
+}
+
+async function discoverDouyinStore() {
+  const stored = await chrome.storage.local.get([DOUYIN_DISCOVERY_AT_KEY, "lastDouyinDiscoveryOk"]);
+  const lastAttempt = Date.parse(String(stored[DOUYIN_DISCOVERY_AT_KEY] || ""));
+  const interval = stored.lastDouyinDiscoveryOk
+    ? DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS
+    : DOUYIN_DISCOVERY_RETRY_INTERVAL_MS;
+  if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < interval) return false;
+  const attemptedAt = new Date().toISOString();
+  await chrome.storage.local.set({ [DOUYIN_DISCOVERY_AT_KEY]: attemptedAt });
+  const tab = await discoveryTab();
+  if (!await waitForContentScript(tab.id, 3000)) {
+    await chrome.storage.local.set({ lastDouyinDiscoveryOk: false, lastBridgeError: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE" });
+    return false;
+  }
+  const identity = await chrome.tabs.sendMessage(tab.id, { type: "DISCOVER_DOUYIN_STORE" });
+  if (identity?.kind !== "store_identity") {
+    await chrome.storage.local.set({
+      lastDouyinDiscoveryOk: false,
+      lastBridgeError: identity?.errorCode || "DOUYIN_STORE_IDENTITY_FAILED"
+    });
+    return false;
+  }
+  const response = await bridgeFetch("/v1/providers/douyin-ecommerce/stores/identify", {
+    method: "POST",
+    body: JSON.stringify({
+      providerId: identity.providerId,
+      storeId: identity.storeId,
+      storeName: identity.storeName
+    })
+  });
+  if (!response.ok) {
+    throw Object.assign(new Error("本机执行器未接受店铺身份。"), {
+      code: `BRIDGE_STORE_HTTP_${response.status}`
+    });
+  }
+  await chrome.storage.local.set({ lastDouyinDiscoveryOk: true, lastBridgeError: null });
+  return true;
 }
 
 async function findRecentDownload(resource, startedAt) {
@@ -290,7 +357,11 @@ async function poll() {
   try {
     const response = await bridgeFetch("/v1/tasks/next");
     if (!response.ok) throw Object.assign(new Error("本机执行器连接失败。"), { code: `BRIDGE_HTTP_${response.status}` });
-    const { task } = await response.json();
+    let { task } = await response.json();
+    if (!task && await discoverDouyinStore()) {
+      const refreshed = await bridgeFetch("/v1/tasks/next");
+      if (refreshed.ok) ({ task } = await refreshed.json());
+    }
     if (task) await executeTask(task);
     await chrome.storage.local.set({ lastBridgeAt: new Date().toISOString(), lastBridgeError: null });
   } catch (error) {

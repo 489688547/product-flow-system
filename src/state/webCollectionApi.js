@@ -18,6 +18,7 @@ export async function loadWebCollectionStatus(fetchImpl = fetch) {
   const data = payload?.data || {};
   return {
     runners: Array.isArray(data.runners) ? data.runners : [],
+    stores: Array.isArray(data.stores) ? data.stores : [],
     jobs: Array.isArray(data.jobs) ? data.jobs : [],
     runs: Array.isArray(data.runs) ? data.runs : [],
     cursors: Array.isArray(data.cursors) ? data.cursors : [],

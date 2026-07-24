@@ -14,6 +14,7 @@
 
 - `douyin-ecommerce` 的账号密码登录和旧 browser-agent 任务继续保持 `retired`，凭据不恢复。
 - 新能力仅使用公司 Chrome 中员工已建立的登录态，生命周期标记为 `integrating`，真实生产验收前不得标记 `connected`。
+- 插件可在固定抖店“店铺管理”页读取稳定店铺 ID 与显示名并登记 `web_collection_stores`；不复用旧凭据连接表，不上传页面正文。
 - `product_daily`、`live_daily`、`video_daily` 以官方 XLSX/CSV 下载为准；`store_daily` 无下载时可读取代码登记的固定原子指标。
 - 文件导入保留为人工兜底，不与 Chrome 自动采集互斥。
 - 登录、验证码、滑块、扫码或设备验证进入 `waiting_human`，系统不自动绕过。

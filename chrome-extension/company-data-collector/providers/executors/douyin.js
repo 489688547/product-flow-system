@@ -8,6 +8,8 @@ import {
 
 const SELECTOR_VERSION = "2026-07-24";
 const WAIT_AFTER_ACTION_MS = 600;
+const WAIT_AFTER_DATE_MS = 2_000;
+const STORE_MANAGEMENT_PATH = "/ffa/grs-new/qualification/common-tools";
 const HUMAN_TERMS = Object.freeze({
   captcha: ["验证码", "图形验证"],
   slider: ["拖动滑块", "滑块验证"],
@@ -20,7 +22,8 @@ const STORE_IDENTITY_SELECTORS = Object.freeze([
   "[data-testid='shop-name']",
   ".shop-name",
   "[class*='shop-name']",
-  "[class*='shopName']"
+  "[class*='shopName']",
+  "[class*='userName']"
 ]);
 const REPORT_BUTTON_LABELS = Object.freeze([
   "下载报表",
@@ -35,10 +38,10 @@ const STORE_METRIC_LABELS = Object.freeze({
   transactionBuyerCount: ["成交人数", "支付人数"],
   userPaymentAmount: ["用户实际支付金额", "用户支付金额"],
   settlementAmount: ["结算金额"],
-  refundAmountByPaymentDate: ["支付口径退款金额", "退款金额（支付日期）"],
-  refundAmountByRefundDate: ["退款口径退款金额", "退款金额（退款日期）"],
-  refundOrderCountByPaymentDate: ["支付口径退款订单数", "退款订单数（支付日期）"],
-  refundOrderCountByRefundDate: ["退款口径退款订单数", "退款订单数（退款日期）"],
+  refundAmountByPaymentDate: ["支付口径退款金额", "退款金额（支付时间）", "退款金额（支付日期）"],
+  refundAmountByRefundDate: ["退款口径退款金额", "退款金额（退款时间）", "退款金额（退款日期）"],
+  refundOrderCountByPaymentDate: ["支付口径退款订单数", "退款订单数（支付时间）", "退款订单数（支付日期）"],
+  refundOrderCountByRefundDate: ["退款口径退款订单数", "退款订单数（退款时间）", "退款订单数（退款日期）"],
   productExposureUsers: ["商品曝光人数", "商品曝光用户数"],
   productClickUsers: ["商品点击人数", "商品点击用户数"]
 });
@@ -97,10 +100,13 @@ function shanghaiYesterday() {
 
 async function applyBusinessDate(businessDate) {
   if (businessDate === shanghaiYesterday()) {
-    const yesterday = exactVisibleText(["昨天", "昨日"], "button, [role='button'], label, span");
+    const yesterday = exactVisibleText(
+      ["近1天", "昨天", "昨日"],
+      "button, [role='button'], [role='tab'], label, span"
+    );
     if (yesterday) {
       yesterday.click();
-      await wait(WAIT_AFTER_ACTION_MS);
+      await wait(WAIT_AFTER_DATE_MS);
       return;
     }
   }
@@ -114,7 +120,7 @@ async function applyBusinessDate(businessDate) {
     });
   }
   for (const input of dateInputs.slice(0, 2)) setNativeInputValue(input, businessDate);
-  await wait(WAIT_AFTER_ACTION_MS);
+  await wait(WAIT_AFTER_DATE_MS);
   if (dateInputs.slice(0, 2).some(input => !String(input.value || "").includes(businessDate))) {
     throw Object.assign(new Error("抖店报表日期未生效。"), {
       code: "DOUYIN_DATE_RANGE_NOT_APPLIED"
@@ -122,16 +128,83 @@ async function applyBusinessDate(businessDate) {
   }
 }
 
-function parseVisibleNumber(value) {
+export function parseVisibleNumber(value) {
   const text = normalizedText(value).replace(/[¥￥,%]/g, "").replace(/,/g, "");
   if (!text || text === "--" || text === "-") return null;
-  const match = text.match(/-?\d+(?:\.\d+)?/);
+  const match = text.match(/(-?\d+(?:\.\d+)?)\s*(万|亿)?/);
   if (!match) return null;
-  const number = Number(match[0]);
+  const number = Number(match[1]);
   if (!Number.isFinite(number)) return null;
-  if (text.includes("亿")) return number * 100_000_000;
-  if (text.includes("万")) return number * 10_000;
+  if (match[2] === "亿") return number * 100_000_000;
+  if (match[2] === "万") return number * 10_000;
   return number;
+}
+
+export function parseDouyinStoreIdentityText(value) {
+  const lines = String(value || "")
+    .split(/\r?\n/)
+    .map(normalizedText)
+    .filter(Boolean);
+  const idIndex = lines.findIndex(line => /店铺ID\s*[:：]\s*[-_a-zA-Z0-9]{1,128}/.test(line));
+  if (idIndex < 0) return null;
+  const storeId = lines[idIndex].match(/店铺ID\s*[:：]\s*([-_a-zA-Z0-9]{1,128})/)?.[1] || "";
+  const suffix = /(旗舰店|专营店|专卖店|企业店|个人店|官方店)$/;
+  const storeName = lines
+    .slice(Math.max(0, idIndex - 8), idIndex)
+    .reverse()
+    .find(line => suffix.test(line) && line.length <= 120);
+  if (!storeId || !storeName) return null;
+  return {
+    providerId: "douyin-ecommerce",
+    storeId,
+    storeName
+  };
+}
+
+export function discoverDouyinStoreIdentity() {
+  if (location.origin !== "https://fxg.jinritemai.com") {
+    return {
+      kind: "failed",
+      errorCode: "DOUYIN_ORIGIN_BLOCKED",
+      safeSummary: "店铺识别只允许在抖店后台执行。"
+    };
+  }
+  const markers = pageMarkers();
+  if (markers.loginPage) {
+    return {
+      kind: "waiting_human",
+      errorCode: "DOUYIN_LOGIN_REQUIRED",
+      safeSummary: "请在公司 Chrome 登录抖店后重试。"
+    };
+  }
+  if (
+    markers.captcha
+    || markers.slider
+    || markers.scan
+    || markers.deviceVerification
+    || markers.smsVerification
+  ) {
+    return {
+      kind: "waiting_human",
+      errorCode: "DOUYIN_HUMAN_VERIFICATION_REQUIRED",
+      safeSummary: "请在公司 Chrome 完成人工验证后重试。"
+    };
+  }
+  if (location.pathname !== STORE_MANAGEMENT_PATH) {
+    return {
+      kind: "failed",
+      errorCode: "DOUYIN_STORE_IDENTITY_PAGE_REQUIRED",
+      safeSummary: "请打开抖店店铺管理页面后重试。"
+    };
+  }
+  const identity = parseDouyinStoreIdentityText(document.body?.innerText);
+  return identity
+    ? { kind: "store_identity", ...identity }
+    : {
+      kind: "failed",
+      errorCode: "DOUYIN_STORE_IDENTITY_MISSING",
+      safeSummary: "抖店店铺管理页未识别到稳定店铺身份。"
+    };
 }
 
 function metricByRegisteredKey(key) {
@@ -140,12 +213,16 @@ function metricByRegisteredKey(key) {
 
   const labels = STORE_METRIC_LABELS[key] || [];
   const cards = Array.from(document.querySelectorAll(
-    "[data-e2e*='metric'], [class*='metric'], [class*='card'], [class*='indicator']"
+    "[data-e2e*='metric'], [class*='data-card-wrapper'], [class*='metric'], [class*='indicator']"
   )).filter(visible);
-  const card = cards.find(candidate => labels.some(label => normalizedText(candidate.textContent).includes(label)));
-  return card ? parseVisibleNumber(card.textContent.replace(labels.find(label =>
-    normalizedText(card.textContent).includes(label)
-  ) || "", "")) : null;
+  for (const card of cards) {
+    const text = normalizedText(card.textContent);
+    const label = labels.find(candidate => text.includes(candidate));
+    if (!label) continue;
+    const value = parseVisibleNumber(text.replace(label, ""));
+    if (value !== null) return value;
+  }
+  return null;
 }
 
 function captureStoreOverview(resource) {
@@ -165,7 +242,14 @@ function captureStoreOverview(resource) {
 }
 
 async function clickOfficialReport(resourceType) {
-  const button = exactVisibleText(REPORT_BUTTON_LABELS);
+  const buttons = Array.from(document.querySelectorAll("button, [role='button'], a"))
+    .filter(element => (
+      visible(element)
+      && REPORT_BUTTON_LABELS.includes(normalizedText(element.textContent))
+    ));
+  const button = resourceType === "video_daily"
+    ? buttons.find(element => normalizedText(element.parentElement?.parentElement?.textContent).includes("短视频明细"))
+    : buttons[0];
   if (!button) return false;
   button.click();
   await wait(WAIT_AFTER_ACTION_MS);

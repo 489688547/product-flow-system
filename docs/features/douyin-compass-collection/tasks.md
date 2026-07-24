@@ -37,6 +37,9 @@
 - [ ] 完成昨天真实验收
   - 输出：已登录店铺四资源的真实结果、selector/report version、原始归档和 D1 查询证据。
   - 验证：成功资源有完成批次，失败资源有安全错误和可执行恢复动作。
+  - 2026-07-24 现场证据：已从固定抖店管理页识别店铺 `90862283 / TIYES提野星宠物用品旗舰店`；店铺总览 `selectorVersion=2026-07-24` 成功读取 11 个白名单原子指标。
+  - 官方报表解析：`douyin-product-v2` 105 行、`douyin-live-v2` 226 行、`douyin-video-v2` 1131 行；原始 XLSX 已按店铺、资源、业务日和内容哈希归档到公司 Mac。
+  - D1 准备：正式库与展示库已保留 Time Travel 恢复点并应用 `0013`，既有正式库 10 个任务、3 个游标完整保留；待 GitOps 发布新路由和公司 Chrome 重载新版插件后执行完整批次入库。
 - [ ] 完成全量门禁和 GitOps 发布
   - 输出：全量检查、PR、main 合并、Cloudflare Git 部署、生产 API/UI 与插件复核。
   - 验证：Definition of Done 和 production readiness 全部通过。

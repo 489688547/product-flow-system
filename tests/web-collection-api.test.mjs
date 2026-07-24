@@ -178,16 +178,31 @@ test("control plane keeps same-day Douyin jobs isolated by store", async () => {
   assert.equal(unsafe.body.error.code, "WEB_COLLECTION_JOB_INVALID");
 });
 
-test("runner asks the server to create yesterday tasks for every connected Douyin store", async () => {
+test("runner registers a safely discovered Douyin store before creating its daily tasks", async () => {
   const db = createWebCollectionD1Mock();
-  db.tables.data_connection_shops.set("shop-row-1", {
-    id: "shop-row-1",
-    platform_id: "douyin-ecommerce",
-    shop_id: "store-a",
-    shop_name: "品牌旗舰店",
-    status: "connected"
-  });
   const registration = await register(db);
+  const identified = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: registration.body.data.token,
+    body: {
+      action: "register_store",
+      providerId: "douyin-ecommerce",
+      storeId: "90862283",
+      storeName: "TIYES提野星宠物用品旗舰店"
+    }
+  });
+
+  assert.equal(identified.response.status, 200);
+  assert.deepEqual(identified.body.data.store, {
+    providerId: "douyin-ecommerce",
+    storeId: "90862283",
+    storeName: "TIYES提野星宠物用品旗舰店",
+    status: "connected",
+    lastSeenAt: identified.body.data.store.lastSeenAt
+  });
+  assert.equal(db.tables.web_collection_stores.get("douyin-ecommerce:90862283").runner_id, registration.body.data.id);
+
   const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
     method: "POST",
     db,
@@ -202,8 +217,33 @@ test("runner asks the server to create yesterday tasks for every connected Douyi
     result.body.data.jobs
       .filter(job => job.providerId === "douyin-ecommerce")
       .map(job => job.storeId),
-    ["store-a", "store-a", "store-a", "store-a"]
+    ["90862283", "90862283", "90862283", "90862283"]
   );
+
+  const status = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    db,
+    session: executive
+  });
+  assert.equal(status.body.data.stores[0].storeName, "TIYES提野星宠物用品旗舰店");
+});
+
+test("runner store registration rejects unknown providers and unsafe identity fields", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  for (const body of [
+    { action: "register_store", providerId: "unknown", storeId: "90862283", storeName: "旗舰店" },
+    { action: "register_store", providerId: "douyin-ecommerce", storeId: "../90862283", storeName: "旗舰店" },
+    { action: "register_store", providerId: "douyin-ecommerce", storeId: "90862283", storeName: "x\n恶意字段" }
+  ]) {
+    const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+      method: "POST",
+      db,
+      token: registration.body.data.token,
+      body
+    });
+    assert.equal(result.response.status, 400);
+    assert.equal(result.body.error.code, "WEB_COLLECTION_STORE_INVALID");
+  }
 });
 
 test("claim lease, legal transitions, completion and cursor are atomic from the runner perspective", async () => {

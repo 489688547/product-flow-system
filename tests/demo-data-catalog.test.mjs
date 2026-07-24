@@ -41,6 +41,7 @@ test("credentials, sessions, grants, tokens, provider configuration and audits n
     "ai_skill_audit",
     "erp_collector_tokens",
     "web_collection_runners",
+    "web_collection_stores",
     "user_insight_runner_tokens"
   ]) {
     assert.equal(demoTablePolicy(table).policy, "skip", table);

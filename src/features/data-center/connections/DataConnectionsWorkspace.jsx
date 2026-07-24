@@ -41,7 +41,7 @@ export function DataConnectionsWorkspace({
   const [category, setCategory] = useState(validCategory(initialCategory) ? initialCategory : "ecommerce");
   const [selection, setSelection] = useState(null);
   const [detailActive, setDetailActive] = useState(false);
-  const [webCollection, setWebCollection] = useState({ runners: [], jobs: [], cursors: [] });
+  const [webCollection, setWebCollection] = useState({ runners: [], stores: [], jobs: [], cursors: [] });
   const [webCollectionError, setWebCollectionError] = useState("");
   const platformController = usePlatformConnections();
 
@@ -75,6 +75,7 @@ export function DataConnectionsWorkspace({
   const openNew = definition => setSelection({ definition, instance: null });
   const openExisting = (definition, instance) => setSelection({ definition, instance });
   const douyinStoreIds = [...new Set([
+    ...webCollection.stores,
     ...webCollection.jobs,
     ...webCollection.cursors
   ].filter(item => item.providerId === "douyin-ecommerce" && item.storeId).map(item => item.storeId))];
@@ -105,6 +106,7 @@ export function DataConnectionsWorkspace({
               ? "healthy"
               : "pending_validation",
       resources: douyinRecoveries[0]?.resources || buildDouyinCollectionRecovery().resources,
+      stores: webCollection.stores.filter(store => store.providerId === "douyin-ecommerce"),
       error: webCollectionError
     },
     oceanengine: {

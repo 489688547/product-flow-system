@@ -75,9 +75,17 @@ export const DOUYIN_COLLECTION_RESOURCES = Object.freeze([
 ]);
 
 const STORE_FILE_IMPORT_CONNECTORS = new Set(STORE_FILE_IMPORT_CONNECTOR_IDS);
+const RETIRED_STORE_CREDENTIAL_CONNECTORS = new Set([
+  "douyin-ecommerce",
+  ...STORE_FILE_IMPORT_CONNECTOR_IDS
+]);
 
 export function storeFileImportPending(connectorId) {
   return STORE_FILE_IMPORT_CONNECTORS.has(String(connectorId || ""));
+}
+
+export function retiredStoreCredentialCleanupAllowed(connectorId) {
+  return RETIRED_STORE_CREDENTIAL_CONNECTORS.has(String(connectorId || ""));
 }
 
 export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([

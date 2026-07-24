@@ -30,21 +30,21 @@ const SCHEMAS = Object.freeze({
   }),
   product_daily: Object.freeze({
     reportVersion: "douyin-product-v1",
-    required: Object.freeze(["businessDate", "productId", "transactionAmount"]),
+    required: Object.freeze(["productId", "transactionAmount"]),
     fields: Object.freeze({
       businessDate: { aliases: DATE_ALIASES, kind: "date" },
       productId: { aliases: ["商品ID", "商品id"], kind: "identity" },
       skuId: { aliases: ["SKU ID", "SKUID", "sku_id"], kind: "string" },
-      productName: { aliases: ["商品名称"], kind: "string" },
+      productName: { aliases: ["商品名称", "商品标题"], kind: "string" },
       skuName: { aliases: ["SKU名称", "规格名称"], kind: "string" },
       merchantCode: { aliases: ["商家编码", "商品编码"], kind: "string" },
-      exposureUsers: { aliases: ["商品曝光人数", "曝光人数"], kind: "number" },
-      clickUsers: { aliases: ["商品点击人数", "点击人数"], kind: "number" },
-      transactionBuyers: { aliases: ["成交人数", "成交用户数"], kind: "number" },
-      transactionOrderCount: { aliases: ["成交订单数"], kind: "number" },
+      exposureUsers: { aliases: ["商品曝光人数", "曝光人数", "商品卡曝光人数"], kind: "number" },
+      clickUsers: { aliases: ["商品点击人数", "点击人数", "商品卡点击人数"], kind: "number" },
+      transactionBuyers: { aliases: ["成交人数", "成交用户数", "商品卡成交人数"], kind: "number" },
+      transactionOrderCount: { aliases: ["成交订单数", "商品卡成交订单数"], kind: "number" },
       transactionQuantity: { aliases: ["成交件数", "成交商品件数"], kind: "number" },
-      transactionAmount: { aliases: ["成交金额"], kind: "number" },
-      userPaymentAmount: { aliases: ["用户支付金额", "支付金额"], kind: "number" },
+      transactionAmount: { aliases: ["成交金额", "商品卡用户支付金额"], kind: "number" },
+      userPaymentAmount: { aliases: ["用户支付金额", "支付金额", "商品卡用户支付金额"], kind: "number" },
       refundOrderCount: { aliases: ["退款订单数"], kind: "number" },
       refundQuantity: { aliases: ["退款件数"], kind: "number" },
       refundAmount: { aliases: ["退款金额"], kind: "number" }
@@ -52,42 +52,46 @@ const SCHEMAS = Object.freeze({
   }),
   live_daily: Object.freeze({
     reportVersion: "douyin-live-v1",
-    required: Object.freeze(["businessDate", "liveSessionId", "transactionAmount"]),
+    required: Object.freeze(["startedAt", "transactionAmount"]),
     fields: Object.freeze({
       businessDate: { aliases: DATE_ALIASES, kind: "date" },
       liveSessionId: { aliases: ["直播场次ID", "直播间ID", "场次ID"], kind: "identity" },
-      accountId: { aliases: ["账号ID", "主播账号ID"], kind: "string" },
+      accountId: { aliases: ["账号ID", "主播账号ID", "主播抖音号"], kind: "string" },
       startedAt: { aliases: ["开播时间", "直播开始时间"], kind: "timestamp" },
       endedAt: { aliases: ["结束时间", "直播结束时间"], kind: "timestamp" },
-      durationSeconds: { aliases: ["开播时长", "直播时长"], kind: "duration" },
-      exposureUsers: { aliases: ["曝光人数", "直播曝光人数"], kind: "number" },
+      durationSeconds: {
+        aliases: ["开播时长", "直播时长", "直播时长(分钟)", "直播时长（分钟）"],
+        minuteAliases: ["直播时长(分钟)", "直播时长（分钟）"],
+        kind: "duration"
+      },
+      exposureUsers: { aliases: ["曝光人数", "直播曝光人数", "直播间曝光人数"], kind: "number" },
       entryUsers: { aliases: ["进入直播间人数", "进入人数"], kind: "number" },
-      viewerUsers: { aliases: ["观看人数", "直播观看人数"], kind: "number" },
+      viewerUsers: { aliases: ["观看人数", "直播观看人数", "直播间观看人数"], kind: "number" },
       effectiveViewerUsers: { aliases: ["有效观看人数", "有效看播人数"], kind: "number" },
-      productClickUsers: { aliases: ["商品点击人数"], kind: "number" },
+      productClickUsers: { aliases: ["商品点击人数", "直播间商品点击人数"], kind: "number" },
       addToCartUsers: { aliases: ["加购人数", "商品加购人数"], kind: "number" },
-      transactionBuyers: { aliases: ["成交人数", "成交用户数"], kind: "number" },
-      transactionOrderCount: { aliases: ["成交订单数"], kind: "number" },
-      transactionQuantity: { aliases: ["成交件数"], kind: "number" },
-      transactionAmount: { aliases: ["成交金额"], kind: "number" },
-      userPaymentAmount: { aliases: ["用户支付金额", "支付金额"], kind: "number" },
-      refundOrderCount: { aliases: ["退款订单数"], kind: "number" },
-      refundAmount: { aliases: ["退款金额"], kind: "number" }
+      transactionBuyers: { aliases: ["成交人数", "成交用户数", "直播间成交人数"], kind: "number" },
+      transactionOrderCount: { aliases: ["成交订单数", "直播间成交订单数"], kind: "number" },
+      transactionQuantity: { aliases: ["成交件数", "直播间成交件数"], kind: "number" },
+      transactionAmount: { aliases: ["成交金额", "直播间成交金额"], kind: "number" },
+      userPaymentAmount: { aliases: ["用户支付金额", "支付金额", "直播间用户支付金额"], kind: "number" },
+      refundOrderCount: { aliases: ["退款订单数", "直播间退款订单数"], kind: "number" },
+      refundAmount: { aliases: ["退款金额", "直播间退款金额"], kind: "number" }
     })
   }),
   video_daily: Object.freeze({
     reportVersion: "douyin-video-v1",
-    required: Object.freeze(["businessDate", "videoId", "playCount", "transactionAmount"]),
+    required: Object.freeze(["videoId", "playCount", "transactionAmount"]),
     fields: Object.freeze({
       businessDate: { aliases: DATE_ALIASES, kind: "date" },
       videoId: { aliases: ["视频ID", "短视频ID"], kind: "identity" },
-      accountId: { aliases: ["账号ID", "作者账号ID"], kind: "string" },
+      accountId: { aliases: ["账号ID", "作者账号ID", "达人抖音号"], kind: "string" },
       publishedAt: { aliases: ["发布时间", "视频发布时间"], kind: "timestamp" },
       title: { aliases: ["视频标题", "标题"], kind: "string" },
-      productId: { aliases: ["关联商品ID", "商品ID"], kind: "string" },
+      productId: { aliases: ["关联商品ID", "商品ID", "带货商品ID"], kind: "string" },
       materialId: { aliases: ["素材ID"], kind: "string" },
       playUsers: { aliases: ["播放人数"], kind: "number" },
-      playCount: { aliases: ["播放次数", "播放量"], kind: "number" },
+      playCount: { aliases: ["播放次数", "播放量", "视频观看次数"], kind: "number" },
       effectivePlayCount: { aliases: ["有效播放次数", "有效播放量"], kind: "number" },
       likeCount: { aliases: ["点赞数", "点赞量"], kind: "number" },
       commentCount: { aliases: ["评论数", "评论量"], kind: "number" },
@@ -97,11 +101,17 @@ const SCHEMAS = Object.freeze({
       transactionBuyers: { aliases: ["成交人数", "成交用户数"], kind: "number" },
       transactionOrderCount: { aliases: ["成交订单数"], kind: "number" },
       transactionQuantity: { aliases: ["成交件数"], kind: "number" },
-      transactionAmount: { aliases: ["成交金额"], kind: "number" },
+      transactionAmount: { aliases: ["成交金额", "用户支付金额(元)", "用户支付金额（元）"], kind: "number" },
       refundOrderCount: { aliases: ["退款订单数"], kind: "number" },
-      refundAmount: { aliases: ["退款金额"], kind: "number" }
+      refundAmount: { aliases: ["退款金额", "退款金额(元)", "退款金额（元）"], kind: "number" }
     })
   })
+});
+
+const V2_SIGNATURES = Object.freeze({
+  product_daily: Object.freeze(["商品标题", "商品卡用户支付金额"]),
+  live_daily: Object.freeze(["主播抖音号", "直播间成交金额"]),
+  video_daily: Object.freeze(["视频观看次数", "用户支付金额(元)"])
 });
 
 const DATE_ERROR_CODES = Object.freeze({
@@ -147,13 +157,25 @@ function signatureScore(headers, schema) {
   return { columns, required, mapped, complete: required === schema.required.length };
 }
 
+function reportVersion(resourceType, headers, fallback) {
+  const normalized = new Set(headers.map(cleanHeader));
+  const signature = V2_SIGNATURES[resourceType] || [];
+  return signature.length && signature.every(header => normalized.has(cleanHeader(header)))
+    ? `douyin-${resourceType.replace("_daily", "")}-v2`
+    : fallback;
+}
+
 export function detectDouyinReport({ fileName = "", headers = [] } = {}) {
   let selected = null;
   for (const [resourceType, schema] of Object.entries(SCHEMAS)) {
     const score = signatureScore(headers, schema);
     if (!score.complete) continue;
     if (!selected || score.mapped > selected.mapped) {
-      selected = { resourceType, reportVersion: schema.reportVersion, mapped: score.mapped };
+      selected = {
+        resourceType,
+        reportVersion: reportVersion(resourceType, headers, schema.reportVersion),
+        mapped: score.mapped
+      };
     }
   }
   if (!selected) {
@@ -220,12 +242,30 @@ function durationValue(value) {
   return numberValue(value);
 }
 
-function fieldValue(kind, value) {
+function fieldValue(kind, value, { minutes = false } = {}) {
   if (kind === "number") return numberValue(value);
   if (kind === "date") return dateValue(value);
   if (kind === "timestamp") return timestampValue(value);
-  if (kind === "duration") return durationValue(value);
+  if (kind === "duration") {
+    const duration = durationValue(value);
+    return minutes && duration !== null ? duration * 60 : duration;
+  }
   return value === null || value === undefined || value === "" ? null : valueText(value);
+}
+
+function fileBusinessDates(fileName) {
+  const dates = [];
+  for (const match of String(fileName || "").matchAll(/(20\d{2})[_-]?(\d{2})[_-]?(\d{2})/g)) {
+    dates.push(`${match[1]}-${match[2]}-${match[3]}`);
+  }
+  return [...new Set(dates)];
+}
+
+function derivedLiveSessionId(fact) {
+  return `live-${createHash("sha256")
+    .update(`${fact.accountId || "unknown"}\n${fact.startedAt || ""}`)
+    .digest("hex")
+    .slice(0, 24)}`;
 }
 
 async function sourceFile(input) {
@@ -275,6 +315,12 @@ export async function readDouyinReport(input, { resourceType, businessDate, stor
   if (missing.length) {
     throw reportError("DOUYIN_REQUIRED_FIELDS_MISSING", `抖店报表缺少必需字段：${missing.join("、")}`);
   }
+  const parsedReportVersion = reportVersion(resourceType, rows[headerIndex], schema.reportVersion);
+  const fileDates = fileBusinessDates(file.name);
+  const dateFromFile = best.columns.businessDate < 0;
+  if (dateFromFile && (!fileDates.length || fileDates.some(date => date !== businessDate))) {
+    throw reportError(DATE_ERROR_CODES[resourceType], `抖店报表文件日期与任务日期 ${businessDate} 不一致。`);
+  }
 
   const facts = [];
   const identities = new Set();
@@ -286,11 +332,20 @@ export async function readDouyinReport(input, { resourceType, businessDate, stor
     const mapped = {
       providerId: "douyin-ecommerce",
       storeId,
-      sourceVersion: schema.reportVersion
+      sourceVersion: parsedReportVersion
     };
     for (const [field, definition] of Object.entries(schema.fields)) {
       const column = best.columns[field];
-      mapped[field] = column >= 0 ? fieldValue(definition.kind, row[column]) : null;
+      if (field === "businessDate" && column < 0) {
+        mapped[field] = businessDate;
+        continue;
+      }
+      const header = column >= 0 ? cleanHeader(rows[headerIndex][column]) : "";
+      const minutes = definition.minuteAliases?.map(cleanHeader).includes(header) || false;
+      mapped[field] = column >= 0 ? fieldValue(definition.kind, row[column], { minutes }) : null;
+    }
+    if (resourceType === "live_daily" && !mapped.liveSessionId) {
+      mapped.liveSessionId = derivedLiveSessionId(mapped);
     }
     if (mapped.businessDate !== businessDate) {
       throw reportError(DATE_ERROR_CODES[resourceType], `抖店报表日期 ${mapped.businessDate || "无法识别"} 与任务日期 ${businessDate} 不一致。`);
@@ -312,13 +367,17 @@ export async function readDouyinReport(input, { resourceType, businessDate, stor
     }
   }
 
-  const mappedFields = Object.entries(best.columns).filter(([, column]) => column >= 0).map(([field]) => field);
-  const coverage = mappedFields.length / Object.keys(schema.fields).length;
+  const mappedFields = new Set(
+    Object.entries(best.columns).filter(([, column]) => column >= 0).map(([field]) => field)
+  );
+  if (dateFromFile) mappedFields.add("businessDate");
+  if (resourceType === "live_daily" && best.columns.liveSessionId < 0) mappedFields.add("liveSessionId");
+  const coverage = mappedFields.size / Object.keys(schema.fields).length;
   return {
     resourceType,
-    reportVersion: schema.reportVersion,
+    reportVersion: parsedReportVersion,
     contentHash: await hashFile(file),
-    mappedFields,
+    mappedFields: [...mappedFields],
     sourceRowCount,
     rejectedCount: 0,
     coverage,

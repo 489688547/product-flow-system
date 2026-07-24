@@ -14,6 +14,7 @@ import {
   heartbeatRunner,
   listWebCollectionStatus,
   recordWebCollectionNotification,
+  registerWebCollectionStore,
   triggerWebCollectionJob,
   transitionWebCollectionJob,
   webCollectionDatabase
@@ -43,6 +44,7 @@ export async function onRequest({ request, env, data = {} }) {
     let result;
     switch (body?.action) {
       case "heartbeat": result = await heartbeatRunner(db, runner, body); break;
+      case "register_store": result = await registerWebCollectionStore(db, runner, body); break;
       case "ensure_plan": result = await ensureWebCollectionPlan(
         db,
         body.jobs,

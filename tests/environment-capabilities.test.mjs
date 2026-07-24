@@ -184,10 +184,16 @@ test("Douyin Compass collection declares control and business D1 boundaries with
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"]);
   assert.deepEqual(capability.bindingTables.PRODUCT_FLOW_DB, [
     "web_collection_runners",
+    "web_collection_stores",
     "web_collection_jobs",
     "web_collection_runs",
     "web_collection_cursors",
-    "web_collection_notifications"
+    "web_collection_notifications",
+    "commerce_fact_batches",
+    "commerce_store_daily_facts",
+    "commerce_product_daily_facts",
+    "commerce_live_daily_facts",
+    "commerce_video_daily_facts"
   ]);
   assert.deepEqual(capability.bindingTables.DEMO_FLOW_DB, [
     "commerce_fact_batches",

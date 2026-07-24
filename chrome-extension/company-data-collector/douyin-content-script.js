@@ -20,6 +20,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     sendResponse({ ok: true, providerId: "douyin-ecommerce" });
     return false;
   }
+  if (message?.type === "DISCOVER_DOUYIN_STORE") {
+    douyinExecutorPromise
+      .then(executor => executor.discoverDouyinStoreIdentity())
+      .then(sendResponse)
+      .catch(error => sendResponse({
+        kind: "failed",
+        errorCode: error?.code || "DOUYIN_STORE_IDENTITY_FAILED",
+        safeSummary: "抖店店铺身份识别失败。"
+      }));
+    return true;
+  }
   if (message?.type !== "RUN_REGISTERED_TASK") return false;
   runRegisteredTask(message.task)
     .then(sendResponse)

@@ -30,6 +30,21 @@ FROM web_collection_cursors_legacy;
 
 DROP TABLE web_collection_cursors_legacy;
 
+CREATE TABLE web_collection_stores (
+  id TEXT PRIMARY KEY,
+  provider_id TEXT NOT NULL,
+  store_id TEXT NOT NULL,
+  store_name TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'connected'
+    CHECK (status IN ('connected', 'disabled')),
+  runner_id TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(provider_id, store_id),
+  FOREIGN KEY(runner_id) REFERENCES web_collection_runners(id)
+);
+
 CREATE TABLE commerce_fact_batches (
   id TEXT PRIMARY KEY,
   job_id TEXT NOT NULL,
@@ -163,6 +178,9 @@ CREATE TABLE commerce_video_daily_facts (
 
 CREATE INDEX idx_web_collection_jobs_store_date
   ON web_collection_jobs(provider_id, store_id, business_date, status);
+
+CREATE INDEX idx_web_collection_stores_provider
+  ON web_collection_stores(provider_id, status, updated_at);
 
 CREATE INDEX idx_commerce_fact_batches_lookup
   ON commerce_fact_batches(provider_id, store_id, resource_type, business_date, status);
