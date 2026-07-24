@@ -125,20 +125,85 @@ function productId(record) {
 
 function catalogProjection(resourceType, records, now) {
   if (resourceType === "products") {
+    const grouped = new Map();
+    for (const record of records) {
+      const payload = record.payload || {};
+      const merchantCode = text(firstValue(payload, ["productCode", "主商家编码", "商品编码"]));
+      const sourceProductId = text(firstValue(payload, ["sourceProductId", "系统商品ID", "商品ID"])) || merchantCode || record.sourceKey;
+      const key = merchantCode || sourceProductId;
+      const item = grouped.get(key) || {
+        sourceProductId,
+        merchantCode,
+        name: text(firstValue(payload, ["productName", "商品名称"])) || merchantCode || record.sourceKey,
+        shortName: text(firstValue(payload, ["shortName", "商品简称"])),
+        remark: text(firstValue(payload, ["remark", "商品备注"])),
+        category: text(firstValue(payload, ["category", "商品分类", "商品类目"])),
+        brand: text(firstValue(payload, ["brand", "品牌"])),
+        supplierCode: text(firstValue(payload, ["supplierCode", "供应商编码", "供应商商家编码"])),
+        supplierName: text(firstValue(payload, ["supplierName", "供应商", "供应商名称"])),
+        activeStatus: text(firstValue(payload, ["status", "商品状态"])),
+        sourceModifiedAt: record.modifiedAt,
+        skus: []
+      };
+      const merchantSkuCode = text(firstValue(payload, ["skuCode", "规格商家编码", "SKU编码"]));
+      const sourceSkuId = text(firstValue(payload, ["sourceSkuId", "系统规格ID", "规格ID"]));
+      const barcode = text(firstValue(payload, ["barcode", "69码", "条形码", "条码"]));
+      if (merchantSkuCode || sourceSkuId || barcode) {
+        item.skus.push({
+          sourceSkuId,
+          merchantSkuCode,
+          barcode,
+          specification: text(firstValue(payload, ["skuName", "规格", "规格名称"])),
+          skuRemark: text(firstValue(payload, ["skuRemark", "规格备注"])),
+          purchasePrice: numberOrNull(firstValue(payload, ["purchasePrice", "成本价", "采购价"])),
+          salePrice: numberOrNull(firstValue(payload, ["salePrice", "销售价", "售价"])),
+          wholesalePrice: numberOrNull(firstValue(payload, ["wholesalePrice", "批发价"])),
+          weight: numberOrNull(firstValue(payload, ["weight", "重量"])),
+          activeStatus: text(firstValue(payload, ["status", "规格状态", "商品状态"])),
+          sourceModifiedAt: record.modifiedAt
+        });
+      }
+      grouped.set(key, item);
+    }
     return {
       source: "kuaimai-file",
       syncedAt: now,
-      items: records.map(record => ({
-        sourceProductId: record.sourceKey,
-        merchantCode: text(record.payload.productCode),
-        name: text(record.payload.productName) || text(record.payload.productCode) || record.sourceKey,
-        supplierCode: text(record.payload.supplierCode),
-        supplierName: text(record.payload.supplierName),
-        activeStatus: text(record.payload.status),
-        sourceModifiedAt: record.modifiedAt,
-        skus: []
-      }))
+      items: [...grouped.values()]
     };
+  }
+  if (["product_kits", "product_combinations"].includes(resourceType)) {
+    const grouped = new Map();
+    for (const record of records) {
+      const payload = record.payload || {};
+      const merchantCode = text(firstValue(payload, [
+        "productCode", "套件主商家编码", "套件商家编码", "组合装主商家编码", "组合装商家编码", "主商家编码"
+      ]));
+      if (!merchantCode) continue;
+      const item = grouped.get(merchantCode) || {
+        sourceProductId: text(firstValue(payload, ["sourceProductId", "系统商品ID", "商品ID"])) || merchantCode,
+        merchantCode,
+        name: text(firstValue(payload, ["productName", "套件名称", "组合装名称", "商品名称"])) || merchantCode,
+        typeTag: resourceType === "product_kits" ? "3" : "4",
+        productKind: "bundle",
+        category: "组合品",
+        skus: [],
+        components: []
+      };
+      const componentCode = text(firstValue(payload, [
+        "componentSkuCode", "单品规格商家编码", "子商品规格商家编码", "子商品商家编码", "组成规格商家编码"
+      ]));
+      if (componentCode) {
+        item.components.push({
+          skuOuterId: componentCode,
+          inventoryUnitCode: componentCode,
+          title: text(firstValue(payload, ["componentName", "单品名称", "子商品名称", "组成商品名称"])),
+          ratio: numberOrNull(firstValue(payload, ["componentQuantity", "组合比例", "单品数量", "组成数量", "数量"])),
+          purchasePrice: numberOrNull(firstValue(payload, ["componentCost", "子商品供应商进价", "单品成本价", "组成成本价"]))
+        });
+      }
+      grouped.set(merchantCode, item);
+    }
+    return { source: "kuaimai-file", syncedAt: now, items: [...grouped.values()] };
   }
   if (resourceType === "skus") {
     return {

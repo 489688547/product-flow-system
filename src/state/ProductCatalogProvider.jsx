@@ -1,12 +1,38 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { productCatalogSalesRange } from "../domain/productCatalogSales.js";
-import { importProductCatalog, loadProductCatalog, syncKuaimaiProductCatalog } from "./productCatalogApi.js";
+import {
+  importProductCatalog,
+  loadProductCatalog,
+  revokeProductCatalogSalesMapping,
+  saveProductCatalogSalesMapping,
+  syncKuaimaiProductCatalog
+} from "./productCatalogApi.js";
+import {
+  kuaimaiProductCollectionProgress,
+  loadWebCollectionStatus,
+  triggerKuaimaiProductCollection
+} from "./webCollectionApi.js";
 
 const ProductCatalogContext = createContext(null);
 
 function friendlyMessage(error, fallback) {
   const message = String(error?.message || "").trim();
   return /load failed|failed to fetch/i.test(message) ? fallback : message || fallback;
+}
+
+function shanghaiBusinessDate(now = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(now);
+  const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function wait(milliseconds) {
+  return new Promise(resolve => window.setTimeout(resolve, milliseconds));
 }
 
 export function ProductCatalogProvider({ children }) {
@@ -22,6 +48,7 @@ export function ProductCatalogProvider({ children }) {
   const requestSequence = useRef(0);
   const salesQueryRef = useRef(salesQuery);
   const [syncProgress, setSyncProgress] = useState(null);
+  const [collectionProgress, setCollectionProgress] = useState(null);
 
   const refresh = useCallback(async ({ quiet = false, query = salesQueryRef.current } = {}) => {
     const requestId = requestSequence.current + 1;
@@ -58,7 +85,7 @@ export function ProductCatalogProvider({ children }) {
     try {
       const result = await importProductCatalog(input);
       await refresh({ quiet: true });
-      setNotice(`已导入 ${Number(result.counts?.products || 0)} 个商品、${Number(result.counts?.skus || 0)} 个 SKU。`);
+      setNotice(`已导入 ${Number(result.counts?.products || 0)} 个商品、${Number(result.counts?.skus || 0)} 个 SKU，并重新核对当前销售归属。`);
       return result;
     } catch (importError) {
       setError(friendlyMessage(importError, "商品主数据导入失败。"));
@@ -86,6 +113,68 @@ export function ProductCatalogProvider({ children }) {
     }
   }, [refresh]);
 
+  const collectKuaimaiProducts = useCallback(async ({ force = false } = {}) => {
+    setBusy("chrome-products");
+    setError("");
+    setNotice("");
+    setCollectionProgress({ status: "running", label: "正在创建 Chrome 采集任务", completed: 0, total: 3, jobs: [] });
+    try {
+      const result = await triggerKuaimaiProductCollection({ date: shanghaiBusinessDate(), force });
+      const jobIds = (result.jobs || []).map(job => job.id).filter(Boolean);
+      if (jobIds.length !== 3) throw new Error("商品采集任务创建不完整，请查看数据同步。");
+
+      for (let attempt = 0; attempt < 180; attempt += 1) {
+        const progress = kuaimaiProductCollectionProgress(await loadWebCollectionStatus(), jobIds);
+        setCollectionProgress(progress);
+        if (progress.status === "success") {
+          await refresh({ quiet: true, query: salesQueryRef.current });
+          setNotice("Chrome 插件已获取普通商品、套件和组合装，并重新核对当前销售归属。");
+          return result;
+        }
+        if (["waiting_human", "schema_changed", "failed"].includes(progress.status)) {
+          throw new Error(progress.label);
+        }
+        await wait(2000);
+      }
+      throw new Error("等待 Chrome 商品采集超时，请查看数据同步。");
+    } catch (collectionError) {
+      setError(friendlyMessage(collectionError, "Chrome 商品采集失败。"));
+      throw collectionError;
+    } finally {
+      setBusy("");
+    }
+  }, [refresh]);
+
+  const saveSalesMapping = useCallback(async input => {
+    setBusy(`sales-mapping:${input.code}`); setError(""); setNotice("");
+    try {
+      const result = await saveProductCatalogSalesMapping(input);
+      await refresh({ quiet: true, query: salesQueryRef.current });
+      setNotice(`销售编码 ${input.code} 已关联商品。`);
+      return result;
+    } catch (mappingError) {
+      setError(friendlyMessage(mappingError, "销售编码关联失败。"));
+      throw mappingError;
+    } finally {
+      setBusy("");
+    }
+  }, [refresh]);
+
+  const revokeSalesMapping = useCallback(async input => {
+    setBusy(`sales-mapping:${input.code}`); setError(""); setNotice("");
+    try {
+      const result = await revokeProductCatalogSalesMapping(input);
+      await refresh({ quiet: true, query: salesQueryRef.current });
+      setNotice(`销售编码 ${input.code} 的人工关联已撤销。`);
+      return result;
+    } catch (mappingError) {
+      setError(friendlyMessage(mappingError, "销售编码关联撤销失败。"));
+      throw mappingError;
+    } finally {
+      setBusy("");
+    }
+  }, [refresh]);
+
   const value = useMemo(() => ({
     items,
     meta,
@@ -98,10 +187,14 @@ export function ProductCatalogProvider({ children }) {
     error,
     notice,
     syncProgress,
+    collectionProgress,
     refresh,
     importRows,
-    syncKuaimai
-  }), [busy, error, importRows, items, loading, meta, notice, refresh, runs, salesLoading, salesQuery, syncKuaimai, syncProgress]);
+    syncKuaimai,
+    collectKuaimaiProducts,
+    saveSalesMapping,
+    revokeSalesMapping
+  }), [busy, collectKuaimaiProducts, collectionProgress, error, importRows, items, loading, meta, notice, refresh, revokeSalesMapping, runs, salesLoading, salesQuery, saveSalesMapping, syncKuaimai, syncProgress]);
 
   return <ProductCatalogContext.Provider value={value}>{children}</ProductCatalogContext.Provider>;
 }

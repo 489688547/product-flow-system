@@ -7,6 +7,8 @@ export const KUAIMAI_ORDER_ROUTE = "/index.html#/trade/searchlist/";
 
 export const KUAIMAI_SALES_ROUTE = "/index.html#/report/sale_multidimension_next/";
 
+export const KUAIMAI_PRODUCT_ROUTE = "/index.html#/prod/parallel/";
+
 export const KUAIMAI_DOWNLOAD_CENTER_ROUTE = "/index.html#/index/download_center/";
 
 export const KUAIMAI_DOWNLOAD_ORIGINS = Object.freeze([
@@ -107,6 +109,31 @@ export const KUAIMAI_SALES_SELECTORS = Object.freeze({
   upgradeDialog: ".el-dialog"
 });
 
+export const KUAIMAI_PRODUCT_SELECTORS = Object.freeze({
+  productCode: "input[placeholder='主商家编码']",
+  queryButton: "button",
+  exportMenu: "a.taskbar-menu_item.j-tip-left",
+  exportOption: "a.taskbar-sub_menu_item",
+  exportDialog: ".el-dialog, .el-message-box",
+  exportFormat: ".el-dialog input[type='radio']",
+  exportDialogButton: ".el-dialog button"
+});
+
+const KUAIMAI_PRODUCT_EXPORTS = Object.freeze({
+  products: Object.freeze({
+    exportLabel: "导出普通商品",
+    downloadFilePrefixes: ["快麦导出_普通商品"]
+  }),
+  product_kits: Object.freeze({
+    exportLabel: "导出套件",
+    downloadFilePrefixes: ["快麦导出_套件"]
+  }),
+  product_combinations: Object.freeze({
+    exportLabel: "导出组合装",
+    downloadFilePrefixes: ["快麦导出_组合装"]
+  })
+});
+
 export function matchesKuaimaiControlText(text, label) {
   const normalized = String(text || "").replace(/\s+/g, " ").trim();
   const expected = String(label || "").trim();
@@ -134,6 +161,15 @@ function matchesKuaimaiExportResource(resourceType, value) {
   }
   if (resourceType === "sales_items") {
     return content.startsWith("销售主题分析-按订单商品明细-");
+  }
+  if (resourceType === "products") {
+    return content.startsWith("快麦导出_普通商品");
+  }
+  if (resourceType === "product_kits") {
+    return content.startsWith("快麦导出_套件");
+  }
+  if (resourceType === "product_combinations") {
+    return content.startsWith("快麦导出_组合装");
   }
   return false;
 }
@@ -199,6 +235,18 @@ export function classifyKuaimaiPage({ url = "", markers = {} } = {}) {
   return { state: "schema_changed", errorCode: "KUAIMAI_ORDER_PAGE_SCHEMA_CHANGED" };
 }
 
+export function classifyKuaimaiProductPage({ url = "", markers = {} } = {}) {
+  if (!validOrigin(url)) return { state: "blocked_origin", errorCode: "KUAIMAI_ORIGIN_BLOCKED" };
+  if (markers.humanVerification) return { state: "waiting_human", errorCode: "KUAIMAI_HUMAN_VERIFICATION_REQUIRED" };
+  if (markers.loginPage || /\/login(?:[/?#]|$)/i.test(url)) {
+    return { state: "waiting_login", errorCode: "KUAIMAI_LOGIN_REQUIRED" };
+  }
+  if (markers.productCode && markers.queryButton && markers.exportMenu && markers.exportOption) {
+    return { state: "ready" };
+  }
+  return { state: "schema_changed", errorCode: "KUAIMAI_PRODUCT_PAGE_SCHEMA_CHANGED" };
+}
+
 function assertBusinessDate(value) {
   const businessDate = String(value || "");
   const match = businessDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -233,6 +281,11 @@ export function buildKuaimaiTaskUrl(baseUrl, task) {
     url.hash = "#/report/sale_multidimension_next/";
     return url.href;
   }
+  if (KUAIMAI_PRODUCT_EXPORTS[task?.resourceType]) {
+    const url = new URL(baseUrl);
+    url.hash = "#/prod/parallel/";
+    return url.href;
+  }
   const startTime = Date.parse(`${businessDate}T00:00:00+08:00`);
   const endTime = Date.parse(`${businessDate}T23:59:59+08:00`);
   const url = new URL(baseUrl);
@@ -250,6 +303,19 @@ export function buildKuaimaiTaskUrl(baseUrl, task) {
 
 export function buildKuaimaiActionPlan(task) {
   const businessDate = assertBusinessDate(task?.businessDate);
+  const productExport = KUAIMAI_PRODUCT_EXPORTS[task?.resourceType];
+  if (productExport) {
+    return [
+      {
+        action: "export_product_snapshot",
+        exportLabel: productExport.exportLabel,
+        formatValue: "1"
+      },
+      { action: "confirm_product_fields" },
+      { action: "confirm_product_export" },
+      { action: "download_from_center", resourceType: task.resourceType }
+    ];
+  }
   if (task?.resourceType === "sales_items") {
     return [
       {
@@ -323,6 +389,39 @@ export const kuaimaiResources = Object.freeze({
     scheduleVersion: "v2",
     downloadExtensions: [".xlsx", ".xls", ".csv"],
     downloadFilePrefixes: ["销售主题分析-按订单商品明细-"],
+    downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
+  }),
+  products: Object.freeze({
+    providerId: "kuaimai",
+    resourceType: "products",
+    origin: "https://erpb.superboss.cc",
+    route: KUAIMAI_PRODUCT_ROUTE,
+    rangeKind: "current_snapshot",
+    scheduleVersion: "v1",
+    downloadExtensions: [".xlsx", ".xls", ".csv"],
+    downloadFilePrefixes: KUAIMAI_PRODUCT_EXPORTS.products.downloadFilePrefixes,
+    downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
+  }),
+  product_kits: Object.freeze({
+    providerId: "kuaimai",
+    resourceType: "product_kits",
+    origin: "https://erpb.superboss.cc",
+    route: KUAIMAI_PRODUCT_ROUTE,
+    rangeKind: "current_snapshot",
+    scheduleVersion: "v1",
+    downloadExtensions: [".xlsx", ".xls", ".csv"],
+    downloadFilePrefixes: KUAIMAI_PRODUCT_EXPORTS.product_kits.downloadFilePrefixes,
+    downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
+  }),
+  product_combinations: Object.freeze({
+    providerId: "kuaimai",
+    resourceType: "product_combinations",
+    origin: "https://erpb.superboss.cc",
+    route: KUAIMAI_PRODUCT_ROUTE,
+    rangeKind: "current_snapshot",
+    scheduleVersion: "v1",
+    downloadExtensions: [".xlsx", ".xls", ".csv"],
+    downloadFilePrefixes: KUAIMAI_PRODUCT_EXPORTS.product_combinations.downloadFilePrefixes,
     downloadOrigins: KUAIMAI_DOWNLOAD_ORIGINS
   })
 });

@@ -31,6 +31,67 @@ test("product and SKU resources project into the shared product catalog", () => 
   assert.equal(skus.catalog.items[0].skus[0].barcode, "6978705011208");
 });
 
+test("product snapshot groups SKU rows and preserves cost and classification", () => {
+  const projection = projectKuaimaiErpRecords("products", [
+    record("P-1::S-1", {
+      productCode: "SPU-1",
+      productName: "测试商品",
+      skuCode: "SKU-1",
+      barcode: "6978705011208",
+      skuName: "红色",
+      purchasePrice: "6.50",
+      category: "仓鼠食品",
+      brand: "提野星"
+    }),
+    record("P-1::S-2", {
+      productCode: "SPU-1",
+      productName: "测试商品",
+      skuCode: "SKU-2",
+      barcode: "6978705011215",
+      skuName: "蓝色",
+      purchasePrice: "7.00",
+      category: "仓鼠食品",
+      brand: "提野星"
+    })
+  ], { batchId: "batch-products", now });
+
+  assert.equal(projection.catalog.items.length, 1);
+  assert.equal(projection.catalog.items[0].category, "仓鼠食品");
+  assert.equal(projection.catalog.items[0].brand, "提野星");
+  assert.deepEqual(
+    projection.catalog.items[0].skus.map(sku => [sku.merchantSkuCode, sku.barcode, sku.purchasePrice]),
+    [
+      ["SKU-1", "6978705011208", 6.5],
+      ["SKU-2", "6978705011215", 7]
+    ]
+  );
+});
+
+test("kit and combination snapshots project official component relationships", () => {
+  for (const resourceType of ["product_kits", "product_combinations"]) {
+    const projection = projectKuaimaiErpRecords(resourceType, [
+      record(`${resourceType}-1`, {
+        productCode: resourceType === "product_kits" ? "KIT-1" : "COMBO-1",
+        productName: resourceType === "product_kits" ? "测试套件" : "测试组合装",
+        componentSkuCode: "SKU-1",
+        componentName: "单品一",
+        componentQuantity: "2",
+        componentCost: "6.50"
+      })
+    ], { batchId: `batch-${resourceType}`, now });
+
+    assert.equal(projection.catalog.items.length, 1);
+    assert.equal(projection.catalog.items[0].productKind, "bundle");
+    assert.deepEqual(projection.catalog.items[0].components, [{
+      skuOuterId: "SKU-1",
+      inventoryUnitCode: "SKU-1",
+      title: "单品一",
+      ratio: 2,
+      purchasePrice: 6.5
+    }]);
+  }
+});
+
 test("inventory snapshot projects into daily inventory without inventing missing values", () => {
   const projection = projectKuaimaiErpRecords("inventory_snapshot", [record("wh-1::sku-1", {
     productCode: "P-001", skuCode: "SKU-001", quantity: "18", warehouseName: "华东仓"

@@ -10,7 +10,8 @@ import { routeError } from "./http.js";
 const RUNNER_SCOPE = "company_web_collection";
 const PROVIDER_RESOURCES = Object.freeze({
   kuaimai: new Set([
-    "orders", "order_items", "sales_items", "products", "inventory", "purchases", "suppliers", "aftersales",
+    "orders", "order_items", "sales_items", "products", "product_kits", "product_combinations",
+    "inventory", "purchases", "suppliers", "aftersales",
     "shops", "warehouses", "sales_analysis", "goods_ledger", "inventory_cost"
   ]),
   "douyin-ecommerce": new Set(["store_daily", "product_daily", "live_daily", "video_daily"]),
@@ -304,13 +305,15 @@ function dailyRange(businessDate) {
   };
 }
 
-export async function triggerWebCollectionJob(db, input) {
+export async function triggerWebCollectionJob(db, input, target = { environmentId: "production", environmentVersion: 1 }) {
   const providerId = String(input?.providerId || "").trim();
   const storeId = String(input?.storeId || "").trim();
   const resourceType = String(input?.resourceType || "").trim();
   const businessDate = String(input?.businessDate || "").trim();
+  // 商品入口由服务端展开普通商品、套件和组合装三任务；快照类资源不带日范围。
+  const productResources = ["products", "product_kits", "product_combinations"];
   const triggerable = providerId === "kuaimai"
-    ? new Set(["orders", "order_items", "sales_items"])
+    ? new Set(["orders", "order_items", "sales_items", "products"])
     : providerId === "douyin-ecommerce"
       ? new Set(["store_daily", "product_daily", "live_daily", "video_daily"])
       : null;
@@ -321,34 +324,44 @@ export async function triggerWebCollectionJob(db, input) {
   ) {
     throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发已登记的快麦或抖店资源。");
   }
-  const scheduleVersion = providerId === "kuaimai" && resourceType === "sales_items"
-    ? "v3"
-    : providerId === "kuaimai" && resourceType === "orders"
-      ? "v2"
-      : "v1";
-  const key = webCollectionJobKey({ providerId, storeId, resourceType, businessDate, scheduleVersion });
-  const plan = await ensureWebCollectionPlan(db, [{
-    providerId,
-    storeId,
-    resourceType,
-    businessDate,
-    rangeKind: "daily_fact",
-    range: dailyRange(businessDate),
-    scheduleVersion,
-    idempotencyKey: key
-  }]);
-  let job = plan.jobs[0];
+  const requestedResources = providerId === "kuaimai" && resourceType === "products"
+    ? productResources
+    : [resourceType];
+  const requestedJobs = requestedResources.map(type => {
+    const scheduleVersion = providerId === "kuaimai" && type === "sales_items"
+      ? "v3"
+      : providerId === "kuaimai" && type === "orders"
+        ? "v2"
+        : "v1";
+    const rangeKind = productResources.includes(type) ? "current_snapshot" : "daily_fact";
+    return {
+      providerId,
+      storeId,
+      resourceType: type,
+      businessDate,
+      rangeKind,
+      range: rangeKind === "daily_fact" ? dailyRange(businessDate) : null,
+      scheduleVersion,
+      idempotencyKey: webCollectionJobKey({ providerId, storeId, resourceType: type, businessDate, scheduleVersion })
+    };
+  });
+  const plan = await ensureWebCollectionPlan(db, requestedJobs, target);
+  const savedJobs = [];
   let requeued = false;
-  if (input.force === true && ["waiting_human", "failed", "schema_changed", "success"].includes(job.status)) {
-    const now = new Date().toISOString();
-    await db.prepare(`UPDATE web_collection_jobs SET status = 'queued', stage = 'queued', runner_id = NULL,
-      lease_expires_at = NULL, error_code = NULL, error_summary = NULL, started_at = NULL, completed_at = NULL,
-      updated_at = ? WHERE id = ?`)
-      .bind(now, job.id).run();
-    job = mapJob(await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(job.id).first());
-    requeued = true;
+  for (const plannedJob of plan.jobs) {
+    let job = plannedJob;
+    if (input.force === true && ["waiting_human", "failed", "schema_changed", "success"].includes(job.status)) {
+      const now = new Date().toISOString();
+      await db.prepare(`UPDATE web_collection_jobs SET status = 'queued', stage = 'queued', runner_id = NULL,
+        lease_expires_at = NULL, error_code = NULL, error_summary = NULL, started_at = NULL, completed_at = NULL,
+        updated_at = ? WHERE id = ?`)
+        .bind(now, job.id).run();
+      job = mapJob(await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(job.id).first());
+      requeued = true;
+    }
+    savedJobs.push(job);
   }
-  return { created: plan.created, requeued, job };
+  return { created: plan.created, requeued, job: savedJobs[0], jobs: savedJobs };
 }
 
 export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } = {}) {

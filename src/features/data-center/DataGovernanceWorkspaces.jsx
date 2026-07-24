@@ -11,7 +11,8 @@ import {
 } from "../../state/webCollectionApi.js";
 import {
   buildDouyinCollectionRecovery,
-  buildKuaimaiSalesRecovery
+  buildKuaimaiSalesRecovery,
+  countDataSyncIssues
 } from "../../domain/dataSyncRecovery.js";
 import { buildDataSyncRunRows } from "../../domain/dataSyncRunRows.js";
 import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapters.js";
@@ -69,16 +70,18 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
   useEffect(() => {
     refreshWebCollection();
   }, [refreshWebCollection]);
-  const cards = [["待处理问题", quality.openIssues], ["待确认商品映射", quality.unmappedProducts], ["本期口径排除", quality.excludedRows]];
   const salesAnomaly = quality.latestSalesAnomaly;
+  const currentIssueCount = countDataSyncIssues({ openIssues: quality.openIssues, latestSalesAnomaly: salesAnomaly });
+  const cards = [["待处理问题", currentIssueCount], ["待确认商品映射", quality.unmappedProducts], ["本期口径排除", quality.excludedRows]];
   const targetDayMissing = salesAnomaly?.code === "SALES_TARGET_DAY_MISSING";
   const salesRecovery = useMemo(() => buildKuaimaiSalesRecovery({
     date: salesAnomaly?.date,
+    anomalyStatus: salesAnomaly?.status,
     runners: webCollection.runners,
     jobs: webCollection.jobs,
     loading: webCollectionLoading,
     error: webCollectionError
-  }), [salesAnomaly?.date, webCollection.jobs, webCollection.runners, webCollectionError, webCollectionLoading]);
+  }), [salesAnomaly?.date, salesAnomaly?.status, webCollection.jobs, webCollection.runners, webCollectionError, webCollectionLoading]);
   const syncRunRows = useMemo(() => buildDataSyncRunRows({
     legacyRuns: state.syncRuns,
     jobs: webCollection.jobs,

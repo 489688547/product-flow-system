@@ -86,13 +86,95 @@ test("a code attached to multiple products remains unmatched instead of double c
   assert.deepEqual(result.items.map(item => item.sales.quantity), [0, 0]);
 });
 
-test("catalog rows put the highest-selling products first with a stable name fallback", () => {
+test("bundle components describe consumption and do not become bundle sales codes", () => {
+  const result = aggregateProductCatalogSales([
+    {
+      id: "bundle",
+      productKind: "bundle",
+      skus: [],
+      components: [{ inventoryUnitCode: "6978705011208", ratio: 2 }]
+    },
+    {
+      id: "single",
+      productKind: "single",
+      skus: [{ barcode: "6978705011208" }],
+      components: []
+    }
+  ], [{ code: "6978705011208", platform: "抖音", qty: 3, netSales: 60 }]);
+
+  assert.equal(result.items.find(item => item.id === "bundle").sales.quantity, 0);
+  assert.equal(result.items.find(item => item.id === "single").sales.quantity, 3);
+});
+
+test("a component-only code stays unmatched and explains the missing single-product record", () => {
+  const result = aggregateProductCatalogSales([
+    {
+      id: "bundle",
+      productKind: "bundle",
+      skus: [],
+      components: [{ inventoryUnitCode: "6978705011208", ratio: 2 }]
+    }
+  ], [{ code: "6978705011208", platform: "抖音", qty: 3, netSales: 60 }]);
+
+  assert.equal(result.items[0].sales.quantity, 0);
+  assert.equal(result.meta.unmatchedCodeCount, 1);
+  assert.equal(result.meta.unmatchedItems[0].reason, "catalog_component_only");
+});
+
+test("sales mappings attribute otherwise unmatched codes and preserve unmatched code details", () => {
+  const result = aggregateProductCatalogSales([
+    { id: "product-1", name: "商品一", skus: [] },
+    { id: "product-2", name: "商品二", skus: [] }
+  ], [
+    { code: "MAPPED", platform: "抖音", qty: 2, netSales: 40, latestDataDate: "2026-07-20" },
+    { code: "UNKNOWN", platform: "抖音", qty: 3, netSales: 60, latestDataDate: "2026-07-20" },
+    { code: "UNKNOWN", platform: "天猫", qty: 4, netSales: 88, latestDataDate: "2026-07-21" }
+  ], {
+    mappings: [{ code: "MAPPED", productId: "product-1", version: 1 }],
+    titles: { MAPPED: "已关联标题", UNKNOWN: "待关联标题" }
+  });
+
+  assert.equal(result.items[0].sales.quantity, 2);
+  assert.equal(result.meta.unmatchedCodeCount, 1);
+  assert.equal(result.meta.unmatchedRowCount, 2);
+  assert.deepEqual(result.meta.unmatchedItems, [{
+    id: "UNKNOWN",
+    code: "UNKNOWN",
+    title: "待关联标题",
+    quantity: 7,
+    netSales: 148,
+    rowCount: 2,
+    latestDataDate: "2026-07-21",
+    platforms: [
+      { platform: "天猫", quantity: 4, netSales: 88 },
+      { platform: "抖音", quantity: 3, netSales: 60 }
+    ]
+  }]);
+});
+
+test("a manual mapping cannot hide a catalog SKU ownership conflict", () => {
+  const result = aggregateProductCatalogSales([
+    { id: "product-1", skus: [{ barcode: "DUPLICATE" }] },
+    { id: "product-2", skus: [{ merchantSkuCode: "DUPLICATE" }] }
+  ], [{ code: "DUPLICATE", platform: "抖音", qty: 3, netSales: 60 }], {
+    mappings: [{ code: "DUPLICATE", productId: "product-1", version: 1 }]
+  });
+
+  assert.equal(result.meta.unmatchedCodeCount, 1);
+  assert.equal(result.meta.unmatchedItems[0].reason, "catalog_code_conflict");
+  assert.deepEqual(result.items.map(item => item.sales.quantity), [0, 0]);
+});
+
+test("catalog rows default to sales amount descending and support all sales sort directions", () => {
   const items = [
     { id: "zero", name: "零销量", sales: { quantity: 0, netSales: 0 } },
-    { id: "second", name: "乙商品", sales: { quantity: 8, netSales: 120 } },
-    { id: "first", name: "甲商品", sales: { quantity: 8, netSales: 160 } }
+    { id: "quantity", name: "销量商品", sales: { quantity: 12, netSales: 120 } },
+    { id: "sales", name: "销售额商品", sales: { quantity: 8, netSales: 160 } }
   ];
 
-  assert.deepEqual(sortProductCatalogBySales(items).map(item => item.id), ["first", "second", "zero"]);
-  assert.deepEqual(items.map(item => item.id), ["zero", "second", "first"]);
+  assert.deepEqual(sortProductCatalogBySales(items).map(item => item.id), ["sales", "quantity", "zero"]);
+  assert.deepEqual(sortProductCatalogBySales(items, "netSales_asc").map(item => item.id), ["zero", "quantity", "sales"]);
+  assert.deepEqual(sortProductCatalogBySales(items, "quantity_desc").map(item => item.id), ["quantity", "sales", "zero"]);
+  assert.deepEqual(sortProductCatalogBySales(items, "quantity_asc").map(item => item.id), ["zero", "sales", "quantity"]);
+  assert.deepEqual(items.map(item => item.id), ["zero", "quantity", "sales"]);
 });

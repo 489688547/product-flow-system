@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   catalogDataIssues,
+  catalogDisplayCategory,
+  catalogProductCost,
   catalogSellableQuantity,
   flattenCatalogConsumption,
   normalizeCatalogComponent
@@ -65,6 +67,47 @@ test("aggregates different bundle components and calculates sellable stock", () 
   assert.deepEqual(result.components.map(component => component.inventoryUnitCode).sort(), ["6977173969059", "6978705011727"]);
   assert.equal(result.totalCost, 37.2);
   assert.equal(catalogSellableQuantity({ items, itemId: bundle.id, inventoryByCode: { "6978705011727": 502, "6977173969059": 2064 } }), 502);
+});
+
+test("bundle classification is fixed and cost always comes from component SKU costs", () => {
+  const items = catalogItems();
+  const original = items.find(item => item.merchantCode === "BYMSDHBD");
+  const bundle = {
+    ...original,
+    category: "仓鼠用品",
+    skus: [{ id: "bundle-price", barcode: "BUNDLE-PRICE", purchasePrice: 999 }],
+    components: original.components.map(component => ({ ...component, purchasePrice: 888 }))
+  };
+  const catalog = items.map(item => item.id === bundle.id ? bundle : item);
+  const result = catalogProductCost({ items: catalog, itemId: bundle.id });
+
+  assert.equal(catalogDisplayCategory(bundle), "组合品");
+  assert.equal(result.kind, "bundle");
+  assert.equal(result.complete, true);
+  assert.equal(result.total, 18.6);
+  assert.deepEqual(result.components.map(component => ({
+    code: component.inventoryUnitCode,
+    ratio: component.ratio,
+    unitCost: component.unitCost,
+    cost: component.cost
+  })), [
+    { code: "6977173969059", ratio: 1, unitCost: 4, cost: 4 },
+    { code: "6978705011727", ratio: 1, unitCost: 14.6, cost: 14.6 }
+  ]);
+});
+
+test("bundle cost stays incomplete when any component SKU cost is missing", () => {
+  const items = catalogItems();
+  const bundle = items.find(item => item.merchantCode === "2DGZZ");
+  const catalog = items.map(item => item.merchantCode === "1111"
+    ? { ...item, skus: item.skus.map(sku => ({ ...sku, purchasePrice: null })) }
+    : item);
+  const result = catalogProductCost({ items: catalog, itemId: bundle.id });
+
+  assert.equal(result.complete, false);
+  assert.equal(result.total, null);
+  assert.equal(result.components[0].unitCost, null);
+  assert.equal(result.issues.some(issue => issue.code === "PRODUCT_CATALOG_COMPONENT_COST_MISSING"), true);
 });
 
 test("recursively expands nested bundles and stops component cycles", () => {

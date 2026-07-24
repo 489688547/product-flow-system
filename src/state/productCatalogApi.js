@@ -20,6 +20,10 @@ export function productCatalogSyncUrl() {
   return "/api/platform/v1/product-catalog/sync/kuaimai";
 }
 
+export function productCatalogSalesMappingsUrl() {
+  return "/api/platform/v1/product-catalog/sales-mappings";
+}
+
 async function payloadFor(response, fallback, { allowUnsynced = false } = {}) {
   const payload = await response.json().catch(() => ({}));
   const invalidReadPayload = allowUnsynced && !Array.isArray(payload?.items);
@@ -48,6 +52,24 @@ export async function importProductCatalog(input, fetchImpl = fetch) {
     body: JSON.stringify(input)
   });
   return payloadFor(response, "商品主数据导入失败。");
+}
+
+export async function saveProductCatalogSalesMapping(input, fetchImpl = fetch) {
+  const response = await fetchImpl(productCatalogSalesMappingsUrl(), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  return payloadFor(response, "销售编码关联失败。");
+}
+
+export async function revokeProductCatalogSalesMapping(input, fetchImpl = fetch) {
+  const response = await fetchImpl(productCatalogSalesMappingsUrl(), {
+    method: "DELETE",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input)
+  });
+  return payloadFor(response, "销售编码关联撤销失败。");
 }
 
 export async function syncKuaimaiProductCatalog(fetchImpl = fetch, onProgress) {

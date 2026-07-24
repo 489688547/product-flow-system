@@ -1,6 +1,7 @@
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Barcode, CircleAlert, FileSpreadsheet, PackageCheck, PackageSearch, RefreshCw, Search, Upload } from "lucide-react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, ArrowUpDown, CircleAlert, FileSpreadsheet, PackageCheck, PackageSearch, RefreshCw, Search, Upload } from "lucide-react";
 import { parseProductCatalogRows } from "../../domain/productCatalog.js";
+import { catalogDisplayCategory, catalogProductCost } from "../../domain/productCatalogGraph.js";
 import { productCatalogSalesRange, sortProductCatalogBySales } from "../../domain/productCatalogSales.js";
 import { streamSpreadsheetRows } from "../../domain/xlsxLite.js";
 import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
@@ -12,6 +13,7 @@ import { DateRangePickerField } from "../../ui/DateRangePickerField.jsx";
 import { HeaderFilter } from "../../ui/HeaderFilter.jsx";
 import { TablePagination } from "../../ui/TablePagination.jsx";
 import { ProductCatalogDetailDialog } from "./ProductCatalogDetailDialog.jsx";
+import { ProductCatalogSalesMappingDialog } from "./ProductCatalogSalesMappingDialog.jsx";
 
 const PAGE_SIZE = 50;
 
@@ -25,10 +27,17 @@ const DATE_OPTIONS = [
 
 const VIEW_OPTIONS = [
   { value: "all", label: "全部商品" },
-  { value: "attention", label: "待完善" },
-  { value: "bundle", label: "组合商品" },
+  { value: "attention", label: "资料待补充" },
+  { value: "bundle", label: "组合品" },
   { value: "unsold", label: "未售商品" },
   { value: "unlinked", label: "未关联产品" }
+];
+
+const SALES_SORT_OPTIONS = [
+  { value: "netSales_desc", label: "销售额 高→低" },
+  { value: "netSales_asc", label: "销售额 低→高" },
+  { value: "quantity_desc", label: "销量 高→低" },
+  { value: "quantity_asc", label: "销量 低→高" }
 ];
 
 async function rowsFromSpreadsheet(file) {
@@ -73,45 +82,54 @@ function money(value) {
   return `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function hasValue(value) {
-  return value !== null && value !== undefined && value !== "" && Number.isFinite(Number(value));
-}
-
-function priceRange(item) {
-  const costs = (item.skus || []).map(sku => sku.purchasePrice).filter(hasValue);
-  const components = item.components || [];
-  if (!costs.length && components.length && components.every(component => hasValue(component.purchasePrice) && Number.isInteger(component.ratio))) {
-    const bundleCost = components.reduce((sum, component) => sum + Number(component.purchasePrice) * component.ratio, 0);
-    return `¥${bundleCost.toFixed(2)}`;
-  }
-  if (!costs.length) return "—";
-  const min = Math.min(...costs);
-  const max = Math.max(...costs);
-  return min === max ? `¥${min.toFixed(2)}` : `¥${min.toFixed(2)}–${max.toFixed(2)}`;
-}
-
 function catalogIssues(item) {
   const issues = [];
   const skus = item.skus || [];
-  if (!skus.length) issues.push("缺少 SKU");
-  else if (skus.some(sku => !String(sku.barcode || "").trim())) issues.push("缺少库存单位编码");
-  if (item.productKind === "bundle" && !(item.components || []).length) issues.push("组合关系待补齐");
-  if (!String(item.category || "").trim()) issues.push("未分类");
+  const components = item.components || [];
+  if (item.productKind === "bundle") {
+    if (!components.length) issues.push("缺少组成关系");
+    else if (components.some(component => !String(component.inventoryUnitCode || "").trim())) issues.push("缺少子 SKU 编码");
+  } else if (!skus.length) {
+    issues.push("缺少规格");
+  } else if (skus.some(sku => !String(sku.barcode || sku.merchantSkuCode || "").trim())) {
+    issues.push("缺少规格编码");
+  }
+  if (item.productKind !== "bundle" && !String(item.category || "").trim()) issues.push("未分类");
   if (!String(item.brand || "").trim()) issues.push("未设置品牌");
   return issues;
 }
 
-function skuSummary(item) {
+function structureSummary(item) {
   const skus = item.skus || [];
+  const components = item.components || [];
+  if (item.productKind === "bundle") {
+    const first = components[0];
+    if (!components.length) return <span className="catalog-summary-cell warning"><strong>组成待补齐</strong><small>尚未读取到子 SKU</small></span>;
+    return <span className="catalog-summary-cell">
+      <strong className="catalog-code">{first?.inventoryUnitCode || "缺少子 SKU 编码"}{first?.ratio ? ` × ${quantity(first.ratio)}` : ""}</strong>
+      <small>{quantity(components.length)} 个子 SKU{components.length > 1 ? " · 详情查看全部" : ""}</small>
+    </span>;
+  }
   const primary = skus.find(sku => sku.barcode)?.barcode || "";
-  if (!skus.length) return <span className="catalog-summary-cell warning"><strong>暂无 SKU</strong><small>需要 ERP 商品文件补齐</small></span>;
-  return <span className="catalog-summary-cell"><strong className="catalog-code">{primary || "缺少库存单位编码"}</strong><small>{quantity(skus.length)} 个库存单位{skus.length > 1 ? " · 详情查看全部" : ` · 规格商家编码 ${skus[0].merchantSkuCode || "—"}`}</small></span>;
+  if (!skus.length) return <span className="catalog-summary-cell warning"><strong>暂无规格</strong><small>需要 ERP 商品档案补齐</small></span>;
+  return <span className="catalog-summary-cell"><strong className="catalog-code">{primary || skus[0].merchantSkuCode || "缺少规格编码"}</strong><small>{quantity(skus.length)} 个规格{skus.length > 1 ? " · 详情查看全部" : ` · 规格商家编码 ${skus[0].merchantSkuCode || "—"}`}</small></span>;
 }
 
 function typeSummary(item) {
   const components = item.components || [];
-  if (item.productKind === "bundle") return <span className={`catalog-summary-cell ${components.length ? "" : "warning"}`}><strong>组合商品</strong><small>{components.length ? `${quantity(components.length)} 项组成` : "组合关系待补齐"}</small></span>;
-  return <span className="catalog-summary-cell"><strong>单品</strong><small>{quantity((item.skus || []).length)} 个库存单位</small></span>;
+  if (item.productKind === "bundle") return <span className={`catalog-summary-cell ${components.length ? "" : "warning"}`}><strong>组合品</strong><small>{components.length ? `${quantity(components.length)} 个子 SKU` : "SKU 组成待补齐"}</small></span>;
+  return <span className="catalog-summary-cell"><strong>单品</strong><small>独立销售与库存</small></span>;
+}
+
+function costSummary(item, items) {
+  const result = catalogProductCost({ items, itemId: item.id });
+  const value = result.kind === "bundle"
+    ? result.complete ? money(result.total) : "—"
+    : result.complete && result.min === result.max
+      ? money(result.min)
+      : result.complete ? `${money(result.min)}–${money(result.max)}` : "—";
+  if (value !== "—") return <span className="catalog-summary-cell"><strong>{value}</strong><small>{item.productKind === "bundle" ? "子 SKU 成本 × 数量汇总" : "来源于 ERP 商品档案"}</small></span>;
+  return <span className="catalog-summary-cell warning"><strong>成本待补齐</strong><small>{item.productKind === "bundle" ? "组件成本不完整或无查看权限" : "规格成本未提供或无查看权限"}</small></span>;
 }
 
 function salesSummary(item) {
@@ -131,7 +149,23 @@ function matchesView(item, view, productLinks) {
 }
 
 export function ProductCatalogWorkspace({ canEdit }) {
-  const { items, meta, loading, salesLoading, salesQuery, setSalesQuery, busy, error, notice, refresh, importRows } = useProductCatalog();
+  const {
+    items,
+    meta,
+    loading,
+    salesLoading,
+    salesQuery,
+    setSalesQuery,
+    busy,
+    error,
+    notice,
+    collectionProgress,
+    refresh,
+    importRows,
+    collectKuaimaiProducts,
+    saveSalesMapping,
+    revokeSalesMapping
+  } = useProductCatalog();
   const { state: productState } = useProductFlow();
   const { state: supplyState } = useSupplyChain();
   const [query, setQuery] = useState("");
@@ -145,7 +179,10 @@ export function ProductCatalogWorkspace({ canEdit }) {
   const [parseError, setParseError] = useState("");
   const [pending, setPending] = useState(null);
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [mappingOpen, setMappingOpen] = useState(false);
+  const [salesSort, setSalesSort] = useState("netSales_desc");
   const [page, setPage] = useState(1);
+  const fileInputRef = useRef(null);
   const deferredQuery = useDeferredValue(query.trim());
 
   const productLinks = useMemo(() => new Map((productState.products || []).filter(product => product.catalogProductId).map(product => [product.catalogProductId, product])), [productState.products]);
@@ -158,7 +195,7 @@ export function ProductCatalogWorkspace({ canEdit }) {
     return counts;
   }, [supplyState.productSupplierLinks]);
   const salesMeta = meta.sales || {};
-  const categories = useMemo(() => [...new Set(items.map(item => item.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN")), [items]);
+  const categories = useMemo(() => [...new Set(items.map(catalogDisplayCategory).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-CN")), [items]);
   const platforms = useMemo(() => {
     const values = new Set(salesMeta.availablePlatforms || []);
     if (salesDraft.platform) values.add(salesDraft.platform);
@@ -182,18 +219,18 @@ export function ProductCatalogWorkspace({ canEdit }) {
   const filtered = useMemo(() => sortProductCatalogBySales(items
     .filter(item => matchesView(item, view, productLinks))
     .filter(item => includesQuery(item, deferredQuery))
-    .filter(item => category === "all" || item.category === category)
+    .filter(item => category === "all" || catalogDisplayCategory(item) === category)
     .filter(item => kind === "all" || item.productKind === kind)
-    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id)))), [category, deferredQuery, items, kind, linked, productLinks, view]);
-  useEffect(() => setPage(1), [category, kind, linked, query, salesQuery.from, salesQuery.platform, salesQuery.to, view]);
+    .filter(item => linked === "all" || (linked === "linked" ? productLinks.has(item.id) : !productLinks.has(item.id))), salesSort), [category, deferredQuery, items, kind, linked, productLinks, salesSort, view]);
+  useEffect(() => setPage(1), [category, kind, linked, query, salesQuery.from, salesQuery.platform, salesQuery.to, salesSort, view]);
   const visible = useMemo(() => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filtered, page]);
   const totals = useMemo(() => ({
     products: items.length,
-    inventoryUnits: new Set(items.flatMap(item => [...(item.skus || []).map(sku => sku.barcode).filter(Boolean), ...(item.components || []).map(component => component.inventoryUnitCode).filter(Boolean)])).size,
     coveredProducts: Number(salesMeta.coveredProducts) || 0,
     catalogIssueCount: items.filter(item => catalogIssues(item).length).length,
+    unmatchedCodeCount: Number(salesMeta.unmatchedCodeCount) || 0,
     unmatchedRowCount: Number(salesMeta.unmatchedRowCount) || 0
-  }), [items, salesMeta.coveredProducts, salesMeta.unmatchedRowCount]);
+  }), [items, salesMeta.coveredProducts, salesMeta.unmatchedCodeCount, salesMeta.unmatchedRowCount]);
   const coverageStale = Boolean(!salesLoading && salesMeta.latestDataDate && salesMeta.latestDataDate < salesQuery.to);
   const salesDraftChanged = salesDraft.from !== salesQuery.from || salesDraft.to !== salesQuery.to || salesDraft.platform !== (salesQuery.platform || "");
 
@@ -243,16 +280,32 @@ export function ProductCatalogWorkspace({ canEdit }) {
 
   const columns = [
     { key: "product", header: "商品", render: item => <span className="catalog-product-cell"><strong>{item.name}</strong><small>主商家编码 <b className="catalog-code">{item.merchantCode || "—"}</b></small></span> },
-    { key: "codes", header: "SKU / 库存单位", render: skuSummary },
-    { key: "type", header: "类型 / 组成", render: typeSummary },
-    { key: "classification", header: "分类 / 品牌", render: item => <span className={`catalog-summary-cell ${item.category && item.brand ? "" : "warning"}`}><strong>{item.category || "未分类"}</strong><small>{item.brand || "未设置品牌"}</small></span> },
-    { key: "sales", header: "销量 / 净销售额", render: salesSummary },
-    { key: "cost", header: "ERP 成本", render: item => <span className="catalog-summary-cell"><strong>{priceRange(item)}</strong><small>来源于 ERP 商品档案</small></span> },
-    { key: "status", header: "状态 / 操作", render: item => {
+    { key: "codes", header: "SKU / 组成", render: structureSummary },
+    {
+      key: "type",
+      header: <div className="product-catalog-column-header"><span>类型 / 组成</span><HeaderFilter compact label="类型" value={kind} onChange={setKind} options={[{ value: "all", label: "全部类型" }, { value: "single", label: "单品" }, { value: "bundle", label: "组合品" }]} /></div>,
+      render: typeSummary
+    },
+    {
+      key: "classification",
+      header: <div className="product-catalog-column-header"><span>分类 / 品牌</span><HeaderFilter compact label="分类" value={category} onChange={setCategory} options={[{ value: "all", label: "全部分类" }, ...categories.map(value => ({ value, label: value }))]} /></div>,
+      render: item => {
+        const displayCategory = catalogDisplayCategory(item);
+        return <span className={`catalog-summary-cell ${(displayCategory !== "未分类") && item.brand ? "" : "warning"}`}><strong>{displayCategory}</strong><small>{item.brand || "未设置品牌"}</small></span>;
+      }
+    },
+    {
+      key: "sales",
+      header: <div className="product-catalog-column-header align-end"><span>销量 / 净销售额</span><HeaderFilter compact label="销量与销售额" action="排序" icon={ArrowUpDown} value={salesSort} onChange={setSalesSort} options={SALES_SORT_OPTIONS} /></div>,
+      ariaSort: salesSort.endsWith("_asc") ? "ascending" : "descending",
+      render: salesSummary
+    },
+    { key: "cost", header: "成本", render: item => costSummary(item, items) },
+    { key: "status", header: <div className="product-catalog-column-header"><span>状态 / 操作</span><HeaderFilter compact label="关联" value={linked} onChange={setLinked} options={[{ value: "all", label: "全部关联状态" }, { value: "linked", label: "已关联产品" }, { value: "unlinked", label: "未关联产品" }]} /></div>, render: item => {
       const issues = catalogIssues(item);
       const linkedProduct = productLinks.get(item.id);
       return <span className="product-catalog-status-cell">
-        <span className={issues.length ? "warning" : "success"}>{issues.length ? `资料待完善 · ${issues.length} 项` : "档案完整"}</span>
+        <span className={issues.length ? "warning" : "success"} title={issues.join("、")}>{issues.length ? `待补充：${issues.join("、")}` : "资料完整"}</span>
         <small>{linkedProduct ? `已关联 ${linkedProduct.name}` : "未关联产品全周期"}</small>
         <Button className="compact" onClick={() => setSelectedProduct(item)} aria-label={`查看 ${item.name} 商品详情`}>查看详情</Button>
       </span>;
@@ -261,27 +314,31 @@ export function ProductCatalogWorkspace({ canEdit }) {
 
   if (loading && !items.length) return <div className="product-catalog-loading" aria-label="正在加载商品主数据"><span /><span /><span /></div>;
   const empty = !items.length
-    ? <div className="empty-state compact-empty">还没有商品主数据。请导入 ERP 商品档案 XLSX / CSV；快麦开放平台 API 暂未打通。</div>
+    ? <div className="empty-state compact-empty">还没有商品主数据。请通过 Chrome 插件获取快麦 ERP 商品，或导入 ERP 商品档案 XLSX / CSV。</div>
     : <div className="empty-state compact-empty"><span>没有符合当前条件的商品。</span><Button onClick={clearFilters}>清除筛选</Button></div>;
 
   return <div className="data-workspace product-catalog-workspace">
     <section className="product-catalog-metrics" aria-label="商品主数据概况">
-      {[
-        [PackageSearch, "商品", quantity(totals.products), "ERP 主商品"],
-        [Barcode, "库存单位", quantity(totals.inventoryUnits), "69 码与内部唯一码"],
-        [PackageCheck, "有销量商品", quantity(totals.coveredProducts), `共 ${quantity(totals.products)} 个商品`],
-        [AlertTriangle, "商品档案待完善", quantity(totals.catalogIssueCount), "编码、分类、品牌或组合关系"]
-      ].map(([Icon, label, value, detail]) => <div key={label}><Icon size={18} aria-hidden="true" /><span>{label}<strong>{value}</strong><small>{detail}</small></span></div>)}
-      <small className="product-catalog-sources"><span>商品档案 {dateTime(meta.lastSuccessfulSyncAt)}</span><span>销售事实至 {salesMeta.latestDataDate || "—"}</span><span>当前查询 {salesQuery.from} 至 {salesQuery.to}</span></small>
+      <div><PackageSearch size={18} aria-hidden="true" /><span>商品<strong>{quantity(totals.products)}</strong><small>ERP 主商品</small></span></div>
+      <div><PackageCheck size={18} aria-hidden="true" /><span>有销量商品<strong>{quantity(totals.coveredProducts)}</strong><small>当前经营范围</small></span></div>
+      <button type="button" className="product-catalog-metric-action" onClick={() => setMappingOpen(true)}>
+        <AlertTriangle size={18} aria-hidden="true" />
+        <span>ERP 商品数据可能不完整<strong>{quantity(totals.unmatchedCodeCount)}</strong><small>{quantity(totals.unmatchedRowCount)} 条编码 × 平台汇总</small></span>
+      </button>
+      <div><RefreshCw size={18} aria-hidden="true" /><span>最近同步状态<strong>{salesMeta.latestDataDate || "待同步"}</strong><small>商品档案 {dateTime(meta.lastSuccessfulSyncAt)}</small></span></div>
     </section>
 
-    {coverageStale || totals.unmatchedRowCount > 0 ? <section className="product-catalog-alert" role="alert">
+    {coverageStale || totals.unmatchedCodeCount > 0 ? <section className="product-catalog-alert" role="alert">
       <CircleAlert size={20} aria-hidden="true" />
       <div>
-        <strong>{totals.unmatchedRowCount > 0 ? `${quantity(totals.unmatchedRowCount)} 条销售汇总未匹配商品` : "销售事实覆盖不足"}</strong>
-        <span>{coverageStale ? `销售事实仅更新至 ${salesMeta.latestDataDate}；` : ""}{totals.unmatchedRowCount > 0 ? "未匹配数据不会猜测归属，相关商品销量可能不完整。" : "当前商品档案仍可查看，请前往数据同步补齐经营事实。"}</span>
+        <strong>{totals.unmatchedCodeCount > 0 ? "ERP 商品数据可能不完整" : "销售事实覆盖不足"}</strong>
+        <span>{coverageStale ? `销售事实仅更新至 ${salesMeta.latestDataDate}；` : ""}{totals.unmatchedCodeCount > 0 ? `${quantity(totals.unmatchedCodeCount)} 个销售编码没有对应商品。请先获取完整的 ERP 商品、SKU 和组合关系，导入后自动重新核对当前销售归属。` : "当前商品档案仍可查看，请补齐经营事实。"}</span>
       </div>
-      <a href="#data-sync">{totals.unmatchedRowCount > 0 ? "去处理未匹配数据" : "查看数据同步"}</a>
+      <Button onClick={() => {
+        if (totals.unmatchedCodeCount > 0 && canEdit) collectKuaimaiProducts().catch(() => {});
+        else if (totals.unmatchedCodeCount > 0) setMappingOpen(true);
+        else window.location.hash = "#data-sync";
+      }} disabled={busy === "chrome-products"}>{totals.unmatchedCodeCount > 0 ? canEdit ? collectionProgress?.label || "从 Chrome 重新获取商品" : "查看异常明细" : "查看数据同步"}</Button>
     </section> : null}
 
     <section className="product-catalog-toolbar" aria-label="商品搜索与操作">
@@ -290,11 +347,6 @@ export function ProductCatalogWorkspace({ canEdit }) {
       </div>
       <div className="product-catalog-toolbar-main">
         <label className="product-catalog-search"><Search size={16} aria-hidden="true" /><span className="sr-only">搜索商品</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索商品、69 码、内部唯一码或商家编码" /></label>
-        <div className="product-catalog-filters">
-          <HeaderFilter label="类型" value={kind} onChange={setKind} options={[{ value: "all", label: "全部类型" }, { value: "single", label: "单品" }, { value: "bundle", label: "组合商品" }]} />
-          <HeaderFilter label="分类" value={category} onChange={setCategory} options={[{ value: "all", label: "全部分类" }, ...categories.map(value => ({ value, label: value }))]} />
-          <HeaderFilter label="关联" value={linked} onChange={setLinked} options={[{ value: "all", label: "全部关联状态" }, { value: "linked", label: "已关联产品" }, { value: "unlinked", label: "未关联产品" }]} />
-        </div>
       </div>
       <form className="product-catalog-sales-query" onSubmit={applySalesQuery}>
         <div><strong>经营数据范围</strong><small>修改条件不会自动读取，点击查询后更新销量。</small></div>
@@ -304,8 +356,9 @@ export function ProductCatalogWorkspace({ canEdit }) {
       </form>
       <div className="product-catalog-actions">
         <span className="product-catalog-query-state" role="status">{salesLoading ? <><RefreshCw size={14} className="is-spinning" />经营数据更新中</> : `已应用 ${salesQuery.from} 至 ${salesQuery.to} · ${salesQuery.platform || "全部平台"}`}</span>
-        {canEdit ? <label className={`upload-field ${parsing || busy === "import" ? "is-busy" : ""}`}><Upload size={16} />{parsing ? "正在解析…" : busy === "import" ? "正在导入…" : "导入 ERP 商品文件"}<input type="file" accept=".xlsx,.csv" disabled={parsing || Boolean(busy)} onChange={event => { handleFile(event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
-        <span className="product-catalog-provider-state" title="快麦开放平台 API 暂未打通，请使用 ERP 商品文件导入"><CircleAlert size={14} />快麦 API 未打通</span>
+        {canEdit ? <Button variant="primary" disabled={Boolean(busy)} disabledReason="正在处理商品数据" onClick={() => collectKuaimaiProducts().catch(() => {})}><RefreshCw size={16} className={busy === "chrome-products" ? "is-spinning" : ""} />{busy === "chrome-products" ? collectionProgress?.label || "Chrome 采集中…" : "从 Chrome 获取 ERP 商品"}</Button> : null}
+        {canEdit ? <label className={`upload-field ${parsing || busy === "import" ? "is-busy" : ""}`}><Upload size={16} />{parsing ? "正在解析…" : busy === "import" ? "正在导入…" : "导入 ERP 商品文件"}<input ref={fileInputRef} type="file" accept=".xlsx,.csv" disabled={parsing || Boolean(busy)} onChange={event => { handleFile(event.target.files?.[0]); event.target.value = ""; }} /></label> : null}
+        <span className="product-catalog-provider-state" title="Chrome 插件会依次采集普通商品、套件和组合装"><PackageCheck size={14} />Chrome 插件 · 普通商品、套件和组合装</span>
       </div>
     </section>
 
@@ -315,17 +368,38 @@ export function ProductCatalogWorkspace({ canEdit }) {
     {notice ? <p className="supply-message success" role="status">{notice}</p> : null}
     {pending ? <section className="supply-import-preview product-catalog-preview"><FileSpreadsheet size={20} /><div><strong>{pending.fileName}</strong><span>识别 {pending.items.length} 个商品、{pending.counts.skus} 个 SKU · 异常 {pending.errors.length} 行</span>{pending.errors.slice(0, 3).map(item => <small key={`${item.rowNumber}-${item.field}`}>第 {item.rowNumber} 行：{item.message}</small>)}</div><div className="supply-import-actions"><Button onClick={() => setPending(null)}>取消</Button><Button variant="primary" disabled={!pending.items.length || Boolean(busy)} onClick={confirmImport}>确认导入</Button></div></section> : null}
 
-    <div className="product-catalog-results-heading"><span>显示 {quantity(filtered.length)} 个商品</span><small>销量按已应用日期范围排序</small></div>
+    <div className="product-catalog-results-heading"><span>显示 {quantity(filtered.length)} 个商品</span><small>{SALES_SORT_OPTIONS.find(option => option.value === salesSort)?.label} · 按已应用日期范围</small></div>
     <DataTable className="product-catalog-table" columns={columns} rows={visible} minWidth={1180} empty={empty} />
     {filtered.length ? <TablePagination total={filtered.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} /> : null}
 
     <ProductCatalogDetailDialog
       product={selectedProduct}
+      catalogItems={items}
       linkedProduct={selectedProduct ? productLinks.get(selectedProduct.id) : null}
       supplierCount={selectedProduct ? supplierCounts.get(selectedProduct.id) || 0 : 0}
       catalogUpdatedAt={dateTime(meta.lastSuccessfulSyncAt)}
       salesUpdatedAt={salesMeta.latestDataDate ? `${salesMeta.latestDataDate} · 入库 ${dateTime(salesMeta.lastSuccessfulSyncAt)}` : "尚未同步"}
       onClose={() => setSelectedProduct(null)}
+    />
+    <ProductCatalogSalesMappingDialog
+      open={mappingOpen}
+      items={salesMeta.unmatchedItems || []}
+      mappings={salesMeta.mappings || []}
+      products={items.filter(item => item.active !== false && item.presentInSource !== false)}
+      range={salesQuery}
+      canEdit={canEdit}
+      busy={busy}
+      onRequestCatalogImport={() => {
+        setMappingOpen(false);
+        fileInputRef.current?.click();
+      }}
+      onRequestCatalogCollection={() => {
+        setMappingOpen(false);
+        collectKuaimaiProducts().catch(() => {});
+      }}
+      onSave={saveSalesMapping}
+      onRevoke={revokeSalesMapping}
+      onClose={() => setMappingOpen(false)}
     />
   </div>;
 }

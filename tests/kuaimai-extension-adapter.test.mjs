@@ -152,6 +152,52 @@ test("Kuaimai sales-item task uses the rich sales report and creation-time contr
   assert.match(KUAIMAI_SALES_SELECTORS.dialogButton, /\.el-message-box button/);
 });
 
+test("Kuaimai product snapshot resources use the three official product exports", async () => {
+  const {
+    buildKuaimaiActionPlan,
+    buildKuaimaiTaskUrl,
+    KUAIMAI_PRODUCT_ROUTE,
+    KUAIMAI_PRODUCT_SELECTORS,
+    kuaimaiResources
+  } = await import(adapterUrl);
+  const cases = [
+    ["products", "导出普通商品"],
+    ["product_kits", "导出套件"],
+    ["product_combinations", "导出组合装"]
+  ];
+
+  for (const [resourceType, exportLabel] of cases) {
+    const task = {
+      jobId: `job-${resourceType}`,
+      providerId: "kuaimai",
+      resourceType,
+      businessDate: "2026-07-24"
+    };
+    assert.equal(
+      buildKuaimaiTaskUrl(`https://erpb.superboss.cc${KUAIMAI_PRODUCT_ROUTE}`, task),
+      "https://erpb.superboss.cc/index.html#/prod/parallel/"
+    );
+    assert.deepEqual(buildKuaimaiActionPlan(task), [
+      {
+        action: "export_product_snapshot",
+        exportLabel,
+        formatValue: "1"
+      },
+      { action: "confirm_product_fields" },
+      { action: "confirm_product_export" },
+      { action: "download_from_center", resourceType }
+    ]);
+    assert.equal(kuaimaiResources[resourceType].rangeKind, "current_snapshot");
+    assert.equal(kuaimaiResources[resourceType].route, KUAIMAI_PRODUCT_ROUTE);
+  }
+  assert.equal(KUAIMAI_PRODUCT_SELECTORS.exportMenu, "a.taskbar-menu_item.j-tip-left");
+  assert.equal(KUAIMAI_PRODUCT_SELECTORS.exportOption, "a.taskbar-sub_menu_item");
+  assert.match(KUAIMAI_PRODUCT_SELECTORS.exportDialog, /\.el-dialog/);
+  assert.deepEqual(kuaimaiResources.products.downloadFilePrefixes, ["快麦导出_普通商品"]);
+  assert.deepEqual(kuaimaiResources.product_kits.downloadFilePrefixes, ["快麦导出_套件"]);
+  assert.deepEqual(kuaimaiResources.product_combinations.downloadFilePrefixes, ["快麦导出_组合装"]);
+});
+
 test("Kuaimai download center selects only the current task resource and time window", async () => {
   const {
     KUAIMAI_DOWNLOAD_CENTER_ROUTE,
@@ -179,6 +225,21 @@ test("Kuaimai download center selects only the current task resource and time wi
       exportTime: "2026-07-23 15:07:40",
       content: "销售主题分析-按订单商品明细-20260723150740_a01a2c7ba370217f",
       status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-23 15:07:41",
+      content: "快麦导出_普通商品明细导出表20260723150740_269021_tEVOMo.csv",
+      status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-23 15:07:42",
+      content: "快麦导出_套件明细导出表20260723150741_269021_AbCd12.xls",
+      status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-23 15:07:43",
+      content: "快麦导出_组合装明细导出表20260723150742_269021_EfGh34.xls",
+      status: "导出完成"
     }
   ];
 
@@ -202,6 +263,18 @@ test("Kuaimai download center selects only the current task resource and time wi
   assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "sales_items", startedAt, rows }), {
     state: "ready",
     rowIndex: 3
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "products", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 4
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "product_kits", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 5
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "product_combinations", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 6
   });
 });
 

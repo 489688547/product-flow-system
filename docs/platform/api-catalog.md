@@ -29,7 +29,7 @@
 | `/api/data-center/sales` | 按日期读取数据中心销售事实 | 需要公司会话；最长 370 天；订单创建时间；上海时区；排除“其它” |
 | `/api/platform/v1/data-services/sales` | 发现销售数据覆盖范围并按日期读取经营汇总 | 需要公司会话；无日期时返回可用月份；完整日期时返回单行汇总；订单创建时间；上海时区；排除“其它” |
 | `/api/platform/v1/data-services/sales-repair` | 兼容保留的快麦 API 销售修复路由 | 当前产品停用且不从前端调用；最新日异常改由 Chrome 采集状态与官方文件导入闭环 |
-| `/api/platform/v1/web-collection/jobs` | 读取公司 Mac Chrome 采集状态；服务端按已登记店铺生成快麦/抖店日计划；或排队固定资源任务 | GET 需数据中心相关公司会话；runner 动作需设备令牌；用户 `trigger` 仅总经办、数据中心、运营非只读身份，按店铺/资源/日期幂等且不接收网页地址、凭据或脚本 |
+| `/api/platform/v1/web-collection/jobs` | 读取公司 Mac Chrome 采集状态；服务端按已登记店铺生成快麦/抖店日计划；或排队固定快麦订单、销售明细与商品快照任务 | GET 需数据中心相关公司会话；runner 动作需设备令牌；用户 `trigger` 仅总经办、数据中心、运营非只读身份；商品入口由服务端展开普通商品、套件和组合装三任务，按店铺/资源/日期与目标环境版本幂等且不接收网页地址、凭据或脚本 |
 | `/api/data-center/connectors` | 读取和维护连接器实例与内部保险箱非敏感元数据 | 数据中心授权部门可读；运营可维护非店铺连接器；仅总经办维护内部保险箱、归档并销毁已退役店铺凭证 |
 | `/api/ecommerce-operations` | 读取可见的店铺经营状态 | 需要公司会话和授权部门；D1 分实体存储 |
 | `/api/ecommerce-operations/actions` | 提交重点产品、方案、执行、协同和复盘动作 | 服务端校验角色、状态与版本；拒绝只读身份 |
@@ -147,15 +147,17 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 ### 商品主数据契约
 
-`GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是产品全周期、供应链、供应商管理和货流共同消费的库存单位；`items[].components[]` 为向后兼容新增的组合关系，包含库存单位编码和正整数组合比例。采购成本（包括组件成本）仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、库存单位、内部唯一码、组合商品、组件关系及最后成功同步时间、来源和方式。
+`GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是单品自身的商品规格；`items[].components[]` 是组合品的组成规格，包含组件规格编码和正整数组成数量。组合品不要求拥有独立库存 SKU，有有效组成关系时不得因为 `skus=[]` 判定档案缺失。商品主商家编码是商品身份，不冒充库存规格编码。采购成本（包括组件成本）仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、商品规格、内部唯一码、组合品、组件关系及最后成功同步时间、来源和方式。
 
-商品经营读取使用 `GET /api/platform/v1/product-catalog?from=YYYY-MM-DD&to=YYYY-MM-DD&platform=<平台>`。`from` 与 `to` 必须同时提交、包含边界日期且最多 370 天；`platform` 省略时排除空值、`其它`、`其他`、`未知` 和 `未知平台`。服务端在 D1 先按 `code × platform` 聚合 `product_sales_daily`，再用目录 SKU 条码/规格商家编码确定性关联商品，避免把明细或任意 SQL 暴露给浏览器。
+商品经营读取使用 `GET /api/platform/v1/product-catalog?from=YYYY-MM-DD&to=YYYY-MM-DD&platform=<平台>`。`from` 与 `to` 必须同时提交、包含边界日期且最多 370 天；`platform` 省略时排除空值、`其它`、`其他`、`未知` 和 `未知平台`。服务端在 D1 先按 `code × platform` 聚合 `product_sales_daily`，再用目录单品规格条码/规格商家编码或已启用的人工销售编码映射确定性关联商品。组合品组件只描述出库消耗，不能被自动当作组合品销售编码；目录编码冲突保持未匹配，人工映射不得掩盖冲突。
 
-带销量范围时每个商品增加 `{ sales: { quantity, netSales, matchedCodeCount, platforms } }`；`meta.sales` 返回 `from`、`to`、`platform`、`availablePlatforms`、`totalQuantity`、`totalNetSales`、`coveredProducts`、`unmatchedRowCount`、`latestDataDate`、`timeBasis=create_time`、`timezone=Asia/Shanghai` 和销售事实最后入库时间。销量基础字段对现有商品目录读者可见，采购成本裁剪规则不变。旧客户端不带日期参数时不扫描销售表且响应保持兼容；商品 GET 只读已治理 D1 表，不在读取请求中执行建表或改表。
+带销量范围时每个商品增加 `{ sales: { quantity, netSales, matchedCodeCount, platforms } }`；`meta.sales` 返回 `from`、`to`、`platform`、`availablePlatforms`、`totalQuantity`、`totalNetSales`、`coveredProducts`、`unmatchedCodeCount`、`unmatchedRowCount`、`unmatchedItems`、`mappings`、`latestDataDate`、`timeBasis=create_time`、`timezone=Asia/Shanghai` 和销售事实最后入库时间。`unmatchedItems` 一行代表一个销售编码，包含安全标题、平台汇总、销售数量、净销售额、行数和最新业务日期；`unmatchedRowCount` 继续表示编码 × 平台行数。销量基础字段对现有商品目录读者可见，采购成本裁剪规则不变。旧客户端不带日期参数时不扫描销售表且响应保持兼容。
+
+`POST /api/platform/v1/product-catalog/sales-mappings` 接收 `{ code, productId, expectedVersion }`，`DELETE` 接收 `{ code, expectedVersion }`。仅总经办、公司平台权限和运营部非只读身份可写；目标必须是当前有效商品。每次创建、替换或撤销都推进版本并追加无秘密审计。映射只改变销售事实归属，不修改 ERP 商品、商品规格或组合品组成；版本落后返回 `409 PRODUCT_CATALOG_SALES_MAPPING_VERSION_CONFLICT`。
 
 `POST /api/platform/v1/product-catalog/import` 接收 `{ source, fileName, items, errors }`。客户端只提交已标准化商品与异常摘要，不提交原始文件内容；服务端按主商家编码和规格商家编码幂等合并。`POST /api/platform/v1/product-catalog/sync/kuaimai` 接收可选 `{ cursor }`：游标 0 完整读取 `item.list.query` 并先归并为唯一商品，后续游标复用已落库共享目录，不重复拉取和重写整表；组合候选按稳定 ERP 商品身份排序，每批最多读取 30 个 `item.single.get` 详情，详情请求最多 5 路并发，返回 `complete`、`nextCursor`、`progress` 和安全失败摘要。成功详情按父商品成组替换组件；失败详情保留旧关系。
 
-快麦开放平台 API 当前未打通，商品页不提供 API 同步操作；商品档案使用 ERP 官方文件导入，销售异常读取 Chrome 采集控制面并以官方销售报表兜底。历史 API 路由和错误码仅为兼容保留，不构成当前可用能力。回滚销量视图不删除目录或 `product_sales_daily`；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。销量查询按日期、编码和平台聚合，最大范围 370 天，不新增销售复制表。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_SALES_RANGE_INVALID`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`。
+快麦开放平台 API 当前未打通，商品页不提供 API 同步操作；主操作通过公司 Mac Chrome 插件依次获取普通商品、套件和组合装官方文件，三任务全部归档、入库并投影后刷新商品目录，人工 ERP 商品文件导入作为回退。历史 API 路由和错误码仅为兼容保留，不构成当前可用能力。回滚可停止创建商品快照任务并保留文件导入，不删除目录、归档或 `product_sales_daily`；旧产品 `skuCodes` 和供应关系 `productId` 继续兼容。销量查询按日期、编码和平台聚合，最大范围 370 天，不新增销售复制表。主要错误码：`PRODUCT_CATALOG_STORAGE_UNAVAILABLE`、`PRODUCT_CATALOG_SALES_RANGE_INVALID`、`PRODUCT_CATALOG_SALES_MAPPING_VERSION_CONFLICT`、`PRODUCT_CATALOG_SALES_MAPPING_PRODUCT_NOT_FOUND`、`PRODUCT_CATALOG_IMPORT_INVALID`、`PRODUCT_CATALOG_WRITE_DENIED`。
 
 `GET /api/data-center/connectors` 返回 `{ connectors, vaultItems }`。财务、产品、供应链和运营只能读取连接器；内部保险箱元数据仅向总经办返回。`PUT` 使用 `{ expectedVersion, instance }` 保存连接器，或由总经办使用 `{ expectedVersion, vaultItem }` 保存内部保险箱条目。敏感值不得出现在请求中，只能提交 `credentialEntryId` 引用；新配置固定为 `pending_validation`，客户端提交 `healthy` 不生效。归档使用 `{ action: "archive", id, expectedVersion }` 且仅总经办可执行。所有修改使用乐观版本并在 `data_audit_logs` 只记录动作和变更字段名。
 
@@ -177,7 +179,7 @@ AI 点评只传输方案中的产品、平台、店铺、现状证据、目标�
 
 ### 快麦 ERP 本地归档与采集契约
 
-`POST /api/platform/v1/erp-collection/runners` 仅允许总经办真实公司会话登记固定范围采集器，令牌明文只返回一次并写入 macOS 钥匙串，D1 只保存 SHA-256 哈希。`POST /api/platform/v1/erp-collection/ingest` 接受授权公司会话或有效采集令牌，按文件哈希幂等写入归档清单、批次、脱敏最小索引和共享业务投影。`GET /api/platform/v1/erp-collection/archives` 返回归档状态、相对路径和批次，不返回本机绝对路径。
+`POST /api/platform/v1/erp-collection/runners` 仅允许总经办真实公司会话登记固定范围采集器，令牌明文只返回一次并写入 macOS 钥匙串，D1 只保存 SHA-256 哈希。`POST /api/platform/v1/erp-collection/ingest` 接受授权公司会话或有效采集令牌，按文件哈希幂等写入归档清单、批次、脱敏最小索引和共享业务投影。高行数的 `sales_items` 使用 `POST /api/platform/v1/erp-collection/sales-facts`：公司 Mac 从完整本地原文件汇总出 `日期 × 69码 × 平台` 标准事实后提交，D1 只保存事实、批次摘要和安全异常，不复制数千条销售明细索引。`GET /api/platform/v1/erp-collection/archives` 返回归档状态、相对路径和批次，不返回本机绝对路径。
 
 完整原始文件只保存在 `~/Desktop/公司数据中心/快麦ERP/`，不进入 D1、日志、Git 或前端。订单归日使用 `Asia/Shanghai` 的订单创建时间；正常经营判断排除“其它/其他/未知”。认证、请求、响应、错误、兼容、容量和回滚见 `docs/platform/apis/erp-collection-v1.md`。
 

@@ -35,7 +35,7 @@ export async function onRequest({ request, env, data = {} }) {
     const body = await request.json().catch(() => { throw routeError(400, "VALIDATION_INVALID_JSON", "请求内容不是有效的 JSON 对象。"); });
     if (body?.action === "trigger") {
       authorizeWebCollectionTrigger(data.session);
-      return successResponse(await triggerWebCollectionJob(db, body), id);
+      return successResponse(await triggerWebCollectionJob(db, body, collectionTargetFromRequestData(data)), id);
     }
     const sessionCreatesPlan = body?.action === "ensure_plan" && data.session;
     const runner = sessionCreatesPlan

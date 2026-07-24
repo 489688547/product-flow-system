@@ -52,18 +52,29 @@ function emptySales() {
   return { quantity: 0, netSales: 0, matchedCodeCount: 0, platforms: [] };
 }
 
-export function sortProductCatalogBySales(items = []) {
+const SALES_SORTS = {
+  netSales_desc: { field: "netSales", direction: -1 },
+  netSales_asc: { field: "netSales", direction: 1 },
+  quantity_desc: { field: "quantity", direction: -1 },
+  quantity_asc: { field: "quantity", direction: 1 }
+};
+
+export function sortProductCatalogBySales(items = [], sort = "netSales_desc") {
+  const rule = SALES_SORTS[sort] || SALES_SORTS.netSales_desc;
+  const secondaryField = rule.field === "netSales" ? "quantity" : "netSales";
   return [...items].sort((left, right) => {
-    const quantityDifference = (Number(right?.sales?.quantity) || 0) - (Number(left?.sales?.quantity) || 0);
-    if (quantityDifference) return quantityDifference;
-    const salesDifference = (Number(right?.sales?.netSales) || 0) - (Number(left?.sales?.netSales) || 0);
-    if (salesDifference) return salesDifference;
+    const primaryDifference = ((Number(left?.sales?.[rule.field]) || 0) - (Number(right?.sales?.[rule.field]) || 0)) * rule.direction;
+    if (primaryDifference) return primaryDifference;
+    const secondaryDifference = (Number(right?.sales?.[secondaryField]) || 0) - (Number(left?.sales?.[secondaryField]) || 0);
+    if (secondaryDifference) return secondaryDifference;
     return String(left?.name || "").localeCompare(String(right?.name || ""), "zh-CN");
   });
 }
 
-export function aggregateProductCatalogSales(items = [], rows = []) {
+export function aggregateProductCatalogSales(items = [], rows = [], options = {}) {
   const ownersByCode = new Map();
+  const componentCodes = new Set();
+  const itemIds = new Set(items.map(item => item.id).filter(Boolean));
   for (const item of items) {
     const itemCodes = new Set((item.skus || []).flatMap(codeValues));
     for (const code of itemCodes) {
@@ -71,18 +82,61 @@ export function aggregateProductCatalogSales(items = [], rows = []) {
       owners.add(item.id);
       ownersByCode.set(code, owners);
     }
+    for (const component of item.components || []) {
+      const code = String(component?.inventoryUnitCode || "").trim();
+      if (code) componentCodes.add(code);
+    }
   }
+  const mappedProductByCode = new Map((options.mappings || [])
+    .filter(mapping => mapping?.active !== false && itemIds.has(mapping?.productId))
+    .map(mapping => [String(mapping.code || "").trim(), mapping.productId])
+    .filter(([code]) => Boolean(code)));
+  const titles = options.titles && typeof options.titles === "object" ? options.titles : {};
 
   const salesByProduct = new Map();
+  const unmatchedByCode = new Map();
   let unmatchedRowCount = 0;
   for (const row of rows) {
     const code = String(row?.code || "").trim();
     const owners = ownersByCode.get(code);
-    if (!owners || owners.size !== 1) {
+    const hasCatalogConflict = Boolean(owners && owners.size > 1);
+    const productId = owners?.size === 1
+      ? [...owners][0]
+      : !owners?.size
+        ? mappedProductByCode.get(code)
+        : "";
+    if (!productId) {
       unmatchedRowCount += 1;
+      const quantity = Number(row.qty) || 0;
+      const netSales = Number(row.netSales) || 0;
+      const platform = String(row.platform || "未知平台").trim() || "未知平台";
+      const current = unmatchedByCode.get(code) || {
+        id: code,
+        code,
+        title: String(titles[code] || "").trim(),
+        quantity: 0,
+        netSales: 0,
+        rowCount: 0,
+        latestDataDate: "",
+        byPlatform: new Map(),
+        ...(hasCatalogConflict
+          ? { reason: "catalog_code_conflict" }
+          : componentCodes.has(code)
+            ? { reason: "catalog_component_only" }
+            : {})
+      };
+      current.quantity += quantity;
+      current.netSales += netSales;
+      current.rowCount += 1;
+      const latestDataDate = String(row.latestDataDate || row.date || "");
+      if (latestDataDate > current.latestDataDate) current.latestDataDate = latestDataDate;
+      const platformSales = current.byPlatform.get(platform) || { platform, quantity: 0, netSales: 0 };
+      platformSales.quantity += quantity;
+      platformSales.netSales += netSales;
+      current.byPlatform.set(platform, platformSales);
+      unmatchedByCode.set(code, current);
       continue;
     }
-    const productId = [...owners][0];
     const current = salesByProduct.get(productId) || { ...emptySales(), codes: new Set(), byPlatform: new Map() };
     const quantity = Number(row.qty) || 0;
     const netSales = Number(row.netSales) || 0;
@@ -114,9 +168,22 @@ export function aggregateProductCatalogSales(items = [], rows = []) {
     if (sales.quantity || sales.netSales) coveredProducts += 1;
     return { ...item, sales };
   });
+  const unmatchedItems = [...unmatchedByCode.values()]
+    .map(({ byPlatform, ...item }) => ({
+      ...item,
+      platforms: [...byPlatform.values()].sort((left, right) => right.quantity - left.quantity || left.platform.localeCompare(right.platform, "zh-CN"))
+    }))
+    .sort((left, right) => right.netSales - left.netSales || right.quantity - left.quantity || left.code.localeCompare(right.code, "zh-CN"));
 
   return {
     items: resultItems,
-    meta: { totalQuantity, totalNetSales, coveredProducts, unmatchedRowCount }
+    meta: {
+      totalQuantity,
+      totalNetSales,
+      coveredProducts,
+      unmatchedCodeCount: unmatchedItems.length,
+      unmatchedRowCount,
+      unmatchedItems
+    }
   };
 }

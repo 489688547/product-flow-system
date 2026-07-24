@@ -418,6 +418,48 @@ test("authorized operator triggers the registered rich Kuaimai sales report", as
   assert.equal(result.body.data.job.idempotencyKey, "kuaimai:sales_items:2026-07-22:v3:env:production:v1");
 });
 
+test("authorized operator triggers the complete Kuaimai product snapshot group", async () => {
+  const db = createWebCollectionD1Mock();
+  const input = {
+    action: "trigger",
+    providerId: "kuaimai",
+    resourceType: "products",
+    businessDate: "2026-07-24"
+  };
+  const first = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    dataEnvironment: { id: "display", version: 9 },
+    body: input
+  });
+
+  assert.equal(first.response.status, 200);
+  assert.equal(first.body.data.created, 3);
+  assert.deepEqual(
+    first.body.data.jobs.map(job => [job.resourceType, job.rangeKind, job.businessDate]),
+    [
+      ["products", "current_snapshot", "2026-07-24"],
+      ["product_kits", "current_snapshot", "2026-07-24"],
+      ["product_combinations", "current_snapshot", "2026-07-24"]
+    ]
+  );
+  assert.equal(first.body.data.jobs.every(job => job.status === "queued"), true);
+  assert.equal(first.body.data.jobs.every(job => job.targetEnvironment === "display"), true);
+  assert.equal(first.body.data.jobs.every(job => job.targetEnvironmentVersion === 9), true);
+
+  const repeated = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    dataEnvironment: { id: "display", version: 9 },
+    body: input
+  });
+  assert.equal(repeated.response.status, 200);
+  assert.equal(repeated.body.data.created, 0);
+  assert.equal(db.tables.web_collection_jobs.size, 3);
+});
+
 test("authorized operator triggers the repaired Kuaimai orders schedule", async () => {
   const db = createWebCollectionD1Mock();
   const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {

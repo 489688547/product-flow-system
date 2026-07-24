@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { onRequest } from "../functions/api/platform/v1/erp-collection/ingest.js";
+import { readBatchRecords } from "../functions/api/platform/v1/erp-collection/_shared/storage.js";
 import { createErpCollectionD1Mock } from "./helpers/erp-collection-d1-mock.mjs";
 
 const hash = "a".repeat(64);
@@ -122,4 +123,40 @@ test("ERP collection ingest returns stable validation and method errors", async 
   assert.equal(invalid.response.status, 400);
   assert.equal(invalid.body.error.code, "ERP_COLLECTION_RECORDS_REQUIRED");
   assert.equal((await call({ session: sessions.data, db, method: "GET" })).response.status, 405);
+});
+
+test("completed batch projection reads source records in bounded keyset pages", async () => {
+  const sourceRows = Array.from({ length: 501 }, (_, index) => ({
+    source_key: `source-${String(index).padStart(4, "0")}`,
+    occurred_at: "2026-07-23T10:00:00+08:00",
+    modified_at: null,
+    shop_id: null,
+    warehouse_id: null,
+    content_hash: hash,
+    payload: JSON.stringify({ sourceOrderId: `order-${index}` })
+  }));
+  let calls = 0;
+  const db = {
+    prepare(sql) {
+      assert.match(sql, /source_key > \?/i);
+      assert.match(sql, /limit \?/i);
+      return {
+        bind(batchId, afterKey, limit) {
+          assert.equal(batchId, "batch-large");
+          return {
+            async all() {
+              calls += 1;
+              return {
+                results: sourceRows.filter(row => row.source_key > afterKey).slice(0, limit)
+              };
+            }
+          };
+        }
+      };
+    }
+  };
+
+  const records = await readBatchRecords(db, "batch-large");
+  assert.equal(records.length, 501);
+  assert.equal(calls, 2);
 });

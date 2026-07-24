@@ -80,6 +80,12 @@ export function assertBusinessDateMatchesRange({ businessDate, rangeStart, range
   }
 }
 
+// 商品快照类导出是当前时点全量，不携带业务日期范围，跳过按日校验。
+export function assertCollectionFileMatchesTask({ resourceType, businessDate, rangeStart, rangeEnd } = {}) {
+  if (["products", "product_kits", "product_combinations"].includes(String(resourceType || ""))) return;
+  assertBusinessDateMatchesRange({ businessDate, rangeStart, rangeEnd });
+}
+
 export function createCommerceFactUploader({
   baseUrl,
   runnerToken,
@@ -120,7 +126,7 @@ async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
       root,
       resourceType,
       onValidated: async validation => {
-        assertBusinessDateMatchesRange({ businessDate, ...validation });
+        assertCollectionFileMatchesTask({ resourceType, businessDate, ...validation });
         await onValidated?.(validation);
       },
       upload: collection => uploadErpCollection(collection, {

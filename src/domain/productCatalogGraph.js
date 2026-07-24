@@ -106,7 +106,7 @@ export function flattenCatalogConsumption({ items = [], itemId = "", skuId = "",
         const skuMatch = indexes.byInventoryCode.get(code);
         const targetItem = skuMatch?.item || indexes.byMerchantCode.get(code);
         if (targetItem?.components?.length) visit(targetItem, factor * edge.ratio, nextPath);
-        else addLeaf(code, factor * edge.ratio, edge.purchasePrice ?? skuMatch?.sku?.purchasePrice, item.id);
+        else addLeaf(code, factor * edge.ratio, skuMatch ? skuMatch.sku?.purchasePrice : edge.purchasePrice, item.id);
       }
       return;
     }
@@ -146,6 +146,62 @@ export function catalogSellableQuantity({ items = [], itemId = "", skuId = "", i
     return available === null ? null : Math.floor(available / component.ratio);
   });
   return quantities.some(value => value === null) ? null : Math.min(...quantities);
+}
+
+export function catalogDisplayCategory(item = {}) {
+  if (item.productKind === "bundle") return "组合品";
+  return text(item.category, 160) || "未分类";
+}
+
+export function catalogProductCost({ items = [], itemId = "" } = {}) {
+  const item = items.find(candidate => candidate?.id === itemId);
+  if (!item) {
+    return {
+      kind: "unknown",
+      complete: false,
+      total: null,
+      min: null,
+      max: null,
+      components: [],
+      issues: [{ code: "PRODUCT_CATALOG_ITEM_NOT_FOUND", itemId }]
+    };
+  }
+
+  if (item.productKind === "bundle") {
+    const consumption = flattenCatalogConsumption({ items, itemId, quantity: 1 });
+    const missingCosts = consumption.components
+      .filter(component => component.unitCost === null)
+      .map(component => ({
+        code: "PRODUCT_CATALOG_COMPONENT_COST_MISSING",
+        itemId,
+        inventoryUnitCode: component.inventoryUnitCode
+      }));
+    const issues = [...consumption.issues, ...missingCosts];
+    const complete = consumption.components.length > 0 && issues.length === 0;
+    return {
+      kind: "bundle",
+      complete,
+      total: complete ? consumption.totalCost : null,
+      min: null,
+      max: null,
+      components: consumption.components,
+      issues
+    };
+  }
+
+  const costs = (item.skus || [])
+    .map(sku => numberOrNull(sku.purchasePrice))
+    .filter(value => value !== null);
+  const complete = costs.length > 0;
+  return {
+    kind: "single",
+    complete,
+    total: costs.length === 1 ? costs[0] : null,
+    min: complete ? Math.min(...costs) : null,
+    max: complete ? Math.max(...costs) : null,
+    components: [],
+    issues: complete ? [] : [{ code: "PRODUCT_CATALOG_SKU_COST_MISSING", itemId }]
+  };
 }
 
 export function catalogDataIssues(items = []) {
