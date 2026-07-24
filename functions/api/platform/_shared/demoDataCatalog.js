@@ -44,8 +44,14 @@ const BUSINESS_TABLES = [
   table("product_catalog_components", "mask", ["id"], 32, { maskFields: { updated_by: "identity" } }),
   table("product_catalog_sync_runs", "mask", ["id"], 33, { maskFields: { updated_by: "identity" } }),
   table("product_catalog_meta", "copy", ["key"], 34),
-  table("product_sales_daily", "transform_sales", ["code", "date", "platform"], 35, { required: true, batchSize: 250 }),
-  table("product_sales_meta", "copy", ["id"], 36, { required: true }),
+  table("product_catalog_sales_mappings", "mask", ["code"], 35, {
+    maskFields: { created_by: "identity", updated_by: "identity" }
+  }),
+  table("product_catalog_sales_mapping_audit", "mask", ["id"], 36, {
+    maskFields: { actor: "identity" }
+  }),
+  table("product_sales_daily", "transform_sales", ["code", "date", "platform"], 37, { required: true, batchSize: 250 }),
+  table("product_sales_meta", "copy", ["id"], 38, { required: true }),
 
   table("data_sources", "mask", ["entity_type", "id"], 40, {
     maskFields: { updated_by: "identity" },
