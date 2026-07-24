@@ -4,14 +4,21 @@ import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { loadErpArchives } from "../../state/erpCollectionApi.js";
-import { loadWebCollectionStatus, triggerKuaimaiSalesCollection } from "../../state/webCollectionApi.js";
-import { buildKuaimaiSalesRecovery } from "../../domain/dataSyncRecovery.js";
+import {
+  loadWebCollectionStatus,
+  triggerKuaimaiSalesCollection,
+  triggerWebCollection
+} from "../../state/webCollectionApi.js";
+import {
+  buildDouyinCollectionRecovery,
+  buildKuaimaiSalesRecovery
+} from "../../domain/dataSyncRecovery.js";
 import { buildDataSyncRunRows } from "../../domain/dataSyncRunRows.js";
 import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapters.js";
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
 
-const STATUS_LABELS = { healthy: "正常", success: "成功", pending_validation: "待验证", waiting_verification: "等待人工验证", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", disabled: "未启用" };
+const STATUS_LABELS = { healthy: "正常", success: "成功", pending_validation: "待验证", waiting_verification: "等待人工验证", waiting_human: "等待人工处理", collecting: "页面读数中", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", unavailable: "尚未完成真实采集", disabled: "未启用" };
 
 function statusLabel(status) {
   return STATUS_LABELS[status] || status || "未启用";
@@ -21,7 +28,7 @@ export function DataSourcesWorkspace({ canEdit, canManage, canManagePlatform, in
   return <DataConnectionsWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManagePlatform} initialCategory={initialCategory} />;
 }
 
-const EMPTY_WEB_COLLECTION_STATUS = Object.freeze({ runners: [], jobs: [], runs: [], cursors: [], notifications: [] });
+const EMPTY_WEB_COLLECTION_STATUS = Object.freeze({ runners: [], stores: [], jobs: [], runs: [], cursors: [], notifications: [] });
 
 export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = false }) {
   const { state, refresh } = useDataCenter();
@@ -35,6 +42,8 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
   const [triggering, setTriggering] = useState(false);
   const [triggerMessage, setTriggerMessage] = useState("");
   const [triggerError, setTriggerError] = useState("");
+  const [douyinTriggering, setDouyinTriggering] = useState("");
+  const [douyinTriggerMessage, setDouyinTriggerMessage] = useState("");
   const refreshWebCollection = useCallback(async () => {
     setWebCollectionLoading(true);
     try {
@@ -75,6 +84,37 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
     jobs: webCollection.jobs,
     runs: webCollection.runs
   }), [state.syncRuns, webCollection.jobs, webCollection.runs]);
+  const douyinStoreIds = useMemo(() => {
+    const ids = new Set();
+    webCollection.stores.forEach(store => {
+      if (store.providerId === "douyin-ecommerce" && store.storeId) ids.add(store.storeId);
+    });
+    webCollection.jobs.forEach(job => {
+      if (job.providerId === "douyin-ecommerce" && job.storeId) ids.add(job.storeId);
+    });
+    webCollection.cursors.forEach(cursor => {
+      if (cursor.providerId === "douyin-ecommerce" && cursor.storeId) ids.add(cursor.storeId);
+    });
+    return [...ids].sort();
+  }, [webCollection.cursors, webCollection.jobs, webCollection.stores]);
+  const douyinStoreNames = useMemo(() => new Map(
+    webCollection.stores
+      .filter(store => store.providerId === "douyin-ecommerce")
+      .map(store => [store.storeId, store.storeName])
+  ), [webCollection.stores]);
+  const douyinResourceRows = useMemo(() => {
+    const storeIds = douyinStoreIds.length ? douyinStoreIds : [""];
+    return storeIds.flatMap(storeId => buildDouyinCollectionRecovery({
+      storeId,
+      runners: webCollection.runners,
+      jobs: webCollection.jobs,
+      cursors: webCollection.cursors
+    }).resources.map(resource => ({
+      ...resource,
+      storeId,
+      storeName: douyinStoreNames.get(storeId) || ""
+    })));
+  }, [douyinStoreIds, douyinStoreNames, webCollection.cursors, webCollection.jobs, webCollection.runners]);
   useEffect(() => {
     if (focusTarget !== "kuaimai-sales" || salesAnomaly?.status !== "anomaly") return;
     const frame = requestAnimationFrame(() => {
@@ -111,6 +151,26 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
   const primaryActionAllowed = primaryAction.type !== "retrigger" || canTrigger;
   const primaryActionBusy = primaryAction.type === "retrigger" ? triggering : webCollectionLoading;
   const runPrimaryAction = primaryAction.type === "retrigger" ? retriggerCollection : refreshStatus;
+  const retryDouyinResource = async resource => {
+    if (!canTrigger || !resource.storeId || !resource.businessDate || douyinTriggering) return;
+    setDouyinTriggering(resource.type);
+    setDouyinTriggerMessage("");
+    try {
+      await triggerWebCollection({
+        providerId: "douyin-ecommerce",
+        storeId: resource.storeId,
+        resourceType: resource.type,
+        businessDate: resource.businessDate,
+        force: true
+      });
+      setDouyinTriggerMessage(`${resource.label}已重新排队，Chrome 插件将在下一轮领取。`);
+      await refreshWebCollection();
+    } catch (error) {
+      setDouyinTriggerMessage(error.message || "抖店 Chrome 采集任务触发失败。");
+    } finally {
+      setDouyinTriggering("");
+    }
+  };
   return <div className="data-workspace data-sync-workspace">
     <div className="data-sync-status-bar">
       <div className="data-quality-summary" aria-label="数据质量摘要">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{value}</strong></article>)}</div>
@@ -130,6 +190,18 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
         </div>
       </div>
     </section> : null}
+    <section className="section-panel">
+      <div className="section-head"><div><h2>抖店 Chrome 官方报表采集</h2><p>每天 05:00 后按已登记店铺采集昨天的四类资源；失败会留记录，不会覆盖上次可信批次。</p></div><a className="btn" href="https://fxg.jinritemai.com/" target="_blank" rel="noreferrer"><MonitorCheck size={16} aria-hidden="true" />打开抖店处理</a></div>
+      {douyinTriggerMessage ? <p className="data-sync-trigger-message" role="status">{douyinTriggerMessage}</p> : null}
+      <DataTable minWidth={760} columns={[
+        { key: "store", header: "店铺", render: row => row.storeName ? <span><strong>{row.storeName}</strong><small>店铺 ID {row.storeId}</small></span> : row.storeId || "尚未识别" },
+        { key: "resource", header: "资源", render: row => row.label },
+        { key: "date", header: "业务日期", render: row => row.businessDate || "—" },
+        { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : ["failed", "waiting_human", "schema_changed"].includes(row.status) ? "danger" : "warning"}`}>{row.status === "unavailable" ? "尚未完成真实采集" : statusLabel(row.status)}</span> },
+        { key: "instruction", header: "处理说明", render: row => row.instruction },
+        { key: "actions", header: "操作", render: row => <TableActions>{row.canRetry && canTrigger ? <Button disabled={Boolean(douyinTriggering)} onClick={() => retryDouyinResource(row)}><RefreshCw size={14} aria-hidden="true" />{douyinTriggering === row.type ? "重新排队中…" : "重新触发"}</Button> : null}</TableActions> }
+      ]} rows={douyinResourceRows} empty={<div className="empty-state compact-empty">尚未登记抖店资源。</div>} />
+    </section>
     <section className="section-panel"><div className="section-head"><div><h2>快麦原始归档</h2><p>公司 Mac 保存原文件，线上只显示安全清单和入库状态；归档成功不等于已经入库。</p></div><span className={`status-badge ${archiveError ? "danger" : archives.length ? "success" : "neutral"}`}>{archiveLoading ? "读取中" : archiveError ? "读取失败" : archives.length ? `${archives.length} 个归档文件` : "等待导出"}</span></div>
       {archiveError ? <div className="sales-service-message danger" role="alert">{archiveError}</div> : null}
       {!archiveLoading && !archiveError ? <DataTable minWidth={760} columns={[

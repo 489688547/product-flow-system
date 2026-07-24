@@ -24,3 +24,23 @@ test("integration registry routes every AI consumer through Lingsuan", () => {
   assert.equal(JSON.stringify(lingsuan).includes("OPENAI_API_KEY"), false);
   assert.equal(JSON.stringify(lingsuan).includes("api.openai.com"), false);
 });
+
+test("Douyin restores only pre-authenticated Chrome official-report collection", () => {
+  const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+  const douyin = registry.platforms.find(entry => entry.id === "douyin-ecommerce");
+
+  assert.ok(douyin, "Douyin ecommerce must be registered");
+  assert.equal(douyin.status, "integrating");
+  assert.match(douyin.summary, /已登录 Chrome/);
+  assert.match(douyin.summary, /账号密码登录.*退役/);
+  assert.equal(douyin.capabilities.includes("已登录 Chrome 官方报表采集"), true);
+  assert.equal(douyin.capabilities.includes("账号密码登录保持退役"), true);
+  for (const resource of ["店铺每日", "商品每日", "直播每日", "短视频每日"]) {
+    assert.equal(douyin.capabilities.includes(resource), true, resource);
+  }
+  assert.equal(douyin.domains.includes("fxg.jinritemai.com"), true);
+  assert.equal(douyin.domains.includes("compass.jinritemai.com"), true);
+  assert.equal(douyin.apiRoutes.includes("/api/platform/v1/commerce-facts"), true);
+  assert.equal(douyin.apiRoutes.includes("/api/platform/v1/commerce-facts/ingest"), true);
+  assert.equal(douyin.evidence.includes("docs/decisions/2026-07-24-douyin-preauthenticated-chrome-collection.md"), true);
+});

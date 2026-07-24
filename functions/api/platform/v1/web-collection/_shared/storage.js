@@ -1,4 +1,9 @@
-import { assertWebCollectionTransition, webCollectionRetryDecision } from "../../../../../../src/domain/webCollection.js";
+import {
+  assertWebCollectionTransition,
+  createDailyPlan,
+  webCollectionJobKey,
+  webCollectionRetryDecision
+} from "../../../../../../src/domain/webCollection.js";
 import { collectionIdempotencyKey } from "../../../_shared/collectionTarget.js";
 import { routeError } from "./http.js";
 
@@ -8,12 +13,26 @@ const PROVIDER_RESOURCES = Object.freeze({
     "orders", "order_items", "sales_items", "products", "inventory", "purchases", "suppliers", "aftersales",
     "shops", "warehouses", "sales_analysis", "goods_ledger", "inventory_cost"
   ]),
+  "douyin-ecommerce": new Set(["store_daily", "product_daily", "live_daily", "video_daily"]),
   test_fixture: new Set(["sample"])
 });
 const FORBIDDEN_JOB_FIELDS = new Set([
   "url", "origin", "selector", "selectors", "script", "javascript", "credentials", "cookie", "token",
   "targetenvironment", "targetenvironmentversion", "databaseid", "binding"
 ]);
+const DAILY_COLLECTION_RESOURCES = Object.freeze({
+  kuaimai: Object.freeze([
+    Object.freeze({ type: "orders", rangeKind: "daily_fact", scheduleVersion: "v2" }),
+    Object.freeze({ type: "order_items", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v3" })
+  ]),
+  "douyin-ecommerce": Object.freeze([
+    Object.freeze({ type: "store_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "product_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "live_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "video_daily", rangeKind: "daily_fact", scheduleVersion: "v1" })
+  ])
+});
 
 export function webCollectionDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
@@ -73,17 +92,31 @@ function normalizeJob(input) {
   const providerId = String(input.providerId || "").trim();
   const resourceType = String(input.resourceType || "").trim();
   if (!PROVIDER_RESOURCES[providerId]?.has(resourceType)) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "provider 或 resource 未在采集器代码注册表中登记。");
+  const storeId = String(input.storeId || "").trim();
+  if (storeId && !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)) {
+    throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "店铺标识无效。");
+  }
+  if (providerId === "douyin-ecommerce" && !storeId) {
+    throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "抖店采集任务必须包含已登记店铺标识。");
+  }
   const businessDate = String(input.businessDate || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "业务日期无效。");
   const rangeKind = input.rangeKind === "daily_fact" ? "daily_fact" : input.rangeKind === "current_snapshot" ? "current_snapshot" : "";
   if (!rangeKind) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "资源范围类型无效。");
-  const expectedKey = `${providerId}:${resourceType}:${businessDate}:${String(input.scheduleVersion || "v1")}`;
+  const expectedKey = webCollectionJobKey({
+    providerId,
+    storeId,
+    resourceType,
+    businessDate,
+    scheduleVersion: input.scheduleVersion
+  });
   if (input.idempotencyKey !== expectedKey) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "任务幂等键与资源范围不一致。");
   if (rangeKind === "daily_fact" && (!input.range?.start || !input.range?.end || input.range?.timeZone !== "Asia/Shanghai")) {
     throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "日事实任务必须提供上海时区完整范围。");
   }
   return {
     providerId,
+    storeId,
     resourceType,
     businessDate,
     rangeKind,
@@ -101,6 +134,7 @@ function mapJob(row) {
   return {
     id: row.id,
     providerId: row.provider_id,
+    storeId: row.store_id || "",
     resourceType: row.resource_type,
     businessDate: row.business_date,
     rangeKind: row.range_kind,
@@ -154,6 +188,42 @@ export async function heartbeatRunner(db, runner, input) {
   return { runnerId: runner.id, lastSeenAt: now };
 }
 
+function normalizeStoreIdentity(input) {
+  const providerId = String(input?.providerId || "").trim();
+  const storeId = String(input?.storeId || "").trim();
+  const storeName = String(input?.storeName || "").trim();
+  if (
+    providerId !== "douyin-ecommerce"
+    || !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)
+    || !storeName
+    || storeName.length > 120
+    || /[\u0000-\u001f\u007f]/.test(storeName)
+  ) {
+    throw routeError(400, "WEB_COLLECTION_STORE_INVALID", "店铺身份无效或平台尚未登记。");
+  }
+  return { providerId, storeId, storeName };
+}
+
+export async function registerWebCollectionStore(db, runner, input) {
+  const store = normalizeStoreIdentity(input);
+  const now = new Date().toISOString();
+  await db.prepare(`INSERT INTO web_collection_stores
+    (id, provider_id, store_id, store_name, status, runner_id, last_seen_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'connected', ?, ?, ?, ?)
+    ON CONFLICT(provider_id, store_id) DO UPDATE SET store_name = excluded.store_name,
+      status = 'connected', runner_id = excluded.runner_id, last_seen_at = excluded.last_seen_at,
+      updated_at = excluded.updated_at`)
+    .bind(randomId("web-store"), store.providerId, store.storeId, store.storeName, runner.id, now, now, now)
+    .run();
+  return {
+    store: {
+      ...store,
+      status: "connected",
+      lastSeenAt: now
+    }
+  };
+}
+
 export async function ensureWebCollectionPlan(db, jobs, target = { environmentId: "production", environmentVersion: 1 }) {
   if (!Array.isArray(jobs) || !jobs.length || jobs.length > 100) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "任务计划必须包含 1 至 100 个资源。");
   const normalized = jobs.map(normalizeJob);
@@ -172,11 +242,11 @@ export async function ensureWebCollectionPlan(db, jobs, target = { environmentId
     if (!row) {
       const id = randomId("web-job");
       await db.prepare(`INSERT INTO web_collection_jobs
-        (id, provider_id, resource_type, business_date, range_kind, range_start, range_end, time_zone,
+        (id, provider_id, store_id, resource_type, business_date, range_kind, range_start, range_end, time_zone,
           schedule_version, idempotency_key, status, selector_version, target_environment,
           target_environment_version, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .bind(id, job.providerId, job.resourceType, job.businessDate, job.rangeKind, job.rangeStart, job.rangeEnd,
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        .bind(id, job.providerId, job.storeId, job.resourceType, job.businessDate, job.rangeKind, job.rangeStart, job.rangeEnd,
           job.timeZone, job.scheduleVersion, idempotencyKey, "queued", job.selectorVersion,
           target.environmentId, target.environmentVersion, now, now).run();
       row = await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(id).first();
@@ -193,6 +263,39 @@ export async function ensureWebCollectionPlan(db, jobs, target = { environmentId
   return { created, duplicate: saved.length - created, jobs: saved };
 }
 
+export async function ensureRegisteredWebCollectionPlan(
+  db,
+  {
+    now = new Date(),
+    target = { environmentId: "production", environmentVersion: 1 }
+  } = {}
+) {
+  const shopResult = await db.prepare(`SELECT store_id, store_name FROM web_collection_stores
+    WHERE provider_id = 'douyin-ecommerce' AND status = 'connected'
+    ORDER BY updated_at DESC`).all();
+  const stores = (shopResult?.results || [])
+    .filter(row => /^[-_a-zA-Z0-9]{1,128}$/.test(String(row.store_id || "")))
+    .map(row => ({ id: row.store_id }));
+  const jobs = createDailyPlan({
+    now,
+    adapters: [
+      {
+        id: "kuaimai",
+        enabled: true,
+        resources: DAILY_COLLECTION_RESOURCES.kuaimai
+      },
+      {
+        id: "douyin-ecommerce",
+        enabled: stores.length > 0,
+        stores,
+        resources: DAILY_COLLECTION_RESOURCES["douyin-ecommerce"]
+      }
+    ]
+  });
+  if (!jobs.length) return { created: 0, duplicate: 0, jobs: [] };
+  return ensureWebCollectionPlan(db, jobs, target);
+}
+
 function dailyRange(businessDate) {
   return {
     start: `${businessDate}T00:00:00+08:00`,
@@ -203,20 +306,36 @@ function dailyRange(businessDate) {
 
 export async function triggerWebCollectionJob(db, input) {
   const providerId = String(input?.providerId || "").trim();
+  const storeId = String(input?.storeId || "").trim();
   const resourceType = String(input?.resourceType || "").trim();
   const businessDate = String(input?.businessDate || "").trim();
-  if (providerId !== "kuaimai" || !["orders", "order_items", "sales_items"].includes(resourceType) || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
-    throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发已登记的快麦订单、订单商品明细或销售主题明细采集。");
+  const triggerable = providerId === "kuaimai"
+    ? new Set(["orders", "order_items", "sales_items"])
+    : providerId === "douyin-ecommerce"
+      ? new Set(["store_daily", "product_daily", "live_daily", "video_daily"])
+      : null;
+  if (
+    !triggerable?.has(resourceType)
+    || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)
+    || (providerId === "douyin-ecommerce" && !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId))
+  ) {
+    throw routeError(400, "WEB_COLLECTION_TRIGGER_INVALID", "当前只支持按业务日期触发已登记的快麦或抖店资源。");
   }
-  const scheduleVersion = resourceType === "sales_items" ? "v3" : resourceType === "orders" ? "v2" : "v1";
+  const scheduleVersion = providerId === "kuaimai" && resourceType === "sales_items"
+    ? "v3"
+    : providerId === "kuaimai" && resourceType === "orders"
+      ? "v2"
+      : "v1";
+  const key = webCollectionJobKey({ providerId, storeId, resourceType, businessDate, scheduleVersion });
   const plan = await ensureWebCollectionPlan(db, [{
     providerId,
+    storeId,
     resourceType,
     businessDate,
     rangeKind: "daily_fact",
     range: dailyRange(businessDate),
     scheduleVersion,
-    idempotencyKey: `${providerId}:${resourceType}:${businessDate}:${scheduleVersion}`
+    idempotencyKey: key
   }]);
   let job = plan.jobs[0];
   let requeued = false;
@@ -238,7 +357,7 @@ export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } =
   const lease = new Date(now.getTime() + seconds * 1000).toISOString();
   const row = await db.prepare(`SELECT * FROM web_collection_jobs
     WHERE status = 'queued'
-      OR (status IN ('claimed', 'opening', 'exporting', 'downloading', 'validating', 'ingesting')
+      OR (status IN ('claimed', 'opening', 'collecting', 'exporting', 'downloading', 'validating', 'ingesting')
         AND lease_expires_at < ? AND attempt < 3)
     ORDER BY business_date, created_at LIMIT 1`).bind(now.toISOString()).first();
   if (!row) return { job: null };
@@ -305,18 +424,24 @@ export async function completeWebCollectionJob(db, runner, input) {
     db.prepare(`UPDATE web_collection_jobs SET status = 'success', stage = 'success', lease_expires_at = NULL,
       error_code = NULL, error_summary = NULL, completed_at = ?, updated_at = ? WHERE id = ?`).bind(now, now, row.id),
     db.prepare(`INSERT INTO web_collection_cursors
-      (id, provider_id, resource_type, business_date, job_id, run_id, batch_id, completed_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(provider_id, resource_type) DO UPDATE SET business_date = excluded.business_date,
+      (id, provider_id, store_id, resource_type, business_date, job_id, run_id, batch_id, completed_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider_id, store_id, resource_type) DO UPDATE SET business_date = excluded.business_date,
         job_id = excluded.job_id, run_id = excluded.run_id, batch_id = excluded.batch_id,
         completed_at = excluded.completed_at, updated_at = excluded.updated_at`)
-      .bind(cursorId, row.provider_id, row.resource_type, row.business_date, row.id, runId, runInput.batchId || null, now, now)
+      .bind(cursorId, row.provider_id, row.store_id || "", row.resource_type, row.business_date, row.id, runId,
+        runInput.batchId || null, now, now)
   ];
   await db.batch(statements);
   return {
     job: mapJob(await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(row.id).first()),
     runId,
-    cursor: { providerId: row.provider_id, resourceType: row.resource_type, businessDate: row.business_date }
+    cursor: {
+      providerId: row.provider_id,
+      storeId: row.store_id || "",
+      resourceType: row.resource_type,
+      businessDate: row.business_date
+    }
   };
 }
 
@@ -337,23 +462,44 @@ export async function recordWebCollectionNotification(db, runner, input) {
 
 export async function listWebCollectionStatus(db, { limit = 100 } = {}) {
   const safeLimit = Math.min(300, Math.max(1, Number(limit) || 100));
-  const [runners, jobs, runs, cursors, notifications] = await Promise.all([
+  const [runners, stores, jobs, runs, cursors, notifications] = await Promise.all([
     db.prepare(`SELECT id, name, status, version, chrome_status, current_job_id, last_seen_at, created_at
       FROM web_collection_runners ORDER BY created_at DESC LIMIT ?`).bind(safeLimit).all(),
+    db.prepare(`SELECT provider_id, store_id, store_name, status, runner_id, last_seen_at, updated_at
+      FROM web_collection_stores ORDER BY updated_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT * FROM web_collection_jobs ORDER BY business_date DESC, created_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT id, job_id, runner_id, attempt, status, stage, batch_id, archive_id, row_count,
       error_code, error_summary, started_at, completed_at, created_at
       FROM web_collection_runs ORDER BY created_at DESC LIMIT ?`).bind(safeLimit).all(),
-    db.prepare(`SELECT provider_id, resource_type, business_date, job_id, run_id, batch_id, completed_at, updated_at
+    db.prepare(`SELECT provider_id, store_id, resource_type, business_date, job_id, run_id, batch_id, completed_at, updated_at
       FROM web_collection_cursors ORDER BY updated_at DESC LIMIT ?`).bind(safeLimit).all(),
     db.prepare(`SELECT id, job_id, runner_id, kind, dedupe_key, result, sent_at
       FROM web_collection_notifications ORDER BY sent_at DESC LIMIT ?`).bind(safeLimit).all()
   ]);
   return {
     runners: (runners?.results || []).map(row => ({ id: row.id, name: row.name, status: row.status, version: row.version || null, chromeStatus: row.chrome_status || null, currentJobId: row.current_job_id || null, lastSeenAt: row.last_seen_at || null, createdAt: row.created_at })),
+    stores: (stores?.results || []).map(row => ({
+      providerId: row.provider_id,
+      storeId: row.store_id,
+      storeName: row.store_name,
+      status: row.status,
+      runnerId: row.runner_id,
+      lastSeenAt: row.last_seen_at,
+      updatedAt: row.updated_at
+    })),
     jobs: (jobs?.results || []).map(mapJob),
     runs: (runs?.results || []).map(mapRun),
-    cursors: (cursors?.results || []).map(row => ({ providerId: row.provider_id, resourceType: row.resource_type, businessDate: row.business_date, jobId: row.job_id, runId: row.run_id, batchId: row.batch_id || null, completedAt: row.completed_at, updatedAt: row.updated_at })),
+    cursors: (cursors?.results || []).map(row => ({
+      providerId: row.provider_id,
+      storeId: row.store_id || "",
+      resourceType: row.resource_type,
+      businessDate: row.business_date,
+      jobId: row.job_id,
+      runId: row.run_id,
+      batchId: row.batch_id || null,
+      completedAt: row.completed_at,
+      updatedAt: row.updated_at
+    })),
     notifications: (notifications?.results || []).map(row => ({ id: row.id, jobId: row.job_id || null, runnerId: row.runner_id, kind: row.kind, dedupeKey: row.dedupe_key, result: row.result, sentAt: row.sent_at }))
   };
 }

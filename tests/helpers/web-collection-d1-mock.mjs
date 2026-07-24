@@ -5,6 +5,7 @@ export function createWebCollectionD1Mock() {
     web_collection_runs: new Map(),
     web_collection_cursors: new Map(),
     web_collection_notifications: new Map(),
+    web_collection_stores: new Map(),
     production_data_access_tokens: new Map(),
     product_flow_org_members: new Map()
   };
@@ -31,7 +32,7 @@ export function createWebCollectionD1Mock() {
         }
         if (query.includes("from web_collection_jobs") && query.includes("status = 'queued'")) {
           const [now] = state.values;
-          const recoverable = new Set(["claimed", "opening", "exporting", "downloading", "validating", "ingesting"]);
+          const recoverable = new Set(["claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting"]);
           return [...tables.web_collection_jobs.values()]
             .filter(row => row.status === "queued" || (
               recoverable.has(row.status)
@@ -58,6 +59,7 @@ export function createWebCollectionD1Mock() {
         if (query.includes("from web_collection_runs")) return { results: [...tables.web_collection_runs.values()] };
         if (query.includes("from web_collection_cursors")) return { results: [...tables.web_collection_cursors.values()] };
         if (query.includes("from web_collection_notifications")) return { results: [...tables.web_collection_notifications.values()] };
+        if (query.includes("from web_collection_stores")) return { results: [...tables.web_collection_stores.values()] };
         return { results: [] };
       },
       async run() {
@@ -69,6 +71,23 @@ export function createWebCollectionD1Mock() {
           });
           return { success: true };
         }
+        if (query.startsWith("insert into web_collection_stores")) {
+          const [id, providerId, storeId, storeName, runnerId, lastSeenAt, createdAt, updatedAt] = state.values;
+          const key = `${providerId}:${storeId}`;
+          const current = tables.web_collection_stores.get(key);
+          tables.web_collection_stores.set(key, {
+            id: current?.id || id,
+            provider_id: providerId,
+            store_id: storeId,
+            store_name: storeName,
+            status: "connected",
+            runner_id: runnerId,
+            last_seen_at: lastSeenAt,
+            created_at: current?.created_at || createdAt,
+            updated_at: updatedAt
+          });
+          return { success: true };
+        }
         if (query.startsWith("update web_collection_runners set version")) {
           const [version, chromeStatus, currentJobId, lastSeenAt, id] = state.values;
           Object.assign(tables.web_collection_runners.get(id), {
@@ -77,11 +96,11 @@ export function createWebCollectionD1Mock() {
           return { success: true };
         }
         if (query.startsWith("insert into web_collection_jobs")) {
-          const [id, providerId, resourceType, businessDate, rangeKind, rangeStart, rangeEnd, timeZone,
+          const [id, providerId, storeId, resourceType, businessDate, rangeKind, rangeStart, rangeEnd, timeZone,
             scheduleVersion, idempotencyKey, status, selectorVersion, targetEnvironment,
             targetEnvironmentVersion, createdAt, updatedAt] = state.values;
           tables.web_collection_jobs.set(id, {
-            id, provider_id: providerId, resource_type: resourceType, business_date: businessDate,
+            id, provider_id: providerId, store_id: storeId, resource_type: resourceType, business_date: businessDate,
             range_kind: rangeKind, range_start: rangeStart, range_end: rangeEnd, time_zone: timeZone,
             schedule_version: scheduleVersion, idempotency_key: idempotencyKey, status, selector_version: selectorVersion,
             target_environment: targetEnvironment, target_environment_version: targetEnvironmentVersion,
@@ -143,11 +162,11 @@ export function createWebCollectionD1Mock() {
           return { success: true };
         }
         if (query.startsWith("insert into web_collection_cursors")) {
-          const [id, providerId, resourceType, businessDate, jobId, runId, batchId, completedAt, updatedAt] = state.values;
-          const key = `${providerId}:${resourceType}`;
+          const [id, providerId, storeId, resourceType, businessDate, jobId, runId, batchId, completedAt, updatedAt] = state.values;
+          const key = [providerId, storeId, resourceType].filter(Boolean).join(":");
           const existing = tables.web_collection_cursors.get(key);
           tables.web_collection_cursors.set(key, {
-            id: existing?.id || id, provider_id: providerId, resource_type: resourceType, business_date: businessDate,
+            id: existing?.id || id, provider_id: providerId, store_id: storeId, resource_type: resourceType, business_date: businessDate,
             job_id: jobId, run_id: runId, batch_id: batchId, completed_at: completedAt, updated_at: updatedAt
           });
           return { success: true };

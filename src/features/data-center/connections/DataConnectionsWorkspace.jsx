@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { Database, LockKeyhole, RefreshCw } from "lucide-react";
 import { DATA_ACCESS_CATEGORIES, dataAccessCategoryFor } from "../../../domain/dataAccessCatalog.js";
 import { DATA_CONNECTOR_DEFINITIONS, storeFileImportPending } from "../../../domain/dataCenterConnectors.js";
+import { buildDouyinCollectionRecovery } from "../../../domain/dataSyncRecovery.js";
 import { useDataCenter } from "../../../state/DataCenterProvider.jsx";
+import { loadWebCollectionStatus } from "../../../state/webCollectionApi.js";
 import { usePlatformConnections } from "../../../state/usePlatformConnections.js";
 import { Button } from "../../../ui/Button.jsx";
 import { CompanyDataWorkspace } from "./CompanyDataWorkspace.jsx";
@@ -39,7 +41,22 @@ export function DataConnectionsWorkspace({
   const [category, setCategory] = useState(validCategory(initialCategory) ? initialCategory : "ecommerce");
   const [selection, setSelection] = useState(null);
   const [detailActive, setDetailActive] = useState(false);
+  const [webCollection, setWebCollection] = useState({ runners: [], stores: [], jobs: [], cursors: [] });
+  const [webCollectionError, setWebCollectionError] = useState("");
   const platformController = usePlatformConnections();
+
+  async function refreshWebCollection() {
+    try {
+      setWebCollection(await loadWebCollectionStatus());
+      setWebCollectionError("");
+    } catch (error) {
+      setWebCollectionError(error.message || "Chrome 官方报表采集状态读取失败。");
+    }
+  }
+
+  useEffect(() => {
+    refreshWebCollection();
+  }, []);
 
   useEffect(() => {
     setSelection(null);
@@ -52,11 +69,52 @@ export function DataConnectionsWorkspace({
     : null;
 
   async function refreshAll() {
-    await Promise.allSettled([refreshConnections(), platformController.refresh()]);
+    await Promise.allSettled([refreshConnections(), platformController.refresh(), refreshWebCollection()]);
   }
 
   const openNew = definition => setSelection({ definition, instance: null });
   const openExisting = (definition, instance) => setSelection({ definition, instance });
+  const douyinStoreIds = [...new Set([
+    ...webCollection.stores,
+    ...webCollection.jobs,
+    ...webCollection.cursors
+  ].filter(item => item.providerId === "douyin-ecommerce" && item.storeId).map(item => item.storeId))];
+  const douyinRecoveries = douyinStoreIds.map(storeId => buildDouyinCollectionRecovery({
+    storeId,
+    runners: webCollection.runners,
+    jobs: webCollection.jobs,
+    cursors: webCollection.cursors
+  }));
+  const douyinResources = douyinRecoveries.flatMap(item => item.resources);
+  const douyinHealthy = douyinRecoveries.length > 0
+    && douyinRecoveries.every(item => item.resources.every(resource => resource.status === "success"));
+  const douyinActive = douyinResources.some(item =>
+    ["queued", "claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting"].includes(item.status)
+  );
+  const douyinFailed = douyinResources.some(item =>
+    ["failed", "waiting_human", "schema_changed"].includes(item.status)
+  );
+  const providerReadiness = {
+    "douyin-ecommerce": {
+      status: webCollectionError
+        ? "failed"
+        : douyinFailed
+          ? "failed"
+          : douyinActive
+            ? "running"
+            : douyinHealthy
+              ? "healthy"
+              : "pending_validation",
+      resources: douyinRecoveries[0]?.resources || buildDouyinCollectionRecovery().resources,
+      stores: webCollection.stores.filter(store => store.providerId === "douyin-ecommerce"),
+      error: webCollectionError
+    },
+    oceanengine: {
+      status: "unavailable",
+      resources: [],
+      error: ""
+    }
+  };
 
   return (
     <div className="data-connections-workspace">
@@ -79,6 +137,7 @@ export function DataConnectionsWorkspace({
             waitingForSamples={storeFileImportPending}
             pendingMessage="请先提供平台后台原始 XLSX / CSV；识别规则验证后再开放导入。"
             pendingActionLabel="等待文件样例"
+            providerReadiness={providerReadiness}
           />
         ) : null}
         {!connectionsLoading && category === "erp" ? (

@@ -1,4 +1,16 @@
-const RUNNING_STATES = new Set(["queued", "claimed", "opening", "exporting", "downloading", "validating", "ingesting", "running"]);
+import { DOUYIN_COLLECTION_RESOURCES } from "./dataCenterConnectors.js";
+
+const RUNNING_STATES = new Set(["queued", "claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting", "running"]);
+
+export const DOUYIN_RECOVERY = Object.freeze({
+  DOUYIN_LOGIN_REQUIRED: "在公司 Mac 的同一 Chrome Profile 登录抖店后重新触发。",
+  DOUYIN_HUMAN_VERIFICATION_REQUIRED: "在公司 Mac 完成验证码、扫码、滑块或设备验证后重新触发。",
+  DOUYIN_REPORT_SCHEMA_CHANGED: "页面字段已变化，采集已停止，等待更新采集适配。",
+  DOUYIN_PAGE_SCHEMA_CHANGED: "页面结构已变化，采集已停止，等待更新采集适配。",
+  DOUYIN_STORE_IDENTITY_MISMATCH: "确认公司 Chrome 当前店铺与任务店铺一致后重新触发。",
+  DOUYIN_OFFICIAL_REPORT_BUTTON_MISSING: "官方报表入口不可用，请检查账号权限或页面变化。",
+  EXTENSION_DOWNLOAD_TIMEOUT: "官方报表下载超时，请稍后重新触发。"
+});
 
 function timestamp(value) {
   const parsed = Date.parse(String(value || ""));
@@ -166,4 +178,60 @@ export function buildKuaimaiSalesRecovery({
     runner,
     job
   });
+}
+
+export function buildDouyinCollectionRecovery({
+  storeId = "",
+  runners = [],
+  jobs = [],
+  cursors = [],
+  now = new Date()
+} = {}) {
+  const matchingJobs = jobs.filter(job => (
+    job?.providerId === "douyin-ecommerce"
+    && (!storeId || job.storeId === storeId)
+  ));
+  const matchingCursors = cursors.filter(cursor => (
+    cursor?.providerId === "douyin-ecommerce"
+    && (!storeId || cursor.storeId === storeId)
+  ));
+  const fallbackRunner = latest(runners);
+
+  return {
+    providerId: "douyin-ecommerce",
+    storeId,
+    resources: DOUYIN_COLLECTION_RESOURCES.map(resource => {
+      const job = latest(matchingJobs.filter(item => item.resourceType === resource.type));
+      const cursor = latest(matchingCursors.filter(item => item.resourceType === resource.type));
+      const runner = runners.find(item => item.id === job?.runnerId) || fallbackRunner;
+      const online = runnerOnline(runner, now);
+      const errorCode = String(job?.errorCode || "");
+      const jobStatus = String(job?.status || "");
+      const status = jobStatus && jobStatus !== "success"
+        ? jobStatus
+        : cursor || jobStatus === "success"
+          ? "success"
+          : "unavailable";
+      const instruction = DOUYIN_RECOVERY[errorCode]
+        || (RUNNING_STATES.has(status)
+          ? online
+            ? "公司 Mac 正在采集，完成后刷新状态。"
+            : "公司 Mac 采集器离线，恢复后台服务后会继续领取任务。"
+          : status === "success"
+            ? "最近可信批次已完成；可在执行记录查看日期、行数和结果。"
+            : "尚未完成真实采集，不会显示为已接通。");
+      return {
+        type: resource.type,
+        label: resource.label,
+        status,
+        businessDate: job?.businessDate || cursor?.businessDate || null,
+        errorCode: errorCode || null,
+        instruction,
+        runner,
+        job,
+        cursor,
+        canRetry: Boolean(job && ["waiting_human", "failed", "schema_changed", "success"].includes(jobStatus))
+      };
+    })
+  };
 }

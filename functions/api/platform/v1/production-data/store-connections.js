@@ -1,4 +1,4 @@
-import { storeFileImportPending } from "../../../../../src/domain/dataCenterConnectors.js";
+import { retiredStoreCredentialCleanupAllowed } from "../../../../../src/domain/dataCenterConnectors.js";
 import { jsonResponse, optionsResponse } from "../../../dingtalk/_shared/dingtalk.js";
 import { destroyConnectorRecord, listConnectorRecords } from "../../../data-center/_shared/connectorStorage.js";
 import { destroyCredentialEntry, listCredentialMetadata } from "../../_shared/credentialVaultStorage.js";
@@ -39,8 +39,8 @@ async function summarizeStoreConnections(db) {
       .bind("douyin-ecommerce").first()
   ]);
   return {
-    storeCredentialsWithSecret: credentials.filter(item => storeFileImportPending(item.category) && item.hasSecret).length,
-    storeConnectorInstances: connectorRecords.connectors.filter(item => storeFileImportPending(item.connectorId)).length,
+    storeCredentialsWithSecret: credentials.filter(item => retiredStoreCredentialCleanupAllowed(item.category) && item.hasSecret).length,
+    storeConnectorInstances: connectorRecords.connectors.filter(item => retiredStoreCredentialCleanupAllowed(item.connectorId)).length,
     legacyConnections: (legacyConnections?.results || []).filter(item => item.status !== "disabled").length,
     activeBrowserTasks: Number(taskRow?.count || 0)
   };
@@ -76,7 +76,7 @@ async function cleanupStoreConnections(db, env, access, unlock) {
     }
 
     const records = await listConnectorRecords(db);
-    for (const connection of records.connectors.filter(item => storeFileImportPending(item.connectorId))) {
+    for (const connection of records.connectors.filter(item => retiredStoreCredentialCleanupAllowed(item.connectorId))) {
       await destroyConnectorRecord(db, connection.id, { expectedVersion: connection.version }, {
         expectedVersion: connection.version,
         actor: access.name,
@@ -86,7 +86,7 @@ async function cleanupStoreConnections(db, env, access, unlock) {
     }
 
     const credentials = await listCredentialMetadata(db, { scopeType: "connector", includeArchived: true });
-    for (const credential of credentials.filter(item => storeFileImportPending(item.category) && item.hasSecret)) {
+    for (const credential of credentials.filter(item => retiredStoreCredentialCleanupAllowed(item.category) && item.hasSecret)) {
       await destroyCredentialEntry(db, credential.id, { expectedVersion: credential.version }, {
         actorType: "employee",
         actorId: access.userId,

@@ -46,28 +46,33 @@ const BUSINESS_TABLES = [
   table("product_catalog_meta", "copy", ["key"], 34),
   table("product_sales_daily", "transform_sales", ["code", "date", "platform"], 35, { required: true, batchSize: 250 }),
   table("product_sales_meta", "copy", ["id"], 36, { required: true }),
+  table("commerce_fact_batches", "copy", ["id"], 37),
+  table("commerce_store_daily_facts", "transform_sales", ["id"], 38, { batchSize: 250 }),
+  table("commerce_product_daily_facts", "transform_sales", ["id"], 39, { batchSize: 250 }),
+  table("commerce_live_daily_facts", "transform_sales", ["id"], 40, { batchSize: 250 }),
+  table("commerce_video_daily_facts", "transform_sales", ["id"], 41, { batchSize: 250 }),
 
-  table("data_sources", "mask", ["entity_type", "id"], 40, {
+  table("data_sources", "mask", ["entity_type", "id"], 42, {
     maskFields: { updated_by: "identity" },
     maskJsonFields: ["payload"]
   }),
-  table("data_sync_runs", "mask", ["entity_type", "id"], 41, {
+  table("data_sync_runs", "mask", ["entity_type", "id"], 43, {
     maskFields: { updated_by: "identity" },
     maskJsonFields: ["payload"]
   }),
-  table("data_source_files", "mask", ["entity_type", "id"], 42, {
+  table("data_source_files", "mask", ["entity_type", "id"], 44, {
     maskFields: { updated_by: "identity" },
     maskJsonFields: ["payload"]
   }),
-  table("data_dimension_mappings", "mask", ["entity_type", "id"], 43, {
+  table("data_dimension_mappings", "mask", ["entity_type", "id"], 45, {
     maskFields: { updated_by: "identity" },
     maskJsonFields: ["payload"]
   }),
-  table("data_quality_issues", "mask", ["entity_type", "id"], 44, {
+  table("data_quality_issues", "mask", ["entity_type", "id"], 46, {
     maskFields: { updated_by: "identity" },
     maskJsonFields: ["payload"]
   }),
-  table("data_center_meta", "copy", ["key"], 45),
+  table("data_center_meta", "copy", ["key"], 47),
 
   table("ecommerce_operation_records", "mask", ["entity_type", "id"], 50, {
     maskFields: { updated_by: "identity" },
@@ -227,6 +232,7 @@ const CONTROL_TABLES = [
   "erp_file_archives",
   "erp_source_records",
   "web_collection_runners",
+  "web_collection_stores",
   "web_collection_jobs",
   "web_collection_runs",
   "web_collection_cursors",

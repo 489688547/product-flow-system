@@ -9,7 +9,11 @@ import {
   summarizeErpAccessHealth,
   summarizePlatformConnectionHealth
 } from "../src/domain/dataAccessCatalog.js";
-import { DATA_CONNECTOR_DEFINITIONS } from "../src/domain/dataCenterConnectors.js";
+import {
+  DATA_CONNECTOR_DEFINITIONS,
+  DOUYIN_COLLECTION_RESOURCES,
+  storeFileImportPending
+} from "../src/domain/dataCenterConnectors.js";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
 const read = path => readFileSync(resolve(root, path), "utf8");
@@ -33,14 +37,21 @@ test("data access has the approved categories and stable membership", () => {
   ]);
 });
 
-test("store connectors wait for native files and define no login secrets", () => {
+test("Douyin uses Chrome official reports while the other store connectors wait for files", () => {
   const storeIds = new Set(["douyin-ecommerce", "kuaishou", "taobao", "pinduoduo", "xiaohongshu", "jd-jingmai"]);
   const stores = DATA_CONNECTOR_DEFINITIONS.filter(item => storeIds.has(item.id));
   assert.equal(stores.length, storeIds.size);
   for (const definition of stores) {
-    assert.deepEqual(definition.methods, ["export"]);
+    assert.deepEqual(definition.methods, definition.id === "douyin-ecommerce" ? ["browser"] : ["export"]);
     assert.deepEqual(definition.fields, []);
   }
+  assert.equal(storeFileImportPending("douyin-ecommerce"), false);
+  assert.deepEqual(DOUYIN_COLLECTION_RESOURCES.map(item => item.label), [
+    "店铺每日",
+    "商品每日",
+    "直播每日",
+    "短视频每日"
+  ]);
 });
 
 test("catalog health keeps sync failures and stale platform reads visible", () => {
@@ -75,6 +86,21 @@ test("the workspace exposes the three approved categories and no old tabs", () =
   assert.match(workspace, /!detailActive[\s\S]*<DataAccessTabs/);
   assert.match(workspace, /role="tabpanel"/);
   assert.doesNotMatch(workspace, /经营数据连接器|内部系统保险箱/);
+  assert.match(workspace, /loadWebCollectionStatus/);
+  assert.match(workspace, /providerReadiness/);
+});
+
+test("Douyin access is truthful and Qianchuan remains unavailable", () => {
+  const catalog = read("src/features/data-center/connections/ConnectorCatalog.jsx");
+  const domain = read("src/domain/dataCenterConnectors.js");
+  assert.match(domain, /Chrome 官方报表采集/);
+  assert.match(domain, /店铺每日/);
+  assert.match(domain, /商品每日/);
+  assert.match(domain, /直播每日/);
+  assert.match(domain, /短视频每日/);
+  assert.match(catalog, /打开抖店处理/);
+  assert.match(catalog, /尚未接入/);
+  assert.doesNotMatch(`${domain}\n${catalog}`, /巨量(?:引擎|千川)[\s\S]{0,80}已接通/);
 });
 
 test("legacy and readiness links open company data inside data access", () => {

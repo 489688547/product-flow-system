@@ -29,7 +29,7 @@
 | `/api/data-center/sales` | 按日期读取数据中心销售事实 | 需要公司会话；最长 370 天；订单创建时间；上海时区；排除“其它” |
 | `/api/platform/v1/data-services/sales` | 发现销售数据覆盖范围并按日期读取经营汇总 | 需要公司会话；无日期时返回可用月份；完整日期时返回单行汇总；订单创建时间；上海时区；排除“其它” |
 | `/api/platform/v1/data-services/sales-repair` | 兼容保留的快麦 API 销售修复路由 | 当前产品停用且不从前端调用；最新日异常改由 Chrome 采集状态与官方文件导入闭环 |
-| `/api/platform/v1/web-collection/jobs` | 读取公司 Mac Chrome 采集状态，或排队固定快麦订单商品明细任务 | GET 需数据中心相关公司会话；runner 动作需设备令牌；用户 `trigger` 仅总经办、数据中心、运营非只读身份，按日期幂等且不接收网页地址、凭据或脚本 |
+| `/api/platform/v1/web-collection/jobs` | 读取公司 Mac Chrome 采集状态；服务端按已登记店铺生成快麦/抖店日计划；或排队固定资源任务 | GET 需数据中心相关公司会话；runner 动作需设备令牌；用户 `trigger` 仅总经办、数据中心、运营非只读身份，按店铺/资源/日期幂等且不接收网页地址、凭据或脚本 |
 | `/api/data-center/connectors` | 读取和维护连接器实例与内部保险箱非敏感元数据 | 数据中心授权部门可读；运营可维护非店铺连接器；仅总经办维护内部保险箱、归档并销毁已退役店铺凭证 |
 | `/api/ecommerce-operations` | 读取可见的店铺经营状态 | 需要公司会话和授权部门；D1 分实体存储 |
 | `/api/ecommerce-operations/actions` | 提交重点产品、方案、执行、协同和复盘动作 | 服务端校验角色、状态与版本；拒绝只读身份 |
