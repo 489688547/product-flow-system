@@ -48,3 +48,29 @@ test("development backlog durable docs and API contract are registered", () => {
     assert.equal(existsSync(resolve(path)), true, `${path} must exist`);
   }
 });
+
+test("development backlog API errors and agent claim rule are durable", () => {
+  const agents = readFileSync(resolve("AGENTS.md"), "utf8");
+  const catalog = readFileSync(resolve("docs/platform/api-catalog.md"), "utf8");
+  const errors = readFileSync(resolve("docs/platform/error-codes.md"), "utf8");
+  const apiPath = resolve("docs/platform/apis/development-backlog-v1.md");
+  assert.equal(existsSync(apiPath), true, "development backlog API contract must exist");
+  assert.match(agents, /研发待办[\s\S]*查询[\s\S]*认领/);
+  assert.match(catalog, /\/api\/platform\/v1\/development-backlog/);
+  assert.match(errors, /BACKLOG_ACTIVE_CONFLICT/);
+  assert.match(readFileSync(apiPath, "utf8"), /expectedVersion/);
+});
+
+test("development backlog tests run through the default API test suite", () => {
+  const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8"));
+  const backlogTestScript = packageJson.scripts?.["test:development-backlog"] || "";
+  for (const file of [
+    "tests/development-backlog-migration.test.mjs",
+    "tests/development-backlog-domain.test.mjs",
+    "tests/development-backlog-api.test.mjs",
+    "tests/development-backlog-ai.test.mjs"
+  ]) {
+    assert.match(backlogTestScript, new RegExp(file.replaceAll(".", "\\.")));
+  }
+  assert.match(packageJson.scripts?.test || "", /npm run test:development-backlog/);
+});

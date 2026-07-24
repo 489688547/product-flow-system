@@ -52,6 +52,7 @@ Small, low-risk fixes may omit feature documents only when the pull request expl
 - Every acquisition job must persist the server-resolved target environment and version. Browsers, runners and provider payloads may not choose a binding or database ID; a stale display version fails before projection writes.
 - Every external write capability must declare its display behavior. Display mode defaults to fail closed and may proceed only through a registered simulator that preserves validation, authorization, idempotency and safe audit without loading Provider credentials.
 - AI Provider configuration, credentials, leases, token usage and Skill audit always use the control database. AI context builders and business Skills use the selected `businessDb`, and both usage tables record `data_environment` independently from `execution_mode`.
+- Confirmed product-development work must be recorded in the shared 研发待办 control plane. Before changing an overlapping module or repository path, an agent or developer must first 查询 the confirmed backlog item and 认领 it with the real branch name; active scope conflicts must be resolved rather than bypassed. AI discussions remain drafts until an authorized executive confirms the structured item.
 
 ## Security and external systems
 

@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { onRequest as onJobs } from "../functions/api/platform/v1/web-collection/jobs.js";
 import { onRequest as onRunners } from "../functions/api/platform/v1/web-collection/runners.js";
+import { ensureRegisteredWebCollectionPlan } from "../functions/api/platform/v1/web-collection/_shared/storage.js";
 import { createWebCollectionD1Mock } from "./helpers/web-collection-d1-mock.mjs";
 
 const executive = { userId: "exec-1", name: "负责人", role: "executive", department: "总经办" };
@@ -203,18 +204,14 @@ test("runner registers a safely discovered Douyin store before creating its dail
   });
   assert.equal(db.tables.web_collection_stores.get("douyin-ecommerce:90862283").runner_id, registration.body.data.id);
 
-  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
-    method: "POST",
-    db,
-    token: registration.body.data.token,
-    body: { action: "ensure_registered_plan" }
+  const result = await ensureRegisteredWebCollectionPlan(db, {
+    now: new Date("2026-07-24T05:30:00+08:00")
   });
 
-  assert.equal(result.response.status, 200);
-  assert.equal(result.body.data.jobs.filter(job => job.providerId === "kuaimai").length, 3);
-  assert.equal(result.body.data.jobs.filter(job => job.providerId === "douyin-ecommerce").length, 4);
+  assert.equal(result.jobs.filter(job => job.providerId === "kuaimai").length, 3);
+  assert.equal(result.jobs.filter(job => job.providerId === "douyin-ecommerce").length, 4);
   assert.deepEqual(
-    result.body.data.jobs
+    result.jobs
       .filter(job => job.providerId === "douyin-ecommerce")
       .map(job => job.storeId),
     ["90862283", "90862283", "90862283", "90862283"]

@@ -26,7 +26,9 @@ const REQUIRED_PRODUCTION_TABLES = [
   "data_connection_shops",
   "browser_agent_tasks",
   "browser_agent_task_grants",
-  "data_connection_audit"
+  "data_connection_audit",
+  "development_backlog_items",
+  "development_backlog_events"
 ];
 const TEST_PLATFORM_MASTER_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 const TEST_DEMO_MASKING_KEY = "test-demo-masking-key-with-enough-entropy";

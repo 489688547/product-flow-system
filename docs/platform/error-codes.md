@@ -216,6 +216,26 @@
 - `AI_STREAM_CANCELLED`：客户端主动停止回答，租约已释放且审计标记未完成。
 - `AI_LOCAL_PREVIEW_READ_ONLY`：本地 Node 预览只展示脱敏状态，不调用 Provider 或修改配置。
 - `AI_FEATURE_NOT_REGISTERED`：业务 App 或功能没有进入服务端注册表；在 Provider 调用前失败，不能由客户端临时补充归属。
+
+## 研发待办
+
+- `BACKLOG_STORAGE_UNAVAILABLE`：控制数据库不可用；可重试，不能回退浏览器本地列表。
+- `BACKLOG_QUERY_FAILED`：研发待办读取失败；返回安全摘要，不返回 SQL。
+- `BACKLOG_WRITE_FAILED`：研发待办写入失败；未确认写入时不得显示成功。
+- `BACKLOG_FORBIDDEN`：当前身份无权执行创建、编辑、开发推进或验收动作。
+- `BACKLOG_NOT_FOUND`：事项不存在。
+- `BACKLOG_INPUT_INVALID`：筛选、字段、版本或动作输入无效。
+- `BACKLOG_MODULE_NOT_REGISTERED`：模块未进入服务端登记表。
+- `BACKLOG_INVALID_TRANSITION`：当前状态不允许请求的动作。
+- `BACKLOG_VERSION_CONFLICT`：事项已被其他任务更新；客户端必须刷新，不自动覆盖。
+- `BACKLOG_SCOPE_REQUIRED`：事项尚未明确受影响路径，不能认领。
+- `BACKLOG_SCOPE_INVALID`：路径不是安全仓库相对路径。
+- `BACKLOG_ACTIVE_CONFLICT`：存在模块或路径重叠的活跃事项；返回冲突编号、负责人和分支等安全信息。
+- `BACKLOG_BRANCH_INVALID`：分支名不符合 `codex/` 安全规则。
+- `BACKLOG_ACCEPTANCE_EVIDENCE_REQUIRED`：提交验收缺少证据。
+- `BACKLOG_BLOCKED_REASON_REQUIRED`：阻塞事项缺少原因。
+- `BACKLOG_RESUME_CONDITION_REQUIRED`：阻塞事项缺少恢复条件。
+- `BACKLOG_AI_DRAFT_INVALID`：模型没有返回可验证结构化草稿；不写 D1，可重新生成。
 - `AI_USAGE_RANGE_INVALID`：AI 用量查询缺少日期、日期倒序或超过 366 天。
 - `AI_USAGE_ACCESS_DENIED`：当前身份没有数据中心读取权限，HTTP 403。
 - `AI_USAGE_QUERY_FAILED`：AI 用量聚合读取失败；可按 `retryable` 手动重试，响应不包含 SQL 或 Provider 原始错误。

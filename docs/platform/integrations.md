@@ -67,6 +67,8 @@ Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状
 
 公司总助对话与电商运营方案点评都通过统一 AI 能力调用。每个功能必须在服务端注册稳定 `appId/featureId` 并复用 `invokeAiFeature` 或流式聊天编排；业务路由不得导入 Provider 配置、Responses 适配器或自行发起模型请求。治理 CI 会扫描直接模型地址、Secret 和低层适配器导入，唯一例外是平台连接测试器使用合成内容验证候选凭据。
 
+研发待办草稿同样通过统一 AI 能力调用，登记为 `company-platform/development-backlog-draft`。它只整理当前需求描述并返回未落库结构化草稿；总经办确认后才通过标准研发待办 API 写入控制 D1。AI 未配置时页面进入数据中心 AI 大模型设置，临时超时或限流留在当前页面重试。
+
 ## 内部平台资料
 
 任意已登录员工可读取内部平台资料，仅总经办平台管理员可维护。D1 表 `integration_private_profiles` 保存字段白名单内的非敏感资料；`integration_profile_audit` 只记录变更字段名，不保存字段值。资料超过 180 天未验证时，说明书显示复核提醒。内部 API 失败时公开平台地图继续可用。
