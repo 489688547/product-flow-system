@@ -84,11 +84,13 @@ export function ProductCatalogSalesMappingDialog({
         <RefreshCw size={20} aria-hidden="true" />
         <div>
           <strong>先更新 ERP 商品档案</strong>
-          <span>通过 Chrome 插件重新获取普通商品、套件和组合装后，系统会自动重新核对当前日期范围内的销售归属。</span>
+          <span>{onRequestCatalogCollection
+            ? "通过 Chrome 插件重新获取普通商品、套件和组合装后，系统会自动重新核对当前日期范围内的销售归属。"
+            : "导入最新的 ERP 商品档案后，系统会自动重新核对当前日期范围内的销售归属。"}</span>
         </div>
         {canEdit ? <div className="product-catalog-source-actions">
-          <Button variant="primary" disabled={Boolean(busy)} disabledReason="正在处理商品数据" onClick={onRequestCatalogCollection}><RefreshCw size={15} />通过 Chrome 插件重新获取</Button>
-          <Button disabled={Boolean(busy)} disabledReason="正在处理商品数据" onClick={onRequestCatalogImport}><FileSpreadsheet size={15} />导入 ERP 商品文件</Button>
+          {onRequestCatalogCollection ? <Button variant="primary" disabled={Boolean(busy)} disabledReason="正在处理商品数据" onClick={onRequestCatalogCollection}><RefreshCw size={15} />通过 Chrome 插件重新获取</Button> : null}
+          <Button variant={onRequestCatalogCollection ? undefined : "primary"} disabled={Boolean(busy)} disabledReason="正在处理商品数据" onClick={onRequestCatalogImport}><FileSpreadsheet size={15} />导入 ERP 商品文件</Button>
         </div> : null}
       </section>
       <div className="product-catalog-mapping-intro">
