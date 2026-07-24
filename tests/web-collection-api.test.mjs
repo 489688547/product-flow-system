@@ -178,6 +178,34 @@ test("control plane keeps same-day Douyin jobs isolated by store", async () => {
   assert.equal(unsafe.body.error.code, "WEB_COLLECTION_JOB_INVALID");
 });
 
+test("runner asks the server to create yesterday tasks for every connected Douyin store", async () => {
+  const db = createWebCollectionD1Mock();
+  db.tables.data_connection_shops.set("shop-row-1", {
+    id: "shop-row-1",
+    platform_id: "douyin-ecommerce",
+    shop_id: "store-a",
+    shop_name: "品牌旗舰店",
+    status: "connected"
+  });
+  const registration = await register(db);
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: registration.body.data.token,
+    body: { action: "ensure_registered_plan" }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.jobs.filter(job => job.providerId === "kuaimai").length, 3);
+  assert.equal(result.body.data.jobs.filter(job => job.providerId === "douyin-ecommerce").length, 4);
+  assert.deepEqual(
+    result.body.data.jobs
+      .filter(job => job.providerId === "douyin-ecommerce")
+      .map(job => job.storeId),
+    ["store-a", "store-a", "store-a", "store-a"]
+  );
+});
+
 test("claim lease, legal transitions, completion and cursor are atomic from the runner perspective", async () => {
   const db = createWebCollectionD1Mock();
   const registration = await register(db);
@@ -291,6 +319,9 @@ test("runner reclaims an expired non-terminal stage after a local crash", async 
   const jobId = first.body.data.job.id;
   await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
     method: "POST", db, token, body: { action: "transition", jobId, from: "claimed", status: "opening", stage: "opening" }
+  });
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "transition", jobId, from: "opening", status: "collecting", stage: "collecting" }
   });
   db.tables.web_collection_jobs.get(jobId).lease_expires_at = "2026-07-20T00:00:00.000Z";
 

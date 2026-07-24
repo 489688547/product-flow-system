@@ -5,6 +5,7 @@ export function createWebCollectionD1Mock() {
     web_collection_runs: new Map(),
     web_collection_cursors: new Map(),
     web_collection_notifications: new Map(),
+    data_connection_shops: new Map(),
     production_data_access_tokens: new Map(),
     product_flow_org_members: new Map()
   };
@@ -31,7 +32,7 @@ export function createWebCollectionD1Mock() {
         }
         if (query.includes("from web_collection_jobs") && query.includes("status = 'queued'")) {
           const [now] = state.values;
-          const recoverable = new Set(["claimed", "opening", "exporting", "downloading", "validating", "ingesting"]);
+          const recoverable = new Set(["claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting"]);
           return [...tables.web_collection_jobs.values()]
             .filter(row => row.status === "queued" || (
               recoverable.has(row.status)
@@ -58,6 +59,7 @@ export function createWebCollectionD1Mock() {
         if (query.includes("from web_collection_runs")) return { results: [...tables.web_collection_runs.values()] };
         if (query.includes("from web_collection_cursors")) return { results: [...tables.web_collection_cursors.values()] };
         if (query.includes("from web_collection_notifications")) return { results: [...tables.web_collection_notifications.values()] };
+        if (query.includes("from data_connection_shops")) return { results: [...tables.data_connection_shops.values()] };
         return { results: [] };
       },
       async run() {

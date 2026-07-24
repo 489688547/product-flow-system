@@ -2,6 +2,7 @@ export const WEB_COLLECTION_STATES = Object.freeze([
   "queued",
   "claimed",
   "opening",
+  "collecting",
   "waiting_human",
   "exporting",
   "downloading",
@@ -15,7 +16,8 @@ export const WEB_COLLECTION_STATES = Object.freeze([
 const TRANSITIONS = Object.freeze({
   queued: new Set(["claimed"]),
   claimed: new Set(["opening", "queued", "failed"]),
-  opening: new Set(["exporting", "waiting_human", "schema_changed", "failed"]),
+  opening: new Set(["collecting", "exporting", "waiting_human", "schema_changed", "failed"]),
+  collecting: new Set(["validating", "waiting_human", "schema_changed", "failed"]),
   waiting_human: new Set(["queued"]),
   exporting: new Set(["downloading", "waiting_human", "schema_changed", "failed"]),
   downloading: new Set(["validating", "failed"]),

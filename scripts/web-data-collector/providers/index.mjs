@@ -9,3 +9,45 @@ export const WEB_COLLECTION_ADAPTERS = Object.freeze([
     ])
   })
 ]);
+
+function processorError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+export function createProviderProcessorRegistry(processors = []) {
+  const byId = new Map();
+  for (const processor of processors) {
+    const id = String(processor?.id || "").trim();
+    if (!id || typeof processor?.process !== "function" || byId.has(id)) {
+      throw processorError("PROCESSOR_REGISTRY_INVALID", "网页采集 processor 注册无效。");
+    }
+    byId.set(id, processor);
+  }
+  return Object.freeze({
+    require(providerId) {
+      const processor = byId.get(String(providerId || ""));
+      if (!processor) {
+        throw processorError("PROCESSOR_NOT_REGISTERED", "网页采集平台 processor 未登记。");
+      }
+      return processor;
+    }
+  });
+}
+
+export function createKuaimaiProcessor(processDownload) {
+  if (typeof processDownload !== "function") {
+    throw processorError("KUAIMAI_PROCESSOR_INVALID", "快麦下载处理器未配置。");
+  }
+  return Object.freeze({
+    id: "kuaimai",
+    process({ job, result, onValidated }) {
+      return processDownload({
+        jobId: job.id,
+        fileName: result.safeFileName || result.fileName,
+        resourceType: job.resourceType,
+        businessDate: job.businessDate,
+        onValidated
+      });
+    }
+  });
+}

@@ -1,10 +1,15 @@
 import { createDailyPlan } from "../../src/domain/webCollection.js";
-import { WEB_COLLECTION_ADAPTERS } from "./providers/index.mjs";
+import {
+  WEB_COLLECTION_ADAPTERS,
+  createKuaimaiProcessor,
+  createProviderProcessorRegistry
+} from "./providers/index.mjs";
 
 function safeTask(job) {
   return {
     jobId: job.id,
     providerId: job.providerId,
+    ...(job.storeId ? { storeId: job.storeId } : {}),
     resourceType: job.resourceType,
     businessDate: job.businessDate,
     status: job.status,
@@ -18,8 +23,21 @@ function safeErrorCode(value, fallback = "WEB_COLLECTION_LOCAL_PROCESSING_FAILED
   return /^[A-Z0-9_]{3,80}$/.test(code) ? code : fallback;
 }
 
-export function createWebCollectorOrchestrator({ api, processDownload, notify = async () => {} }) {
-  if (!api || typeof processDownload !== "function") throw new Error("网页采集编排依赖不完整。");
+export function createWebCollectorOrchestrator({
+  api,
+  processors,
+  processDownload,
+  notify = async () => {}
+}) {
+  if (!api) throw new Error("网页采集编排依赖不完整。");
+  const processorRegistry = processors || (
+    typeof processDownload === "function"
+      ? createProviderProcessorRegistry([createKuaimaiProcessor(processDownload)])
+      : null
+  );
+  if (!processorRegistry || typeof processorRegistry.require !== "function") {
+    throw new Error("网页采集 processor 注册表未配置。");
+  }
   let activeJob = null;
   let processingResult = false;
 
@@ -36,7 +54,12 @@ export function createWebCollectorOrchestrator({ api, processDownload, notify = 
   }
 
   async function fail(from, result, fallbackCode) {
-    const target = result.status === "schema_changed" ? "schema_changed" : result.status === "waiting_human" || result.status === "waiting_login" ? "waiting_human" : "failed";
+    const resultStatus = result.status || result.kind;
+    const target = resultStatus === "schema_changed"
+      ? "schema_changed"
+      : resultStatus === "waiting_human" || resultStatus === "waiting_login"
+        ? "waiting_human"
+        : "failed";
     const errorCode = safeErrorCode(result.errorCode, fallbackCode);
     await transition(from, target, { stage: result.stage || from, errorCode });
     await notify({
@@ -55,6 +78,7 @@ export function createWebCollectorOrchestrator({ api, processDownload, notify = 
     async prepare({ now = new Date() } = {}) {
       const jobs = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now });
       await api.heartbeat({ version: "0.1.0", chromeStatus: "extension_expected", currentJobId: activeJob?.id || null });
+      if (typeof api.ensureRegisteredPlan === "function") return api.ensureRegisteredPlan();
       if (!jobs.length) return { jobs: [] };
       return api.ensurePlan(jobs);
     },
@@ -79,23 +103,28 @@ export function createWebCollectorOrchestrator({ api, processDownload, notify = 
       }
       processingResult = true;
       try {
-        if (["waiting_login", "waiting_human", "schema_changed", "failed"].includes(result.status)) {
+        const resultKind = result.kind || result.status;
+        const resultStatus = result.status || resultKind;
+        if (["waiting_login", "waiting_human", "schema_changed", "failed"].includes(resultStatus)) {
           await fail("opening", result, "WEB_COLLECTION_EXTENSION_FAILED");
           return { terminal: true };
         }
-        if (result.status !== "downloaded") {
+        if (!["downloaded", "captured"].includes(resultKind)) {
           await fail("opening", { ...result, status: "failed" }, "WEB_COLLECTION_RESULT_STATUS_INVALID");
           return { terminal: true };
         }
         let current = "opening";
-        await transition(current, "exporting"); current = "exporting";
-        await transition(current, "downloading"); current = "downloading";
+        if (resultKind === "downloaded") {
+          await transition(current, "exporting"); current = "exporting";
+          await transition(current, "downloading"); current = "downloading";
+        } else {
+          await transition(current, "collecting", { stage: "collecting" }); current = "collecting";
+        }
         await transition(current, "validating"); current = "validating";
-        const processed = await processDownload({
-          jobId: activeJob.id,
-          fileName: result.fileName,
-          resourceType: activeJob.resourceType,
-          businessDate: activeJob.businessDate,
+        const processor = processorRegistry.require(activeJob.providerId);
+        const processed = await processor.process({
+          job: activeJob,
+          result,
           onValidated: async () => {
             if (current === "validating") {
               await transition(current, "ingesting");
@@ -111,7 +140,7 @@ export function createWebCollectorOrchestrator({ api, processDownload, notify = 
           jobId: activeJob.id,
           run: {
             batchId: processed.batchId || null,
-            archiveId: processed.archiveId || null,
+            archiveId: processed.archiveId || processed.relativeArchiveKey || null,
             rowCount: Number.isFinite(Number(processed.rowCount)) ? Number(processed.rowCount) : null,
             fileHash: processed.fileHash || null
           }

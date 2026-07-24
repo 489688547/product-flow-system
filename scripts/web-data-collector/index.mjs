@@ -23,6 +23,14 @@ import { createCollectorBridge } from "./bridge.mjs";
 import { resolveSafeDownload } from "./download.mjs";
 import { notifyCollectionIssue } from "./notification.mjs";
 import { createWebCollectorOrchestrator } from "./orchestrator.mjs";
+import {
+  createKuaimaiProcessor,
+  createProviderProcessorRegistry
+} from "./providers/index.mjs";
+import {
+  createDouyinProcessor,
+  DEFAULT_DOUYIN_ARCHIVE_ROOT
+} from "./providers/douyin/index.mjs";
 
 function argument(argv, name, fallback = "") {
   const index = argv.indexOf(name);
@@ -72,6 +80,38 @@ export function assertBusinessDateMatchesRange({ businessDate, rangeStart, range
   }
 }
 
+export function createCommerceFactUploader({
+  baseUrl,
+  runnerToken,
+  fetchImpl = nodeRequest
+}) {
+  const token = String(runnerToken || "").trim();
+  if (!/^wdc_[a-f0-9]{48}$/i.test(token)) {
+    throw Object.assign(new Error("经营事实上传缺少有效 runner token。"), {
+      code: "WEB_COLLECTION_RUNNER_TOKEN_INVALID"
+    });
+  }
+  const endpoint = `${normalizeBaseUrl(baseUrl)}/api/platform/v1/commerce-facts/ingest`;
+  return async input => {
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(input)
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload?.error?.message || `经营事实上传失败（HTTP ${response.status}）。`);
+      error.code = payload?.error?.code || "COMMERCE_FACT_UPLOAD_FAILED";
+      error.retryable = Boolean(payload?.error?.retryable || response.status >= 500);
+      throw error;
+    }
+    return payload.data || payload;
+  };
+}
+
 async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
   const erpToken = await readErpCollectorToken();
   return async ({ jobId, fileName, resourceType, businessDate, onValidated }) => {
@@ -107,7 +147,23 @@ async function serve({ root, baseUrl, downloadsDirectory }) {
     createDownloadProcessor({ root, downloadsDirectory, baseUrl })
   ]);
   const api = createWebCollectionApi({ baseUrl, token: runnerToken });
-  const orchestrator = createWebCollectorOrchestrator({ api, processDownload, notify: notifyCollectionIssue });
+  const uploadFactChunk = createCommerceFactUploader({ baseUrl, runnerToken });
+  const processors = createProviderProcessorRegistry([
+    createKuaimaiProcessor(processDownload),
+    createDouyinProcessor({
+      archiveRoot: DEFAULT_DOUYIN_ARCHIVE_ROOT,
+      uploadFactChunk,
+      resolveDownloadFile: safeFileName => resolveSafeDownload({
+        directory: downloadsDirectory,
+        fileName: safeFileName
+      })
+    })
+  ]);
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processors,
+    notify: notifyCollectionIssue
+  });
   const bridge = createCollectorBridge({
     allowedOrigin: EXTENSION_ORIGIN,
     pairingKey,
@@ -153,6 +209,7 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
       bridge: "http://127.0.0.1:17653",
       downloadsDirectory,
       archiveRoot: root,
+      douyinArchiveRoot: DEFAULT_DOUYIN_ARCHIVE_ROOT,
       secrets: "macOS Keychain"
     };
   }

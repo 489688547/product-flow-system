@@ -27,8 +27,8 @@
 - [x] 实现 Douyin MV3 adapter
   - 输出：固定 host/page/action、下载、`store_daily` 安全读数、登录与人工验证状态。
   - 失败测试：远端 URL/selector、未知 task 字段、任意页面内容或未登记 host 被接受时失败。
-- [ ] 抽取通用 orchestrator processor
-  - 输出：Kuaimai 与 Douyin 共用任务执行，支持 `downloaded`/`captured`，保持原有重试、游标、通知。
+- [x] 抽取通用 orchestrator processor
+  - 输出：服务端按已登记店铺生成日计划；Kuaimai 与 Douyin 共用任务执行，支持 `downloaded`/`captured`；本机按 provider 归档、解析、上传完整批次，失败不推进游标。
   - 失败测试：采集结果未入库却完成任务、失败无同步记录或 Kuaimai 回归时失败。
 - [ ] 接入数据接入和数据同步 UI
   - 输出：真实 readiness、四资源执行记录、异常优先和人工恢复；巨量千川仍未接入。

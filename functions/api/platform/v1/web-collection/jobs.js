@@ -10,6 +10,7 @@ import {
   claimWebCollectionJob,
   completeWebCollectionJob,
   ensureWebCollectionPlan,
+  ensureRegisteredWebCollectionPlan,
   heartbeatRunner,
   listWebCollectionStatus,
   recordWebCollectionNotification,
@@ -47,6 +48,7 @@ export async function onRequest({ request, env, data = {} }) {
         body.jobs,
         sessionCreatesPlan ? collectionTargetFromRequestData(data) : undefined
       ); break;
+      case "ensure_registered_plan": result = await ensureRegisteredWebCollectionPlan(db); break;
       case "claim": result = await claimWebCollectionJob(db, runner, body); break;
       case "transition": result = await transitionWebCollectionJob(db, runner, body); break;
       case "complete": result = await completeWebCollectionJob(db, runner, body); break;

@@ -15,11 +15,12 @@
 
 ## Provider and task contract
 
-The server accepts only code-registered provider and resource IDs. Kuaimai currently schedules `orders`, `order_items` and `sales_items`: the first two are trade exports, while `sales_items` is the rich 《销售主题分析-按订单商品明细》 source used for refund- and cost-aware sales facts. A plan item contains `providerId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie or token field are rejected.
+The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `data_connection_shops.shop_id`. The server, not the runner, resolves that store directory. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie or token field are rejected.
 
 Runner actions are:
 
 - `heartbeat`: update version, Chrome status, current job and last-seen time.
+- `ensure_registered_plan`: after 05:00 Asia/Shanghai, generate yesterday's fixed Kuaimai tasks and four Douyin tasks for every connected store. The request accepts no store, URL, resource or database target.
 - `ensure_plan`: idempotently create 1–100 deterministic jobs.
 - `claim`: lease one queued or expired-lease job for 60–900 seconds.
 - `transition`: perform one legal state transition with safe stage and error summary.
@@ -28,11 +29,11 @@ Runner actions are:
 
 User action is:
 
-- `trigger`: enqueue a fixed Kuaimai daily job for `orders`, `order_items` or `sales_items` and `businessDate`. `force=false` is idempotent and never resets an existing job. `force=true` may requeue `waiting_human`, `failed`, `schema_changed` or `success` after the user confirms login; queued or running work is not duplicated. The request cannot select a URL, selector, credential or arbitrary resource.
+- `trigger`: enqueue a fixed Kuaimai daily job or one of the four registered Douyin daily resources for an already selected stable store and `businessDate`. `force=false` is idempotent and never resets an existing job. `force=true` may requeue `waiting_human`, `failed`, `schema_changed` or `success` after the user confirms login; queued or running work is not duplicated. The request cannot select a URL, selector, credential or arbitrary resource.
 
 ## States, leases and idempotency
 
-States are `queued`, `claimed`, `opening`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency includes `providerId:resourceType:businessDate:scheduleVersion` plus the server-owned target environment and version. Only `complete` from `ingesting` advances `(providerId, resourceType)` cursor. Provider facts are projected to the persisted target business database; a stale display version is rejected.
+States are `queued`, `claimed`, `opening`, `collecting`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. `collecting` is used only for a fixed safe page read; official files use `exporting` and `downloading`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency includes `providerId:storeId:resourceType:businessDate:scheduleVersion` plus the server-owned target environment and version. Only `complete` from `ingesting` advances `(providerId, storeId, resourceType)` cursor. Provider facts are projected to the persisted target business database; a stale display version is rejected.
 
 ## Responses
 
@@ -53,7 +54,7 @@ Responses use `{ data, meta }` and `cache-control: no-store`. The list response 
 
 ## Compatibility, capacity and rollback
 
-This is an additive v1 API. New providers add code adapters and registered resource IDs without changing the shared task schema. The migration adds five metadata tables and does not mutate ERP fact or archive tables. D1 stores small operational metadata only; binary exports remain in the local archive. Rollback disables the generic LaunchAgent and job creation while retaining jobs, runs, cursors and notifications for audit; the existing Kuaimai file scanner remains available.
+This is an additive v1 API. New providers add code adapters and registered resource IDs without changing the shared task schema. D1 stores small operational metadata and completed standard facts only; binary exports remain in the local archive. Rollback disables the provider adapter and registered daily plan while retaining jobs, runs, cursors, notifications and last trusted facts for audit; the existing Kuaimai file scanner remains available.
 
 ## Observability and contract tests
 

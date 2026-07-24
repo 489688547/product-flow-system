@@ -96,8 +96,6 @@ async function waitForContentScript(tabId, timeoutMs) {
 async function reportTaskResult(task, result) {
   const payload = {
     jobId: task.jobId,
-    providerId: task.providerId,
-    resourceType: task.resourceType,
     ...result
   };
   const response = await bridgeFetch(`/v1/tasks/${encodeURIComponent(task.jobId)}/result`, {
@@ -209,11 +207,12 @@ async function executeTask(task) {
   try {
     tab = await ensureProviderTab(resource, taskUrl);
   } catch (error) {
-    await reportTaskResult(task, {
-      status: "failed",
-      stage: "opening",
-      errorCode: error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
-    });
+      await reportTaskResult(task, {
+        kind: "failed",
+        errorCode: error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE",
+        safeSummary: "页面采集脚本不可用，请重载公司采集扩展后重试。",
+        stage: "opening"
+      });
     return;
   }
   const startedAt = Date.now();
@@ -221,22 +220,27 @@ async function executeTask(task) {
   try {
     result = await chrome.tabs.sendMessage(tab.id, { type: "RUN_REGISTERED_TASK", task });
   } catch {
-    await reportTaskResult(task, { status: "failed", stage: "opening", errorCode: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE" });
+    await reportTaskResult(task, {
+      kind: "failed",
+      errorCode: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE",
+      safeSummary: "页面采集脚本不可用，请重载公司采集扩展后重试。",
+      stage: "opening"
+    });
     return;
   }
   if (result?.kind === "captured") {
     if (task.providerId !== "douyin-ecommerce" || task.resourceType !== "store_daily") {
       await reportTaskResult(task, {
-        status: "failed",
-        stage: "collecting",
-        errorCode: "EXTENSION_CAPTURE_RESOURCE_INVALID"
+        kind: "failed",
+        errorCode: "EXTENSION_CAPTURE_RESOURCE_INVALID",
+        safeSummary: "页面读数资源与任务不匹配。",
+        stage: "collecting"
       });
       return;
     }
     await reportTaskResult(task, {
       kind: "captured",
-      status: "captured",
-      stage: "collecting",
+      resourceType: "store_daily",
       facts: result.facts,
       pageType: result.pageType,
       selectorVersion: result.selectorVersion
@@ -244,23 +248,39 @@ async function executeTask(task) {
     return;
   }
   if (result?.status !== "exporting") {
-    await reportTaskResult(task, result || { status: "failed", stage: "opening", errorCode: "EXTENSION_NO_PAGE_RESPONSE" });
+    const status = result?.status || result?.kind;
+    const waiting = ["waiting_login", "waiting_human"].includes(status);
+    const schemaChanged = status === "schema_changed";
+    await reportTaskResult(task, waiting ? {
+      kind: "waiting_human",
+      errorCode: result?.errorCode || "EXTENSION_PAGE_NOT_READY",
+      safeSummary: result?.safeSummary || "请在公司 Chrome 完成登录或安全验证后重试。"
+    } : {
+      kind: schemaChanged ? "schema_changed" : "failed",
+      errorCode: result?.errorCode || "EXTENSION_NO_PAGE_RESPONSE",
+      safeSummary: result?.safeSummary || (schemaChanged
+        ? "平台页面结构已变化，采集已停止，请检查适配器。"
+        : "平台页面采集失败，请检查登录状态和页面可用性后重试。"),
+      stage: result?.stage || "opening"
+    });
     return;
   }
   const download = await waitForDownload(resource, tab.id, startedAt);
   if (!download) {
-    await reportTaskResult(task, { status: "failed", stage: "downloading", errorCode: "EXTENSION_DOWNLOAD_TIMEOUT" });
+    await reportTaskResult(task, {
+      kind: "failed",
+      errorCode: "EXTENSION_DOWNLOAD_TIMEOUT",
+      safeSummary: "官方报表下载超时，请稍后重试。",
+      stage: "downloading"
+    });
     return;
   }
   await reportTaskResult(task, {
     kind: "downloaded",
-    status: "downloaded",
-    stage: "downloading",
     downloadId: download.id,
-    fileName: safeBaseName(download.filename),
     safeFileName: safeBaseName(download.filename),
-    ...(result.pageType ? { pageType: result.pageType } : {}),
-    ...(result.reportVersion ? { reportVersion: result.reportVersion } : {})
+    pageType: result.pageType || `${task.providerId.replace(/[^a-z0-9]+/gi, "_")}_${task.resourceType}`,
+    reportVersion: result.reportVersion || `${task.providerId.replace(/[^a-z0-9]+/gi, "_")}_${resource.scheduleVersion || "v1"}`
   });
 }
 

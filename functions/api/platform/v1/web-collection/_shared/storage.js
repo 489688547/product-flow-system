@@ -1,5 +1,6 @@
 import {
   assertWebCollectionTransition,
+  createDailyPlan,
   webCollectionJobKey,
   webCollectionRetryDecision
 } from "../../../../../../src/domain/webCollection.js";
@@ -19,6 +20,19 @@ const FORBIDDEN_JOB_FIELDS = new Set([
   "url", "origin", "selector", "selectors", "script", "javascript", "credentials", "cookie", "token",
   "targetenvironment", "targetenvironmentversion", "databaseid", "binding"
 ]);
+const DAILY_COLLECTION_RESOURCES = Object.freeze({
+  kuaimai: Object.freeze([
+    Object.freeze({ type: "orders", rangeKind: "daily_fact", scheduleVersion: "v2" }),
+    Object.freeze({ type: "order_items", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v3" })
+  ]),
+  "douyin-ecommerce": Object.freeze([
+    Object.freeze({ type: "store_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "product_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "live_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }),
+    Object.freeze({ type: "video_daily", rangeKind: "daily_fact", scheduleVersion: "v1" })
+  ])
+});
 
 export function webCollectionDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
@@ -213,6 +227,39 @@ export async function ensureWebCollectionPlan(db, jobs, target = { environmentId
   return { created, duplicate: saved.length - created, jobs: saved };
 }
 
+export async function ensureRegisteredWebCollectionPlan(
+  db,
+  {
+    now = new Date(),
+    target = { environmentId: "production", environmentVersion: 1 }
+  } = {}
+) {
+  const shopResult = await db.prepare(`SELECT shop_id, shop_name FROM data_connection_shops
+    WHERE platform_id = 'douyin-ecommerce' AND status = 'connected'
+    ORDER BY updated_at DESC`).all();
+  const stores = (shopResult?.results || [])
+    .filter(row => /^[-_a-zA-Z0-9]{1,128}$/.test(String(row.shop_id || "")))
+    .map(row => ({ id: row.shop_id }));
+  const jobs = createDailyPlan({
+    now,
+    adapters: [
+      {
+        id: "kuaimai",
+        enabled: true,
+        resources: DAILY_COLLECTION_RESOURCES.kuaimai
+      },
+      {
+        id: "douyin-ecommerce",
+        enabled: stores.length > 0,
+        stores,
+        resources: DAILY_COLLECTION_RESOURCES["douyin-ecommerce"]
+      }
+    ]
+  });
+  if (!jobs.length) return { created: 0, duplicate: 0, jobs: [] };
+  return ensureWebCollectionPlan(db, jobs, target);
+}
+
 function dailyRange(businessDate) {
   return {
     start: `${businessDate}T00:00:00+08:00`,
@@ -274,7 +321,7 @@ export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } =
   const lease = new Date(now.getTime() + seconds * 1000).toISOString();
   const row = await db.prepare(`SELECT * FROM web_collection_jobs
     WHERE status = 'queued'
-      OR (status IN ('claimed', 'opening', 'exporting', 'downloading', 'validating', 'ingesting')
+      OR (status IN ('claimed', 'opening', 'collecting', 'exporting', 'downloading', 'validating', 'ingesting')
         AND lease_expires_at < ? AND attempt < 3)
     ORDER BY business_date, created_at LIMIT 1`).bind(now.toISOString()).first();
   if (!row) return { job: null };
