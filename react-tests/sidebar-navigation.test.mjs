@@ -18,7 +18,8 @@ const navigation = [
   ["performance-mine", "我的绩效", null, "人事管理", "performance-management"],
   ["data-overview", "数据总览", null, "数据中心", "data-center"],
   ["data-quality", "数据质量", null, "数据中心", "data-center"],
-  ["handbook", "说明书", null, "平台", "handbook"]
+  ["handbook", "说明书", null, "平台", "handbook"],
+  ["development-backlog", "研发待办", null, "平台", "development-backlog"]
 ];
 
 const appSource = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");

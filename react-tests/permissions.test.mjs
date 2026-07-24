@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canEditFeature, DEFAULT_PERMISSIONS } from "../src/domain/permissions.js";
+import { canEditFeature, canViewNavigation, DEFAULT_PERMISSIONS } from "../src/domain/permissions.js";
 
 test("data center edit defaults admit each governed definition department", () => {
   assert.deepEqual(DEFAULT_PERMISSIONS.features.dataCenter.editDepartments, [
@@ -28,4 +28,11 @@ test("data center edit titles include finance and supply chain owners", () => {
   assert.equal(canEditFeature(DEFAULT_PERMISSIONS, { department: "其他", title: "财务负责人" }, "dataCenter"), true);
   assert.equal(canEditFeature(DEFAULT_PERMISSIONS, { department: "其他", title: "供应链负责人" }, "dataCenter"), true);
   assert.equal(canEditFeature(DEFAULT_PERMISSIONS, { department: "产品部", title: "产品负责人" }, "dataCenter"), false);
+});
+
+test("development backlog navigation is visible to every authenticated department", () => {
+  for (const department of ["总经办", "产品部", "运营部", "客服部", "其他"]) {
+    assert.equal(canViewNavigation(DEFAULT_PERMISSIONS, { userId: `user-${department}`, department }, "development-backlog"), true, department);
+  }
+  assert.equal(canViewNavigation(DEFAULT_PERMISSIONS, null, "development-backlog"), false);
 });
