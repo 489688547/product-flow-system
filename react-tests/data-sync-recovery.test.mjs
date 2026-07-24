@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildKuaimaiSalesRecovery } from "../src/domain/dataSyncRecovery.js";
-import { loadWebCollectionStatus, triggerKuaimaiSalesCollection, webCollectionStatusApiUrl } from "../src/state/webCollectionApi.js";
+import {
+  DOUYIN_RECOVERY,
+  buildDouyinCollectionRecovery,
+  buildKuaimaiSalesRecovery
+} from "../src/domain/dataSyncRecovery.js";
+import {
+  loadWebCollectionStatus,
+  triggerKuaimaiSalesCollection,
+  triggerWebCollection,
+  webCollectionStatusApiUrl
+} from "../src/state/webCollectionApi.js";
 
 const now = new Date("2026-07-23T01:05:00.000Z");
 const runner = {
@@ -51,6 +60,69 @@ test("sales recovery client can auto-enqueue and manually requeue the exact Chro
     businessDate: "2026-07-22",
     force: true
   });
+});
+
+test("generic collection trigger requires a registered provider, store, resource and business date", async () => {
+  const calls = [];
+  const result = await triggerWebCollection({
+    providerId: "douyin-ecommerce",
+    storeId: "store-a",
+    resourceType: "product_daily",
+    businessDate: "2026-07-23",
+    force: true
+  }, async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({ data: { job: { id: "douyin-job-1" } } }), {
+      status: 200,
+      headers: { "content-type": "application/json" }
+    });
+  });
+  assert.equal(result.job.id, "douyin-job-1");
+  assert.equal(calls[0].url, "/api/platform/v1/web-collection/jobs");
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    action: "trigger",
+    providerId: "douyin-ecommerce",
+    storeId: "store-a",
+    resourceType: "product_daily",
+    businessDate: "2026-07-23",
+    force: true
+  });
+});
+
+test("Douyin recovery exposes four resources and provider-specific human actions", () => {
+  const recovery = buildDouyinCollectionRecovery({
+    storeId: "store-a",
+    runners: [runner],
+    jobs: [{
+      id: "douyin-job-1",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23",
+      status: "waiting_human",
+      errorCode: "DOUYIN_LOGIN_REQUIRED",
+      runnerId: "runner-1"
+    }],
+    cursors: [{
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "product_daily",
+      businessDate: "2026-07-22"
+    }],
+    now
+  });
+
+  assert.deepEqual(recovery.resources.map(item => item.label), [
+    "店铺每日",
+    "商品每日",
+    "直播每日",
+    "短视频每日"
+  ]);
+  assert.equal(recovery.resources[0].status, "waiting_human");
+  assert.equal(recovery.resources[1].status, "success");
+  assert.equal(recovery.resources[2].status, "unavailable");
+  assert.match(recovery.resources[0].instruction, /公司 Mac.*Chrome.*登录抖店/);
+  assert.equal(DOUYIN_RECOVERY.DOUYIN_REPORT_SCHEMA_CHANGED.includes("适配"), true);
 });
 
 test("sales recovery selects the exact Kuaimai order-item job and reports Chrome progress", () => {

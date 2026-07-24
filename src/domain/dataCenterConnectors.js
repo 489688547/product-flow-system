@@ -60,12 +60,18 @@ function definition(input) {
 }
 
 export const STORE_FILE_IMPORT_CONNECTOR_IDS = Object.freeze([
-  "douyin-ecommerce",
   "kuaishou",
   "taobao",
   "pinduoduo",
   "xiaohongshu",
   "jd-jingmai"
+]);
+
+export const DOUYIN_COLLECTION_RESOURCES = Object.freeze([
+  Object.freeze({ type: "store_daily", label: "店铺每日" }),
+  Object.freeze({ type: "product_daily", label: "商品每日" }),
+  Object.freeze({ type: "live_daily", label: "直播每日" }),
+  Object.freeze({ type: "video_daily", label: "短视频每日" })
 ]);
 
 const STORE_FILE_IMPORT_CONNECTORS = new Set(STORE_FILE_IMPORT_CONNECTOR_IDS);
@@ -79,18 +85,19 @@ export const DATA_CONNECTOR_DEFINITIONS = Object.freeze([
     id: "douyin-ecommerce",
     name: "抖音电商",
     identityLabel: "店铺名称",
-    description: "店铺订单、商品与经营数据",
+    description: "Chrome 官方报表采集",
     logo: "douyin",
-    methods: ["export"],
+    methods: ["browser"],
     accountTypes: ["shop"],
-    datasets: ["orders", "products", "shop-performance"],
+    datasets: DOUYIN_COLLECTION_RESOURCES.map(item => item.type),
+    collectionResources: DOUYIN_COLLECTION_RESOURCES,
     fields: []
   }),
   definition({
     id: "oceanengine",
     name: "巨量引擎",
     identityLabel: "广告账户名称",
-    description: "巨量引擎与巨量千川投放数据",
+    description: "巨量引擎与巨量千川投放数据（尚未接入）",
     logo: "oceanengine",
     methods: ["api", "browser", "export"],
     accountTypes: ["advertiser", "qianchuan"],
