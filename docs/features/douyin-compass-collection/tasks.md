@@ -43,3 +43,4 @@
 - [ ] 完成全量门禁和 GitOps 发布
   - 输出：全量检查、PR、main 合并、Cloudflare Git 部署、生产 API/UI 与插件复核。
   - 验证：Definition of Done 和 production readiness 全部通过。
+  - 2026-07-24 发布前证据：本地 `lint`、治理、集成、环境能力、完整测试与生产构建均通过；PR #82 已创建，等待合并后的生产部署与最终复核。
