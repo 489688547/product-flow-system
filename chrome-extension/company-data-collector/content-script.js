@@ -179,6 +179,58 @@ async function waitForKuaimaiSalesPage(provider, selectors, matchesText) {
   return classification;
 }
 
+function isKuaimaiProductResource(resourceType) {
+  return ["products", "product_kits", "product_combinations"].includes(resourceType);
+}
+
+async function productPageProbe(provider, selectors, matchesText) {
+  const bodyText = String(document.body?.innerText || "");
+  const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
+  return provider.classifyProductPage({
+    url: location.href,
+    markers: {
+      loginPage: /\/login(?:[/?#]|$)/i.test(location.pathname) || Boolean(document.querySelector("input[type='password']")),
+      humanVerification: verificationTerms.some(term => bodyText.includes(term)),
+      productCode: Boolean(document.querySelector(selectors.productCode)),
+      queryButton: Boolean(exactTextElement(selectors.queryButton, "查询", matchesText)),
+      exportMenu: Boolean(exactTextElement(selectors.exportMenu, "导出", matchesText)),
+      exportOption: Array.from(document.querySelectorAll(selectors.exportOption))
+        .some(element => ["导出普通商品", "导出套件", "导出组合装"].some(label => matchesText(element.textContent, label)))
+    }
+  });
+}
+
+async function waitForKuaimaiProductPage(provider, selectors, matchesText) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  let classification;
+  do {
+    classification = await productPageProbe(provider, selectors, matchesText);
+    if (["ready", "waiting_login", "waiting_human", "blocked_origin"].includes(classification.state)) {
+      return classification;
+    }
+    await wait(250);
+  } while (Date.now() < deadline);
+  return classification;
+}
+
+async function visibleProductDialog(selectors, predicate, timeoutCode) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  do {
+    const dialog = Array.from(document.querySelectorAll(selectors.exportDialog))
+      .find(element => element.getClientRects().length > 0 && predicate(element));
+    if (dialog) return dialog;
+    await wait(250);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("商品导出弹窗不可用。"), { code: timeoutCode });
+}
+
+function productDialogConfirm(dialog, selectors, matchesText, errorCode) {
+  const button = Array.from(dialog.querySelectorAll(selectors.exportDialogButton))
+    .find(element => matchesText(element.textContent, "确定") && element.getClientRects().length > 0);
+  if (!button) throw Object.assign(new Error("商品导出确认按钮不可用。"), { code: errorCode });
+  return button;
+}
+
 function setNativeInputValue(input, value) {
   const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
   descriptor?.set?.call(input, value);
@@ -293,6 +345,78 @@ async function downloadFromKuaimaiCenter({
 
 async function runKuaimaiAction(action, selectors, matchesText, context) {
   switch (action.action) {
+    case "export_product_snapshot": {
+      const productSelectors = context.productSelectors;
+      const menu = findRequiredTextElement(
+        productSelectors.exportMenu,
+        "导出",
+        matchesText,
+        "KUAIMAI_PRODUCT_EXPORT_MENU_MISSING"
+      );
+      menu.click();
+      await wait(150);
+      const option = findRequiredTextElement(
+        productSelectors.exportOption,
+        action.exportLabel,
+        matchesText,
+        "KUAIMAI_PRODUCT_EXPORT_OPTION_MISSING"
+      );
+      option.click();
+      await wait(500);
+      const dialog = Array.from(document.querySelectorAll(productSelectors.exportDialog))
+        .find(element => element.getClientRects().length > 0 && String(element.textContent || "").includes("选择导出格式"));
+      if (!dialog) {
+        throw Object.assign(new Error("商品导出格式弹窗不可用。"), { code: "KUAIMAI_PRODUCT_EXPORT_DIALOG_MISSING" });
+      }
+      const format = dialog.querySelector(`${productSelectors.exportFormat}[value='${action.formatValue}']`);
+      if (!format) {
+        throw Object.assign(new Error("商品导出格式不可用。"), { code: "KUAIMAI_PRODUCT_EXPORT_FORMAT_MISSING" });
+      }
+      (format.closest("label") || format).click();
+      await wait(100);
+      const confirm = Array.from(dialog.querySelectorAll(productSelectors.exportDialogButton))
+        .find(element => matchesText(element.textContent, "确定") && element.getClientRects().length > 0);
+      if (!confirm) {
+        throw Object.assign(new Error("商品导出确认按钮不可用。"), { code: "KUAIMAI_PRODUCT_EXPORT_CONFIRM_MISSING" });
+      }
+      confirm.click();
+      await wait(800);
+      return;
+    }
+    case "confirm_product_fields": {
+      const productSelectors = context.productSelectors;
+      const dialog = await visibleProductDialog(
+        productSelectors,
+        element => element.querySelectorAll("input[type='checkbox']").length > 0,
+        "KUAIMAI_PRODUCT_FIELDS_DIALOG_MISSING"
+      );
+      productDialogConfirm(
+        dialog,
+        productSelectors,
+        matchesText,
+        "KUAIMAI_PRODUCT_FIELDS_CONFIRM_MISSING"
+      ).click();
+      await wait(500);
+      return;
+    }
+    case "confirm_product_export": {
+      const productSelectors = context.productSelectors;
+      const dialog = await visibleProductDialog(
+        productSelectors,
+        element => /导出过程中|确定要导出/i.test(String(element.textContent || ""))
+          && !String(element.textContent || "").includes("选择导出格式"),
+        "KUAIMAI_PRODUCT_FINAL_CONFIRM_MISSING"
+      );
+      context.exportStartedAt = Date.now();
+      productDialogConfirm(
+        dialog,
+        productSelectors,
+        matchesText,
+        "KUAIMAI_PRODUCT_FINAL_CONFIRM_MISSING"
+      ).click();
+      await wait(800);
+      return;
+    }
     case "prepare_sales_report":
       await prepareKuaimaiSalesReport(action, context.salesSelectors, matchesText, context);
       return;
@@ -397,14 +521,21 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
 
 async function runRegisteredTask(task) {
   const [{ registeredTaskRuntime }, kuaimai] = await Promise.all([registryPromise, kuaimaiPromise]);
-  const { KUAIMAI_SELECTORS, KUAIMAI_SALES_SELECTORS, matchesKuaimaiControlText } = kuaimai;
+  const {
+    KUAIMAI_PRODUCT_SELECTORS,
+    KUAIMAI_SELECTORS,
+    KUAIMAI_SALES_SELECTORS,
+    matchesKuaimaiControlText
+  } = kuaimai;
   const runtime = registeredTaskRuntime(task);
   if (runtime.provider.id !== "kuaimai") {
     return { status: "failed", stage: "opening", errorCode: "EXTENSION_PROVIDER_NOT_IMPLEMENTED" };
   }
   const classification = task.resourceType === "sales_items"
     ? await waitForKuaimaiSalesPage(runtime.provider, KUAIMAI_SALES_SELECTORS, matchesKuaimaiControlText)
-    : await waitForKuaimaiOrderPage(runtime.provider, KUAIMAI_SELECTORS, matchesKuaimaiControlText);
+    : isKuaimaiProductResource(task.resourceType)
+      ? await waitForKuaimaiProductPage(runtime.provider, KUAIMAI_PRODUCT_SELECTORS, matchesKuaimaiControlText)
+      : await waitForKuaimaiOrderPage(runtime.provider, KUAIMAI_SELECTORS, matchesKuaimaiControlText);
   if (classification.state !== "ready") {
     return {
       status: classification.state,
@@ -413,11 +544,17 @@ async function runRegisteredTask(task) {
     };
   }
   try {
-    const context = { exportStartedAt: null, kuaimai, salesSelectors: KUAIMAI_SALES_SELECTORS };
+    const context = {
+      exportStartedAt: null,
+      kuaimai,
+      productSelectors: KUAIMAI_PRODUCT_SELECTORS,
+      salesSelectors: KUAIMAI_SALES_SELECTORS
+    };
     for (const action of runtime.actionPlan) {
       await runKuaimaiAction(action, KUAIMAI_SELECTORS, matchesKuaimaiControlText, context);
     }
-    return { status: "exporting", stage: "exporting" };
+    // 回传导出点击时间，service worker 只接受这之后创建的下载文件。
+    return { status: "exporting", stage: "exporting", exportStartedAt: context.exportStartedAt || null };
   } catch (error) {
     return {
       status: "failed",

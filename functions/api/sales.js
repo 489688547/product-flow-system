@@ -1,5 +1,6 @@
 import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
 import { scaleSalesFact } from "../../src/domain/demoSalesTransform.js";
+import { resolveRepairedSalesDays } from "./platform/v1/data-services/_shared/salesRepairResolution.js";
 
 const META_ID = "sales-meta";
 // Cloudflare D1 allows at most 100 bound parameters per statement; 9 rows × 11 columns = 99.
@@ -87,7 +88,7 @@ function validRow(row) {
   return row && typeof row === "object" && /^69\d{10,12}$/.test(String(row.code || "")) && /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || ""));
 }
 
-export async function insertSalesRows(db, rows) {
+function salesInsertStatements(db, rows) {
   const statements = [];
   for (let index = 0; index < rows.length; index += INSERT_CHUNK) {
     const chunk = rows.slice(index, index + INSERT_CHUNK);
@@ -106,6 +107,11 @@ export async function insertSalesRows(db, rows) {
         pre_ship_refund = excluded.pre_ship_refund, post_ship_refund = excluded.post_ship_refund`)
       .bind(...values));
   }
+  return statements;
+}
+
+export async function insertSalesRows(db, rows) {
+  const statements = salesInsertStatements(db, rows);
   if (typeof db.batch === "function") {
     for (let index = 0; index < statements.length; index += BATCH_STATEMENTS) {
       await db.batch(statements.slice(index, index + BATCH_STATEMENTS));
@@ -115,10 +121,25 @@ export async function insertSalesRows(db, rows) {
   for (const statement of statements) await statement.run();
 }
 
+// 官方文件/采集导入成功后，尽力复核并结案受影响日期的未结销售修复记录；
+// 结案失败只记录日志，绝不影响本次导入结果。
+async function resolveRepairRunsBestEffort(db, dates, importedBy) {
+  try {
+    const resolution = await resolveRepairedSalesDays(db, { dates, resolvedBy: String(importedBy || "") });
+    return resolution.resolved.length;
+  } catch (error) {
+    console.warn("销售修复记录自动结案失败，导入结果不受影响。", error?.message || error);
+    return 0;
+  }
+}
+
 export async function replaceSalesFactsForDates(db, rows, {
   source = "快麦销售主题报表",
   importedBy = "公司网页采集器",
-  importedAt = new Date().toISOString()
+  importedAt = new Date().toISOString(),
+  // 分块上传的首包传入整批完整日期列表：删除范围以它为准，
+  // 保证同一批次的日期重写只做一次，后续分块只插入。
+  replaceDates = null
 } = {}) {
   await ensureSalesTables(db);
   const validRows = (Array.isArray(rows) ? rows : []).filter(validRow);
@@ -128,11 +149,18 @@ export async function replaceSalesFactsForDates(db, rows, {
     error.status = 422;
     throw error;
   }
-  const dates = [...new Set(validRows.map(row => String(row.date)))].sort();
-  for (const day of dates) {
-    await db.prepare("DELETE FROM product_sales_daily WHERE date = ?").bind(day).run();
+  const dates = Array.isArray(replaceDates) && replaceDates.length
+    ? [...new Set(replaceDates.map(day => String(day)))].sort()
+    : [...new Set(validRows.map(row => String(row.date)))].sort();
+  const deleteStatements = dates.map(day => db.prepare("DELETE FROM product_sales_daily WHERE date = ?").bind(day));
+  const insertStatements = salesInsertStatements(db, validRows);
+  const factStatements = [...deleteStatements, ...insertStatements];
+  if (typeof db.batch === "function" && factStatements.length <= BATCH_STATEMENTS) {
+    await db.batch(factStatements);
+  } else {
+    for (const statement of deleteStatements) await statement.run();
+    await insertSalesRows(db, validRows);
   }
-  await insertSalesRows(db, validRows);
   const meta = await readMeta(db);
   const months = [...new Set(dates.map(day => day.slice(0, 7)))].sort();
   const monthRows = {};
@@ -211,25 +239,27 @@ export async function onRequest({ request, env, data = {} }) {
       // 默认按整月覆盖（Excel整月导入用）。
       const dateScope = body.replaceScope === "dates";
       if (dateScope) {
-        const dates = [...new Set(rows.map(row => String(row.date)))];
-        for (const day of dates) {
-          await db.prepare("DELETE FROM product_sales_daily WHERE date = ?").bind(day).run();
-        }
-      } else {
-        for (const month of months) {
-          await db.prepare("DELETE FROM product_sales_daily WHERE substr(date, 1, 7) = ?").bind(month).run();
-        }
+        const result = await replaceSalesFactsForDates(db, rows, {
+          source: String(body.source || "").slice(0, 120),
+          importedBy: String(body.importedBy || "").slice(0, 80)
+        });
+        const repairRunsResolved = await resolveRepairRunsBestEffort(db, result.dates, body.importedBy);
+        return jsonResponse({ synced: true, months: result.months, rows: result.rows, importedAt: result.importedAt, repairRunsResolved });
+      }
+      for (const month of months) {
+        await db.prepare("DELETE FROM product_sales_daily WHERE substr(date, 1, 7) = ?").bind(month).run();
       }
       await insertSalesRows(db, rows);
       const meta = await readMeta(db);
       const importedAt = new Date().toISOString();
       meta.titles = { ...meta.titles, ...(body.titles && typeof body.titles === "object" ? body.titles : {}) };
       meta.imports = [
-        { id: `import-${Date.now()}`, months, monthRows, rows: rows.length, scope: dateScope ? "dates" : "months", source: String(body.source || "").slice(0, 120), importedBy: String(body.importedBy || "").slice(0, 80), importedAt },
-        ...meta.imports.filter(item => dateScope ? item.scope === "months" || !item.months?.some(month => months.includes(month)) : !item.months?.some(month => months.includes(month)))
+        { id: `import-${Date.now()}`, months, monthRows, rows: rows.length, scope: "months", source: String(body.source || "").slice(0, 120), importedBy: String(body.importedBy || "").slice(0, 80), importedAt },
+        ...meta.imports.filter(item => !item.months?.some(month => months.includes(month)))
       ].slice(0, 60);
       await writeMeta(db, meta);
-      return jsonResponse({ synced: true, months, rows: rows.length, importedAt });
+      const repairRunsResolved = await resolveRepairRunsBestEffort(db, [...new Set(rows.map(row => String(row.date)))], body.importedBy);
+      return jsonResponse({ synced: true, months, rows: rows.length, importedAt, repairRunsResolved });
     }
     if (request.method === "DELETE") {
       const month = String(url.searchParams.get("month") || "").trim();
