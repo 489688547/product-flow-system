@@ -14,6 +14,17 @@
       "tables": ["product_flow_state", "product_flow_state_parts"]
     },
     {
+      "id": "development-backlog",
+      "name": "研发待办控制面",
+      "description": "所有员工读取同一研发事项；总经办治理需求和验收，开发人员通过版本与范围冲突检查认领和推进，AI 只生成待确认草稿。",
+      "platforms": ["cloudflare-pages", "cloudflare-d1", "lingsuan-ai-gateway"],
+      "requiredIn": ["preview", "production"],
+      "level": "blocking",
+      "envVars": [],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": ["development_backlog_items", "development_backlog_events"]
+    },
+    {
       "id": "display-data-environment",
       "name": "展示数据库环境",
       "description": "正式控制库保存浏览器级环境授权和刷新任务，独立展示 D1 保存可切换业务数据；两套绑定必须同时就绪且物理隔离。",

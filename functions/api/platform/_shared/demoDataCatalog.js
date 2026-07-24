@@ -251,7 +251,9 @@ const CONTROL_TABLES = [
   "data_metric_audit_logs",
   "hr_audit_logs",
   "integration_private_profiles",
-  "integration_profile_audit"
+  "integration_profile_audit",
+  "development_backlog_items",
+  "development_backlog_events"
 ].map((name, index) => table(name, "skip", ["id"], 1000 + index));
 
 export const DEMO_DATA_CATALOG = Object.freeze([...BUSINESS_TABLES, ...CONTROL_TABLES]);
