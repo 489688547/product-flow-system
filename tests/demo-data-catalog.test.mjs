@@ -14,6 +14,18 @@ test("catalog transforms sales, recalculates summaries and skips unknown tables"
   assert.equal(copyableDemoTables().some(entry => entry.table === "totally_unknown_table"), false);
 });
 
+test("commerce fact batches copy only safe metadata and transform all operating facts", () => {
+  assert.equal(demoTablePolicy("commerce_fact_batches").policy, "copy");
+  for (const table of [
+    "commerce_store_daily_facts",
+    "commerce_product_daily_facts",
+    "commerce_live_daily_facts",
+    "commerce_video_daily_facts"
+  ]) {
+    assert.equal(demoTablePolicy(table).policy, "transform_sales", table);
+  }
+});
+
 test("credentials, sessions, grants, tokens, provider configuration and audits never copy", () => {
   for (const table of [
     "product_flow_sessions",
