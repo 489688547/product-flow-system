@@ -43,6 +43,7 @@ function recovery(input) {
 
 export function buildKuaimaiSalesRecovery({
   date = "",
+  anomalyStatus = "",
   runners = [],
   jobs = [],
   loading = false,
@@ -80,6 +81,18 @@ export function buildKuaimaiSalesRecovery({
   const errorCode = String(job?.errorCode || "");
 
   if (status === "success") {
+    if (anomalyStatus === "anomaly") {
+      return recovery({
+        tone: "danger",
+        label: "入库校验未通过",
+        title: `${date} 快麦文件已采集，但销售事实尚未生成`,
+        instruction: "原始文件已保留，但本批未通过完整性校验，不能算同步成功。请重新采集并入库；若仍失败，再导入快麦官方销售报表。",
+        primaryAction: { type: "retrigger", label: "重新采集并入库" },
+        showConnectorLink: false,
+        runner,
+        job
+      });
+    }
     return recovery({
       tone: "success",
       label: "Chrome 采集完成",
@@ -234,4 +247,11 @@ export function buildDouyinCollectionRecovery({
       };
     })
   };
+}
+
+// 待处理问题卡片同时反映持久化质量问题与实时销售异常，取两者较大值避免漏报。
+export function countDataSyncIssues({ openIssues = 0, latestSalesAnomaly } = {}) {
+  const persistedCount = Math.max(0, Number(openIssues) || 0);
+  const liveAnomalyCount = latestSalesAnomaly?.status === "anomaly" ? 1 : 0;
+  return Math.max(persistedCount, liveAnomalyCount);
 }

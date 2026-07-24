@@ -136,6 +136,8 @@ const businessDataTables = [
   "product_catalog_components",
   "product_catalog_sync_runs",
   "product_catalog_meta",
+  "product_catalog_sales_mappings",
+  "product_catalog_sales_mapping_audit",
   "product_sales_daily",
   "product_sales_meta",
   "erp_collection_batches",

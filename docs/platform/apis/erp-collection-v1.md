@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`POST /api/platform/v1/erp-collection/ingest` accepts preflighted official ERP export indexes through the shared data-acquisition boundary. The first provider is Kuaimai. Provider files remain in the company Mac archive; credentials, cookies, verification codes, browser sessions and full raw rows never enter the request.
+`POST /api/platform/v1/erp-collection/ingest` accepts preflighted official ERP export indexes through the shared data-acquisition boundary. High-volume Kuaimai sales exports use `POST /api/platform/v1/erp-collection/sales-facts`, which accepts locally aggregated standard facts without copying thousands of detail indexes into D1. Provider files remain in the company Mac archive; credentials, cookies, verification codes, browser sessions and full raw rows never enter the request.
 
 ## Authentication and authorization
 
@@ -20,13 +20,15 @@ JSON object with:
 - `records`: at most 500 normalized records with stable source key, source timestamps, shop/warehouse references, row SHA-256 and the whitelisted minimum standard index.
 - `issues`: at most 500 preflight quality issues.
 
-Orders, order items and rich sales items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. `sales_items` comes from 《销售主题分析-按订单商品明细》 and projects `69码 × 创建日 × 平台` facts only after the whole batch is completed. Quantity, net sales, net cost and gross profit use the governed formulas in `docs/product/data-definitions.md`; unmapped product codes become safe quality exceptions rather than guessed mappings. The projection replaces only the exact completed business dates, never an entire month.
+`sales-facts` receives the same `batch` and optional `archive`, aggregated `facts`, and safe `issues`; it does not accept or persist raw detail records. Uploads are chunked at 1,000 facts per pack with idempotency keys `batch.id:projected-sales:N`. A multi-pack upload declares `chunk: { index, total }` (at most 50 packs) on every pack; the first pack also carries `replaceDates` with the batch's complete date list, so the date rewrite happens exactly once and later packs insert idempotently without deleting. The legacy single-pack full upload (no `chunk`, up to 5,000 facts, dates derived from the facts) remains accepted for older runners. The local trusted adapter must first verify the whole file, ignore only explicit provider summary rows, redact personal fields, and aggregate by `69码 × 创建日 × 平台`. The server validates every fact again and atomically replaces only the exact completed business dates.
+
+Orders, order items and rich sales items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. `sales_items` comes from 《销售主题分析-按订单商品明细》 and only writes facts after the whole batch is completed. Quantity, net sales, net cost and gross profit use the governed formulas in `docs/product/data-definitions.md`; unmapped product codes become safe quality exceptions rather than guessed mappings.
 
 Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values. The server repeats the allowlist normalization before persistence as defense in depth.
 
 ## Response
 
-HTTP `201` returns `data.archiveId`, `data.batchId`, normalized batch status and `counts` for inserted, updated, unchanged and issue rows. Repeating the same file hash, idempotent chunk or unchanged source row does not create another fact.
+HTTP `201` returns `data.archiveId`, `data.batchId` and normalized batch status. The standard ingest route also returns `counts`; `sales-facts` returns `projection.sourceRecords`, `projection.storedSourceRecords=0`, fact row count and projected dates. Repeating the same file hash or idempotency key replaces the same exact dates and does not accumulate duplicate facts.
 
 Archive metadata, runner authorization and collection batch control stay in the formal control database. Standard business projections use the target environment persisted on the control job. Display-target sales facts pass through the shared two-times transformation; a stale display version fails before projection writes.
 
@@ -39,6 +41,9 @@ Archive metadata, runner authorization and collection batch control stay in the 
 - `ERP_COLLECTION_DB_UNAVAILABLE`: D1 binding unavailable.
 - `ERP_COLLECTION_*`: invalid platform, resource, hash, source key, timestamp, secret field or chunk size.
 - `ERP_COLLECTION_SALES_FACTS_EMPTY`: a completed rich sales batch did not produce any trusted aggregate facts.
+- `ERP_COLLECTION_SALES_FACT_INVALID` / `ERP_COLLECTION_SALES_FACTS_TOO_LARGE`: an aggregate fact lacks a valid 69 code/date, exceeds the 1,000-row pack (5,000 for the legacy single-pack format) or the 50-pack batch bound.
+- `ERP_COLLECTION_SALES_FACTS_DATES_REQUIRED` / `ERP_COLLECTION_SALES_FACTS_DATES_INVALID`: a multi-pack first pack misses the full rewrite date list, or a later pack illegally carries one.
+- `ERP_COLLECTION_BATCH_PARTIAL`: a sales export still has blocking validation errors and cannot be reported as synchronized.
 - `ERP_COLLECTION_INGEST_FAILED`: unexpected storage failure; response and logs must not expose source rows or credentials.
 
 ## Compatibility and deprecation
@@ -47,7 +52,7 @@ The route is additive under `/api/platform/v1`. Resource types and payload valid
 
 ## Capacity and retention
 
-D1 stores archive metadata, minimum query indexes, business projections, batch metadata and quality issues; it is not the binary-file archive. A verified 15-day Kuaimai order-item sample contains 157,217 rows and approximately 339.84 MiB of serialized records, so full raw history stays under `~/Desktop/公司数据中心/快麦ERP/` until a governed NAS/R2 location is available.
+D1 stores archive metadata, necessary minimum query indexes, business projections, batch metadata and quality issues; it is not the binary-file archive. High-volume daily sales files keep no per-detail D1 source index: the local archive remains trace evidence while D1 stores only the aggregate facts and counts. A verified 15-day Kuaimai order-item sample contains 157,217 rows and approximately 339.84 MiB of serialized records, so full raw history stays under `~/Desktop/公司数据中心/快麦ERP/` until a governed NAS/R2 location is available.
 
 ## Observability
 
@@ -57,6 +62,7 @@ Audit by batch ID, provider, resource type, file hash, range, row count, status,
 
 - `tests/kuaimai-erp-collection-domain.test.mjs`
 - `tests/kuaimai-erp-collection-api.test.mjs`
+- `tests/kuaimai-erp-sales-facts-api.test.mjs`
 - `tests/kuaimai-erp-collection-cli.test.mjs`
 - `tests/kuaimai-erp-collection-migration.test.mjs`
 - `tests/kuaimai-erp-local-archive.test.mjs`

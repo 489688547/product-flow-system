@@ -3,10 +3,13 @@ import test from "node:test";
 import {
   DOUYIN_RECOVERY,
   buildDouyinCollectionRecovery,
-  buildKuaimaiSalesRecovery
+  buildKuaimaiSalesRecovery,
+  countDataSyncIssues
 } from "../src/domain/dataSyncRecovery.js";
 import {
+  kuaimaiProductCollectionProgress,
   loadWebCollectionStatus,
+  triggerKuaimaiProductCollection,
   triggerKuaimaiSalesCollection,
   triggerWebCollection,
   webCollectionStatusApiUrl
@@ -123,6 +126,94 @@ test("Douyin recovery exposes four resources and provider-specific human actions
   assert.equal(recovery.resources[2].status, "unavailable");
   assert.match(recovery.resources[0].instruction, /公司 Mac.*Chrome.*登录抖店/);
   assert.equal(DOUYIN_RECOVERY.DOUYIN_REPORT_SCHEMA_CHANGED.includes("适配"), true);
+});
+
+test("product catalog client triggers the complete Chrome snapshot group", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({
+      data: {
+        jobs: [
+          { id: "products", resourceType: "products", status: "queued" },
+          { id: "kits", resourceType: "product_kits", status: "queued" },
+          { id: "combinations", resourceType: "product_combinations", status: "queued" }
+        ]
+      }
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  const result = await triggerKuaimaiProductCollection({ date: "2026-07-24" }, fetchImpl);
+
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    action: "trigger",
+    providerId: "kuaimai",
+    resourceType: "products",
+    businessDate: "2026-07-24",
+    force: false
+  });
+  assert.deepEqual(result.jobs.map(job => job.id), ["products", "kits", "combinations"]);
+});
+
+test("product collection progress completes only when all three jobs succeed", () => {
+  const jobIds = ["products", "kits", "combinations"];
+  assert.deepEqual(kuaimaiProductCollectionProgress({
+    jobs: [
+      { id: "products", resourceType: "products", status: "success" },
+      { id: "kits", resourceType: "product_kits", status: "ingesting" },
+      { id: "combinations", resourceType: "product_combinations", status: "queued" }
+    ]
+  }, jobIds), {
+    status: "running",
+    label: "正在写入商品数据",
+    completed: 1,
+    total: 3,
+    jobs: [
+      { id: "products", resourceType: "products", status: "success" },
+      { id: "kits", resourceType: "product_kits", status: "ingesting" },
+      { id: "combinations", resourceType: "product_combinations", status: "queued" }
+    ]
+  });
+  assert.equal(kuaimaiProductCollectionProgress({
+    jobs: jobIds.map(id => ({ id, resourceType: id, status: "success" }))
+  }, jobIds).status, "success");
+  const failed = kuaimaiProductCollectionProgress({
+    jobs: [
+      { id: "products", resourceType: "products", status: "success" },
+      { id: "kits", resourceType: "product_kits", status: "waiting_human", errorCode: "KUAIMAI_LOGIN_REQUIRED" },
+      { id: "combinations", resourceType: "product_combinations", status: "queued" }
+    ]
+  }, jobIds);
+  assert.equal(failed.status, "waiting_human");
+  assert.match(failed.label, /登录/);
+});
+
+test("sales recovery does not report success while the target-day sales facts are still missing", () => {
+  const recovery = buildKuaimaiSalesRecovery({
+    date: "2026-07-23",
+    anomalyStatus: "anomaly",
+    runners: [runner],
+    jobs: [{
+      id: "sales",
+      providerId: "kuaimai",
+      resourceType: "sales_items",
+      businessDate: "2026-07-23",
+      status: "success",
+      runnerId: "runner-1",
+      updatedAt: "2026-07-24T06:53:21.671Z"
+    }],
+    now: new Date("2026-07-24T07:00:00.000Z")
+  });
+
+  assert.equal(recovery.tone, "danger");
+  assert.equal(recovery.label, "入库校验未通过");
+  assert.match(recovery.title, /已采集.*销售事实尚未生成/);
+  assert.deepEqual(recovery.primaryAction, { type: "retrigger", label: "重新采集并入库" });
+});
+
+test("data sync issue count includes a live sales anomaly without double counting persisted issues", () => {
+  assert.equal(countDataSyncIssues({ openIssues: 0, latestSalesAnomaly: { status: "anomaly" } }), 1);
+  assert.equal(countDataSyncIssues({ openIssues: 3, latestSalesAnomaly: { status: "anomaly" } }), 3);
+  assert.equal(countDataSyncIssues({ openIssues: 0, latestSalesAnomaly: { status: "healthy" } }), 0);
 });
 
 test("sales recovery selects the exact Kuaimai order-item job and reports Chrome progress", () => {

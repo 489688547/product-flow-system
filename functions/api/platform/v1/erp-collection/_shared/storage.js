@@ -1,11 +1,12 @@
 import { projectKuaimaiErpRecords } from "../../../../../../src/domain/kuaimaiErpProjection.js";
 import { scaleSalesFact } from "../../../../../../src/domain/demoSalesTransform.js";
-import { replaceSalesFactsForDates } from "../../../../sales.js";
+import { ensureSalesTables, insertSalesRows, replaceSalesFactsForDates } from "../../../../sales.js";
 import { resolveRepairedSalesDays } from "../../data-services/_shared/salesRepairResolution.js";
 import { appendGoodsFlowEvents, saveGoodsFlowExceptions, saveInventoryDaily } from "../../goods-flow/_shared/storage.js";
 import { upsertProductCatalog } from "../../product-catalog/_shared/storage.js";
 
 const WRITE_BATCH_SIZE = 50;
+const SOURCE_RECORD_PAGE_SIZE = 500;
 
 // 官方文件/采集导入成功后，尽力复核并结案受影响日期的未结销售修复记录；
 // 结案失败只记录日志，绝不影响本次导入结果。
@@ -59,18 +60,32 @@ async function readExistingRecords(db, resourceType, records) {
   return existing;
 }
 
-async function readBatchRecords(db, batchId) {
-  const result = await db.prepare(`SELECT source_key, occurred_at, modified_at, shop_id, warehouse_id, content_hash, payload
-    FROM erp_source_records WHERE source_batch_id = ? ORDER BY source_key`).bind(batchId).all();
-  return (result?.results || []).map(row => ({
-    sourceKey: row.source_key,
-    occurredAt: row.occurred_at || null,
-    modifiedAt: row.modified_at || null,
-    shopId: row.shop_id || null,
-    warehouseId: row.warehouse_id || null,
-    contentHash: row.content_hash,
-    payload: JSON.parse(row.payload || "{}")
-  }));
+export async function readBatchRecords(db, batchId) {
+  const records = [];
+  let afterKey = "";
+  while (true) {
+    const result = await db.prepare(`SELECT source_key, occurred_at, modified_at, shop_id, warehouse_id, content_hash, payload
+      FROM erp_source_records
+      WHERE source_batch_id = ? AND source_key > ?
+      ORDER BY source_key
+      LIMIT ?`)
+      .bind(batchId, afterKey, SOURCE_RECORD_PAGE_SIZE)
+      .all();
+    const rows = result?.results || [];
+    records.push(...rows.map(row => ({
+      sourceKey: row.source_key,
+      occurredAt: row.occurred_at || null,
+      modifiedAt: row.modified_at || null,
+      shopId: row.shop_id || null,
+      warehouseId: row.warehouse_id || null,
+      contentHash: row.content_hash,
+      payload: JSON.parse(row.payload || "{}")
+    })));
+    if (rows.length < SOURCE_RECORD_PAGE_SIZE) break;
+    afterKey = String(rows.at(-1)?.source_key || "");
+    if (!afterKey) break;
+  }
+  return records;
 }
 
 async function projectCompletedBatch(controlDb, businessDb, resourceType, batchId, actor, now, target) {
@@ -263,6 +278,88 @@ export async function ingestErpCollection(controlDb, input, {
     duplicateFile: Boolean(existingBatch),
     counts,
     projection
+  };
+}
+
+export async function ingestProjectedSalesCollection(controlDb, input, {
+  actor = "",
+  businessDb = controlDb,
+  target = { environmentId: "production", environmentVersion: 1 }
+} = {}) {
+  const now = new Date().toISOString();
+  const existingBatch = await findBatch(controlDb, input.batch);
+  const batchId = existingBatch?.id || input.batch.id;
+  const existingArchive = await findArchive(controlDb, input.archive);
+  const archiveId = input.archive ? (existingArchive?.id || input.archive.id) : null;
+  const chunk = input.chunk || null;
+  const finalPack = !chunk || chunk.index >= chunk.total;
+  // 日期重写在同一批次只能做一次：首包携带完整日期列表先删后写，
+  // 后续分块只做幂等 upsert 插入，绝不再次删除，避免整批重写互相覆盖。
+  let sales;
+  if (input.replaceDates) {
+    sales = await replaceSalesFactsForDates(businessDb, input.facts, {
+      source: "快麦销售主题分析-按订单商品明细（本机聚合）",
+      importedBy: String(actor).slice(0, 80),
+      importedAt: now,
+      replaceDates: input.replaceDates
+    });
+  } else if (chunk) {
+    await ensureSalesTables(businessDb);
+    await insertSalesRows(businessDb, input.facts);
+    sales = {
+      rows: input.facts.length,
+      dates: [...new Set(input.facts.map(fact => String(fact.date)))].sort()
+    };
+  } else {
+    sales = await replaceSalesFactsForDates(businessDb, input.facts, {
+      source: "快麦销售主题分析-按订单商品明细（本机聚合）",
+      importedBy: String(actor).slice(0, 80),
+      importedAt: now
+    });
+  }
+  const summary = {
+    idempotencyKey: input.idempotencyKey,
+    targetEnvironment: target.environmentId,
+    targetEnvironmentVersion: target.environmentVersion,
+    projectionMode: "local_standard_facts",
+    salesFactsChunk: chunk ? `${chunk.index}/${chunk.total}` : "single",
+    sourceRows: input.batch.rowCount,
+    factRows: sales.rows,
+    issues: input.issues.length
+  };
+  // 结案复核只在事实完整落库后进行：首包整批重写与单包直接复核；
+  // 分块插入路径只在最终包复核，避免读到半截事实误判。
+  const repairRunsResolved = input.replaceDates || !chunk || finalPack
+    ? await resolveRepairRunsBestEffort(businessDb, sales.dates, actor)
+    : 0;
+  await runBatches(controlDb, [
+    batchStatement(
+      controlDb,
+      { ...input.batch, id: batchId, status: finalPack ? "completed" : "pending" },
+      { actor: String(actor).slice(0, 120), now },
+      summary,
+      archiveId,
+      target
+    ),
+    ...(input.archive ? [archiveStatement(controlDb, input.archive, archiveId, batchId, finalPack ? "processed" : "processing", now)] : []),
+    ...input.issues.map(issue => issueStatement(controlDb, issue, input.batch.resourceType, batchId, now))
+  ]);
+  return {
+    batchId,
+    archiveId,
+    resourceType: input.batch.resourceType,
+    status: finalPack ? "completed" : "pending",
+    targetEnvironment: target.environmentId,
+    targetEnvironmentVersion: target.environmentVersion,
+    duplicateFile: Boolean(existingBatch),
+    projection: {
+      sourceRecords: input.batch.rowCount,
+      storedSourceRecords: 0,
+      salesRows: sales.rows,
+      salesDates: sales.dates,
+      exceptions: input.issues.filter(issue => issue.severity !== "info").length,
+      repairRunsResolved
+    }
   };
 }
 

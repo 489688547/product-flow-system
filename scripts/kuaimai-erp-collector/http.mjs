@@ -8,7 +8,7 @@ export async function nodeRequest(url, options = {}) {
     const request = transport.request(target, {
       method: options.method || "GET",
       headers: options.headers || {},
-      timeout: 30_000
+      timeout: Number(options.timeoutMs) > 0 ? Number(options.timeoutMs) : 30_000
     }, response => {
       const chunks = [];
       response.on("data", chunk => chunks.push(chunk));

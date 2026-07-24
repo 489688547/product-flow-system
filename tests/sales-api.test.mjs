@@ -54,11 +54,14 @@ test("ERP sales projection replaces only completed business dates", async () => 
 
   assert.deepEqual(result.dates, ["2026-07-22"]);
   assert.equal(result.rows, 1);
-  assert.equal(db.runs.some(statement =>
+  assert.equal(db.batches.flat().some(statement =>
     /DELETE FROM product_sales_daily WHERE date = \?/.test(statement.sql)
     && statement.bindings[0] === "2026-07-22"
   ), true);
-  assert.equal(db.batches.flat().some(statement => /INSERT INTO product_sales_daily/.test(statement.sql)), true);
+  assert.deepEqual(
+    db.batches[0].map(statement => /DELETE FROM product_sales_daily/.test(statement.sql) ? "delete" : "insert"),
+    ["delete", "insert"]
+  );
 });
 
 test("sales import batches a full month without dozens of D1 round trips", async () => {
@@ -140,4 +143,30 @@ test("sales routes use the selected business database without touching productio
     imports: [],
     titles: {}
   });
+});
+
+test("replaceSalesFactsForDates honors an explicit rewrite date list from the first chunk pack", async () => {
+  const db = createDb();
+  const result = await replaceSalesFactsForDates(db, [{
+    code: "6978705011208",
+    date: "2026-07-22",
+    platform: "抖店(放心购)",
+    qty: 1,
+    sales: 19.9,
+    netSales: 19.9,
+    grossProfit: 11.9,
+    refund: 0,
+    cost: 8
+  }], {
+    importedAt: "2026-07-24T05:10:00.000Z",
+    replaceDates: ["2026-07-22", "2026-07-23"]
+  });
+
+  assert.deepEqual(result.dates, ["2026-07-22", "2026-07-23"]);
+  assert.deepEqual(
+    db.batches.flat()
+      .filter(statement => /DELETE FROM product_sales_daily WHERE date = \?/.test(statement.sql))
+      .map(statement => statement.bindings[0]),
+    ["2026-07-22", "2026-07-23"]
+  );
 });

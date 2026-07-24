@@ -4,8 +4,24 @@ import { FloatingMenu } from "../../ui/FloatingMenu.jsx";
 
 function matches(item, query) {
   if (!query) return true;
-  const haystack = [item.name, item.merchantCode, item.category, item.brand, ...(item.skus || []).flatMap(sku => [sku.barcode, sku.merchantSkuCode])].join(" ").toLowerCase();
+  const haystack = [
+    item.name,
+    item.merchantCode,
+    item.category,
+    item.brand,
+    ...(item.skus || []).flatMap(sku => [sku.barcode, sku.merchantSkuCode]),
+    ...(item.components || []).map(component => component.inventoryUnitCode)
+  ].join(" ").toLowerCase();
   return haystack.includes(query.toLowerCase());
+}
+
+function codeSummary(item) {
+  const skuCodes = (item.skus || []).flatMap(sku => [sku.barcode, sku.merchantSkuCode]).filter(Boolean);
+  const componentCodes = (item.components || []).map(component => component.inventoryUnitCode).filter(Boolean);
+  const codes = item.productKind === "bundle" ? componentCodes : skuCodes;
+  if (!codes.length) return item.productKind === "bundle" ? "SKU 组成待补齐" : "SKU 编码待补齐";
+  const unique = [...new Set(codes)];
+  return `${item.productKind === "bundle" ? "子 SKU " : "SKU "}${unique.slice(0, 2).join(" / ")}${unique.length > 2 ? ` 等 ${unique.length} 个` : ""}`;
 }
 
 export function ProductCatalogSelect({ items = [], value = "", onChange, placeholder = "选择 ERP 商品…", disabled = false }) {
@@ -28,7 +44,7 @@ export function ProductCatalogSelect({ items = [], value = "", onChange, placeho
       <label><Search size={15} aria-hidden="true" /><span className="sr-only">搜索 ERP 商品</span><input autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder="搜索商品、69 码或商家编码" /></label>
       {value ? <button type="button" role="option" aria-selected="false" className="unlink" onClick={() => choose("")}><Unlink size={15} aria-hidden="true" /><span><strong>解除 ERP 关联</strong><small>保留当前产品档案中的 69 码</small></span></button> : null}
       <div className="product-catalog-select-options">
-        {filtered.map(item => <button type="button" role="option" aria-selected={item.id === value} key={item.id} onClick={() => choose(item.id)}><span><strong>{item.name}</strong><small>{item.merchantCode || "无主商家编码"} · {(item.skus || []).map(sku => sku.barcode).filter(Boolean).slice(0, 2).join(" / ") || "无条码"}</small></span>{item.id === value ? <Check size={15} aria-hidden="true" /> : null}</button>)}
+        {filtered.map(item => <button type="button" role="option" aria-selected={item.id === value} key={item.id} onClick={() => choose(item.id)}><span><strong>{item.name}</strong><small>{item.merchantCode || "无主商家编码"} · {codeSummary(item)}</small></span>{item.id === value ? <Check size={15} aria-hidden="true" /> : null}</button>)}
         {!filtered.length ? <div className="empty-state compact-empty">没有匹配的 ERP 商品</div> : null}
         {items.length > 100 && filtered.length === 100 ? <small className="product-catalog-select-limit">结果较多，请继续输入名称或编码缩小范围。</small> : null}
       </div>

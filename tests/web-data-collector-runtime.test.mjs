@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   assertBusinessDateMatchesRange,
+  assertCollectionFileMatchesTask,
   createCommerceFactUploader
 } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
@@ -44,8 +45,12 @@ test("orchestrator schedules all extension-implemented Kuaimai resources after 0
 
   await orchestrator.prepare({ now: "2026-07-22T05:01:00+08:00" });
   const plan = api.calls.find(([name]) => name === "ensurePlan")[1];
-  assert.deepEqual(plan.map(item => item.resourceType), ["orders", "order_items", "sales_items"]);
-  assert.deepEqual(plan.map(item => item.businessDate), ["2026-07-21", "2026-07-21", "2026-07-21"]);
+  assert.deepEqual(plan.map(item => item.resourceType), [
+    "orders", "order_items", "sales_items", "products", "product_kits", "product_combinations"
+  ]);
+  assert.deepEqual(plan.map(item => item.businessDate), [
+    "2026-07-21", "2026-07-21", "2026-07-21", "2026-07-22", "2026-07-22", "2026-07-22"
+  ]);
 });
 
 test("orchestrator prefers the server-owned registered-store plan", async () => {
@@ -93,6 +98,17 @@ test("download validation rejects a parsed range from another business date", ()
     }),
     error => error?.code === "WEB_COLLECTION_BUSINESS_DATE_MISMATCH"
   );
+});
+
+test("current product snapshots do not require an event date range", () => {
+  for (const resourceType of ["products", "product_kits", "product_combinations"]) {
+    assert.doesNotThrow(() => assertCollectionFileMatchesTask({
+      resourceType,
+      businessDate: "2026-07-24",
+      rangeStart: null,
+      rangeEnd: null
+    }));
+  }
 });
 
 test("commerce fact uploader uses the runner grant and fixed ingest route", async () => {

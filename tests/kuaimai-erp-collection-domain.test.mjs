@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   KUAIMAI_ERP_RESOURCE_TYPES,
-  normalizeErpCollectionPayload
+  normalizeErpCollectionPayload,
+  normalizeErpSalesFactsPayload
 } from "../src/domain/kuaimaiErpCollection.js";
 
 const hash = "a".repeat(64);
@@ -32,7 +33,7 @@ function payload(overrides = {}) {
 
 test("ERP collection exposes the governed resource registry", () => {
   assert.deepEqual(KUAIMAI_ERP_RESOURCE_TYPES, [
-    "orders", "order_items", "sales_items", "products", "skus", "inventory_snapshot",
+    "orders", "order_items", "sales_items", "products", "product_kits", "product_combinations", "skus", "inventory_snapshot",
     "inventory_movements", "suppliers", "purchase_orders", "aftersales",
     "shops", "warehouses", "finance"
   ]);
@@ -58,4 +59,104 @@ test("order records require a source key, creation timestamp and valid hashes", 
   assert.throws(() => normalizeErpCollectionPayload(payload({ records: [{ sourceKey: "", occurredAt: "2026-07-01T10:00:00+08:00", contentHash: hash, payload: {} }] }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_SOURCE_KEY_REQUIRED");
   assert.throws(() => normalizeErpCollectionPayload(payload({ records: [{ sourceKey: "order-1", occurredAt: "", contentHash: hash, payload: {} }] }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_OCCURRED_AT_REQUIRED");
   assert.throws(() => normalizeErpCollectionPayload(payload({ batch: { ...payload().batch, contentHash: "not-a-hash" } }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_HASH_INVALID");
+});
+
+function salesFactsPayload(factCount, overrides = {}) {
+  return {
+    batch: {
+      platformId: "kuaimai",
+      resourceType: "sales_items",
+      sourceFileName: "销售主题分析.xlsx",
+      contentHash: hash,
+      rowCount: factCount * 4,
+      status: "completed",
+      collectedAt: "2026-07-24T06:50:00.000Z"
+    },
+    facts: Array.from({ length: factCount }, (_, index) => ({
+      code: `69${String(1000000000 + index)}`,
+      date: "2026-07-23",
+      platform: "抖店(放心购)",
+      qty: 1,
+      sales: 19.9,
+      netSales: 19.9,
+      grossProfit: 11.9,
+      refund: 0,
+      cost: 8
+    })),
+    issues: [],
+    ...overrides
+  };
+}
+
+test("legacy single-pack sales facts keep working up to 5000 rows", () => {
+  const normalized = normalizeErpSalesFactsPayload(salesFactsPayload(2), { idempotencyKey: "batch:projected-sales" });
+  assert.equal(normalized.chunk, null);
+  assert.equal(normalized.replaceDates, null);
+  assert.equal(normalized.facts.length, 2);
+
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(5001), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_TOO_LARGE"
+  );
+});
+
+test("chunked sales facts packs are limited to 1000 rows and 50 packs per batch", () => {
+  const first = normalizeErpSalesFactsPayload(salesFactsPayload(1000, {
+    chunk: { index: 1, total: 3 },
+    replaceDates: ["2026-07-23"]
+  }), { idempotencyKey: "batch:projected-sales:1" });
+  assert.deepEqual(first.chunk, { index: 1, total: 3 });
+  assert.deepEqual(first.replaceDates, ["2026-07-23"]);
+
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(1001, {
+      chunk: { index: 1, total: 2 },
+      replaceDates: ["2026-07-23"]
+    }), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_TOO_LARGE"
+  );
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(1, {
+      chunk: { index: 1, total: 51 },
+      replaceDates: ["2026-07-23"]
+    }), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_TOO_LARGE"
+  );
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(1, { chunk: { index: 3, total: 2 } }), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_CHUNK_INVALID"
+  );
+});
+
+test("chunked sales facts enforce the rewrite-dates contract across packs", () => {
+  // 多包首包必须携带完整重写日期列表。
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(1, { chunk: { index: 1, total: 2 } }), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_DATES_REQUIRED"
+  );
+  // 后续包只允许插入，携带重写日期会被拒绝，避免第二包删掉第一包已写的数据。
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(1, {
+      chunk: { index: 2, total: 2 },
+      replaceDates: ["2026-07-23"]
+    }), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_DATES_INVALID"
+  );
+  // 重写日期必须覆盖本包所有事实日期，且格式必须是 YYYY-MM-DD。
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(1, {
+      chunk: { index: 1, total: 2 },
+      replaceDates: ["2026-07-24"]
+    }), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_DATES_INVALID"
+  );
+  assert.throws(
+    () => normalizeErpSalesFactsPayload(salesFactsPayload(1, { replaceDates: ["2026/07/23"] }), { idempotencyKey: "x" }),
+    error => error.code === "ERP_COLLECTION_SALES_FACTS_DATES_INVALID"
+  );
+
+  // 后续包不带日期列表时按插入处理。
+  const continuation = normalizeErpSalesFactsPayload(salesFactsPayload(1, { chunk: { index: 2, total: 2 } }), { idempotencyKey: "batch:projected-sales:2" });
+  assert.deepEqual(continuation.chunk, { index: 2, total: 2 });
+  assert.equal(continuation.replaceDates, null);
 });

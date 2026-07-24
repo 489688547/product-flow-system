@@ -3,6 +3,8 @@ export const KUAIMAI_ERP_RESOURCE_TYPES = Object.freeze([
   "order_items",
   "sales_items",
   "products",
+  "product_kits",
+  "product_combinations",
   "skus",
   "inventory_snapshot",
   "inventory_movements",
@@ -20,14 +22,37 @@ const HASH_PATTERN = /^[a-f0-9]{64}$/i;
 const SECRET_KEY_PATTERN = /^(password|passwd|pwd|cookie|cookies|access_?token|refresh_?token|verification_?code|raw_?html)$/i;
 const PERSONAL_DATA_KEY_PATTERN = /^(收件人|收件姓名|收货人|收货姓名|手机|手机号|手机号码|联系电话|联系手机|电话|固话|座机|省|市|区|县|街道|收件地址|收货地址|详细地址|街道地址|详细地址\(包含省市区\)|购方地址|快递单号|物流单号|运单号|退回快递单号|邮箱|电子邮箱|email|买家旺旺|买家昵称|买家姓名|买家ID|买家留言|系统备注|卖家备注|买家备注|身份证|身份证号|证件号)$/i;
 const MAX_CHUNK_SIZE = 500;
+// 销售事实分块上传：新格式单包最多 1000 条，单批最多 50 包（即 5 万条总量上限）；
+// 老版 runner 的整批单包格式保持兼容，仍允许最多 5000 条一包。
+const MAX_SALES_FACTS_PER_PACK = 1000;
+const MAX_SALES_FACTS_LEGACY_PACK = 5000;
+const MAX_SALES_FACTS_CHUNKS = 50;
+const MAX_SALES_FACTS_REPLACE_DATES = 400;
 const INDEX_FIELDS = Object.freeze({
   sourceOrderId: ["sourceOrderId", "系统订单号", "系统单号", "订单编号", "订单号", "交易号"],
   sourceItemId: ["sourceItemId", "订单明细ID", "明细ID", "子订单号"],
-  productCode: ["productCode", "主商家编码", "商品编码"],
-  skuCode: ["skuCode", "规格商家编码", "商家编码", "规格编码", "SKU编码"],
+  sourceProductId: ["sourceProductId", "系统商品ID", "系统主商品ID", "商品ID"],
+  sourceSkuId: ["sourceSkuId", "系统规格ID", "系统SKU ID", "规格ID", "SKU ID"],
+  productCode: ["productCode", "套件主商家编码", "套件商家编码", "组合装主商家编码", "组合装商家编码", "主商家编码", "商品编码"],
+  skuCode: ["skuCode", "套件规格商家编码", "组合装规格商家编码", "规格商家编码", "商家编码", "规格编码", "SKU编码"],
   barcode: ["barcode", "69码", "规格条形码", "商品条形码", "条码", "条形码"],
-  productName: ["productName", "商品名称"],
-  skuName: ["skuName", "规格名称", "商品规格"],
+  productName: ["productName", "套件名称", "组合装名称", "商品名称"],
+  skuName: ["skuName", "规格", "规格名称", "商品规格"],
+  shortName: ["shortName", "商品简称"],
+  remark: ["remark", "商品备注"],
+  skuRemark: ["skuRemark", "规格备注"],
+  wholesalePrice: ["wholesalePrice", "规格批发价(元)", "商品批发价(元)", "批发价（元）", "批发价"],
+  purchasePrice: ["purchasePrice", "规格成本价(元)", "商品成本价(元)", "成本价（元）", "成本价", "采购价"],
+  salePrice: ["salePrice", "规格销售价(元)", "商品销售价(元)", "销售价（元）", "销售价", "售价"],
+  weight: ["weight", "规格重量(千克)", "商品重量(千克)", "重量（kg）", "重量"],
+  category: ["category", "规格类目", "商品分类", "商品类目", "分类"],
+  brand: ["brand", "规格品牌", "商品品牌", "品牌"],
+  componentProductCode: ["componentProductCode", "单品主商家编码", "子商品主商家编码", "组成商品主商家编码"],
+  componentSkuCode: ["componentSkuCode", "单品规格商家编码", "子商品规格商家编码", "子商品商家编码", "组成规格商家编码"],
+  componentName: ["componentName", "单品名称", "子商品名称", "组成商品名称"],
+  componentSpecification: ["componentSpecification", "单品规格", "子商品规格", "组成规格"],
+  componentQuantity: ["componentQuantity", "组合比例", "单品数量", "组成数量", "数量"],
+  componentCost: ["componentCost", "子商品供应商进价", "单品成本价", "组成成本价"],
   quantity: ["quantity", "数量", "净销量", "销售数量", "库存数量", "可用库存", "变动数量", "采购数量", "退款数量"],
   netQuantity: ["netQuantity", "净销量"],
   grossQuantity: ["grossQuantity", "销售数量"],
@@ -237,4 +262,106 @@ export function normalizeErpCollectionPayload(input, { idempotencyKey = "" } = {
     records: normalizedRecords,
     issues: normalizedIssues
   };
+}
+
+function normalizeSalesFactsChunk(rawChunk) {
+  if (rawChunk === undefined || rawChunk === null) return null;
+  if (typeof rawChunk !== "object" || Array.isArray(rawChunk)) {
+    fail("ERP_COLLECTION_SALES_FACTS_CHUNK_INVALID", "销售事实分块信息格式无效。");
+  }
+  const index = Math.trunc(Number(rawChunk.index));
+  const total = Math.trunc(Number(rawChunk.total));
+  if (!Number.isInteger(index) || !Number.isInteger(total) || index < 1 || total < index) {
+    fail("ERP_COLLECTION_SALES_FACTS_CHUNK_INVALID", "销售事实分块序号必须从 1 开始且不超过总包数。");
+  }
+  if (total > MAX_SALES_FACTS_CHUNKS) {
+    fail("ERP_COLLECTION_SALES_FACTS_TOO_LARGE", `单批最多分 ${MAX_SALES_FACTS_CHUNKS} 包上传标准销售事实。`);
+  }
+  return { index, total };
+}
+
+function normalizeSalesFactsReplaceDates(rawDates, chunk, facts) {
+  if (rawDates === undefined || rawDates === null) {
+    // 多包分块的首包必须携带完整日期列表：服务端先按这些日期整体删除，
+    // 后续包只插入，避免第二包把第一包已写入的数据删掉。
+    if (chunk && chunk.total > 1 && chunk.index === 1) {
+      fail("ERP_COLLECTION_SALES_FACTS_DATES_REQUIRED", "分块上传的首包必须携带完整重写日期列表。");
+    }
+    return null;
+  }
+  if (!Array.isArray(rawDates) || !rawDates.length) {
+    fail("ERP_COLLECTION_SALES_FACTS_DATES_INVALID", "重写日期列表不能为空。");
+  }
+  if (chunk && chunk.index > 1) {
+    fail("ERP_COLLECTION_SALES_FACTS_DATES_INVALID", "只有分块首包允许携带重写日期列表，后续包只能插入。");
+  }
+  if (rawDates.length > MAX_SALES_FACTS_REPLACE_DATES) {
+    fail("ERP_COLLECTION_SALES_FACTS_DATES_INVALID", `单批最多重写 ${MAX_SALES_FACTS_REPLACE_DATES} 个日期。`);
+  }
+  const dates = [...new Set(rawDates.map(value => {
+    const day = text(value, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+      fail("ERP_COLLECTION_SALES_FACTS_DATES_INVALID", "重写日期必须是 YYYY-MM-DD 格式。");
+    }
+    return day;
+  }))].sort();
+  const covered = new Set(dates);
+  if (facts.some(fact => !covered.has(fact.date))) {
+    fail("ERP_COLLECTION_SALES_FACTS_DATES_INVALID", "重写日期列表必须覆盖本包所有销售事实的日期。");
+  }
+  return dates;
+}
+
+export function normalizeErpSalesFactsPayload(input, { idempotencyKey = "" } = {}) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) fail("ERP_COLLECTION_BODY_INVALID", "请求内容必须是 JSON 对象。");
+  if (text(input.batch?.resourceType, 80).toLowerCase() !== "sales_items") {
+    fail("ERP_COLLECTION_RESOURCE_INVALID", "销售事实投影只接受 sales_items 资源。");
+  }
+  if (text(input.batch?.status, 40) !== "completed") {
+    fail("ERP_COLLECTION_BATCH_PARTIAL", "销售明细批次未通过完整性校验，不能写入标准事实。");
+  }
+  const rawFacts = Array.isArray(input.facts) ? input.facts : [];
+  if (!rawFacts.length) fail("ERP_COLLECTION_SALES_FACTS_EMPTY", "销售明细没有可写入的标准事实。");
+  const chunk = normalizeSalesFactsChunk(input.chunk);
+  const packLimit = chunk ? MAX_SALES_FACTS_PER_PACK : MAX_SALES_FACTS_LEGACY_PACK;
+  if (rawFacts.length > packLimit) {
+    fail("ERP_COLLECTION_SALES_FACTS_TOO_LARGE", `单包最多写入 ${packLimit} 条标准销售事实。`);
+  }
+  const facts = rawFacts.map((fact, index) => {
+    if (!fact || typeof fact !== "object" || Array.isArray(fact)) fail("ERP_COLLECTION_SALES_FACT_INVALID", `第 ${index + 1} 条销售事实格式无效。`);
+    const code = text(fact.code, 32);
+    const date = text(fact.date, 10);
+    if (!/^69\d{10,12}$/.test(code) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      fail("ERP_COLLECTION_SALES_FACT_INVALID", `第 ${index + 1} 条销售事实缺少有效 69 码或日期。`);
+    }
+    return {
+      code,
+      date,
+      platform: text(fact.platform || "未知平台", 120),
+      qty: Number(fact.qty) || 0,
+      sales: Number(fact.sales) || 0,
+      netSales: Number(fact.netSales) || 0,
+      grossProfit: Number(fact.grossProfit) || 0,
+      refund: Number(fact.refund) || 0,
+      cost: Number(fact.cost) || 0,
+      preShipRefund: Number(fact.preShipRefund) || 0,
+      postShipRefund: Number(fact.postShipRefund) || 0
+    };
+  });
+  const base = normalizeErpCollectionPayload({
+    batch: input.batch,
+    archive: input.archive,
+    issues: input.issues,
+    records: [{
+      sourceKey: "projected-sales-validation",
+      occurredAt: `${facts[0].date}T00:00:00+08:00`,
+      contentHash: input.batch.contentHash,
+      payload: { barcode: facts[0].code }
+    }]
+  }, { idempotencyKey });
+  if (base.issues.some(issue => issue.severity === "error")) {
+    fail("ERP_COLLECTION_BATCH_PARTIAL", "销售明细仍有阻断性校验错误，不能写入标准事实。");
+  }
+  const replaceDates = normalizeSalesFactsReplaceDates(input.replaceDates, chunk, facts);
+  return { ...base, records: [], facts, chunk, replaceDates };
 }

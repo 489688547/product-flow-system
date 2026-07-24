@@ -35,9 +35,26 @@ const RESOURCE_SCHEMAS = {
     warehouse: ["仓库ID", "仓库编号", "仓库名称", "发货仓库", "仓库"]
   },
   products: {
-    identities: [["系统商品ID", "商品ID", "主商家编码", "商品编码", "商家编码"]],
+    identities: [
+      ["系统商品ID", "商品ID", "主商家编码", "商品编码", "商家编码"],
+      ["系统规格ID", "规格ID", "SKU ID", "规格商家编码", "规格编码", "SKU编码"]
+    ],
     modifiedAt: ["修改时间", "更新时间"],
     shop: ["店铺ID", "店铺编号", "店铺名称", "店铺"]
+  },
+  product_kits: {
+    identities: [
+      ["套件主商家编码", "套件商家编码", "主商家编码", "系统商品ID", "商品ID"],
+      ["单品规格商家编码", "子商品规格商家编码", "子商品商家编码", "组成规格商家编码", "规格商家编码", "SKU编码"]
+    ],
+    modifiedAt: ["修改时间", "更新时间"]
+  },
+  product_combinations: {
+    identities: [
+      ["组合装主商家编码", "组合装商家编码", "主商家编码", "系统商品ID", "商品ID"],
+      ["单品规格商家编码", "子商品规格商家编码", "子商品商家编码", "组成规格商家编码", "规格商家编码", "SKU编码"]
+    ],
+    modifiedAt: ["修改时间", "更新时间"]
   },
   skus: {
     identities: [["系统规格ID", "规格ID", "SKU ID", "商家编码", "规格编码", "SKU编码", "69码", "条码"]],
@@ -205,6 +222,13 @@ async function fileHash(file) {
   return createHash("sha256").update(new Uint8Array(await file.arrayBuffer())).digest("hex");
 }
 
+const SUMMARY_ROW_MARKERS = new Set(["汇总", "合计", "总计", "小计", "数据合计", "全部合计"]);
+
+function isExplicitSummaryRow(row = []) {
+  const firstValue = row.map(valueText).find(Boolean);
+  return SUMMARY_ROW_MARKERS.has(firstValue);
+}
+
 export async function readKuaimaiExport(input, { resourceType = "orders", collectedAt = new Date().toISOString() } = {}) {
   const schema = RESOURCE_SCHEMAS[resourceType];
   if (!schema) throw new KuaimaiExportError("KUAIMAI_EXPORT_RESOURCE_INVALID", `不支持的资源类型：${resourceType}`);
@@ -246,6 +270,7 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
     if (!row.some(value => valueText(value))) continue;
     const identity = columns.identityColumns.map(index => valueText(row[index])).filter(Boolean);
     if (!identity.length) {
+      if (resourceType === "sales_items" && isExplicitSummaryRow(row)) continue;
       issues.push({ code: "SOURCE_KEY_MISSING", severity: "error", message: `第 ${rowIndex + 1} 行缺少稳定来源编号。`, details: { rowNumber: rowIndex + 1 } });
       continue;
     }

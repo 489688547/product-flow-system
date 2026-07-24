@@ -111,6 +111,20 @@ test("a repaired sales adapter publishes a new schedule version instead of mutat
   assert.equal(sales.idempotencyKey, "kuaimai:sales_items:2026-07-22:v3");
 });
 
+test("Kuaimai daily plan includes all three current product snapshots", () => {
+  const plan = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-24T05:01:00+08:00" });
+  assert.deepEqual(
+    plan
+      .filter(job => ["products", "product_kits", "product_combinations"].includes(job.resourceType))
+      .map(job => [job.resourceType, job.businessDate, job.rangeKind]),
+    [
+      ["products", "2026-07-24", "current_snapshot"],
+      ["product_kits", "2026-07-24", "current_snapshot"],
+      ["product_combinations", "2026-07-24", "current_snapshot"]
+    ]
+  );
+});
+
 test("state transitions reject skipped stages and terminal recovery", () => {
   assert.equal(WEB_COLLECTION_STATES.includes("waiting_human"), true);
   assert.equal(assertWebCollectionTransition("queued", "claimed"), true);

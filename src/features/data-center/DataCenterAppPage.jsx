@@ -17,7 +17,7 @@ import { triggerKuaimaiSalesCollection } from "../../state/webCollectionApi.js";
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据、趋势和平台分布。"],
   insights: ["用户洞察", "按平台、店铺和产品查看用户市场与竞品参考。"],
-  products: ["商品主数据", "统一维护 ERP 商品、SKU、69 码及跨 App 关联。"],
+  products: ["商品主数据", "统一维护 ERP 商品、商品规格、组合品组成及跨 App 关联。"],
   sources: ["数据接入", "统一管理电商平台、ERP 与公司数据。"],
   metrics: ["数据口径", "维护公司统一的定义、公式、版本和责任部门。"],
   sync: ["数据同步", "查看采集结果、数据质量和待处理异常。"],
@@ -128,7 +128,7 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
   };
   return (
     <section className="page data-center-page">
-      <PageHeader title={title} description={description} identity={section === "services" ? "服务端统一调用 · 不展示个人排行 · 内容不入审计" : section === "products" ? "快麦已落库 · 订单创建时间 · 默认不含其它" : undefined}>
+      <PageHeader title={title} description={description} identity={section === "services" ? "服务端统一调用 · 不展示个人排行 · 内容不入审计" : undefined}>
         {section === "overview" ? <a className={`data-health-link ${dataHealthOkay ? "success" : "warning"}`} href={latestSalesAnomaly.status === "anomaly" ? "#data-sync/kuaimai-sales" : "#data-sync"} aria-label={`${dataHealthLabel}，查看同步记录`}>{dataHealthLabel}</a> : null}
       </PageHeader>
       {section !== "services" && error ? <div className="section-panel" role="status">{error}</div> : null}

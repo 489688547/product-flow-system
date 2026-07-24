@@ -51,8 +51,13 @@ export function createErpCollectionD1Mock() {
           };
         }
         if (query.includes("from erp_source_records") && query.includes("source_batch_id = ?")) {
-          const [batchId] = state.values;
-          return { results: [...tables.erp_source_records.values()].filter(row => row.source_batch_id === batchId) };
+          const [batchId, afterKey = "", limit = 500] = state.values;
+          return {
+            results: [...tables.erp_source_records.values()]
+              .filter(row => row.source_batch_id === batchId && row.source_key > afterKey)
+              .sort((left, right) => left.source_key.localeCompare(right.source_key))
+              .slice(0, limit)
+          };
         }
         if (query.includes("from erp_file_archives") && query.includes("order by archived_at")) {
           return { results: [...tables.erp_file_archives.values()].sort((left, right) => right.archived_at.localeCompare(left.archived_at)) };

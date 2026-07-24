@@ -27,7 +27,7 @@ export async function loadWebCollectionStatus(fetchImpl = fetch) {
 }
 
 const REGISTERED_TRIGGER_RESOURCES = Object.freeze({
-  kuaimai: new Set(["orders", "order_items", "sales_items"]),
+  kuaimai: new Set(["orders", "order_items", "sales_items", "products"]),
   "douyin-ecommerce": new Set(["store_daily", "product_daily", "live_daily", "video_daily"])
 });
 
@@ -45,7 +45,6 @@ export async function triggerWebCollection(input, fetchImpl = fetch) {
     error.code = "WEB_COLLECTION_TRIGGER_INVALID";
     throw error;
   }
-  const safeResourceType = ["orders", "order_items", "sales_items"].includes(resourceType) ? resourceType : "order_items";
   const response = await fetchImpl("/api/platform/v1/web-collection/jobs", {
     method: "POST",
     credentials: "include",
@@ -54,7 +53,7 @@ export async function triggerWebCollection(input, fetchImpl = fetch) {
       action: "trigger",
       providerId,
       ...(storeId ? { storeId } : {}),
-      resourceType: providerId === "kuaimai" ? safeResourceType : resourceType,
+      resourceType,
       businessDate,
       force: Boolean(input.force)
     })
@@ -82,4 +81,51 @@ export function triggerKuaimaiSalesCollection(
     businessDate: date,
     force
   }, fetchImpl);
+}
+
+// 商品快照入口只提交 products；服务端展开普通商品、套件和组合装三任务。
+export function triggerKuaimaiProductCollection({ date, force = false }, fetchImpl = fetch) {
+  return triggerWebCollection({
+    providerId: "kuaimai",
+    resourceType: "products",
+    businessDate: date,
+    force
+  }, fetchImpl);
+}
+
+function productCollectionFailure(jobs) {
+  const waiting = jobs.find(job => job.status === "waiting_human");
+  if (waiting) {
+    const code = String(waiting.errorCode || "");
+    if (/LOGIN_REQUIRED/i.test(code)) return { status: "waiting_human", label: "请先在 Chrome 登录快麦" };
+    return { status: "waiting_human", label: "请在 Chrome 完成快麦验证" };
+  }
+  if (jobs.some(job => job.status === "schema_changed")) {
+    return { status: "schema_changed", label: "快麦商品页面结构已变化" };
+  }
+  if (jobs.some(job => ["failed", "cancelled"].includes(job.status))) {
+    return { status: "failed", label: "商品采集失败，请查看数据同步" };
+  }
+  return null;
+}
+
+export function kuaimaiProductCollectionProgress(status, jobIds) {
+  const jobById = new Map((status?.jobs || []).map(job => [job.id, job]));
+  const jobs = (jobIds || []).map(id => jobById.get(id)).filter(Boolean);
+  const total = jobIds?.length || 0;
+  const completed = jobs.filter(job => job.status === "success").length;
+  const failure = productCollectionFailure(jobs);
+  if (failure) return { ...failure, completed, total, jobs };
+  if (total > 0 && completed === total) {
+    return { status: "success", label: "商品数据已更新", completed, total, jobs };
+  }
+  const stages = new Set(jobs.flatMap(job => [job.status, job.stage]).filter(Boolean));
+  const label = stages.has("ingesting")
+    ? "正在写入商品数据"
+    : stages.has("validating") || stages.has("downloading")
+      ? "正在校验商品文件"
+      : stages.has("exporting")
+        ? "Chrome 正在导出商品数据"
+        : "等待 Chrome 插件采集";
+  return { status: "running", label, completed, total, jobs };
 }

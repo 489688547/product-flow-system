@@ -70,7 +70,10 @@
   - 来源：`codex/company-strategy-platform`、`codex/stale-chunk-recovery`、`codex/release-brand-content-assets`、Cloudflare 兼容 dirty 备份。
   - 输出：缺失修复进入 main，等价实现有证据，最终发布资产由源码重建。
 
-- [ ] 长期规则反写与全环境验收
+- [x] 长期规则反写与全环境验收
   - 依赖：全部实现任务。
   - 文件：`AGENTS.md`、两项仓库 Skill、平台文档、环境清单、集成注册表、ADR、生成模块。
   - 输出：完整门禁、PR、合并、Preview/Production 部署验证和安全工作树归档。
+  - 验证：Lint、治理、集成、环境能力、React 588 项、API 397 项、货物流投影 2 项和生产构建全部通过；GitHub PR #30 的 `quality` 成功并已合入 `main`。
+  - 环境：Preview 与 Production 共用 D1 `product-flow-system`，必要 Secret 名称远程检查通过；迁移前快照保存在外部备份目录，已上线的数据口径迁移账本完成对账，商品目录与货物流迁移已应用，远端无待执行迁移。
+  - 线上：Cloudflare Pages Production 已绑定 `main` 合并提交 `4a5fea3`；正式入口返回新分包，匿名环境接口保持 401；总经理登录态可看到数据分析、商品主数据、数据接入、平台连接、数据口径等完整导航，钉钉和快麦连接均显示已配置且凭证不回显。

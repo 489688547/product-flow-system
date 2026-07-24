@@ -1,5 +1,6 @@
 import { Button } from "../../ui/Button.jsx";
 import { Modal } from "../../ui/Modal.jsx";
+import { catalogDisplayCategory, catalogProductCost } from "../../domain/productCatalogGraph.js";
 
 function quantity(value) {
   return Number(value || 0).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
@@ -17,6 +18,7 @@ function skuCost(value) {
 
 export function ProductCatalogDetailDialog({
   product,
+  catalogItems = [],
   linkedProduct,
   supplierCount = 0,
   catalogUpdatedAt = "尚未同步",
@@ -26,6 +28,8 @@ export function ProductCatalogDetailDialog({
   if (!product) return null;
   const skus = product.skus || [];
   const components = product.components || [];
+  const productCost = catalogProductCost({ items: catalogItems, itemId: product.id });
+  const componentCostByCode = new Map(productCost.components.map(component => [component.inventoryUnitCode, component]));
   const sales = product.sales || { quantity: 0, netSales: 0, matchedCodeCount: 0, platforms: [] };
 
   return (
@@ -39,34 +43,49 @@ export function ProductCatalogDetailDialog({
     >
       <div className="product-catalog-detail-grid">
         <section>
-          <header><h3>商品档案</h3><span>{product.productKind === "bundle" ? "组合商品" : "单品"}</span></header>
+          <header><h3>商品档案</h3><span>{product.productKind === "bundle" ? "组合品" : "单品"}</span></header>
           <dl>
             <div><dt>主商家编码</dt><dd className="catalog-code">{product.merchantCode || "未提供"}</dd></div>
-            <div><dt>分类</dt><dd>{product.category || "未分类"}</dd></div>
+            <div><dt>分类</dt><dd>{catalogDisplayCategory(product)}</dd></div>
             <div><dt>品牌</dt><dd>{product.brand || "未设置品牌"}</dd></div>
             <div><dt>来源</dt><dd>{product.source || "快麦 ERP"}</dd></div>
           </dl>
         </section>
 
         <section>
-          <header><h3>SKU 与库存单位</h3><span>{quantity(skus.length)} 个</span></header>
-          {skus.length ? <div className="product-catalog-detail-list">
-            {skus.map(sku => <article key={sku.id || `${sku.merchantSkuCode}-${sku.barcode}`}>
-              <div><strong className="catalog-code">{sku.barcode || "缺少库存单位编码"}</strong><small>{sku.barcodeType === "sales_barcode" ? "标准商品条码" : sku.barcodeType === "missing" ? "编码待补齐" : "内部唯一码"}</small></div>
-              <div><strong>{sku.specificationAlias || sku.specification || "默认规格"}</strong><small>规格商家编码 {sku.merchantSkuCode || "—"}</small></div>
-              <div><strong>{skuCost(sku.purchasePrice)}</strong><small>ERP 成本</small></div>
-            </article>)}
-          </div> : <p className="product-catalog-detail-empty">尚未读取到 SKU，请通过 ERP 商品文件补齐。</p>}
+          <header><h3>{product.productKind === "bundle" ? "SKU 组成" : "商品 SKU"}</h3><span>{quantity(product.productKind === "bundle" ? components.length : skus.length)} 个</span></header>
+          {product.productKind === "bundle"
+            ? (components.length ? <div className="product-catalog-detail-list">
+              {components.map(component => {
+                const resolvedCost = componentCostByCode.get(component.inventoryUnitCode);
+                return <article key={component.id || `${component.inventoryUnitCode}-${component.ratio}`}>
+                <div><strong className="catalog-code">{component.inventoryUnitCode || "缺少子 SKU 编码"}</strong><small>子 SKU</small></div>
+                <div><strong>× {quantity(component.ratio)}</strong><small>每套所需数量</small></div>
+                <div><strong>{skuCost(resolvedCost?.unitCost)}</strong><small>子 SKU 单位成本</small></div>
+                <div><strong>{resolvedCost?.unitCost === null || resolvedCost?.unitCost === undefined ? "成本不完整" : money(resolvedCost.cost)}</strong><small>组件成本小计</small></div>
+              </article>;
+              })}
+              <div className={`product-catalog-bundle-total ${productCost.complete ? "" : "warning"}`}>
+                <span>组合品成本</span>
+                <strong>{productCost.complete ? money(productCost.total) : "成本不完整"}</strong>
+              </div>
+            </div> : <p className="product-catalog-detail-empty">尚未读取到子 SKU 与数量，当前组合关系不完整。</p>)
+            : (skus.length ? <div className="product-catalog-detail-list">
+              {skus.map(sku => <article key={sku.id || `${sku.merchantSkuCode}-${sku.barcode}`}>
+                <div><strong className="catalog-code">{sku.barcode || "缺少 SKU 编码"}</strong><small>{sku.barcodeType === "sales_barcode" ? "标准商品条码" : sku.barcodeType === "missing" ? "编码待补齐" : "内部唯一码"}</small></div>
+                <div><strong>{sku.specificationAlias || sku.specification || "默认规格"}</strong><small>SKU 商家编码 {sku.merchantSkuCode || "—"}</small></div>
+                <div><strong>{skuCost(sku.purchasePrice)}</strong><small>成本</small></div>
+              </article>)}
+            </div> : <p className="product-catalog-detail-empty">尚未读取到商品 SKU，请通过 ERP 商品档案补齐。</p>)}
         </section>
 
         <section>
-          <header><h3>组合关系</h3><span>{product.productKind === "bundle" ? `${quantity(components.length)} 项组成` : "非组合商品"}</span></header>
-          {components.length ? <div className="product-catalog-detail-list compact">
-            {components.map(component => <article key={component.id || `${component.inventoryUnitCode}-${component.ratio}`}>
-              <div><strong className="catalog-code">{component.inventoryUnitCode || "缺少库存单位编码"}</strong><small>组件库存单位</small></div>
-              <div><strong>× {quantity(component.ratio)}</strong><small>组合比例</small></div>
-            </article>)}
-          </div> : <p className="product-catalog-detail-empty">{product.productKind === "bundle" ? "组合关系待补齐，当前不能可靠计算组件消耗。" : "单品直接使用自身库存单位，不需要组合关系。"}</p>}
+          <header><h3>库存关系</h3><span>{product.productKind === "bundle" ? "按子 SKU 扣减" : "按自身 SKU 扣减"}</span></header>
+          <p className="product-catalog-detail-empty">
+            {product.productKind === "bundle"
+              ? `每销售 1 套组合品，ERP 按上方 ${quantity(components.length)} 个子 SKU 及对应数量扣减库存。`
+              : "单品销售后直接扣减所选商品 SKU 的库存。"}
+          </p>
         </section>
 
         <section>

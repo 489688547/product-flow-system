@@ -141,3 +141,25 @@ test("scanner waits for one stable interval before archiving and uploading", asy
   assert.equal(uploads[0].archive.relativePath.startsWith("原始归档/orders/"), true);
   assert.equal((await loadLocalManifest(layout.manifest)).values().next().value.status, "processed");
 });
+
+test("scanner distinguishes kit and combination snapshots from ordinary product files", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  await writeFile(
+    path.join(layout.waiting, "快麦导出_套件.csv"),
+    "套件主商家编码,套件名称,子商品商家编码,子商品名称,组合比例\nKIT-1,测试套件,SKU-1,单品一,2\n"
+  );
+  await writeFile(
+    path.join(layout.waiting, "快麦导出_组合装.csv"),
+    "组合装主商家编码,组合装名称,单品规格商家编码,单品名称,数量\nCOMBO-1,测试组合装,SKU-2,单品二,3\n"
+  );
+  const uploads = [];
+  await scanWaitingDirectory({ root, upload: async value => uploads.push(value) });
+  const result = await scanWaitingDirectory({ root, upload: async value => uploads.push(value) });
+
+  assert.equal(result.processed, 2);
+  assert.deepEqual(
+    uploads.map(value => value.batch.resourceType).sort(),
+    ["product_combinations", "product_kits"]
+  );
+});

@@ -1,4 +1,5 @@
 import { aggregateProductCatalogSales, productCatalogSalesRange } from "../../../../../../src/domain/productCatalogSales.js";
+import { readProductCatalogSalesMappings } from "./storage.js";
 
 const EXCLUDED_PLATFORMS = ["", "其它", "其他", "未知", "未知平台"];
 
@@ -25,13 +26,17 @@ export function catalogSalesQuery(url) {
   return { from, to, platform };
 }
 
-async function lastSuccessfulSalesSyncAt(db) {
+async function salesMeta(db) {
   const row = await db.prepare("SELECT payload FROM product_sales_meta WHERE id = ?").bind("sales-meta").first();
-  if (!row?.payload) return "";
+  if (!row?.payload) return { lastSuccessfulSyncAt: "", titles: {} };
   try {
-    return JSON.parse(row.payload)?.imports?.[0]?.importedAt || "";
+    const parsed = JSON.parse(row.payload);
+    return {
+      lastSuccessfulSyncAt: parsed?.imports?.[0]?.importedAt || "",
+      titles: parsed?.titles && typeof parsed.titles === "object" ? parsed.titles : {}
+    };
   } catch {
-    return "";
+    return { lastSuccessfulSyncAt: "", titles: {} };
   }
 }
 
@@ -46,7 +51,7 @@ export async function readCatalogSales(db, items, query) {
     where.push(`TRIM(COALESCE(platform, '')) NOT IN (${excludedPlaceholders})`);
     values.push(...EXCLUDED_PLATFORMS);
   }
-  const [salesResult, platformResult, lastSuccessfulSyncAt] = await Promise.all([
+  const [salesResult, platformResult, storedSalesMeta, mappings] = await Promise.all([
     db.prepare(`SELECT code, platform, SUM(qty) AS qty, SUM(net_sales) AS net_sales, MAX(date) AS latest_date
       FROM product_sales_daily
       WHERE ${where.join(" AND ")}
@@ -56,7 +61,8 @@ export async function readCatalogSales(db, items, query) {
       WHERE date >= ? AND date <= ?
         AND TRIM(COALESCE(platform, '')) NOT IN (${excludedPlaceholders})
       ORDER BY platform`).bind(query.from, query.to, ...EXCLUDED_PLATFORMS).all(),
-    lastSuccessfulSalesSyncAt(db)
+    salesMeta(db),
+    readProductCatalogSalesMappings(db, { activeOnly: false })
   ]);
   const rows = (salesResult?.results || []).map(row => ({
     code: row.code,
@@ -65,7 +71,10 @@ export async function readCatalogSales(db, items, query) {
     netSales: Number(row.net_sales) || 0,
     latestDataDate: String(row.latest_date || "")
   }));
-  const aggregated = aggregateProductCatalogSales(items, rows);
+  const aggregated = aggregateProductCatalogSales(items, rows, {
+    mappings,
+    titles: storedSalesMeta.titles
+  });
   return {
     items: aggregated.items,
     meta: {
@@ -78,7 +87,8 @@ export async function readCatalogSales(db, items, query) {
       timezone: "Asia/Shanghai",
       excludeOther: !query.platform,
       latestDataDate: rows.reduce((latest, row) => row.latestDataDate > latest ? row.latestDataDate : latest, ""),
-      lastSuccessfulSyncAt
+      lastSuccessfulSyncAt: storedSalesMeta.lastSuccessfulSyncAt,
+      mappings
     }
   };
 }
