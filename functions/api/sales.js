@@ -1,5 +1,6 @@
 import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
 import { scaleSalesFact } from "../../src/domain/demoSalesTransform.js";
+import { resolveRepairedSalesDays } from "./platform/v1/data-services/_shared/salesRepairResolution.js";
 
 const META_ID = "sales-meta";
 // Cloudflare D1 allows at most 100 bound parameters per statement; 9 rows × 11 columns = 99.
@@ -113,6 +114,18 @@ export async function insertSalesRows(db, rows) {
     return;
   }
   for (const statement of statements) await statement.run();
+}
+
+// 官方文件/采集导入成功后，尽力复核并结案受影响日期的未结销售修复记录；
+// 结案失败只记录日志，绝不影响本次导入结果。
+async function resolveRepairRunsBestEffort(db, dates, importedBy) {
+  try {
+    const resolution = await resolveRepairedSalesDays(db, { dates, resolvedBy: String(importedBy || "") });
+    return resolution.resolved.length;
+  } catch (error) {
+    console.warn("销售修复记录自动结案失败，导入结果不受影响。", error?.message || error);
+    return 0;
+  }
 }
 
 export async function replaceSalesFactsForDates(db, rows, {
@@ -229,7 +242,13 @@ export async function onRequest({ request, env, data = {} }) {
         ...meta.imports.filter(item => dateScope ? item.scope === "months" || !item.months?.some(month => months.includes(month)) : !item.months?.some(month => months.includes(month)))
       ].slice(0, 60);
       await writeMeta(db, meta);
-      return jsonResponse({ synced: true, months, rows: rows.length, importedAt });
+      // 两个导入分支（replaceScope=dates 与整月覆盖）受影响日期即本次行的去重日期。
+      const repairRunsResolved = await resolveRepairRunsBestEffort(
+        db,
+        [...new Set(rows.map(row => String(row.date)))],
+        body.importedBy
+      );
+      return jsonResponse({ synced: true, months, rows: rows.length, importedAt, repairRunsResolved });
     }
     if (request.method === "DELETE") {
       const month = String(url.searchParams.get("month") || "").trim();

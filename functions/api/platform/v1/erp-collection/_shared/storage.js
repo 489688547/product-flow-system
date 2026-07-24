@@ -1,10 +1,24 @@
 import { projectKuaimaiErpRecords } from "../../../../../../src/domain/kuaimaiErpProjection.js";
 import { scaleSalesFact } from "../../../../../../src/domain/demoSalesTransform.js";
 import { replaceSalesFactsForDates } from "../../../../sales.js";
+import { resolveRepairedSalesDays } from "../../data-services/_shared/salesRepairResolution.js";
 import { appendGoodsFlowEvents, saveGoodsFlowExceptions, saveInventoryDaily } from "../../goods-flow/_shared/storage.js";
 import { upsertProductCatalog } from "../../product-catalog/_shared/storage.js";
 
 const WRITE_BATCH_SIZE = 50;
+
+// 官方文件/采集导入成功后，尽力复核并结案受影响日期的未结销售修复记录；
+// 结案失败只记录日志，绝不影响本次导入结果。
+async function resolveRepairRunsBestEffort(businessDb, dates, actor) {
+  if (!dates?.length) return 0;
+  try {
+    const resolution = await resolveRepairedSalesDays(businessDb, { dates, resolvedBy: String(actor || "").slice(0, 80) });
+    return resolution.resolved.length;
+  } catch (error) {
+    console.warn("销售修复记录自动结案失败，导入结果不受影响。", error?.message || error);
+    return 0;
+  }
+}
 
 export function erpCollectionDatabase(env = {}) {
   return env.PRODUCT_FLOW_DB || env.product_flow_db || env.DB || null;
@@ -84,6 +98,7 @@ async function projectCompletedBatch(controlDb, businessDb, resourceType, batchI
     })
     : { rows: 0, dates: [] };
   if (projection.exceptions.length) await saveGoodsFlowExceptions(businessDb, projection.exceptions);
+  const repairRunsResolved = await resolveRepairRunsBestEffort(businessDb, sales.dates, actor);
   return {
     sourceRecords: records.length,
     catalogProducts: catalog.products || 0,
@@ -92,7 +107,8 @@ async function projectCompletedBatch(controlDb, businessDb, resourceType, batchI
     inventoryDaily: projection.inventoryDaily.length,
     salesRows: sales.rows,
     salesDates: sales.dates,
-    exceptions: projection.exceptions.length
+    exceptions: projection.exceptions.length,
+    repairRunsResolved
   };
 }
 
