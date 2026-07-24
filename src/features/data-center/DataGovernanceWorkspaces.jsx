@@ -19,7 +19,7 @@ import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapt
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
 
-const STATUS_LABELS = { healthy: "正常", success: "成功", pending_validation: "待验证", waiting_verification: "等待人工验证", waiting_human: "等待人工处理", collecting: "页面读数中", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", unavailable: "尚未完成真实采集", disabled: "未启用" };
+const STATUS_LABELS = { healthy: "正常", success: "成功", pending_validation: "待验证", waiting_verification: "等待人工验证", waiting_human: "等待人工处理", collecting: "页面读数中", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", unavailable: "尚未完成真实采集", superseded: "已被新批次取代", disabled: "未启用" };
 
 function statusLabel(status) {
   return STATUS_LABELS[status] || status || "未启用";

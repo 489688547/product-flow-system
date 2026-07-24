@@ -10,7 +10,8 @@ export const WEB_COLLECTION_STATES = Object.freeze([
   "ingesting",
   "success",
   "failed",
-  "schema_changed"
+  "schema_changed",
+  "superseded"
 ]);
 
 const TRANSITIONS = Object.freeze({

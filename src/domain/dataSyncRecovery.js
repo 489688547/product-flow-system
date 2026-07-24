@@ -9,7 +9,8 @@ export const DOUYIN_RECOVERY = Object.freeze({
   DOUYIN_PAGE_SCHEMA_CHANGED: "页面结构已变化，采集已停止，等待更新采集适配。",
   DOUYIN_STORE_IDENTITY_MISMATCH: "确认公司 Chrome 当前店铺与任务店铺一致后重新触发。",
   DOUYIN_OFFICIAL_REPORT_BUTTON_MISSING: "官方报表入口不可用，请检查账号权限或页面变化。",
-  EXTENSION_DOWNLOAD_TIMEOUT: "官方报表下载超时，请稍后重新触发。"
+  EXTENSION_DOWNLOAD_TIMEOUT: "官方报表下载超时，请稍后重新触发。",
+  WEB_COLLECTION_STAGE_EXPIRED: "上一轮采集卡在中途已超时自动终止，请确认公司 Mac 已登录抖店后点击重新触发。"
 });
 
 function timestamp(value) {
@@ -203,6 +204,7 @@ export function buildDouyinCollectionRecovery({
   const matchingJobs = jobs.filter(job => (
     job?.providerId === "douyin-ecommerce"
     && (!storeId || job.storeId === storeId)
+    && job?.status !== "superseded"
   ));
   const matchingCursors = cursors.filter(cursor => (
     cursor?.providerId === "douyin-ecommerce"
@@ -218,10 +220,16 @@ export function buildDouyinCollectionRecovery({
       const cursor = latest(matchingCursors.filter(item => item.resourceType === resource.type));
       const runner = runners.find(item => item.id === job?.runnerId) || fallbackRunner;
       const online = runnerOnline(runner, now);
-      const errorCode = String(job?.errorCode || "");
       const jobStatus = String(job?.status || "");
-      const status = jobStatus && jobStatus !== "success"
-        ? jobStatus
+      // 已有可信成功游标（业务日 ≥ 该运行中任务）时，陈旧的运行中任务不再盖掉成功状态，
+      // 避免一次采集成功后又冒出的重复任务把资源长期显示为“采集中”。
+      const supersededByCursor = Boolean(cursor)
+        && RUNNING_STATES.has(jobStatus)
+        && String(cursor.businessDate || "") >= String(job?.businessDate || "");
+      const errorCode = supersededByCursor ? "" : String(job?.errorCode || "");
+      const effectiveStatus = supersededByCursor ? "" : jobStatus;
+      const status = effectiveStatus && effectiveStatus !== "success"
+        ? effectiveStatus
         : cursor || jobStatus === "success"
           ? "success"
           : "unavailable";
@@ -237,13 +245,13 @@ export function buildDouyinCollectionRecovery({
         type: resource.type,
         label: resource.label,
         status,
-        businessDate: job?.businessDate || cursor?.businessDate || null,
+        businessDate: (supersededByCursor ? cursor?.businessDate : job?.businessDate) || cursor?.businessDate || null,
         errorCode: errorCode || null,
         instruction,
         runner,
         job,
         cursor,
-        canRetry: Boolean(job && ["waiting_human", "failed", "schema_changed", "success"].includes(jobStatus))
+        canRetry: Boolean(job) && ["waiting_human", "failed", "schema_changed", "success"].includes(status)
       };
     })
   };

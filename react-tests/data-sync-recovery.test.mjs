@@ -128,6 +128,54 @@ test("Douyin recovery exposes four resources and provider-specific human actions
   assert.equal(DOUYIN_RECOVERY.DOUYIN_REPORT_SCHEMA_CHANGED.includes("适配"), true);
 });
 
+test("a trusted success cursor keeps a stale duplicate opening job from masking the resource", () => {
+  const recovery = buildDouyinCollectionRecovery({
+    storeId: "store-a",
+    runners: [runner],
+    jobs: [{
+      id: "stale-opening",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23",
+      status: "opening",
+      runnerId: "runner-1",
+      updatedAt: "2026-07-24T08:28:00.000Z"
+    }],
+    cursors: [{
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23"
+    }],
+    now
+  });
+  const storeDaily = recovery.resources.find(item => item.type === "store_daily");
+  assert.equal(storeDaily.status, "success");
+  assert.equal(storeDaily.businessDate, "2026-07-23");
+  assert.equal(storeDaily.canRetry, true);
+  // 新业务日的运行中任务仍应显示为采集中，不被旧游标掩盖。
+  const newerDay = buildDouyinCollectionRecovery({
+    storeId: "store-a",
+    runners: [runner],
+    jobs: [{ id: "newer", providerId: "douyin-ecommerce", storeId: "store-a", resourceType: "store_daily", businessDate: "2026-07-24", status: "opening", runnerId: "runner-1" }],
+    cursors: [{ providerId: "douyin-ecommerce", storeId: "store-a", resourceType: "store_daily", businessDate: "2026-07-23" }],
+    now
+  });
+  assert.equal(newerDay.resources.find(item => item.type === "store_daily").status, "opening");
+});
+
+test("superseded jobs are ignored by the douyin recovery view", () => {
+  const recovery = buildDouyinCollectionRecovery({
+    storeId: "store-a",
+    runners: [runner],
+    jobs: [{ id: "sup", providerId: "douyin-ecommerce", storeId: "store-a", resourceType: "live_daily", businessDate: "2026-07-23", status: "superseded", runnerId: "runner-1" }],
+    cursors: [],
+    now
+  });
+  assert.equal(recovery.resources.find(item => item.type === "live_daily").status, "unavailable");
+});
+
 test("product catalog client triggers the complete Chrome snapshot group", async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
