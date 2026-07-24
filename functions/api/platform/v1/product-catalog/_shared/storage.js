@@ -59,6 +59,25 @@ export async function ensureProductCatalogTables(db) {
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS product_catalog_sales_mappings (
+    code TEXT PRIMARY KEY,
+    product_id TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
+    version INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    created_by TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    updated_by TEXT NOT NULL
+  )`).run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS product_catalog_sales_mapping_audit (
+    id TEXT PRIMARY KEY,
+    code TEXT NOT NULL,
+    product_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    actor TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  )`).run();
 }
 
 async function runBatches(db, statements) {
@@ -230,6 +249,26 @@ function parsePayload(row) {
   } catch {
     return null;
   }
+}
+
+export function productCatalogSalesMapping(row = {}) {
+  return {
+    code: String(row.code || ""),
+    productId: String(row.product_id || ""),
+    active: Boolean(row.active),
+    version: Number(row.version) || 0,
+    createdAt: String(row.created_at || ""),
+    updatedAt: String(row.updated_at || "")
+  };
+}
+
+export async function readProductCatalogSalesMappings(db, { activeOnly = true } = {}) {
+  await ensureProductCatalogTables(db);
+  const result = await db.prepare(`SELECT code, product_id, active, version, created_at, updated_at
+    FROM product_catalog_sales_mappings
+    ${activeOnly ? "WHERE active = 1" : ""}
+    ORDER BY code`).all();
+  return (result?.results || []).map(productCatalogSalesMapping);
 }
 
 export async function readProductCatalog(db) {

@@ -205,7 +205,7 @@
     {
       "id": "product-catalog-storage",
       "name": "共享商品主数据",
-      "description": "数据中心统一维护，产品全周期、供应链和货流共用的 ERP 商品、库存单位编码、组合比例与同步批次存储；商品经营视图读取已落库销售日聚合。",
+      "description": "数据中心统一维护，产品全周期、供应链和货流共用的 ERP 商品、单品规格、组合品组成、销售编码映射与同步批次存储；商品经营视图读取已落库销售日聚合。",
       "platforms": ["cloudflare-pages", "cloudflare-d1", "erp-file-import"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",
@@ -217,6 +217,8 @@
         "product_catalog_components",
         "product_catalog_sync_runs",
         "product_catalog_meta",
+        "product_catalog_sales_mappings",
+        "product_catalog_sales_mapping_audit",
         "product_sales_daily",
         "product_sales_meta"
       ]
@@ -224,7 +226,7 @@
     {
       "id": "kuaimai-product-sync",
       "name": "快麦开放平台商品 API（未打通）",
-      "description": "兼容代码和历史环境名称保留；当前商品主数据只使用 ERP 官方文件导入，不从产品页面调用快麦开放平台 API。",
+      "description": "兼容代码和历史环境名称保留；当前商品主数据不调用快麦开放平台 API，由公司 Mac Chrome 插件获取普通商品、套件和组合装官方导出，人工文件导入作为回退。",
       "platforms": ["kuaimai", "cloudflare-d1"],
       "requiredIn": [],
       "level": "warning",

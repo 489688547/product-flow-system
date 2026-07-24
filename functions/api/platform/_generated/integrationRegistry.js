@@ -116,12 +116,14 @@ const integrationRegistry = {
         "公司 Mac 每日网页采集",
         "订单创建时间口径",
         "异常日 Chrome 自动排队与人工重排",
+        "普通商品套件组合装快照组",
         "本地原始文件归档",
         "通用任务租约与游标",
         "最小索引幂等落库",
         "导入批次与异常审计",
         "固定范围采集令牌",
-        "销售日聚合"
+        "销售日聚合",
+        "共享商品目录投影"
       ],
       "businessQuestions": [
         "快麦历史数据补录",
@@ -212,6 +214,7 @@ const integrationRegistry = {
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/product-catalog",
         "/api/platform/v1/product-catalog/import",
+        "/api/platform/v1/product-catalog/sales-mappings",
         "/api/platform/v1/product-catalog/sync/kuaimai"
       ],
       "publicDocs": [
@@ -608,6 +611,7 @@ const integrationRegistry = {
         "/api/platform/v1/web-collection/runners",
         "/api/platform/v1/product-catalog",
         "/api/platform/v1/product-catalog/import",
+        "/api/platform/v1/product-catalog/sales-mappings",
         "/api/platform/v1/product-catalog/sync/kuaimai",
         "/api/ecommerce-operations",
         "/api/performance-management",
