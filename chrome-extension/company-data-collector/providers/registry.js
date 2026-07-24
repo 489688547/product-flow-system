@@ -8,6 +8,7 @@ import {
 const taskFields = new Set([
   "jobId",
   "providerId",
+  "storeId",
   "resourceType",
   "businessDate",
   "status",
@@ -56,6 +57,9 @@ export function assertRegisteredTask(task) {
     throw contractError("EXTENSION_TASK_INVALID", "插件任务 ID 无效。");
   }
   registeredResource(task.providerId, task.resourceType);
+  if (task.storeId !== undefined && !/^[-_a-zA-Z0-9]{1,128}$/.test(String(task.storeId || ""))) {
+    throw contractError("EXTENSION_TASK_INVALID", "插件任务店铺标识无效。");
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(task.businessDate || ""))) {
     throw contractError("EXTENSION_TASK_INVALID", "插件任务业务日期无效。");
   }

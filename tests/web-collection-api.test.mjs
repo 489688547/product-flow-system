@@ -142,6 +142,42 @@ test("control plane accepts the canonical Kuaimai order_items resource used by t
   assert.equal(result.body.data.jobs[0].resourceType, "order_items");
 });
 
+test("control plane keeps same-day Douyin jobs isolated by store", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const token = registration.body.data.token;
+  const makeJob = storeId => ({
+    providerId: "douyin-ecommerce",
+    storeId,
+    resourceType: "product_daily",
+    businessDate: "2026-07-23",
+    rangeKind: "daily_fact",
+    range: { start: "2026-07-23T00:00:00+08:00", end: "2026-07-23T23:59:59+08:00", timeZone: "Asia/Shanghai" },
+    scheduleVersion: "v1",
+    idempotencyKey: `douyin-ecommerce:${storeId}:product_daily:2026-07-23:v1`
+  });
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token,
+    body: { action: "ensure_plan", jobs: [makeJob("store-a"), makeJob("store-b")] }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.created, 2);
+  assert.deepEqual(result.body.data.jobs.map(job => job.storeId), ["store-a", "store-b"]);
+  assert.equal(db.tables.web_collection_jobs.size, 2);
+
+  const unsafe = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token,
+    body: { action: "ensure_plan", jobs: [makeJob("../unsafe")] }
+  });
+  assert.equal(unsafe.response.status, 400);
+  assert.equal(unsafe.body.error.code, "WEB_COLLECTION_JOB_INVALID");
+});
+
 test("claim lease, legal transitions, completion and cursor are atomic from the runner perspective", async () => {
   const db = createWebCollectionD1Mock();
   const registration = await register(db);
@@ -322,6 +358,29 @@ test("authorized operator triggers the repaired Kuaimai orders schedule", async 
 
   assert.equal(result.response.status, 200);
   assert.equal(result.body.data.job.idempotencyKey, "kuaimai:orders:2026-07-22:v2:env:production:v1");
+});
+
+test("authorized operator triggers a registered Douyin store resource", async () => {
+  const db = createWebCollectionD1Mock();
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    body: {
+      action: "trigger",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23"
+    }
+  });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.job.storeId, "store-a");
+  assert.equal(
+    result.body.data.job.idempotencyKey,
+    "douyin-ecommerce:store-a:store_daily:2026-07-23:v1:env:production:v1"
+  );
 });
 
 test("manual confirmation requeues a Kuaimai job after login is restored", async () => {

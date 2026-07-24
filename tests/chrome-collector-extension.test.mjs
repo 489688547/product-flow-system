@@ -84,4 +84,24 @@ test("extension task contract only allows registered provider resources", async 
     () => assertRegisteredTask({ jobId: "job-1", providerId: "kuaimai", resourceType: "orders", businessDate: "2026-07-21", url: "https://evil.example" }),
     error => error?.code === "EXTENSION_TASK_UNSAFE_FIELDS"
   );
+  assert.equal(
+    assertRegisteredTask({
+      jobId: "job-1",
+      providerId: "kuaimai",
+      storeId: "store-a",
+      resourceType: "orders",
+      businessDate: "2026-07-21"
+    }).storeId,
+    "store-a"
+  );
+  assert.throws(
+    () => assertRegisteredTask({
+      jobId: "job-1",
+      providerId: "kuaimai",
+      storeId: "../unsafe",
+      resourceType: "orders",
+      businessDate: "2026-07-21"
+    }),
+    error => error?.code === "EXTENSION_TASK_INVALID"
+  );
 });

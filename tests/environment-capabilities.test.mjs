@@ -58,6 +58,13 @@ test("platform credential vault declares its root secret migration and affected 
 
   const chromeCollection = manifest.capabilities.find(entry => entry.id === "company-web-data-collection");
   assert.deepEqual(chromeCollection.requiredIn, ["preview", "production"]);
+  assert.deepEqual(chromeCollection.platforms, [
+    "cloudflare-pages",
+    "cloudflare-d1",
+    "kuaimai",
+    "douyin-ecommerce",
+    "erp-file-import"
+  ]);
   assert.match(chromeCollection.description, /异常.*幂等排队/);
 
   const registry = JSON.parse(readFileSync(resolve(root, "docs/platform/integration-registry.json"), "utf8"));

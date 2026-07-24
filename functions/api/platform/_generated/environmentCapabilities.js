@@ -330,11 +330,12 @@ const environmentCapabilities = {
     {
       "id": "company-web-data-collection",
       "name": "公司网页数据采集运行时",
-      "description": "公司 Mac 通过日常 Chrome 的内置 MV3 插件、本机 loopback 执行器、固定 provider adapter、日计划和任务租约采集已验证网页数据；销售异常可按业务日期幂等排队，登录恢复后由授权用户人工重排。这是当前快麦自动采集主通道，D1 只保存设备、任务、运行、游标和通知安全元数据。",
+      "description": "公司 Mac 通过日常 Chrome 的内置 MV3 插件、本机 loopback 执行器、固定 provider adapter、日计划和任务租约采集已验证网页数据；销售异常可按店铺和业务日期幂等排队，登录恢复后由授权用户人工重排。这是当前快麦与抖店官方报表采集的共享运行时，D1 控制面只保存设备、任务、运行、游标和通知安全元数据。",
       "platforms": [
         "cloudflare-pages",
         "cloudflare-d1",
         "kuaimai",
+        "douyin-ecommerce",
         "erp-file-import"
       ],
       "requiredIn": [

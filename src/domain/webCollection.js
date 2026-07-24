@@ -98,13 +98,14 @@ function rangeFor(kind, businessDate, timeZone) {
 
 export function webCollectionJobKey(job) {
   const providerId = String(job?.providerId || "").trim();
+  const storeId = String(job?.storeId || "").trim();
   const resourceType = String(job?.resourceType || "").trim();
   const businessDate = String(job?.businessDate || "").trim();
   const scheduleVersion = String(job?.scheduleVersion || "v1").trim();
   if (!providerId || !resourceType || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
     throw new Error("采集任务幂等键字段不完整。");
   }
-  return `${providerId}:${resourceType}:${businessDate}:${scheduleVersion}`;
+  return [providerId, storeId, resourceType, businessDate, scheduleVersion].filter(Boolean).join(":");
 }
 
 export function createDailyPlan({
@@ -122,21 +123,29 @@ export function createDailyPlan({
     if (!adapter || adapter.enabled === false) continue;
     const providerId = String(adapter.id || "").trim();
     if (!providerId) continue;
-    for (const resource of adapter.resources || []) {
-      if (!resource || resource.enabled === false) continue;
-      const resourceType = String(resource.type || "").trim();
-      if (!resourceType) continue;
-      const rangeKind = resource.rangeKind === "daily_fact" ? "daily_fact" : "current_snapshot";
-      const businessDate = rangeKind === "daily_fact" ? yesterday : today;
-      const job = {
-        providerId,
-        resourceType,
-        businessDate,
-        rangeKind,
-        range: rangeFor(rangeKind, businessDate, timeZone),
-        scheduleVersion: String(resource.scheduleVersion || "v1")
-      };
-      plan.push({ ...job, idempotencyKey: webCollectionJobKey(job) });
+    const stores = Array.isArray(adapter.stores) && adapter.stores.length
+      ? adapter.stores
+      : [{ id: String(adapter.storeId || "").trim() }];
+    for (const store of stores) {
+      if (!store || store.enabled === false) continue;
+      const storeId = String(store.id || "").trim();
+      for (const resource of adapter.resources || []) {
+        if (!resource || resource.enabled === false) continue;
+        const resourceType = String(resource.type || "").trim();
+        if (!resourceType) continue;
+        const rangeKind = resource.rangeKind === "daily_fact" ? "daily_fact" : "current_snapshot";
+        const businessDate = rangeKind === "daily_fact" ? yesterday : today;
+        const job = {
+          providerId,
+          storeId,
+          resourceType,
+          businessDate,
+          rangeKind,
+          range: rangeFor(rangeKind, businessDate, timeZone),
+          scheduleVersion: String(resource.scheduleVersion || "v1")
+        };
+        plan.push({ ...job, idempotencyKey: webCollectionJobKey(job) });
+      }
     }
   }
   return plan;
@@ -153,6 +162,7 @@ export function nextCursorForSuccessfulJob(job, run) {
   if (job?.status !== "success") return null;
   return {
     providerId: job.providerId,
+    storeId: String(job.storeId || ""),
     resourceType: job.resourceType,
     businessDate: job.businessDate,
     jobId: job.id,
@@ -163,7 +173,14 @@ export function nextCursorForSuccessfulJob(job, run) {
 }
 
 function failureDedupeKey(job) {
-  return [job.businessDate, job.providerId, job.resourceType, job.errorCode || "UNKNOWN", job.stage || job.status].join(":");
+  return [
+    job.businessDate,
+    job.providerId,
+    job.storeId || "",
+    job.resourceType,
+    job.errorCode || "UNKNOWN",
+    job.stage || job.status
+  ].filter(Boolean).join(":");
 }
 
 export function notificationIntents({
@@ -181,6 +198,7 @@ export function notificationIntents({
       kind: "failure",
       jobId: job.id,
       providerId: job.providerId,
+      storeId: String(job.storeId || ""),
       resourceType: job.resourceType,
       errorCode: job.errorCode || "UNKNOWN",
       stage: job.stage || job.status,

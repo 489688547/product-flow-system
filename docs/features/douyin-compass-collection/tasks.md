@@ -15,7 +15,7 @@
 - [x] 固化治理、ADR、integration 与环境能力
   - 输出：旧凭据登录保持退役、已登录 Chrome 只读采集进入 `integrating`，登记 D1 表与展示策略。
   - 失败测试：缺少 ADR、路径影响或环境模块时治理检查失败。
-- [ ] 扩展 store-scoped 网页采集控制面
+- [x] 扩展 store-scoped 网页采集控制面
   - 输出：Douyin 四资源、storeId job/cursor、目标环境版本、稳定错误和日计划。
   - 失败测试：不同店铺任务冲突或未知字段被接受时失败。
 - [ ] 实现标准经营事实与批次 API

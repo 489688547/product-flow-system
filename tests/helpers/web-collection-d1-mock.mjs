@@ -77,11 +77,11 @@ export function createWebCollectionD1Mock() {
           return { success: true };
         }
         if (query.startsWith("insert into web_collection_jobs")) {
-          const [id, providerId, resourceType, businessDate, rangeKind, rangeStart, rangeEnd, timeZone,
+          const [id, providerId, storeId, resourceType, businessDate, rangeKind, rangeStart, rangeEnd, timeZone,
             scheduleVersion, idempotencyKey, status, selectorVersion, targetEnvironment,
             targetEnvironmentVersion, createdAt, updatedAt] = state.values;
           tables.web_collection_jobs.set(id, {
-            id, provider_id: providerId, resource_type: resourceType, business_date: businessDate,
+            id, provider_id: providerId, store_id: storeId, resource_type: resourceType, business_date: businessDate,
             range_kind: rangeKind, range_start: rangeStart, range_end: rangeEnd, time_zone: timeZone,
             schedule_version: scheduleVersion, idempotency_key: idempotencyKey, status, selector_version: selectorVersion,
             target_environment: targetEnvironment, target_environment_version: targetEnvironmentVersion,
@@ -143,11 +143,11 @@ export function createWebCollectionD1Mock() {
           return { success: true };
         }
         if (query.startsWith("insert into web_collection_cursors")) {
-          const [id, providerId, resourceType, businessDate, jobId, runId, batchId, completedAt, updatedAt] = state.values;
-          const key = `${providerId}:${resourceType}`;
+          const [id, providerId, storeId, resourceType, businessDate, jobId, runId, batchId, completedAt, updatedAt] = state.values;
+          const key = [providerId, storeId, resourceType].filter(Boolean).join(":");
           const existing = tables.web_collection_cursors.get(key);
           tables.web_collection_cursors.set(key, {
-            id: existing?.id || id, provider_id: providerId, resource_type: resourceType, business_date: businessDate,
+            id: existing?.id || id, provider_id: providerId, store_id: storeId, resource_type: resourceType, business_date: businessDate,
             job_id: jobId, run_id: runId, batch_id: batchId, completed_at: completedAt, updated_at: updatedAt
           });
           return { success: true };
