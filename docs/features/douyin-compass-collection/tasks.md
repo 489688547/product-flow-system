@@ -24,7 +24,7 @@
 - [x] 实现 Douyin 文件解析与本机 processor
   - 输出：安全样例 fixtures、四资源字段映射、日期/店铺/行数校验、原始归档和 ingest。
   - 失败测试：未知格式、错日期、缺字段、重复文件或敏感字段进入 payload 时失败。
-- [ ] 实现 Douyin MV3 adapter
+- [x] 实现 Douyin MV3 adapter
   - 输出：固定 host/page/action、下载、`store_daily` 安全读数、登录与人工验证状态。
   - 失败测试：远端 URL/selector、未知 task 字段、任意页面内容或未登记 host 被接受时失败。
 - [ ] 抽取通用 orchestrator processor

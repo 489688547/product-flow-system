@@ -7,8 +7,10 @@
   "permissions": ["alarms", "downloads", "storage", "tabs"],
   "host_permissions": [
     "http://127.0.0.1:17653/*",
+    "https://compass.jinritemai.com/*",
     "https://erp.superboss.cc/*",
-    "https://erpb.superboss.cc/*"
+    "https://erpb.superboss.cc/*",
+    "https://fxg.jinritemai.com/*"
   ],
   "background": {
     "service_worker": "service-worker.js",
@@ -23,12 +25,21 @@
       "matches": ["https://erp.superboss.cc/*", "https://erpb.superboss.cc/*"],
       "js": ["content-script.js"],
       "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://fxg.jinritemai.com/*", "https://compass.jinritemai.com/*"],
+      "js": ["douyin-content-script.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["providers/registry.js", "providers/kuaimai.js"],
+      "resources": ["providers/registry.js", "providers/kuaimai.js", "providers/douyin.js", "providers/executors/kuaimai.js"],
       "matches": ["https://erp.superboss.cc/*", "https://erpb.superboss.cc/*"]
+    },
+    {
+      "resources": ["providers/registry.js", "providers/douyin.js", "providers/executors/douyin.js"],
+      "matches": ["https://fxg.jinritemai.com/*", "https://compass.jinritemai.com/*"]
     }
   ]
 }

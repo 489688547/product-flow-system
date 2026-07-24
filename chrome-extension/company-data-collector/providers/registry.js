@@ -4,6 +4,13 @@ import {
   classifyKuaimaiPage,
   kuaimaiResources
 } from "./kuaimai.js";
+import {
+  buildDouyinActionPlan,
+  buildDouyinTaskUrl,
+  classifyDouyinPage,
+  douyinResources,
+  projectDouyinTask
+} from "./douyin.js";
 
 const taskFields = new Set([
   "jobId",
@@ -22,7 +29,16 @@ const providers = Object.freeze({
     resources: kuaimaiResources,
     classifyPage: classifyKuaimaiPage,
     buildTaskUrl: buildKuaimaiTaskUrl,
-    buildActionPlan: buildKuaimaiActionPlan
+    buildActionPlan: buildKuaimaiActionPlan,
+    projectTask: task => task
+  }),
+  "douyin-ecommerce": Object.freeze({
+    id: "douyin-ecommerce",
+    resources: douyinResources,
+    classifyPage: classifyDouyinPage,
+    buildTaskUrl: buildDouyinTaskUrl,
+    buildActionPlan: buildDouyinActionPlan,
+    projectTask: projectDouyinTask
   })
 });
 
@@ -57,6 +73,9 @@ export function assertRegisteredTask(task) {
     throw contractError("EXTENSION_TASK_INVALID", "插件任务 ID 无效。");
   }
   registeredResource(task.providerId, task.resourceType);
+  if (task.providerId === "douyin-ecommerce" && task.storeId === undefined) {
+    throw contractError("EXTENSION_TASK_INVALID", "抖店任务必须包含店铺标识。");
+  }
   if (task.storeId !== undefined && !/^[-_a-zA-Z0-9]{1,128}$/.test(String(task.storeId || ""))) {
     throw contractError("EXTENSION_TASK_INVALID", "插件任务店铺标识无效。");
   }
@@ -72,7 +91,7 @@ export function registeredTaskRuntime(task) {
   return {
     provider,
     resource: registeredResource(task.providerId, task.resourceType),
-    actionPlan: provider.buildActionPlan(task)
+    actionPlan: provider.buildActionPlan(provider.projectTask(task))
   };
 }
 

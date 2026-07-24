@@ -224,6 +224,25 @@ async function executeTask(task) {
     await reportTaskResult(task, { status: "failed", stage: "opening", errorCode: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE" });
     return;
   }
+  if (result?.kind === "captured") {
+    if (task.providerId !== "douyin-ecommerce" || task.resourceType !== "store_daily") {
+      await reportTaskResult(task, {
+        status: "failed",
+        stage: "collecting",
+        errorCode: "EXTENSION_CAPTURE_RESOURCE_INVALID"
+      });
+      return;
+    }
+    await reportTaskResult(task, {
+      kind: "captured",
+      status: "captured",
+      stage: "collecting",
+      facts: result.facts,
+      pageType: result.pageType,
+      selectorVersion: result.selectorVersion
+    });
+    return;
+  }
   if (result?.status !== "exporting") {
     await reportTaskResult(task, result || { status: "failed", stage: "opening", errorCode: "EXTENSION_NO_PAGE_RESPONSE" });
     return;
@@ -234,10 +253,14 @@ async function executeTask(task) {
     return;
   }
   await reportTaskResult(task, {
+    kind: "downloaded",
     status: "downloaded",
     stage: "downloading",
     downloadId: download.id,
-    fileName: safeBaseName(download.filename)
+    fileName: safeBaseName(download.filename),
+    safeFileName: safeBaseName(download.filename),
+    ...(result.pageType ? { pageType: result.pageType } : {}),
+    ...(result.reportVersion ? { reportVersion: result.reportVersion } : {})
   });
 }
 
