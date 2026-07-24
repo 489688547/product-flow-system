@@ -13,6 +13,7 @@ import { useDataStandards } from "../../state/DataStandardsProvider.jsx";
 import { DataStandardsWorkspace } from "./data-standards/DataStandardsWorkspace.jsx";
 import { AiModelWorkspace } from "./AiModelWorkspace.jsx";
 import { triggerKuaimaiSalesCollection } from "../../state/webCollectionApi.js";
+import { useStoreOperations } from "../../state/useStoreOperations.js";
 
 const SECTION_META = {
   overview: ["数据总览", "统一查看公司经营数据、趋势和平台分布。"],
@@ -114,10 +115,11 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
       // Errors stay visible through the provider state and can be retried from the cards.
     }
   };
+  const storeOperations = useStoreOperations({ enabled: section === "overview" });
   const canManageConnections = canManagePlatformConnections(user);
   const canManage = user?.role !== "readonly" && canAccessCompanyPlatform(user);
   const content = {
-    overview: <DataOverview factViews={factViews} range={range} setRange={setRange} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} comparisonRange={comparisonRange} comparisonResults={comparisonResults} comparisonRun={comparisonRun} comparisonLoading={!legacyOverviewRollback && comparisonLoading} comparisonError={legacyOverviewRollback ? null : comparisonError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} />,
+    overview: <DataOverview factViews={factViews} range={range} setRange={setRange} metricResults={legacyOverviewRollback ? legacyMetricResults : results} metricRun={legacyOverviewRollback ? null : run} metricLoading={!legacyOverviewRollback && resultLoading} metricError={legacyOverviewRollback ? null : metricError} comparisonRange={comparisonRange} comparisonResults={comparisonResults} comparisonRun={comparisonRun} comparisonLoading={!legacyOverviewRollback && comparisonLoading} comparisonError={legacyOverviewRollback ? null : comparisonError} retryMetricResults={retryMetricResults} compatibilityRollback={legacyOverviewRollback} storeOperations={storeOperations} />,
     insights: <UserInsightsProvider><UserInsightsWorkspace /></UserInsightsProvider>,
     products: <ProductCatalogWorkspace canEdit={canEdit} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManageConnections} initialCategory={dataAccessCategory} />,

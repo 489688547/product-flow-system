@@ -55,6 +55,18 @@ export function createWebCollectionD1Mock() {
       },
       async all() {
         if (query.includes("from web_collection_runners")) return { results: [...tables.web_collection_runners.values()] };
+        if (query.includes("from web_collection_jobs") && query.includes("attempt >= 3")) {
+          const recoverable = new Set(["claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting"]);
+          const now = state.values[state.values.length - 1];
+          return {
+            results: [...tables.web_collection_jobs.values()].filter(row => (
+              recoverable.has(row.status)
+              && row.lease_expires_at != null
+              && row.lease_expires_at < now
+              && Number(row.attempt || 0) >= 3
+            ))
+          };
+        }
         if (query.includes("from web_collection_jobs")) return { results: [...tables.web_collection_jobs.values()] };
         if (query.includes("from web_collection_runs")) return { results: [...tables.web_collection_runs.values()] };
         if (query.includes("from web_collection_cursors")) return { results: [...tables.web_collection_cursors.values()] };
@@ -130,6 +142,26 @@ export function createWebCollectionD1Mock() {
             started_at: null,
             completed_at: null,
             updated_at: updatedAt
+          });
+          return { success: true };
+        }
+        if (query.startsWith("update web_collection_jobs set status = 'superseded'")) {
+          const [updatedAt, providerId, storeId, resourceType, businessDate, exceptId] = state.values;
+          const active = new Set(["queued", "claimed", "opening", "collecting", "waiting_human", "exporting", "downloading", "validating", "ingesting"]);
+          for (const jobRow of tables.web_collection_jobs.values()) {
+            if (jobRow.provider_id === providerId && (jobRow.store_id || "") === storeId
+              && jobRow.resource_type === resourceType && jobRow.business_date === businessDate
+              && jobRow.id !== exceptId && active.has(jobRow.status)) {
+              Object.assign(jobRow, { status: "superseded", stage: "superseded", lease_expires_at: null, updated_at: updatedAt });
+            }
+          }
+          return { success: true };
+        }
+        if (query.startsWith("update web_collection_jobs set status = 'failed'")) {
+          const [errorSummary, completedAt, updatedAt, id] = state.values;
+          Object.assign(tables.web_collection_jobs.get(id), {
+            status: "failed", stage: "failed", error_code: "WEB_COLLECTION_STAGE_EXPIRED",
+            error_summary: errorSummary, lease_expires_at: null, completed_at: completedAt, updated_at: updatedAt
           });
           return { success: true };
         }

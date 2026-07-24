@@ -3,6 +3,7 @@ import { AlertCircle, ArrowDown, ArrowRight, ArrowUp, PackageCheck, Percent, Ref
 import { compareDataCenterMetric, dataCenterPresetRange, DATA_CENTER_OVERVIEW_METRICS } from "../../domain/dataCenter.js";
 import { Button } from "../../ui/Button.jsx";
 import { DateRangePickerField } from "../../ui/DateRangePickerField.jsx";
+import { StoreOperationsPanel } from "./StoreOperationsPanel.jsx";
 
 const money = value => value == null ? "暂无结果" : `¥${Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 0 })}`;
 const number = value => value == null ? "暂无结果" : Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
@@ -113,7 +114,7 @@ function Trend({ rows }) {
   );
 }
 
-export function DataOverview({ factViews, range, setRange, metricResults = [], metricRun, metricLoading, metricError, comparisonRange, comparisonResults = [], comparisonRun, comparisonLoading, comparisonError, retryMetricResults, compatibilityRollback = false }) {
+export function DataOverview({ factViews, range, setRange, metricResults = [], metricRun, metricLoading, metricError, comparisonRange, comparisonResults = [], comparisonRun, comparisonLoading, comparisonError, retryMetricResults, compatibilityRollback = false, storeOperations = null }) {
   const rangeResults = metricResults.filter(result => result.from === range.from && result.to === range.to);
   const byMetricCode = new Map(rangeResults.map(result => [result.metricCode, result]));
   const previousRangeResults = comparisonResults.filter(result => result.from === comparisonRange.from && result.to === comparisonRange.to);
@@ -153,6 +154,7 @@ export function DataOverview({ factViews, range, setRange, metricResults = [], m
         <section className="section-panel data-trend-panel"><div className="section-head"><div><h2>经营趋势</h2><p>{range.from} 至 {range.to}，按日 GMV。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.trendByDay || factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>
         <section className="section-panel"><div className="section-head"><div><h2>平台分布</h2><p>按 GMV 查看当前日期范围的平台占比。</p></div></div><div className="data-contribution-list">{factViews.byPlatform.slice(0, 6).map(row => { const share = totalGmv ? row.sales / totalGmv * 100 : 0; return <div key={row.platform}><span><strong>{row.platform}</strong><small>{number(share)}%</small></span><i><b style={{ width: `${share}%` }} /></i><em>{money(row.sales)}</em></div>; })}{!factViews.byPlatform.length ? <div className="empty-state compact-empty">暂无平台数据。</div> : null}</div></section>
       </div>
+      {storeOperations ? <StoreOperationsPanel {...storeOperations} /> : null}
     </div>
   );
 }

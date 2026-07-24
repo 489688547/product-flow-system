@@ -368,6 +368,8 @@ export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } =
   const seconds = Math.min(900, Math.max(60, Number(leaseSeconds) || 300));
   const now = new Date();
   const lease = new Date(now.getTime() + seconds * 1000).toISOString();
+  // 领取前先自愈无法再重领的僵尸任务，避免它们永久占位且从不落到终态。
+  await expireUnrecoverableWebCollectionJobs(db, { now }).catch(() => { /* 自愈失败不应阻断领取 */ });
   const row = await db.prepare(`SELECT * FROM web_collection_jobs
     WHERE status = 'queued'
       OR (status IN ('claimed', 'opening', 'collecting', 'exporting', 'downloading', 'validating', 'ingesting')
@@ -379,6 +381,39 @@ export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } =
     .bind(runner.id, lease, now.toISOString(), now.toISOString(), row.id).run();
   const claimed = await db.prepare("SELECT * FROM web_collection_jobs WHERE id = ? LIMIT 1").bind(row.id).first();
   return { job: mapJob(claimed) };
+}
+
+// 运行中的采集阶段；过了租约且重试已用尽时无人能再领取，需要扫成终态。
+const RUNNING_JOB_STATES = Object.freeze([
+  "claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting"
+]);
+
+// 自愈：把「运行中 + 租约已过 + attempt≥3」的僵尸任务转成 failed，恢复重试与展示。
+// 只处理公司 Mac 已无法按 claim 逻辑（attempt<3）重领的任务，不与正常重领抢占。
+export async function expireUnrecoverableWebCollectionJobs(db, { now = new Date() } = {}) {
+  const iso = now.toISOString();
+  const placeholders = RUNNING_JOB_STATES.map(() => "?").join(", ");
+  const stuck = await db.prepare(`SELECT id, runner_id, attempt, started_at FROM web_collection_jobs
+    WHERE status IN (${placeholders}) AND lease_expires_at IS NOT NULL AND lease_expires_at < ? AND attempt >= 3`)
+    .bind(...RUNNING_JOB_STATES, iso).all();
+  const rows = stuck?.results || [];
+  if (!rows.length) return { expired: 0, jobIds: [] };
+  const errorSummary = "采集阶段超过租约且重试已用尽，已自动标记失败，可重新触发。";
+  const statements = [];
+  for (const row of rows) {
+    statements.push(db.prepare(`UPDATE web_collection_jobs SET status = 'failed', stage = 'failed',
+      error_code = 'WEB_COLLECTION_STAGE_EXPIRED', error_summary = ?, lease_expires_at = NULL,
+      completed_at = ?, updated_at = ? WHERE id = ?`)
+      .bind(errorSummary, iso, iso, row.id));
+    statements.push(db.prepare(`INSERT INTO web_collection_runs
+      (id, job_id, runner_id, attempt, status, stage, batch_id, archive_id, file_hash, row_count,
+        error_code, error_summary, started_at, completed_at, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(randomId("web-run"), row.id, row.runner_id || null, Number(row.attempt || 3), "failed", "failed",
+        null, null, null, null, "WEB_COLLECTION_STAGE_EXPIRED", errorSummary, row.started_at || iso, iso, iso));
+  }
+  await db.batch(statements);
+  return { expired: rows.length, jobIds: rows.map(row => row.id) };
 }
 
 async function ownedJob(db, runner, jobId) {
@@ -443,7 +478,14 @@ export async function completeWebCollectionJob(db, runner, input) {
         job_id = excluded.job_id, run_id = excluded.run_id, batch_id = excluded.batch_id,
         completed_at = excluded.completed_at, updated_at = excluded.updated_at`)
       .bind(cursorId, row.provider_id, row.store_id || "", row.resource_type, row.business_date, row.id, runId,
-        runInput.batchId || null, now, now)
+        runInput.batchId || null, now, now),
+    // 同一 (provider,店铺,资源,业务日) 一旦有成功批次，其余未终结的重复任务标记为已被取代，
+    // 避免验收触发等留下的重复任务被再次领取或长期显示为“采集中”。
+    db.prepare(`UPDATE web_collection_jobs SET status = 'superseded', stage = 'superseded',
+      lease_expires_at = NULL, updated_at = ? WHERE provider_id = ? AND store_id = ?
+        AND resource_type = ? AND business_date = ? AND id <> ?
+        AND status IN ('queued', 'claimed', 'opening', 'collecting', 'waiting_human', 'exporting', 'downloading', 'validating', 'ingesting')`)
+      .bind(now, row.provider_id, row.store_id || "", row.resource_type, row.business_date, row.id)
   ];
   await db.batch(statements);
   return {
@@ -475,6 +517,8 @@ export async function recordWebCollectionNotification(db, runner, input) {
 
 export async function listWebCollectionStatus(db, { limit = 100 } = {}) {
   const safeLimit = Math.min(300, Math.max(1, Number(limit) || 100));
+  // 读取前先自愈僵尸任务，使卡在运行中且无法重领的任务立即显示为可重试的失败态。
+  await expireUnrecoverableWebCollectionJobs(db).catch(() => { /* 自愈失败不应阻断状态读取 */ });
   const [runners, stores, jobs, runs, cursors, notifications] = await Promise.all([
     db.prepare(`SELECT id, name, status, version, chrome_status, current_job_id, last_seen_at, created_at
       FROM web_collection_runners ORDER BY created_at DESC LIMIT ?`).bind(safeLimit).all(),

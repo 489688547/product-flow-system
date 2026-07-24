@@ -374,6 +374,87 @@ test("runner reclaims an expired non-terminal stage after a local crash", async 
   assert.equal(reclaimed.body.data.job.attempt, 2);
 });
 
+test("stuck running stage past retry budget self-heals to a retryable failure on status read", async () => {
+  const db = createWebCollectionD1Mock();
+  const base = {
+    provider_id: "douyin-ecommerce", store_id: "90862283", resource_type: "store_daily",
+    range_kind: "daily_fact", range_start: null, range_end: null, time_zone: "Asia/Shanghai",
+    schedule_version: "v1", selector_version: null, target_environment: "production",
+    target_environment_version: 1, runner_id: "web-runner-1", error_code: null, error_summary: null,
+    created_at: "2026-07-23T05:00:00.000Z", updated_at: "2026-07-23T05:05:00.000Z",
+    started_at: "2026-07-23T05:01:00.000Z", completed_at: null
+  };
+  // 僵尸任务：opening + 租约已过 + attempt=3，公司 Mac 无法再领取，也从不落到终态。
+  db.tables.web_collection_jobs.set("zombie", {
+    ...base, id: "zombie", business_date: "2026-07-23", status: "opening", stage: "opening", attempt: 3,
+    idempotency_key: "douyin-ecommerce:90862283:store_daily:2026-07-23:v1",
+    lease_expires_at: "2026-07-23T06:00:00.000Z"
+  });
+  // 未耗尽的过期运行中任务（attempt=2）仍应留给公司 Mac 重领，不被自愈扫成失败。
+  db.tables.web_collection_jobs.set("reclaimable", {
+    ...base, id: "reclaimable", business_date: "2026-07-22", status: "opening", stage: "opening", attempt: 2,
+    idempotency_key: "douyin-ecommerce:90862283:store_daily:2026-07-22:v1",
+    lease_expires_at: "2026-07-22T06:00:00.000Z"
+  });
+
+  const status = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    db, session: executive
+  });
+  assert.equal(status.response.status, 200);
+  const zombie = db.tables.web_collection_jobs.get("zombie");
+  assert.equal(zombie.status, "failed");
+  assert.equal(zombie.error_code, "WEB_COLLECTION_STAGE_EXPIRED");
+  assert.equal(zombie.lease_expires_at, null);
+  assert.equal(db.tables.web_collection_jobs.get("reclaimable").status, "opening");
+  assert.ok([...db.tables.web_collection_runs.values()].some(run => (
+    run.job_id === "zombie" && run.status === "failed" && run.error_code === "WEB_COLLECTION_STAGE_EXPIRED"
+  )));
+
+  // 落到 failed 后，运营可强制重触发重新排队，恢复采集。
+  const retried = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, session: operator,
+    body: {
+      action: "trigger", providerId: "douyin-ecommerce", storeId: "90862283",
+      resourceType: "store_daily", businessDate: "2026-07-23", force: true
+    }
+  });
+  assert.equal(retried.response.status, 200);
+  assert.equal(db.tables.web_collection_jobs.get("zombie").status, "queued");
+});
+
+test("a successful batch supersedes duplicate non-terminal jobs for the same store, resource and business day", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const token = registration.body.data.token;
+  const runnerId = [...db.tables.web_collection_runners.values()][0].id;
+  const base = {
+    provider_id: "douyin-ecommerce", store_id: "90862283", resource_type: "store_daily", business_date: "2026-07-23",
+    range_kind: "daily_fact", range_start: null, range_end: null, time_zone: "Asia/Shanghai", selector_version: null,
+    target_environment: "production", target_environment_version: 1, attempt: 1, runner_id: runnerId,
+    lease_expires_at: "2026-07-24T08:33:00.000Z", error_code: null, error_summary: null,
+    created_at: "2026-07-24T08:20:00.000Z", updated_at: "2026-07-24T08:20:00.000Z",
+    started_at: "2026-07-24T08:20:00.000Z", completed_at: null
+  };
+  // 正常日采（v1）已进入入库阶段，归当前采集器所有。
+  db.tables.web_collection_jobs.set("job-a", {
+    ...base, id: "job-a", schedule_version: "v1", status: "ingesting", stage: "ingesting",
+    idempotency_key: "douyin-ecommerce:90862283:store_daily:2026-07-23:v1:env:production:v1"
+  });
+  // 验收测试留下的重复任务（不同 scheduleVersion），卡在 opening。
+  db.tables.web_collection_jobs.set("job-b", {
+    ...base, id: "job-b", schedule_version: "extension-acceptance-v1", status: "opening", stage: "opening",
+    idempotency_key: "douyin-ecommerce:90862283:store_daily:2026-07-23:extension-acceptance-v1:env:production:v1"
+  });
+
+  const completed = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "complete", jobId: "job-a", run: { batchId: "batch-x", rowCount: 10 } }
+  });
+  assert.equal(completed.response.status, 200);
+  assert.equal(db.tables.web_collection_jobs.get("job-a").status, "success");
+  assert.equal(db.tables.web_collection_jobs.get("job-b").status, "superseded");
+  assert.equal(db.tables.web_collection_jobs.get("job-b").lease_expires_at, null);
+});
+
 test("company session reads safe status while unauthenticated callers are rejected", async () => {
   const db = createWebCollectionD1Mock();
   const denied = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", { db });
