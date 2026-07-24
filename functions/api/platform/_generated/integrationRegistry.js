@@ -387,6 +387,7 @@ const integrationRegistry = {
         "网页采集任务控制面",
         "用户洞察共享 API",
         "共享数据口径",
+        "研发待办控制面",
         "销售异常后台修复",
         "前端运行时故障恢复"
       ],
@@ -407,6 +408,7 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/**",
+        "functions/api/platform/v1/development-backlog/**",
         "functions/api/platform/v1/platform-connections.js",
         "functions/api/platform/_shared/platformCredentials.js",
         "functions/api/platform/v1/data-standards/**",
@@ -445,6 +447,8 @@ const integrationRegistry = {
         "/api/platform/v1/platform-connections",
         "/api/platform/v1/credential-vault",
         "/api/platform/v1/data-standards",
+        "/api/platform/v1/development-backlog",
+        "/api/platform/v1/development-backlog/",
         "/api/platform/v1/data-services/sales",
         "/api/platform/v1/data-services/sales-repair",
         "/api/platform/v1/web-collection/jobs",
@@ -493,7 +497,7 @@ const integrationRegistry = {
       "id": "cloudflare-d1",
       "name": "Cloudflare D1",
       "status": "connected",
-      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、销售聚合、共享商品目录、用户洞察、货流事实、数据中心、加密凭证、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
+      "summary": "保存共享业务状态、平台数据、登录会话、组织数据、研发待办、销售聚合、共享商品目录、用户洞察、货流事实、数据中心、加密凭证、店铺运营、人事绩效、跨 App 协同和 AI 安全元数据。",
       "capabilities": [
         "共享状态持久化",
         "共享状态原子比较并写入",
@@ -502,6 +506,7 @@ const integrationRegistry = {
         "浏览器级数据环境授权",
         "登录会话",
         "组织数据",
+        "研发待办与追加事件",
         "销售聚合",
         "销售异常修复任务",
         "共享商品目录",
@@ -550,6 +555,7 @@ const integrationRegistry = {
       "codePaths": [
         "functions/api/state.js",
         "functions/api/platform.js",
+        "functions/api/platform/v1/development-backlog/**",
         "functions/api/supply-chain.js",
         "functions/api/supply-chain/**",
         "functions/api/platform/v1/goods-flow/**",
@@ -588,7 +594,8 @@ const integrationRegistry = {
         "migrations/0004_data_standards.sql",
         "migrations/0005_user_insights.sql",
         "migrations/0005_goods_flow_core.sql",
-        "migrations/0006_product_catalog_components.sql"
+        "migrations/0006_product_catalog_components.sql",
+        "migrations/0014_development_backlog.sql"
       ],
       "envVars": [
         "PRODUCT_FLOW_DB",
@@ -601,6 +608,8 @@ const integrationRegistry = {
       "apiRoutes": [
         "/api/state",
         "/api/platform",
+        "/api/platform/v1/development-backlog",
+        "/api/platform/v1/development-backlog/",
         "/api/supply-chain",
         "/api/platform/v1/goods-flow/",
         "/api/sales",
@@ -1195,6 +1204,7 @@ const integrationRegistry = {
       "capabilities": [
         "Responses 流式生成",
         "非流式业务调用",
+        "研发待办结构化草稿",
         "固定模型配置",
         "原生 Function Calling 能力探测",
         "服务端受控 Skill 路由",
@@ -1232,6 +1242,7 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/api/platform/v1/ai/**",
+        "functions/api/platform/v1/development-backlog/ai-draft.js",
         "functions/api/ecommerce-operations/ai-review.js",
         "functions/api/platform/_shared/platformConnectionTesters.js",
         "functions/api/platform/_shared/platformCredentials.js",
@@ -1266,6 +1277,7 @@ const integrationRegistry = {
         "/api/platform/v1/ai/provider/test",
         "/api/platform/v1/ai/chat",
         "/api/platform/v1/ai/usage",
+        "/api/platform/v1/development-backlog/ai-draft",
         "/api/platform/v1/platform-connections/:platformId/reveal",
         "/api/ecommerce-operations/ai-review"
       ],

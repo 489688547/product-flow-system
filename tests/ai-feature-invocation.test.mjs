@@ -23,12 +23,15 @@ test("AI feature registry accepts only registered server identities", async () =
   const { getAiFeatureDefinition, listAiFeatureDefinitions } = await import(featureRegistryUrl);
   const companyAssistant = getAiFeatureDefinition("company-ai-assistant", "assistant-chat");
   const operationsReview = getAiFeatureDefinition("ecommerce-operations", "plan-review");
+  const developmentBacklogDraft = getAiFeatureDefinition("company-platform", "development-backlog-draft");
 
   assert.equal(companyAssistant.featureName, "对话分析");
   assert.equal(companyAssistant.supportsSkills, true);
   assert.equal(operationsReview.featureName, "方案点评");
   assert.equal(operationsReview.fallbackMode, "rule_fallback");
-  assert.equal(listAiFeatureDefinitions().length, 2);
+  assert.equal(developmentBacklogDraft.featureName, "研发待办草稿");
+  assert.equal(developmentBacklogDraft.fallbackMode, "none");
+  assert.equal(listAiFeatureDefinitions().length, 3);
   assert.throws(
     () => getAiFeatureDefinition("browser", "forged"),
     error => error.code === "AI_FEATURE_NOT_REGISTERED" && error.status === 500

@@ -36,6 +36,18 @@ test("collaboration execution declares its production D1 schema", () => {
   assert.equal(existsSync(resolve(root, "migrations/0002_collaboration_execution.sql")), true);
 });
 
+test("development backlog declares its control D1 and governed AI boundary", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const capability = manifest.capabilities.find(entry => entry.id === "development-backlog");
+  assert.ok(capability, "development backlog capability must be declared");
+  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "lingsuan-ai-gateway"]);
+  assert.deepEqual(capability.requiredIn, ["preview", "production"]);
+  assert.deepEqual(capability.envVars, []);
+  assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
+  assert.deepEqual(capability.tables, ["development_backlog_items", "development_backlog_events"]);
+  assert.equal(existsSync(resolve(root, "migrations/0014_development_backlog.sql")), true);
+});
+
 test("platform credential vault declares its root secret migration and affected providers", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "platform-credential-vault");

@@ -24,6 +24,7 @@ export const NAV_PERMISSION_ITEMS = [
   { key: "content-team", label: "团队效能" },
   { key: "content-issues", label: "品牌数据问题" },
   { key: "content-settings", label: "品牌内容设置" },
+  { key: "development-backlog", label: "研发待办" },
   { key: "issues", label: "问题反馈" },
   { key: "settings", label: "设置" }
 ];
@@ -64,6 +65,7 @@ export const DEFAULT_PERMISSIONS = {
     "content-team": { departments: ["*"] },
     "content-issues": { departments: ["*"] },
     "content-settings": { departments: ["总经办", "品牌", "品牌部", "运营", "运营部"] },
+    "development-backlog": { departments: ["*"] },
     issues: { departments: ["总经办"] },
     settings: { departments: ["总经办", "产品部", "产品团队"] }
   },
@@ -190,6 +192,7 @@ function matchesScope(user, departments = [], titles = []) {
 
 export function canViewNavigation(permissions, user, key) {
   if (key === "handbook") return Boolean(user);
+  if (key === "development-backlog") return Boolean(user);
   if (canManagePermissions(user)) return true;
   if (key === "settings" && FEATURE_PERMISSION_ITEMS.some(item => canViewFeature(permissions, user, item.key))) return true;
   const normalized = normalizePermissions(permissions);

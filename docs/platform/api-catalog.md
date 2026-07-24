@@ -133,6 +133,12 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 每个业务 AI 功能必须先进入服务端功能注册表，再使用固定 App 与功能 ID 调用统一执行器；浏览器不能声明审计归属。未知功能返回 `AI_FEATURE_NOT_REGISTERED` 且不得请求 Provider。非流式能力统一处理 Provider 配置、超时、Token、一次审计与规则降级；公司总助聊天继续使用同一注册归属和流式编排。业务路由不得持有模型地址、Secret、Authorization Header 或低层 Responses 适配器。
 
+### 研发待办
+
+`/api/platform/v1/development-backlog` 是公司内部研发事项、分支占用和验收结果的共享控制面。所有员工可读，非只读员工可认领，总经办治理创建、内容、优先级、验收和关闭。所有写入要求 `expectedVersion`，认领在服务端重新检查登记模块和仓库相对路径冲突，成功写入追加不可变事件。
+
+AI 草稿路由 `/api/platform/v1/development-backlog/ai-draft` 使用 `company-platform/development-backlog-draft` 和 `invokeAiFeature`，只返回未落库结构化草稿。表 `development_backlog_items`、`development_backlog_events` 固定使用控制数据库，展示目录策略为 `skip`。完整契约见 `docs/platform/apis/development-backlog-v1.md`。
+
 聊天请求只接受最多 12 条 `{ role, content }` 文本消息和弱 `appHint.screen` 路由提示；客户端提交的身份、部门、数据权限和公司状态字段全部忽略。单条用户消息最多 4,000 字符、助手历史最多 8,000 字符、总计最多 24,000 字符，最后一条必须是用户消息。包含明确财务关键词和具体金额/比例的手工粘贴内容在 Provider 调用前返回 `AI_FINANCE_TRANSFER_BLOCKED`。
 
 成功响应使用 SSE：`meta` 声明 request ID 和允许/阻止域，`text_delta` 返回正文增量，`sources` 返回 App、数据域、更新时间和记录数，`usage` 返回 token，`error` 返回稳定安全错误，`done` 声明回答是否完整。每个用户同一时间只允许一个生成请求；取消、失败和完成都会释放租约。审计只保存数据域、记录数、更新时间、token、耗时和结果码，不保存消息、回答或上下文。

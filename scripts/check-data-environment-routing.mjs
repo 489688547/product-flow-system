@@ -28,6 +28,7 @@ const CONTROL_PLANE_PREFIXES = [
   "functions/api/platform/v1/browser-agent/",
   "functions/api/platform/v1/credential-vault/",
   "functions/api/platform/v1/data-connections/",
+  "functions/api/platform/v1/development-backlog/",
   "functions/api/platform/v1/erp-collection/",
   "functions/api/platform/v1/production-data/",
   "functions/api/platform/v1/web-collection/"

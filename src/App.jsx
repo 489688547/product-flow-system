@@ -1,4 +1,4 @@
-import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Bot, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
+import { AppWindow, Archive, BadgeDollarSign, BarChart3, BookOpenText, Bot, Boxes, BriefcaseBusiness, Bug, CalendarCheck, CalendarRange, ChartNoAxesCombined, ChevronDown, ClipboardCheck, ClipboardList, Clapperboard, Database, DatabaseZap, FileClock, FileVideo2, GitBranch, Home, LayoutDashboard, ListChecks, ListTodo, LogOut, PackageSearch, PanelsTopLeft, Plug, RefreshCcw, Ruler, Settings, ShieldCheck, SlidersHorizontal, Smartphone, Sparkles, Target, Users, UsersRound, Workflow } from "lucide-react";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { FloatingIssueButton } from "./features/issues/FloatingIssueButton.jsx";
 import { useProductFlow } from "./state/ProductFlowProvider.jsx";
@@ -47,6 +47,7 @@ const BrandDataIssuesPage = lazyNamed(() => import("./features/brand-content/Bra
 const BrandContentSettingsPage = lazyNamed(() => import("./features/brand-content/BrandContentSettingsPage.jsx"), "BrandContentSettingsPage");
 const CollaborationPage = lazyNamed(() => import("./features/collaboration/CollaborationPage.jsx"), "CollaborationPage");
 const AiAssistantWorkspace = lazyNamed(() => import("./features/ai-assistant/AiAssistantWorkspace.jsx"), "AiAssistantWorkspace");
+const DevelopmentBacklogPage = lazyNamed(() => import("./features/development-backlog/DevelopmentBacklogPage.jsx"), "DevelopmentBacklogPage");
 
 const SUPPLY_CHAIN_NAV = [
   ["supply-overview", "货流驾驶舱", LayoutDashboard, "供应链管理", "overview"],
@@ -121,6 +122,7 @@ const COMPANY_NAV = [
   ...PERFORMANCE_MANAGEMENT_NAV,
   ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
+  ["development-backlog", "研发待办", ListTodo, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
 ];
@@ -137,6 +139,7 @@ const PRODUCT_NAV = [
   ...PERFORMANCE_MANAGEMENT_NAV,
   ...DATA_CENTER_NAV,
   ["handbook", "说明书", BookOpenText, "平台"],
+  ["development-backlog", "研发待办", ListTodo, "平台"],
   ["issues", "问题反馈", Bug, "平台"],
   ["settings", "设置", Settings, "平台"]
 ];
@@ -286,6 +289,7 @@ export default function App() {
     "content-issues": <BrandDataIssuesPage />,
     "content-settings": <BrandContentSettingsPage />,
     handbook: <HandbookPage selectedSlug={routeDetail} sessionUser={sessionUser} onSelectDocument={slug => showScreen("handbook", slug)} />,
+    "development-backlog": <DevelopmentBacklogPage sessionUser={sessionUser} onNavigate={showScreen} />,
     issues: <IssuePage />,
     settings: <SettingsPage detail={routeDetail} />
   };
