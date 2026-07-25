@@ -21,14 +21,14 @@
   - 验证：`node --test react-tests/sidebar-navigation.test.mjs react-tests/supply-chain.test.mjs react-tests/supply-chain-ui.test.mjs`，34/34 通过；`npm run lint`、`npm run build` 通过。
   - 提交：`feat(supply-chain): establish workflow workspaces`。
 
-- [ ] 任务 2：实现共享事实消费客户端
+- [x] 任务 2：实现共享事实消费客户端
   - 依赖：任务 1；`DEV-000005` 契约可分阶段就绪。
   - 文件：`src/state/supplyChainDataApi.js`、`react-tests/supply-chain-data-contract.test.mjs`。
   - 输入：产品目录、库存、销售、采购付款、质量售后和任务 API。
   - 输出：统一数据与 `trusted/partial/stale/unavailable` 质量状态。
   - 失败测试：认证错误、部分覆盖、过期、游标和契约缺失状态先失败。
   - 实现步骤：安全请求 → 响应校验 → 质量归一 → 聚合加载 → 取消与重试。
-  - 验证：`node --test react-tests/supply-chain-data-contract.test.mjs`。
+  - 验证：`node --test react-tests/supply-chain-data-contract.test.mjs`，5/5 通过；供应链聚焦回归 39/39、`npm run lint` 通过。
   - 提交：`feat(supply-chain): consume shared supply facts`。
 
 - [ ] 任务 3：实现角色工作台
