@@ -9,10 +9,13 @@ async function withBridge(callback) {
   const { createCollectorBridge } = await import("../scripts/web-data-collector/bridge.mjs");
   const submitted = [];
   const stores = [];
+  const taskRequests = [];
   const bridge = createCollectorBridge({
     allowedOrigin,
     pairingKey,
-    getNextTask: async () => ({
+    getNextTask: async input => {
+      taskRequests.push(input);
+      return ({
       jobId: "job-1",
       providerId: "kuaimai",
       storeId: "",
@@ -22,13 +25,14 @@ async function withBridge(callback) {
       url: "https://must-not-leak.example",
       selector: "body",
       token: "must-not-leak"
-    }),
+      });
+    },
     submitResult: async result => submitted.push(result),
     registerStore: async store => stores.push(store)
   });
   await bridge.listen({ port: 0 });
   try {
-    await callback({ bridge, baseUrl: `http://127.0.0.1:${bridge.port}`, submitted, stores });
+    await callback({ bridge, baseUrl: `http://127.0.0.1:${bridge.port}`, submitted, stores, taskRequests });
   } finally {
     await bridge.close();
   }
@@ -98,6 +102,17 @@ test("loopback bridge exposes only the safe extension task projection", async ()
         status: "queued"
       }
     });
+  });
+});
+
+test("loopback bridge forwards only a validated Chrome-profile store ID when claiming work", async () => {
+  await withBridge(async ({ baseUrl, taskRequests }) => {
+    const response = await fetch(`${baseUrl}/v1/tasks/next?storeId=90862283`, { headers: headers() });
+    assert.equal(response.status, 200);
+    assert.deepEqual(taskRequests, [{ storeId: "90862283" }]);
+
+    const unsafe = await fetch(`${baseUrl}/v1/tasks/next?storeId=../90862283`, { headers: headers() });
+    assert.equal(unsafe.status, 400);
   });
 });
 

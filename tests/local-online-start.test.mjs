@@ -7,23 +7,32 @@ function source(path) {
   return readFileSync(resolve(path), "utf8");
 }
 
-test("the standard local launcher supervises Vite and Pages Functions behind one URL", () => {
+test("the standard local launcher runs Pages Functions remotely behind one Vite URL", () => {
   const packageJson = JSON.parse(source("package.json"));
   const launcher = source("scripts/start-local-online.mjs");
   const sharedEnv = source("scripts/shared-local-env.mjs");
+  const viteConfig = source("vite.config.js");
   const finderLauncher = source("启动服务.command");
 
   assert.equal(packageJson.scripts.start, "node scripts/start-local-online.mjs");
   assert.match(launcher, /spawn/);
   assert.match(launcher, /waitForPort/);
+  assert.match(launcher, /waitForAuthenticatedApi/);
   assert.match(launcher, /const VITE_PORT = 8127/);
   assert.match(launcher, /const PAGES_PORT = 8132/);
-  assert.match(launcher, /pages[",\s]+"dev/);
+  assert.match(launcher, /pages[",\s]+"functions[",\s]+"build/);
+  assert.match(launcher, /"--watch"/);
+  assert.match(launcher, /"dev"/);
+  assert.match(launcher, /"--remote"/);
+  assert.match(launcher, /mkdtempSync/);
+  assert.match(launcher, /randomBytes/);
+  assert.match(launcher, /LOCAL_ONLINE_REQUEST_SECRET/);
+  assert.match(launcher, /"--env-file"/);
   assert.match(launcher, /VITE_API_TARGET.*PAGES_PORT/s);
   assert.match(launcher, /"--port", String\(PAGES_PORT\)/);
   assert.doesNotMatch(launcher, /"--proxy"/);
   assert.match(launcher, /resolveSharedEnvPath/);
-  assert.match(launcher, /CLOUDFLARE_INCLUDE_PROCESS_ENV/);
+  assert.doesNotMatch(launcher, /CLOUDFLARE_INCLUDE_PROCESS_ENV/);
   assert.match(sharedEnv, /resolve\(root, "\.env"\)/);
   assert.match(sharedEnv, /--git-common-dir/);
   assert.match(launcher, /checkBranchBase/);
@@ -32,11 +41,14 @@ test("the standard local launcher supervises Vite and Pages Functions behind one
   assert.match(launcher, /SIGINT/);
   assert.match(launcher, /SIGTERM/);
   assert.match(launcher, /killChild/);
+  assert.match(viteConfig, /x-pfs-local-online-session/);
+  assert.match(viteConfig, /LOCAL_ONLINE_REQUEST_SECRET/);
+  assert.doesNotMatch(viteConfig, /VITE_LOCAL_ONLINE_REQUEST_SECRET/);
   assert.match(finderLauncher, /npm start/);
   assert.doesNotMatch(finderLauncher, /node server\.mjs/);
 });
 
-test("Wrangler explicitly enables the localhost-only online account mode", () => {
+test("Wrangler explicitly enables the guarded local-online account mode", () => {
   const wrangler = source("wrangler.toml");
   const envExample = source(".env.example");
 

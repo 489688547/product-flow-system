@@ -173,7 +173,7 @@ async function serve({ root, baseUrl, downloadsDirectory }) {
   const bridge = createCollectorBridge({
     allowedOrigin: EXTENSION_ORIGIN,
     pairingKey,
-    getNextTask: () => orchestrator.nextTask(),
+    getNextTask: input => orchestrator.nextTask(input),
     registerStore: store => orchestrator.registerStore(store),
     submitResult: result => {
       void orchestrator.submitResult(result).catch(() => {});

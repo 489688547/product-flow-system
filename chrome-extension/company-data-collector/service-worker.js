@@ -15,7 +15,8 @@ const KEEP_ALIVE_INTERVAL_MS = 20000;
 const DOUYIN_DISCOVERY_URL = "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools";
 const DOUYIN_DISCOVERY_TAB_KEY = "douyinDiscoveryTabId";
 const DOUYIN_DISCOVERY_AT_KEY = "lastDouyinDiscoveryAt";
-const DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS = 12 * 60 * 60 * 1000;
+const DOUYIN_PROFILE_STORE_ID_KEY = "douyinProfileStoreId";
+const DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS = 60 * 1000;
 const DOUYIN_DISCOVERY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 let polling = false;
 
@@ -196,18 +197,25 @@ async function discoveryTab() {
 }
 
 async function discoverDouyinStore() {
-  const stored = await chrome.storage.local.get([DOUYIN_DISCOVERY_AT_KEY, "lastDouyinDiscoveryOk"]);
+  const stored = await chrome.storage.local.get([
+    DOUYIN_DISCOVERY_AT_KEY,
+    DOUYIN_PROFILE_STORE_ID_KEY,
+    "lastDouyinDiscoveryOk"
+  ]);
+  const savedStoreId = /^[-_a-zA-Z0-9]{1,128}$/.test(String(stored[DOUYIN_PROFILE_STORE_ID_KEY] || ""))
+    ? String(stored[DOUYIN_PROFILE_STORE_ID_KEY])
+    : "";
   const lastAttempt = Date.parse(String(stored[DOUYIN_DISCOVERY_AT_KEY] || ""));
   const interval = stored.lastDouyinDiscoveryOk
     ? DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS
     : DOUYIN_DISCOVERY_RETRY_INTERVAL_MS;
-  if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < interval) return false;
+  if (Number.isFinite(lastAttempt) && Date.now() - lastAttempt < interval) return savedStoreId;
   const attemptedAt = new Date().toISOString();
   await chrome.storage.local.set({ [DOUYIN_DISCOVERY_AT_KEY]: attemptedAt });
   const tab = await discoveryTab();
   if (!await waitForContentScript(tab.id, 3000)) {
     await chrome.storage.local.set({ lastDouyinDiscoveryOk: false, lastBridgeError: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE" });
-    return false;
+    return "";
   }
   const identity = await chrome.tabs.sendMessage(tab.id, { type: "DISCOVER_DOUYIN_STORE" });
   if (identity?.kind !== "store_identity") {
@@ -215,7 +223,7 @@ async function discoverDouyinStore() {
       lastDouyinDiscoveryOk: false,
       lastBridgeError: identity?.errorCode || "DOUYIN_STORE_IDENTITY_FAILED"
     });
-    return false;
+    return "";
   }
   const response = await bridgeFetch("/v1/providers/douyin-ecommerce/stores/identify", {
     method: "POST",
@@ -230,8 +238,19 @@ async function discoverDouyinStore() {
       code: `BRIDGE_STORE_HTTP_${response.status}`
     });
   }
-  await chrome.storage.local.set({ lastDouyinDiscoveryOk: true, lastBridgeError: null });
-  return true;
+  await chrome.storage.local.set({
+    [DOUYIN_PROFILE_STORE_ID_KEY]: identity.storeId,
+    lastDouyinDiscoveryOk: true,
+    lastBridgeError: null
+  });
+  return identity.storeId;
+}
+
+async function nextTaskPath(storeId = "") {
+  const params = new URLSearchParams();
+  if (/^[-_a-zA-Z0-9]{1,128}$/.test(String(storeId || ""))) params.set("storeId", storeId);
+  const query = params.toString();
+  return `/v1/tasks/next${query ? `?${query}` : ""}`;
 }
 
 // 只接受本次导出开始之后创建、且文件名匹配登记的下载；多个候选取时间
@@ -420,11 +439,15 @@ async function poll() {
   if (polling) return;
   polling = true;
   try {
-    const response = await bridgeFetch("/v1/tasks/next");
+    const stored = await chrome.storage.local.get(DOUYIN_PROFILE_STORE_ID_KEY);
+    let profileStoreId = String(stored[DOUYIN_PROFILE_STORE_ID_KEY] || "");
+    if (profileStoreId) profileStoreId = await discoverDouyinStore();
+    const response = await bridgeFetch(await nextTaskPath(profileStoreId));
     if (!response.ok) throw Object.assign(new Error("本机执行器连接失败。"), { code: `BRIDGE_HTTP_${response.status}` });
     let { task } = await response.json();
-    if (!task && await discoverDouyinStore()) {
-      const refreshed = await bridgeFetch("/v1/tasks/next");
+    if (!task && !profileStoreId) {
+      profileStoreId = await discoverDouyinStore();
+      const refreshed = await bridgeFetch(await nextTaskPath(profileStoreId));
       if (refreshed.ok) ({ task } = await refreshed.json());
     }
     if (task) await executeTask(task);

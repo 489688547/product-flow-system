@@ -82,9 +82,14 @@ export function createWebCollectorOrchestrator({
       if (!jobs.length) return { jobs: [] };
       return api.ensurePlan(jobs);
     },
-    async nextTask() {
-      if (activeJob) return processingResult ? null : safeTask(activeJob);
-      const claimed = await api.claim(300);
+    async nextTask({ storeId = "" } = {}) {
+      const profileStoreId = String(storeId || "");
+      if (activeJob) {
+        if (processingResult) return null;
+        if (activeJob.providerId === "douyin-ecommerce" && activeJob.storeId !== profileStoreId) return null;
+        return safeTask(activeJob);
+      }
+      const claimed = await api.claim(300, profileStoreId ? { storeId: profileStoreId } : {});
       if (!claimed?.job) return null;
       activeJob = claimed.job;
       await transition("claimed", "opening");

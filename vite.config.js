@@ -4,6 +4,19 @@ import tailwindcss from "@tailwindcss/vite";
 import { manualChunks } from "./scripts/build-chunks.mjs";
 
 const apiTarget = process.env.VITE_API_TARGET || "http://127.0.0.1:8132";
+const localOnlineRequestSecret = process.env.LOCAL_ONLINE_REQUEST_SECRET || "";
+
+function apiProxy() {
+  return {
+    target: apiTarget,
+    configure(proxy) {
+      if (!localOnlineRequestSecret) return;
+      proxy.on("proxyReq", proxyRequest => {
+        proxyRequest.setHeader("x-pfs-local-online-session", localOnlineRequestSecret);
+      });
+    }
+  };
+}
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -15,12 +28,12 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": apiTarget
+      "/api": apiProxy()
     }
   },
   preview: {
     proxy: {
-      "/api": apiTarget
+      "/api": apiProxy()
     }
   }
 });

@@ -4,7 +4,7 @@
 
 - 状态：已评审，开发中
 - 负责人：总经办 / 平台维护
-- 最近更新：2026-07-20
+- 最近更新：2026-07-25
 
 ## 背景与问题
 
@@ -12,9 +12,11 @@
 
 当前只有一名开发者，线上尚无其他业务用户。产品负责人已明确授权：本地开发使用自己的真实最高权限账号，直接读写线上业务数据，也可以执行该账号在线上允许的钉钉、快麦等真实外部动作。开发与线上唯一允许的差异是代码是否已经部署。
 
+2026-07-25 复核发现，`wrangler pages dev` 的本地 Miniflare 到远程 D1 代理会间歇返回 `Network connection lost` / `1031`，而生产 Pages、生产 D1 和 Wrangler D1 控制面直查均正常。标准本地线上模式不能继续依赖这条链路。
+
 ## 目标
 
-- 本地统一使用 Pages Functions 运行完整后端，不再使用假身份或功能残缺的本地 API 实现。
+- 本地统一使用由 Pages Functions 构建出的 Worker API，并通过 `wrangler dev --remote` 在 Cloudflare 网络执行；不再使用假身份、功能残缺的本地 API 或 Miniflare 远程 D1 代理。
 - 本地通过仅存在于 `.env` 的个人令牌，还原 D1 中当前账号的真实组织身份和最高权限。
 - 本地读取、创建、修改和删除业务数据时，走与线上相同的 API、D1 表、版本检查和业务审计。
 - 本地可以发送钉钉待办、创建日历、同步组织和触发快麦同步等真实动作，权限与线上同账号一致。
@@ -35,7 +37,7 @@
 - 本地 GET/HEAD 请求需要 `read` 能力；POST/PUT/PATCH/DELETE 请求需要 `write` 能力。
 - 通过校验后，中间件注入真实 `corpId`、`userId`、`unionId`、姓名、部门、职务和角色，`loginMode` 为 `local-online-account`。
 - 钉钉、快麦等真实动作不单独授予“本地特权”；请求进入现有线上路由后，继续使用真实账号角色、目标用户范围、平台连接和提供商权限校验。
-- 非 localhost、127.0.0.1 或 ::1 的请求永远不能使用本地线上账号模式。
+- 非回环请求只有在本次远程开发 Worker 同时持有并收到匹配的一次性传输密钥时，才能使用本地线上账号模式；已部署 Preview/Production 不配置该密钥。
 
 ## 当前流程
 
@@ -47,8 +49,8 @@
 
 ## 目标流程
 
-1. 开发者双击“启动服务”或执行标准命令，Vite 与 Pages Functions 共同启动，浏览器只访问 Vite `http://127.0.0.1:8127`，其 `/api` 请求由 Wrangler 处理。
-2. Pages Functions 只在回环主机且 `LOCAL_ONLINE_ACCOUNT_MODE=1` 时，从服务端环境读取 `PRODUCTION_DATA_ACCESS_TOKEN`。
+1. 开发者双击“启动服务”或执行标准命令；启动器先把 Pages Functions 构建为临时 Worker，再以 `wrangler dev --remote` 在 Cloudflare 网络执行。浏览器只访问 Vite `http://127.0.0.1:8127`，其 `/api` 请求由 Wrangler 处理。
+2. 启动器为本次进程生成随机传输密钥。Vite 仅在服务端代理时增加该密钥，浏览器无法读取；远程 Worker 只有在密钥匹配且 `LOCAL_ONLINE_ACCOUNT_MODE=1` 时，才从服务端环境读取 `PRODUCTION_DATA_ACCESS_TOKEN`。
 3. 中间件对令牌做 SHA-256 哈希，在远程生产 D1 校验令牌与真实组织身份，并按请求方法校验 `read` 或 `write`。
 4. 校验成功后注入真实线上会话，后续路由不区分本地和已部署版本。
 5. 页面显示固定风险条，标明当前是本地代码、线上真实环境、真实账号及“操作立即生效”。
@@ -56,7 +58,8 @@
 
 ## 业务规则
 
-- `LOCAL_ONLINE_ACCOUNT_MODE` 只是显式开关，不构成授权；个人令牌、回环主机、D1 身份和能力校验缺一不可。
+- `LOCAL_ONLINE_ACCOUNT_MODE` 只是显式开关，不构成授权；个人令牌、可信本地传输、D1 身份和能力校验缺一不可。
+- 远程开发 Worker 不具备回环 hostname，因此必须同时校验启动器生成的 `LOCAL_ONLINE_REQUEST_SECRET`；该随机值仅存在于临时权限文件、Vite Node 进程和远程开发 Worker，启动退出即销毁。
 - 个人令牌原文只由 Wrangler 从被忽略的 `.env` 加载到服务端环境，浏览器响应、前端 bundle 和日志不得出现令牌值。
 - 中间件每次请求校验当前组织身份，权限撤销后下一次请求立即失效。
 - 自动钉钉组织同步不得因部分组织快照未包含该人员而把已明确授权的最高权限账号降级或停用；撤销必须经过直接身份核验或显式管理操作。
@@ -69,6 +72,7 @@
 
 - `LOCAL_ONLINE_ACCOUNT_MODE`：本地线上账号模式显式开关，值为 `1`。
 - `PRODUCTION_DATA_ACCESS_TOKEN`：个人原始令牌，仅存在于被忽略的 `.env` 和本地 Worker 环境。
+- `LOCAL_ONLINE_REQUEST_SECRET`：每次 `npm start` 随机生成的一次性服务端传输密钥，不由开发者配置，不写入仓库或浏览器。
 - `production_data_access_tokens`：保存令牌哈希、稳定身份、能力、有效期和撤销状态。
 - `product_flow_org_members`：真实公司身份来源，使用 `corp_id`、`user_id`、`union_id`、`name`、`department`、`title`、`role`、`active`。
 - 本地会话增加 `loginMode: "local-online-account"`，不新增数据库表。
@@ -92,8 +96,9 @@
 - 本地钉钉待办、日历和快麦动作请求进入正式适配器，不再出现 `EXTERNAL_ACTION_DISABLED_IN_TEST`。
 - 只读令牌不能写，失效令牌不能读，非本地主机不能借本地令牌登录。
 - 浏览器源码、响应体、构建产物和日志中找不到个人令牌。
+- 远程开发请求缺少或伪造一次性传输密钥时不能注入真实账号；启动退出后临时密钥文件被删除。
 - 页面在桌面和窄屏都持续显示本地线上真实环境警示及真实账号。
-- 标准启动入口只暴露一个用户访问地址，并支持前端热更新和 Functions 本地执行。
+- 标准启动入口只暴露一个用户访问地址，支持前端热更新，并在开放页面前连续验证远程 API 已能读取真实会话和生产 D1。
 - 生产环境现有钉钉登录、业务权限和 API 行为不变。
 
 ## 上线与回滚

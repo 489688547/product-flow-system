@@ -10,25 +10,27 @@
 - The runner token is returned once, stored only in macOS Keychain and sent as `Authorization: Bearer`. D1 stores only SHA-256.
 - Runner actions on `POST /jobs` require an active `company_web_collection` runner token.
 - User action `POST /jobs` with `action=trigger` requires an active non-readonly company session in 总经办、数据中心 or 运营.
+- User action `POST /jobs` with `action=register_store` requires an active executive session and an existing active company runner. The server selects that runner; the browser cannot submit a runner ID.
 - `GET /jobs` requires a company session in 总经办、数据中心、运营、供应链 or 财务.
 - Every route requires the formal control database. Job creation persists the server-resolved target environment and version; browser requests and runners cannot submit a binding or database ID.
 
 ## Provider and task contract
 
-The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `web_collection_stores.store_id`. The paired extension may register a Douyin store only after reading the fixed shop-management page; the bridge and runner accept exactly `providerId`, stable `storeId` and `storeName`. The server, not the runner, resolves that store directory. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie, token or page body field are rejected.
+The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `web_collection_stores.store_id`. An executive may register multiple Douyin stores from 数据接入 using only `storeId` and `storeName`; `(providerId, storeId)` is unique and submitting the same ID updates its name. The paired extension may also register a Douyin store after reading the fixed shop-management page. The bridge and runner accept exactly `providerId`, stable `storeId` and `storeName`. The server, not the runner, resolves that store directory. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie, token or page body field are rejected.
 
 Runner actions are:
 
 - `heartbeat`: update version, Chrome status, current job and last-seen time.
 - `ensure_registered_plan`: after 05:00 Asia/Shanghai, generate yesterday's fixed Kuaimai tasks and four Douyin tasks for every connected store. The request accepts no store, URL, resource or database target.
 - `ensure_plan`: idempotently create 1–100 deterministic jobs.
-- `claim`: lease one queued or expired-lease job for 60–900 seconds.
+- `claim`: lease one queued or expired-lease job for 60–900 seconds. Kuaimai work may be claimed without a store identity; Douyin work is returned only when `storeId` matches the current Chrome Profile identity.
 - `transition`: perform one legal state transition with safe stage and error summary.
 - `complete`: atomically append the success run, mark the job successful and upsert its resource cursor.
 - `record_notification`: persist one deduplicated macOS notification result.
 
 User action is:
 
+- `register_store`: add or rename one Douyin store in the server-owned directory. It accepts only `providerId=douyin-ecommerce`, stable `storeId` and `storeName`.
 - `trigger`: enqueue a fixed Kuaimai daily job or one of the four registered Douyin daily resources for an already selected stable store and `businessDate`. `force=false` is idempotent and never resets an existing job. `force=true` may requeue `waiting_human`, `failed`, `schema_changed` or `success` after the user confirms login; queued or running work is not duplicated. The request cannot select a URL, selector, credential or arbitrary resource.
 
 ## States, leases and idempotency
@@ -43,7 +45,9 @@ Responses use `{ data, meta }` and `cache-control: no-store`. The list response 
 
 - `WEB_COLLECTION_STORAGE_UNAVAILABLE`: D1 binding or table unavailable, retryable.
 - `WEB_COLLECTION_RUNNER_TOKEN_REQUIRED` / `WEB_COLLECTION_RUNNER_TOKEN_INVALID`: missing or invalid Keychain token.
+- `WEB_COLLECTION_RUNNER_REQUIRED`: a user tried to add a store before the company collector was registered.
 - `WEB_COLLECTION_RUNNER_REGISTER_DENIED` / `WEB_COLLECTION_VIEW_DENIED`: authorization failure.
+- `WEB_COLLECTION_STORE_INVALID`: store identity or Chrome Profile store scope is invalid.
 - `WEB_COLLECTION_TRIGGER_DENIED`: the company session cannot enqueue or retry collection.
 - `WEB_COLLECTION_TRIGGER_INVALID`: the requested provider, resource or business date is outside the fixed user-trigger contract.
 - `WEB_COLLECTION_JOB_INVALID`: provider, resource, date, range, key or forbidden instruction field is invalid.

@@ -26,6 +26,36 @@ export async function loadWebCollectionStatus(fetchImpl = fetch) {
   };
 }
 
+export async function registerDouyinStore(input, fetchImpl = fetch) {
+  const storeName = String(input?.storeName || "").trim();
+  const storeId = String(input?.storeId || "").trim();
+  if (!storeName || storeName.length > 120 || !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)) {
+    const error = new Error("请填写有效的店铺名称和店铺 ID。");
+    error.code = "WEB_COLLECTION_STORE_INVALID";
+    throw error;
+  }
+  const response = await fetchImpl("/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    credentials: "include",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    body: JSON.stringify({
+      action: "register_store",
+      providerId: "douyin-ecommerce",
+      storeName,
+      storeId
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload?.error?.message || "抖音店铺添加失败。");
+    error.status = response.status;
+    error.code = payload?.error?.code || "WEB_COLLECTION_STORE_SAVE_FAILED";
+    error.retryable = Boolean(payload?.error?.retryable);
+    throw error;
+  }
+  return payload?.data || {};
+}
+
 const REGISTERED_TRIGGER_RESOURCES = Object.freeze({
   kuaimai: new Set(["orders", "order_items", "sales_items", "products"]),
   "douyin-ecommerce": new Set(["store_daily", "product_daily", "live_daily", "video_daily"])

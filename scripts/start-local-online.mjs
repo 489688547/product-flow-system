@@ -1,7 +1,9 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
-import { dirname, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { checkBranchBase } from "./check-branch-base.mjs";
 import { loadSharedEnv, resolveSharedEnvPath } from "./shared-local-env.mjs";
@@ -16,6 +18,7 @@ const WRANGLER_BACKUP = resolve(ROOT, ".wrangler-toml.online-backup");
 const SANDBOX_MARKER = "本地沙箱模式";
 const children = new Set();
 let stopping = false;
+let runtimeTempDir = "";
 
 function swapToSandboxConfig() {
   writeFileSync(WRANGLER_BACKUP, readFileSync(WRANGLER_CONFIG, "utf8"));
@@ -61,6 +64,22 @@ function startChild(name, command, args, env = process.env) {
   return child;
 }
 
+function runCommand(name, command, args, env = process.env) {
+  return new Promise((resolveRun, rejectRun) => {
+    const child = spawn(command, args, { cwd: ROOT, env, stdio: "inherit" });
+    children.add(child);
+    child.once("exit", (code, signal) => {
+      children.delete(child);
+      if (code === 0) {
+        resolveRun();
+        return;
+      }
+      const detail = signal ? `signal ${signal}` : `code ${code ?? 1}`;
+      rejectRun(new Error(`${name} failed (${detail}).`));
+    });
+  });
+}
+
 function portOpen(port) {
   return new Promise(resolveOpen => {
     const socket = connect({ host: HOST, port });
@@ -85,6 +104,53 @@ async function waitForPort(port, timeoutMs = 20_000) {
   throw new Error(`Timed out waiting for ${HOST}:${port}.`);
 }
 
+async function waitForAuthenticatedApi(secret, timeoutMs = 90_000) {
+  const deadline = Date.now() + timeoutMs;
+  let consecutiveSuccesses = 0;
+  let lastFailure = "远程 API 尚未就绪";
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`http://${HOST}:${PAGES_PORT}/api/auth/session`, {
+        headers: { "x-pfs-local-online-session": secret }
+      });
+      const body = await response.json().catch(() => ({}));
+      if (response.ok && body.authenticated === true && body.user?.loginMode === "local-online-account") {
+        consecutiveSuccesses += 1;
+        if (consecutiveSuccesses >= 3) return;
+      } else {
+        consecutiveSuccesses = 0;
+        lastFailure = body.message || `HTTP ${response.status}`;
+      }
+    } catch (error) {
+      consecutiveSuccesses = 0;
+      lastFailure = error?.message || String(error);
+    }
+    await new Promise(resolveWait => setTimeout(resolveWait, 500));
+  }
+  throw new Error(`远程 API 未通过连续验证：${lastFailure}`);
+}
+
+function prepareRemoteRuntime() {
+  runtimeTempDir = mkdtempSync(join(tmpdir(), "product-flow-local-online-"));
+  const requestSecret = randomBytes(32).toString("base64url");
+  const envPath = join(runtimeTempDir, "runtime.env");
+  writeFileSync(envPath, `LOCAL_ONLINE_REQUEST_SECRET=${requestSecret}\n`, { mode: 0o600 });
+  return {
+    bundlePath: join(runtimeTempDir, "index.js"),
+    envPath,
+    requestSecret
+  };
+}
+
+function cleanupRemoteRuntime() {
+  if (!runtimeTempDir) return;
+  try {
+    rmSync(runtimeTempDir, { recursive: true, force: true });
+  } finally {
+    runtimeTempDir = "";
+  }
+}
+
 function killChild(child) {
   if (!child.killed) child.kill("SIGTERM");
 }
@@ -94,6 +160,7 @@ function shutdown() {
   stopping = true;
   for (const child of children) killChild(child);
   restoreConfigIfSwapped();
+  cleanupRemoteRuntime();
 }
 
 process.once("SIGINT", shutdown);
@@ -115,22 +182,48 @@ async function main() {
   }
   const sharedEnvPath = resolveSharedEnvPath(ROOT);
   const sharedEnv = loadSharedEnv(ROOT, { envPath: sharedEnvPath });
-  const wranglerEnv = {
-    ...process.env,
-    ...sharedEnv.values,
-    CLOUDFLARE_INCLUDE_PROCESS_ENV: "true"
-  };
+  if (!sharedEnv.values.PRODUCTION_DATA_ACCESS_TOKEN) {
+    throw new Error("本地线上账号缺少 PRODUCTION_DATA_ACCESS_TOKEN。");
+  }
   console.log(useLocalD1 ? "正在启动本地代码 · 本地沙箱环境（本地 D1，不连生产库）..." : "正在启动本地代码 · 线上真实环境...");
-  startChild("Wrangler", executable("wrangler"), [
-    "pages", "dev",
-    "--port", String(PAGES_PORT),
-    "--ip", HOST,
-    "--live-reload"
-  ], wranglerEnv);
+  let requestSecret = "";
+  if (useLocalD1) {
+    startChild("Wrangler", executable("wrangler"), [
+      "pages", "dev",
+      "--port", String(PAGES_PORT),
+      "--ip", HOST,
+      "--live-reload",
+      "--env-file", sharedEnvPath
+    ]);
+  } else {
+    const runtime = prepareRemoteRuntime();
+    requestSecret = runtime.requestSecret;
+    const functionsBuildArgs = [
+      "pages", "functions", "build", "functions",
+      "--outdir", runtimeTempDir,
+      "--output-config-path", join(runtimeTempDir, "wrangler.jsonc"),
+      "--project-directory", ROOT,
+      "--build-output-directory", "dist"
+    ];
+    await runCommand("Pages Functions build", executable("wrangler"), functionsBuildArgs);
+    startChild("Pages Functions watcher", executable("wrangler"), [...functionsBuildArgs, "--watch"]);
+    startChild("Wrangler", executable("wrangler"), [
+      "dev", runtime.bundlePath,
+      "--remote",
+      "--port", String(PAGES_PORT),
+      "--ip", HOST,
+      "--config", WRANGLER_CONFIG,
+      "--env-file", sharedEnvPath,
+      "--env-file", runtime.envPath,
+      "--show-interactive-dev-session=false"
+    ]);
+  }
   await waitForPort(PAGES_PORT);
+  if (!useLocalD1) await waitForAuthenticatedApi(requestSecret);
   startChild("Vite", executable("vite"), ["--host", HOST, "--port", String(VITE_PORT)], {
     ...process.env,
-    VITE_API_TARGET: `http://${HOST}:${PAGES_PORT}`
+    VITE_API_TARGET: `http://${HOST}:${PAGES_PORT}`,
+    ...(requestSecret ? { LOCAL_ONLINE_REQUEST_SECRET: requestSecret } : {})
   });
   await waitForPort(VITE_PORT);
   console.log(`请打开 http://${HOST}:${VITE_PORT}/`);

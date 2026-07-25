@@ -34,7 +34,11 @@ export function createWebCollectionApi({ baseUrl, token, fetchImpl = nodeRequest
     registerStore: input => action({ action: "register_store", ...input }),
     ensurePlan: jobs => action({ action: "ensure_plan", jobs }),
     ensureRegisteredPlan: () => action({ action: "ensure_registered_plan" }),
-    claim: (leaseSeconds = 300) => action({ action: "claim", leaseSeconds }),
+    claim: (leaseSeconds = 300, input = {}) => action({
+      action: "claim",
+      leaseSeconds,
+      ...(input.storeId ? { storeId: input.storeId } : {})
+    }),
     transition: input => action({ action: "transition", ...input }),
     complete: input => action({ action: "complete", ...input }),
     recordNotification: input => action({ action: "record_notification", ...input })

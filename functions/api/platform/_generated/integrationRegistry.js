@@ -278,8 +278,10 @@ const integrationRegistry = {
       "id": "douyin-ecommerce",
       "name": "抖音电商罗盘",
       "status": "integrating",
-      "summary": "账号密码登录与旧 browser-agent 任务保持退役；公司 Mac 仅复用员工维护的已登录 Chrome，以官方报表下载为主采集抖店与电商罗盘经营数据，文件导入保留为人工兜底。",
+      "summary": "账号密码登录与旧 browser-agent 任务保持退役；公司 Mac 仅复用员工维护的已登录 Chrome，以官方报表下载为主采集抖店与电商罗盘经营数据。数据接入维护多店铺名称与稳定店铺 ID，不同账号使用独立 Chrome Profile，Douyin 任务按 Profile 店铺 ID 领取。",
       "capabilities": [
+        "多店铺名称与店铺 ID 目录",
+        "Chrome Profile 店铺隔离",
         "已登录 Chrome 官方报表采集",
         "账号密码登录保持退役",
         "店铺每日",
@@ -292,6 +294,8 @@ const integrationRegistry = {
         "标准经营事实"
       ],
       "businessQuestions": [
+        "如何登记和识别多个抖音店铺",
+        "不同 Chrome 登录账号如何避免串店",
         "抖店昨天四类经营数据是否就绪",
         "公司 Chrome 未登录或要求人工验证",
         "官方报表下载或字段发生变化",
@@ -371,10 +375,11 @@ const integrationRegistry = {
       "id": "cloudflare-pages",
       "name": "Cloudflare Pages",
       "status": "connected",
-      "summary": "托管 React 应用与 Pages Functions，并提供生产和预览运行边界。",
+      "summary": "托管 React 应用与 Pages Functions，并通过 Cloudflare 远程开发 Worker 提供稳定的本地线上 API 运行边界。",
       "capabilities": [
         "静态站点托管",
         "Pages Functions",
+        "远程 Worker 本地开发",
         "生产部署",
         "预览环境",
         "本地线上账号运行",
@@ -417,9 +422,11 @@ const integrationRegistry = {
         "src/state/resilientLocalStorage.js",
         "src/state/applicationRecovery.js",
         "src/ui/ApplicationErrorBoundary.jsx",
+        "scripts/start-local-online.mjs",
         "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
         "scripts/check-deployed-readiness.mjs",
+        "vite.config.js",
         "cloudflare-entry.html",
         "404.html",
         "public/404.html",
@@ -430,6 +437,7 @@ const integrationRegistry = {
       "envVars": [
         "PLATFORM_CREDENTIAL_MASTER_KEY",
         "LOCAL_ONLINE_ACCOUNT_MODE",
+        "LOCAL_ONLINE_REQUEST_SECRET",
         "PRODUCTION_DATA_ACCESS_TOKEN",
         "AI_ASSISTANT_ENABLED",
         "LINGSUAN_API_KEY",
@@ -467,6 +475,10 @@ const integrationRegistry = {
         {
           "label": "Pages Functions 文档",
           "url": "https://developers.cloudflare.com/pages/functions/"
+        },
+        {
+          "label": "Workers 远程开发",
+          "url": "https://developers.cloudflare.com/workers/local-development/"
         }
       ],
       "evidence": [
@@ -479,10 +491,13 @@ const integrationRegistry = {
         "src/state/resilientLocalStorage.js",
         "src/ui/ApplicationErrorBoundary.jsx",
         "docs/features/frontend-runtime-resilience/prd.md",
+        "docs/features/environment-parity-production-data/prd.md",
         "docs/platform/architecture.md",
         "docs/platform/apis/data-services-sales-v1.md",
+        "scripts/start-local-online.mjs",
         "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
+        "vite.config.js",
         "wrangler.toml"
       ],
       "relations": [

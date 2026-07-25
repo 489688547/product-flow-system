@@ -2118,12 +2118,6 @@ main { min-width: 0; overflow-x: hidden; }
 .data-source-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; display: grid; grid-template-columns: repeat(5, minmax(130px, 1fr)) auto; align-items: end; gap: var(--space-3); }
 .data-source-form label, .data-settings-workspace label { min-width: 0; display: grid; gap: 5px; color: var(--text-secondary); font-size: 11px; font-weight: 700; }
 .data-connections-workspace { min-width: 0; display: grid; gap: var(--space-4); }
-.connection-summary { min-height: 70px; padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
-.connection-summary > div { min-width: 0; display: flex; align-items: center; gap: var(--space-2); }
-.connection-summary > div:first-child > svg { color: var(--accent); }
-.connection-summary span { min-width: 0; display: grid; gap: 2px; color: var(--text-secondary); font-size: 11px; }
-.connection-summary strong { color: var(--text-primary); font-size: 14px; }
-.connection-summary small { color: var(--text-tertiary); font-size: 11px; font-weight: 400; }
 .connection-tabs { width: fit-content; padding: 3px; display: flex; gap: 2px; border: 1px solid var(--border); border-radius: calc(var(--radius-control) + 3px); background: var(--surface-subtle); }
 .connection-tabs button { min-height: 34px; padding: 0 13px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--text-secondary); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .connection-tabs button[aria-selected="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px color-mix(in oklch, var(--text-primary), transparent 90%); }
@@ -2192,6 +2186,18 @@ main { min-width: 0; overflow-x: hidden; }
 .connector-add-action { width: 100%; min-height: 34px; margin-top: auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px dashed var(--border-strong); border-radius: var(--radius-control); background: var(--surface-subtle); color: var(--text-secondary); font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
 .connector-add-action:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
 .connector-add-action:disabled { cursor: not-allowed; opacity: .48; }
+.douyin-store-card { min-height: 248px; }
+.douyin-store-card .connector-card-head { grid-template-rows: auto; }
+.douyin-store-list { min-width: 0; max-height: 168px; margin: 0; padding: 0; overflow-y: auto; display: grid; align-content: start; list-style: none; border-block: 1px solid var(--border); }
+.douyin-store-list li { min-width: 0; padding: 10px 2px; display: grid; grid-template-columns: 18px minmax(0, 1fr); align-items: center; gap: 8px; border-bottom: 1px solid var(--border); }
+.douyin-store-list li:last-child { border-bottom: 0; }
+.douyin-store-list svg { color: var(--text-tertiary); }
+.douyin-store-list span { min-width: 0; display: grid; gap: 2px; }
+.douyin-store-list b, .douyin-store-list small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.douyin-store-list b { font-size: 11px; }
+.douyin-store-list small { color: var(--text-tertiary); font-size: 9px; }
+.douyin-store-empty { display: grid; place-items: center; min-height: 72px; margin: 0; color: var(--text-tertiary); font-size: 11px; }
+.douyin-store-dialog { width: min(560px, calc(100vw - 32px)); }
 .connector-dialog { overflow: hidden; }
 .connector-dialog-body { display: grid; gap: var(--space-4); }
 .connector-dialog-intro, .connector-verification-note { padding: var(--space-3); display: flex; align-items: flex-start; gap: var(--space-2); border: 1px solid color-mix(in oklch, var(--accent), transparent 78%); border-radius: var(--radius-control); background: var(--accent-soft); }
@@ -2783,8 +2789,6 @@ main { min-width: 0; overflow-x: hidden; }
   .product-catalog-results-heading { align-items: flex-start; flex-direction: column; gap: 2px; }
   .table-pagination { align-items: stretch; flex-direction: column; }
   .table-pagination > div { justify-content: space-between; }
-  .connection-summary { align-items: stretch; flex-direction: column; }
-  .connection-summary > div:last-child { justify-content: space-between; }
   .data-access-tabs { width: 100%; }
   .data-access-grid, .connector-catalog-grid { grid-template-columns: 1fr; }
   .data-access-card { min-height: 0; }
@@ -2826,7 +2830,6 @@ main { min-width: 0; overflow-x: hidden; }
   .connector-dialog { width: 100vw; max-width: none; height: 100dvh; max-height: none; border-radius: 0; }
   .connector-dialog .modal-body { padding-left: var(--space-4); padding-right: var(--space-4); }
   .connector-dialog .modal-footer { position: sticky; bottom: 0; }
-  .connection-summary > div:last-child { align-items: stretch; flex-direction: column; }
 }
 
 @media (prefers-reduced-motion: reduce) {

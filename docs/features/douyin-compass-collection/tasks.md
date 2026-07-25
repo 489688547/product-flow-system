@@ -44,3 +44,9 @@
   - 输出：全量检查、PR、main 合并、Cloudflare Git 部署、生产 API/UI 与插件复核。
   - 验证：Definition of Done 和 production readiness 全部通过。
   - 2026-07-24 发布前证据：本地 `lint`、治理、集成、环境能力、完整测试与生产构建均通过；PR #82 已创建，等待合并后的生产部署与最终复核。
+- [x] 优化数据接入与多店铺识别
+  - 删除数据接入摘要/刷新块、抖音资源标签、运行状态说明和“打开抖店处理”。
+  - 抖音卡片展示全部已登记店铺名称与店铺 ID，底部操作为“添加”。
+  - 已授权管理员通过服务端目录幂等新增或更新店铺；非法 ID、无 runner、无权限均稳定失败。
+  - 不同登录账号使用独立 Chrome Profile；扩展按当前 Profile 已识别店铺 ID 领取 Douyin 任务，避免串店。
+  - 按 TDD 完成控制面、客户端、Bridge、orchestrator、extension、UI 与响应式验证。

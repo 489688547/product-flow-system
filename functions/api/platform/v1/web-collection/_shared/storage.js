@@ -79,6 +79,15 @@ export async function authenticateWebCollectionRunner(db, request) {
   return { id: row.id, name: row.name, scope: row.scope };
 }
 
+export async function activeWebCollectionRunner(db) {
+  const row = await db.prepare(`SELECT id, name, scope FROM web_collection_runners
+    WHERE status = 'active' ORDER BY COALESCE(last_seen_at, created_at) DESC LIMIT 1`).first();
+  if (!row || row.scope !== RUNNER_SCOPE) {
+    throw routeError(409, "WEB_COLLECTION_RUNNER_REQUIRED", "请先登记公司 Mac 采集器，再添加店铺。");
+  }
+  return { id: row.id, name: row.name, scope: row.scope };
+}
+
 function safeErrorSummary(value) {
   const summary = String(value || "").replace(/[\r\n]+/g, " ").trim().slice(0, 240);
   if (/password|cookie|token|验证码|authorization|bearer/i.test(summary)) return "采集阶段失败，敏感错误详情已隐藏。";
@@ -364,17 +373,23 @@ export async function triggerWebCollectionJob(db, input, target = { environmentI
   return { created: plan.created, requeued, job: savedJobs[0], jobs: savedJobs };
 }
 
-export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300 } = {}) {
+export async function claimWebCollectionJob(db, runner, { leaseSeconds = 300, storeId = "" } = {}) {
   const seconds = Math.min(900, Math.max(60, Number(leaseSeconds) || 300));
+  const profileStoreId = String(storeId || "").trim();
+  if (profileStoreId && !/^[-_a-zA-Z0-9]{1,128}$/.test(profileStoreId)) {
+    throw routeError(400, "WEB_COLLECTION_STORE_INVALID", "Chrome Profile 的店铺标识无效。");
+  }
   const now = new Date();
   const lease = new Date(now.getTime() + seconds * 1000).toISOString();
   // 领取前先自愈无法再重领的僵尸任务，避免它们永久占位且从不落到终态。
   await expireUnrecoverableWebCollectionJobs(db, { now }).catch(() => { /* 自愈失败不应阻断领取 */ });
   const row = await db.prepare(`SELECT * FROM web_collection_jobs
-    WHERE status = 'queued'
-      OR (status IN ('claimed', 'opening', 'collecting', 'exporting', 'downloading', 'validating', 'ingesting')
-        AND lease_expires_at < ? AND attempt < 3)
-    ORDER BY business_date, created_at LIMIT 1`).bind(now.toISOString()).first();
+    WHERE (provider_id != 'douyin-ecommerce'
+      OR (provider_id = 'douyin-ecommerce' AND store_id = ?))
+      AND (status = 'queued'
+        OR (status IN ('claimed', 'opening', 'collecting', 'exporting', 'downloading', 'validating', 'ingesting')
+          AND lease_expires_at < ? AND attempt < 3))
+    ORDER BY business_date, created_at LIMIT 1`).bind(profileStoreId, now.toISOString()).first();
   if (!row) return { job: null };
   await db.prepare(`UPDATE web_collection_jobs SET status = 'claimed', stage = 'claimed', runner_id = ?,
     lease_expires_at = ?, attempt = attempt + 1, started_at = COALESCE(started_at, ?), updated_at = ? WHERE id = ?`)

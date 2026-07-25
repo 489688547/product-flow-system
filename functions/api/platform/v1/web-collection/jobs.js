@@ -6,6 +6,7 @@ import {
 import { collectionTargetFromRequestData } from "../../_shared/collectionTarget.js";
 import { errorResponse, requestId, routeError, successResponse } from "./_shared/http.js";
 import {
+  activeWebCollectionRunner,
   authenticateWebCollectionRunner,
   claimWebCollectionJob,
   completeWebCollectionJob,
@@ -38,9 +39,16 @@ export async function onRequest({ request, env, data = {} }) {
       return successResponse(await triggerWebCollectionJob(db, body, collectionTargetFromRequestData(data)), id);
     }
     const sessionCreatesPlan = body?.action === "ensure_plan" && data.session;
-    const runner = sessionCreatesPlan
-      ? { id: `session:${authorizeWebCollectionAdmin(data.session).actor || data.session.userId}` }
-      : await authenticateWebCollectionRunner(db, request);
+    const sessionRegistersStore = body?.action === "register_store" && data.session;
+    let runner;
+    if (sessionCreatesPlan) {
+      runner = { id: `session:${authorizeWebCollectionAdmin(data.session).actor || data.session.userId}` };
+    } else if (sessionRegistersStore) {
+      authorizeWebCollectionAdmin(data.session);
+      runner = await activeWebCollectionRunner(db);
+    } else {
+      runner = await authenticateWebCollectionRunner(db, request);
+    }
     let result;
     switch (body?.action) {
       case "heartbeat": result = await heartbeatRunner(db, runner, body); break;

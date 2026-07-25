@@ -9,6 +9,7 @@ import {
 import {
   kuaimaiProductCollectionProgress,
   loadWebCollectionStatus,
+  registerDouyinStore,
   triggerKuaimaiProductCollection,
   triggerKuaimaiSalesCollection,
   triggerWebCollection,
@@ -35,6 +36,35 @@ test("web collection status client reads the existing safe control-plane payload
   });
   assert.equal(status.runners[0].name, "公司 Mac");
   assert.deepEqual(status.jobs, []);
+});
+
+test("Douyin store registration posts only the store name and store ID", async () => {
+  const calls = [];
+  const result = await registerDouyinStore({
+    storeName: "TIYES 提野星旗舰店",
+    storeId: "90862283"
+  }, async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({
+      data: {
+        store: {
+          providerId: "douyin-ecommerce",
+          storeName: "TIYES 提野星旗舰店",
+          storeId: "90862283"
+        }
+      }
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  });
+
+  assert.equal(calls[0].url, "/api/platform/v1/web-collection/jobs");
+  assert.equal(calls[0].options.credentials, "include");
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    action: "register_store",
+    providerId: "douyin-ecommerce",
+    storeName: "TIYES 提野星旗舰店",
+    storeId: "90862283"
+  });
+  assert.equal(result.store.storeId, "90862283");
 });
 
 test("sales recovery client can auto-enqueue and manually requeue the exact Chrome resource", async () => {

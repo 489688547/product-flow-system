@@ -164,7 +164,9 @@ export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, 
         return;
       }
       if (request.method === "GET" && url.pathname === "/v1/tasks/next") {
-        json(response, 200, { task: safeTaskProjection(await getNextTask()) }, allowedOrigin);
+        const storeId = String(url.searchParams.get("storeId") || "").trim();
+        if (storeId && !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)) throw new Error("BRIDGE_STORE_ID_INVALID");
+        json(response, 200, { task: safeTaskProjection(await getNextTask({ storeId })) }, allowedOrigin);
         return;
       }
       if (request.method === "POST" && url.pathname === "/v1/providers/douyin-ecommerce/stores/identify") {

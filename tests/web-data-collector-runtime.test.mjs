@@ -20,8 +20,8 @@ function apiDouble(job) {
     calls,
     async heartbeat(input) { calls.push(["heartbeat", input]); },
     async ensurePlan(jobs) { calls.push(["ensurePlan", jobs]); return { jobs }; },
-    async claim() {
-      calls.push(["claim"]);
+    async claim(leaseSeconds, input) {
+      calls.push(["claim", leaseSeconds, input]);
       if (claimed) return { job: null };
       claimed = true;
       return { job: { ...job, status: "claimed", attempt: 1 } };
@@ -173,6 +173,23 @@ test("orchestrator returns a safe task and completes only after archive ingest",
     ["validating", "ingesting"]
   ]);
   assert.equal(api.calls.at(-1)[0], "complete");
+});
+
+test("orchestrator does not expose an active Douyin task to another Chrome profile", async () => {
+  const douyinJob = {
+    ...job,
+    id: "douyin-job-1",
+    providerId: "douyin-ecommerce",
+    storeId: "store-a",
+    resourceType: "store_daily"
+  };
+  const api = apiDouble(douyinJob);
+  const orchestrator = createWebCollectorOrchestrator({ api, processDownload: async () => ({}) });
+
+  const ownerTask = await orchestrator.nextTask({ storeId: "store-a" });
+  assert.equal(ownerTask.storeId, "store-a");
+  assert.equal(await orchestrator.nextTask({ storeId: "store-b" }), null);
+  assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, { storeId: "store-a" }]);
 });
 
 test("orchestrator records login and verification as waiting_human without ingest", async () => {
