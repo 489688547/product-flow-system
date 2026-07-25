@@ -224,6 +224,69 @@ test("runner registers a safely discovered Douyin store before creating its dail
   assert.equal(status.body.data.stores[0].storeName, "TIYES提野星宠物用品旗舰店");
 });
 
+test("an executive can add and rename multiple Douyin stores while ordinary operators cannot", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+
+  for (const store of [
+    { storeId: "90862283", storeName: "TIYES 提野星旗舰店" },
+    { storeId: "99887766", storeName: "TIYES 第二店" },
+    { storeId: "90862283", storeName: "TIYES 提野星宠物用品旗舰店" }
+  ]) {
+    const saved = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+      method: "POST",
+      db,
+      session: executive,
+      body: {
+        action: "register_store",
+        providerId: "douyin-ecommerce",
+        ...store
+      }
+    });
+    assert.equal(saved.response.status, 200);
+  }
+
+  assert.equal(db.tables.web_collection_stores.size, 2);
+  assert.equal(
+    db.tables.web_collection_stores.get("douyin-ecommerce:90862283").store_name,
+    "TIYES 提野星宠物用品旗舰店"
+  );
+  assert.equal(
+    db.tables.web_collection_stores.get("douyin-ecommerce:90862283").runner_id,
+    registration.body.data.id
+  );
+
+  const denied = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    body: {
+      action: "register_store",
+      providerId: "douyin-ecommerce",
+      storeId: "11223344",
+      storeName: "无权添加"
+    }
+  });
+  assert.equal(denied.response.status, 403);
+});
+
+test("a session cannot register a Douyin store before the company collector exists", async () => {
+  const db = createWebCollectionD1Mock();
+  const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: executive,
+    body: {
+      action: "register_store",
+      providerId: "douyin-ecommerce",
+      storeId: "90862283",
+      storeName: "TIYES 提野星旗舰店"
+    }
+  });
+  assert.equal(result.response.status, 409);
+  assert.equal(result.body.error.code, "WEB_COLLECTION_RUNNER_REQUIRED");
+});
+
 test("runner store registration rejects unknown providers and unsafe identity fields", async () => {
   const db = createWebCollectionD1Mock();
   const registration = await register(db);
@@ -241,6 +304,40 @@ test("runner store registration rejects unknown providers and unsafe identity fi
     assert.equal(result.response.status, 400);
     assert.equal(result.body.error.code, "WEB_COLLECTION_STORE_INVALID");
   }
+});
+
+test("runner claims Douyin work only for the store identified by its Chrome profile", async () => {
+  const db = createWebCollectionD1Mock();
+  const registration = await register(db);
+  const token = registration.body.data.token;
+  const jobs = ["store-a", "store-b"].map(storeId => ({
+    providerId: "douyin-ecommerce",
+    storeId,
+    resourceType: "store_daily",
+    businessDate: "2026-07-23",
+    rangeKind: "daily_fact",
+    range: { start: "2026-07-23T00:00:00+08:00", end: "2026-07-23T23:59:59+08:00", timeZone: "Asia/Shanghai" },
+    scheduleVersion: "v1",
+    idempotencyKey: `douyin-ecommerce:${storeId}:store_daily:2026-07-23:v1`
+  }));
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token,
+    body: { action: "ensure_plan", jobs }
+  });
+
+  const unidentified = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "claim", leaseSeconds: 300 }
+  });
+  assert.equal(unidentified.response.status, 200);
+  assert.equal(unidentified.body.data.job, null);
+
+  const claimed = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST", db, token, body: { action: "claim", leaseSeconds: 300, storeId: "store-b" }
+  });
+  assert.equal(claimed.response.status, 200);
+  assert.equal(claimed.body.data.job.storeId, "store-b");
 });
 
 test("claim lease, legal transitions, completion and cursor are atomic from the runner perspective", async () => {

@@ -87,18 +87,23 @@ test("the workspace exposes the three approved categories and no old tabs", () =
   assert.match(workspace, /role="tabpanel"/);
   assert.doesNotMatch(workspace, /经营数据连接器|内部系统保险箱/);
   assert.match(workspace, /loadWebCollectionStatus/);
-  assert.match(workspace, /providerReadiness/);
+  assert.doesNotMatch(workspace, /connection-summary|敏感信息加密保存|providerReadiness/);
 });
 
-test("Douyin access is truthful and Qianchuan remains unavailable", () => {
+test("Douyin access is a multi-store directory while Qianchuan remains unavailable", () => {
   const catalog = read("src/features/data-center/connections/ConnectorCatalog.jsx");
+  const douyinCard = read("src/features/data-center/connections/DouyinStoreCard.jsx");
+  const douyinDialog = read("src/features/data-center/connections/DouyinStoreDialog.jsx");
   const domain = read("src/domain/dataCenterConnectors.js");
   assert.match(domain, /Chrome 官方报表采集/);
-  assert.match(domain, /店铺每日/);
-  assert.match(domain, /商品每日/);
-  assert.match(domain, /直播每日/);
-  assert.match(domain, /短视频每日/);
-  assert.match(catalog, /打开抖店处理/);
+  assert.match(catalog, /DouyinStoreCard/);
+  assert.match(douyinCard, /storeName/);
+  assert.match(douyinCard, /storeId/);
+  assert.match(douyinCard, /\/>添加/);
+  assert.match(douyinDialog, /店铺名称/);
+  assert.match(douyinDialog, /店铺 ID/);
+  assert.doesNotMatch(`${catalog}\n${douyinCard}`, /打开抖店处理|只有四类资源/);
+  assert.doesNotMatch(douyinCard, /正在同步|店铺每日|商品每日|直播每日|短视频每日/);
   assert.match(catalog, /尚未接入/);
   assert.doesNotMatch(`${domain}\n${catalog}`, /巨量(?:引擎|千川)[\s\S]{0,80}已接通/);
 });

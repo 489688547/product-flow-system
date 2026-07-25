@@ -58,6 +58,12 @@ function isLoopbackRequest(request) {
   return ["localhost", "127.0.0.1", "::1"].includes(hostname);
 }
 
+function hasLocalOnlineTransportSecret(request, env = {}) {
+  const expected = String(env.LOCAL_ONLINE_REQUEST_SECRET || "");
+  const actual = String(request.headers.get("x-pfs-local-online-session") || "");
+  return Boolean(expected) && actual === expected;
+}
+
 function localOnlineError(error) {
   return jsonResponse({
     authenticated: false,
@@ -70,7 +76,8 @@ function localOnlineError(error) {
 }
 
 async function localOnlineAccountSession(request, env = {}) {
-  if (env.LOCAL_ONLINE_ACCOUNT_MODE !== "1" || !isLoopbackRequest(request)) return null;
+  const trustedTransport = isLoopbackRequest(request) || hasLocalOnlineTransportSecret(request, env);
+  if (env.LOCAL_ONLINE_ACCOUNT_MODE !== "1" || !trustedTransport) return null;
   if (!env.PRODUCTION_DATA_ACCESS_TOKEN) {
     throw productionAccessError("本地线上账号缺少个人令牌。", 401, "LOCAL_ONLINE_TOKEN_REQUIRED");
   }

@@ -23,6 +23,11 @@ export function createWebCollectionD1Mock() {
           const [hash] = state.values;
           return [...tables.web_collection_runners.values()].find(row => row.token_hash === hash && row.status === "active") || null;
         }
+        if (query.includes("from web_collection_runners") && query.includes("where status = 'active'")) {
+          return [...tables.web_collection_runners.values()]
+            .filter(row => row.status === "active")
+            .sort((left, right) => String(right.last_seen_at || right.created_at).localeCompare(String(left.last_seen_at || left.created_at)))[0] || null;
+        }
         if (query.includes("from web_collection_jobs") && query.includes("idempotency_key = ?")) {
           const [key] = state.values;
           return [...tables.web_collection_jobs.values()].find(row => row.idempotency_key === key) || null;
@@ -31,13 +36,22 @@ export function createWebCollectionD1Mock() {
           return tables.web_collection_jobs.get(state.values[0]) || null;
         }
         if (query.includes("from web_collection_jobs") && query.includes("status = 'queued'")) {
-          const [now] = state.values;
+          const filtersDouyinByStore = query.includes("provider_id = 'douyin-ecommerce' and store_id = ?");
+          const profileStoreId = filtersDouyinByStore ? state.values[0] : "";
+          const now = state.values.at(-1);
           const recoverable = new Set(["claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting"]);
           return [...tables.web_collection_jobs.values()]
-            .filter(row => row.status === "queued" || (
-              recoverable.has(row.status)
-              && row.lease_expires_at < now
-              && Number(row.attempt || 0) < 3
+            .filter(row => (
+              !filtersDouyinByStore
+              || row.provider_id !== "douyin-ecommerce"
+              || row.store_id === profileStoreId
+            ))
+            .filter(row => (
+              row.status === "queued" || (
+                recoverable.has(row.status)
+                && row.lease_expires_at < now
+                && Number(row.attempt || 0) < 3
+              )
             ))
             .sort((left, right) => `${left.business_date}:${left.created_at}`.localeCompare(`${right.business_date}:${right.created_at}`))[0] || null;
         }

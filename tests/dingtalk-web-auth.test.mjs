@@ -653,6 +653,45 @@ test("local online mode never bypasses authentication on non-local hosts", async
   assert.equal(response.status, 401);
 });
 
+test("remote local-online runtime accepts only its server-generated transport secret", async () => {
+  const env = {
+    ...await localOnlineEnv(),
+    LOCAL_ONLINE_REQUEST_SECRET: "one-start-only-secret"
+  };
+  const context = {
+    request: new Request("https://remote-preview.example/api/state", {
+      headers: { "x-pfs-local-online-session": "one-start-only-secret" }
+    }),
+    env,
+    data: {},
+    next: async () => Response.json({ ok: true })
+  };
+
+  const response = await apiMiddleware(context);
+
+  assert.equal(response.status, 200);
+  assert.equal(context.data.session.loginMode, "local-online-account");
+  assert.equal(context.data.session.userId, "user-1");
+});
+
+test("remote local-online runtime rejects missing or mismatched transport secrets", async () => {
+  const env = {
+    ...await localOnlineEnv(),
+    LOCAL_ONLINE_REQUEST_SECRET: "one-start-only-secret"
+  };
+  for (const header of [null, "wrong-secret"]) {
+    const headers = header ? { "x-pfs-local-online-session": header } : {};
+    const response = await apiMiddleware({
+      request: new Request("https://remote-preview.example/api/state", { headers }),
+      env,
+      data: {},
+      next: async () => Response.json({ ok: true })
+    });
+
+    assert.equal(response.status, 401);
+  }
+});
+
 test("session bootstrap exposes the middleware preview identity", async () => {
   const response = await getCurrentSession({
     request: new Request("http://127.0.0.1:8141/api/auth/session"),

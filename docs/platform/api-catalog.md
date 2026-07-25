@@ -119,7 +119,7 @@ OTP、短信验证码、二维码内容、滑块答案和当次人工验证结�
 
 完整认证、授权、请求、响应、兼容、错误和回滚契约见 `docs/platform/apis/data-services-sales-v1.md`。
 
-本地线上账号：`npm start` 使用 8127 Vite 热更新，并把全部 `/api/*` 代理给 8132 `wrangler pages dev`；`wrangler.toml` 将 `PRODUCT_FLOW_DB` 绑定到远程生产 D1。只有请求主机为 `localhost`、`127.0.0.1` 或 `::1`、`LOCAL_ONLINE_ACCOUNT_MODE=1`、服务端个人令牌有效且对应 active executive 时，中间件才注入真实组织会话。GET/HEAD 要求 `read`，其他方法要求 `write`；通过后所有业务数据和钉钉、快麦动作继续执行各自正式路由权限。非本地主机即使误配开关和令牌也必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
+本地线上账号：`npm start` 使用 8127 Vite 热更新，并把全部 `/api/*` 代理给 8132 `wrangler dev --remote`；Pages Functions 构建出的 Worker 在 Cloudflare 网络执行并原生访问 `PRODUCT_FLOW_DB`。回环请求，或同时持有启动器随机 `LOCAL_ONLINE_REQUEST_SECRET` 且携带匹配内部 Header 的远程开发请求，在 `LOCAL_ONLINE_ACCOUNT_MODE=1`、服务端个人令牌有效且对应 active executive 时由中间件注入真实组织会话。该随机值不进入浏览器、仓库或已部署环境。GET/HEAD 要求 `read`，其他方法要求 `write`；通过后所有业务数据和钉钉、快麦动作继续执行各自正式路由权限。已部署 Preview/Production 即使误配开关和个人令牌，也因没有本次启动密钥而必须完成正式钉钉登录。数据中心页面可用 `?from=YYYY-MM-DD&to=YYYY-MM-DD#data-overview` 打开指定日期范围，非法或倒序日期回退到默认“当月至昨天”。
 
 用户洞察作为数据中心、产品全周期和电商店铺运营的共享能力，使用 `/api/platform/v1/user-insights*`。完整认证、权限、类目确认、规则版本、竞品确认、采集设备、幂等、错误和兼容契约见 `docs/platform/apis/user-insights-v1.md`；公司 Mac 浏览器采集边界见 `docs/platform/browser-market-collection.md`。
 

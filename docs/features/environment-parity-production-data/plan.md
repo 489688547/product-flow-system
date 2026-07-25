@@ -6,13 +6,14 @@
 
 ## 架构方案
 
-Wrangler Pages Dev 作为唯一完整本地后端，远程绑定生产 D1；Vite 作为唯一浏览器入口提供热更新，并把 `/api` 代理到 Wrangler。API 中间件仅在回环主机和显式开关下读取服务端 `PRODUCTION_DATA_ACCESS_TOKEN`，复用生产令牌校验模块得到真实组织身份后注入标准会话。之后所有请求进入现有线上路由，因此 D1 写入、钉钉与快麦动作自然复用正式权限、适配器、幂等和审计规则。
+Pages Functions 先构建为临时 Worker bundle，再由 `wrangler dev --remote` 在 Cloudflare 网络执行并原生访问生产 D1；Vite 作为唯一浏览器入口提供热更新，并把 `/api` 代理到 Wrangler。启动器每次生成随机传输密钥，Vite 只在 Node 代理层增加内部 Header，远程 Worker 同时持有该密钥。API 中间件校验这条传输通道后读取服务端 `PRODUCTION_DATA_ACCESS_TOKEN`，复用生产令牌校验模块得到真实组织身份并注入标准会话。之后所有请求进入现有线上路由，因此 D1 写入、钉钉与快麦动作自然复用正式权限、适配器、幂等和审计规则。
 
 ## 文件职责
 
 - `functions/api/platform/_shared/productionDataAccess.js`：增加原始令牌校验入口并返回完整组织身份。
 - `functions/api/_middleware.js`：用真实令牌会话替换硬编码只读预览身份。
-- `scripts/start-local-online.mjs`：管理 Vite 与 Wrangler 两个子进程，提供单一启动和退出行为。
+- `scripts/start-local-online.mjs`：构建并监听 Pages Functions、生成并清理一次性密钥、管理 Vite 与远程 Wrangler 子进程，并在开放页面前验证真实 API。
+- `vite.config.js`：仅在服务端代理层发送一次性本地线上传输 Header。
 - `package.json`、`启动服务.command`：把标准本地入口切换到完整线上账号运行时。
 - `src/state/AuthProvider.jsx`：移除会话失败时的硬编码假账号回退。
 - `src/ui/LocalOnlineEnvironmentBanner.jsx`：业务中立的本地线上环境提示。
@@ -29,7 +30,8 @@ Wrangler Pages Dev 作为唯一完整本地后端，远程绑定生产 D1；Vite
 - `authorizeProductionAccess(request, db, options)` 保持现有 Bearer API，内部调用 `authorizeProductionToken`，兼容生产数据网关。
 - 本地会话结构沿用正式会话字段，额外设置 `loginMode: "local-online-account"`。
 - HTTP `GET`、`HEAD` 映射 `read`；其他方法映射 `write`。
-- `npm start` 启动 Vite `127.0.0.1:8127` 和内部 Wrangler Pages Dev `127.0.0.1:8132`；浏览器只使用 8127，Vite 将 `/api` 代理到 Wrangler。
+- `npm start` 启动 Vite `127.0.0.1:8127` 和内部 Wrangler Remote Dev `127.0.0.1:8132`；浏览器只使用 8127，Vite 将 `/api` 代理到 Wrangler。
+- `LOCAL_ONLINE_REQUEST_SECRET` 由启动器生成，不允许写入 `.env` 或 Cloudflare 已部署环境；请求 Header 名为 `x-pfs-local-online-session`。
 
 ## 数据迁移
 
@@ -42,6 +44,7 @@ Wrangler Pages Dev 作为唯一完整本地后端，远程绑定生产 D1；Vite
 - 外部动作重复：不在验收中创建无业务意义动作；真实业务操作继续依赖原幂等与查询状态。
 - D1 误写：页面持续展示线上真实环境；业务 API 原版本冲突和审计保留。
 - 启动失败：父进程打印缺失配置并同时关闭子进程；可回滚到上一版启动器。
+- 远程开发不可用：启动器在会话/API 连续校验未通过时直接退出，不开放半可用页面；可暂时使用 `npm run start:sandbox` 验证非真实数据功能。
 - 应用回滚：撤销个人令牌、恢复旧中间件和启动入口；无数据迁移需要回退。
 
 ## 验证命令

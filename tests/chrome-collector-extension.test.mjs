@@ -98,6 +98,9 @@ test("Douyin content execution supports safe capture and official downloads only
   assert.match(adapter, /route:\s*"\/shop\/video\/overview"/);
   assert.match(serviceWorker, /result\?\.kind === "captured"/);
   assert.match(serviceWorker, /safeFileName/);
+  assert.match(serviceWorker, /DOUYIN_PROFILE_STORE_ID_KEY/);
+  assert.match(serviceWorker, /URLSearchParams/);
+  assert.match(serviceWorker, /storeId/);
   assert.doesNotMatch(executor, /chrome\.(cookies|debugger|webRequest)/);
   assert.doesNotMatch(executor, /task\.(url|selector|script)/);
 });

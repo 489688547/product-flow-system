@@ -23,6 +23,13 @@
   - 输出：双击或 `npm start` 均运行与线上相同的 Functions 和远程 D1。
   - 验证：`node --test tests/local-online-start.test.mjs` 2/2 通过；Vite 8127 与 Wrangler 8132 启动成功，8127 页面使用 Vite 热更新并通过 Wrangler 取得真实 `.env` 会话。
 
+- [x] 稳定的远程 API 开发运行时
+  - 依赖：唯一完整本地启动入口。
+  - 文件：`tests/local-online-start.test.mjs`、`tests/dingtalk-web-auth.test.mjs`、`scripts/start-local-online.mjs`、`vite.config.js`、`functions/api/_middleware.js`。
+  - 失败测试：标准线上模式不得使用 Pages Dev 远程 D1；必须构建 Functions、使用 `wrangler dev --remote`、生成一次性传输密钥、拒绝缺少或伪造密钥的远程请求，并在页面开放前完成真实会话检查。
+  - 输出：本地页面继续只访问 8127，API 在 Cloudflare 网络执行并原生访问 D1；沙箱模式继续使用本地 Pages Dev 与 SQLite。
+  - 验证：`node --test tests/local-online-start.test.mjs tests/dingtalk-web-auth.test.mjs` 36/36 通过；`npm start` 启动前真实会话 3/3、启动后会话/数据环境/商品目录 9/9 返回 200；Functions 源文件变化后自动重建，重建后相同三组真实 API 9/9 返回 200，无 Miniflare `Network connection lost` / `1031`。
+
 - [x] 真实环境可见性
   - 依赖：真实本地会话鉴权。
   - 文件：`react-tests/local-online-account-ui.test.mjs`、`react-tests/local-dev-login.test.mjs`、`src/state/AuthProvider.jsx`、`src/ui/LocalOnlineEnvironmentBanner.jsx`、`src/App.jsx`、全局 CSS。

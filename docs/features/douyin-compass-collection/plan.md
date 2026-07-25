@@ -69,3 +69,11 @@ npm run build
 ```
 
 发布通过 PR 合并 main 和 Cloudflare Git 部署完成；本地、插件、Git 部署、生产 API 四条验证证据分别记录。
+
+## 多店铺目录优化增量计划
+
+1. 先补失败测试：数据接入不再渲染摘要/刷新块和抖音资源标签；抖音卡片提供多店铺列表与“添加”。
+2. 扩展网页采集控制面：已授权管理员可复用现有 `web_collection_stores` 幂等登记店铺，服务端选择已登记的公司 runner；未知 Provider、非法 ID、无 runner 和无权限稳定失败。
+3. 扩展 Chrome 领取契约：当前 Profile 保存最近识别的抖音店铺 ID，Bridge、orchestrator 和 runner API 只领取匹配店铺的 Douyin 任务，其他 Provider 保持兼容。
+4. 新增紧凑店铺弹窗，只提交 `storeName/storeId`；成功后刷新目录。同 ID 更新名称，多店铺全部可见。
+5. 定向验证 API、Bridge、orchestrator、extension、React 静态契约和响应式样式，再执行完整 Definition of Done。
