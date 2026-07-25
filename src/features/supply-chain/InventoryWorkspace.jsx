@@ -6,6 +6,7 @@ import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
 import { StocktakeWorkspace } from "./StocktakeWorkspace.jsx";
 import { rowsFromInventorySpreadsheet } from "./inventoryImportRows.js";
+import { classifyStocktakeVariance } from "../../domain/supplyChainWorkflow.js";
 
 function displayNumber(value) {
   return value === null || value === undefined ? "—" : Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
@@ -18,11 +19,13 @@ function displayMoney(value) {
 const GROUPS = [
   ["balance", "库存余额"],
   ["snapshots", "快照与盘点"],
+  ["bom", "BOM 与物料"],
   ["risks", "风险与物料"]
 ];
 
 export function InventoryWorkspace({
   products,
+  catalogItems = [],
   canEdit,
   projectionRows = [],
   stocktakes = [],
@@ -102,8 +105,8 @@ export function InventoryWorkspace({
     { key: "counted", header: <span className="num">最近实盘</span>, render: row => <span className="num">{displayNumber(row.countedQuantity)}</span> },
     { key: "calibrated", header: <span className="num">校准库存</span>, render: row => <span className="num"><strong>{displayNumber(row.calibratedQuantity)}</strong></span> },
     { key: "variance", header: <span className="num">盘点差异</span>, render: row => {
-      const variance = row.countedQuantity === null || row.countedQuantity === undefined ? null : Number(row.countedQuantity) - Number(row.erpQuantity || 0);
-      return <span className="num">{variance === null ? "—" : <span className={variance ? "text-warning" : ""}>{variance > 0 ? "+" : ""}{displayNumber(variance)}</span>}</span>;
+      const result = classifyStocktakeVariance({ theoreticalQuantity: row.erpQuantity, countedQuantity: row.countedQuantity });
+      return <span className="num">{result.varianceQuantity === null ? "—" : <span className={result.requiresDiscussion ? "text-warning" : ""}>{result.varianceQuantity > 0 ? "+" : ""}{displayNumber(result.varianceQuantity)}<small className="table-secondary">{result.status === "discussion_required" ? "超 5%，需讨论" : "5% 内可接受"}</small></span>}</span>;
     } },
     { key: "days", header: <span className="num">可售天数</span>, render: row => <span className="num">{row.daysOfSupply === null || row.daysOfSupply === undefined ? "待销量" : `${displayNumber(row.daysOfSupply)} 天`}</span> },
     { key: "age", header: "库龄", render: row => row.ageBucket || "待 ERP" },
@@ -130,6 +133,22 @@ export function InventoryWorkspace({
   ];
 
   const sortedRisks = [...state.inventoryRisks].sort((left, right) => Number(left.status !== "active") - Number(right.status !== "active") || Number(left.sellableDays) - Number(right.sellableDays));
+  const bomRows = catalogItems.flatMap(item => (item.components || []).map((component, index) => ({
+    ...component,
+    id: component.id || `${item.id}:${component.inventoryUnitCode || component.sourceSkuId || index}`,
+    productId: item.id,
+    productName: item.name,
+    ownership: component.providedByUs === true ? "我方提供" : component.providedByUs === false ? "供应商自带" : "责任待确认"
+  })));
+  const bomColumns = [
+    { key: "product", header: "成品", render: row => <strong>{row.productName}</strong> },
+    { key: "component", header: "组成物料 / SKU", render: row => <span><strong>{row.title || row.inventoryUnitCode || "待关联物料"}</strong><small className="table-secondary">{row.inventoryUnitCode || row.sourceSkuId || "库存单位待补"}</small></span> },
+    { key: "ratio", header: <span className="num">单位用量</span>, render: row => <span className="num">{displayNumber(row.ratio)}</span> },
+    { key: "ownership", header: "供料责任", render: row => <span className={`status-badge ${row.ownership === "我方提供" ? "success" : row.ownership === "供应商自带" ? "neutral" : "warning"}`}>{row.ownership}</span> },
+    { key: "quantity", header: <span className="num">物料库存</span>, render: row => <span className="num">{row.ownership === "供应商自带" ? "不建库存" : displayNumber(row.availableQuantity)}</span> },
+    { key: "cost", header: <span className="num">单位成本</span>, render: row => <span className="num">{row.ownership === "供应商自带" ? "供应商承担" : displayMoney(row.purchasePrice)}</span> }
+  ];
+  const clearanceRows = projectionRows.filter(row => Number(row.daysOfSupply) > 45).sort((left, right) => Number(right.daysOfSupply) - Number(left.daysOfSupply));
 
   const pendingStocktakeCount = projectionRows.filter(row => row.stocktakeStatus !== "calibrated").length;
   const fundsHidden = projectionRows.some(row => row.inventoryCashTied === null || row.inventoryCashTied === undefined);
@@ -158,7 +177,7 @@ export function InventoryWorkspace({
       {GROUPS.map(([key, label]) => <button key={key} type="button" className={activeGroup === key ? "active" : ""} onClick={() => scrollToGroup(key)}>{label}</button>)}
     </nav>
     <section className="section-panel" id="inventory-group-balance">
-      <div className="section-head"><div><h2>SKU × 仓库库存余额</h2><p>ERP账面永不被实盘覆盖；校准库存按最近月度盘点锚点延伸。</p></div></div>
+      <div className="section-head"><div><h2>SKU × 仓库库存余额</h2><p>理论与实盘分开保留：ERP账面永不被实盘覆盖；校准库存按最近月度盘点锚点延伸。</p></div></div>
       <DataTable className="goods-flow-inventory-table" minWidth={960} columns={projectionColumns} rows={projectionRows} empty={<div className="empty-state compact-empty">还没有统一库存投影。先导入 ERP 库存快照；首次线下盘点前会明确标记“未盘点”。</div>} />
     </section>
     <StocktakeWorkspace
@@ -181,9 +200,28 @@ export function InventoryWorkspace({
       {pending ? <div className="supply-import-preview"><FileSpreadsheet size={20} /><div><strong>{pending.fileName}</strong><span>ERP 快照 · 有效 {pending.validRows.length} 行 · 错误 {pending.errors.length} 行</span>{pending.errors.slice(0, 3).map(item => <small key={`${item.rowNumber}-${item.field}`}>第 {item.rowNumber} 行：{item.message}</small>)}</div><div className="supply-import-actions"><Button onClick={() => setPending(null)}>取消</Button><Button variant="primary" disabled={!pending.validRows.length} onClick={confirmImport}>确认导入</Button></div></div> : null}
       <DataTable minWidth={980} columns={snapshotColumns} rows={state.inventorySnapshots} empty={<div className="empty-state compact-empty">还没有成品库存快照。可导入快麦库存表或钉钉盘点表。</div>} />
     </section>
+    <section className="section-panel" id="inventory-group-bom">
+      <div className="section-head"><div><h2>BOM 与物料消耗</h2><p>以成品下钻组成 SKU 和用量；我方提供物料进入库存扣减，供应商自带物料不伪造库存。</p></div></div>
+      <DataTable minWidth={940} columns={bomColumns} rows={bomRows} empty={<div className="empty-state compact-empty">商品目录尚未提供已确认 BOM；待数据中心和版本化规则接通后展示。</div>} />
+    </section>
     <section className="section-panel" id="inventory-group-risks">
       <div className="section-head"><div><h2>异常库存与到货风险</h2><p>异常中的产品优先展示；已解除记录保留，便于回看供应商延迟和补货处理。</p></div></div>
       <DataTable minWidth={940} columns={riskColumns} rows={sortedRisks} empty={<div className="empty-state compact-empty">还没有异常库存记录。</div>} />
+    </section>
+    <section className="section-panel">
+      <div className="section-head"><div><h2>清仓候选</h2><p>可售天数高于 45 天的 SKU 进入候选；采购复核后才能发送运营，过季与低动销依据缺失时明确待补。</p></div></div>
+      <DataTable
+        minWidth={760}
+        columns={[
+          projectionColumns[0],
+          projectionColumns[1],
+          projectionColumns[4],
+          projectionColumns[6],
+          { key: "coverage", header: "规则覆盖", render: () => <span><strong>库存规则已覆盖</strong><small className="table-secondary">过季、节日、日动销待销售事实补齐</small></span> }
+        ]}
+        rows={clearanceRows}
+        empty={<div className="empty-state compact-empty">当前可信库存中没有可售天数高于 45 天的清仓候选。</div>}
+      />
     </section>
     <section className="section-panel">
       <div className="section-head"><div><h2>原辅料库存明细</h2><p>按产品、物料和仓库保留数量、单价与金额；不同计量口径不做数量合计。</p></div></div>

@@ -11,9 +11,10 @@ import { useGoodsFlow } from "../../state/GoodsFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
-import { CashCycleWorkspace } from "./CashCycleWorkspace.jsx";
+import { CostFinanceWorkspace } from "./CostFinanceWorkspace.jsx";
+import { DataRulesWorkspace } from "./DataRulesWorkspace.jsx";
 import { InventoryWorkspace } from "./InventoryWorkspace.jsx";
-import { PlanningWorkspace } from "./PlanningWorkspace.jsx";
+import { PlanningProcurementWorkspace } from "./PlanningProcurementWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
 import { SupplyChainWorkbench } from "./SupplyChainWorkbench.jsx";
@@ -225,7 +226,7 @@ export function SupplyChainAppPage({ section = "workbench" }) {
   const [salesRows, setSalesRows] = useState([]);
   const { user } = useAuth();
   const { state: productState } = useProductFlow();
-  const { items: catalogItems } = useProductCatalog();
+  const { items: catalogItems, meta: catalogMeta } = useProductCatalog();
   const { state, loading, error } = useSupplyChain();
   const goodsFlow = useGoodsFlow();
   const lifecycleProducts = useMemo(() => (productState.products || []).map(product => catalogBackedProduct(product, catalogItems)), [catalogItems, productState.products]);
@@ -321,13 +322,15 @@ export function SupplyChainAppPage({ section = "workbench" }) {
   const content = {
     workbench: <SupplyChainWorkbench actor={actor} items={workbenchItems} dataQuality={workbenchQuality} />,
     planning: (
-      <PlanningWorkspace
+      <PlanningProcurementWorkspace
         products={products}
         summary={summary}
         salesRows={salesRows}
         risks={state.inventoryRisks}
         supplyLinks={state.productSupplierLinks}
         workflowAvailable={false}
+        canSyncApprovals={financeRole || supplyEditor}
+        canEditApprovalMapping={supplyEditor}
       />
     ),
     suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} />,
@@ -335,6 +338,7 @@ export function SupplyChainAppPage({ section = "workbench" }) {
     inventory: (
       <InventoryWorkspace
         products={products}
+        catalogItems={catalogItems}
         summary={summary}
         canEdit={supplyEditor}
         projectionRows={goodsFlow.inventory}
@@ -345,12 +349,21 @@ export function SupplyChainAppPage({ section = "workbench" }) {
       />
     ),
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,
-    finance: <CashCycleWorkspace dashboard={goodsFlow.dashboard} terms={goodsFlow.terms} canEditTerms={canEditTerms} canRecalculateCcc={canRecalculateCcc} canFreezeCcc={canFreezeCcc} onSaveTerm={goodsFlow.saveTerm} onRecalculate={goodsFlow.recalculateCcc} onFreeze={goodsFlow.freezeCcc} />,
+    finance: <CostFinanceWorkspace dashboard={goodsFlow.dashboard} terms={goodsFlow.terms} summary={summary} canEditTerms={canEditTerms} canRecalculateCcc={canRecalculateCcc} canFreezeCcc={canFreezeCcc} onSaveTerm={goodsFlow.saveTerm} onRecalculate={goodsFlow.recalculateCcc} onFreeze={goodsFlow.freezeCcc} workflowAvailable={false} />,
     rules: (
-      <div className="supply-work-grid">
+      <DataRulesWorkspace
+        workflowAvailable={false}
+        sources={[
+          { name: "商品主数据", status: catalogItems.length ? "trusted" : "unavailable", description: "共享 product-catalog 商品、SKU 与组合关系", countLabel: `${catalogItems.length} 个商品`, updatedAt: catalogMeta?.lastSuccessfulSyncAt },
+          { name: "ERP 库存", status: goodsFlow.error ? "unavailable" : goodsFlow.stale ? "stale" : goodsFlow.inventory.length ? "trusted" : "partial", description: "SKU × 仓库当前库存与盘点校准", countLabel: `${goodsFlow.inventory.length} 条库存`, updatedAt: goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt },
+          { name: "销售需求", status: salesRows.length ? "trusted" : "partial", description: "订单创建时间下的日销量与销售成本", countLabel: `${salesRows.length} 条销售事实`, updatedAt: null },
+          { name: "采购与付款", status: state.purchaseApprovals.length || state.paymentApprovals.length ? "partial" : "unavailable", description: "钉钉审批与 ERP 采购投影", countLabel: `${state.purchaseApprovals.length} 张采购 · ${state.paymentApprovals.length} 张付款`, updatedAt: null },
+          { name: "质量与售后", status: state.qualityIssues.length ? "partial" : "unavailable", description: "质量导入、售后与评价事实", countLabel: `${state.qualityIssues.length} 个质量事件`, updatedAt: null }
+        ]}
+      >
         <SyncRecordsWorkspace salesRows={salesRows} canEdit={supplyEditor} />
         <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
-      </div>
+      </DataRulesWorkspace>
     )
   };
   return (

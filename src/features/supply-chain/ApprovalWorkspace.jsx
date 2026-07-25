@@ -4,8 +4,10 @@ import { useSupplyChain } from "../../state/SupplyChainProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
 import { Modal } from "../../ui/Modal.jsx";
+import { TablePagination } from "../../ui/TablePagination.jsx";
 
 const money = value => `¥${Number(value || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const PAGE_SIZE = 30;
 const approved = status => ["COMPLETED", "APPROVED", "AGREE"].includes(String(status || "").toUpperCase());
 const mappingStatus = row => {
   const supplierMapped = Boolean(row.supplierId);
@@ -22,6 +24,7 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [mappingRecord, setMappingRecord] = useState(null);
+  const [page, setPage] = useState(1);
   const [mappingSelection, setMappingSelection] = useState({ supplierId: "", productId: "" });
   const paymentsByPurchase = useMemo(() => {
     const map = new Map();
@@ -61,6 +64,7 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
     return { ...purchase, id: purchase.id || purchase.processInstanceId, payments, actualPaid, requestedAmount, overpaid: requestedAmount > 0 && actualPaid > requestedAmount + 0.01 };
   });
   const overpaidCount = rows.filter(row => row.overpaid).length;
+  const visibleRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const columns = [
     { key: "purchase", header: "采购申请", render: row => <span><strong>{row.reason || row.title || "未填写事由"}</strong><small className="table-secondary">{row.businessCategory || row.processInstanceId}</small></span> },
     { key: "status", header: "采购状态", render: row => <span className={`status-badge ${approved(row.status) ? "success" : "warning"}`}>{approved(row.status) ? "已通过" : row.status || "处理中"}</span> },
@@ -82,7 +86,8 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
       ) : null}
       {error ? <p className="supply-message error" role="alert">{error}</p> : null}
       {notice ? <p className="supply-message success" role="status">{notice}</p> : null}
-      <DataTable columns={columns} rows={rows} minWidth={1080} empty={<div className="empty-state compact-empty">还没有审批数据。已预置真实采购申请和付款审批流程，可直接同步最近 30 天。</div>} />
+      <DataTable columns={columns} rows={visibleRows} minWidth={1080} empty={<div className="empty-state compact-empty">还没有审批数据。已预置真实采购申请和付款审批流程，可直接同步最近 30 天。</div>} />
+      {rows.length > PAGE_SIZE ? <TablePagination total={rows.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} /> : null}
       {overpaidCount ? <p className="supply-message warning">有 {overpaidCount} 张采购申请出现付款超申请，请财务核对是否为重复关联或分次付款口径。</p> : null}
       {paymentsByPurchase.get("unmapped")?.length ? <p className="supply-message warning">有 {paymentsByPurchase.get("unmapped").length} 张付款审批未从钉钉关联审批字段识别到采购单。</p> : null}
       <Modal

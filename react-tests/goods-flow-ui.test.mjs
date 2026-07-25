@@ -30,15 +30,22 @@ test("goods-flow tables and navigation remain readable at laptop and DingTalk wi
   assert.doesNotMatch(css, /\.goods-flow[^\n{]*\{[^}]*border-left:\s*[2-9]/);
 });
 
-test("supply-chain composition consumes goods-flow state and preserves legacy operations", () => {
+test("supply-chain composition consumes goods-flow state through the task-first workspaces", () => {
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
   assert.match(page, /useGoodsFlow\(\)/);
-  assert.match(page, /overview: <GoodsFlowOverview/);
-  assert.match(page, /demand: <ComingPhaseWorkspace/);
-  assert.match(page, /transit: <ComingPhaseWorkspace/);
-  assert.match(page, /fulfillment: <ComingPhaseWorkspace/);
-  assert.match(page, /cash: <CashCycleWorkspace/);
-  for (const workspace of ["SupplierWorkspace", "ApprovalWorkspace", "ProductSupplyWorkspace", "InventoryWorkspace", "QualityWorkspace"]) {
+  for (const route of ["workbench:", "planning:", "suppliers:", "transit:", "inventory:", "quality:", "finance:", "rules:"]) {
+    assert.match(page, new RegExp(route));
+  }
+  for (const workspace of [
+    "SupplyChainWorkbench",
+    "PlanningProcurementWorkspace",
+    "SupplierWorkspace",
+    "TransitWorkspace",
+    "InventoryWorkspace",
+    "QualityWorkspace",
+    "CostFinanceWorkspace",
+    "DataRulesWorkspace"
+  ]) {
     assert.match(page, new RegExp(workspace));
   }
 });

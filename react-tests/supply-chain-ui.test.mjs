@@ -176,6 +176,7 @@ test("transit workspace renders product summaries and an evidence-backed courier
 
 test("planning workspace explains procurement suggestions and keeps planned workflow writes disabled", () => {
   const planning = read("src/features/supply-chain/PlanningWorkspace.jsx");
+  const workspace = read("src/features/supply-chain/PlanningProcurementWorkspace.jsx");
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
   const css = read("src/styles.css");
   for (const label of ["断货风险", "爆单风险", "清仓建议", "系统建议量", "采购前后库存", "计算依据"]) {
@@ -184,7 +185,62 @@ test("planning workspace explains procurement suggestions and keeps planned work
   assert.match(planning, /calculateProcurementSuggestion/);
   assert.match(planning, /工作流接入后可确认/);
   assert.match(planning, /调整依据/);
-  assert.match(page, /PlanningWorkspace/);
+  assert.match(workspace, /库存风险与建议/);
+  assert.match(workspace, /采购与付款/);
+  assert.match(workspace, /ApprovalWorkspace/);
+  assert.match(workspace, /DEV-000006/);
+  assert.match(workspace, /role="tablist"/);
+  assert.match(page, /PlanningProcurementWorkspace/);
   assert.match(css, /\.supply-planning-layout/);
+  assert.match(css, /\.supply-workspace-tabs/);
   assert.doesNotMatch(planning, /metric-card|kpi-card/);
+});
+
+test("supplier workspace covers capability sourcing evaluation concentration and cost evidence", () => {
+  const supplier = read("src/features/supply-chain/SupplierWorkspace.jsx");
+  for (const label of ["档案与能力", "评价与风险", "报价与成本", "能力或供货范围", "单一来源风险", "客观指标", "采购评价", "质量评价", "产品评价", "历史采购价格"]) {
+    assert.match(supplier, new RegExp(label));
+  }
+  assert.match(supplier, /evaluateSupplierPerformance/);
+  assert.match(supplier, /role="tablist"/);
+  assert.match(supplier, /待数据中心补齐/);
+});
+
+test("inventory workspace exposes multi-warehouse stocktake BOM and clearance controls", () => {
+  const inventory = read("src/features/supply-chain/InventoryWorkspace.jsx");
+  for (const label of ["SKU × 仓库库存余额", "理论与实盘", "5%", "BOM 与物料消耗", "我方提供", "供应商自带", "清仓候选"]) {
+    assert.match(inventory, new RegExp(label.replace("×", "\\×")));
+  }
+  assert.match(inventory, /classifyStocktakeVariance/);
+  assert.match(inventory, /catalogItems/);
+});
+
+test("quality workspace separates standards inspections and six-step incident closure", () => {
+  const quality = read("src/features/supply-chain/QualityWorkspace.jsx");
+  for (const label of ["质量标准", "质检执行", "问题闭环", "知识库版", "质检清单版", "首批检查", "后续抽检", "应检未检", "发现", "定性", "处理", "整改", "验证", "关闭"]) {
+    assert.match(quality, new RegExp(label));
+  }
+  assert.match(quality, /role="tablist"/);
+  assert.match(quality, /DEV-000006/);
+});
+
+test("cost and finance workspace separates payable assets cost and freight reconciliation", () => {
+  const finance = read("src/features/supply-chain/CostFinanceWorkspace.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  for (const label of ["现金循环", "应收应付", "报价与成本", "快递费核对", "已付款未交货", "已下单未付款", "历史价格", "理论运费", "结算运费", "申诉"]) {
+    assert.match(finance, new RegExp(label));
+  }
+  assert.match(finance, /classifyFinancialPosition/);
+  assert.match(finance, /reconcileFreightCharge/);
+  assert.match(page, /CostFinanceWorkspace/);
+});
+
+test("data and rules workspace exposes source coverage and versioned business rules", () => {
+  const rules = read("src/features/supply-chain/DataRulesWorkspace.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  for (const label of ["数据覆盖", "商品主数据", "ERP 库存", "销售需求", "采购与付款", "质量与售后", "工作流命令", "规则目录", "订单创建时间", "盘点差异", "BOM 损耗", "清仓阈值"]) {
+    assert.match(rules, new RegExp(label));
+  }
+  assert.match(rules, /trusted|partial|stale|unavailable/);
+  assert.match(page, /DataRulesWorkspace/);
 });

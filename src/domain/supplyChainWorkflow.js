@@ -332,3 +332,155 @@ export function classifyStockRisk({
   }
   return { kind: "healthy", severity: "success", reason: "当前库存覆盖与销量处于常规范围" };
 }
+
+export function calculateBomCost({ components = [], lossRate = 0.1 } = {}) {
+  const ownedComponents = components.filter(component => component?.providedByUs !== false);
+  const missingInventoryUnitIds = ownedComponents
+    .filter(component => component?.unitCost === null
+      || component?.unitCost === undefined
+      || !Number.isFinite(Number(component.unitCost)))
+    .map(component => String(component.inventoryUnitId || "unknown"));
+  if (missingInventoryUnitIds.length) {
+    return {
+      materialCost: null,
+      lossRate: Math.max(0, finiteNumber(lossRate)),
+      lossAmount: null,
+      totalCost: null,
+      status: "partial",
+      missingInventoryUnitIds
+    };
+  }
+  const materialCost = ownedComponents.reduce(
+    (sum, component) => sum + Math.max(0, finiteNumber(component.ratio)) * Math.max(0, finiteNumber(component.unitCost)),
+    0
+  );
+  const safeLossRate = Math.max(0, finiteNumber(lossRate));
+  const lossAmount = materialCost * safeLossRate;
+  return {
+    materialCost: Math.round(materialCost * 10000) / 10000,
+    lossRate: safeLossRate,
+    lossAmount: Math.round(lossAmount * 10000) / 10000,
+    totalCost: Math.round((materialCost + lossAmount) * 10000) / 10000,
+    status: "complete",
+    missingInventoryUnitIds: []
+  };
+}
+
+export function classifyStocktakeVariance({
+  theoreticalQuantity,
+  countedQuantity,
+  threshold = 0.05
+} = {}) {
+  if (countedQuantity === null || countedQuantity === undefined || theoreticalQuantity === null || theoreticalQuantity === undefined) {
+    return {
+      status: "uninspected",
+      varianceQuantity: null,
+      varianceRate: null,
+      requiresDiscussion: false
+    };
+  }
+  const theoretical = finiteNumber(theoreticalQuantity);
+  const counted = finiteNumber(countedQuantity);
+  const varianceQuantity = counted - theoretical;
+  const varianceRate = theoretical === 0
+    ? varianceQuantity === 0 ? 0 : null
+    : Math.abs(varianceQuantity) / Math.abs(theoretical);
+  const requiresDiscussion = varianceRate === null
+    ? varianceQuantity !== 0
+    : varianceRate > Math.max(0, finiteNumber(threshold, 0.05));
+  return {
+    status: requiresDiscussion ? "discussion_required" : "acceptable",
+    varianceQuantity,
+    varianceRate,
+    requiresDiscussion
+  };
+}
+
+function normalizedRatingValues(perspectives) {
+  return Object.values(perspectives || {})
+    .flatMap(value => value && typeof value === "object" ? Object.values(value) : [])
+    .map(Number)
+    .filter(value => Number.isFinite(value) && value >= 1 && value <= 5);
+}
+
+export function evaluateSupplierPerformance({ objective = {}, perspectives = {} } = {}) {
+  const qualificationRate = Number(objective.qualificationRate);
+  const onTimeRate = Number(objective.onTimeRate);
+  const incidentCount = Number(objective.incidentCount);
+  const priceChangeRate = Number(objective.priceChangeRate);
+  const objectiveComplete = [qualificationRate, onTimeRate, incidentCount, priceChangeRate].every(Number.isFinite);
+  const objectiveScore = objectiveComplete
+    ? Math.max(0, Math.min(100,
+      qualificationRate * 100 * 0.35
+      + onTimeRate * 100 * 0.25
+      + Math.max(0, 100 - incidentCount * 15) * 0.15
+      + Math.max(0, 100 - Math.abs(priceChangeRate) * 500) * 0.25))
+    : null;
+  const ratings = normalizedRatingValues(perspectives);
+  const perspectiveScore = ratings.length
+    ? ratings.reduce((sum, value) => sum + value, 0) / ratings.length / 5 * 100
+    : null;
+  const combinedScore = objectiveScore !== null && perspectiveScore !== null
+    ? objectiveScore * 0.7 + perspectiveScore * 0.3
+    : null;
+  return {
+    objective,
+    perspectives,
+    objectiveScore: objectiveScore === null ? null : Math.round(objectiveScore * 10) / 10,
+    perspectiveScore: perspectiveScore === null ? null : Math.round(perspectiveScore * 10) / 10,
+    combinedScore: combinedScore === null ? null : Math.round(combinedScore * 10) / 10,
+    grade: combinedScore === null ? null : combinedScore >= 85 ? "A" : combinedScore >= 70 ? "B" : "C",
+    status: objectiveComplete && ["procurement", "quality", "product"].every(key => perspectives?.[key])
+      ? "complete"
+      : "partial"
+  };
+}
+
+export function classifyFinancialPosition({ orderedAmount, paidAmount, receivedAmount } = {}) {
+  const orderedKnown = orderedAmount !== null && orderedAmount !== undefined && Number.isFinite(Number(orderedAmount));
+  const paidKnown = paidAmount !== null && paidAmount !== undefined && Number.isFinite(Number(paidAmount));
+  const receivedKnown = receivedAmount !== null && receivedAmount !== undefined && Number.isFinite(Number(receivedAmount));
+  const ordered = Math.max(0, finiteNumber(orderedAmount));
+  const paid = Math.max(0, finiteNumber(paidAmount));
+  const received = Math.max(0, finiteNumber(receivedAmount));
+  return {
+    orderedAmount: orderedKnown ? ordered : null,
+    paidAmount: paidKnown ? paid : null,
+    receivedAmount: receivedKnown ? received : null,
+    inTransitAsset: orderedKnown && paidKnown && receivedKnown
+      ? received >= ordered ? 0 : Math.min(paid, Math.max(0, ordered - received))
+      : null,
+    payable: orderedKnown && paidKnown ? Math.max(0, ordered - paid) : null,
+    status: orderedKnown && paidKnown && receivedKnown ? "complete" : "partial",
+    missing: [
+      ...(!orderedKnown ? ["采购金额"] : []),
+      ...(!paidKnown ? ["付款金额"] : []),
+      ...(!receivedKnown ? ["收货金额"] : [])
+    ]
+  };
+}
+
+export function reconcileFreightCharge({
+  theoreticalAmount,
+  billedAmount,
+  absoluteThreshold = 5,
+  rateThreshold = 0.05,
+  evidenceIds = []
+} = {}) {
+  const theoretical = Math.max(0, finiteNumber(theoreticalAmount));
+  const billed = Math.max(0, finiteNumber(billedAmount));
+  const differenceAmount = Math.round((billed - theoretical) * 100) / 100;
+  const differenceRate = theoretical > 0
+    ? Math.round(differenceAmount / theoretical * 10000) / 10000
+    : differenceAmount === 0 ? 0 : null;
+  const materialDifference = Math.abs(differenceAmount) > Math.max(0, finiteNumber(absoluteThreshold))
+    && (differenceRate === null || Math.abs(differenceRate) > Math.max(0, finiteNumber(rateThreshold)));
+  return {
+    theoreticalAmount: theoretical,
+    billedAmount: billed,
+    differenceAmount,
+    differenceRate,
+    status: materialDifference ? differenceAmount > 0 ? "dispute" : "review" : "matched",
+    evidenceIds: Array.isArray(evidenceIds) ? evidenceIds : []
+  };
+}

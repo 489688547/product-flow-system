@@ -14,9 +14,14 @@ import {
   SUPPLY_CHAIN_WORKSPACES,
   buildGoodsFlowProgress,
   buildRoleWorkbench,
+  calculateBomCost,
   calculateBundleRequirements,
   calculateProcurementSuggestion,
+  classifyFinancialPosition,
+  classifyStocktakeVariance,
   classifyStockRisk,
+  evaluateSupplierPerformance,
+  reconcileFreightCharge,
   normalizeSupplyChainSection
 } from "../src/domain/supplyChainWorkflow.js";
 
@@ -198,6 +203,76 @@ test("stock risk separates replenish spike and clearance signals", () => {
   assert.equal(classifyStockRisk({ daysOfSupply: 30, todaySales: 220, averageDailySales: 80 }).kind, "spike");
   assert.equal(classifyStockRisk({ daysOfSupply: 52, averageDailySales: 12 }).kind, "clearance");
   assert.equal(classifyStockRisk({ daysOfSupply: null, longestLeadTimeDays: 15 }).kind, "unknown");
+});
+
+test("BOM cost applies configurable loss and stays incomplete when any owned component has no cost", () => {
+  const complete = calculateBomCost({
+    lossRate: 0.1,
+    components: [
+      { inventoryUnitId: "inner", ratio: 2, unitCost: 3, providedByUs: true },
+      { inventoryUnitId: "bag", ratio: 1, unitCost: 1, providedByUs: true },
+      { inventoryUnitId: "supplier-box", ratio: 1, unitCost: null, providedByUs: false }
+    ]
+  });
+  assert.equal(complete.materialCost, 7);
+  assert.equal(complete.totalCost, 7.7);
+  assert.equal(complete.status, "complete");
+
+  const partial = calculateBomCost({
+    components: [{ inventoryUnitId: "inner", ratio: 2, unitCost: null, providedByUs: true }]
+  });
+  assert.equal(partial.totalCost, null);
+  assert.equal(partial.status, "partial");
+  assert.deepEqual(partial.missingInventoryUnitIds, ["inner"]);
+});
+
+test("stocktake variance uses the five percent rule without treating a missing count as zero", () => {
+  assert.deepEqual(classifyStocktakeVariance({ theoreticalQuantity: 100, countedQuantity: null }), {
+    status: "uninspected",
+    varianceQuantity: null,
+    varianceRate: null,
+    requiresDiscussion: false
+  });
+  assert.equal(classifyStocktakeVariance({ theoreticalQuantity: 100, countedQuantity: 96 }).status, "acceptable");
+  assert.equal(classifyStocktakeVariance({ theoreticalQuantity: 100, countedQuantity: 93 }).status, "discussion_required");
+});
+
+test("supplier evaluation preserves three perspectives and combines objective evidence into an ABC grade", () => {
+  const result = evaluateSupplierPerformance({
+    objective: { qualificationRate: 0.98, onTimeRate: 0.96, incidentCount: 1, priceChangeRate: 0.01 },
+    perspectives: {
+      procurement: { cooperation: 4, professionalism: 5 },
+      quality: { correctiveAttitude: 4 },
+      product: { resourceEnablement: 3 }
+    }
+  });
+  assert.equal(result.grade, "A");
+  assert.equal(result.perspectives.procurement.cooperation, 4);
+  assert.equal(result.perspectives.quality.correctiveAttitude, 4);
+  assert.equal(result.status, "complete");
+});
+
+test("purchase finance separates paid undelivered assets from ordered unpaid liabilities", () => {
+  const paidUndelivered = classifyFinancialPosition({ orderedAmount: 1000, paidAmount: 600, receivedAmount: 0 });
+  assert.equal(paidUndelivered.inTransitAsset, 600);
+  assert.equal(paidUndelivered.payable, 400);
+  const received = classifyFinancialPosition({ orderedAmount: 1000, paidAmount: 600, receivedAmount: 1000 });
+  assert.equal(received.inTransitAsset, 0);
+  assert.equal(received.payable, 400);
+});
+
+test("freight reconciliation identifies material overcharges and retains line evidence", () => {
+  const result = reconcileFreightCharge({
+    theoreticalAmount: 80,
+    billedAmount: 95,
+    absoluteThreshold: 5,
+    rateThreshold: 0.05,
+    evidenceIds: ["bill-line-1", "erp-shipment-1"]
+  });
+  assert.equal(result.status, "dispute");
+  assert.equal(result.differenceAmount, 15);
+  assert.equal(result.differenceRate, 0.1875);
+  assert.deepEqual(result.evidenceIds, ["bill-line-1", "erp-shipment-1"]);
 });
 
 test("catalog supplier links resolve to the lifecycle product when available", () => {
