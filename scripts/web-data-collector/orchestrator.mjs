@@ -27,7 +27,9 @@ export function createWebCollectorOrchestrator({
   api,
   processors,
   processDownload,
-  notify = async () => {}
+  notify = async () => {},
+  now = () => new Date(),
+  extensionOnlineWindowMs = 2 * 60 * 1000
 }) {
   if (!api) throw new Error("网页采集编排依赖不完整。");
   const processorRegistry = processors || (
@@ -39,7 +41,25 @@ export function createWebCollectorOrchestrator({
     throw new Error("网页采集 processor 注册表未配置。");
   }
   let activeJob = null;
+  let activeLeaseExpiresAt = 0;
+  let lastExtensionSeenAt = 0;
   let processingResult = false;
+
+  function currentTime() {
+    const value = now();
+    const parsed = value instanceof Date ? value.valueOf() : Date.parse(String(value || ""));
+    return Number.isFinite(parsed) ? parsed : Date.now();
+  }
+
+  function rememberLease(job, fallbackSeconds = 300) {
+    const parsed = Date.parse(String(job?.leaseExpiresAt || ""));
+    activeLeaseExpiresAt = Number.isFinite(parsed) ? parsed : currentTime() + fallbackSeconds * 1000;
+  }
+
+  function clearActiveJob() {
+    activeJob = null;
+    activeLeaseExpiresAt = 0;
+  }
 
   async function transition(from, status, details = {}) {
     const response = await api.transition({
@@ -51,6 +71,7 @@ export function createWebCollectorOrchestrator({
       ...(details.errorSummary ? { errorSummary: String(details.errorSummary).slice(0, 160) } : {})
     });
     activeJob = { ...activeJob, ...(response?.job || {}), status };
+    if (response?.job?.leaseExpiresAt) rememberLease(activeJob);
   }
 
   async function fail(from, result, fallbackCode) {
@@ -71,27 +92,38 @@ export function createWebCollectorOrchestrator({
       errorCode,
       stage: result.stage || from
     });
-    activeJob = null;
+    clearActiveJob();
   }
 
   return Object.freeze({
-    async prepare({ now = new Date() } = {}) {
-      const jobs = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now });
-      await api.heartbeat({ version: "0.1.0", chromeStatus: "extension_expected", currentJobId: activeJob?.id || null });
+    async prepare({ now: planNow = new Date() } = {}) {
+      const jobs = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: planNow });
+      const extensionOnline = lastExtensionSeenAt > 0
+        && Math.max(0, currentTime() - lastExtensionSeenAt) <= extensionOnlineWindowMs;
+      await api.heartbeat({
+        version: "0.1.0",
+        chromeStatus: extensionOnline ? "extension_online" : "extension_offline",
+        currentJobId: activeJob?.id || null
+      });
       if (typeof api.ensureRegisteredPlan === "function") return api.ensureRegisteredPlan();
       if (!jobs.length) return { jobs: [] };
       return api.ensurePlan(jobs);
     },
     async nextTask({ storeId = "" } = {}) {
+      lastExtensionSeenAt = currentTime();
       const profileStoreId = String(storeId || "");
       if (activeJob) {
         if (processingResult) return null;
+        if (activeLeaseExpiresAt && currentTime() >= activeLeaseExpiresAt) clearActiveJob();
+      }
+      if (activeJob) {
         if (activeJob.providerId === "douyin-ecommerce" && activeJob.storeId !== profileStoreId) return null;
         return safeTask(activeJob);
       }
       const claimed = await api.claim(300, profileStoreId ? { storeId: profileStoreId } : {});
       if (!claimed?.job) return null;
       activeJob = claimed.job;
+      rememberLease(activeJob, 300);
       await transition("claimed", "opening");
       return safeTask(activeJob);
     },
@@ -155,7 +187,7 @@ export function createWebCollectorOrchestrator({
             fileHash: processed.fileHash || null
           }
         });
-        activeJob = null;
+        clearActiveJob();
         return completed;
       } catch (error) {
         if (activeJob) {

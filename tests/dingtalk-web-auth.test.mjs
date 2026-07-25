@@ -517,8 +517,8 @@ test("API middleware lets web collection jobs validate the runner token", async 
   assert.equal(continued, true);
 });
 
-test("API middleware lets ERP archive and ingest routes validate collector tokens", async () => {
-  for (const path of ["archives", "ingest"]) {
+test("API middleware lets ERP archive, ingest and sales-facts routes validate collector tokens", async () => {
+  for (const path of ["archives", "ingest", "sales-facts"]) {
     let continued = false;
     const response = await apiMiddleware({
       request: new Request(`https://flow.example.com/api/platform/v1/erp-collection/${path}`, {

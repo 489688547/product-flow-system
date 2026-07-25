@@ -34,7 +34,8 @@ function resultMessage(run) {
   return run.errorSummary || [run.errorCode, run.stage ? `阶段 ${run.stage}` : ""].filter(Boolean).join(" · ") || "采集未完成，请查看任务状态。";
 }
 
-export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [] } = {}) {
+export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], now = new Date() } = {}) {
+  const nowValue = now instanceof Date ? now.valueOf() : Date.parse(String(now || ""));
   const jobById = new Map(jobs.map(job => [job.id, job]));
   const terminalRows = runs.map(run => {
     const job = jobById.get(run.jobId) || {};
@@ -60,6 +61,12 @@ export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [] } =
     .map(job => {
       const businessDate = safeDate(job.businessDate);
       const terminal = TERMINAL_JOB_STATES.has(job.status);
+      const queued = job.status === "queued";
+      const leaseExpiresAt = Date.parse(String(job.leaseExpiresAt || ""));
+      const expired = !terminal && !queued
+        && Number.isFinite(nowValue)
+        && Number.isFinite(leaseExpiresAt)
+        && leaseExpiresAt <= nowValue;
       return {
         id: `web-job:${job.id}`,
         sourceId: job.providerId || "web-collection",
@@ -68,13 +75,17 @@ export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [] } =
         from: businessDate,
         to: businessDate,
         rowCount: null,
-        status: terminal ? job.status : "running",
+        status: terminal || queued ? job.status : expired ? "stale" : "running",
         stage: job.stage || job.status || "",
         startedAt: job.startedAt || job.createdAt || null,
         completedAt: null,
         message: terminal
           ? resultMessage(job)
-          : `Chrome 采集进行中${job.stage || job.status ? `，当前阶段 ${job.stage || job.status}` : ""}。`
+          : queued
+            ? "任务已排队，等待 Chrome 扩展领取。"
+            : expired
+              ? "任务租约已过期，等待采集器重新领取。"
+              : `Chrome 采集进行中${job.stage || job.status ? `，当前阶段 ${job.stage || job.status}` : ""}。`
       };
     });
   return [...terminalRows, ...jobRows, ...legacyRuns]

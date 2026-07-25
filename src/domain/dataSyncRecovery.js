@@ -29,6 +29,10 @@ function runnerOnline(runner, now) {
   return Boolean(seenAt) && Math.max(0, now.valueOf() - seenAt) <= 5 * 60 * 1000;
 }
 
+function extensionOnline(runner) {
+  return ["ready", "extension_online"].includes(String(runner?.chromeStatus || ""));
+}
+
 function recovery(input) {
   return {
     tone: "warning",
@@ -77,6 +81,7 @@ export function buildKuaimaiSalesRecovery({
   const job = latest(preferredJobs.length ? preferredJobs : matchingJobs);
   const runner = (runners || []).find(item => item.id === job?.runnerId) || latest(runners);
   const online = runnerOnline(runner, now);
+  const chromeOnline = extensionOnline(runner);
   const runnerName = runner?.name || "公司 Mac";
   const status = String(job?.status || "");
   const errorCode = String(job?.errorCode || "");
@@ -130,6 +135,18 @@ export function buildKuaimaiSalesRecovery({
       job
     });
   }
+  if (status === "failed" && errorCode === "EXTENSION_SITE_ACCESS_DENIED") {
+    return recovery({
+      tone: "danger",
+      label: "需要网站访问权限",
+      title: "Chrome 插件无法进入快麦页面",
+      instruction: "请在 Chrome 中为“公司数据采集器”开启快麦网站访问权限，重新加载扩展后再触发。",
+      primaryAction: { type: "retrigger", label: "权限已开启，重新触发" },
+      showConnectorLink: false,
+      runner,
+      job
+    });
+  }
   if (status === "failed") {
     return recovery({
       tone: "danger",
@@ -153,6 +170,42 @@ export function buildKuaimaiSalesRecovery({
       title: `${date} 任务已排队，但公司 Mac 采集器未在线`,
       instruction: `${runnerName}的后台采集服务没有持续上报心跳。服务恢复后会自动领取任务；此时打开快麦页面不能代替恢复采集服务。`,
       primaryAction: { type: "refresh", label: "重新检测采集器" },
+      showConnectorLink: false,
+      runner,
+      job
+    });
+  }
+  if (status === "queued" && !chromeOnline) {
+    return recovery({
+      tone: "danger",
+      label: "Chrome 扩展未连接",
+      title: `${date} 任务已排队，但 Chrome 扩展尚未领取`,
+      instruction: `${runnerName}的后台采集服务在线，但没有收到 Chrome 扩展轮询。请打开已安装扩展的 Chrome，再刷新状态。`,
+      primaryAction: { type: "refresh", label: "重新检测 Chrome" },
+      showConnectorLink: false,
+      runner,
+      job
+    });
+  }
+  if (status === "queued") {
+    return recovery({
+      tone: "warning",
+      label: "等待 Chrome 领取",
+      title: `${date} 快麦订单明细已进入采集队列`,
+      instruction: `${runnerName}和 Chrome 扩展均在线，任务将在下一轮轮询时领取。`,
+      primaryAction: { type: "refresh", label: "刷新领取状态" },
+      showConnectorLink: false,
+      runner,
+      job
+    });
+  }
+  if (RUNNING_STATES.has(status) && !chromeOnline) {
+    return recovery({
+      tone: "danger",
+      label: "Chrome 扩展已中断",
+      title: `${date} 快麦采集在 ${job.stage || status} 阶段中断`,
+      instruction: `${runnerName}的后台服务在线，但 Chrome 扩展已停止轮询；恢复 Chrome 后，过期任务会自动重新领取。`,
+      primaryAction: { type: "refresh", label: "重新检测 Chrome" },
       showConnectorLink: false,
       runner,
       job
@@ -220,6 +273,7 @@ export function buildDouyinCollectionRecovery({
       const cursor = latest(matchingCursors.filter(item => item.resourceType === resource.type));
       const runner = runners.find(item => item.id === job?.runnerId) || fallbackRunner;
       const online = runnerOnline(runner, now);
+      const chromeOnline = extensionOnline(runner);
       const jobStatus = String(job?.status || "");
       // 已有可信成功游标（业务日 ≥ 该运行中任务）时，陈旧的运行中任务不再盖掉成功状态，
       // 避免一次采集成功后又冒出的重复任务把资源长期显示为“采集中”。
@@ -234,9 +288,17 @@ export function buildDouyinCollectionRecovery({
           ? "success"
           : "unavailable";
       const instruction = DOUYIN_RECOVERY[errorCode]
-        || (RUNNING_STATES.has(status)
+        || (status === "queued"
           ? online
-            ? "公司 Mac 正在采集，完成后刷新状态。"
+            ? chromeOnline
+              ? "等待公司 Mac 的 Chrome 扩展领取任务。"
+              : "后台采集服务在线，但 Chrome 扩展尚未连接。"
+            : "公司 Mac 采集器离线，恢复后台服务后会继续领取任务。"
+          : RUNNING_STATES.has(status)
+          ? online
+            ? chromeOnline
+              ? "公司 Mac 正在采集，完成后刷新状态。"
+              : "后台采集服务在线，但 Chrome 扩展已中断；恢复后会自动重领。"
             : "公司 Mac 采集器离线，恢复后台服务后会继续领取任务。"
           : status === "success"
             ? "最近可信批次已完成；可在执行记录查看日期、行数和结果。"

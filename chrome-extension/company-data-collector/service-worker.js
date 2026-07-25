@@ -11,6 +11,7 @@ const ACTIVE_JOB_KEY = "activeJob";
 const COLLECTOR_TAB_KEY = "collectorTabId";
 const TAB_LOAD_TIMEOUT_MS = 30000;
 const CONTENT_SCRIPT_PROBE_TIMEOUT_MS = 10000;
+const CONTENT_SCRIPT_AUTO_INJECTION_TIMEOUT_MS = 1500;
 const KEEP_ALIVE_INTERVAL_MS = 20000;
 const DOUYIN_DISCOVERY_URL = "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools";
 const DOUYIN_DISCOVERY_TAB_KEY = "douyinDiscoveryTabId";
@@ -19,6 +20,11 @@ const DOUYIN_PROFILE_STORE_ID_KEY = "douyinProfileStoreId";
 const DOUYIN_DISCOVERY_SUCCESS_INTERVAL_MS = 60 * 1000;
 const DOUYIN_DISCOVERY_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 let polling = false;
+
+const REGISTERED_CONTENT_SCRIPTS = Object.freeze({
+  kuaimai: "content-script.js",
+  "douyin-ecommerce": "douyin-content-script.js"
+});
 
 function safeBaseName(value) {
   return String(value || "").split(/[\\/]/).pop();
@@ -104,6 +110,29 @@ async function waitForContentScript(tabId, timeoutMs) {
   return false;
 }
 
+async function injectRegisteredContentScript(resource, tabId) {
+  const file = REGISTERED_CONTENT_SCRIPTS[resource?.providerId];
+  if (!file) {
+    throw Object.assign(new Error("平台采集脚本未登记。"), {
+      code: "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
+    });
+  }
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: [file]
+    });
+  } catch (error) {
+    const message = String(error?.message || "");
+    const permissionDenied = /cannot access|host permission|not allowed|permission|不允许|权限/i.test(message);
+    throw Object.assign(new Error(permissionDenied ? "插件没有该平台的网站访问权限。" : "页面采集脚本注入失败。"), {
+      code: permissionDenied
+        ? "EXTENSION_SITE_ACCESS_DENIED"
+        : "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE"
+    });
+  }
+}
+
 async function reportTaskResult(task, result) {
   const payload = {
     jobId: task.jobId,
@@ -159,6 +188,9 @@ export async function ensureProviderTab(resource, targetUrl) {
   if (!await waitForContentScript(tab.id, 500)) {
     await chrome.tabs.reload(tab.id);
     tab = await waitForTabComplete(tab.id);
+  }
+  if (!await waitForContentScript(tab.id, CONTENT_SCRIPT_AUTO_INJECTION_TIMEOUT_MS)) {
+    await injectRegisteredContentScript(resource, tab.id);
   }
   if (!await waitForContentScript(tab.id, CONTENT_SCRIPT_PROBE_TIMEOUT_MS)) {
     throw Object.assign(new Error("页面采集脚本不可用。"), {
@@ -356,10 +388,13 @@ async function runRegisteredBridgeTask(task) {
   try {
     tab = await ensureProviderTab(resource, taskUrl);
   } catch (error) {
+    const errorCode = error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE";
       await reportTaskResult(task, {
         kind: "failed",
-        errorCode: error?.code || "EXTENSION_CONTENT_SCRIPT_UNAVAILABLE",
-        safeSummary: "页面采集脚本不可用，请重载公司采集扩展后重试。",
+        errorCode,
+        safeSummary: errorCode === "EXTENSION_SITE_ACCESS_DENIED"
+          ? "公司采集扩展没有该平台的网站访问权限，请允许访问后重试。"
+          : "页面采集脚本不可用，请重载公司采集扩展后重试。",
         stage: "opening"
       });
     return;

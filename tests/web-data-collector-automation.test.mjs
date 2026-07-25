@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   EXTENSION_ID,
   collectorLaunchAgentPlist,
+  resolveStableCollectorPath,
   validatePairingKey,
   validateRunnerToken
 } from "../scripts/web-data-collector/automation.mjs";
@@ -27,4 +28,18 @@ test("LaunchAgent keeps the loopback runner alive and pins the repository entryp
   assert.match(plist, /<key>KeepAlive<\/key>/);
   assert.match(plist, /<true\/>/);
   assert.doesNotMatch(plist, /pairing|wdc_|wcp_/i);
+});
+
+test("LaunchAgent resolves a temporary worktree entrypoint back to the primary checkout", () => {
+  assert.equal(resolveStableCollectorPath({
+    collectorPath: "/repo/.worktrees/data-sync-fix/scripts/web-data-collector/index.mjs",
+    worktreeRoot: "/repo/.worktrees/data-sync-fix",
+    gitCommonDir: "/repo/.git"
+  }), "/repo/scripts/web-data-collector/index.mjs");
+
+  assert.equal(resolveStableCollectorPath({
+    collectorPath: "/repo/scripts/web-data-collector/index.mjs",
+    worktreeRoot: "/repo",
+    gitCommonDir: "/repo/.git"
+  }), "/repo/scripts/web-data-collector/index.mjs");
 });

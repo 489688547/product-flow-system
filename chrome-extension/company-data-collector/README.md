@@ -15,12 +15,17 @@
 
 1. 先由数据中心管理员登记本机 runner：`npm run collect:web -- register --base-url <线上地址>`。
 2. 打开 Chrome `chrome://extensions`，开启“开发者模式”。
-3. 点击“加载已解压的扩展程序”，选择本目录。
+3. 点击“加载已解压的扩展程序”，只选择主检出仓库的
+   `/Users/roger/Documents/product-flow-system/chrome-extension/company-data-collector`。
+   不得从 `.worktrees/*` 临时工作树加载；临时分支被清理后 Chrome 会报 `ERR_FILE_NOT_FOUND`。
 4. 点击扩展图标，输入登记命令本次返回的 `wcp_...` 配对码。
 5. 运行 `npm run collect:web -- install --base-url <线上地址>` 安装并启动 LaunchAgent。
 6. 运行 `npm run collect:web -- preflight --base-url <线上地址>` 检查扩展目录、Keychain、下载目录和归档目录。
 
 仓库内插件代码更新后，必须在 `chrome://extensions` 对“公司数据采集器”点击“重新加载”；Pages 部署不会自动更新本机未打包插件。
+
+若旧扩展已经因临时目录删除而显示 `ERR_FILE_NOT_FOUND`，在 `chrome://extensions`
+移除损坏条目，再从上述主检出仓库目录重新“加载已解压的扩展程序”；不要通过重建临时目录掩盖错误。
 
 首期不需要发布 Chrome 应用商店。若后续要在多台公司电脑统一安装，再评估私有商店发布或企业策略强制安装。
 

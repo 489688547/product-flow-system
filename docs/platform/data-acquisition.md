@@ -31,11 +31,15 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 ## 运行与恢复
 
-- 已验证的 ERP 网页导出使用仓库内 MV3 插件复用公司日常 Chrome 登录态；首期通过“加载已解压的扩展程序”安装，不依赖 Chrome 应用商店。插件只申请 alarms、storage、tabs、downloads 和登记平台 host 权限，不申请 Cookie、History、WebRequest、Debugger 或 Native Messaging。
+- 已验证的 ERP 网页导出使用仓库内 MV3 插件复用公司日常 Chrome 登录态；首期通过“加载已解压的扩展程序”安装，不依赖 Chrome 应用商店。插件只申请 alarms、storage、tabs、downloads、scripting 和登记平台 host 权限；scripting 仅注入代码包内按 provider 固定登记的 content script，不申请 Cookie、History、WebRequest、Debugger 或 Native Messaging。
 - 本机执行器只监听 `127.0.0.1`，请求带 `Origin` 时必须匹配固定扩展 ID；Chrome MV3 Service Worker 未发送 `Origin` 时仍必须通过随机配对密钥，缺少或错误密钥一律拒绝。runner token 和配对密钥分别存在 macOS Keychain。插件只接收 provider/resource/businessDate/jobId，不接收远程 URL、选择器、脚本或凭据。
+- ERP 采集器令牌由 `/erp-collection/runners` 登记并保存在 macOS Keychain；`/erp-collection/archives`、`/erp-collection/ingest` 和 `/erp-collection/sales-facts` 都属于 handler 自认证路由，API 中间件必须放行 Bearer token 交由各 handler 校验，不能先按员工会话拦截。销售事实路由遗漏放行会表现为文件已归档但 D1 上传 HTTP 401。
+- runner 进程心跳与 Chrome 扩展轮询是两种独立状态：后台进程存活只能证明本机服务在线，只有已认证扩展在最近两分钟调用本机领取接口才能写 `extension_online`，否则写 `extension_offline`。`queued` 只表示等待领取，页面不得把它显示为“正在采集”；只有 `claimed` 及后续阶段才表示已经开始处理。
+- 永久 LaunchAgent 不得保存临时 `.worktrees/*` 入口。安装器必须通过 Git common directory 把当前工作树中的采集入口映射回主检出仓库的同一相对路径，再原子写入 plist；临时分支被删除后，服务重启仍须能找到入口。
 - 05:00 日计划由本机执行器生成并通过控制面幂等登记；扩展触发官方导出，解析、脱敏、原始文件本机归档和 D1 ingest 仍由本机执行器完成。只有完整 ingest 成功才能推进游标。
 - 控制面只自动恢复已登记的瞬时错误：下载、网络或本机处理失败按 5 分钟、15 分钟退避，同一任务最多领取 3 次；重排必须保持 provider、resource、业务日期、目标环境和幂等键不变。登录、验证码与 `schema_changed` 不自动循环；页面适配器修复通过提升 `scheduleVersion` 创建可审计的新任务，旧失败记录不得覆盖或删除。
 - `claimed`、`opening`、`collecting`、`exporting`、`downloading`、`validating` 或 `ingesting` 阶段的设备租约过期表示本机执行中断；控制面允许其他轮询重新领取同一任务并增加 attempt，最多 3 次。不能只恢复 `claimed`，否则进程在后续阶段退出会让任务永久显示“同步中”。
+- 本机编排器必须同步释放自己内存中的过期活动任务，再向控制面重新领取；只依赖服务端允许重领但继续返回旧的内存任务，会让 attempt 永远不增长并阻塞整个串行队列。结果正在本机校验或入库时不得中途释放，避免并发写入同一批次。
 - 当运行中阶段的租约已过期且 attempt 已达 3 次上限时，任务既无法再被采集器重领、又从不落到终态，会成为永久显示“同步中”的僵尸任务。控制面必须在状态读取与领取入口自愈：把这类任务转为 `failed` 并写 `WEB_COLLECTION_STAGE_EXPIRED`（同时追加一条 `web_collection_runs` 失败记录），使其恢复到可由授权人员强制重触发的终态；attempt 未达上限的过期运行中任务仍留给采集器重领，不被自愈抢占。
 - 同一 `(provider, 店铺, 资源, 业务日)` 一旦有成功批次，其余未终结的重复任务（含验收触发等以不同 `scheduleVersion` 幂等键创建的任务）必须在完成入库的同一事务内转为终态 `superseded`（释放租约、不再可被领取）。展示与恢复视图必须忽略 `superseded` 任务，且在存在可信成功游标（业务日不早于该运行中任务）时以成功状态为准，不得让陈旧或重复的运行中任务把已成功的资源长期显示为“采集中”。仅业务日更新的运行中任务才继续显示为采集中。
 - 每次采集尝试到达 `success`、`failed`、`waiting_human` 或 `schema_changed` 时都必须追加一条 `web_collection_runs` 记录；状态查询以安全字段返回运行记录并由数据同步页关联任务的 provider、resource 和业务日期。重试只重排任务，不能抹掉失败尝试。行数未知时返回 `null`，界面不得补成 0。
@@ -46,7 +50,7 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 - Provider 的默认导出模板不能视为稳定数据契约。快麦订单 adapter 必须在官方导出弹窗内逐项确认代码登记的非个人经营字段，至少包含平台、店铺、仓库、订单状态、数量、金额、成本和下单时间；字段缺失或勾选未生效时停止导出并返回安全结构错误。手机号、地址、邮箱、买家身份和备注不得进入登记字段，文件解析仍须在本机剔除意外出现的个人字段后才能上传。
 - ERP 批次的 `partial` 表示允许的原始归档终态（例如部分来源行因映射问题未投影），不是仍在处理；最终分块到达 `partial` 或 `completed` 时原始归档都标记为 `processed`，仅 `pending` 保持 `processing`。数据质量问题通过 issue 记录闭环，不能让已结束归档永久显示“入库中”。但 `sales_items` 批次只有在 `completed` 且完成销售事实投影后，网页采集任务才能显示成功；`partial` 必须进入失败或重试，避免原始文件已收下却被误报为销售已同步。
 - 高行数 `sales_items` 在公司 Mac 完成脱敏、校验和 `日期 × 69码 × 平台` 聚合后，通过一次标准事实请求写入 D1；完整明细文件留在本机/NAS 原始归档，D1 记录文件哈希、原始行数、事实行数、日期范围和安全异常，不按 500 行分块复制销售明细。
-- 采集任务开始前必须主动探测 provider 标签页的 content script；探测失败时强制刷新并等待再次探测成功后才能执行。仅凭 URL、加载状态或同源 SPA 的 hash 变化，不能判定扩展升级或重载后的脚本已经注入。
+- 采集任务开始前必须主动探测 provider 标签页的 content script；探测失败时强制刷新，仍失败则只能通过 `scripting.executeScript` 注入代码包内按 provider 固定登记的脚本，不能接收远端脚本名或代码。主动注入仍失败时必须区分 `EXTENSION_SITE_ACCESS_DENIED`（员工需恢复登记域名的网站访问权限）与 `EXTENSION_CONTENT_SCRIPT_UNAVAILABLE`（扩展包或运行时异常），不能笼统显示“采集中”。仅凭 URL、加载状态或同源 SPA 的 hash 变化，不能判定扩展升级或重载后的脚本已经注入。
 
 - 旧店铺浏览器 agent 已停用，不再创建或领取店铺登录任务。后续若有具备稳定接口和明确授权的新 provider，必须重新完成集成评审和生产验证。
 - 浏览器 provider 必须按页面条件等待可操作状态；平台专属的登录方式切换、字段选择器和人工验证文案留在 adapter 内。对有动态风控的平台，adapter 只预填凭证，不代替用户点击登录、接受协议或提交验证码；再次验证优先复用同一登录页，同一固定浏览器 Profile 在人工登录后复用会话。普通手机登录方式中的“发送验证码”等说明不得直接当成已出现人工挑战，邮箱验证码、滑块、扫码和设备确认则必须保持人工等待状态。

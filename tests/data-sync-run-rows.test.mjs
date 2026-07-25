@@ -66,3 +66,44 @@ test("data sync rows keep failure history and active jobs without inventing row 
   assert.equal(rows[2].status, "failed");
   assert.match(rows[2].message, /EXTENSION_DOWNLOAD_TIMEOUT/);
 });
+
+test("queued jobs remain waiting records instead of pretending Chrome collection is running", () => {
+  const [row] = buildDataSyncRunRows({
+    jobs: [{
+      id: "job-queued",
+      providerId: "kuaimai",
+      resourceType: "order_items",
+      businessDate: "2026-07-24",
+      status: "queued",
+      stage: "queued",
+      attempt: 0,
+      createdAt: "2026-07-24T21:06:40.365Z"
+    }]
+  });
+
+  assert.equal(row.status, "queued");
+  assert.equal(row.stage, "queued");
+  assert.match(row.message, /等待 Chrome 扩展领取/);
+  assert.doesNotMatch(row.message, /进行中|正在采集/);
+});
+
+test("an expired active lease is shown as waiting for recovery instead of still running", () => {
+  const [row] = buildDataSyncRunRows({
+    jobs: [{
+      id: "job-expired",
+      providerId: "douyin-ecommerce",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23",
+      status: "opening",
+      stage: "opening",
+      attempt: 1,
+      leaseExpiresAt: "2026-07-24T08:33:23.841Z",
+      startedAt: "2026-07-24T08:28:23.841Z"
+    }],
+    now: new Date("2026-07-25T03:05:00.000Z")
+  });
+
+  assert.equal(row.status, "stale");
+  assert.match(row.message, /租约已过期.*重新领取/);
+  assert.doesNotMatch(row.message, /进行中/);
+});

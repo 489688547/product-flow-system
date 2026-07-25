@@ -19,10 +19,19 @@ import { collaborationDraftFromDataIssue } from "../../domain/collaborationAdapt
 import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
 
-const STATUS_LABELS = { healthy: "正常", success: "成功", pending_validation: "待验证", waiting_verification: "等待人工验证", waiting_human: "等待人工处理", collecting: "页面读数中", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", unavailable: "尚未完成真实采集", superseded: "已被新批次取代", disabled: "未启用" };
+const STATUS_LABELS = { healthy: "正常", success: "成功", queued: "等待 Chrome 领取", claimed: "已被 Chrome 领取", opening: "正在打开页面", exporting: "正在生成报表", downloading: "正在下载报表", validating: "正在校验", ingesting: "正在入库", pending_validation: "待验证", waiting_verification: "等待人工验证", waiting_human: "等待人工处理", collecting: "页面读数中", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", unavailable: "尚未完成真实采集", superseded: "已被新批次取代", disabled: "未启用" };
 
 function statusLabel(status) {
   return STATUS_LABELS[status] || status || "未启用";
+}
+
+function chromeStatusLabel(status) {
+  return {
+    extension_online: "扩展已连接",
+    extension_offline: "扩展未连接",
+    extension_expected: "扩展状态未确认",
+    ready: "扩展已连接"
+  }[status] || "状态未知";
 }
 
 export function DataSourcesWorkspace({ canEdit, canManage, canManagePlatform, initialCategory }) {
@@ -184,7 +193,7 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
         ? `截至目前尚未读取到该业务日的订单创建时间销售事实${salesAnomaly.latestTrustedDate ? `，最近可信日期为 ${salesAnomaly.latestTrustedDate}` : ""}；系统已自动排队 Chrome 采集任务。`
         : `GMV 为近 7 个有效日中位数的 ${(salesAnomaly.salesRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，销量为 ${(salesAnomaly.qtyRatio * 100).toLocaleString("zh-CN", { maximumFractionDigits: 1 })}%，均低于 25% 警戒线。`}</p></div><span className={`status-badge ${salesRecovery.tone}`}>{salesRecovery.label}</span></div>
       <div className="data-sync-recovery-body">
-        <div><strong>{salesRecovery.title}</strong><p>{salesRecovery.instruction}</p><small>{salesRecovery.runner ? `${salesRecovery.runner.name || "公司 Mac"} · Chrome ${salesRecovery.runner.chromeStatus || "状态未知"} · 最近在线 ${salesRecovery.runner.lastSeenAt || "—"}` : "尚未读取到公司 Mac 采集设备"}</small>{salesRecovery.job ? <small>任务 {salesRecovery.job.resourceType || "order_items"} · 阶段 {salesRecovery.job.stage || salesRecovery.job.status || "—"} · 第 {Number(salesRecovery.job.attempt) || 1} 次</small> : null}{triggerMessage ? <p className="data-sync-trigger-message" role="status">{triggerMessage}</p> : null}{triggerError ? <p className="data-sync-trigger-message danger" role="alert">{triggerError}</p> : null}</div>
+        <div><strong>{salesRecovery.title}</strong><p>{salesRecovery.instruction}</p><small>{salesRecovery.runner ? `${salesRecovery.runner.name || "公司 Mac"} · Chrome ${chromeStatusLabel(salesRecovery.runner.chromeStatus)} · 最近在线 ${salesRecovery.runner.lastSeenAt || "—"}` : "尚未读取到公司 Mac 采集设备"}</small>{salesRecovery.job ? <small>任务 {salesRecovery.job.resourceType || "order_items"} · 阶段 {statusLabel(salesRecovery.job.stage || salesRecovery.job.status)} · {Number(salesRecovery.job.attempt) > 0 ? `第 ${Number(salesRecovery.job.attempt)} 次` : "尚未领取"}</small> : null}{triggerMessage ? <p className="data-sync-trigger-message" role="status">{triggerMessage}</p> : null}{triggerError ? <p className="data-sync-trigger-message danger" role="alert">{triggerError}</p> : null}</div>
         <div className="data-sync-recovery-actions">
           {primaryActionAllowed ? <Button variant="primary" disabled={primaryActionBusy} onClick={runPrimaryAction}><RefreshCw size={16} aria-hidden="true" />{primaryActionBusy ? (primaryAction.type === "retrigger" ? "正在触发…" : "正在检测…") : primaryAction.label}</Button> : null}
           {salesRecovery.showKuaimaiLogin ? <a className="btn" href="https://erpb.superboss.cc/index.html#/trade/searchlist/" target="_blank" rel="noreferrer"><MonitorCheck size={16} aria-hidden="true" />打开快麦 ERP</a> : null}

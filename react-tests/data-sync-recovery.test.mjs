@@ -345,6 +345,27 @@ test("sales recovery turns login, schema and offline states into named actions",
   assert.match(offline.instruction, /公司 Mac.*后台采集服务.*心跳/);
 });
 
+test("sales recovery names missing Chrome site access instead of showing a generic failure", () => {
+  const recovery = buildKuaimaiSalesRecovery({
+    date: "2026-07-24",
+    runners: [{ ...runner, chromeStatus: "extension_online" }],
+    jobs: [{
+      id: "items",
+      providerId: "kuaimai",
+      resourceType: "order_items",
+      businessDate: "2026-07-24",
+      status: "failed",
+      errorCode: "EXTENSION_SITE_ACCESS_DENIED",
+      runnerId: "runner-1"
+    }],
+    now
+  });
+
+  assert.equal(recovery.label, "需要网站访问权限");
+  assert.match(recovery.instruction, /快麦.*网站访问权限/);
+  assert.deepEqual(recovery.primaryAction, { type: "retrigger", label: "权限已开启，重新触发" });
+});
+
 test("queued work does not pretend to be collecting when the company Mac is offline", () => {
   const recovery = buildKuaimaiSalesRecovery({
     date: "2026-07-22",
@@ -357,6 +378,54 @@ test("queued work does not pretend to be collecting when the company Mac is offl
   assert.equal(recovery.showConnectorLink, false);
   assert.match(recovery.title, /任务已排队/);
   assert.match(recovery.instruction, /后台采集服务.*自动领取任务/);
+});
+
+test("queued work reports extension availability separately from the background runner heartbeat", () => {
+  const queuedJob = {
+    id: "items",
+    providerId: "kuaimai",
+    resourceType: "order_items",
+    businessDate: "2026-07-22",
+    status: "queued",
+    stage: "queued"
+  };
+  const extensionOffline = buildKuaimaiSalesRecovery({
+    date: "2026-07-22",
+    runners: [{ ...runner, chromeStatus: "extension_offline" }],
+    jobs: [queuedJob],
+    now
+  });
+  assert.equal(extensionOffline.label, "Chrome 扩展未连接");
+  assert.doesNotMatch(extensionOffline.instruction, /正在执行|正在采集/);
+
+  const extensionOnline = buildKuaimaiSalesRecovery({
+    date: "2026-07-22",
+    runners: [{ ...runner, chromeStatus: "extension_online" }],
+    jobs: [queuedJob],
+    now
+  });
+  assert.equal(extensionOnline.label, "等待 Chrome 领取");
+  assert.doesNotMatch(extensionOnline.instruction, /正在执行|正在采集/);
+});
+
+test("queued Douyin resources wait for Chrome instead of claiming that collection has started", () => {
+  const recovery = buildDouyinCollectionRecovery({
+    storeId: "store-a",
+    runners: [{ ...runner, chromeStatus: "extension_online" }],
+    jobs: [{
+      id: "store-daily",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-22",
+      status: "queued",
+      stage: "queued"
+    }],
+    now
+  });
+  assert.equal(recovery.resources[0].status, "queued");
+  assert.match(recovery.resources[0].instruction, /等待.*领取/);
+  assert.doesNotMatch(recovery.resources[0].instruction, /正在采集/);
 });
 
 test("sales recovery keeps file import available when status cannot be read", () => {

@@ -192,6 +192,72 @@ test("orchestrator does not expose an active Douyin task to another Chrome profi
   assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, { storeId: "store-a" }]);
 });
 
+test("orchestrator releases an expired in-memory lease before the extension asks for another task", async () => {
+  let clock = new Date("2026-07-25T02:40:00.000Z");
+  let attempt = 0;
+  const calls = [];
+  const api = {
+    async heartbeat(input) { calls.push(["heartbeat", input]); },
+    async claim() {
+      attempt += 1;
+      calls.push(["claim", attempt]);
+      return {
+        job: {
+          ...job,
+          status: "claimed",
+          attempt,
+          leaseExpiresAt: new Date(clock.valueOf() + 300_000).toISOString()
+        }
+      };
+    },
+    async transition(input) {
+      calls.push(["transition", input]);
+      return {
+        job: {
+          ...job,
+          status: input.status,
+          attempt,
+          leaseExpiresAt: new Date(clock.valueOf() + 300_000).toISOString()
+        }
+      };
+    }
+  };
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({}),
+    now: () => clock
+  });
+
+  const first = await orchestrator.nextTask();
+  clock = new Date("2026-07-25T02:46:00.000Z");
+  const reclaimed = await orchestrator.nextTask();
+
+  assert.equal(first.attempt, 1);
+  assert.equal(reclaimed.attempt, 2);
+  assert.equal(calls.filter(([name]) => name === "claim").length, 2);
+});
+
+test("runner heartbeat distinguishes the background service from a real Chrome extension poll", async () => {
+  let clock = new Date("2026-07-25T02:40:00.000Z");
+  const api = apiDouble(job);
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({}),
+    now: () => clock
+  });
+
+  await orchestrator.prepare();
+  assert.equal(api.calls.filter(([name]) => name === "heartbeat").at(-1)[1].chromeStatus, "extension_offline");
+
+  await orchestrator.nextTask();
+  await orchestrator.prepare();
+  assert.equal(api.calls.filter(([name]) => name === "heartbeat").at(-1)[1].chromeStatus, "extension_online");
+
+  clock = new Date("2026-07-25T02:43:01.000Z");
+  await orchestrator.prepare();
+  assert.equal(api.calls.filter(([name]) => name === "heartbeat").at(-1)[1].chromeStatus, "extension_offline");
+});
+
 test("orchestrator records login and verification as waiting_human without ingest", async () => {
   const api = apiDouble(job);
   let processed = false;
