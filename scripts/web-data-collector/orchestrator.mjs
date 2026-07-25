@@ -29,7 +29,9 @@ export function createWebCollectorOrchestrator({
   processDownload,
   notify = async () => {},
   now = () => new Date(),
-  extensionOnlineWindowMs = 2 * 60 * 1000
+  extensionOnlineWindowMs = 2 * 60 * 1000,
+  executionMode = "extension",
+  runtimeVersion = "0.2.0"
 }) {
   if (!api) throw new Error("网页采集编排依赖不完整。");
   const processorRegistry = processors || (
@@ -44,6 +46,7 @@ export function createWebCollectorOrchestrator({
   let activeLeaseExpiresAt = 0;
   let lastExtensionSeenAt = 0;
   let processingResult = false;
+  let dedicatedBrowserStatus = "dedicated_browser_offline";
 
   function currentTime() {
     const value = now();
@@ -101,16 +104,19 @@ export function createWebCollectorOrchestrator({
       const extensionOnline = lastExtensionSeenAt > 0
         && Math.max(0, currentTime() - lastExtensionSeenAt) <= extensionOnlineWindowMs;
       await api.heartbeat({
-        version: "0.1.0",
-        chromeStatus: extensionOnline ? "extension_online" : "extension_offline",
+        version: runtimeVersion,
+        chromeStatus: executionMode === "dedicated"
+          ? dedicatedBrowserStatus
+          : extensionOnline ? "extension_online" : "extension_offline",
         currentJobId: activeJob?.id || null
       });
       if (typeof api.ensureRegisteredPlan === "function") return api.ensureRegisteredPlan();
       if (!jobs.length) return { jobs: [] };
       return api.ensurePlan(jobs);
     },
-    async nextTask({ storeId = "" } = {}) {
-      lastExtensionSeenAt = currentTime();
+    async nextTask({ storeId = "", executor = "extension" } = {}) {
+      if (executionMode === "dedicated" && executor !== "dedicated" && storeId) return null;
+      if (executor === "extension") lastExtensionSeenAt = currentTime();
       const profileStoreId = String(storeId || "");
       if (activeJob) {
         if (processingResult) return null;
@@ -126,6 +132,12 @@ export function createWebCollectorOrchestrator({
       rememberLease(activeJob, 300);
       await transition("claimed", "opening");
       return safeTask(activeJob);
+    },
+    recordBrowserStatus(status = {}) {
+      dedicatedBrowserStatus = status.online === true
+        ? "dedicated_browser_online"
+        : "dedicated_browser_offline";
+      return dedicatedBrowserStatus;
     },
     async registerStore(input) {
       const result = await api.registerStore(input);

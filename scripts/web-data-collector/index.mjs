@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import os from "node:os";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -9,6 +9,7 @@ import { DEFAULT_ARCHIVE_ROOT } from "../kuaimai-erp-collector/archive.mjs";
 import { uploadErpCollection } from "../kuaimai-erp-collector/api.mjs";
 import { readCollectorToken as readErpCollectorToken } from "../kuaimai-erp-collector/automation.mjs";
 import { nodeRequest } from "../kuaimai-erp-collector/http.mjs";
+import { ensureManagedChrome } from "../browser-runtime/managed-chrome.mjs";
 import { createWebCollectionApi } from "./api.mjs";
 import {
   EXTENSION_ID,
@@ -20,6 +21,15 @@ import {
   storeRunnerToken
 } from "./automation.mjs";
 import { createCollectorBridge } from "./bridge.mjs";
+import { createBrowserProfileRegistry } from "./browser/profile-registry.mjs";
+import { createDedicatedBrowserRuntime } from "./browser/runtime.mjs";
+import {
+  DOUYIN_DEDICATED_RESOURCES,
+  createCdpDouyinController,
+  createDouyinDedicatedExecutor
+} from "./browser/providers/douyin.mjs";
+import { createCheckpointStore } from "./checkpoints.mjs";
+import { createLocalDiagnosticStore } from "./diagnostics.mjs";
 import { resolveSafeDownload } from "./download.mjs";
 import { notifyCollectionIssue } from "./notification.mjs";
 import { createWebCollectorOrchestrator } from "./orchestrator.mjs";
@@ -40,6 +50,14 @@ function argument(argv, name, fallback = "") {
 function normalizeBaseUrl(value) {
   return String(value || "http://127.0.0.1:8132").trim().replace(/\/+$/, "");
 }
+
+export const DEFAULT_MANAGED_PROFILE_ROOT = path.join(
+  os.homedir(),
+  "Library",
+  "Application Support",
+  "Product Flow Collector",
+  "Profiles"
+);
 
 async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
   const personalToken = String(process.env.PRODUCTION_DATA_ACCESS_TOKEN || "").trim();
@@ -146,7 +164,13 @@ async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
   };
 }
 
-async function serve({ root, baseUrl, downloadsDirectory }) {
+async function serve({
+  root,
+  baseUrl,
+  downloadsDirectory,
+  browserMode = "dedicated",
+  profileRoot = DEFAULT_MANAGED_PROFILE_ROOT
+}) {
   const [runnerToken, pairingKey, processDownload] = await Promise.all([
     readRunnerToken(),
     readPairingKey(),
@@ -168,8 +192,36 @@ async function serve({ root, baseUrl, downloadsDirectory }) {
   const orchestrator = createWebCollectorOrchestrator({
     api,
     processors,
-    notify: notifyCollectionIssue
+    notify: notifyCollectionIssue,
+    executionMode: browserMode
   });
+  const profileRegistry = createBrowserProfileRegistry({ rootDir: profileRoot });
+  const runtimeStateRoot = path.dirname(profileRoot);
+  const checkpointStore = createCheckpointStore({
+    rootDir: path.join(runtimeStateRoot, "Checkpoints")
+  });
+  const diagnosticStore = createLocalDiagnosticStore({
+    rootDir: path.join(runtimeStateRoot, "Diagnostics"),
+    encryptionKey: createHash("sha256").update(pairingKey).digest()
+  });
+  const dedicatedExecutor = createDouyinDedicatedExecutor({
+    createController: browser => createCdpDouyinController({
+      browser,
+      downloadsDirectory
+    })
+  });
+  const dedicatedRuntime = browserMode === "dedicated"
+    ? createDedicatedBrowserRuntime({
+      api,
+      profileRegistry,
+      ensureBrowser: profile => ensureManagedChrome(profile),
+      orchestrator,
+      executeTask: input => dedicatedExecutor.executeTask(input),
+      checkpointStore,
+      diagnosticStore,
+      diagnosticPageType: task => DOUYIN_DEDICATED_RESOURCES[task.resourceType]?.pageType || ""
+    })
+    : null;
   const bridge = createCollectorBridge({
     allowedOrigin: EXTENSION_ORIGIN,
     pairingKey,
@@ -180,15 +232,33 @@ async function serve({ root, baseUrl, downloadsDirectory }) {
     }
   });
   await bridge.listen({ port: 17653 });
-  await orchestrator.prepare();
-  const timer = setInterval(() => void orchestrator.prepare().catch(() => {}), 60_000);
+  let cycleRunning = false;
+  const runCycle = async () => {
+    if (cycleRunning) return;
+    cycleRunning = true;
+    try {
+      await orchestrator.prepare();
+      await diagnosticStore.cleanup();
+      await dedicatedRuntime?.runOnce();
+    } finally {
+      cycleRunning = false;
+    }
+  };
+  await runCycle().catch(() => {});
+  const timer = setInterval(() => void runCycle().catch(() => {}), 60_000);
   const stop = async () => {
     clearInterval(timer);
     await bridge.close();
   };
   process.once("SIGINT", () => void stop().then(() => process.exit(0)));
   process.once("SIGTERM", () => void stop().then(() => process.exit(0)));
-  return { status: "serving", host: "127.0.0.1", port: bridge.port, extensionId: EXTENSION_ID };
+  return {
+    status: "serving",
+    host: "127.0.0.1",
+    port: bridge.port,
+    extensionId: EXTENSION_ID,
+    browserMode
+  };
 }
 
 export async function runWebCollector(argv = process.argv.slice(2)) {
@@ -196,6 +266,10 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
   const root = resolve(argument(argv, "--root", DEFAULT_ARCHIVE_ROOT));
   const baseUrl = normalizeBaseUrl(argument(argv, "--base-url", process.env.WEB_COLLECTION_BASE_URL || "http://127.0.0.1:8132"));
   const downloadsDirectory = resolve(argument(argv, "--downloads", path.join(os.homedir(), "Downloads")));
+  const browserMode = argument(argv, "--browser-mode", "dedicated") === "extension"
+    ? "extension"
+    : "dedicated";
+  const profileRoot = resolve(argument(argv, "--profile-root", DEFAULT_MANAGED_PROFILE_ROOT));
   const extensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../chrome-extension/company-data-collector");
   if (command === "register") return registerRunner(baseUrl);
   if (command === "install") {
@@ -203,7 +277,8 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
     const launchAgent = await installLaunchAgent({
       collectorPath: fileURLToPath(import.meta.url),
       root,
-      baseUrl
+      baseUrl,
+      browserMode
     });
     return { ...launchAgent, extensionId: EXTENSION_ID, extensionPath };
   }
@@ -217,10 +292,18 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
       downloadsDirectory,
       archiveRoot: root,
       douyinArchiveRoot: DEFAULT_DOUYIN_ARCHIVE_ROOT,
+      browserMode,
+      profileRoot,
       secrets: "macOS Keychain"
     };
   }
-  if (command === "serve") return serve({ root, baseUrl, downloadsDirectory });
+  if (command === "serve") return serve({
+    root,
+    baseUrl,
+    downloadsDirectory,
+    browserMode,
+    profileRoot
+  });
   throw new Error(`未知命令：${command}`);
 }
 

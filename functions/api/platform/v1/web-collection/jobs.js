@@ -13,6 +13,7 @@ import {
   ensureWebCollectionPlan,
   ensureRegisteredWebCollectionPlan,
   heartbeatRunner,
+  listRunnerWebCollectionStores,
   listWebCollectionStatus,
   recordWebCollectionNotification,
   registerWebCollectionStore,
@@ -52,6 +53,7 @@ export async function onRequest({ request, env, data = {} }) {
     let result;
     switch (body?.action) {
       case "heartbeat": result = await heartbeatRunner(db, runner, body); break;
+      case "assigned_stores": result = await listRunnerWebCollectionStores(db, runner); break;
       case "register_store": result = await registerWebCollectionStore(db, runner, body); break;
       case "ensure_plan": result = await ensureWebCollectionPlan(
         db,

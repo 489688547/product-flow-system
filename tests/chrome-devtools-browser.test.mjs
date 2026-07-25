@@ -42,6 +42,33 @@ test("CDP commands retain a watchdog until Chrome responds", async () => {
   session.close();
 });
 
+test("CDP sessions deliver browser download events and allow unsubscribe", async () => {
+  const session = new chromeDevtoolsInternals.CdpSession("ws://company-chrome", {
+    WebSocketImpl: SilentWebSocket,
+    timeoutMs: 20
+  });
+  session.socket.emit("open");
+  const received = [];
+  const unsubscribe = session.on("Browser.downloadProgress", event => received.push(event));
+
+  session.socket.emit("message", {
+    data: JSON.stringify({
+      method: "Browser.downloadProgress",
+      params: { guid: "download-1", state: "inProgress" }
+    })
+  });
+  unsubscribe();
+  session.socket.emit("message", {
+    data: JSON.stringify({
+      method: "Browser.downloadProgress",
+      params: { guid: "download-1", state: "completed" }
+    })
+  });
+
+  assert.deepEqual(received, [{ guid: "download-1", state: "inProgress" }]);
+  session.close();
+});
+
 test("browser login reuses the newest matching Chrome page", () => {
   const pages = [
     { id: "newest", type: "page", url: "https://fxg.jinritemai.com/login/common?channel=zhaoshang#login" },

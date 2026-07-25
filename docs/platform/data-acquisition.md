@@ -4,7 +4,7 @@
 
 数据中心通过统一 provider registry、连接保险箱、文件导入、受控任务和结果 writer 获取外部系统数据。业务 App 只读取标准事实表或平台 API，不能直接登录抖音、ERP、广告平台或 NAS。
 
-2026-07-21 起，抖音等店铺网页登录采集已退役：动态协议、验证码、滑块和设备验证使其不适合作为稳定无人值守能力。店铺经营改用平台原始文件；通用 provider 边界继续服务于已经验证的 ERP、广告和内部数据接入，不能因旧抖音实现而推断其他平台已接通。
+旧的“保存账号密码并由通用 agent 代登录”路径已经退役。抖店经营采集改为公司 Mac 的专用持久 Chrome Profile：员工只在该独立窗口处理登录、扫码、验证码、滑块或设备确认；浏览器只执行代码登记的页面短动作、官方报表下载和固定白名单指标读取。本机采集服务承担等待、归档、解析、校验、检查点、重试和受控 API 入库。该能力在完成真实连续验收前保持 `integrating`，不能据此推断其他店铺或广告平台已接通。
 
 ## 分层
 
@@ -32,9 +32,13 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 ## 运行与恢复
 
 - 已验证的 ERP 网页导出使用仓库内 MV3 插件复用公司日常 Chrome 登录态；首期通过“加载已解压的扩展程序”安装，不依赖 Chrome 应用商店。插件只申请 alarms、storage、tabs、downloads、scripting 和登记平台 host 权限；scripting 仅注入代码包内按 provider 固定登记的 content script，不申请 Cookie、History、WebRequest、Debugger 或 Native Messaging。
+- 抖店使用可见的专用 Chrome 进程，每个已登记店铺对应一个非默认 `user-data-dir`。DevTools 只绑定 `127.0.0.1` 的随机端口并从该 Profile 的 `DevToolsActivePort` 发现；默认个人 Chrome Profile、外网调试地址、远端 URL/脚本/选择器和未登记店铺一律拒绝。
+- 专用浏览器模式与 MV3 共用 `web_collection_jobs` 的 claim/lease，不建立第二套队列。专用模式启用时，MV3 bridge 不向扩展返回 Douyin 任务，但继续服务 Kuaimai；Douyin 只能由匹配 `storeId` 的专用 Profile 领取。回滚时可切回 `--browser-mode extension`，不能让两个执行器并发领取同一店铺任务。
+- runner 通过 `assigned_stores` 只读取分配给本设备的已启用店铺，响应仅包含 `providerId/storeId/storeName`。本机 Profile 目录、DevTools 端口、Cookie、Token、凭据、页面正文和截图不得返回服务器。
+- 官方下载和固定页面读数完成后，本机把可恢复结果原子写入权限为 `0600` 的检查点；服务重启并重新取得同一任务租约后优先恢复检查点，不重复执行页面动作。失败截图只允许来自登记页面，使用本机 AES-256-GCM 加密保存，服务器只接收稳定错误码与诊断编号；诊断文件保留七天后清理。
 - 本机执行器只监听 `127.0.0.1`，请求带 `Origin` 时必须匹配固定扩展 ID；Chrome MV3 Service Worker 未发送 `Origin` 时仍必须通过随机配对密钥，缺少或错误密钥一律拒绝。runner token 和配对密钥分别存在 macOS Keychain。插件只接收 provider/resource/businessDate/jobId，不接收远程 URL、选择器、脚本或凭据。
 - ERP 采集器令牌由 `/erp-collection/runners` 登记并保存在 macOS Keychain；`/erp-collection/archives`、`/erp-collection/ingest` 和 `/erp-collection/sales-facts` 都属于 handler 自认证路由，API 中间件必须放行 Bearer token 交由各 handler 校验，不能先按员工会话拦截。销售事实路由遗漏放行会表现为文件已归档但 D1 上传 HTTP 401。
-- runner 进程心跳与 Chrome 扩展轮询是两种独立状态：后台进程存活只能证明本机服务在线，只有已认证扩展在最近两分钟调用本机领取接口才能写 `extension_online`，否则写 `extension_offline`。`queued` 只表示等待领取，页面不得把它显示为“正在采集”；只有 `claimed` 及后续阶段才表示已经开始处理。
+- runner 进程心跳与浏览器执行器状态必须分开表达。MV3 使用 `extension_online/offline`；专用浏览器使用 `dedicated_browser_online/offline`。`queued` 只表示等待领取，页面不得把它显示为“正在采集”；只有 `claimed` 及后续阶段才表示已经开始处理。
 - 永久 LaunchAgent 不得保存临时 `.worktrees/*` 入口。安装器必须通过 Git common directory 把当前工作树中的采集入口映射回主检出仓库的同一相对路径，再原子写入 plist；临时分支被删除后，服务重启仍须能找到入口。
 - 05:00 日计划由本机执行器生成并通过控制面幂等登记；扩展触发官方导出，解析、脱敏、原始文件本机归档和 D1 ingest 仍由本机执行器完成。只有完整 ingest 成功才能推进游标。
 - 控制面只自动恢复已登记的瞬时错误：下载、网络或本机处理失败按 5 分钟、15 分钟退避，同一任务最多领取 3 次；重排必须保持 provider、resource、业务日期、目标环境和幂等键不变。登录、验证码与 `schema_changed` 不自动循环；页面适配器修复通过提升 `scheduleVersion` 创建可审计的新任务，旧失败记录不得覆盖或删除。
@@ -52,7 +56,7 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 - 高行数 `sales_items` 在公司 Mac 完成脱敏、校验和 `日期 × 69码 × 平台` 聚合后，通过一次标准事实请求写入 D1；完整明细文件留在本机/NAS 原始归档，D1 记录文件哈希、原始行数、事实行数、日期范围和安全异常，不按 500 行分块复制销售明细。
 - 采集任务开始前必须主动探测 provider 标签页的 content script；探测失败时强制刷新，仍失败则只能通过 `scripting.executeScript` 注入代码包内按 provider 固定登记的脚本，不能接收远端脚本名或代码。主动注入仍失败时必须区分 `EXTENSION_SITE_ACCESS_DENIED`（员工需恢复登记域名的网站访问权限）与 `EXTENSION_CONTENT_SCRIPT_UNAVAILABLE`（扩展包或运行时异常），不能笼统显示“采集中”。仅凭 URL、加载状态或同源 SPA 的 hash 变化，不能判定扩展升级或重载后的脚本已经注入。
 
-- 旧店铺浏览器 agent 已停用，不再创建或领取店铺登录任务。后续若有具备稳定接口和明确授权的新 provider，必须重新完成集成评审和生产验证。
+- 旧的凭据登录 browser agent 已停用，不再创建或领取店铺登录任务。专用 Chrome 不读取数据中心保存的账号密码，也不代替员工提交验证码或破解风控。
 - 浏览器 provider 必须按页面条件等待可操作状态；平台专属的登录方式切换、字段选择器和人工验证文案留在 adapter 内。对有动态风控的平台，adapter 只预填凭证，不代替用户点击登录、接受协议或提交验证码；再次验证优先复用同一登录页，同一固定浏览器 Profile 在人工登录后复用会话。普通手机登录方式中的“发送验证码”等说明不得直接当成已出现人工挑战，邮箱验证码、滑块、扫码和设备确认则必须保持人工等待状态。
 - 公司 Mac 离线：任务留在队列，不丢失连接。
 - 五分钟 claim 到期：其他同 scope agent 可重新领取。
@@ -63,4 +67,4 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 ## 当前范围
 
-店铺网页登录 provider 已退役；六个店铺平台当前只登记文件样例等待状态。文件上传、字段识别和标准化解析尚未在没有真实样例时实现。ERP、广告、钉钉和 NAS 是否可用仍以各自注册表与生产证据为准。
+抖店专用 Chrome 采集已完成本地实现，等待公司 Mac 真实登录态、最新业务日四资源与连续七个业务日验收；在此之前状态保持 `integrating`。其他店铺平台仍以文件样例和各自生产证据为准。快麦继续使用现有 MV3 官方导出与本机处理链路；广告、钉钉和 NAS 是否可用仍以集成注册表与生产证据为准。

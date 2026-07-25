@@ -85,6 +85,17 @@ export function createWebCollectionD1Mock() {
         if (query.includes("from web_collection_runs")) return { results: [...tables.web_collection_runs.values()] };
         if (query.includes("from web_collection_cursors")) return { results: [...tables.web_collection_cursors.values()] };
         if (query.includes("from web_collection_notifications")) return { results: [...tables.web_collection_notifications.values()] };
+        if (query.includes("from web_collection_stores") && query.includes("where runner_id = ?")) {
+          const [runnerId] = state.values;
+          return {
+            results: [...tables.web_collection_stores.values()]
+              .filter(row => row.runner_id === runnerId && row.status === "connected")
+              .sort((left, right) => (
+                `${left.provider_id}:${left.store_name}:${left.store_id}`
+                  .localeCompare(`${right.provider_id}:${right.store_name}:${right.store_id}`)
+              ))
+          };
+        }
         if (query.includes("from web_collection_stores")) return { results: [...tables.web_collection_stores.values()] };
         return { results: [] };
       },

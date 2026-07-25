@@ -2,10 +2,12 @@ import { spawn } from "node:child_process";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { managedEndpointReady, normalizeLoopbackEndpoint } from "../browser-runtime/managed-chrome.mjs";
+
 const CHROME_BINARY = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 async function endpointReady(endpoint, fetchImpl = fetch) {
-  try { return (await fetchImpl(`${endpoint.replace(/\/$/, "")}/json/version`)).ok; } catch { return false; }
+  return managedEndpointReady(normalizeLoopbackEndpoint(endpoint), fetchImpl);
 }
 
 export async function ensureCompanyChrome(endpoint = "http://127.0.0.1:9222", options = {}) {

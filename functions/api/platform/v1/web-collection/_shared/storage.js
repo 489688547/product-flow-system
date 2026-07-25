@@ -234,6 +234,20 @@ export async function registerWebCollectionStore(db, runner, input) {
   };
 }
 
+export async function listRunnerWebCollectionStores(db, runner) {
+  const result = await db.prepare(`SELECT provider_id, store_id, store_name
+    FROM web_collection_stores
+    WHERE runner_id = ? AND status = 'connected'
+    ORDER BY provider_id, store_name, store_id`).bind(runner.id).all();
+  return {
+    stores: (result?.results || []).map(row => ({
+      providerId: row.provider_id,
+      storeId: row.store_id,
+      storeName: row.store_name
+    }))
+  };
+}
+
 export async function ensureWebCollectionPlan(db, jobs, target = { environmentId: "production", environmentVersion: 1 }) {
   if (!Array.isArray(jobs) || !jobs.length || jobs.length > 100) throw routeError(400, "WEB_COLLECTION_JOB_INVALID", "任务计划必须包含 1 至 100 个资源。");
   const normalized = jobs.map(normalizeJob);

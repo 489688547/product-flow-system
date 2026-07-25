@@ -13,6 +13,14 @@ import {
 } from "../scripts/web-data-collector/providers/index.mjs";
 import { createDouyinProcessor } from "../scripts/web-data-collector/providers/douyin/index.mjs";
 
+async function dedicatedRuntimeModules() {
+  const [profileRegistry, runtime] = await Promise.all([
+    import("../scripts/web-data-collector/browser/profile-registry.mjs").catch(() => ({})),
+    import("../scripts/web-data-collector/browser/runtime.mjs").catch(() => ({}))
+  ]);
+  return { ...profileRegistry, ...runtime };
+}
+
 function apiDouble(job) {
   const calls = [];
   let claimed = false;
@@ -190,6 +198,268 @@ test("orchestrator does not expose an active Douyin task to another Chrome profi
   assert.equal(ownerTask.storeId, "store-a");
   assert.equal(await orchestrator.nextTask({ storeId: "store-b" }), null);
   assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, { storeId: "store-a" }]);
+});
+
+test("dedicated mode keeps Douyin work away from the extension bridge", async () => {
+  const douyinJob = {
+    ...job,
+    id: "douyin-job-1",
+    providerId: "douyin-ecommerce",
+    storeId: "store-a",
+    resourceType: "store_daily"
+  };
+  const api = apiDouble(douyinJob);
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({}),
+    executionMode: "dedicated"
+  });
+
+  assert.equal(await orchestrator.nextTask({ storeId: "store-a" }), null);
+  const dedicated = await orchestrator.nextTask({ storeId: "store-a", executor: "dedicated" });
+  assert.equal(dedicated.storeId, "store-a");
+  assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, { storeId: "store-a" }]);
+});
+
+test("profile registry creates one safe local profile per assigned store", async () => {
+  const { createBrowserProfileRegistry } = await dedicatedRuntimeModules();
+  assert.equal(typeof createBrowserProfileRegistry, "function", "createBrowserProfileRegistry must be implemented");
+  const registry = createBrowserProfileRegistry({ rootDir: "/managed/profiles" });
+
+  const first = registry.register({
+    providerId: "douyin-ecommerce",
+    storeId: "90862283",
+    storeName: "TIYES 提野星旗舰店"
+  });
+  const repeated = registry.register({
+    providerId: "douyin-ecommerce",
+    storeId: "90862283",
+    storeName: "新名称"
+  });
+
+  assert.equal(first.profileKey, "douyin-ecommerce:90862283");
+  assert.equal(repeated.profileKey, first.profileKey);
+  assert.equal(registry.list().length, 1);
+  assert.deepEqual(registry.listSafe(), [{
+    providerId: "douyin-ecommerce",
+    storeId: "90862283",
+    storeName: "新名称",
+    profileKey: "douyin-ecommerce:90862283"
+  }]);
+  assert.doesNotMatch(JSON.stringify(registry.listSafe()), /managed\/profiles|Users\//);
+});
+
+test("dedicated runtime fetches assigned stores and completes a short browser action", async () => {
+  const { createDedicatedBrowserRuntime } = await dedicatedRuntimeModules();
+  assert.equal(typeof createDedicatedBrowserRuntime, "function", "createDedicatedBrowserRuntime must be implemented");
+  const calls = [];
+  const runtime = createDedicatedBrowserRuntime({
+    api: {
+      async assignedStores() {
+        calls.push(["assignedStores"]);
+        return {
+          stores: [{
+            providerId: "douyin-ecommerce",
+            storeId: "90862283",
+            storeName: "TIYES 提野星旗舰店"
+          }]
+        };
+      }
+    },
+    profileRegistry: {
+      register(store) {
+        calls.push(["register", store.storeId]);
+        return { ...store, profileKey: `${store.providerId}:${store.storeId}`, profileDir: "/local/hidden" };
+      }
+    },
+    ensureBrowser: async profile => {
+      calls.push(["ensureBrowser", profile.profileKey]);
+      return { ...profile, online: true, endpoint: "http://127.0.0.1:43127" };
+    },
+    orchestrator: {
+      async nextTask(input) {
+        calls.push(["nextTask", input]);
+        return {
+          jobId: "job-1",
+          providerId: "douyin-ecommerce",
+          storeId: "90862283",
+          resourceType: "store_daily",
+          businessDate: "2026-07-24"
+        };
+      },
+      async submitResult(result) {
+        calls.push(["submitResult", result.kind]);
+        return { job: { status: "success" } };
+      },
+      recordBrowserStatus(status) {
+        calls.push(["recordBrowserStatus", status]);
+      }
+    },
+    executeTask: async ({ task, browser }) => {
+      assert.equal(task.storeId, "90862283");
+      assert.equal(browser.online, true);
+      return {
+        kind: "captured",
+        jobId: "job-1",
+        resourceType: "store_daily",
+        facts: {},
+        pageType: "shop_compass_overview",
+        selectorVersion: "2026-07-25"
+      };
+    }
+  });
+
+  const result = await runtime.runOnce();
+
+  assert.equal(result.processed, 1);
+  assert.deepEqual(calls.find(([name]) => name === "nextTask"), [
+    "nextTask",
+    { storeId: "90862283", executor: "dedicated" }
+  ]);
+  assert.equal(calls.some(([name]) => name === "submitResult"), true);
+});
+
+test("dedicated runtime resumes a downloaded checkpoint without repeating browser work", async () => {
+  const { createDedicatedBrowserRuntime } = await dedicatedRuntimeModules();
+  assert.equal(typeof createDedicatedBrowserRuntime, "function", "createDedicatedBrowserRuntime must be implemented");
+  const calls = [];
+  const checkpointResult = {
+    kind: "downloaded",
+    jobId: "job-1",
+    filePath: "/managed/downloads/report.xlsx",
+    safeFileName: "report.xlsx",
+    pageType: "shop_compass_product",
+    reportVersion: "douyin-product-v2"
+  };
+  const runtime = createDedicatedBrowserRuntime({
+    api: {
+      async assignedStores() {
+        return {
+          stores: [{
+            providerId: "douyin-ecommerce",
+            storeId: "90862283",
+            storeName: "TIYES 提野星旗舰店"
+          }]
+        };
+      }
+    },
+    profileRegistry: {
+      register(store) {
+        return { ...store, profileKey: `${store.providerId}:${store.storeId}`, profileDir: "/local/hidden" };
+      }
+    },
+    ensureBrowser: async profile => ({ ...profile, online: true, endpoint: "http://127.0.0.1:43127" }),
+    orchestrator: {
+      async nextTask() {
+        return {
+          jobId: "job-1",
+          providerId: "douyin-ecommerce",
+          storeId: "90862283",
+          resourceType: "product_daily",
+          businessDate: "2026-07-24"
+        };
+      },
+      async submitResult(result) {
+        calls.push(["submitResult", result]);
+        return { job: { status: "success" } };
+      },
+      recordBrowserStatus() {}
+    },
+    checkpointStore: {
+      async load(jobId) {
+        calls.push(["load", jobId]);
+        return { stage: "downloaded", result: checkpointResult };
+      },
+      async save() {
+        throw new Error("must not save recovered result");
+      },
+      async clear(jobId) {
+        calls.push(["clear", jobId]);
+      }
+    },
+    executeTask: async () => {
+      throw new Error("browser work must not repeat");
+    }
+  });
+
+  const result = await runtime.runOnce();
+
+  assert.equal(result.processed, 1);
+  assert.deepEqual(calls, [
+    ["load", "job-1"],
+    ["submitResult", checkpointResult],
+    ["clear", "job-1"]
+  ]);
+});
+
+test("dedicated runtime records a safe failed result and local diagnostic when browser action crashes", async () => {
+  const { createDedicatedBrowserRuntime } = await dedicatedRuntimeModules();
+  assert.equal(typeof createDedicatedBrowserRuntime, "function", "createDedicatedBrowserRuntime must be implemented");
+  const calls = [];
+  const runtime = createDedicatedBrowserRuntime({
+    api: {
+      async assignedStores() {
+        return {
+          stores: [{
+            providerId: "douyin-ecommerce",
+            storeId: "90862283",
+            storeName: "TIYES 提野星旗舰店"
+          }]
+        };
+      }
+    },
+    profileRegistry: {
+      register(store) {
+        return { ...store, profileKey: `${store.providerId}:${store.storeId}`, profileDir: "/local/hidden" };
+      }
+    },
+    ensureBrowser: async profile => ({ ...profile, online: true, endpoint: "http://127.0.0.1:43127" }),
+    orchestrator: {
+      async nextTask() {
+        return {
+          jobId: "job-1",
+          providerId: "douyin-ecommerce",
+          storeId: "90862283",
+          resourceType: "product_daily",
+          businessDate: "2026-07-24"
+        };
+      },
+      async submitResult(result) {
+        calls.push(["submitResult", result]);
+      },
+      recordBrowserStatus() {}
+    },
+    diagnosticStore: {
+      async write(input) {
+        calls.push(["diagnostic", input]);
+        return {
+          diagnosticId: "diag_aaaaaaaaaaaaaaaaaaaaaaaa",
+          errorCode: input.errorCode,
+          createdAt: "2026-07-25T09:00:00.000Z"
+        };
+      }
+    },
+    diagnosticPageType: () => "shop_compass_product",
+    executeTask: async () => {
+      throw Object.assign(new Error("raw customer page detail"), {
+        code: "DOUYIN_ACTION_FAILED",
+        localArtifact: Buffer.from("encrypted locally")
+      });
+    }
+  });
+
+  const result = await runtime.runOnce();
+  const submitted = calls.find(([name]) => name === "submitResult")[1];
+
+  assert.equal(result.failed, 1);
+  assert.deepEqual(submitted, {
+    kind: "failed",
+    jobId: "job-1",
+    errorCode: "DOUYIN_ACTION_FAILED",
+    safeSummary: "本机浏览器操作失败，诊断编号 diag_aaaaaaaaaaaaaaaaaaaaaaaa。",
+    stage: "opening"
+  });
+  assert.doesNotMatch(JSON.stringify(submitted), /raw customer|encrypted locally|Users\//i);
 });
 
 test("orchestrator releases an expired in-memory lease before the extension asks for another task", async () => {
