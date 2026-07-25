@@ -107,13 +107,19 @@ test("Douyin content execution supports safe capture and official downloads only
 
 test("Douyin visible-number parsing only applies the unit attached to the primary value", async () => {
   const {
+    isDouyinYesterdayPresetSelected,
+    parseDouyinComparisonNumber,
     parseDouyinStoreIdentityText,
-    parseVisibleNumber
+    parseVisibleNumber,
+    waitForDouyinPageClassification
   } = await import(new URL("providers/executors/douyin.js", extensionRoot));
 
   assert.equal(parseVisibleNumber("¥63,750.34 较上期 7.35% 同行顶尖 ¥4.35万"), 63_750.34);
   assert.equal(parseVisibleNumber("33.15万 较上期 64.97% 同行标杆 19.22万"), 331_500);
   assert.equal(parseVisibleNumber("-"), null);
+  assert.equal(parseDouyinComparisonNumber("¥42,927.91 昨日 ¥58,095.61", "昨日"), 58_095.61);
+  assert.equal(parseDouyinComparisonNumber("2,148 昨日 2,763", "昨日"), 2_763);
+  assert.equal(parseDouyinComparisonNumber("¥42,927.91 较上期 8.87%", "昨日"), null);
   assert.deepEqual(
     parseDouyinStoreIdentityText(
       "店铺管理\nTIYES提野星宠物用品旗舰店\n正常营业\n2023年03月15日开店\n店铺ID: 90862283"
@@ -125,6 +131,22 @@ test("Douyin visible-number parsing only applies the unit attached to the primar
     }
   );
   assert.equal(parseDouyinStoreIdentityText("抖店首页\n尚未进入店铺管理"), null);
+  assert.equal(isDouyinYesterdayPresetSelected({ label: "近1天", selected: true }), true);
+  assert.equal(isDouyinYesterdayPresetSelected({ label: "昨日", selected: true }), true);
+  assert.equal(isDouyinYesterdayPresetSelected({ label: "实时", selected: true }), false);
+  assert.equal(isDouyinYesterdayPresetSelected({ label: "近1天", selected: false }), false);
+
+  const states = [
+    { state: "schema_changed", errorCode: "DOUYIN_PAGE_SCHEMA_CHANGED" },
+    { state: "ready" }
+  ];
+  let waits = 0;
+  assert.deepEqual(await waitForDouyinPageClassification({
+    read: () => states.shift(),
+    waitImpl: async () => { waits += 1; },
+    timeoutMs: 100
+  }), { state: "ready" });
+  assert.equal(waits, 1);
 });
 
 test("extension task contract only allows registered provider resources", async () => {

@@ -4,7 +4,11 @@
 
 数据中心通过统一 provider registry、连接保险箱、文件导入、受控任务和结果 writer 获取外部系统数据。业务 App 只读取标准事实表或平台 API，不能直接登录抖音、ERP、广告平台或 NAS。
 
-旧的“保存账号密码并由通用 agent 代登录”路径已经退役。抖店经营采集改为公司 Mac 的专用持久 Chrome Profile：员工只在该独立窗口处理登录、扫码、验证码、滑块或设备确认；浏览器只执行代码登记的页面短动作、官方报表下载和固定白名单指标读取。本机采集服务承担等待、归档、解析、校验、检查点、重试和受控 API 入库。该能力在完成真实连续验收前保持 `integrating`，不能据此推断其他店铺或广告平台已接通。
+旧的“保存账号密码并由通用 agent 代登录”路径已经退役。抖店经营采集默认复用公司日常 Chrome
+的已登录状态：MV3 扩展只执行代码登记的页面短动作、官方报表下载和固定白名单指标读取，本机采集
+服务承担等待、归档、解析、校验、检查点、重试和受控 API 入库。专用持久 Chrome Profile 仅作为
+多账号隔离或扩展故障时的显式回退。该能力在完成真实连续验收前保持 `integrating`，不能据此推断
+其他店铺或广告平台已接通。
 
 ## 分层
 
@@ -32,8 +36,12 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 ## 运行与恢复
 
 - 已验证的 ERP 网页导出使用仓库内 MV3 插件复用公司日常 Chrome 登录态；首期通过“加载已解压的扩展程序”安装，不依赖 Chrome 应用商店。插件只申请 alarms、storage、tabs、downloads、scripting 和登记平台 host 权限；scripting 仅注入代码包内按 provider 固定登记的 content script，不申请 Cookie、History、WebRequest、Debugger 或 Native Messaging。
-- 抖店使用可见的专用 Chrome 进程，每个已登记店铺对应一个非默认 `user-data-dir`。DevTools 只绑定 `127.0.0.1` 的随机端口并从该 Profile 的 `DevToolsActivePort` 发现；默认个人 Chrome Profile、外网调试地址、远端 URL/脚本/选择器和未登记店铺一律拒绝。
-- 专用浏览器模式与 MV3 共用 `web_collection_jobs` 的 claim/lease，不建立第二套队列。专用模式启用时，MV3 bridge 不向扩展返回 Douyin 任务，但继续服务 Kuaimai；Douyin 只能由匹配 `storeId` 的专用 Profile 领取。回滚时可切回 `--browser-mode extension`，不能让两个执行器并发领取同一店铺任务。
+- 抖店默认使用公司日常 Chrome 的 MV3 扩展；扩展按最近核对的稳定 `storeId` 领取任务。需要账号隔离
+  时可显式启用专用 Chrome 进程，每个已登记店铺对应一个非默认 `user-data-dir`；DevTools 只绑定
+  `127.0.0.1` 的随机端口。外网调试地址、远端 URL/脚本/选择器和未登记店铺一律拒绝。
+- 默认扩展模式与专用回退模式共用 `web_collection_jobs` 的 claim/lease，不建立第二套队列。
+  专用模式启用时，MV3 bridge 不向扩展返回 Douyin 任务，但继续服务 Kuaimai；不能让两个执行器并发
+  领取同一店铺任务。LaunchAgent、安装器和 CLI 未显式指定时都使用 `--browser-mode extension`。
 - runner 通过 `assigned_stores` 只读取分配给本设备的已启用店铺，响应仅包含 `providerId/storeId/storeName`。本机 Profile 目录、DevTools 端口、Cookie、Token、凭据、页面正文和截图不得返回服务器。
 - 官方下载和固定页面读数完成后，本机把可恢复结果原子写入权限为 `0600` 的检查点；服务重启并重新取得同一任务租约后优先恢复检查点，不重复执行页面动作。失败截图只允许来自登记页面，使用本机 AES-256-GCM 加密保存，服务器只接收稳定错误码与诊断编号；诊断文件保留七天后清理。
 - 本机执行器只监听 `127.0.0.1`，请求带 `Origin` 时必须匹配固定扩展 ID；Chrome MV3 Service Worker 未发送 `Origin` 时仍必须通过随机配对密钥，缺少或错误密钥一律拒绝。runner token 和配对密钥分别存在 macOS Keychain。插件只接收 provider/resource/businessDate/jobId，不接收远程 URL、选择器、脚本或凭据。
@@ -67,4 +75,7 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 ## 当前范围
 
-抖店专用 Chrome 采集已完成本地实现，等待公司 Mac 真实登录态、最新业务日四资源与连续七个业务日验收；在此之前状态保持 `integrating`。其他店铺平台仍以文件样例和各自生产证据为准。快麦继续使用现有 MV3 官方导出与本机处理链路；广告、钉钉和 NAS 是否可用仍以集成注册表与生产证据为准。
+抖店公司 Chrome 扩展采集已完成本地实现，店铺每日已通过 2026-07-24 真实登录态与 D1 完成批次
+验收；商品、直播、短视频仍需完成最新业务日主链路生产复核，因此状态保持 `integrating`。其他店铺
+平台仍以文件样例和各自生产证据为准。快麦继续使用现有 MV3 官方导出与本机处理链路；广告、钉钉
+和 NAS 是否可用仍以集成注册表与生产证据为准。

@@ -2,7 +2,10 @@
 
 ## 状态
 
-已接受，2026-07-25。
+已被 `2026-07-25-existing-chrome-extension-first.md` 取代，2026-07-25。
+
+真实验收发现公司日常 Chrome 已有可复用登录态，而专用 Profile 会重复要求登录并增加运行入口。
+本 ADR 保留为历史记录；专用浏览器实现继续作为多账号隔离和故障回退，不再是默认主链路。
 
 本决策取代“MV3 扩展承担长任务执行”的主链路设计，但不推翻
 `2026-07-24-douyin-preauthenticated-chrome-collection.md` 中关于已登录 Chrome、

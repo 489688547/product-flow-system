@@ -29,7 +29,7 @@ test("LaunchAgent keeps the loopback runner alive and pins the repository entryp
   });
   assert.match(plist, /com\.company\.web-data-collector/);
   assert.match(plist, /<string>serve<\/string>/);
-  assert.match(plist, /<string>--browser-mode<\/string>\s*<string>dedicated<\/string>/);
+  assert.match(plist, /<string>--browser-mode<\/string>\s*<string>extension<\/string>/);
   assert.match(plist, /<key>KeepAlive<\/key>/);
   assert.match(plist, /<true\/>/);
   assert.doesNotMatch(plist, /pairing|wdc_|wcp_/i);
@@ -49,7 +49,7 @@ test("LaunchAgent resolves a temporary worktree entrypoint back to the primary c
   }), "/repo/scripts/web-data-collector/index.mjs");
 });
 
-test("LaunchAgent installer preserves the requested extension rollback mode", async () => {
+test("LaunchAgent installer preserves the requested dedicated fallback mode", async () => {
   const home = await mkdtemp(path.join(os.tmpdir(), "web-collector-agent-"));
   const commands = [];
   try {
@@ -58,7 +58,7 @@ test("LaunchAgent installer preserves the requested extension rollback mode", as
       collectorPath: "/repo/scripts/web-data-collector/index.mjs",
       root: "/Users/company/Desktop/company-data-archive",
       baseUrl: "https://flow.example.com",
-      browserMode: "extension",
+      browserMode: "dedicated",
       home,
       command: async (program, args) => {
         commands.push([program, args]);
@@ -67,7 +67,7 @@ test("LaunchAgent installer preserves the requested extension rollback mode", as
       }
     });
     const plist = await readFile(result.plistPath, "utf8");
-    assert.match(plist, /<string>--browser-mode<\/string>\s*<string>extension<\/string>/);
+    assert.match(plist, /<string>--browser-mode<\/string>\s*<string>dedicated<\/string>/);
     assert.equal(commands.some(([program, args]) => (
       program === "/bin/launchctl" && args[0] === "bootstrap"
     )), true);

@@ -1,5 +1,10 @@
 # 专用浏览器采集器实施计划
 
+> **2026-07-25 update:** The dedicated runtime was implemented but is no longer the default after real-session
+> acceptance. `docs/decisions/2026-07-25-existing-chrome-extension-first.md` makes the company daily Chrome
+> extension the primary short-action executor; the local service still owns long-running work, and dedicated mode
+> remains an explicit fallback.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace Douyin MV3 long-running collection with a visible, persistent, store-scoped Chrome runtime that performs only short page actions while the local collector owns downloads, parsing, validation, retries, checkpoints, diagnostics, and governed API upload.
@@ -158,3 +163,29 @@
 - [ ] Verify a registered Douyin store opens in its managed visible profile, reports login/manual action accurately, and does not let the extension claim the same job.
 - [ ] When the profile is logged in, execute the latest business-day four-resource collection and verify completed or safely failed records in Data Sync and completed batches in D1.
 - [ ] Record evidence in the backlog item and submit it for review. Do not disable the MV3 rollback path until seven consecutive business days pass.
+
+## Task 8: Restore the already signed-in company Chrome as the default
+
+**Files:**
+
+- Modify: `tests/web-data-collector-automation.test.mjs`
+- Modify: `react-tests/data-center-app.test.mjs`
+- Modify: `tests/web-data-collector-runtime.test.mjs`
+- Modify: `scripts/web-data-collector/automation.mjs`
+- Modify: `scripts/web-data-collector/index.mjs`
+- Modify: `scripts/web-data-collector/orchestrator.mjs`
+- Modify: `src/features/data-center/DataGovernanceWorkspaces.jsx`
+- Modify: `docs/decisions/2026-07-25-dedicated-browser-collection.md`
+- Create: `docs/decisions/2026-07-25-existing-chrome-extension-first.md`
+- Modify: `docs/features/douyin-compass-collection/{prd,design,plan,tasks}.md`
+- Modify: `docs/platform/data-acquisition.md`
+- Modify: `docs/platform/integration-registry.json`
+
+- [x] Write failing tests requiring the default LaunchAgent mode and the Data Sync copy to use the company Chrome extension.
+- [x] Run the focused tests and confirm they fail against the dedicated-default implementation.
+- [x] Change the LaunchAgent, installer, and CLI defaults to `extension`; retain explicit `dedicated` fallback.
+- [x] Preserve safe local-processing/ingest error summaries in terminal run records.
+- [x] Update Data Sync copy to direct employees to the company daily Chrome login state.
+- [x] Record the superseding ADR and update durable product/platform/integration sources.
+- [x] Run the complete Definition of Done and Pages Functions compatibility build.
+- [ ] Commit, push, merge through GitHub, wait for Cloudflare Git deployment, and verify production.

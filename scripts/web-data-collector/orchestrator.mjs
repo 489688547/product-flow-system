@@ -85,7 +85,11 @@ export function createWebCollectorOrchestrator({
         ? "waiting_human"
         : "failed";
     const errorCode = safeErrorCode(result.errorCode, fallbackCode);
-    await transition(from, target, { stage: result.stage || from, errorCode });
+    await transition(from, target, {
+      stage: result.stage || from,
+      errorCode,
+      ...(result.errorSummary ? { errorSummary: result.errorSummary } : {})
+    });
     await notify({
       kind: target,
       jobId: activeJob.id,
@@ -144,7 +148,10 @@ export function createWebCollectorOrchestrator({
       await api.ensureRegisteredPlan();
       return result;
     },
-    async submitResult(result) {
+    async submitResult(result, {
+      resume = {},
+      onCheckpoint = async () => {}
+    } = {}) {
       if (!activeJob || result?.jobId !== activeJob.id) {
         const error = new Error("插件结果与当前任务不匹配。");
         error.code = "WEB_COLLECTION_RESULT_JOB_MISMATCH";
@@ -179,6 +186,8 @@ export function createWebCollectorOrchestrator({
         const processed = await processor.process({
           job: activeJob,
           result,
+          resume,
+          onStage: onCheckpoint,
           onValidated: async () => {
             if (current === "validating") {
               await transition(current, "ingesting");

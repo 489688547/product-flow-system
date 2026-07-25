@@ -76,7 +76,7 @@ export const douyinResources = Object.freeze({
     providerId: "douyin-ecommerce",
     resourceType: "store_daily",
     origin: "https://compass.jinritemai.com",
-    route: "/",
+    route: "/shop",
     pageType: "shop_compass_overview",
     reportVersion: "douyin-store-v1",
     scheduleVersion: "v1",
@@ -168,7 +168,9 @@ export function classifyDouyinPage({ url = "", markers = {} } = {}) {
       safeSummary: "页面需要验证码、扫码、滑块或设备确认，请人工完成后重试。"
     };
   }
-  if (markers.storeIdentity && markers.reportPage) return { state: "ready" };
+  // 店铺身份已在任务领取前通过抖店后台完成配对；罗盘新版不再稳定暴露
+  // 旧版 shop-name DOM 标记，因此业务页本身加载完成即可继续采集。
+  if (markers.reportPage) return { state: "ready" };
   return { state: "schema_changed", errorCode: "DOUYIN_PAGE_SCHEMA_CHANGED" };
 }
 

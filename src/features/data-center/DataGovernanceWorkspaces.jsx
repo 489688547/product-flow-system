@@ -177,10 +177,10 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
         businessDate: resource.businessDate,
         force: true
       });
-      setDouyinTriggerMessage(`${resource.label}已重新排队，专用 Chrome 将在下一轮领取。`);
+      setDouyinTriggerMessage(`${resource.label}已重新排队，公司 Chrome 扩展将在下一轮领取。`);
       await refreshWebCollection();
     } catch (error) {
-      setDouyinTriggerMessage(error.message || "抖店专用 Chrome 采集任务触发失败。");
+      setDouyinTriggerMessage(error.message || "抖店 Chrome 采集任务触发失败。");
     } finally {
       setDouyinTriggering("");
     }
@@ -205,7 +205,7 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
       </div>
     </section> : null}
     <section className="section-panel">
-      <div className="section-head"><div><h2>抖店专用 Chrome 官方报表采集</h2><p>每天 05:00 后由公司 Mac 的独立店铺 Profile 采集昨天四类资源；失败会留记录，不会覆盖上次可信批次。</p></div><a className="btn" href="https://fxg.jinritemai.com/" target="_blank" rel="noreferrer"><MonitorCheck size={16} aria-hidden="true" />打开抖店登录页</a></div>
+      <div className="section-head"><div><h2>抖店 Chrome 官方报表采集</h2><p>每天 05:00 后优先复用公司日常 Chrome 的已登录状态采集昨天四类资源；失败会留记录，不会覆盖上次可信批次。</p></div><a className="btn" href="https://fxg.jinritemai.com/" target="_blank" rel="noreferrer"><MonitorCheck size={16} aria-hidden="true" />打开抖店登录页</a></div>
       {douyinTriggerMessage ? <p className="data-sync-trigger-message" role="status">{douyinTriggerMessage}</p> : null}
       <DataTable minWidth={760} columns={[
         { key: "store", header: "店铺", render: row => row.storeName ? <span><strong>{row.storeName}</strong><small>店铺 ID {row.storeId}</small></span> : row.storeId || "尚未识别" },

@@ -65,12 +65,15 @@ test("dedicated Douyin adapter opens only the fixed registered report page", asy
       online: true,
       profileKey: "douyin-ecommerce:90862283",
       endpoint: "http://127.0.0.1:43127"
-    }
+    },
+    onCheckpoint: async stage => calls.push(["checkpoint", stage])
   });
 
   assert.deepEqual(calls[0], ["open", "https://compass.jinritemai.com/shop/merchandise-traffic"]);
-  assert.deepEqual(calls[1], ["date", "2026-07-24"]);
-  assert.deepEqual(calls[2], ["download", {
+  assert.deepEqual(calls[1], ["checkpoint", "opening"]);
+  assert.deepEqual(calls[2], ["date", "2026-07-24"]);
+  assert.deepEqual(calls[3], ["checkpoint", "waiting_download"]);
+  assert.deepEqual(calls[4], ["download", {
     resourceType: "product_daily",
     pageType: "shop_compass_product",
     reportVersion: "douyin-product-v2"

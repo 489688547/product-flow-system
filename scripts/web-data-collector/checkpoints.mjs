@@ -26,6 +26,20 @@ const RESULT_FIELDS = new Set([
   "stage"
 ]);
 const SENSITIVE_FIELD = /cookie|token|password|credential|authorization|html|pageText/i;
+const RESUME_FIELDS = new Set(["archive", "parsed", "nextChunkIndex", "processed"]);
+const ARCHIVE_FIELDS = new Set(["relativeArchiveKey", "fileHash"]);
+const PARSED_FIELDS = new Set(["reportVersion", "rowCount", "coverage", "confidence"]);
+const PROCESSED_FIELDS = new Set([
+  "batchId",
+  "rowCount",
+  "coverage",
+  "confidence",
+  "relativeArchiveKey",
+  "archiveId",
+  "fileHash",
+  "sourceVersion",
+  "completedCount"
+]);
 
 function assertJobId(value) {
   const jobId = String(value || "");
@@ -44,6 +58,108 @@ function validateResult(result, jobId) {
   }
   if (result.jobId && result.jobId !== jobId) throw new Error("本机检查点任务结果不匹配。");
   return structuredClone(result);
+}
+
+function assertObjectFields(value, fields, label) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`本机检查点${label}无效。`);
+  }
+  if (Object.keys(value).some(key => SENSITIVE_FIELD.test(key) || !fields.has(key))) {
+    throw new Error(`本机检查点${label}包含敏感或未登记字段。`);
+  }
+}
+
+function validateRelativeArchiveKey(value) {
+  const key = String(value || "");
+  if (
+    !key
+    || key.length > 600
+    || key.startsWith("/")
+    || key.includes("\\")
+    || key.split("/").some(part => !part || part === "." || part === "..")
+  ) {
+    throw new Error("本机检查点恢复归档路径无效。");
+  }
+  return key;
+}
+
+function validateHash(value) {
+  const hash = String(value || "").toLowerCase();
+  if (!/^[a-f0-9]{64}$/.test(hash)) throw new Error("本机检查点恢复文件哈希无效。");
+  return hash;
+}
+
+function validateCount(value, label) {
+  const count = Number(value);
+  if (!Number.isInteger(count) || count < 0 || count > 10_000_000) {
+    throw new Error(`本机检查点恢复${label}无效。`);
+  }
+  return count;
+}
+
+function validateCoverage(value) {
+  if (value === null || value === undefined) return null;
+  const coverage = Number(value);
+  if (!Number.isFinite(coverage) || coverage < 0 || coverage > 1) {
+    throw new Error("本机检查点恢复覆盖率无效。");
+  }
+  return coverage;
+}
+
+function validateConfidence(value) {
+  if (value === null || value === undefined) return null;
+  const confidence = String(value || "");
+  if (!["low", "medium", "high"].includes(confidence)) {
+    throw new Error("本机检查点恢复可信等级无效。");
+  }
+  return confidence;
+}
+
+function validateResume(resume) {
+  if (resume === undefined) return undefined;
+  assertObjectFields(resume, RESUME_FIELDS, "恢复信息");
+  const normalized = {};
+  if (resume.archive !== undefined) {
+    assertObjectFields(resume.archive, ARCHIVE_FIELDS, "恢复归档信息");
+    normalized.archive = {
+      relativeArchiveKey: validateRelativeArchiveKey(resume.archive.relativeArchiveKey),
+      fileHash: validateHash(resume.archive.fileHash)
+    };
+  }
+  if (resume.parsed !== undefined) {
+    assertObjectFields(resume.parsed, PARSED_FIELDS, "恢复解析信息");
+    const reportVersion = String(resume.parsed.reportVersion || "");
+    if (!/^[-_.a-zA-Z0-9]{1,120}$/.test(reportVersion)) {
+      throw new Error("本机检查点恢复报表版本无效。");
+    }
+    normalized.parsed = {
+      reportVersion,
+      rowCount: validateCount(resume.parsed.rowCount, "解析行数"),
+      coverage: validateCoverage(resume.parsed.coverage),
+      confidence: validateConfidence(resume.parsed.confidence)
+    };
+  }
+  if (resume.nextChunkIndex !== undefined) {
+    normalized.nextChunkIndex = validateCount(resume.nextChunkIndex, "分块位置");
+  }
+  if (resume.processed !== undefined && resume.processed !== null) {
+    assertObjectFields(resume.processed, PROCESSED_FIELDS, "恢复完成信息");
+    const processed = {};
+    for (const [key, value] of Object.entries(resume.processed)) {
+      if (key === "relativeArchiveKey") processed[key] = validateRelativeArchiveKey(value);
+      else if (key === "fileHash") processed[key] = validateHash(value);
+      else if (["rowCount", "completedCount"].includes(key)) processed[key] = validateCount(value, key);
+      else if (key === "coverage") processed[key] = validateCoverage(value);
+      else if (key === "confidence") processed[key] = validateConfidence(value);
+      else if (!/^[-_.:/a-zA-Z0-9]{1,240}$/.test(String(value || ""))) {
+        throw new Error(`本机检查点恢复完成字段 ${key} 无效。`);
+      } else processed[key] = String(value);
+    }
+    normalized.processed = processed;
+  } else if (resume.processed === null) {
+    normalized.processed = null;
+  }
+  return normalized;
 }
 
 export function createCheckpointStore({
@@ -71,6 +187,9 @@ export function createCheckpointStore({
         updatedAt: now().toISOString(),
         ...(checkpoint.result !== undefined
           ? { result: validateResult(checkpoint.result, jobId) }
+          : {}),
+        ...(checkpoint.resume !== undefined
+          ? { resume: validateResume(checkpoint.resume) }
           : {})
       };
       await fs.mkdir(rootDir, { recursive: true, mode: 0o700 });
@@ -92,6 +211,7 @@ export function createCheckpointStore({
           throw new Error("本机检查点内容无效。");
         }
         if (parsed.result !== undefined) parsed.result = validateResult(parsed.result, jobId);
+        if (parsed.resume !== undefined) parsed.resume = validateResume(parsed.resume);
         return parsed;
       } catch (error) {
         if (error?.code === "ENOENT") return null;

@@ -3,19 +3,20 @@
 ## 目标与能力结论
 
 在现有网页采集平台上稳定运行 `douyin-ecommerce` adapter，完成店铺、商品、直播、短视频昨天经营
-事实的官方报表采集、标准化入库、只读查询和同步可观测性；将长任务从 MV3 扩展迁移到公司 Mac
-专用持久 Chrome Profile 与本机后台采集服务。
+事实的官方报表采集、标准化入库、只读查询和同步可观测性；由公司日常 Chrome 的 MV3 扩展执行
+短页面动作，本机后台采集服务承担全部耗时任务。
 
 能力评审结论为“扩展现有共享能力”：共享任务、设备、租约、游标、下载、归档、通知、业务数据库
-选择和同步 UI；新增 Profile、浏览器监管和执行检查点，不建立第二套任务系统。Provider 页面规则、
-文件映射和错误码留在 Douyin adapter。旧凭据登录保持退役。
+选择和同步 UI；复用扩展心跳、浏览器监管和执行检查点，不建立第二套任务系统。Provider 页面规则、
+文件映射和错误码留在 Douyin adapter。旧凭据登录保持退役，专用 Profile 保留为显式回退。
 
 ## 架构与接口
 
 - 控制面：`/api/platform/v1/web-collection` 保存 store-scoped job/run/cursor、目标环境和版本。
-- 店铺目录：专用 Chrome 只在固定抖店管理页识别稳定店铺 ID 和显示名，本机服务调用 runner 鉴权的 `register_store`，保存到 `web_collection_stores` 后才生成任务。
-- 浏览器：本机服务管理非默认 `user-data-dir` 的可见持久 Chrome Profile，只接受固定
-  provider/resource/store/date 任务，在允许来源执行官方导出或 `store_daily` 安全读数。
+- 店铺目录：公司 Chrome 扩展只在固定抖店管理页识别稳定店铺 ID 和显示名，本机服务调用 runner
+  鉴权的 `register_store`，保存到 `web_collection_stores` 后才生成任务。
+- 浏览器：默认复用公司日常 Chrome；只接受固定 provider/resource/store/date 任务，在允许来源
+  执行官方导出或 `store_daily` 安全读数。专用 `user-data-dir` 仅在显式回退模式使用。
 - 本机：浏览器监管与 provider processor 等待报表、识别下载、保存检查点、归档原文件、解析、
   预检、分块上传和恢复。
 - 写入：`POST /api/platform/v1/commerce-facts/ingest` 校验 runner、job grant、目标环境版本、store/date/resource/schema 和批次。
@@ -57,8 +58,8 @@
 
 ## 回滚
 
-停用专用浏览器执行器并恢复插件领取，保留迁移表与已完成批次以避免数据丢失。控制面 schema 对
-Kuaimai 向后兼容；旧账号密码登录和被销毁凭据不恢复。
+默认扩展模式异常时可显式切换专用浏览器执行器，恢复后重新安装为扩展模式。保留迁移表与已完成
+批次以避免数据丢失。控制面 schema 对 Kuaimai 向后兼容；旧账号密码登录和被销毁凭据不恢复。
 
 ## 验证
 
@@ -88,12 +89,12 @@ npm run build
 4. 新增紧凑店铺弹窗，只提交 `storeName/storeId`；成功后刷新目录。同 ID 更新名称，多店铺全部可见。
 5. 定向验证 API、Bridge、orchestrator、extension、React 静态契约和响应式样式，再执行完整 Definition of Done。
 
-## 专用浏览器重构增量计划
+## 公司日常 Chrome 主链路增量计划
 
-1. 新增失败测试和运行时契约：Profile 注册、非默认数据目录、固定域名、互斥执行器版本和可恢复检查点。
-2. 实现本机 browser supervisor：启动/复用/重启可见 Chrome，区分设备、Profile、登录和页面故障。
-3. 把 Douyin 页面短操作迁移到专用浏览器 executor；官方下载优先，`store_daily` 保留固定白名单读数。
-4. 把报表等待、下载稳定、加密诊断、归档、解析、分块上传、重试和断点恢复全部放入本机 runtime。
-5. 扩展数据同步状态：显示 Profile、执行器版本、检查点、人工动作和 07:30 截止结果。
-6. 使用 2026-07-23 四类完成批次回归，并采集最新业务日；插件与新执行器不得重复领取。
-7. GitOps 发布后观察 7 个业务日，满足成功率和恢复验收再停止插件自动领取。
+1. 先写失败测试，要求 LaunchAgent、安装器和 CLI 未显式指定模式时使用 `extension`。
+2. 保留 `dedicated` 显式参数及互斥租约，作为多账号隔离和扩展故障回退。
+3. 数据同步文案默认说明公司日常 Chrome 已登录态；runner 实际上报专用状态时仍显示回退模式。
+4. 本机继续承担报表等待、下载稳定、加密诊断、归档、解析、分块上传、重试和断点恢复。
+5. 失败转终态时写入安全错误摘要，不能再把服务端或本机失败统一吞成空白记录。
+6. 使用 2026-07-24 店铺批次回归，确认新可信批次替代误采实时批次并推进游标。
+7. 通过 GitOps 发布后验证线上页面、采集状态、扩展轮询和只读事实查询。

@@ -278,10 +278,11 @@ const integrationRegistry = {
       "id": "douyin-ecommerce",
       "name": "抖音电商罗盘",
       "status": "integrating",
-      "summary": "账号密码登录与旧 browser-agent 任务保持退役；公司 Mac 仅复用员工维护的已登录 Chrome，以官方报表下载为主采集抖店与电商罗盘经营数据。数据接入维护多店铺名称与稳定店铺 ID，不同账号使用独立 Chrome Profile，Douyin 任务按 Profile 店铺 ID 领取。",
+      "summary": "账号密码登录与旧 browser-agent 任务保持退役；公司 Mac 默认通过 MV3 扩展复用日常已登录 Chrome，以官方报表下载为主采集抖店与电商罗盘经营数据，本机服务承担耗时处理与受控入库。数据接入维护多店铺名称与稳定店铺 ID，任务按当前 Chrome 已核对的店铺 ID 领取；专用 Profile 仅作显式回退。",
       "capabilities": [
         "多店铺名称与店铺 ID 目录",
-        "Chrome Profile 店铺隔离",
+        "公司日常 Chrome 登录态复用",
+        "专用 Profile 显式回退",
         "已登录 Chrome 官方报表采集",
         "账号密码登录保持退役",
         "店铺每日",
@@ -295,6 +296,7 @@ const integrationRegistry = {
       ],
       "businessQuestions": [
         "如何登记和识别多个抖音店铺",
+        "公司日常 Chrome 已登录时如何直接复用",
         "不同 Chrome 登录账号如何避免串店",
         "抖店昨天四类经营数据是否就绪",
         "公司 Chrome 未登录或要求人工验证",
@@ -339,6 +341,7 @@ const integrationRegistry = {
       "publicDocs": [],
       "evidence": [
         "docs/decisions/2026-07-24-douyin-preauthenticated-chrome-collection.md",
+        "docs/decisions/2026-07-25-existing-chrome-extension-first.md",
         "docs/features/douyin-compass-collection/prd.md",
         "docs/features/douyin-compass-collection/design.md",
         "docs/platform/apis/commerce-facts-v1.md"
@@ -362,7 +365,7 @@ const integrationRegistry = {
         {
           "platformId": "kuaimai",
           "type": "shares-web-collection-runtime",
-          "description": "复用公司 Mac、MV3 扩展、本机桥接、任务租约、游标与通知；provider 页面规则和事实 writer 保持隔离。"
+          "description": "默认复用公司日常 Chrome 的 MV3 扩展、本机桥接、任务租约、游标与通知；专用 Profile 仅作显式回退，provider 页面规则和事实 writer 保持隔离。"
         },
         {
           "platformId": "oceanengine-qianchuan",

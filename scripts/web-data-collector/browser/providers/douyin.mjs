@@ -25,7 +25,7 @@ const TASK_FIELDS = new Set([
 
 export const DOUYIN_DEDICATED_RESOURCES = Object.freeze({
   store_daily: Object.freeze({
-    url: "https://compass.jinritemai.com/",
+    url: "https://compass.jinritemai.com/shop",
     pageType: "shop_compass_overview",
     reportVersion: "douyin-store-v1"
   }),
@@ -254,7 +254,7 @@ export function createDouyinDedicatedExecutor({ createController }) {
     throw douyinError("DOUYIN_BROWSER_CONTROLLER_REQUIRED", "抖店专用浏览器控制器未配置。");
   }
   return Object.freeze({
-    async executeTask({ task: input, browser, profile = null }) {
+    async executeTask({ task: input, browser, profile = null, onCheckpoint = async () => {} }) {
       const task = validateDedicatedDouyinTask(input);
       if (
         browser?.online !== true
@@ -271,6 +271,7 @@ export function createDouyinDedicatedExecutor({ createController }) {
       const controller = await createController(browser);
       try {
         await controller.open(resource.url);
+        await onCheckpoint("opening");
         const inspection = await controller.inspect({
           expectedStoreId: task.storeId,
           expectedStoreName: profile?.storeName
@@ -302,6 +303,7 @@ export function createDouyinDedicatedExecutor({ createController }) {
         }
 
         await controller.applyBusinessDate(task.businessDate);
+        await onCheckpoint("waiting_download");
         const download = await controller.downloadOfficialReport({
           resourceType: task.resourceType,
           pageType: resource.pageType,

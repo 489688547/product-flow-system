@@ -392,6 +392,95 @@ test("dedicated runtime resumes a downloaded checkpoint without repeating browse
   ]);
 });
 
+test("dedicated runtime carries processor resume state across stage checkpoints", async () => {
+  const { createDedicatedBrowserRuntime } = await dedicatedRuntimeModules();
+  const calls = [];
+  const checkpointResult = {
+    kind: "downloaded",
+    jobId: "job-1",
+    filePath: "/managed/downloads/report.xlsx",
+    safeFileName: "report.xlsx",
+    pageType: "shop_compass_product",
+    reportVersion: "douyin-product-v2"
+  };
+  const resume = {
+    archive: {
+      relativeArchiveKey: "douyin-ecommerce/90862283/product_daily/2026/07/report.xlsx",
+      fileHash: "a".repeat(64)
+    },
+    nextChunkIndex: 1
+  };
+  const runtime = createDedicatedBrowserRuntime({
+    api: {
+      async assignedStores() {
+        return {
+          stores: [{
+            providerId: "douyin-ecommerce",
+            storeId: "90862283",
+            storeName: "TIYES 提野星旗舰店"
+          }]
+        };
+      }
+    },
+    profileRegistry: {
+      register(store) {
+        return { ...store, profileKey: `${store.providerId}:${store.storeId}`, profileDir: "/local/hidden" };
+      }
+    },
+    ensureBrowser: async profile => ({ ...profile, online: true, endpoint: "http://127.0.0.1:43127" }),
+    orchestrator: {
+      async nextTask() {
+        return {
+          jobId: "job-1",
+          providerId: "douyin-ecommerce",
+          storeId: "90862283",
+          resourceType: "product_daily",
+          businessDate: "2026-07-24"
+        };
+      },
+      async submitResult(result, options) {
+        calls.push(["submitResult", result, options.resume]);
+        await options.onCheckpoint("submitted", {
+          ...options.resume,
+          processed: {
+            batchId: "batch-1",
+            rowCount: 501,
+            relativeArchiveKey: options.resume.archive.relativeArchiveKey,
+            fileHash: options.resume.archive.fileHash,
+            sourceVersion: "douyin-product-v2",
+            completedCount: 501
+          }
+        });
+        return { job: { status: "success" } };
+      },
+      recordBrowserStatus() {}
+    },
+    checkpointStore: {
+      async load() {
+        return { stage: "uploading", result: checkpointResult, resume };
+      },
+      async save(jobId, checkpoint) {
+        calls.push(["save", jobId, checkpoint]);
+      },
+      async clear(jobId) {
+        calls.push(["clear", jobId]);
+      }
+    },
+    executeTask: async () => {
+      throw new Error("browser work must not repeat");
+    }
+  });
+
+  await runtime.runOnce();
+
+  assert.deepEqual(calls[0], ["submitResult", checkpointResult, resume]);
+  assert.equal(calls[1][0], "save");
+  assert.equal(calls[1][2].stage, "submitted");
+  assert.deepEqual(calls[1][2].result, checkpointResult);
+  assert.equal(calls[1][2].resume.processed.batchId, "batch-1");
+  assert.deepEqual(calls.at(-1), ["clear", "job-1"]);
+});
+
 test("dedicated runtime records a safe failed result and local diagnostic when browser action crashes", async () => {
   const { createDedicatedBrowserRuntime } = await dedicatedRuntimeModules();
   assert.equal(typeof createDedicatedBrowserRuntime, "function", "createDedicatedBrowserRuntime must be implemented");
@@ -620,6 +709,69 @@ test("Douyin captured store facts are validated and completed as one immutable b
   assert.equal(uploads[1].complete, true);
 });
 
+test("Douyin processor resumes after an uploaded chunk and checkpoints final submission", async () => {
+  const uploads = [];
+  const stages = [];
+  const processor = createDouyinProcessor({
+    uploadFactChunk: async input => {
+      uploads.push(input);
+      return { completedCount: input.expectedCount };
+    }
+  });
+  const captured = {
+    kind: "captured",
+    resourceType: "store_daily",
+    facts: {
+      transactionAmount: 100,
+      transactionOrderCount: 2,
+      transactionBuyerCount: 2,
+      userPaymentAmount: 90,
+      settlementAmount: null,
+      refundAmountByPaymentDate: null,
+      refundAmountByRefundDate: 5,
+      refundOrderCountByPaymentDate: null,
+      refundOrderCountByRefundDate: 1,
+      productExposureUsers: 1000,
+      productClickUsers: 100
+    },
+    pageType: "shop_compass_overview",
+    selectorVersion: "2026-07-24"
+  };
+  const processed = await processor.process({
+    job: {
+      id: "douyin-job-1",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23"
+    },
+    result: captured,
+    resume: { nextChunkIndex: 1 },
+    onStage: async (stage, state) => {
+      stages.push([stage, structuredClone(state)]);
+    }
+  });
+
+  assert.equal(uploads.length, 1);
+  assert.equal(uploads[0].complete, true);
+  assert.deepEqual(stages.map(([stage]) => stage), ["validated", "uploading", "submitted"]);
+  assert.equal(stages.at(-1)[1].processed.batchId, processed.batchId);
+
+  uploads.length = 0;
+  assert.deepEqual(await processor.process({
+    job: {
+      id: "douyin-job-1",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-23"
+    },
+    result: captured,
+    resume: stages.at(-1)[1]
+  }), processed);
+  assert.equal(uploads.length, 0);
+});
+
 test("processor failure records a failed transition and never completes the job", async () => {
   const douyinJob = {
     id: "douyin-job-2",
@@ -655,5 +807,9 @@ test("processor failure records a failed transition and never completes the job"
   assert.equal(
     api.calls.filter(([name]) => name === "transition").at(-1)[1].status,
     "failed"
+  );
+  assert.equal(
+    api.calls.filter(([name]) => name === "transition").at(-1)[1].errorSummary,
+    "本机文件处理或入库失败。"
   );
 });

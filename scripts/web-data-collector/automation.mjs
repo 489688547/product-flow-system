@@ -55,7 +55,7 @@ export const readRunnerToken = (options = {}) => readSecret({ service: RUNNER_KE
 export const storePairingKey = (value, options = {}) => storeSecret(value, { service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 export const readPairingKey = (options = {}) => readSecret({ service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 
-export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl, browserMode = "dedicated" }) {
+export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl, browserMode = "extension" }) {
   const safeBrowserMode = browserMode === "extension" ? "extension" : "dedicated";
   const argumentsList = [
     nodePath,
@@ -109,7 +109,7 @@ export async function installLaunchAgent({
   collectorPath,
   root,
   baseUrl,
-  browserMode = "dedicated",
+  browserMode = "extension",
   home = os.homedir(),
   command = systemCommand
 }) {

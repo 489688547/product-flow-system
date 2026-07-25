@@ -40,9 +40,26 @@ export function createDedicatedBrowserRuntime({
         });
         if (!task) continue;
         const checkpoint = await checkpointStore?.load?.(task.jobId);
-        let result;
+        let result = checkpoint?.result || null;
+        let resume = checkpoint?.resume || {};
+        const saveCheckpoint = async (stage, nextResume = resume) => {
+          resume = nextResume || {};
+          await checkpointStore?.save?.(task.jobId, {
+            stage,
+            ...(result ? { result } : {}),
+            resume
+          });
+        };
         try {
-          result = checkpoint?.result || await executeTask({ task, browser, profile });
+          if (!result) {
+            await saveCheckpoint("opening");
+            result = await executeTask({
+              task,
+              browser,
+              profile,
+              onCheckpoint: stage => saveCheckpoint(stage)
+            });
+          }
         } catch (error) {
           const candidateCode = String(error?.code || "WEB_COLLECTION_BROWSER_ACTION_FAILED").toUpperCase();
           const errorCode = /^[A-Z0-9_]{3,80}$/.test(candidateCode)
@@ -73,12 +90,12 @@ export function createDedicatedBrowserRuntime({
           continue;
         }
         if (!checkpoint?.result && checkpointStore?.save) {
-          await checkpointStore.save(task.jobId, {
-            stage: result.kind === "downloaded" ? "downloaded" : "validated",
-            result
-          });
+          await saveCheckpoint(result.kind === "downloaded" ? "downloaded" : "validated");
         }
-        await orchestrator.submitResult(result);
+        await orchestrator.submitResult(result, {
+          resume,
+          onCheckpoint: (stage, nextResume) => saveCheckpoint(stage, nextResume)
+        });
         await checkpointStore?.clear?.(task.jobId);
         processed += 1;
       }

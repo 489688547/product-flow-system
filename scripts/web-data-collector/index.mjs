@@ -168,7 +168,7 @@ async function serve({
   root,
   baseUrl,
   downloadsDirectory,
-  browserMode = "dedicated",
+  browserMode = "extension",
   profileRoot = DEFAULT_MANAGED_PROFILE_ROOT
 }) {
   const [runnerToken, pairingKey, processDownload] = await Promise.all([
@@ -266,9 +266,9 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
   const root = resolve(argument(argv, "--root", DEFAULT_ARCHIVE_ROOT));
   const baseUrl = normalizeBaseUrl(argument(argv, "--base-url", process.env.WEB_COLLECTION_BASE_URL || "http://127.0.0.1:8132"));
   const downloadsDirectory = resolve(argument(argv, "--downloads", path.join(os.homedir(), "Downloads")));
-  const browserMode = argument(argv, "--browser-mode", "dedicated") === "extension"
-    ? "extension"
-    : "dedicated";
+  const browserMode = argument(argv, "--browser-mode", "extension") === "dedicated"
+    ? "dedicated"
+    : "extension";
   const profileRoot = resolve(argument(argv, "--profile-root", DEFAULT_MANAGED_PROFILE_ROOT));
   const extensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../chrome-extension/company-data-collector");
   if (command === "register") return registerRunner(baseUrl);
