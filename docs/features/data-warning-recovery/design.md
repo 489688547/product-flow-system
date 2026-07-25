@@ -50,6 +50,8 @@
 - 无权限：数据接入或文件导入页面沿用原有权限禁用原因。
 - 禁用：快麦 API 使用“未打通”文字和禁用操作。
 - 成功：显示 Chrome 采集已完成，并提示刷新状态确认销售事实。
+- 后台服务在线、扩展未轮询：显示“Chrome 扩展未连接”，主动作是“重新检测 Chrome”。
+- 已排队且扩展在线：显示“等待 Chrome 领取”；领取后才按 opening/exporting/downloading/validating/ingesting 显示执行阶段。
 
 ## 响应式与钉钉 WebView
 

@@ -79,6 +79,20 @@ ${argumentsList}
 `;
 }
 
+export function resolveStableCollectorPath({ collectorPath, worktreeRoot, gitCommonDir }) {
+  const checkoutRoot = path.resolve(String(worktreeRoot || ""));
+  const entrypoint = path.resolve(String(collectorPath || ""));
+  const relativeEntrypoint = path.relative(checkoutRoot, entrypoint);
+  if (!relativeEntrypoint || relativeEntrypoint.startsWith("..") || path.isAbsolute(relativeEntrypoint)) {
+    throw Object.assign(new Error("网页采集入口不在当前 Git 工作区内。"), { code: "WEB_COLLECTION_ENTRYPOINT_OUTSIDE_REPOSITORY" });
+  }
+  const resolvedCommonDir = path.resolve(checkoutRoot, String(gitCommonDir || ""));
+  const repositoryRoot = path.basename(resolvedCommonDir) === ".git"
+    ? path.dirname(resolvedCommonDir)
+    : checkoutRoot;
+  return path.join(repositoryRoot, relativeEntrypoint);
+}
+
 export async function installLaunchAgent({
   nodePath = process.execPath,
   collectorPath,
@@ -87,11 +101,21 @@ export async function installLaunchAgent({
   home = os.homedir(),
   command = systemCommand
 }) {
+  const git = await command("/usr/bin/git", [
+    "-C",
+    path.dirname(collectorPath),
+    "rev-parse",
+    "--path-format=absolute",
+    "--show-toplevel",
+    "--git-common-dir"
+  ]);
+  const [worktreeRoot, gitCommonDir] = String(git.stdout || "").trim().split(/\r?\n/);
+  const stableCollectorPath = resolveStableCollectorPath({ collectorPath, worktreeRoot, gitCommonDir });
   const directory = path.join(home, "Library", "LaunchAgents");
   const plistPath = path.join(directory, `${LAUNCH_AGENT_LABEL}.plist`);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const temporaryPath = `${plistPath}.tmp`;
-  await writeFile(temporaryPath, collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl }), { mode: 0o600 });
+  await writeFile(temporaryPath, collectorLaunchAgentPlist({ nodePath, collectorPath: stableCollectorPath, root, baseUrl }), { mode: 0o600 });
   await rename(temporaryPath, plistPath);
   await chmod(plistPath, 0o600);
   await command("/bin/launchctl", ["bootout", `gui/${process.getuid()}`, plistPath]).catch(() => {});

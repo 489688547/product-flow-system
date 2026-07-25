@@ -160,7 +160,7 @@ Expected: 全部 PASS。
 
 - [ ] **Step 1: 写运行时失败测试**
 
-覆盖 MV3 最小权限、固定 host 白名单、无 Cookie/History/WebRequest 权限、配对密钥与扩展来源校验、provider 契约、任务串行领取、页面状态分类、下载文件稳定、相同文件恢复、租约释放、阶段回写、Keychain 令牌读取、LaunchAgent 使用当前仓库绝对路径，以及通知文案无业务数据。
+覆盖 MV3 最小权限、固定 host 白名单、无 Cookie/History/WebRequest 权限、配对密钥与扩展来源校验、provider 契约、任务串行领取、页面状态分类、下载文件稳定、相同文件恢复、服务端与本机内存租约释放、阶段回写、Keychain 令牌读取、runner 心跳与扩展轮询分离、LaunchAgent 使用 Git 主检出仓库绝对路径，以及通知文案无业务数据。
 
 - [ ] **Step 2: 运行测试并确认失败**
 
@@ -170,7 +170,7 @@ Expected: FAIL，因为共享运行时不存在。
 
 - [ ] **Step 3: 实现 MV3 最小权限插件**
 
-扩展只申请 `alarms/storage/tabs/downloads` 和已登记 host 权限。service worker 只接收安全任务字段；content script 将 provider/resource 映射到扩展内固定动作，不实现 `eval`、远程脚本或任意 selector 执行。
+扩展只申请 `alarms/storage/tabs/downloads/scripting` 和已登记 host 权限。`scripting` 只用于自动注入缺失的、代码包内按 provider 固定登记的 content script；service worker 只接收安全任务字段，不能接受远程脚本名或代码。content script 将 provider/resource 映射到扩展内固定动作，不实现 `eval`、远程脚本或任意 selector 执行。
 
 ```js
 await extension.openRegisteredResource({ providerId, resourceType });
@@ -196,7 +196,7 @@ await extension.reportDownload({ jobId, downloadId });
 "collect:web": "node scripts/web-data-collector/index.mjs"
 ```
 
-LaunchAgent label 使用 `com.company.web-data-collector`，守护固定为当前仓库的 `scripts/web-data-collector/index.mjs serve`。安装时原子替换 plist，并将通用 runner token 与本机配对密钥只写 macOS Keychain；命令输出扩展加载目录和配对步骤，不自动修改 Chrome 策略。
+LaunchAgent label 使用 `com.company.web-data-collector`，守护固定为 Git 主检出仓库的 `scripts/web-data-collector/index.mjs serve`。即使安装命令从临时 worktree 执行，也必须通过 Git common directory 解析回主检出路径。安装时原子替换 plist，并将通用 runner token 与本机配对密钥只写 macOS Keychain；命令输出扩展加载目录和配对步骤，不自动修改 Chrome 策略。
 
 - [ ] **Step 7: 运行定向测试**
 
@@ -419,7 +419,7 @@ npm run collect:web -- install --base-url <production-origin>
 npm run collect:web -- preflight --base-url <production-origin>
 ```
 
-确认 LaunchAgent 程序路径指向当前仓库，不再引用 `.worktrees/kuaimai-erp-history`；确认 loopback 端口只监听 `127.0.0.1`，扩展 ID 和配对状态正确，且 Chrome 未授予 Cookie/History/WebRequest 权限。
+确认 LaunchAgent 程序路径指向 Git 主检出仓库，不引用任何 `.worktrees/*`；确认 loopback 端口只监听 `127.0.0.1`，扩展 ID 和配对状态正确，且 Chrome 未授予 Cookie/History/WebRequest 权限。
 
 - [ ] **Step 5: 完成真实快麦验收**
 

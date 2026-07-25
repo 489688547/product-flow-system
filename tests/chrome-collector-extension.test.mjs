@@ -10,7 +10,7 @@ test("MV3 extension uses a stable identity and least-privilege permissions", asy
   assert.equal(manifest.manifest_version, 3);
   assert.equal(typeof manifest.key, "string");
   assert.ok(manifest.key.length > 100);
-  assert.deepEqual(manifest.permissions.sort(), ["alarms", "downloads", "storage", "tabs"]);
+  assert.deepEqual(manifest.permissions.sort(), ["alarms", "downloads", "scripting", "storage", "tabs"]);
   assert.deepEqual(manifest.host_permissions.sort(), [
     "http://127.0.0.1:17653/*",
     "https://compass.jinritemai.com/*",
@@ -184,11 +184,18 @@ test("extension task contract only allows registered provider resources", async 
 
 const sleep = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 
-function createChromeMock({ tabs = [], downloads = [], storage = {} } = {}) {
+function createChromeMock({
+  tabs = [],
+  downloads = [],
+  storage = {},
+  contentScriptAvailable = true,
+  scriptInjectionError = null
+} = {}) {
   const store = new Map(Object.entries(storage));
   const tabList = tabs.map(tab => ({ status: "complete", ...tab }));
   const createdTabs = [];
   const updatedTabs = [];
+  const executedScripts = [];
   let nextTabId = 1000;
   const downloadCreatedListeners = [];
   const downloadChangedListeners = [];
@@ -231,9 +238,18 @@ function createChromeMock({ tabs = [], downloads = [], storage = {} } = {}) {
       },
       async reload() {},
       async sendMessage() {
+        if (!contentScriptAvailable) throw new Error("Receiving end does not exist.");
         return { ok: true };
       },
       onUpdated: { addListener() {}, removeListener() {} }
+    },
+    scripting: {
+      async executeScript(details) {
+        executedScripts.push(details);
+        if (scriptInjectionError) throw scriptInjectionError;
+        contentScriptAvailable = true;
+        return [];
+      }
     },
     downloads: {
       async search(query = {}) {
@@ -277,7 +293,7 @@ function createChromeMock({ tabs = [], downloads = [], storage = {} } = {}) {
       getURL: path => path
     }
   };
-  return { chrome, store, tabList, createdTabs, updatedTabs, downloadCreatedListeners };
+  return { chrome, store, tabList, createdTabs, updatedTabs, executedScripts, downloadCreatedListeners };
 }
 
 async function importServiceWorker(mock) {
@@ -334,6 +350,28 @@ test("service worker always opens a new background tab instead of hijacking empl
   assert.equal(mock.createdTabs[0].active, false);
   assert.equal(tab.id, mock.createdTabs[0].id);
   assert.equal(mock.store.get("collectorTabId"), tab.id);
+});
+
+test("service worker self-recovers when Chrome misses automatic content-script injection", async () => {
+  const collectorTab = { id: 2, url: "https://erpb.superboss.cc/index.html#/trade/searchlist/" };
+  const mock = createChromeMock({
+    tabs: [collectorTab],
+    storage: { collectorTabId: 2 },
+    contentScriptAvailable: false
+  });
+  const sw = await importServiceWorker(mock);
+  const resource = await kuaimaiResource();
+
+  const tab = await sw.ensureProviderTab(
+    resource,
+    "https://erpb.superboss.cc/index.html#/trade/searchlist/"
+  );
+
+  assert.equal(tab.id, 2);
+  assert.deepEqual(mock.executedScripts, [{
+    target: { tabId: 2 },
+    files: ["content-script.js"]
+  }]);
 });
 
 test("keep-alive timer pings a harmless chrome API and stops cleanly after the task", async () => {
