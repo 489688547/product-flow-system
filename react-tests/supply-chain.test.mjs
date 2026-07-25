@@ -14,6 +14,9 @@ import {
   SUPPLY_CHAIN_WORKSPACES,
   buildGoodsFlowProgress,
   buildRoleWorkbench,
+  calculateBundleRequirements,
+  calculateProcurementSuggestion,
+  classifyStockRisk,
   normalizeSupplyChainSection
 } from "../src/domain/supplyChainWorkflow.js";
 
@@ -114,6 +117,87 @@ test("role workbench orders overdue work before upcoming and data-quality work",
   assert.equal(workbench.summary.overdue, 1);
   assert.equal(workbench.summary.dueSoon, 1);
   assert.equal(workbench.summary.dataIssues, 1);
+});
+
+test("procurement suggestion explains lead-time seasonal promotion and MOQ inputs", () => {
+  const suggestion = calculateProcurementSuggestion({
+    inventoryQuantity: 100,
+    averageDailySales: 10,
+    seasonalDailySales: 12,
+    promotionDailySales: 25,
+    promotionDays: 4,
+    longestLeadTimeDays: 20,
+    minimumOrderQuantity: 100,
+    capacityPerBatch: 120,
+    coverage: {
+      inventory: true,
+      demand: true,
+      seasonal: true,
+      promotions: true,
+      leadTime: true,
+      moq: true,
+      capacity: true
+    }
+  });
+
+  assert.equal(suggestion.targetCoverageDays, 20);
+  assert.equal(suggestion.rawQuantity, 192);
+  assert.equal(suggestion.suggestedQuantity, 200);
+  assert.deepEqual(suggestion.rollout.map(item => item.quantity), [120, 80]);
+  assert.equal(suggestion.quality.status, "trusted");
+  assert.equal(suggestion.canConfirm, false);
+  assert.match(suggestion.basis.join("；"), /往年同期日销 12/);
+  assert.match(suggestion.basis.join("；"), /促销额外需求 52/);
+  assert.match(suggestion.basis.join("；"), /起订量 100/);
+});
+
+test("procurement suggestion exposes missing facts instead of treating them as zero", () => {
+  const suggestion = calculateProcurementSuggestion({
+    inventoryQuantity: 80,
+    averageDailySales: 10,
+    longestLeadTimeDays: 15,
+    coverage: {
+      inventory: true,
+      demand: true,
+      seasonal: false,
+      promotions: false,
+      leadTime: true,
+      moq: false,
+      capacity: false
+    }
+  });
+
+  assert.equal(suggestion.suggestedQuantity, 70);
+  assert.equal(suggestion.quality.status, "partial");
+  assert.deepEqual(suggestion.quality.missing, ["往年同期", "促销活动", "起订量", "供应商产能"]);
+  assert.equal(suggestion.canConfirm, false);
+});
+
+test("shared BOM requirements aggregate demand from every related finished product", () => {
+  const requirements = calculateBundleRequirements({
+    plans: [
+      { productId: "p1", quantity: 100 },
+      { productId: "p2", quantity: 50 }
+    ],
+    bom: [
+      { productId: "p1", inventoryUnitId: "bag", ratio: 1, shared: true, providedByUs: true },
+      { productId: "p1", inventoryUnitId: "inner", ratio: 2, shared: false, providedByUs: true },
+      { productId: "p2", inventoryUnitId: "bag", ratio: 1, shared: true, providedByUs: true },
+      { productId: "p2", inventoryUnitId: "supplier-box", ratio: 1, shared: false, providedByUs: false }
+    ]
+  });
+
+  assert.deepEqual(requirements, [
+    { inventoryUnitId: "bag", requiredQuantity: 150, shared: true, productIds: ["p1", "p2"] },
+    { inventoryUnitId: "inner", requiredQuantity: 200, shared: false, productIds: ["p1"] }
+  ]);
+});
+
+test("stock risk separates replenish spike and clearance signals", () => {
+  assert.equal(classifyStockRisk({ daysOfSupply: 8, longestLeadTimeDays: 15 }).kind, "replenish");
+  assert.equal(classifyStockRisk({ daysOfSupply: 30, todaySales: 220, averageDailySales: 80 }).kind, "spike");
+  assert.equal(classifyStockRisk({ daysOfSupply: 52, averageDailySales: 12 }).kind, "clearance");
+  assert.equal(classifyStockRisk({ daysOfSupply: null, longestLeadTimeDays: 15 }).kind, "unknown");
 });
 
 test("catalog supplier links resolve to the lifecycle product when available", () => {

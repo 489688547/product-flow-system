@@ -96,10 +96,12 @@ test("supplier product and quality workspaces dispatch auditable domain changes"
 test("supply chain consumes the platform catalog instead of a private product copy", () => {
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
   const product = read("src/features/supply-chain/ProductSupplyWorkspace.jsx");
+  const planning = read("src/features/supply-chain/PlanningWorkspace.jsx");
   assert.match(page, /useProductCatalog/);
   assert.match(page, /catalogBackedProduct/);
   assert.match(page, /catalogItems=\{catalogItems\}/);
-  assert.match(page, /lifecycleProducts=\{lifecycleProducts\}/);
+  assert.match(page, /products=\{products\}/);
+  assert.match(planning, /productCodes/);
   assert.match(product, /ProductCatalogSelect/);
   assert.doesNotMatch(product, /还没有产品供应关系。可按现有成本表逐条导入或维护。/);
 });
@@ -170,4 +172,19 @@ test("transit workspace renders product summaries and an evidence-backed courier
   assert.match(transit, /采购批次/);
   assert.match(transit, /GoodsFlowProgress/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.goods-flow-progress/);
+});
+
+test("planning workspace explains procurement suggestions and keeps planned workflow writes disabled", () => {
+  const planning = read("src/features/supply-chain/PlanningWorkspace.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  const css = read("src/styles.css");
+  for (const label of ["断货风险", "爆单风险", "清仓建议", "系统建议量", "采购前后库存", "计算依据"]) {
+    assert.match(planning, new RegExp(label));
+  }
+  assert.match(planning, /calculateProcurementSuggestion/);
+  assert.match(planning, /工作流接入后可确认/);
+  assert.match(planning, /调整依据/);
+  assert.match(page, /PlanningWorkspace/);
+  assert.match(css, /\.supply-planning-layout/);
+  assert.doesNotMatch(planning, /metric-card|kpi-card/);
 });

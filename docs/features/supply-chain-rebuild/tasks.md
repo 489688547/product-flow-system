@@ -51,14 +51,14 @@
   - 验证：缺节点不反推与逾期测试通过；`prefers-reduced-motion` 已禁用节点动效；线上真实数据验收 46 个采购批次、9 个节点，1180px 独立批次滚动、390px 横向批次带与纵向货流轨迹均无页面溢出。
   - 提交：`feat(supply-chain): visualize goods flow progress`。
 
-- [ ] 任务 5：实现库存预警与采购建议
+- [x] 任务 5：实现库存预警与采购建议
   - 依赖：任务 2、3。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/PlanningWorkspace.jsx`、`src/styles.css`、`react-tests/supply-chain.test.mjs`、`react-tests/supply-chain-ui.test.mjs`。
   - 输入：库存、需求、同比、活动、周期、MOQ、产能和 BOM。
   - 输出：断货、爆单、清仓预警与可解释采购建议。
   - 失败测试：部分覆盖、共用物料、MOQ、产能、人工调整原因先失败。
   - 实现步骤：风险分类 → 建议计算 → 依据展示 → 调整预览 → 确认边界。
-  - 验证：聚焦测试与缺数据/过期状态。
+  - 验证：供应链聚焦测试 38/38、Lint、生产构建通过；线上真实数据只读验收仅展示 2 条有依据的清仓建议，844 个依据不完整的产品明确排除并显示覆盖缺口；工作流确认保持禁用。
   - 提交：`feat(supply-chain): build procurement planning`。
 
 - [ ] 任务 6：实现采购、付款、生产与收货闭环
@@ -135,7 +135,7 @@
 
 | 场景 | 对应任务 | 状态 | 页面证据 | API 证据 | 测试证据 |
 | --- | --- | --- | --- | --- | --- |
-| 1 库存监控与预警 | 3、5 | 待开发 | — | `inventory`、`sales/daily` | — |
+| 1 库存监控与预警 | 3、5 | 开发中 | 风险摘要、建议明细、采购前后库存 | `inventory`、`sales/daily` | 断货/爆单/清仓分类、MOQ、部分覆盖 |
 | 2 采购下单与跟进 | 4、5、6、8 | 开发中 | 产品货流与批次节点 | `purchases`、`payments`、planned `supply-chain-workflows` | 缺节点不反推、逾期、响应式进度 |
 | 3 供应商管理 | 7、10 | 待开发 | — | `suppliers` | — |
 | 4 价格与成本 | 7、11 | 待开发 | — | 商品成本、采购事实 | — |
@@ -146,5 +146,5 @@
 | 9 质量问题闭环 | 10 | 待开发 | — | `quality-incidents/aftersales` | — |
 | 10 供应商质量评价 | 7、10 | 待开发 | — | `suppliers`、质量事实 | — |
 | 11 应收应付 | 6、11 | 待开发 | — | `purchases/payments` | — |
-| 12 清仓建议 | 5、8 | 待开发 | — | `inventory`、`sales/daily` | — |
+| 12 清仓建议 | 5、8 | 开发中 | 清仓建议列表与调整预览 | `inventory`、`sales/daily`、planned `clearance-suggestions` | 高可售天数、低日动销、缺数据排除 |
 | 13 快递费核对 | 11 | 待开发 | — | 供应链费用工作流契约 | — |

@@ -11,11 +11,9 @@ import { useGoodsFlow } from "../../state/GoodsFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
-import { ApprovalWorkspace } from "./ApprovalWorkspace.jsx";
 import { CashCycleWorkspace } from "./CashCycleWorkspace.jsx";
-import { ComingPhaseWorkspace } from "./ComingPhaseWorkspace.jsx";
 import { InventoryWorkspace } from "./InventoryWorkspace.jsx";
-import { ProductSupplyWorkspace } from "./ProductSupplyWorkspace.jsx";
+import { PlanningWorkspace } from "./PlanningWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
 import { SupplyChainWorkbench } from "./SupplyChainWorkbench.jsx";
@@ -223,27 +221,6 @@ function SupplySettingsWorkspace({ canEdit }) {
   );
 }
 
-function ProcurementWorkspace({ summary, products, catalogItems, lifecycleProducts, supplyEditor, financeEditor }) {
-  const [view, setView] = useState("suppliers");
-  const views = [
-    ["suppliers", "供应商档案"],
-    ["approvals", "采购与付款"],
-    ["products", "产品供应关系"]
-  ];
-  return (
-    <div className="supply-flat-workspace">
-      <div className="supply-procurement-switcher" role="tablist" aria-label="采购与供应商功能">
-        {views.map(([key, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => setView(key)}>{label}</button>
-        ))}
-      </div>
-      {view === "suppliers" ? <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} /> : null}
-      {view === "approvals" ? <ApprovalWorkspace canSync={financeEditor} canEditMapping={supplyEditor} products={products} /> : null}
-      {view === "products" ? <ProductSupplyWorkspace catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} canEdit={supplyEditor} /> : null}
-    </div>
-  );
-}
-
 export function SupplyChainAppPage({ section = "workbench" }) {
   const [salesRows, setSalesRows] = useState([]);
   const { user } = useAuth();
@@ -266,7 +243,6 @@ export function SupplyChainAppPage({ section = "workbench" }) {
   const executive = canAccessCompanyPlatform(user);
   const supplyEditor = executive || ["供应链", "供应链部", "供应链团队", "采购部"].includes(dept);
   const financeRole = executive || ["财务", "财务部"].includes(dept);
-  const financeEditor = financeRole || supplyEditor;
   const warehouseEditor = ["仓库", "仓储部"].includes(dept);
   const canSubmitCount = executive || supplyEditor || warehouseEditor;
   const canConfirmDifference = executive || supplyEditor;
@@ -344,7 +320,16 @@ export function SupplyChainAppPage({ section = "workbench" }) {
   }), [goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt, goodsFlow.error, goodsFlow.stale]);
   const content = {
     workbench: <SupplyChainWorkbench actor={actor} items={workbenchItems} dataQuality={workbenchQuality} />,
-    planning: <ProcurementWorkspace summary={summary} products={products} catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} supplyEditor={supplyEditor} financeEditor={financeEditor} />,
+    planning: (
+      <PlanningWorkspace
+        products={products}
+        summary={summary}
+        salesRows={salesRows}
+        risks={state.inventoryRisks}
+        supplyLinks={state.productSupplierLinks}
+        workflowAvailable={false}
+      />
+    ),
     suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} />,
     transit: <TransitWorkspace purchases={state.purchaseApprovals} products={products} />,
     inventory: (

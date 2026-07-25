@@ -171,3 +171,164 @@ export function buildRoleWorkbench({ actor: inputActor = {}, items = [], now = n
     scope: actor.executive || actor.supervisor ? "all" : "mine"
   };
 }
+
+function finiteNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function positiveNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+const PROCUREMENT_COVERAGE_LABELS = Object.freeze({
+  inventory: "ERP库存",
+  demand: "近期销量",
+  seasonal: "往年同期",
+  promotions: "促销活动",
+  leadTime: "最长备货周期",
+  moq: "起订量",
+  capacity: "供应商产能"
+});
+
+export function calculateProcurementSuggestion({
+  inventoryQuantity,
+  averageDailySales,
+  seasonalDailySales,
+  promotionDailySales,
+  promotionDays,
+  longestLeadTimeDays,
+  minimumOrderQuantity,
+  capacityPerBatch,
+  batchIntervalDays = 2,
+  coverage = {},
+  workflowAvailable = false
+} = {}) {
+  const inventory = Math.max(0, finiteNumber(inventoryQuantity));
+  const averageDemand = Math.max(0, finiteNumber(averageDailySales));
+  const seasonalDemand = positiveNumber(seasonalDailySales);
+  const dailyDemand = Math.max(averageDemand, seasonalDemand || 0);
+  const leadTime = positiveNumber(longestLeadTimeDays);
+  const targetCoverageDays = Math.min(30, Math.max(15, Math.ceil(leadTime || 15)));
+  const promotionDemand = positiveNumber(promotionDailySales);
+  const activePromotionDays = Math.max(0, Math.ceil(finiteNumber(promotionDays)));
+  const promotionExtra = promotionDemand
+    ? Math.ceil(Math.max(0, promotionDemand - dailyDemand) * activePromotionDays)
+    : 0;
+  const rawQuantity = Math.max(0, Math.ceil(dailyDemand * targetCoverageDays + promotionExtra - inventory));
+  const moq = positiveNumber(minimumOrderQuantity);
+  const suggestedQuantity = rawQuantity > 0 && moq
+    ? Math.ceil(rawQuantity / moq) * moq
+    : rawQuantity;
+  const capacity = positiveNumber(capacityPerBatch);
+  const rollout = [];
+  if (suggestedQuantity > 0) {
+    if (capacity && suggestedQuantity > capacity) {
+      let remaining = suggestedQuantity;
+      let sequence = 1;
+      while (remaining > 0) {
+        const quantity = Math.min(capacity, remaining);
+        rollout.push({
+          sequence,
+          quantity,
+          offsetDays: (sequence - 1) * Math.max(1, Math.ceil(finiteNumber(batchIntervalDays, 2)))
+        });
+        remaining -= quantity;
+        sequence += 1;
+      }
+    } else {
+      rollout.push({ sequence: 1, quantity: suggestedQuantity, offsetDays: 0 });
+    }
+  }
+  const missing = Object.entries(PROCUREMENT_COVERAGE_LABELS)
+    .filter(([key]) => coverage[key] !== true)
+    .map(([, label]) => label);
+  const basis = [
+    `现有库存 ${inventory.toLocaleString("zh-CN")}`,
+    `近期日销 ${averageDemand.toLocaleString("zh-CN")}`,
+    seasonalDemand ? `往年同期日销 ${seasonalDemand.toLocaleString("zh-CN")}` : "往年同期待接入",
+    `覆盖 ${targetCoverageDays} 天`,
+    promotionDemand ? `促销额外需求 ${promotionExtra.toLocaleString("zh-CN")}` : "促销活动待接入",
+    moq ? `起订量 ${moq.toLocaleString("zh-CN")}` : "起订量待维护",
+    capacity ? `单批产能 ${capacity.toLocaleString("zh-CN")}` : "供应商产能待维护"
+  ];
+  return {
+    inventoryQuantity: inventory,
+    averageDailySales: averageDemand,
+    targetCoverageDays,
+    demandQuantity: Math.ceil(dailyDemand * targetCoverageDays + promotionExtra),
+    promotionExtra,
+    rawQuantity,
+    suggestedQuantity,
+    projectedInventory: inventory + suggestedQuantity,
+    projectedDaysOfSupply: dailyDemand > 0 ? Math.round((inventory + suggestedQuantity) / dailyDemand * 10) / 10 : null,
+    rollout,
+    basis,
+    quality: {
+      status: missing.length ? "partial" : "trusted",
+      missing
+    },
+    canConfirm: workflowAvailable && missing.length === 0
+  };
+}
+
+export function calculateBundleRequirements({ plans = [], bom = [] } = {}) {
+  const quantityByProduct = new Map(
+    plans
+      .filter(item => item?.productId)
+      .map(item => [String(item.productId), Math.max(0, finiteNumber(item.quantity))])
+  );
+  const requirements = new Map();
+  for (const component of bom) {
+    if (!component?.productId || !component?.inventoryUnitId || component.providedByUs === false) continue;
+    const productId = String(component.productId);
+    const plannedQuantity = quantityByProduct.get(productId) || 0;
+    const ratio = Math.max(0, finiteNumber(component.ratio));
+    if (!plannedQuantity || !ratio) continue;
+    const inventoryUnitId = String(component.inventoryUnitId);
+    const current = requirements.get(inventoryUnitId) || {
+      inventoryUnitId,
+      requiredQuantity: 0,
+      shared: Boolean(component.shared),
+      productIds: []
+    };
+    current.requiredQuantity += plannedQuantity * ratio;
+    current.shared = current.shared || Boolean(component.shared);
+    if (!current.productIds.includes(productId)) current.productIds.push(productId);
+    requirements.set(inventoryUnitId, current);
+  }
+  return [...requirements.values()].map(item => ({
+    ...item,
+    requiredQuantity: Math.round(item.requiredQuantity * 10000) / 10000,
+    shared: item.shared || item.productIds.length > 1
+  }));
+}
+
+export function classifyStockRisk({
+  daysOfSupply,
+  longestLeadTimeDays,
+  todaySales,
+  averageDailySales,
+  seasonalExpired = false
+} = {}) {
+  const days = positiveNumber(daysOfSupply);
+  if (days === null) return { kind: "unknown", severity: "neutral", reason: "可售天数待接入" };
+  const leadTime = positiveNumber(longestLeadTimeDays);
+  if (leadTime && days < leadTime) {
+    return { kind: "replenish", severity: "danger", reason: `可售 ${days} 天，低于最长备货周期 ${leadTime} 天` };
+  }
+  const today = positiveNumber(todaySales);
+  const average = positiveNumber(averageDailySales);
+  if (today && average && today > average * 2) {
+    return { kind: "spike", severity: "warning", reason: `今日销量为近期日均的 ${(today / average).toFixed(1)} 倍` };
+  }
+  if (days > 45 || seasonalExpired || (average !== null && average < 20)) {
+    return {
+      kind: "clearance",
+      severity: "warning",
+      reason: seasonalExpired ? "商品已过季或过节" : days > 45 ? `预计可售 ${days} 天，高于 45 天` : `日动销 ${average} 件，低于 20 件`
+    };
+  }
+  return { kind: "healthy", severity: "success", reason: "当前库存覆盖与销量处于常规范围" };
+}
