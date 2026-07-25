@@ -143,3 +143,31 @@ test("overview and sync records expose cash inventory and source truth separatel
   assert.match(page, /dingtalk-inventory-docs/);
   assert.match(page, /钉钉库存文件/);
 });
+
+test("task-first workbench exposes actionable and data-quality states without decorative KPI cards", () => {
+  const workbench = read("src/features/supply-chain/SupplyChainWorkbench.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  assert.match(workbench, /待处理/);
+  assert.match(workbench, /即将逾期/);
+  assert.match(workbench, /数据问题/);
+  assert.match(workbench, /buildRoleWorkbench/);
+  assert.match(workbench, /aria-label="供应链待处理事项"/);
+  assert.doesNotMatch(workbench, /metric-card|kpi-card/);
+  assert.match(page, /SupplyChainWorkbench/);
+});
+
+test("transit workspace renders product summaries and an evidence-backed courier-style progress", () => {
+  const progress = read("src/features/supply-chain/GoodsFlowProgress.jsx");
+  const transit = read("src/features/supply-chain/TransitWorkspace.jsx");
+  const workflow = read("src/domain/supplyChainWorkflow.js");
+  const css = read("src/styles.css");
+  for (const label of ["采购申请", "审批通过", "采购下单", "生产 / 备货", "发运", "到仓", "质检", "收货入库", "结案"]) {
+    assert.match(workflow, new RegExp(label.replace("/", "\\/")));
+  }
+  assert.match(progress, /buildGoodsFlowProgress/);
+  assert.match(progress, /aria-current/);
+  assert.match(transit, /产品货流/);
+  assert.match(transit, /采购批次/);
+  assert.match(transit, /GoodsFlowProgress/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.goods-flow-progress/);
+});

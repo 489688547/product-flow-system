@@ -31,24 +31,24 @@
   - 验证：`node --test react-tests/supply-chain-data-contract.test.mjs`，5/5 通过；供应链聚焦回归 39/39、`npm run lint` 通过。
   - 提交：`feat(supply-chain): consume shared supply facts`。
 
-- [ ] 任务 3：实现角色工作台
+- [x] 任务 3：实现角色工作台
   - 依赖：任务 1、2。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/SupplyChainWorkbench.jsx`、`src/styles.css`、`react-tests/supply-chain-ui.test.mjs`。
   - 输入：责任配置、采购、库存、质量和数据问题。
   - 输出：我的待处理、即将逾期、数据问题和主管范围切换。
   - 失败测试：多岗位、无人负责、交叉冲突和只读角色测试先失败。
   - 实现步骤：任务归一 → 优先级 → 角色裁剪 → 状态 UI → 操作入口。
-  - 验证：聚焦测试、键盘和 1440/390px。
+  - 验证：供应链聚焦测试 33/33；Lint、生产构建通过；线上真实数据只读验收 1440/390px 无横向溢出，任务操作可键盘聚焦，浏览器无警告或错误。
   - 提交：`feat(supply-chain): add role workbench`。
 
-- [ ] 任务 4：实现产品与采购批次货流进度
+- [x] 任务 4：实现产品与采购批次货流进度
   - 依赖：任务 2。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/GoodsFlowProgress.jsx`、`src/features/supply-chain/TransitWorkspace.jsx`、`src/styles.css`、`react-tests/supply-chain-ui.test.mjs`。
   - 输入：采购、付款、里程碑、质检和收货事实。
   - 输出：产品汇总、批次时间线、当前/逾期/等待/不适用状态。
   - 失败测试：缺节点不反推、逾期、多个批次、减少动效先失败。
   - 实现步骤：节点模型 → 产品聚合 → 时间线 → 动效与无障碍。
-  - 验证：聚焦测试、`prefers-reduced-motion`、1180/390px。
+  - 验证：缺节点不反推与逾期测试通过；`prefers-reduced-motion` 已禁用节点动效；线上真实数据验收 46 个采购批次、9 个节点，1180px 独立批次滚动、390px 横向批次带与纵向货流轨迹均无页面溢出。
   - 提交：`feat(supply-chain): visualize goods flow progress`。
 
 - [ ] 任务 5：实现库存预警与采购建议
@@ -136,10 +136,10 @@
 | 场景 | 对应任务 | 状态 | 页面证据 | API 证据 | 测试证据 |
 | --- | --- | --- | --- | --- | --- |
 | 1 库存监控与预警 | 3、5 | 待开发 | — | `inventory`、`sales/daily` | — |
-| 2 采购下单与跟进 | 4、5、6、8 | 待开发 | — | `purchases`、`payments` | — |
+| 2 采购下单与跟进 | 4、5、6、8 | 开发中 | 产品货流与批次节点 | `purchases`、`payments`、planned `supply-chain-workflows` | 缺节点不反推、逾期、响应式进度 |
 | 3 供应商管理 | 7、10 | 待开发 | — | `suppliers` | — |
 | 4 价格与成本 | 7、11 | 待开发 | — | 商品成本、采购事实 | — |
-| 5 跨部门协同 | 3、6、10 | 待开发 | — | 公司协同中心 | — |
+| 5 跨部门协同 | 3、6、10 | 开发中 | 角色工作台、待指派和数据问题 | 公司协同中心、planned `supply-chain-workflows` | 个人/主管范围、优先级与无人负责 |
 | 6 仓储与库存 | 8 | 待开发 | — | `inventory current/history` | — |
 | 7 质量标准 | 9 | 待开发 | — | 供应链工作流契约 | — |
 | 8 质检执行 | 9 | 待开发 | — | `quality-incidents` | — |

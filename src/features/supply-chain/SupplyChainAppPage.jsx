@@ -14,11 +14,12 @@ import { PageHeader } from "../../ui/PageHeader.jsx";
 import { ApprovalWorkspace } from "./ApprovalWorkspace.jsx";
 import { CashCycleWorkspace } from "./CashCycleWorkspace.jsx";
 import { ComingPhaseWorkspace } from "./ComingPhaseWorkspace.jsx";
-import { GoodsFlowOverview } from "./GoodsFlowOverview.jsx";
 import { InventoryWorkspace } from "./InventoryWorkspace.jsx";
 import { ProductSupplyWorkspace } from "./ProductSupplyWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
+import { SupplyChainWorkbench } from "./SupplyChainWorkbench.jsx";
+import { TransitWorkspace } from "./TransitWorkspace.jsx";
 import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
 import { catalogBackedProduct } from "../../domain/productCatalog.js";
 import { normalizeSupplyChainSection } from "../../domain/supplyChainWorkflow.js";
@@ -275,11 +276,77 @@ export function SupplyChainAppPage({ section = "workbench" }) {
   const canFreezeCcc = financeRole;
   const qualityEditor = executive || dept === "质量管理部";
   const activeSection = normalizeSupplyChainSection(section);
+  const actor = useMemo(() => ({
+    id: user?.id || user?.userid || user?.userId || "",
+    departments: [dept].filter(Boolean),
+    roles: [user?.title, user?.role].filter(Boolean),
+    executive
+  }), [dept, executive, user?.id, user?.role, user?.title, user?.userId, user?.userid]);
+  const workbenchItems = useMemo(() => {
+    const inventoryItems = state.inventoryRisks
+      .filter(row => row.status === "active")
+      .map(row => ({
+        id: `inventory:${row.id}`,
+        kind: "inventory",
+        title: row.title || `${row.productName || row.skuCode || "库存"}需要处理`,
+        reason: row.reason || row.message || "库存或到货状态异常",
+        ownerId: row.ownerId || "",
+        ownerName: row.ownerName || "",
+        ownerDepartment: row.ownerDepartment || "供应链部",
+        dueAt: row.dueAt || row.expectedArrivalAt || null,
+        status: "open",
+        screen: "supply-planning",
+        actionLabel: "处理"
+      }));
+    const purchaseItems = state.purchaseApprovals
+      .filter(row => ["RUNNING", "PENDING"].includes(String(row.status || "").toUpperCase()))
+      .map(row => ({
+        id: `purchase:${row.processInstanceId || row.id}`,
+        kind: "purchase",
+        title: row.title || row.purpose || "采购申请待跟进",
+        reason: row.supplierName || "等待审批或采购处理",
+        ownerId: row.ownerId || "",
+        ownerName: row.ownerName || "",
+        ownerDepartment: row.ownerDepartment || "供应链部",
+        dueAt: row.dueAt || null,
+        status: "open",
+        screen: "supply-planning"
+      }));
+    const qualityItems = state.qualityIssues
+      .filter(row => !["closed", "complete"].includes(String(row.status || "").toLowerCase()))
+      .map(row => ({
+        id: `quality:${row.id}`,
+        kind: "quality",
+        title: row.content || row.category || "质量问题待闭环",
+        reason: row.productName || row.skuCode || "需要定性并跟进整改",
+        ownerId: row.ownerId || "",
+        ownerName: row.ownerName || "",
+        ownerDepartment: row.ownerDepartment || "质量管理部",
+        dueAt: row.dueAt || null,
+        status: "open",
+        screen: "supply-quality"
+      }));
+    const dataItems = goodsFlow.error ? [{
+      id: "data:goods-flow",
+      kind: "data_quality",
+      title: "货流共享数据需要恢复",
+      reason: goodsFlow.error,
+      ownerDepartment: "数据中心",
+      status: "open",
+      screen: "supply-rules"
+    }] : [];
+    return [...inventoryItems, ...purchaseItems, ...qualityItems, ...dataItems];
+  }, [goodsFlow.error, state.inventoryRisks, state.purchaseApprovals, state.qualityIssues]);
+  const workbenchQuality = useMemo(() => ({
+    status: goodsFlow.error ? "stale" : goodsFlow.stale ? "stale" : "trusted",
+    lastSuccessfulSyncAt: goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt || null,
+    missing: goodsFlow.error ? ["货流事实"] : []
+  }), [goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt, goodsFlow.error, goodsFlow.stale]);
   const content = {
-    workbench: <GoodsFlowOverview dashboard={goodsFlow.dashboard} legacySummary={summary} stale={goodsFlow.stale} loading={goodsFlow.loading} error={goodsFlow.error} onRefresh={goodsFlow.refresh} />,
+    workbench: <SupplyChainWorkbench actor={actor} items={workbenchItems} dataQuality={workbenchQuality} />,
     planning: <ProcurementWorkspace summary={summary} products={products} catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} supplyEditor={supplyEditor} financeEditor={financeEditor} />,
     suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} />,
-    transit: <ComingPhaseWorkspace title="生产与在途" phase="Phase 2" description="把采购单从下单、排产、产完、发运到到仓串成可跟催的节点链。" availableEvidence={[`${state.purchaseApprovals.length} 张采购申请`, `${state.suppliers.length} 家供应商`]} requiredSources={["每笔 PO 的承诺交期", "五个节点的实际时间", "延误后的可售天数影响"]} />,
+    transit: <TransitWorkspace purchases={state.purchaseApprovals} products={products} />,
     inventory: (
       <InventoryWorkspace
         products={products}

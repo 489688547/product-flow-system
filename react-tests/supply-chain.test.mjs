@@ -13,6 +13,7 @@ import {
   GOODS_FLOW_STAGES,
   SUPPLY_CHAIN_WORKSPACES,
   buildGoodsFlowProgress,
+  buildRoleWorkbench,
   normalizeSupplyChainSection
 } from "../src/domain/supplyChainWorkflow.js";
 
@@ -70,6 +71,49 @@ test("goods flow progress marks an explicitly active overdue milestone without c
   assert.equal(progress.stages.find(item => item.key === "approval").ownerName, "采购主管");
   assert.equal(progress.stages.find(item => item.key === "production").status, "waiting_data");
   assert.equal(progress.currentStage.key, "approval");
+});
+
+test("role workbench shows an employee only assigned work while supervisors can see assignment gaps", () => {
+  const items = [
+    { id: "mine", title: "核对采购建议", ownerId: "user-1", ownerDepartment: "供应链部", status: "open" },
+    { id: "other", title: "确认付款", ownerId: "user-2", ownerDepartment: "财务部", status: "open" },
+    { id: "gap", title: "指派包材采购", ownerId: "", ownerDepartment: "", status: "open" },
+    { id: "closed", title: "已完成", ownerId: "user-1", status: "closed" }
+  ];
+
+  const employee = buildRoleWorkbench({
+    actor: { id: "user-1", departments: ["供应链部"], roles: ["品牌采购专员"] },
+    items,
+    now: "2026-07-25T10:00:00+08:00"
+  });
+  const supervisor = buildRoleWorkbench({
+    actor: { id: "manager-1", departments: ["供应链部"], roles: ["品牌采购主管"] },
+    items,
+    now: "2026-07-25T10:00:00+08:00"
+  });
+
+  assert.deepEqual(employee.items.map(item => item.id), ["mine"]);
+  assert.deepEqual(supervisor.items.map(item => item.id), ["gap", "mine", "other"]);
+  assert.equal(supervisor.items.find(item => item.id === "gap").attentionState, "needs_assignment");
+  assert.equal(supervisor.summary.needsAssignment, 1);
+});
+
+test("role workbench orders overdue work before upcoming and data-quality work", () => {
+  const workbench = buildRoleWorkbench({
+    actor: { id: "executive", executive: true },
+    now: "2026-07-25T10:00:00+08:00",
+    items: [
+      { id: "normal", title: "普通事项", ownerId: "executive", status: "open" },
+      { id: "quality", title: "库存数据过期", ownerId: "executive", kind: "data_quality", status: "open" },
+      { id: "soon", title: "三天内到期", ownerId: "executive", status: "open", dueAt: "2026-07-27T10:00:00+08:00" },
+      { id: "overdue", title: "已经逾期", ownerId: "executive", status: "open", dueAt: "2026-07-24T10:00:00+08:00" }
+    ]
+  });
+
+  assert.deepEqual(workbench.items.map(item => item.id), ["overdue", "soon", "quality", "normal"]);
+  assert.equal(workbench.summary.overdue, 1);
+  assert.equal(workbench.summary.dueSoon, 1);
+  assert.equal(workbench.summary.dataIssues, 1);
 });
 
 test("catalog supplier links resolve to the lifecycle product when available", () => {
