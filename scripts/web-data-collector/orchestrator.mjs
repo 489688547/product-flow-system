@@ -29,7 +29,9 @@ export function createWebCollectorOrchestrator({
   processDownload,
   notify = async () => {},
   now = () => new Date(),
-  extensionOnlineWindowMs = 2 * 60 * 1000
+  extensionOnlineWindowMs = 2 * 60 * 1000,
+  executionMode = "extension",
+  runtimeVersion = "0.2.0"
 }) {
   if (!api) throw new Error("网页采集编排依赖不完整。");
   const processorRegistry = processors || (
@@ -44,6 +46,7 @@ export function createWebCollectorOrchestrator({
   let activeLeaseExpiresAt = 0;
   let lastExtensionSeenAt = 0;
   let processingResult = false;
+  let dedicatedBrowserStatus = "dedicated_browser_offline";
 
   function currentTime() {
     const value = now();
@@ -82,7 +85,11 @@ export function createWebCollectorOrchestrator({
         ? "waiting_human"
         : "failed";
     const errorCode = safeErrorCode(result.errorCode, fallbackCode);
-    await transition(from, target, { stage: result.stage || from, errorCode });
+    await transition(from, target, {
+      stage: result.stage || from,
+      errorCode,
+      ...(result.errorSummary ? { errorSummary: result.errorSummary } : {})
+    });
     await notify({
       kind: target,
       jobId: activeJob.id,
@@ -101,16 +108,19 @@ export function createWebCollectorOrchestrator({
       const extensionOnline = lastExtensionSeenAt > 0
         && Math.max(0, currentTime() - lastExtensionSeenAt) <= extensionOnlineWindowMs;
       await api.heartbeat({
-        version: "0.1.0",
-        chromeStatus: extensionOnline ? "extension_online" : "extension_offline",
+        version: runtimeVersion,
+        chromeStatus: executionMode === "dedicated"
+          ? dedicatedBrowserStatus
+          : extensionOnline ? "extension_online" : "extension_offline",
         currentJobId: activeJob?.id || null
       });
       if (typeof api.ensureRegisteredPlan === "function") return api.ensureRegisteredPlan();
       if (!jobs.length) return { jobs: [] };
       return api.ensurePlan(jobs);
     },
-    async nextTask({ storeId = "" } = {}) {
-      lastExtensionSeenAt = currentTime();
+    async nextTask({ storeId = "", executor = "extension" } = {}) {
+      if (executionMode === "dedicated" && executor !== "dedicated" && storeId) return null;
+      if (executor === "extension") lastExtensionSeenAt = currentTime();
       const profileStoreId = String(storeId || "");
       if (activeJob) {
         if (processingResult) return null;
@@ -127,12 +137,21 @@ export function createWebCollectorOrchestrator({
       await transition("claimed", "opening");
       return safeTask(activeJob);
     },
+    recordBrowserStatus(status = {}) {
+      dedicatedBrowserStatus = status.online === true
+        ? "dedicated_browser_online"
+        : "dedicated_browser_offline";
+      return dedicatedBrowserStatus;
+    },
     async registerStore(input) {
       const result = await api.registerStore(input);
       await api.ensureRegisteredPlan();
       return result;
     },
-    async submitResult(result) {
+    async submitResult(result, {
+      resume = {},
+      onCheckpoint = async () => {}
+    } = {}) {
       if (!activeJob || result?.jobId !== activeJob.id) {
         const error = new Error("插件结果与当前任务不匹配。");
         error.code = "WEB_COLLECTION_RESULT_JOB_MISMATCH";
@@ -167,6 +186,8 @@ export function createWebCollectorOrchestrator({
         const processed = await processor.process({
           job: activeJob,
           result,
+          resume,
+          onStage: onCheckpoint,
           onValidated: async () => {
             if (current === "validating") {
               await transition(current, "ingesting");

@@ -212,6 +212,7 @@ test("processor archives, parses and uploads bounded chunks with one final compl
   const source = join(root, "product.csv");
   await writeFile(source, await readFile(fixture("product-daily.csv")));
   const uploads = [];
+  const stages = [];
   const processor = createDouyinProcessor({
     archiveRoot: join(root, "archive"),
     uploadFactChunk: async input => {
@@ -236,6 +237,9 @@ test("processor archives, parses and uploads bounded chunks with one final compl
       kind: "downloaded",
       filePath: source,
       reportVersion: "douyin-product-v1"
+    },
+    onStage: async (stage, state) => {
+      stages.push([stage, structuredClone(state)]);
     }
   });
 
@@ -247,4 +251,14 @@ test("processor archives, parses and uploads bounded chunks with one final compl
   assert.equal(result.rowCount, 1);
   assert.equal(result.confidence, "high");
   assert.equal(JSON.stringify(result).includes(root), false);
+  assert.deepEqual(stages.map(([stage]) => stage), [
+    "archived",
+    "parsed",
+    "validated",
+    "uploading",
+    "uploading",
+    "submitted"
+  ]);
+  assert.equal(stages[0][1].archive.relativeArchiveKey.includes(root), false);
+  assert.equal(stages.at(-1)[1].processed.batchId, result.batchId);
 });

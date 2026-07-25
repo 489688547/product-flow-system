@@ -66,6 +66,12 @@ test("Douyin adapter classifies login and verification as human work without byp
     url: "https://evil.example/",
     markers: {}
   }).state, "blocked_origin");
+  assert.deepEqual(classifyDouyinPage({
+    url: "https://compass.jinritemai.com/shop",
+    markers: { reportPage: true, storeIdentity: false }
+  }), {
+    state: "ready"
+  });
 });
 
 test("Douyin store capture accepts only the fixed atomic fact schema", async () => {
@@ -142,4 +148,8 @@ test("Douyin tasks use fixed pages and fixed official-report actions", async () 
           { action: "download_official_report", resourceType }
         ]);
   }
+  assert.equal(
+    new URL(buildDouyinTaskUrl("https://compass.jinritemai.com/shop", baseTask)).pathname,
+    "/shop"
+  );
 });

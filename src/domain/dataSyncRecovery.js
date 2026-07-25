@@ -8,7 +8,11 @@ export const DOUYIN_RECOVERY = Object.freeze({
   DOUYIN_REPORT_SCHEMA_CHANGED: "页面字段已变化，采集已停止，等待更新采集适配。",
   DOUYIN_PAGE_SCHEMA_CHANGED: "页面结构已变化，采集已停止，等待更新采集适配。",
   DOUYIN_STORE_IDENTITY_MISMATCH: "确认公司 Chrome 当前店铺与任务店铺一致后重新触发。",
+  DOUYIN_STORE_MISMATCH: "确认公司 Mac 的专用 Chrome 当前店铺与任务店铺一致后重新触发。",
+  DOUYIN_BROWSER_PROFILE_MISMATCH: "专用 Chrome Profile 与任务店铺不一致，请重新打开该店铺的专用窗口。",
+  DOUYIN_ACTION_FAILED: "本机浏览器操作失败；请按诊断编号检查公司 Mac 后重新触发。",
   DOUYIN_OFFICIAL_REPORT_BUTTON_MISSING: "官方报表入口不可用，请检查账号权限或页面变化。",
+  DOUYIN_DOWNLOAD_TIMEOUT: "官方报表下载超时，请稍后重新触发。",
   EXTENSION_DOWNLOAD_TIMEOUT: "官方报表下载超时，请稍后重新触发。",
   WEB_COLLECTION_STAGE_EXPIRED: "上一轮采集卡在中途已超时自动终止，请确认公司 Mac 已登录抖店后点击重新触发。"
 });
@@ -273,7 +277,9 @@ export function buildDouyinCollectionRecovery({
       const cursor = latest(matchingCursors.filter(item => item.resourceType === resource.type));
       const runner = runners.find(item => item.id === job?.runnerId) || fallbackRunner;
       const online = runnerOnline(runner, now);
-      const chromeOnline = extensionOnline(runner);
+      const dedicatedStatus = String(runner?.chromeStatus || "").startsWith("dedicated_browser_");
+      const chromeOnline = extensionOnline(runner) || runner?.chromeStatus === "dedicated_browser_online";
+      const browserName = dedicatedStatus ? "专用 Chrome" : "Chrome 扩展";
       const jobStatus = String(job?.status || "");
       // 已有可信成功游标（业务日 ≥ 该运行中任务）时，陈旧的运行中任务不再盖掉成功状态，
       // 避免一次采集成功后又冒出的重复任务把资源长期显示为“采集中”。
@@ -291,14 +297,14 @@ export function buildDouyinCollectionRecovery({
         || (status === "queued"
           ? online
             ? chromeOnline
-              ? "等待公司 Mac 的 Chrome 扩展领取任务。"
-              : "后台采集服务在线，但 Chrome 扩展尚未连接。"
+              ? `等待公司 Mac 的${browserName}领取任务。`
+              : `后台采集服务在线，但${browserName}尚未连接。`
             : "公司 Mac 采集器离线，恢复后台服务后会继续领取任务。"
           : RUNNING_STATES.has(status)
           ? online
             ? chromeOnline
-              ? "公司 Mac 正在采集，完成后刷新状态。"
-              : "后台采集服务在线，但 Chrome 扩展已中断；恢复后会自动重领。"
+              ? `公司 Mac 的${browserName}正在执行页面操作或本机处理，完成后刷新状态。`
+              : `后台采集服务在线，但${browserName}已中断；恢复后会自动重领。`
             : "公司 Mac 采集器离线，恢复后台服务后会继续领取任务。"
           : status === "success"
             ? "最近可信批次已完成；可在执行记录查看日期、行数和结果。"

@@ -428,6 +428,27 @@ test("queued Douyin resources wait for Chrome instead of claiming that collectio
   assert.doesNotMatch(recovery.resources[0].instruction, /正在采集/);
 });
 
+test("queued Douyin resources recognize the dedicated browser instead of asking for the extension", () => {
+  const recovery = buildDouyinCollectionRecovery({
+    storeId: "store-a",
+    runners: [{ ...runner, chromeStatus: "dedicated_browser_online" }],
+    jobs: [{
+      id: "store-daily",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "store_daily",
+      businessDate: "2026-07-24",
+      status: "queued",
+      stage: "queued"
+    }],
+    now
+  });
+
+  assert.equal(recovery.resources[0].status, "queued");
+  assert.match(recovery.resources[0].instruction, /专用 Chrome.*领取/);
+  assert.doesNotMatch(recovery.resources[0].instruction, /扩展/);
+});
+
 test("sales recovery keeps file import available when status cannot be read", () => {
   const recovery = buildKuaimaiSalesRecovery({
     date: "2026-07-22",

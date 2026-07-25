@@ -55,8 +55,19 @@ export const readRunnerToken = (options = {}) => readSecret({ service: RUNNER_KE
 export const storePairingKey = (value, options = {}) => storeSecret(value, { service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 export const readPairingKey = (options = {}) => readSecret({ service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 
-export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl }) {
-  const argumentsList = [nodePath, collectorPath, "serve", "--root", root, "--base-url", baseUrl]
+export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl, browserMode = "extension" }) {
+  const safeBrowserMode = browserMode === "extension" ? "extension" : "dedicated";
+  const argumentsList = [
+    nodePath,
+    collectorPath,
+    "serve",
+    "--root",
+    root,
+    "--base-url",
+    baseUrl,
+    "--browser-mode",
+    safeBrowserMode
+  ]
     .map(value => `      <string>${xml(value)}</string>`).join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -98,6 +109,7 @@ export async function installLaunchAgent({
   collectorPath,
   root,
   baseUrl,
+  browserMode = "extension",
   home = os.homedir(),
   command = systemCommand
 }) {
@@ -115,7 +127,17 @@ export async function installLaunchAgent({
   const plistPath = path.join(directory, `${LAUNCH_AGENT_LABEL}.plist`);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const temporaryPath = `${plistPath}.tmp`;
-  await writeFile(temporaryPath, collectorLaunchAgentPlist({ nodePath, collectorPath: stableCollectorPath, root, baseUrl }), { mode: 0o600 });
+  await writeFile(
+    temporaryPath,
+    collectorLaunchAgentPlist({
+      nodePath,
+      collectorPath: stableCollectorPath,
+      root,
+      baseUrl,
+      browserMode
+    }),
+    { mode: 0o600 }
+  );
   await rename(temporaryPath, plistPath);
   await chmod(plistPath, 0o600);
   await command("/bin/launchctl", ["bootout", `gui/${process.getuid()}`, plistPath]).catch(() => {});

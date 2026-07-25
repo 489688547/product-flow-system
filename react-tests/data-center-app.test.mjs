@@ -88,6 +88,12 @@ test("governance workspaces merge quality into sync and use the focused AI model
   assert.match(workspaces, /销售数据尚未同步/);
   assert.match(workspaces, /系统已自动排队 Chrome 采集任务/);
   assert.match(workspaces, /loadWebCollectionStatus/);
+  assert.match(workspaces, /dedicated_browser_online: "专用 Chrome 已连接"/);
+  assert.match(workspaces, /dedicated_browser_offline: "专用 Chrome 未连接"/);
+  assert.match(workspaces, /抖店 Chrome 官方报表采集/);
+  assert.match(workspaces, /公司日常 Chrome 的已登录状态/);
+  assert.doesNotMatch(workspaces, /抖店专用 Chrome 官方报表采集/);
+  assert.doesNotMatch(workspaces, /由公司 Mac 的独立店铺 Profile 采集昨天四类资源/);
   assert.match(workspaces, /buildDataSyncRunRows/);
   assert.match(workspaces, /webCollection\.runs/);
   assert.match(workspaces, /primaryAction\.label/);

@@ -224,6 +224,55 @@ test("runner registers a safely discovered Douyin store before creating its dail
   assert.equal(status.body.data.stores[0].storeName, "TIYES提野星宠物用品旗舰店");
 });
 
+test("runner reads only its enabled store assignments with a safe projection", async () => {
+  const db = createWebCollectionD1Mock();
+  const first = await register(db);
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: first.body.data.token,
+    body: {
+      action: "register_store",
+      providerId: "douyin-ecommerce",
+      storeId: "90862283",
+      storeName: "TIYES 提野星旗舰店"
+    }
+  });
+  const second = await register(db);
+  await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: second.body.data.token,
+    body: {
+      action: "register_store",
+      providerId: "douyin-ecommerce",
+      storeId: "99887766",
+      storeName: "第二店"
+    }
+  });
+  db.tables.web_collection_stores.get("douyin-ecommerce:99887766").status = "disabled";
+
+  const assigned = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    token: first.body.data.token,
+    body: { action: "assigned_stores" }
+  });
+
+  assert.equal(assigned.response.status, 200);
+  assert.deepEqual(assigned.body.data, {
+    stores: [{
+      providerId: "douyin-ecommerce",
+      storeId: "90862283",
+      storeName: "TIYES 提野星旗舰店"
+    }]
+  });
+  assert.doesNotMatch(
+    JSON.stringify(assigned.body.data.stores),
+    /runnerId|lastSeenAt|updatedAt|url|credential|cookie|token|Users\//
+  );
+});
+
 test("an executive can add and rename multiple Douyin stores while ordinary operators cannot", async () => {
   const db = createWebCollectionD1Mock();
   const registration = await register(db);

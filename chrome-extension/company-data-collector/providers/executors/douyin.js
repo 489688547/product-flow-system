@@ -8,7 +8,8 @@ import {
 
 const SELECTOR_VERSION = "2026-07-24";
 const WAIT_AFTER_ACTION_MS = 600;
-const WAIT_AFTER_DATE_MS = 2_000;
+const WAIT_AFTER_DATE_MS = 3_000;
+const YESTERDAY_PRESET_LABELS = Object.freeze(["近1天", "昨天", "昨日"]);
 const STORE_MANAGEMENT_PATH = "/ffa/grs-new/qualification/common-tools";
 const HUMAN_TERMS = Object.freeze({
   captcha: ["验证码", "图形验证"],
@@ -64,6 +65,19 @@ function exactVisibleText(labels, selector = "button, [role='button'], a") {
     .find(element => visible(element) && allowed.has(normalizedText(element.textContent)));
 }
 
+export function isDouyinYesterdayPresetSelected({ label = "", selected = false } = {}) {
+  return selected === true && YESTERDAY_PRESET_LABELS.includes(normalizedText(label));
+}
+
+function yesterdayPresetSelectionApplied() {
+  return Array.from(document.querySelectorAll(
+    "[role='tab'][aria-selected='true'], button[aria-pressed='true'], [role='button'][aria-pressed='true']"
+  )).some(element => isDouyinYesterdayPresetSelected({
+    label: element.textContent,
+    selected: true
+  }));
+}
+
 function bodyHasAny(terms) {
   const bodyText = normalizedText(document.body?.innerText);
   return terms.some(term => bodyText.includes(term));
@@ -71,17 +85,42 @@ function bodyHasAny(terms) {
 
 function pageMarkers() {
   const bodyText = normalizedText(document.body?.innerText);
+  const datePresetVisible = Array.from(document.querySelectorAll(
+    "[role='tab'], button, [role='button'], label"
+  )).some(element => (
+    visible(element)
+    && ["实时", ...YESTERDAY_PRESET_LABELS, "近7天", "近30天", "自定义"]
+      .includes(normalizedText(element.textContent))
+  ));
+  const dateInputVisible = Array.from(document.querySelectorAll(
+    "input[placeholder*='日期'], input[placeholder*='开始时间'], input[placeholder*='结束时间']"
+  )).some(visible);
   const markers = {
     loginPage: /\/login(?:[/?#]|$)/i.test(location.pathname)
       || Boolean(document.querySelector("input[type='password']")),
     reportPage: location.origin === "https://compass.jinritemai.com"
-      && (bodyText.includes("电商罗盘") || bodyText.includes("抖店罗盘") || bodyText.includes("数据")),
+      && (datePresetVisible || dateInputVisible),
     storeIdentity: STORE_IDENTITY_SELECTORS.some(selector => visible(document.querySelector(selector)))
   };
   for (const [marker, terms] of Object.entries(HUMAN_TERMS)) {
     markers[marker] = bodyHasAny(terms);
   }
   return markers;
+}
+
+export async function waitForDouyinPageClassification({
+  read,
+  waitImpl = wait,
+  timeoutMs = 30_000,
+  pollMs = 250
+} = {}) {
+  const deadline = Date.now() + timeoutMs;
+  let classification = read();
+  while (classification?.state === "schema_changed" && Date.now() < deadline) {
+    await waitImpl(pollMs);
+    classification = read();
+  }
+  return classification;
 }
 
 function setNativeInputValue(input, value) {
@@ -101,13 +140,17 @@ function shanghaiYesterday() {
 async function applyBusinessDate(businessDate) {
   if (businessDate === shanghaiYesterday()) {
     const yesterday = exactVisibleText(
-      ["近1天", "昨天", "昨日"],
-      "button, [role='button'], [role='tab'], label, span"
+      YESTERDAY_PRESET_LABELS,
+      "[role='tab'], button, [role='button'], label, span"
     );
     if (yesterday) {
-      yesterday.click();
+      const clickTarget = yesterday.closest("[role='tab'], button, [role='button'], label") || yesterday;
+      clickTarget.click();
       await wait(WAIT_AFTER_DATE_MS);
-      return;
+      if (yesterdayPresetSelectionApplied()) return;
+      throw Object.assign(new Error("抖店报表日期未切换到昨日。"), {
+        code: "DOUYIN_DATE_RANGE_NOT_APPLIED"
+      });
     }
   }
 
@@ -138,6 +181,13 @@ export function parseVisibleNumber(value) {
   if (match[2] === "亿") return number * 100_000_000;
   if (match[2] === "万") return number * 10_000;
   return number;
+}
+
+export function parseDouyinComparisonNumber(value, comparisonLabel) {
+  const text = normalizedText(value);
+  const label = normalizedText(comparisonLabel);
+  const index = label ? text.indexOf(label) : -1;
+  return index >= 0 ? parseVisibleNumber(text.slice(index + label.length)) : null;
 }
 
 export function parseDouyinStoreIdentityText(value) {
@@ -207,9 +257,24 @@ export function discoverDouyinStoreIdentity() {
     };
 }
 
-function metricByRegisteredKey(key) {
+function selectedDatePresetLabel() {
+  const selected = Array.from(document.querySelectorAll(
+    "[role='tab'][aria-selected='true'], button[aria-pressed='true'], [role='button'][aria-pressed='true']"
+  )).find(element => (
+    visible(element)
+    && ["实时", ...YESTERDAY_PRESET_LABELS, "近7天", "近30天", "自定义"]
+      .includes(normalizedText(element.textContent))
+  ));
+  return normalizedText(selected?.textContent);
+}
+
+function metricByRegisteredKey(key, { comparisonLabel = "" } = {}) {
   const registered = document.querySelector(`[data-metric-key='${key}'], [data-e2e-metric='${key}']`);
-  if (visible(registered)) return parseVisibleNumber(registered.textContent);
+  if (visible(registered)) {
+    return comparisonLabel
+      ? parseDouyinComparisonNumber(registered.textContent, comparisonLabel)
+      : parseVisibleNumber(registered.textContent);
+  }
 
   const labels = STORE_METRIC_LABELS[key] || [];
   const cards = Array.from(document.querySelectorAll(
@@ -219,14 +284,19 @@ function metricByRegisteredKey(key) {
     const text = normalizedText(card.textContent);
     const label = labels.find(candidate => text.includes(candidate));
     if (!label) continue;
-    const value = parseVisibleNumber(text.replace(label, ""));
+    const metricText = text.replace(label, "");
+    const value = comparisonLabel
+      ? parseDouyinComparisonNumber(metricText, comparisonLabel)
+      : parseVisibleNumber(metricText);
     if (value !== null) return value;
   }
   return null;
 }
 
-function captureStoreOverview(resource) {
-  const facts = Object.fromEntries(STORE_DAILY_FACT_KEYS.map(key => [key, metricByRegisteredKey(key)]));
+function captureStoreOverview(resource, options = {}) {
+  const facts = Object.fromEntries(
+    STORE_DAILY_FACT_KEYS.map(key => [key, metricByRegisteredKey(key, options)])
+  );
   if (Object.values(facts).every(value => value === null)) {
     throw Object.assign(new Error("店铺总览指标结构已变化。"), {
       code: "DOUYIN_STORE_CAPTURE_SCHEMA_CHANGED"
@@ -239,6 +309,10 @@ function captureStoreOverview(resource) {
     pageType: resource.pageType,
     selectorVersion: SELECTOR_VERSION
   });
+}
+
+function storeOverviewMetricsReady() {
+  return metricByRegisteredKey("transactionAmount") !== null;
 }
 
 async function clickOfficialReport(resourceType) {
@@ -259,7 +333,19 @@ async function clickOfficialReport(resourceType) {
 export async function executeDouyinTask(task) {
   const projected = projectDouyinTask(task);
   const resource = douyinResources[projected.resourceType];
-  const classification = classifyDouyinPage({ url: location.href, markers: pageMarkers() });
+  const classification = await waitForDouyinPageClassification({
+    read: () => {
+      const current = classifyDouyinPage({ url: location.href, markers: pageMarkers() });
+      if (
+        current.state === "ready"
+        && projected.resourceType === "store_daily"
+        && !storeOverviewMetricsReady()
+      ) {
+        return { state: "schema_changed", errorCode: "DOUYIN_STORE_CAPTURE_SCHEMA_CHANGED" };
+      }
+      return current;
+    }
+  });
   if (classification.state !== "ready") {
     return {
       kind: classification.state === "waiting_human" ? "waiting_human" : "failed",
@@ -271,6 +357,17 @@ export async function executeDouyinTask(task) {
   }
 
   try {
+    if (
+      projected.resourceType === "store_daily"
+      && projected.businessDate === shanghaiYesterday()
+      && selectedDatePresetLabel() === "实时"
+    ) {
+      return {
+        ...captureStoreOverview(resource, { comparisonLabel: "昨日" }),
+        status: "captured",
+        stage: "collecting"
+      };
+    }
     await applyBusinessDate(projected.businessDate);
     const downloadStarted = await clickOfficialReport(projected.resourceType);
     if (downloadStarted) {
