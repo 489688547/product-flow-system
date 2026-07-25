@@ -9,6 +9,68 @@ import {
   reduceSupplyChainState,
   resolveSupplyLinkProductId
 } from "../src/domain/supplyChain.js";
+import {
+  GOODS_FLOW_STAGES,
+  SUPPLY_CHAIN_WORKSPACES,
+  buildGoodsFlowProgress,
+  normalizeSupplyChainSection
+} from "../src/domain/supplyChainWorkflow.js";
+
+test("supply chain workspaces follow the task-first product structure", () => {
+  assert.deepEqual(SUPPLY_CHAIN_WORKSPACES.map(item => [item.section, item.label]), [
+    ["workbench", "我的工作台"],
+    ["planning", "计划与采购"],
+    ["suppliers", "供应商"],
+    ["transit", "生产与在途"],
+    ["inventory", "库存与盘点"],
+    ["quality", "质量闭环"],
+    ["finance", "成本与财务"],
+    ["rules", "数据与规则"]
+  ]);
+});
+
+test("legacy supply chain sections resolve to the closest new workspace", () => {
+  assert.equal(normalizeSupplyChainSection("overview"), "workbench");
+  assert.equal(normalizeSupplyChainSection("demand"), "planning");
+  assert.equal(normalizeSupplyChainSection("procurement"), "planning");
+  assert.equal(normalizeSupplyChainSection("fulfillment"), "transit");
+  assert.equal(normalizeSupplyChainSection("cash"), "finance");
+  assert.equal(normalizeSupplyChainSection("records"), "rules");
+  assert.equal(normalizeSupplyChainSection("settings"), "rules");
+  assert.equal(normalizeSupplyChainSection("unknown"), "workbench");
+});
+
+test("goods flow progress never infers missing earlier milestones from a later receipt", () => {
+  const progress = buildGoodsFlowProgress({
+    milestones: [
+      { stage: "purchase_order", status: "complete", actualAt: "2026-07-18T08:00:00+08:00" },
+      { stage: "receipt", status: "complete", actualAt: "2026-07-24T15:00:00+08:00" }
+    ]
+  });
+
+  assert.deepEqual(progress.stages.map(item => item.key), GOODS_FLOW_STAGES.map(item => item.key));
+  assert.equal(progress.stages.find(item => item.key === "purchase_order").status, "complete");
+  assert.equal(progress.stages.find(item => item.key === "receipt").status, "complete");
+  assert.equal(progress.stages.find(item => item.key === "shipment").status, "waiting_data");
+  assert.equal(progress.stages.find(item => item.key === "arrival").status, "waiting_data");
+  assert.equal(progress.completeCount, 2);
+  assert.equal(progress.qualityStatus, "partial");
+});
+
+test("goods flow progress marks an explicitly active overdue milestone without changing other stages", () => {
+  const progress = buildGoodsFlowProgress({
+    now: "2026-07-25T10:00:00+08:00",
+    milestones: [
+      { stage: "purchase_request", status: "complete", actualAt: "2026-07-20T09:00:00+08:00" },
+      { stage: "approval", status: "active", plannedAt: "2026-07-24T18:00:00+08:00", ownerName: "采购主管" }
+    ]
+  });
+
+  assert.equal(progress.stages.find(item => item.key === "approval").status, "overdue");
+  assert.equal(progress.stages.find(item => item.key === "approval").ownerName, "采购主管");
+  assert.equal(progress.stages.find(item => item.key === "production").status, "waiting_data");
+  assert.equal(progress.currentStage.key, "approval");
+});
 
 test("catalog supplier links resolve to the lifecycle product when available", () => {
   const products = [{ id: "p1", catalogProductId: "kuaimai:item:1001" }, { id: "kuaimai:item:1002" }];

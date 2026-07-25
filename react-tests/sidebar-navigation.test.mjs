@@ -12,7 +12,7 @@ const navigation = [
   ["ops-team", "运营团队", null, "电商店铺运营", "ecommerce-operations"],
   ["content-overview", "内容总览", null, "品牌内容协同", "content-overview"],
   ["content-settings", "设置", null, "品牌内容协同", "content-settings"],
-  ["supply-overview", "供应链总览", null, "供应链管理", "supply-chain"],
+  ["supply-workbench", "我的工作台", null, "供应链管理", "supply-chain"],
   ["supply-quality", "质量管理", null, "供应链管理", "supply-chain"],
   ["performance-overview", "绩效总览", null, "人事管理", "performance-management"],
   ["performance-mine", "我的绩效", null, "人事管理", "performance-management"],
@@ -89,6 +89,6 @@ test("keeps only multi-route business apps collapsible for executive accounts", 
 test("auto expands an active child but not the first visible overview", () => {
   const visible = visibleFor({ department: "运营部", title: "运营负责人" });
   assert.equal(expandedGroupForScreen(visible, "supply-quality"), "供应链管理");
-  assert.equal(expandedGroupForScreen(visible, "supply-overview"), "");
+  assert.equal(expandedGroupForScreen(visible, "supply-workbench"), "");
   assert.equal(expandedGroupForScreen(visible, "home"), "");
 });

@@ -11,14 +11,14 @@
 
 ## 任务
 
-- [ ] 任务 1：建立 8 个工作区导航与领域骨架
+- [x] 任务 1：建立 8 个工作区导航与领域骨架
   - 依赖：无。
   - 文件：`src/App.jsx`、`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/SupplyChainAppPage.jsx`、`react-tests/sidebar-navigation.test.mjs`、`react-tests/supply-chain.test.mjs`。
   - 输入：确认的导航和角色规则。
   - 输出：新路由、旧路由兼容、纯领域状态枚举。
   - 失败测试：新导航顺序、旧 screen 映射和领域状态测试先失败。
   - 实现步骤：定义工作区 → 更新导航 → 抽离 App 装配 → 兼容旧路由。
-  - 验证：`node --test react-tests/sidebar-navigation.test.mjs react-tests/supply-chain.test.mjs`。
+  - 验证：`node --test react-tests/sidebar-navigation.test.mjs react-tests/supply-chain.test.mjs react-tests/supply-chain-ui.test.mjs`，34/34 通过；`npm run lint`、`npm run build` 通过。
   - 提交：`feat(supply-chain): establish workflow workspaces`。
 
 - [ ] 任务 2：实现共享事实消费客户端

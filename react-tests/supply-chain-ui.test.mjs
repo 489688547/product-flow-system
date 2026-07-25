@@ -4,27 +4,26 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("primary sidebar exposes the merged goods-flow workspaces in the supply-chain group", () => {
+test("primary sidebar exposes the task-first supply-chain workspaces", () => {
   const app = read("src/App.jsx");
-  for (const label of ["货流驾驶舱", "需求计划", "采购与供应商", "生产与在途", "库存管理", "履约物流", "逆向与质量", "现金循环", "同步与覆盖", "规则设置"]) {
+  for (const label of ["我的工作台", "计划与采购", "供应商", "生产与在途", "库存与盘点", "质量闭环", "成本与财务", "数据与规则"]) {
     assert.match(app, new RegExp(label));
   }
-  for (const key of ["supply-overview", "supply-demand", "supply-procurement", "supply-transit", "supply-inventory", "supply-fulfillment", "supply-quality", "supply-cash", "supply-records", "supply-settings"]) {
+  for (const key of ["supply-workbench", "supply-planning", "supply-suppliers", "supply-transit", "supply-inventory", "supply-quality", "supply-finance", "supply-rules"]) {
     assert.match(app, new RegExp(`"${key}"`));
   }
-  assert.doesNotMatch(app, /\["supply-suppliers", "供应商管理"/);
   assert.match(app, /"供应链管理"/);
   assert.doesNotMatch(app, /\["supply-chain", "供应链管理", Truck, "业务 Apps"\]/);
   assert.match(app, /navigationPermissionKey/);
   assert.match(app, /if \(SUPPLY_CHAIN_SCREEN_TO_SECTION\.has\(screen\)\) return "supply-chain"/);
-  assert.match(app, /if \(screen === "supply-chain"\) return "supply-overview"/);
+  assert.match(app, /if \(screen === "supply-chain"\) return "supply-workbench"/);
 });
 
 test("supply chain page is controlled by the primary route and has no internal navigation", () => {
   const app = read("src/App.jsx");
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
   const css = read("src/styles.css");
-  assert.match(page, /SupplyChainAppPage\(\{ section = "overview" \}\)/);
+  assert.match(page, /SupplyChainAppPage\(\{ section = "workbench" \}\)/);
   assert.doesNotMatch(page, /返回业务 Apps/);
   assert.doesNotMatch(page, /ArrowLeft/);
   assert.doesNotMatch(app, /<SupplyChainAppPage onNavigate=/);

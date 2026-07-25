@@ -21,6 +21,7 @@ import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
 import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
 import { catalogBackedProduct } from "../../domain/productCatalog.js";
+import { normalizeSupplyChainSection } from "../../domain/supplyChainWorkflow.js";
 
 function departmentOf(user) {
   return String(user?.department || "").trim();
@@ -242,7 +243,7 @@ function ProcurementWorkspace({ summary, products, catalogItems, lifecycleProduc
   );
 }
 
-export function SupplyChainAppPage({ section = "overview" }) {
+export function SupplyChainAppPage({ section = "workbench" }) {
   const [salesRows, setSalesRows] = useState([]);
   const { user } = useAuth();
   const { state: productState } = useProductFlow();
@@ -273,10 +274,11 @@ export function SupplyChainAppPage({ section = "overview" }) {
   const canRecalculateCcc = executive || supplyEditor || financeRole;
   const canFreezeCcc = financeRole;
   const qualityEditor = executive || dept === "质量管理部";
+  const activeSection = normalizeSupplyChainSection(section);
   const content = {
-    overview: <GoodsFlowOverview dashboard={goodsFlow.dashboard} legacySummary={summary} stale={goodsFlow.stale} loading={goodsFlow.loading} error={goodsFlow.error} onRefresh={goodsFlow.refresh} />,
-    demand: <ComingPhaseWorkspace title="需求计划" phase="Phase 1" description="形成 SKU × 周的 13 周滚动预测，先从核心 SKU 开始。" availableEvidence={[`${products.length} 个商品主档`, `${salesRows.length} 条销售成本记录`]} requiredSources={["近 104 周 SKU 销量", "投放计划与大促日历", "内容排期和新品首单判断"]} />,
-    procurement: <ProcurementWorkspace summary={summary} products={products} catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} supplyEditor={supplyEditor} financeEditor={financeEditor} />,
+    workbench: <GoodsFlowOverview dashboard={goodsFlow.dashboard} legacySummary={summary} stale={goodsFlow.stale} loading={goodsFlow.loading} error={goodsFlow.error} onRefresh={goodsFlow.refresh} />,
+    planning: <ProcurementWorkspace summary={summary} products={products} catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} supplyEditor={supplyEditor} financeEditor={financeEditor} />,
+    suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} />,
     transit: <ComingPhaseWorkspace title="生产与在途" phase="Phase 2" description="把采购单从下单、排产、产完、发运到到仓串成可跟催的节点链。" availableEvidence={[`${state.purchaseApprovals.length} 张采购申请`, `${state.suppliers.length} 家供应商`]} requiredSources={["每笔 PO 的承诺交期", "五个节点的实际时间", "延误后的可售天数影响"]} />,
     inventory: (
       <InventoryWorkspace
@@ -290,18 +292,21 @@ export function SupplyChainAppPage({ section = "overview" }) {
         transitionStocktake={goodsFlow.transitionStocktake}
       />
     ),
-    fulfillment: <ComingPhaseWorkspace title="履约物流" phase="Phase 2" description="核对 48 小时发货、快递费用和破损对包装的影响。" availableEvidence={[`${products.length} 个商品主档`, `${state.inventorySnapshots.length} 条库存快照`]} requiredSources={["仓配发货时间", "快递账单与运单", "破损和包装复审记录"]} />,
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,
-    cash: <CashCycleWorkspace dashboard={goodsFlow.dashboard} terms={goodsFlow.terms} canEditTerms={canEditTerms} canRecalculateCcc={canRecalculateCcc} canFreezeCcc={canFreezeCcc} onSaveTerm={goodsFlow.saveTerm} onRecalculate={goodsFlow.recalculateCcc} onFreeze={goodsFlow.freezeCcc} />,
-    records: <SyncRecordsWorkspace salesRows={salesRows} canEdit={supplyEditor} />,
-    settings: <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
+    finance: <CashCycleWorkspace dashboard={goodsFlow.dashboard} terms={goodsFlow.terms} canEditTerms={canEditTerms} canRecalculateCcc={canRecalculateCcc} canFreezeCcc={canFreezeCcc} onSaveTerm={goodsFlow.saveTerm} onRecalculate={goodsFlow.recalculateCcc} onFreeze={goodsFlow.freezeCcc} />,
+    rules: (
+      <div className="supply-work-grid">
+        <SyncRecordsWorkspace salesRows={salesRows} canEdit={supplyEditor} />
+        <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
+      </div>
+    )
   };
   return (
     <section className="page supply-chain-app">
       <PageHeader title="供应链管理" description="用现金循环连接需求、采购、库存、履约与质量判断。" />
       {error ? <p className="supply-message error" role="alert">{error}</p> : null}
-      {section !== "overview" && goodsFlow.error ? <p className="supply-message warning" role="status">{goodsFlow.error}</p> : null}
-      {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[section]}
+      {activeSection !== "workbench" && goodsFlow.error ? <p className="supply-message warning" role="status">{goodsFlow.error}</p> : null}
+      {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[activeSection]}
     </section>
   );
 }

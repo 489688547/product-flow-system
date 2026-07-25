@@ -50,19 +50,27 @@ const AiAssistantWorkspace = lazyNamed(() => import("./features/ai-assistant/AiA
 const DevelopmentBacklogPage = lazyNamed(() => import("./features/development-backlog/DevelopmentBacklogPage.jsx"), "DevelopmentBacklogPage");
 
 const SUPPLY_CHAIN_NAV = [
-  ["supply-overview", "货流驾驶舱", LayoutDashboard, "供应链管理", "overview"],
-  ["supply-demand", "需求计划", ClipboardList, "供应链管理", "demand"],
-  ["supply-procurement", "采购与供应商", ClipboardCheck, "供应链管理", "procurement"],
+  ["supply-workbench", "我的工作台", LayoutDashboard, "供应链管理", "workbench"],
+  ["supply-planning", "计划与采购", ClipboardCheck, "供应链管理", "planning"],
+  ["supply-suppliers", "供应商", Users, "供应链管理", "suppliers"],
   ["supply-transit", "生产与在途", Workflow, "供应链管理", "transit"],
-  ["supply-inventory", "库存管理", Boxes, "供应链管理", "inventory"],
-  ["supply-fulfillment", "履约物流", PackageSearch, "供应链管理", "fulfillment"],
-  ["supply-quality", "逆向与质量", ShieldCheck, "供应链管理", "quality"],
-  ["supply-cash", "现金循环", BadgeDollarSign, "供应链管理", "cash"],
-  ["supply-records", "同步与覆盖", FileClock, "供应链管理", "records"],
-  ["supply-settings", "规则设置", Settings, "供应链管理", "settings"]
+  ["supply-inventory", "库存与盘点", Boxes, "供应链管理", "inventory"],
+  ["supply-quality", "质量闭环", ShieldCheck, "供应链管理", "quality"],
+  ["supply-finance", "成本与财务", BadgeDollarSign, "供应链管理", "finance"],
+  ["supply-rules", "数据与规则", Settings, "供应链管理", "rules"]
 ];
 const SUPPLY_CHAIN_SCREEN_TO_SECTION = new Map(SUPPLY_CHAIN_NAV.map(([screen, , , , section]) => [screen, section]));
-const LEGACY_SUPPLY_SCREENS = new Set(["supply-suppliers", "supply-approvals", "supply-products"]);
+const LEGACY_SUPPLY_SCREENS = new Map([
+  ["supply-overview", "supply-workbench"],
+  ["supply-demand", "supply-planning"],
+  ["supply-procurement", "supply-planning"],
+  ["supply-approvals", "supply-planning"],
+  ["supply-products", "supply-suppliers"],
+  ["supply-fulfillment", "supply-transit"],
+  ["supply-cash", "supply-finance"],
+  ["supply-records", "supply-rules"],
+  ["supply-settings", "supply-rules"]
+]);
 const DATA_CENTER_NAV = [
   ["data-overview", "数据总览", Database, "数据中心", "overview"],
   ["data-insights", "用户洞察", UsersRound, "数据中心", "insights"],
@@ -147,8 +155,8 @@ const HIDDEN_SCREENS = new Set(["packages", "ai-assistant"]);
 const VALID_SCREENS = new Set([...COMPANY_NAV.map(([key]) => key), ...PRODUCT_NAV.map(([key]) => key), ...HIDDEN_SCREENS]);
 
 function resolveScreen(screen) {
-  if (screen === "supply-chain") return "supply-overview";
-  if (LEGACY_SUPPLY_SCREENS.has(screen)) return "supply-procurement";
+  if (screen === "supply-chain") return "supply-workbench";
+  if (LEGACY_SUPPLY_SCREENS.has(screen)) return LEGACY_SUPPLY_SCREENS.get(screen);
   if (screen === "data-quality") return "data-sync";
   const resolvedDataScreen = screen === "data-center" ? "data-overview" : screen;
   if (resolvedDataScreen === "ecommerce-operations") return "ops-dashboard";
