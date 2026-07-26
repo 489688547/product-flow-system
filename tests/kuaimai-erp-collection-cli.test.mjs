@@ -160,6 +160,92 @@ test("collector recognizes Kuaimai kit and combination component rows", async ()
   assert.equal(combinationResult.records[0].sourceKey, "COMBO-1::SKU-2");
 });
 
+test("collector parses a complete Kuaimai inventory snapshot without inventing missing quantities", async () => {
+  const file = new File([
+    "仓库名称,系统规格ID,规格商家编码,69码,可用库存,库存更新时间,成本价\n",
+    "杭州仓,S-1,SKU-1,6978705011208,25,2026-07-26 05:10:00,6.50\n",
+    "广州仓,S-2,SKU-2,6978705011215,0,2026-07-26 05:11:00,7.00\n"
+  ], "库存状态导出.csv");
+  const result = await readKuaimaiExport(file, {
+    resourceType: "inventory_snapshot",
+    collectedAt: "2026-07-26T05:12:00+08:00"
+  });
+
+  assert.equal(result.batch.status, "completed");
+  assert.equal(result.batch.rowCount, 2);
+  assert.deepEqual(result.records.map(record => record.sourceKey), [
+    "杭州仓::S-1",
+    "广州仓::S-2"
+  ]);
+  assert.equal(result.records[0].payload.可用库存, "25");
+  assert.equal(result.records[1].payload.可用库存, "0");
+});
+
+test("collector rejects an inventory export without an official quantity column", async () => {
+  const file = new File([
+    "仓库名称,系统规格ID,规格商家编码\n",
+    "杭州仓,S-1,SKU-1\n"
+  ], "库存状态导出.csv");
+
+  await assert.rejects(
+    () => readKuaimaiExport(file, { resourceType: "inventory_snapshot" }),
+    error => (
+      error.code === "KUAIMAI_EXPORT_REQUIRED_COLUMNS_MISSING"
+      && String(error.message).includes("库存数量")
+    )
+  );
+});
+
+test("collector requires both warehouse and stable SKU identity for every inventory row", async () => {
+  const missingWarehouseColumn = new File([
+    "系统规格ID,规格商家编码,可用库存\n",
+    "S-1,SKU-1,25\n"
+  ], "库存状态导出.csv");
+  await assert.rejects(
+    () => readKuaimaiExport(missingWarehouseColumn, { resourceType: "inventory_snapshot" }),
+    error => (
+      error.code === "KUAIMAI_EXPORT_REQUIRED_COLUMNS_MISSING"
+      && String(error.message).includes("仓库与 SKU")
+    )
+  );
+
+  const missingWarehouseValue = new File([
+    "仓库名称,系统规格ID,规格商家编码,可用库存\n",
+    ",S-1,SKU-1,25\n"
+  ], "库存状态导出.csv");
+  await assert.rejects(
+    () => readKuaimaiExport(missingWarehouseValue, {
+      resourceType: "inventory_snapshot"
+    }),
+    error => (
+      error.code === "KUAIMAI_EXPORT_NO_VALID_RECORDS"
+      && error.details?.issues?.some(issue => issue.code === "SOURCE_KEY_INCOMPLETE")
+    )
+  );
+});
+
+test("inventory upload refuses a partial snapshot before advancing collection success", async () => {
+  const file = new File([
+    "仓库名称,系统规格ID,规格商家编码,可用库存\n",
+    "杭州仓,S-1,SKU-1,25\n"
+  ], "库存状态导出.csv");
+  const parsed = await readKuaimaiExport(file, { resourceType: "inventory_snapshot" });
+  parsed.batch.status = "partial";
+  let calls = 0;
+
+  await assert.rejects(
+    () => uploadErpCollection(parsed, {
+      baseUrl: "http://127.0.0.1:8132",
+      fetchImpl: async () => {
+        calls += 1;
+        return new Response("{}", { status: 201 });
+      }
+    }),
+    error => error.code === "ERP_COLLECTION_BATCH_PARTIAL"
+  );
+  assert.equal(calls, 0);
+});
+
 test("uploader chunks records and marks only the final request completed", async () => {
   const parsed = await readKuaimaiExport(fixture, { resourceType: "orders" });
   parsed.records = Array.from({ length: 501 }, (_, index) => ({ ...parsed.records[index % 2], sourceKey: `KM${index}` }));

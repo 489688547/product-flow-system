@@ -88,9 +88,22 @@ export async function readBatchRecords(db, batchId) {
   return records;
 }
 
-async function projectCompletedBatch(controlDb, businessDb, resourceType, batchId, actor, now, target) {
+async function projectCompletedBatch(
+  controlDb,
+  businessDb,
+  resourceType,
+  batchId,
+  actor,
+  now,
+  target,
+  collectedAt
+) {
   const records = await readBatchRecords(controlDb, batchId);
-  const projection = projectKuaimaiErpRecords(resourceType, records, { batchId, now });
+  const projection = projectKuaimaiErpRecords(resourceType, records, {
+    batchId,
+    now,
+    snapshotDate: collectedAt
+  });
   let catalog = { products: 0, skus: 0 };
   if (projection.catalog.items.length) {
     const result = await upsertProductCatalog(businessDb, projection.catalog, {
@@ -120,6 +133,7 @@ async function projectCompletedBatch(controlDb, businessDb, resourceType, batchI
     catalogSkus: catalog.skus || 0,
     goodsFlowEvents: projection.events.length,
     inventoryDaily: projection.inventoryDaily.length,
+    inventoryQuality: projection.inventoryQuality,
     salesRows: sales.rows,
     salesDates: sales.dates,
     exceptions: projection.exceptions.length,
@@ -266,7 +280,16 @@ export async function ingestErpCollection(controlDb, input, {
     ...input.issues.map(issue => issueStatement(controlDb, issue, input.batch.resourceType, batchId, now))
   ]);
   const projection = input.batch.status === "completed"
-    ? await projectCompletedBatch(controlDb, businessDb, input.batch.resourceType, batchId, actor, now, target)
+    ? await projectCompletedBatch(
+      controlDb,
+      businessDb,
+      input.batch.resourceType,
+      batchId,
+      actor,
+      now,
+      target,
+      input.batch.collectedAt
+    )
     : null;
   return {
     batchId,

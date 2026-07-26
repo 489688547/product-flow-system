@@ -125,6 +125,25 @@ test("Kuaimai daily plan includes all three current product snapshots", () => {
   );
 });
 
+test("Kuaimai daily plan includes the current inventory snapshot after 05:00", () => {
+  const before = createDailyPlan({
+    adapters: WEB_COLLECTION_ADAPTERS,
+    now: "2026-07-26T04:59:59+08:00"
+  });
+  const after = createDailyPlan({
+    adapters: WEB_COLLECTION_ADAPTERS,
+    now: "2026-07-26T05:00:00+08:00"
+  });
+
+  assert.equal(before.some(job => job.resourceType === "inventory"), false);
+  assert.deepEqual(
+    after
+      .filter(job => job.resourceType === "inventory")
+      .map(job => [job.businessDate, job.rangeKind, job.scheduleVersion]),
+    [["2026-07-26", "current_snapshot", "v1"]]
+  );
+});
+
 test("state transitions reject skipped stages and terminal recovery", () => {
   assert.equal(WEB_COLLECTION_STATES.includes("waiting_human"), true);
   assert.equal(assertWebCollectionTransition("queued", "claimed"), true);

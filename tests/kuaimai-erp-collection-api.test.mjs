@@ -67,6 +67,46 @@ test("ERP collection ingest creates a batch and writes source records", async ()
   assert.deepEqual(JSON.parse([...db.tables.erp_source_records.values()][0].payload), { sourceOrderId: "order-1001" });
 });
 
+test("completed inventory uses the Shanghai collection day and returns projection quality", async () => {
+  const db = createErpCollectionD1Mock();
+  const inventory = {
+    batch: {
+      platformId: "kuaimai",
+      resourceType: "inventory_snapshot",
+      sourceFileName: "库存状态导出.xlsx",
+      contentHash: "c".repeat(64),
+      rowCount: 1,
+      status: "completed",
+      collectedAt: "2026-07-25T21:12:00.000Z"
+    },
+    records: [{
+      sourceKey: "杭州仓::S-1",
+      modifiedAt: "2026-06-01T09:00:00+08:00",
+      warehouseId: "杭州仓",
+      contentHash: "d".repeat(64),
+      payload: {
+        sourceSkuId: "S-1",
+        quantity: "8",
+        warehouseName: "杭州仓"
+      }
+    }],
+    issues: []
+  };
+
+  const result = await call({
+    session: sessions.data,
+    db,
+    payload: inventory,
+    headers: { "idempotency-key": "inventory-2026-07-26" }
+  });
+
+  assert.equal(result.response.status, 201);
+  assert.equal(result.body.data.projection.inventoryDaily, 1);
+  assert.equal(result.body.data.projection.inventoryQuality.snapshotDate, "2026-07-26");
+  assert.equal(result.body.data.projection.inventoryQuality.complete, true);
+  assert.equal(result.body.data.projection.inventoryQuality.sourceUpdatedAt, "2026-06-01T09:00:00+08:00");
+});
+
 test("ERP collection keeps raw control records in production and persists the selected display target", async () => {
   const controlDb = createErpCollectionD1Mock();
   const displayDb = createErpCollectionD1Mock();
