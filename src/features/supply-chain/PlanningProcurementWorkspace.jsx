@@ -2,10 +2,12 @@ import { ClipboardCheck, TriangleAlert } from "lucide-react";
 import { useState } from "react";
 import { ApprovalWorkspace } from "./ApprovalWorkspace.jsx";
 import { PlanningWorkspace } from "./PlanningWorkspace.jsx";
+import { ProcurementOperationsWorkspace } from "./ProcurementOperationsWorkspace.jsx";
 
 const TABS = Object.freeze([
   { key: "planning", label: "库存风险与建议" },
-  { key: "approvals", label: "采购与付款" }
+  { key: "approvals", label: "采购与付款" },
+  { key: "operations", label: "责任与生产" }
 ]);
 
 export function PlanningProcurementWorkspace({
@@ -14,6 +16,7 @@ export function PlanningProcurementWorkspace({
   salesRows = [],
   risks = [],
   supplyLinks = [],
+  purchases = [],
   workflowAvailable = false,
   canSyncApprovals = false,
   canEditApprovalMapping = false
@@ -47,7 +50,7 @@ export function PlanningProcurementWorkspace({
             workflowAvailable={workflowAvailable}
           />
         </div>
-      ) : (
+      ) : activeTab === "approvals" ? (
         <div id="supply-approvals-panel" role="tabpanel">
           {!workflowAvailable ? (
             <div className="supply-coverage-notice is-partial" role="status">
@@ -70,6 +73,15 @@ export function PlanningProcurementWorkspace({
             canSync={canSyncApprovals}
             canEditMapping={canEditApprovalMapping}
             products={products}
+          />
+        </div>
+      ) : (
+        <div id="supply-operations-panel" role="tabpanel">
+          <ProcurementOperationsWorkspace
+            products={products}
+            purchases={purchases}
+            supplyLinks={supplyLinks}
+            workflowAvailable={workflowAvailable}
           />
         </div>
       )}

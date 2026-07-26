@@ -196,6 +196,28 @@ test("planning workspace explains procurement suggestions and keeps planned work
   assert.doesNotMatch(planning, /metric-card|kpi-card/);
 });
 
+test("planning and procurement exposes responsibility production reminders and rolling replenishment", () => {
+  const composition = read("src/features/supply-chain/PlanningProcurementWorkspace.jsx");
+  const operations = read("src/features/supply-chain/ProcurementOperationsWorkspace.jsx");
+  for (const label of ["库存风险与建议", "采购与付款", "责任与生产"]) assert.match(composition, new RegExp(label));
+  for (const label of [
+    "采购责任",
+    "无人负责",
+    "责任冲突",
+    "生产与原料计划",
+    "兰山厂",
+    "山西厂",
+    "交期提醒",
+    "到货前 3 天",
+    "到货前 1 天",
+    "滚动补货",
+    "连续 5 天销量平稳",
+    "收货结案"
+  ]) assert.match(operations, new RegExp(label));
+  assert.match(operations, /disabled=\{!workflowAvailable\}/);
+  assert.doesNotMatch(operations, /Math\.random|模拟数据|示例订单/);
+});
+
 test("supplier workspace covers capability sourcing evaluation concentration and cost evidence", () => {
   const supplier = read("src/features/supply-chain/SupplierWorkspace.jsx");
   for (const label of ["档案与能力", "评价与风险", "报价与成本", "能力或供货范围", "单一来源风险", "客观指标", "采购评价", "质量评价", "产品评价", "历史采购价格"]) {

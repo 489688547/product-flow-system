@@ -305,6 +305,219 @@ export function calculateBundleRequirements({ plans = [], bom = [] } = {}) {
   }));
 }
 
+const RESPONSIBILITY_DIMENSIONS = Object.freeze([
+  "inventoryUnitId",
+  "productId",
+  "supplierId",
+  "materialType",
+  "category"
+]);
+
+function ruleMatchesItem(rule, item) {
+  const dimensions = RESPONSIBILITY_DIMENSIONS.filter(key => rule?.[key] !== null && rule?.[key] !== undefined && String(rule[key]).trim());
+  return dimensions.length > 0 && dimensions.every(key => String(rule[key]) === String(item?.[key] ?? ""));
+}
+
+export function resolveProcurementResponsibility({ item = {}, rules = [], availablePurchasers = [] } = {}) {
+  const matched = rules
+    .filter(rule => rule?.id && ruleMatchesItem(rule, item))
+    .map(rule => {
+      const matchedDimensions = RESPONSIBILITY_DIMENSIONS.filter(
+        key => rule?.[key] !== null && rule?.[key] !== undefined && String(rule[key]).trim()
+      );
+      return {
+        rule,
+        matchedDimensions,
+        specificityRank: Math.max(...matchedDimensions.map(key => RESPONSIBILITY_DIMENSIONS.length - RESPONSIBILITY_DIMENSIONS.indexOf(key)))
+      };
+    });
+  const highestRank = matched.length ? Math.max(...matched.map(row => row.specificityRank)) : null;
+  const candidates = highestRank === null ? [] : matched.filter(row => row.specificityRank === highestRank);
+  const ownerIds = [...new Set(candidates.map(row => String(row.rule.ownerId || "")).filter(Boolean))];
+  if (ownerIds.length > 1) {
+    return {
+      status: "conflict",
+      ownerId: "",
+      ownerName: "",
+      ruleIds: candidates.map(row => String(row.rule.id)),
+      specificity: candidates[0]?.matchedDimensions[0] || null
+    };
+  }
+  if (ownerIds.length === 1) {
+    const selected = candidates.find(row => String(row.rule.ownerId || "") === ownerIds[0]);
+    return {
+      status: "assigned",
+      ownerId: ownerIds[0],
+      ownerName: String(selected.rule.ownerName || ""),
+      ruleId: String(selected.rule.id),
+      specificity: selected.matchedDimensions[0]
+    };
+  }
+  if (availablePurchasers.length === 1 && availablePurchasers[0]?.id) {
+    return {
+      status: "assigned",
+      ownerId: String(availablePurchasers[0].id),
+      ownerName: String(availablePurchasers[0].name || ""),
+      ruleId: "single-purchaser-default",
+      specificity: "default"
+    };
+  }
+  return {
+    status: "unassigned",
+    ownerId: "",
+    ownerName: "",
+    ruleId: null,
+    specificity: null
+  };
+}
+
+export function buildProductionMaterialPlan({ plans = [], bom = [] } = {}) {
+  const planByProduct = new Map();
+  for (const plan of plans) {
+    if (!plan?.productId) continue;
+    const key = String(plan.productId);
+    const current = planByProduct.get(key) || { quantity: 0, factoryIds: new Set() };
+    current.quantity += Math.max(0, finiteNumber(plan.quantity));
+    if (plan.factoryId) current.factoryIds.add(String(plan.factoryId));
+    planByProduct.set(key, current);
+  }
+  const materialById = new Map();
+  for (const component of bom) {
+    if (!component?.productId || !component?.inventoryUnitId) continue;
+    const productPlan = planByProduct.get(String(component.productId));
+    if (!productPlan?.quantity) continue;
+    const inventoryUnitId = String(component.inventoryUnitId);
+    const requiredQuantity = productPlan.quantity * Math.max(0, finiteNumber(component.ratio));
+    const current = materialById.get(inventoryUnitId) || {
+      inventoryUnitId,
+      title: String(component.title || component.name || inventoryUnitId),
+      requiredQuantity: 0,
+      productIds: new Set(),
+      factoryIds: new Set(),
+      inventoryManaged: false,
+      providerOwned: false
+    };
+    current.requiredQuantity += requiredQuantity;
+    current.productIds.add(String(component.productId));
+    productPlan.factoryIds.forEach(factoryId => current.factoryIds.add(factoryId));
+    if (component.providedByUs === false) current.providerOwned = true;
+    else current.inventoryManaged = true;
+    materialById.set(inventoryUnitId, current);
+  }
+  const materials = [...materialById.values()].map(row => ({
+    ...row,
+    requiredQuantity: Math.round(row.requiredQuantity * 10000) / 10000,
+    productIds: [...row.productIds],
+    factoryIds: [...row.factoryIds],
+    shared: row.productIds.size > 1
+  }));
+  return {
+    plans: [...planByProduct.entries()].map(([productId, row]) => ({
+      productId,
+      quantity: row.quantity,
+      factoryIds: [...row.factoryIds]
+    })),
+    materials,
+    quality: {
+      status: plans.length && materials.length ? "complete" : "missing",
+      missing: [
+        ...(!plans.length ? ["生产计划"] : []),
+        ...(!materials.length ? ["原料BOM"] : [])
+      ]
+    }
+  };
+}
+
+function shanghaiDate(value) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(parsed);
+}
+
+function subtractCalendarDays(value, days) {
+  const parsed = new Date(value);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  parsed.setUTCDate(parsed.getUTCDate() - days);
+  return shanghaiDate(parsed);
+}
+
+export function buildPurchaseReminderPlan({
+  expectedArrivalAt,
+  logisticsDays,
+  customDaysBefore = []
+} = {}) {
+  if (!shanghaiDate(expectedArrivalAt)) {
+    return {
+      expectedArrivalAt: null,
+      shipmentDueAt: null,
+      reminders: [],
+      quality: { status: "missing", missing: ["预计到货时间"] }
+    };
+  }
+  const reminderDays = [...new Set([
+    3,
+    1,
+    ...customDaysBefore.map(value => Math.ceil(finiteNumber(value))).filter(value => value > 0)
+  ])].sort((left, right) => right - left);
+  const safeLogisticsDays = positiveNumber(logisticsDays);
+  return {
+    expectedArrivalAt: shanghaiDate(expectedArrivalAt),
+    shipmentDueAt: safeLogisticsDays ? subtractCalendarDays(expectedArrivalAt, safeLogisticsDays) : null,
+    reminders: reminderDays.map(daysBefore => ({
+      daysBefore,
+      dueAt: subtractCalendarDays(expectedArrivalAt, daysBefore),
+      label: `到货前 ${daysBefore} 天`
+    })),
+    quality: {
+      status: safeLogisticsDays ? "complete" : "partial",
+      missing: safeLogisticsDays ? [] : ["物流时间"]
+    }
+  };
+}
+
+export function evaluateRollingReplenishmentRecovery({
+  dailySales = [],
+  currentInventory,
+  safetyInventory,
+  stableDays = 5,
+  toleranceRate = 0.2
+} = {}) {
+  const requiredDays = Math.max(1, Math.ceil(finiteNumber(stableDays, 5)));
+  const recentSales = dailySales.slice(-requiredDays).map(Number).filter(Number.isFinite);
+  const inventoryKnown = currentInventory !== null && currentInventory !== undefined && Number.isFinite(Number(currentInventory));
+  const safetyKnown = safetyInventory !== null && safetyInventory !== undefined && Number.isFinite(Number(safetyInventory));
+  const enoughDays = recentSales.length === requiredDays;
+  const average = enoughDays ? recentSales.reduce((sum, value) => sum + value, 0) / requiredDays : null;
+  const stable = average !== null && (average === 0
+    ? recentSales.every(value => value === 0)
+    : recentSales.every(value => Math.abs(value - average) / average <= Math.max(0, finiteNumber(toleranceRate, 0.2))));
+  const inventorySafe = inventoryKnown && safetyKnown && Number(currentInventory) >= Number(safetyInventory);
+  const inventoryCoverage = inventoryKnown && safetyKnown;
+  return {
+    status: enoughDays && inventoryCoverage && stable && inventorySafe
+      ? "recovered"
+      : inventoryCoverage
+        ? "tracking"
+        : "partial",
+    stable,
+    inventorySafe,
+    observedDays: recentSales.length,
+    requiredDays,
+    averageDailySales: average === null ? null : Math.round(average * 10) / 10,
+    missing: [
+      ...(!enoughDays ? [`连续 ${requiredDays} 天销量`] : []),
+      ...(!inventoryKnown ? ["当前库存"] : []),
+      ...(!safetyKnown ? ["安全库存"] : [])
+    ]
+  };
+}
+
 export function classifyStockRisk({
   daysOfSupply,
   longestLeadTimeDays,

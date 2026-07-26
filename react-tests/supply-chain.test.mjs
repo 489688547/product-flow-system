@@ -13,6 +13,8 @@ import {
   GOODS_FLOW_STAGES,
   SUPPLY_CHAIN_WORKSPACES,
   buildGoodsFlowProgress,
+  buildProductionMaterialPlan,
+  buildPurchaseReminderPlan,
   buildRoleWorkbench,
   calculateBomCost,
   calculateBundleRequirements,
@@ -21,8 +23,10 @@ import {
   classifyStocktakeVariance,
   classifyStockRisk,
   evaluateSupplierPerformance,
+  evaluateRollingReplenishmentRecovery,
   reconcileFreightCharge,
-  normalizeSupplyChainSection
+  normalizeSupplyChainSection,
+  resolveProcurementResponsibility
 } from "../src/domain/supplyChainWorkflow.js";
 
 test("supply chain workspaces follow the task-first product structure", () => {
@@ -273,6 +277,77 @@ test("freight reconciliation identifies material overcharges and retains line ev
   assert.equal(result.differenceAmount, 15);
   assert.equal(result.differenceRate, 0.1875);
   assert.deepEqual(result.evidenceIds, ["bill-line-1", "erp-shipment-1"]);
+});
+
+test("procurement responsibility prefers the most specific rule and exposes conflicts and gaps", () => {
+  const rules = [
+    { id: "category", category: "主粮", ownerId: "u-category", ownerName: "分类采购" },
+    { id: "supplier", supplierId: "s1", ownerId: "u-supplier", ownerName: "供应商采购" },
+    { id: "sku", inventoryUnitId: "sku-1", ownerId: "u-sku", ownerName: "SKU采购" }
+  ];
+  assert.deepEqual(
+    resolveProcurementResponsibility({ item: { category: "主粮", supplierId: "s1", inventoryUnitId: "sku-1" }, rules }),
+    { status: "assigned", ownerId: "u-sku", ownerName: "SKU采购", ruleId: "sku", specificity: "inventoryUnitId" }
+  );
+  assert.equal(resolveProcurementResponsibility({
+    item: { supplierId: "s1" },
+    rules: [
+      { id: "a", supplierId: "s1", ownerId: "u1" },
+      { id: "b", supplierId: "s1", ownerId: "u2" }
+    ]
+  }).status, "conflict");
+  assert.equal(resolveProcurementResponsibility({ item: {}, rules: [] }).status, "unassigned");
+  assert.equal(resolveProcurementResponsibility({
+    item: {},
+    rules: [],
+    availablePurchasers: [{ id: "only", name: "唯一采购" }]
+  }).ownerId, "only");
+});
+
+test("production material plan aggregates shared BOM and keeps provider-owned materials outside our inventory", () => {
+  const result = buildProductionMaterialPlan({
+    plans: [
+      { productId: "p1", factoryId: "lanshan", quantity: 100 },
+      { productId: "p2", factoryId: "shanxi", quantity: 50 }
+    ],
+    bom: [
+      { productId: "p1", inventoryUnitId: "bag", ratio: 1, providedByUs: true },
+      { productId: "p2", inventoryUnitId: "bag", ratio: 2, providedByUs: true },
+      { productId: "p1", inventoryUnitId: "spice", ratio: 0.1, providedByUs: false }
+    ]
+  });
+  assert.equal(result.materials.find(row => row.inventoryUnitId === "bag").requiredQuantity, 200);
+  assert.deepEqual(result.materials.find(row => row.inventoryUnitId === "bag").factoryIds.sort(), ["lanshan", "shanxi"]);
+  assert.equal(result.materials.find(row => row.inventoryUnitId === "spice").inventoryManaged, false);
+});
+
+test("purchase reminders include universal and product-specific nodes without inventing a due date", () => {
+  assert.equal(buildPurchaseReminderPlan({ expectedArrivalAt: null }).quality.status, "missing");
+  const result = buildPurchaseReminderPlan({
+    expectedArrivalAt: "2026-08-10T00:00:00+08:00",
+    logisticsDays: 2,
+    customDaysBefore: [7, 3]
+  });
+  assert.deepEqual(result.reminders.map(row => row.daysBefore), [7, 3, 1]);
+  assert.equal(result.shipmentDueAt.startsWith("2026-08-08"), true);
+});
+
+test("rolling replenishment closes only after five stable sales days and safe inventory", () => {
+  assert.equal(evaluateRollingReplenishmentRecovery({
+    dailySales: [100, 98, 102, 101, 99],
+    currentInventory: 1000,
+    safetyInventory: 800
+  }).status, "recovered");
+  assert.equal(evaluateRollingReplenishmentRecovery({
+    dailySales: [100, 98, 102, 101],
+    currentInventory: 1000,
+    safetyInventory: 800
+  }).status, "tracking");
+  assert.equal(evaluateRollingReplenishmentRecovery({
+    dailySales: [100, 50, 160, 90, 130],
+    currentInventory: 1000,
+    safetyInventory: 800
+  }).status, "tracking");
 });
 
 test("catalog supplier links resolve to the lifecycle product when available", () => {

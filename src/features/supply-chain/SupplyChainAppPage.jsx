@@ -328,6 +328,7 @@ export function SupplyChainAppPage({ section = "workbench" }) {
         salesRows={salesRows}
         risks={state.inventoryRisks}
         supplyLinks={state.productSupplierLinks}
+        purchases={state.purchaseApprovals}
         workflowAvailable={false}
         canSyncApprovals={financeRole || supplyEditor}
         canEditApprovalMapping={supplyEditor}

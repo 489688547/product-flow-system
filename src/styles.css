@@ -1813,6 +1813,27 @@ main { min-width: 0; overflow-x: hidden; }
 .supply-workspace-tabs button:hover, .supply-workspace-tabs button:focus-visible, .supply-workspace-tabs button.is-active { color: var(--text-primary); }
 .supply-workspace-tabs button.is-active::after { background: var(--accent); }
 .supply-workspace-tabs button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.procurement-operations { min-width: 0; display: grid; gap: var(--space-4); }
+.procurement-operations .section-head h2 { display: flex; align-items: center; gap: 7px; }
+.procurement-operations .section-head h2 svg { color: var(--text-tertiary); }
+.procurement-operation-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; margin-bottom: var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.procurement-operation-summary span { min-width: 0; padding: 10px var(--space-3); display: flex; align-items: baseline; justify-content: space-between; gap: 8px; border-left: 1px solid var(--border); color: var(--text-secondary); font-size: 11px; }
+.procurement-operation-summary span:first-child { border-left: 0; }
+.procurement-operation-summary strong { color: var(--text-primary); font-size: 18px; font-variant-numeric: tabular-nums; }
+.procurement-factory-lanes { margin-bottom: var(--space-3); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.procurement-factory-lanes article { min-width: 0; padding: var(--space-3); display: grid; gap: 4px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface-subtle); }
+.procurement-factory-lanes strong { color: var(--text-primary); font-size: 12px; }
+.procurement-factory-lanes span, .table-footnote { color: var(--text-tertiary); font-size: 10px; }
+.table-footnote { margin: 10px 0 0; }
+.procurement-recovery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.procurement-recovery-grid > article { min-width: 0; padding: var(--space-4); display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: 7px 10px; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
+.procurement-recovery-grid > article > svg { grid-row: 1 / span 3; color: var(--text-tertiary); }
+.procurement-recovery-grid > article > div, .procurement-recovery-grid > article > strong, .procurement-recovery-grid > article > small, .procurement-recovery-grid > article > .btn { grid-column: 2; }
+.procurement-recovery-grid h2 { margin: 0; font-size: 14px; }
+.procurement-recovery-grid p { margin: 4px 0 0; color: var(--text-secondary); font-size: 11px; line-height: 1.55; }
+.procurement-recovery-grid > article > strong { margin-top: 5px; font-size: 12px; }
+.procurement-recovery-grid > article > small { color: var(--text-tertiary); font-size: 10px; }
+.procurement-recovery-grid .btn { width: fit-content; margin-top: 5px; }
 .supply-filter-toolbar { justify-content: flex-start; gap: var(--space-3); margin-bottom: var(--space-4); }
 .supply-filter-toolbar > label:not(.supply-search-field) select { min-width: 150px; }
 .supply-search-field { display: flex; align-items: center; gap: 8px; min-width: min(360px, 100%); padding: 0 12px; border: 1px solid var(--border-color); border-radius: var(--radius-md); background: var(--surface); }
@@ -1832,6 +1853,10 @@ main { min-width: 0; overflow-x: hidden; }
   .supply-filter-toolbar > label:not(.supply-search-field) select,
   .supply-filter-toolbar .btn { width: 100%; }
   .supply-rule-list { grid-template-columns: 1fr; }
+  .procurement-operation-summary, .procurement-factory-lanes, .procurement-recovery-grid { grid-template-columns: 1fr; }
+  .procurement-operation-summary span { border-left: 0; border-top: 1px solid var(--border); }
+  .procurement-operation-summary span:first-child { border-top: 0; }
+  .procurement-recovery-grid .btn { width: 100%; justify-content: center; }
 }
 .supply-planning-alerts { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
 .supply-planning-alerts > div { min-width: 0; padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border-left: 1px solid var(--border); }
