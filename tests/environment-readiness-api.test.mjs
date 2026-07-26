@@ -58,6 +58,7 @@ const USER_INSIGHT_TABLES = [
 const GOODS_FLOW_TABLES = [
   "goods_flow_events",
   "goods_flow_inventory_daily",
+  "goods_flow_inventory_daily_stage",
   "goods_flow_stocktakes",
   "goods_flow_stocktake_lines",
   "goods_flow_receivable_terms",

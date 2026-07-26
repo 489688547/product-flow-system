@@ -1,5 +1,7 @@
 import { requestBusinessDatabase } from "../../../_shared/dataEnvironment.js";
 
+const INVENTORY_WRITE_BATCH_SIZE = 50;
+
 function text(value) {
   return String(value ?? "").trim();
 }
@@ -108,7 +110,113 @@ export async function saveInventoryDaily(db, rows = [], now = new Date().toISOSt
     row.stocktakeId || null, row.stocktakeStatus || "unverified", row.sourceUpdatedAt || null,
     row.confidence || "insufficient", row.createdAt || now, now
   ));
-  return statements.length ? db.batch(statements) : [];
+  const results = [];
+  for (let index = 0; index < statements.length; index += INVENTORY_WRITE_BATCH_SIZE) {
+    results.push(...await db.batch(statements.slice(index, index + INVENTORY_WRITE_BATCH_SIZE)));
+  }
+  return results;
+}
+
+function inventoryValues(row, now) {
+  return [
+    row.id,
+    row.date || row.snapshotDate,
+    row.productId || null,
+    row.skuId,
+    row.skuCode || null,
+    row.warehouseId,
+    numberOrNull(row.erpQuantity) ?? 0,
+    numberOrNull(row.countedQuantity),
+    numberOrNull(row.calibratedQuantity) ?? 0,
+    numberOrNull(row.unitCost) ?? 0,
+    numberOrNull(row.calibratedInventoryValue) ?? 0,
+    numberOrNull(row.sellableQuantity),
+    numberOrNull(row.daysOfSupply),
+    row.ageBucket || null,
+    numberOrNull(row.inventoryCashTied),
+    row.stocktakeId || null,
+    row.stocktakeStatus || "unverified",
+    row.sourceUpdatedAt || null,
+    row.confidence || "insufficient",
+    row.createdAt || now,
+    now
+  ];
+}
+
+function stageInventoryStatement(db, projectionId, row, now) {
+  return db.prepare(`INSERT INTO goods_flow_inventory_daily_stage
+    (projection_id, id, snapshot_date, product_id, sku_id, sku_code, warehouse_id, erp_quantity,
+      counted_quantity, calibrated_quantity, unit_cost, calibrated_inventory_value,
+      sellable_quantity, days_of_supply, age_bucket, inventory_cash_tied, stocktake_id,
+      stocktake_status, source_updated_at, confidence, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(projection_id, snapshot_date, sku_id, warehouse_id) DO UPDATE SET
+      id = excluded.id, product_id = excluded.product_id, sku_code = excluded.sku_code,
+      erp_quantity = excluded.erp_quantity, counted_quantity = excluded.counted_quantity,
+      calibrated_quantity = excluded.calibrated_quantity, unit_cost = excluded.unit_cost,
+      calibrated_inventory_value = excluded.calibrated_inventory_value,
+      sellable_quantity = excluded.sellable_quantity, days_of_supply = excluded.days_of_supply,
+      age_bucket = excluded.age_bucket, inventory_cash_tied = excluded.inventory_cash_tied,
+      stocktake_id = excluded.stocktake_id, stocktake_status = excluded.stocktake_status,
+      source_updated_at = excluded.source_updated_at, confidence = excluded.confidence,
+      created_at = excluded.created_at, updated_at = excluded.updated_at`)
+    .bind(projectionId, ...inventoryValues(row, now));
+}
+
+export async function replaceInventoryDailySnapshot(db, rows = [], {
+  projectionId,
+  now = new Date().toISOString()
+} = {}) {
+  const normalizedRows = rows.filter(Boolean);
+  const safeProjectionId = text(projectionId);
+  const snapshotDates = [...new Set(normalizedRows.map(row => text(row.date || row.snapshotDate)))];
+  const uniqueKeys = new Set(normalizedRows.map(row => (
+    `${text(row.date || row.snapshotDate)}:${text(row.skuId)}:${text(row.warehouseId)}`
+  )));
+  if (
+    !/^[A-Za-z0-9:_-]{1,200}$/.test(safeProjectionId)
+    || !normalizedRows.length
+    || snapshotDates.length !== 1
+    || !/^\d{4}-\d{2}-\d{2}$/.test(snapshotDates[0])
+    || uniqueKeys.size !== normalizedRows.length
+    || normalizedRows.some(row => !text(row.id) || !text(row.skuId) || !text(row.warehouseId))
+  ) {
+    throw storageError(
+      "GOODS_FLOW_INVENTORY_SNAPSHOT_INVALID",
+      "完整库存快照必须包含单一日期和唯一的 SKU×仓库记录。"
+    );
+  }
+
+  const stageStatements = normalizedRows.map(row => (
+    stageInventoryStatement(db, safeProjectionId, row, now)
+  ));
+  for (let index = 0; index < stageStatements.length; index += INVENTORY_WRITE_BATCH_SIZE) {
+    await db.batch(stageStatements.slice(index, index + INVENTORY_WRITE_BATCH_SIZE));
+  }
+
+  const snapshotDate = snapshotDates[0];
+  await db.batch([
+    db.prepare("DELETE FROM goods_flow_inventory_daily WHERE snapshot_date = ?").bind(snapshotDate),
+    db.prepare(`INSERT INTO goods_flow_inventory_daily
+      (id, snapshot_date, product_id, sku_id, sku_code, warehouse_id, erp_quantity, counted_quantity,
+        calibrated_quantity, unit_cost, calibrated_inventory_value, sellable_quantity, days_of_supply,
+        age_bucket, inventory_cash_tied, stocktake_id, stocktake_status, source_updated_at, confidence,
+        created_at, updated_at)
+      SELECT id, snapshot_date, product_id, sku_id, sku_code, warehouse_id, erp_quantity,
+        counted_quantity, calibrated_quantity, unit_cost, calibrated_inventory_value,
+        sellable_quantity, days_of_supply, age_bucket, inventory_cash_tied, stocktake_id,
+        stocktake_status, source_updated_at, confidence, created_at, updated_at
+      FROM goods_flow_inventory_daily_stage
+      WHERE projection_id = ?`).bind(safeProjectionId),
+    db.prepare("DELETE FROM goods_flow_inventory_daily_stage WHERE projection_id = ?")
+      .bind(safeProjectionId)
+  ]);
+
+  return {
+    projectionId: safeProjectionId,
+    snapshotDate,
+    rows: normalizedRows.length
+  };
 }
 
 export async function listInventoryDaily(db, { through } = {}) {

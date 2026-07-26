@@ -113,14 +113,37 @@ function stablePart(value) {
   return text(value, 200).replace(/[^a-zA-Z0-9_-]+/g, "-") || "unknown";
 }
 
+function encodedStablePart(value) {
+  return encodeURIComponent(text(value, 200)).replaceAll("%", "") || "unknown";
+}
+
 function skuId(record) {
-  const code = text(record.payload?.skuCode || record.payload?.barcode || record.sourceKey);
+  const code = text(firstValue(record.payload, [
+    "skuCode", "规格商家编码", "商家编码", "规格编码", "SKU编码",
+    "sourceSkuId", "系统规格ID", "规格ID", "SKU ID",
+    "barcode", "69码", "规格条形码", "商品条形码", "条码", "条形码"
+  ]) || record.sourceKey);
   return `kuaimai:sku:${stablePart(code)}`;
 }
 
 function productId(record) {
-  const code = text(record.payload?.productCode || record.sourceKey);
-  return `kuaimai:product:${stablePart(code)}`;
+  const code = text(firstValue(record.payload, [
+    "productCode", "主商家编码", "商品编码", "sourceProductId", "系统商品ID", "商品ID"
+  ]));
+  return code ? `kuaimai:product:${stablePart(code)}` : null;
+}
+
+function shanghaiDate(value) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.valueOf())) return "";
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const part = type => parts.find(item => item.type === type)?.value || "";
+  return `${part("year")}-${part("month")}-${part("day")}`;
 }
 
 function catalogProjection(resourceType, records, now) {
@@ -227,28 +250,82 @@ function catalogProjection(resourceType, records, now) {
   return { source: "kuaimai-file", syncedAt: now, items: [] };
 }
 
-function inventoryProjection(resourceType, records, now) {
+function inventoryProjection(resourceType, records, now, snapshotDate) {
   if (resourceType !== "inventory_snapshot") return [];
+  const explicitDate = text(snapshotDate, 80);
+  const projectedDate = /^\d{4}-\d{2}-\d{2}$/.test(explicitDate)
+    ? explicitDate
+    : shanghaiDate(explicitDate || now);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(projectedDate)) {
+    throw new Error("快麦库存快照日期无效。");
+  }
   return records.map(record => {
-    const updatedAt = text(record.modifiedAt || now);
-    const quantity = numberOrNull(record.payload.quantity);
+    const sourceUpdatedAt = text(record.modifiedAt, 80) || null;
+    const quantity = numberOrNull(firstValue(record.payload, [
+      "quantity", "实际总库存", "库存数量", "实际库存", "库存", "可用库存", "实际可用数", "可售库存", "可销售库存"
+    ]));
+    const sellableQuantity = numberOrNull(firstValue(record.payload, [
+      "sellableQuantity", "实际可用数", "可用库存", "可售库存", "可销售库存"
+    ])) ?? quantity;
+    const unitCost = numberOrNull(firstValue(record.payload, [
+      "unitCost", "成本价", "库存成本价", "采购价"
+    ]));
     return {
-      id: `kuaimai-inventory-${stablePart(record.sourceKey)}-${updatedAt.slice(0, 10)}`,
-      date: updatedAt.slice(0, 10),
+      id: `kuaimai-inventory-${encodedStablePart(record.sourceKey)}-${projectedDate}`,
+      date: projectedDate,
       productId: productId(record),
       skuId: skuId(record),
-      skuCode: text(record.payload.skuCode || record.payload.barcode),
-      warehouseId: text(record.warehouseId || record.payload.warehouseName) || "未指定仓库",
-      erpQuantity: quantity ?? 0,
-      calibratedQuantity: quantity ?? 0,
-      unitCost: null,
-      sellableQuantity: quantity,
+      skuCode: text(firstValue(record.payload, [
+        "skuCode", "规格商家编码", "商家编码", "规格编码", "SKU编码",
+        "sourceSkuId", "系统规格ID", "规格ID", "SKU ID",
+        "barcode", "69码", "条码", "条形码"
+      ])),
+      warehouseId: text(record.warehouseId || firstValue(record.payload, [
+        "warehouseName", "仓库名称", "仓库", "仓库编号", "仓库ID"
+      ])) || "未指定仓库",
+      erpQuantity: quantity,
+      calibratedQuantity: quantity,
+      unitCost,
+      sellableQuantity,
       stocktakeStatus: "unverified",
-      sourceUpdatedAt: updatedAt,
+      sourceUpdatedAt,
       confidence: quantity === null ? "insufficient" : "partial",
       createdAt: now
     };
   });
+}
+
+function inventoryQuality(resourceType, records, inventoryDaily) {
+  if (resourceType !== "inventory_snapshot") return null;
+  const sourceRows = records.length;
+  const projectedRows = inventoryDaily.length;
+  const ratio = predicate => sourceRows
+    ? inventoryDaily.filter(predicate).length / sourceRows
+    : 0;
+  const quantityCoverage = ratio(row => row.erpQuantity !== null);
+  const skuCoverage = ratio(row => Boolean(row.skuId && row.skuCode));
+  const warehouseCoverage = ratio(row => Boolean(row.warehouseId && row.warehouseId !== "未指定仓库"));
+  const sourceUpdatedAt = inventoryDaily
+    .map(row => row.sourceUpdatedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1) || null;
+  const complete = sourceRows > 0
+    && projectedRows === sourceRows
+    && quantityCoverage === 1
+    && skuCoverage === 1
+    && warehouseCoverage === 1;
+  return {
+    sourceRows,
+    projectedRows,
+    snapshotDate: inventoryDaily[0]?.date || null,
+    quantityCoverage,
+    skuCoverage,
+    warehouseCoverage,
+    sourceUpdatedAt,
+    complete,
+    confidence: complete ? "partial" : "insufficient"
+  };
 }
 
 function eventType(resourceType) {
@@ -286,11 +363,17 @@ function eventProjection(resourceType, records, batchId, now) {
   }));
 }
 
-export function projectKuaimaiErpRecords(resourceType, records = [], { batchId = "", now = new Date().toISOString() } = {}) {
+export function projectKuaimaiErpRecords(
+  resourceType,
+  records = [],
+  { batchId = "", now = new Date().toISOString(), snapshotDate = "" } = {}
+) {
   const sales = salesProjection(resourceType, records, batchId, now);
+  const inventoryDaily = inventoryProjection(resourceType, records, now, snapshotDate);
   return {
     catalog: catalogProjection(resourceType, records, now),
-    inventoryDaily: inventoryProjection(resourceType, records, now),
+    inventoryDaily,
+    inventoryQuality: inventoryQuality(resourceType, records, inventoryDaily),
     events: eventProjection(resourceType, records, batchId, now),
     salesDaily: sales.rows,
     exceptions: sales.exceptions

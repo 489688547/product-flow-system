@@ -109,6 +109,7 @@ const BUSINESS_TABLES = [
     maskJsonFields: ["payload"]
   }),
   table("goods_flow_inventory_daily", "copy", ["id"], 63),
+  table("goods_flow_inventory_daily_stage", "skip", ["projection_id", "snapshot_date", "sku_id", "warehouse_id"], 630),
   table("goods_flow_stocktakes", "mask", ["id"], 64, {
     maskFields: {
       submitted_by: "identity",

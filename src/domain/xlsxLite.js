@@ -214,15 +214,33 @@ export function decodeCsvBuffer(buffer) {
   }
 }
 
+export function detectSpreadsheetFormat(buffer, fileName = "") {
+  const bytes = new Uint8Array(buffer);
+  if (
+    bytes.length >= 4
+    && bytes[0] === 0x50
+    && bytes[1] === 0x4b
+    && bytes[2] === 0x03
+    && bytes[3] === 0x04
+  ) {
+    return "xlsx";
+  }
+  const name = String(fileName || "").toLowerCase();
+  if (name.endsWith(".xls") && !name.endsWith(".xlsx")) return "xls";
+  if (name.endsWith(".xlsx")) return "xlsx";
+  return "csv";
+}
+
 export async function streamSpreadsheetRows(file, onRow) {
   const name = String(file.name || "").toLowerCase();
-  if (name.endsWith(".csv")) {
-    const buffer = await file.arrayBuffer();
+  const buffer = await file.arrayBuffer();
+  const format = detectSpreadsheetFormat(buffer, name);
+  if (format === "csv") {
     streamCsvRows(decodeCsvBuffer(buffer), onRow);
     return;
   }
-  if (name.endsWith(".xls") && !name.endsWith(".xlsx")) {
+  if (format === "xls") {
     throw new Error("暂不支持旧版 .xls 文件，请另存为 .xlsx 或 .csv 再导入。");
   }
-  await streamXlsxRows(await file.arrayBuffer(), onRow);
+  await streamXlsxRows(buffer, onRow);
 }

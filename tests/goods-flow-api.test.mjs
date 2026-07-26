@@ -13,6 +13,13 @@ import { onRequest as freezeCcc } from "../functions/api/platform/v1/goods-flow/
 import { upsertProductCatalog } from "../functions/api/platform/v1/product-catalog/_shared/storage.js";
 
 const sessions = {
+  executive: {
+    userId: "exec-1",
+    name: "总经理",
+    role: "executive",
+    department: "品牌部",
+    departments: ["品牌部", "运营部"]
+  },
   finance: { userId: "finance-1", name: "财务同事", department: "财务部" },
   supply: { userId: "supply-1", name: "供应链同事", department: "供应链部" },
   warehouse: { userId: "warehouse-1", name: "仓库同事", department: "仓库" },
@@ -35,6 +42,41 @@ test("goods-flow routes require session and configured D1", async () => {
   const missing = await call(dashboard, { session: sessions.finance });
   assert.equal(missing.response.status, 501);
   assert.equal(missing.body.error.code, "GOODS_FLOW_STORAGE_UNAVAILABLE");
+});
+
+test("explicit executive role reads all goods-flow data and amounts regardless of current department text", async () => {
+  const db = createGoodsFlowD1Mock({
+    goods_flow_inventory_daily: [{
+      id: "2026-07-26:sku-1:warehouse-1",
+      snapshot_date: "2026-07-26",
+      product_id: null,
+      sku_id: "sku-1",
+      sku_code: "690001",
+      warehouse_id: "warehouse-1",
+      erp_quantity: 8,
+      counted_quantity: null,
+      calibrated_quantity: 8,
+      unit_cost: 2.5,
+      calibrated_inventory_value: 20,
+      sellable_quantity: 8,
+      days_of_supply: null,
+      age_bucket: null,
+      inventory_cash_tied: null,
+      stocktake_id: null,
+      stocktake_status: "unverified",
+      source_updated_at: "2026-07-26T12:00:00.000Z",
+      confidence: "complete",
+      created_at: "2026-07-26T13:00:00.000Z",
+      updated_at: "2026-07-26T13:00:00.000Z"
+    }]
+  });
+
+  const result = await call(inventory, { session: sessions.executive, db });
+
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data[0].unitCost, 2.5);
+  assert.equal(result.body.data[0].calibratedInventoryValue, 20);
+  assert.equal(typeof result.body.meta.requestId, "string");
 });
 
 test("finance maintains effective platform terms while product stays read-only", async () => {

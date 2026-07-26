@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 const adapterUrl = new URL("../chrome-extension/company-data-collector/providers/kuaimai.js", import.meta.url);
+const registryUrl = new URL("../chrome-extension/company-data-collector/providers/registry.js", import.meta.url);
 
 test("Kuaimai adapter only allows registered ERP origins", async () => {
   const { classifyKuaimaiPage } = await import(adapterUrl);
@@ -198,6 +199,69 @@ test("Kuaimai product snapshot resources use the three official product exports"
   assert.deepEqual(kuaimaiResources.product_combinations.downloadFilePrefixes, ["快麦导出_组合装"]);
 });
 
+test("Kuaimai inventory snapshot uses the fixed inventory-status page and official export", async () => {
+  const {
+    buildKuaimaiActionPlan,
+    buildKuaimaiTaskUrl,
+    classifyKuaimaiInventoryPage,
+    KUAIMAI_INVENTORY_ROUTE,
+    KUAIMAI_INVENTORY_SELECTORS,
+    KUAIMAI_INVENTORY_EXPORT_OPTION,
+    matchesKuaimaiInventoryExportLabel,
+    kuaimaiResources
+  } = await import(adapterUrl);
+  const task = {
+    jobId: "job-inventory",
+    providerId: "kuaimai",
+    resourceType: "inventory",
+    businessDate: "2026-07-26"
+  };
+
+  assert.equal(KUAIMAI_INVENTORY_ROUTE, "/index.html#/stock/warehouse_status/");
+  assert.equal(
+    buildKuaimaiTaskUrl("https://erpb.superboss.cc/index.html#/trade/searchlist/", task),
+    "https://erpb.superboss.cc/index.html#/stock/warehouse_status/"
+  );
+  assert.deepEqual(buildKuaimaiActionPlan(task), [
+    { action: "query_inventory" },
+    { action: "export_inventory_snapshot" },
+    { action: "confirm_inventory_export" },
+    { action: "download_from_center", resourceType: "inventory" }
+  ]);
+  assert.equal(kuaimaiResources.inventory.rangeKind, "current_snapshot");
+  assert.equal(kuaimaiResources.inventory.scheduleVersion, "v1");
+  assert.equal(kuaimaiResources.inventory.route, KUAIMAI_INVENTORY_ROUTE);
+  assert.deepEqual(kuaimaiResources.inventory.downloadFilePrefixes, [
+    "快麦导出_库存状态(按sku)",
+    "快麦ERP库存状态导出",
+    "库存状态导出",
+    "库存导出"
+  ]);
+  assert.match(KUAIMAI_INVENTORY_SELECTORS.exportControl, /button/);
+  assert.equal(KUAIMAI_INVENTORY_SELECTORS.exportTrigger, ".el-dropdown");
+  assert.match(KUAIMAI_INVENTORY_SELECTORS.exportOption, /dropdown/);
+  assert.match(KUAIMAI_INVENTORY_SELECTORS.exportDialog, /ui-lhgdialog/);
+  assert.match(KUAIMAI_INVENTORY_SELECTORS.exportDialogButton, /input\[type='button'\]/);
+  assert.equal(KUAIMAI_INVENTORY_EXPORT_OPTION, "按库存导出");
+  assert.equal(matchesKuaimaiInventoryExportLabel("导出库存Excel"), true);
+  assert.equal(matchesKuaimaiInventoryExportLabel("快速导出库存Excel"), false);
+  const { registeredProvider } = await import(registryUrl);
+  assert.equal(registeredProvider("kuaimai").matchesInventoryExportLabel("导出库存Excel"), true);
+
+  assert.equal(classifyKuaimaiInventoryPage({
+    url: "https://erpb.superboss.cc/index.html#/stock/warehouse_status/",
+    markers: { queryButton: true, exportControl: true }
+  }).state, "ready");
+  assert.equal(classifyKuaimaiInventoryPage({
+    url: "https://erpb.superboss.cc/index.html#/stock/warehouse_status/",
+    markers: { loginPage: true }
+  }).errorCode, "KUAIMAI_LOGIN_REQUIRED");
+  assert.equal(classifyKuaimaiInventoryPage({
+    url: "https://erpb.superboss.cc/index.html#/stock/warehouse_status/",
+    markers: { queryButton: true }
+  }).errorCode, "KUAIMAI_INVENTORY_PAGE_SCHEMA_CHANGED");
+});
+
 test("Kuaimai download center selects only the current task resource and time window", async () => {
   const {
     KUAIMAI_DOWNLOAD_CENTER_ROUTE,
@@ -240,6 +304,11 @@ test("Kuaimai download center selects only the current task resource and time wi
       exportTime: "2026-07-23 15:07:43",
       content: "快麦导出_组合装明细导出表20260723150742_269021_EfGh34.xls",
       status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-23 15:07:44",
+      content: "快麦导出_库存状态(按sku)20260723150744_269021_Inv001.csv",
+      status: "导出完成"
     }
   ];
 
@@ -275,6 +344,10 @@ test("Kuaimai download center selects only the current task resource and time wi
   assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "product_combinations", startedAt, rows }), {
     state: "ready",
     rowIndex: 6
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "inventory", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 7
   });
 });
 
