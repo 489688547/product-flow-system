@@ -47,7 +47,11 @@ export function createErpCollectionD1Mock() {
             results: sourceKeys
               .map(sourceKey => tables.erp_source_records.get(`${resourceType}:${sourceKey}`))
               .filter(Boolean)
-              .map(row => ({ source_key: row.source_key, content_hash: row.content_hash }))
+              .map(row => ({
+                source_key: row.source_key,
+                content_hash: row.content_hash,
+                payload: row.payload
+              }))
           };
         }
         if (query.includes("from erp_source_records") && query.includes("source_batch_id = ?")) {

@@ -157,6 +157,58 @@ test("ERP collection ingest is idempotent and updates a changed source record", 
   assert.equal(db.tables.erp_source_records.size, 1);
 });
 
+test("ERP collection updates a normalized payload when the source file hash is unchanged", async () => {
+  const db = createErpCollectionD1Mock();
+  const inventory = {
+    batch: {
+      platformId: "kuaimai",
+      resourceType: "inventory_snapshot",
+      sourceFileName: "库存状态导出.xlsx",
+      contentHash: "e".repeat(64),
+      rowCount: 1,
+      status: "completed",
+      collectedAt: "2026-07-26T05:00:00.000Z"
+    },
+    records: [{
+      sourceKey: "杭州仓::SKU-1",
+      warehouseId: "杭州仓",
+      contentHash: "f".repeat(64),
+      payload: {
+        skuCode: "SKU-1",
+        warehouseName: "杭州仓",
+        purchasePrice: "6.50"
+      }
+    }],
+    issues: []
+  };
+  await call({
+    session: sessions.executive,
+    db,
+    payload: inventory,
+    headers: { "idempotency-key": "inventory-old-index" }
+  });
+
+  const repaired = structuredClone(inventory);
+  repaired.records[0].payload.quantity = "18";
+  repaired.records[0].payload.sellableQuantity = "16";
+  const result = await call({
+    session: sessions.executive,
+    db,
+    payload: repaired,
+    headers: { "idempotency-key": "inventory-repaired-index" }
+  });
+
+  assert.equal(result.body.data.counts.updated, 1);
+  assert.equal(result.body.data.counts.unchanged, 0);
+  assert.deepEqual(JSON.parse([...db.tables.erp_source_records.values()][0].payload), {
+    purchasePrice: "6.50",
+    quantity: "18",
+    sellableQuantity: "16",
+    skuCode: "SKU-1",
+    warehouseName: "杭州仓"
+  });
+});
+
 test("ERP collection ingest returns stable validation and method errors", async () => {
   const db = createErpCollectionD1Mock();
   const invalid = await call({ session: sessions.data, db, payload: { ...body, records: [] }, headers: { "idempotency-key": "bad" } });

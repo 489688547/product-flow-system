@@ -39,7 +39,10 @@ While projection is running, the control batch/archive remain `pending/processin
 `completed/processed` only after the business projection succeeds. The server requires one snapshot date and unique
 `SKU × warehouse` rows, writes staging rows in D1 batches of at most 50 statements, and atomically replaces the target
 date only after all staging rows are present. A failed staging chunk leaves the last trusted live snapshot unchanged
-and the control state replayable. Replaying the same collection batch uses the same projection ID and is idempotent.
+and the control state replayable. Source-record idempotency compares both the provider row hash and the normalized
+minimum-index payload; when an allowlist upgrade preserves a newly governed field, replaying the same file updates the
+stored index and projection instead of treating the row as unchanged. Replaying the same collection batch uses the
+same projection ID and remains idempotent.
 
 Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values. The server repeats the allowlist normalization before persistence as defense in depth.
 
