@@ -292,9 +292,11 @@ AI 点评只传输方案中的产品、平台、店铺、现状证据、目标�
 
 事件使用 `source + sourceReference + sourceVersion` 幂等。ERP 日库存、月度盘点和计算版本分别写入独立表；盘点确认新增盘盈或盘亏事件，不覆盖 ERP 快照。冻结 CCC 后补录来源只能生成新版本，旧版本继续可查。
 
+完成的 ERP 当前库存快照先按不超过 50 条 statement 的 D1 分块写入暂存表，再用一个原子 batch 替换目标快照日期并清理暂存行。任何暂存失败都保留上一可信 live 快照；同一 ERP 批次按稳定 projection ID 重放幂等。`snapshot_date` 使用批次采集/投影日期，行级 ERP 修改时间只保存在 `source_updated_at`。没有真实商品稳定 ID 时 `product_id` 必须为 `null`。
+
 快麦当前仅登记订单、会话刷新和销售日聚合。货流平台可以读取该销售聚合用于销售成本，但在库存接口、权限、字段和生产结果独立验证完成前，不得把快麦登记为库存自动同步来源。ERP 与盘点文件继续标记为文件快照或人工校准。
 
-所有响应包含安全 request ID；数据响应包含更新时间、覆盖率、可信等级和版本。缺数据不补零。外部超时保留上次成功投影，部分导入返回成功数、失败数和异常队列引用。完整权限、错误码、迁移和回滚规则见 `docs/features/supply-chain-goods-flow-phase-0/` 与 `docs/platform/error-codes.md`。
+所有响应包含安全 request ID；数据响应包含更新时间、覆盖率、可信等级和版本。缺数据不补零。外部超时保留上次成功投影，部分导入返回成功数、失败数和异常队列引用。`executive` 公司会话可读取全部货流事实和金额，即使组织会话没有重复携带部门名称；非 executive 继续按服务端部门集合授权。完整权限、错误码、迁移和回滚规则见 `docs/features/supply-chain-goods-flow-phase-0/`、`docs/platform/apis/goods-flow-v1.md` 与 `docs/platform/error-codes.md`。
 
 `POST /api/platform/v1/goods-flow/ccc/:month/recalculate` 的请求体只用于命令封装，不接收指标事实。服务端按月份读取 `goods_flow_events`、`goods_flow_inventory_daily` 和有效平台账期后生成计算输入；浏览器提交的库存、销售、采购、付款或金额字段一律忽略。盘点金额确认会追加 `inventory_adjustment_confirmed` 事件并重建受影响的校准库存投影；追加更正创建新盘点记录，原确认记录不改写。
 
