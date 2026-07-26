@@ -1,6 +1,7 @@
 import {
   buildKuaimaiActionPlan,
   buildKuaimaiTaskUrl,
+  classifyKuaimaiInventoryPage,
   classifyKuaimaiPage,
   classifyKuaimaiProductPage,
   kuaimaiResources
@@ -29,6 +30,7 @@ const providers = Object.freeze({
     id: "kuaimai",
     resources: kuaimaiResources,
     classifyPage: classifyKuaimaiPage,
+    classifyInventoryPage: classifyKuaimaiInventoryPage,
     classifyProductPage: classifyKuaimaiProductPage,
     buildTaskUrl: buildKuaimaiTaskUrl,
     buildActionPlan: buildKuaimaiActionPlan,

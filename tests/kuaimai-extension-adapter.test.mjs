@@ -198,6 +198,56 @@ test("Kuaimai product snapshot resources use the three official product exports"
   assert.deepEqual(kuaimaiResources.product_combinations.downloadFilePrefixes, ["快麦导出_组合装"]);
 });
 
+test("Kuaimai inventory snapshot uses the fixed inventory-status page and official export", async () => {
+  const {
+    buildKuaimaiActionPlan,
+    buildKuaimaiTaskUrl,
+    classifyKuaimaiInventoryPage,
+    KUAIMAI_INVENTORY_ROUTE,
+    KUAIMAI_INVENTORY_SELECTORS,
+    kuaimaiResources
+  } = await import(adapterUrl);
+  const task = {
+    jobId: "job-inventory",
+    providerId: "kuaimai",
+    resourceType: "inventory",
+    businessDate: "2026-07-26"
+  };
+
+  assert.equal(KUAIMAI_INVENTORY_ROUTE, "/index.html#/stock/newstatu/");
+  assert.equal(
+    buildKuaimaiTaskUrl("https://erpb.superboss.cc/index.html#/trade/searchlist/", task),
+    "https://erpb.superboss.cc/index.html#/stock/newstatu/"
+  );
+  assert.deepEqual(buildKuaimaiActionPlan(task), [
+    { action: "export_inventory_snapshot" },
+    { action: "confirm_inventory_export" },
+    { action: "download_from_center", resourceType: "inventory" }
+  ]);
+  assert.equal(kuaimaiResources.inventory.rangeKind, "current_snapshot");
+  assert.equal(kuaimaiResources.inventory.scheduleVersion, "v1");
+  assert.equal(kuaimaiResources.inventory.route, KUAIMAI_INVENTORY_ROUTE);
+  assert.deepEqual(kuaimaiResources.inventory.downloadFilePrefixes, [
+    "快麦ERP库存状态导出",
+    "库存状态导出",
+    "库存导出"
+  ]);
+  assert.match(KUAIMAI_INVENTORY_SELECTORS.exportControl, /button/);
+
+  assert.equal(classifyKuaimaiInventoryPage({
+    url: "https://erpb.superboss.cc/index.html#/stock/newstatu/",
+    markers: { queryButton: true, exportControl: true }
+  }).state, "ready");
+  assert.equal(classifyKuaimaiInventoryPage({
+    url: "https://erpb.superboss.cc/index.html#/stock/newstatu/",
+    markers: { loginPage: true }
+  }).errorCode, "KUAIMAI_LOGIN_REQUIRED");
+  assert.equal(classifyKuaimaiInventoryPage({
+    url: "https://erpb.superboss.cc/index.html#/stock/newstatu/",
+    markers: { queryButton: true }
+  }).errorCode, "KUAIMAI_INVENTORY_PAGE_SCHEMA_CHANGED");
+});
+
 test("Kuaimai download center selects only the current task resource and time window", async () => {
   const {
     KUAIMAI_DOWNLOAD_CENTER_ROUTE,
@@ -240,6 +290,11 @@ test("Kuaimai download center selects only the current task resource and time wi
       exportTime: "2026-07-23 15:07:43",
       content: "快麦导出_组合装明细导出表20260723150742_269021_EfGh34.xls",
       status: "导出完成"
+    },
+    {
+      exportTime: "2026-07-23 15:07:44",
+      content: "快麦ERP库存状态导出20260723150744_269021_Inv001.xlsx",
+      status: "导出完成"
     }
   ];
 
@@ -275,6 +330,10 @@ test("Kuaimai download center selects only the current task resource and time wi
   assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "product_combinations", startedAt, rows }), {
     state: "ready",
     rowIndex: 6
+  });
+  assert.deepEqual(selectKuaimaiDownloadRow({ resourceType: "inventory", startedAt, rows }), {
+    state: "ready",
+    rowIndex: 7
   });
 });
 

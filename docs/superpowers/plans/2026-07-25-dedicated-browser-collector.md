@@ -189,3 +189,28 @@
 - [x] Record the superseding ADR and update durable product/platform/integration sources.
 - [x] Run the complete Definition of Done and Pages Functions compatibility build.
 - [ ] Commit, push, merge through GitHub, wait for Cloudflare Git deployment, and verify production.
+
+## Task 9: 交付快麦当前库存快照采集
+
+**Files:**
+
+- Modify: `chrome-extension/company-data-collector/providers/kuaimai.js`
+- Modify: `chrome-extension/company-data-collector/providers/executors/kuaimai.js`
+- Modify: `chrome-extension/company-data-collector/providers/registry.js`
+- Modify: `scripts/web-data-collector/providers/index.mjs`
+- Modify: `scripts/web-data-collector/index.mjs`
+- Modify: `functions/api/platform/v1/web-collection/_shared/storage.js`
+- Modify: `scripts/kuaimai-erp-collector/{api,core}.mjs`
+- Modify: `src/domain/kuaimaiErpProjection.js`
+- Modify: `functions/api/platform/v1/erp-collection/_shared/storage.js`
+- Modify: focused adapter, control-plane, parser and projection tests plus durable documentation.
+
+- [x] 先写失败测试，锁定固定库存页面、手动触发、每日 `05:00`、本机解析和完整批次约束。
+- [x] 注册 `kuaimai/inventory/current_snapshot/v1`，Chrome 只执行固定页面官方导出。
+- [x] 复用本机下载归档和受控 ERP ingest，把文件解析为 `inventory_snapshot`。
+- [x] 投影到 `goods_flow_inventory_daily`，返回数量、SKU、仓库覆盖率和可信等级。
+- [x] 快照日期使用批次采集日，行级修改时间只作 `sourceUpdatedAt`；缺少商品身份时保持为空。
+- [x] 聚焦采集链测试通过。
+- [ ] 员工重新登录公司 Chrome 后执行真实官方导出，核对文件名前缀、真实表头、D1 行数与供应链
+  current 查询。此项未完成前不得把快麦库存从 `integrating` 标记为 `connected`。
+- [ ] 通过 GitOps 发布并完成生产验收；本任务当前明确不部署。

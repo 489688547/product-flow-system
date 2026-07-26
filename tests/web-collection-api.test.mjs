@@ -208,7 +208,7 @@ test("runner registers a safely discovered Douyin store before creating its dail
     now: new Date("2026-07-24T05:30:00+08:00")
   });
 
-  assert.equal(result.jobs.filter(job => job.providerId === "kuaimai").length, 3);
+  assert.equal(result.jobs.filter(job => job.providerId === "kuaimai").length, 4);
   assert.equal(result.jobs.filter(job => job.providerId === "douyin-ecommerce").length, 4);
   assert.deepEqual(
     result.jobs
@@ -684,6 +684,42 @@ test("authorized operator triggers the complete Kuaimai product snapshot group",
   assert.equal(db.tables.web_collection_jobs.size, 3);
 });
 
+test("authorized operator idempotently triggers the Kuaimai current inventory snapshot", async () => {
+  const db = createWebCollectionD1Mock();
+  const input = {
+    action: "trigger",
+    providerId: "kuaimai",
+    resourceType: "inventory",
+    businessDate: "2026-07-26"
+  };
+  const first = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    body: input
+  });
+
+  assert.equal(first.response.status, 200);
+  assert.equal(first.body.data.created, 1);
+  assert.equal(first.body.data.job.resourceType, "inventory");
+  assert.equal(first.body.data.job.rangeKind, "current_snapshot");
+  assert.equal(first.body.data.job.range, null);
+  assert.equal(
+    first.body.data.job.idempotencyKey,
+    "kuaimai:inventory:2026-07-26:v1:env:production:v1"
+  );
+
+  const repeated = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    method: "POST",
+    db,
+    session: operator,
+    body: input
+  });
+  assert.equal(repeated.response.status, 200);
+  assert.equal(repeated.body.data.created, 0);
+  assert.equal(db.tables.web_collection_jobs.size, 1);
+});
+
 test("authorized operator triggers the repaired Kuaimai orders schedule", async () => {
   const db = createWebCollectionD1Mock();
   const result = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
@@ -796,7 +832,7 @@ test("ensure plan automatically requeues an eligible transient failure without c
   assert.equal(retried.body.data.jobs[0].errorCode, null);
 });
 
-test("Kuaimai Chrome trigger rejects missing sessions, readonly users and unregistered resources", async () => {
+test("Kuaimai Chrome trigger rejects missing sessions, readonly users and non-triggerable resources", async () => {
   const db = createWebCollectionD1Mock();
   const input = { action: "trigger", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-22" };
   const missing = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
@@ -811,7 +847,7 @@ test("Kuaimai Chrome trigger rejects missing sessions, readonly users and unregi
   assert.equal(readonly.body.error.code, "WEB_COLLECTION_TRIGGER_DENIED");
 
   const otherResource = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
-    method: "POST", db, session: operator, body: { ...input, resourceType: "inventory" }
+    method: "POST", db, session: operator, body: { ...input, resourceType: "purchases" }
   });
   assert.equal(otherResource.response.status, 400);
   assert.equal(otherResource.body.error.code, "WEB_COLLECTION_TRIGGER_INVALID");

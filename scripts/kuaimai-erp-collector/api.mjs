@@ -55,13 +55,17 @@ export async function uploadErpCollection(collection, {
   if (!collection?.batch || !Array.isArray(collection.records) || !collection.records.length) {
     throw new Error("没有可上传的 ERP 记录。");
   }
+  if (
+    ["sales_items", "inventory_snapshot"].includes(collection.batch.resourceType)
+    && collection.batch.status !== "completed"
+  ) {
+    const resourceLabel = collection.batch.resourceType === "inventory_snapshot" ? "库存快照" : "销售明细";
+    const error = new Error(`快麦${resourceLabel}未通过完整性校验，不能标记为同步成功。`);
+    error.code = "ERP_COLLECTION_BATCH_PARTIAL";
+    error.status = 422;
+    throw error;
+  }
   if (collection.batch.resourceType === "sales_items") {
-    if (collection.batch.status !== "completed") {
-      const error = new Error("快麦销售明细未通过完整性校验，不能标记为同步成功。");
-      error.code = "ERP_COLLECTION_BATCH_PARTIAL";
-      error.status = 422;
-      throw error;
-    }
     const projection = projectKuaimaiErpRecords("sales_items", collection.records, {
       batchId: collection.batch.id,
       now: collection.batch.collectedAt || new Date().toISOString()
@@ -146,8 +150,12 @@ export async function uploadErpCollection(collection, {
   }
   const finalResult = results.at(-1) || {};
   const finalStatus = String(finalResult.status || collection.batch.status || "");
-  if (collection.batch.resourceType === "sales_items" && finalStatus !== "completed") {
-    const error = new Error("快麦销售明细已上传原始记录，但批次校验未完成，不能标记为同步成功。");
+  if (
+    ["sales_items", "inventory_snapshot"].includes(collection.batch.resourceType)
+    && finalStatus !== "completed"
+  ) {
+    const resourceLabel = collection.batch.resourceType === "inventory_snapshot" ? "库存快照" : "销售明细";
+    const error = new Error(`快麦${resourceLabel}已上传原始记录，但批次校验未完成，不能标记为同步成功。`);
     error.code = "ERP_COLLECTION_BATCH_PARTIAL";
     error.status = 422;
     throw error;
