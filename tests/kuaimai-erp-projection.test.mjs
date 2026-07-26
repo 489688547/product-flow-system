@@ -107,10 +107,10 @@ test("inventory snapshot projects into daily inventory without inventing missing
 test("inventory projection reads official Chinese columns and preserves zero stock", () => {
   const projection = projectKuaimaiErpRecords("inventory_snapshot", [record("杭州仓::S-1", {
     仓库名称: "杭州仓",
+    系统规格ID: "S-1",
     规格商家编码: "SKU-1",
     "69码": "6978705011208",
-    实际总库存: "18",
-    实际可用数: "0",
+    可用库存: "0",
     成本价: "6.50"
   }, {
     warehouseId: "杭州仓",
@@ -124,7 +124,7 @@ test("inventory projection reads official Chinese columns and preserves zero sto
   assert.equal(projection.inventoryDaily[0].skuId, "kuaimai:sku:SKU-1");
   assert.equal(projection.inventoryDaily[0].skuCode, "SKU-1");
   assert.equal(projection.inventoryDaily[0].warehouseId, "杭州仓");
-  assert.equal(projection.inventoryDaily[0].erpQuantity, 18);
+  assert.equal(projection.inventoryDaily[0].erpQuantity, 0);
   assert.equal(projection.inventoryDaily[0].sellableQuantity, 0);
   assert.equal(projection.inventoryDaily[0].unitCost, 6.5);
   assert.equal(projection.inventoryDaily[0].sourceUpdatedAt, "2026-07-26T05:12:00+08:00");
