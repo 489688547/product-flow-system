@@ -126,6 +126,18 @@ const BUSINESS_TABLES = [
     maskFields: { resolved_by: "identity" },
     maskJsonFields: ["details"]
   }),
+  table("supply_chain_workflow_entities", "mask", ["resource_type", "id"], 69, {
+    maskFields: { created_by: "identity", updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("supply_chain_workflow_events", "mask", ["id"], 690, {
+    maskFields: {
+      actor_id: "identity",
+      actor_name: "identity",
+      actor_department: "identity"
+    },
+    maskJsonFields: ["fields"]
+  }),
 
   table("collaboration_items", "mask", ["id"], 70, {
     maskFields: {

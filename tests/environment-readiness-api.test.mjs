@@ -63,7 +63,9 @@ const GOODS_FLOW_TABLES = [
   "goods_flow_stocktake_lines",
   "goods_flow_receivable_terms",
   "goods_flow_ccc_monthly",
-  "goods_flow_exceptions"
+  "goods_flow_exceptions",
+  "supply_chain_workflow_entities",
+  "supply_chain_workflow_events"
 ];
 
 const WEB_COLLECTION_TABLES = [

@@ -247,6 +247,108 @@ export async function listInventoryDaily(db, { through } = {}) {
   }));
 }
 
+function projectInventoryRow(row) {
+  return {
+    id: row.id,
+    date: row.snapshot_date,
+    productId: row.product_id || null,
+    skuId: row.sku_id,
+    skuCode: row.sku_code || "",
+    warehouseId: row.warehouse_id,
+    erpQuantity: numberOrNull(row.erp_quantity) ?? 0,
+    countedQuantity: numberOrNull(row.counted_quantity),
+    calibratedQuantity: numberOrNull(row.calibrated_quantity) ?? 0,
+    unitCost: numberOrNull(row.unit_cost) ?? 0,
+    calibratedInventoryValue: numberOrNull(row.calibrated_inventory_value) ?? 0,
+    sellableQuantity: numberOrNull(row.sellable_quantity),
+    daysOfSupply: numberOrNull(row.days_of_supply),
+    ageBucket: row.age_bucket || "",
+    inventoryCashTied: numberOrNull(row.inventory_cash_tied),
+    stocktakeId: row.stocktake_id || null,
+    stocktakeStatus: row.stocktake_status,
+    sourceUpdatedAt: row.source_updated_at || null,
+    confidence: row.confidence,
+    updatedAt: row.updated_at || null
+  };
+}
+
+function inventoryCursor(row) {
+  return `${row.date}|${row.skuId}|${row.warehouseId}`;
+}
+
+function parseInventoryCursor(value) {
+  if (!value) return null;
+  const [date, skuId, warehouseId, extra] = String(value).split("|");
+  if (extra !== undefined || !/^\d{4}-\d{2}-\d{2}$/.test(date) || !skuId || !warehouseId) {
+    throw storageError("GOODS_FLOW_INVENTORY_QUERY_INVALID", "库存游标无效。");
+  }
+  return { date, skuId, warehouseId };
+}
+
+export async function queryInventoryDaily(db, {
+  mode = "current",
+  asOf,
+  skuId,
+  warehouseId,
+  cursor
+} = {}) {
+  if (!["current", "history"].includes(mode)) {
+    throw storageError("GOODS_FLOW_INVENTORY_QUERY_INVALID", "库存模式仅支持 current 或 history。");
+  }
+  if (asOf && !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+    throw storageError("GOODS_FLOW_INVENTORY_QUERY_INVALID", "库存截止日期无效。");
+  }
+  const decodedCursor = parseInventoryCursor(cursor);
+  const dateRow = await (asOf
+    ? db.prepare("SELECT MAX(snapshot_date) AS latest_date FROM goods_flow_inventory_daily WHERE snapshot_date <= ?").bind(asOf)
+    : db.prepare("SELECT MAX(snapshot_date) AS latest_date FROM goods_flow_inventory_daily")
+  ).first();
+  const latestDate = text(dateRow?.latest_date);
+  if (!latestDate) return { rows: [], nextCursor: null, latestDate: "" };
+
+  const conditions = [];
+  const bindings = [];
+  if (mode === "current") {
+    conditions.push("snapshot_date = ?");
+    bindings.push(latestDate);
+  } else if (asOf) {
+    conditions.push("snapshot_date <= ?");
+    bindings.push(asOf);
+  }
+  if (skuId) {
+    conditions.push("sku_id = ?");
+    bindings.push(text(skuId));
+  }
+  if (warehouseId) {
+    conditions.push("warehouse_id = ?");
+    bindings.push(text(warehouseId));
+  }
+  if (decodedCursor) {
+    conditions.push(`(snapshot_date < ? OR (snapshot_date = ? AND
+      (sku_id > ? OR (sku_id = ? AND warehouse_id > ?))))`);
+    bindings.push(
+      decodedCursor.date,
+      decodedCursor.date,
+      decodedCursor.skuId,
+      decodedCursor.skuId,
+      decodedCursor.warehouseId
+    );
+  }
+  const limit = mode === "current" ? 5001 : 501;
+  const result = await db.prepare(`SELECT * FROM goods_flow_inventory_daily
+    ${conditions.length ? `WHERE ${conditions.join(" AND ")}` : ""}
+    ORDER BY snapshot_date DESC, sku_id, warehouse_id
+    LIMIT ${limit}`).bind(...bindings).all();
+  const projected = resultRows(result).map(projectInventoryRow);
+  const hasNext = projected.length === limit;
+  const rows = hasNext ? projected.slice(0, -1) : projected;
+  return {
+    rows,
+    nextCursor: hasNext ? inventoryCursor(rows.at(-1)) : null,
+    latestDate
+  };
+}
+
 function projectTerm(row) {
   return {
     id: row.id,
