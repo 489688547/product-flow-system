@@ -26,6 +26,9 @@ Orders, order items and rich sales items require a valid business occurrence tim
 
 `inventory_snapshot` accepts current official inventory exports only. The whole local file must be validated before the
 first request; every row needs a stable SKU identity, warehouse identity and a registered official quantity column.
+Before storing control records, the server normalizes the official `实际总库存` and `实际可用数` columns to
+`quantity` and `sellableQuantity`; both fields must survive the minimum-index allowlist so replay projects the
+official quantities rather than zero values.
 The projection date is the batch collection day in Asia/Shanghai, while row-level ERP modification time remains
 `sourceUpdatedAt`. Missing product identity remains `null`; the writer never derives a product from a warehouse/SKU
 source key. A partial snapshot is rejected before upload and again after the final server response.

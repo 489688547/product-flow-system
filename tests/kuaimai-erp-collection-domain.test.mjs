@@ -48,6 +48,41 @@ test("normalization derives a stable batch id and keeps only the standard minimu
   assert.deepEqual(normalized.records[0].payload, { sourceOrderId: "order-1001" });
 });
 
+test("inventory normalization retains the official total and sellable quantity fields", () => {
+  const inventory = payload({
+    batch: {
+      ...payload().batch,
+      resourceType: "inventory_snapshot",
+      sourceFileName: "仓库库存.xlsx",
+      rangeStart: null,
+      rangeEnd: null
+    },
+    records: [{
+      sourceKey: "杭州仓::SKU-1",
+      occurredAt: null,
+      warehouseId: "杭州仓",
+      contentHash: "b".repeat(64),
+      payload: {
+        仓库: "杭州仓",
+        规格商家编码: "SKU-1",
+        实际总库存: "18",
+        实际可用数: "12",
+        成本价: "6.5"
+      }
+    }]
+  });
+
+  const normalized = normalizeErpCollectionPayload(inventory, { idempotencyKey: "inventory-20260726-1" });
+
+  assert.deepEqual(normalized.records[0].payload, {
+    skuCode: "SKU-1",
+    purchasePrice: "6.5",
+    quantity: "18",
+    sellableQuantity: "12",
+    warehouseName: "杭州仓"
+  });
+});
+
 test("normalization rejects unknown resources, oversized chunks and secret fields", () => {
   assert.throws(() => normalizeErpCollectionPayload(payload({ batch: { ...payload().batch, resourceType: "mystery" } }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_RESOURCE_INVALID");
   assert.throws(() => normalizeErpCollectionPayload(payload({ records: Array.from({ length: 501 }, (_, index) => ({ sourceKey: String(index), contentHash: hash, payload: {} })) }), { idempotencyKey: "x" }), error => error.code === "ERP_COLLECTION_CHUNK_TOO_LARGE");
