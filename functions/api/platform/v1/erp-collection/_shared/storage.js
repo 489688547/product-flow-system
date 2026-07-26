@@ -56,13 +56,38 @@ async function readExistingRecords(db, resourceType, records) {
   for (let index = 0; index < records.length; index += WRITE_BATCH_SIZE) {
     const chunk = records.slice(index, index + WRITE_BATCH_SIZE);
     const placeholders = chunk.map(() => "?").join(", ");
-    const result = await db.prepare(`SELECT source_key, content_hash FROM erp_source_records
+    const result = await db.prepare(`SELECT source_key, content_hash, payload FROM erp_source_records
       WHERE resource_type = ? AND source_key IN (${placeholders})`)
       .bind(resourceType, ...chunk.map(record => record.sourceKey))
       .all();
-    for (const row of result?.results || []) existing.set(row.source_key, row.content_hash);
+    for (const row of result?.results || []) {
+      existing.set(row.source_key, {
+        contentHash: row.content_hash,
+        payload: row.payload
+      });
+    }
   }
   return existing;
+}
+
+function comparablePayload(value) {
+  let payload = value;
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      return null;
+    }
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  return JSON.stringify(Object.fromEntries(
+    Object.entries(payload).sort(([left], [right]) => left.localeCompare(right))
+  ));
+}
+
+function unchangedSourceRecord(existing, incoming) {
+  return existing?.contentHash === incoming.contentHash
+    && comparablePayload(existing.payload) === comparablePayload(incoming.payload);
 }
 
 export async function readBatchRecords(db, batchId) {
@@ -267,11 +292,12 @@ export async function ingestErpCollection(controlDb, input, {
   const counts = { inserted: 0, updated: 0, unchanged: 0, issues: input.issues.length };
   const changedRecords = [];
   for (const record of input.records) {
-    const previousHash = existingRecords.get(record.sourceKey);
-    if (!previousHash) counts.inserted += 1;
-    else if (previousHash === record.contentHash) counts.unchanged += 1;
+    const previous = existingRecords.get(record.sourceKey);
+    const unchanged = unchangedSourceRecord(previous, record);
+    if (!previous) counts.inserted += 1;
+    else if (unchanged) counts.unchanged += 1;
     else counts.updated += 1;
-    if (previousHash !== record.contentHash) changedRecords.push(record);
+    if (!unchanged) changedRecords.push(record);
   }
   const summary = {
     idempotencyKey: input.idempotencyKey,
