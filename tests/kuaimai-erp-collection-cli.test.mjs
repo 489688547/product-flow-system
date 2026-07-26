@@ -181,6 +181,25 @@ test("collector parses a complete Kuaimai inventory snapshot without inventing m
   assert.equal(result.records[1].payload.可用库存, "0");
 });
 
+test("collector parses the real warehouse-inventory export headers", async () => {
+  const file = new File([
+    "库存状态\n",
+    "序号,图片,仓库,规格属性,规格别名,7天销量,可售天数,规格商家编码,规格备注,供应商,成本价,实际总库存,实际锁定数,实际可用数,次品数,库存状态,警戒状态\n",
+    "1,,新湖北仓,绿色粽子,绿色粽子,0,,1111,,国产,2.5,14,0,14,0,有货,正常\n"
+  ], "快麦导出_库存状态(按sku).csv");
+
+  const result = await readKuaimaiExport(file, {
+    resourceType: "inventory_snapshot",
+    collectedAt: "2026-07-26T21:34:00+08:00"
+  });
+
+  assert.equal(result.batch.status, "completed");
+  assert.equal(result.batch.rowCount, 1);
+  assert.equal(result.records[0].sourceKey, "新湖北仓::1111");
+  assert.equal(result.records[0].payload.实际总库存, "14");
+  assert.equal(result.records[0].payload.实际可用数, "14");
+});
+
 test("collector rejects an inventory export without an official quantity column", async () => {
   const file = new File([
     "仓库名称,系统规格ID,规格商家编码\n",

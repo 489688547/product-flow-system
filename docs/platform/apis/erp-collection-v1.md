@@ -29,6 +29,8 @@ first request; every row needs a stable SKU identity, warehouse identity and a r
 The projection date is the batch collection day in Asia/Shanghai, while row-level ERP modification time remains
 `sourceUpdatedAt`. Missing product identity remains `null`; the writer never derives a product from a warehouse/SKU
 source key. A partial snapshot is rejected before upload and again after the final server response.
+The Kuaimai adapter uses the official warehouse-inventory export. Kuaimai may label its OOXML workbook with a `.csv`
+suffix, so the company Mac detects the ZIP/OOXML signature before choosing a parser.
 
 Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values. The server repeats the allowlist normalization before persistence as defense in depth.
 
