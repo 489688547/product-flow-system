@@ -64,10 +64,12 @@ const RESOURCE_SCHEMAS = {
   inventory_snapshot: {
     identities: [
       ["仓库ID", "仓库编号", "仓库名称", "仓库"],
-      ["系统规格ID", "规格ID", "SKU ID", "商家编码", "规格编码", "SKU编码", "69码", "条码"]
+      ["系统规格ID", "规格ID", "SKU ID", "规格商家编码", "商家编码", "规格编码", "SKU编码", "69码", "条码"]
     ],
     modifiedAt: ["库存更新时间", "修改时间", "更新时间", "盘点时间"],
-    warehouse: ["仓库ID", "仓库编号", "仓库名称", "仓库"]
+    warehouse: ["仓库ID", "仓库编号", "仓库名称", "仓库"],
+    quantity: ["实际总库存", "可用库存", "实际可用数", "可售库存", "可销售库存", "库存数量", "实际库存", "库存"],
+    requireAllIdentities: true
   },
   inventory_movements: {
     identities: [
@@ -147,7 +149,8 @@ function resolveColumns(headers, schema) {
     occurredAt: findColumn(headers, schema.occurredAt),
     modifiedAt: findColumn(headers, schema.modifiedAt),
     shop: findColumn(headers, schema.shop),
-    warehouse: findColumn(headers, schema.warehouse)
+    warehouse: findColumn(headers, schema.warehouse),
+    quantity: findColumn(headers, schema.quantity)
   };
 }
 
@@ -252,7 +255,11 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
   const columns = resolveColumns(headers, schema);
   const missing = [];
   if (!columns.identityColumns.length) missing.push("稳定来源编号");
+  if (schema.requireAllIdentities && columns.identityColumns.length !== schema.identities.length) {
+    missing.push("仓库与 SKU 稳定身份");
+  }
   if (schema.occurredAt && columns.occurredAt < 0) missing.push("业务发生时间/订单创建时间");
+  if (schema.quantity && columns.quantity < 0) missing.push("库存数量");
   if (missing.length) {
     throw new KuaimaiExportError("KUAIMAI_EXPORT_REQUIRED_COLUMNS_MISSING", `导出文件缺少必需列：${missing.join("、")}`, { headers });
   }
@@ -269,6 +276,15 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
     const row = rows[rowIndex];
     if (!row.some(value => valueText(value))) continue;
     const identity = columns.identityColumns.map(index => valueText(row[index])).filter(Boolean);
+    if (schema.requireAllIdentities && identity.length !== columns.identityColumns.length) {
+      issues.push({
+        code: "SOURCE_KEY_INCOMPLETE",
+        severity: "error",
+        message: `第 ${rowIndex + 1} 行缺少仓库或稳定 SKU 身份。`,
+        details: { rowNumber: rowIndex + 1 }
+      });
+      continue;
+    }
     if (!identity.length) {
       if (resourceType === "sales_items" && isExplicitSummaryRow(row)) continue;
       issues.push({ code: "SOURCE_KEY_MISSING", severity: "error", message: `第 ${rowIndex + 1} 行缺少稳定来源编号。`, details: { rowNumber: rowIndex + 1 } });
@@ -278,6 +294,19 @@ export async function readKuaimaiExport(input, { resourceType = "orders", collec
     if (schema.occurredAt && !occurredAt) {
       issues.push({ sourceKey: identity.join("::"), code: "OCCURRED_AT_INVALID", severity: "error", message: `第 ${rowIndex + 1} 行缺少有效业务发生时间。`, details: { rowNumber: rowIndex + 1 } });
       continue;
+    }
+    if (schema.quantity) {
+      const rawQuantity = valueText(row[columns.quantity]).replaceAll(",", "");
+      if (rawQuantity === "" || !Number.isFinite(Number(rawQuantity))) {
+        issues.push({
+          sourceKey: identity.join("::"),
+          code: "INVENTORY_QUANTITY_INVALID",
+          severity: "error",
+          message: `第 ${rowIndex + 1} 行缺少有效库存数量。`,
+          details: { rowNumber: rowIndex + 1 }
+        });
+        continue;
+      }
     }
     const payload = rowPayload(headers, row);
     const baseSourceKey = identity.join("::");

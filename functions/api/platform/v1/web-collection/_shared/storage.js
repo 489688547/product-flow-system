@@ -25,7 +25,8 @@ const DAILY_COLLECTION_RESOURCES = Object.freeze({
   kuaimai: Object.freeze([
     Object.freeze({ type: "orders", rangeKind: "daily_fact", scheduleVersion: "v2" }),
     Object.freeze({ type: "order_items", rangeKind: "daily_fact", scheduleVersion: "v1" }),
-    Object.freeze({ type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v3" })
+    Object.freeze({ type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v3" }),
+    Object.freeze({ type: "inventory", rangeKind: "current_snapshot", scheduleVersion: "v1" })
   ]),
   "douyin-ecommerce": Object.freeze([
     Object.freeze({ type: "store_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }),
@@ -335,8 +336,9 @@ export async function triggerWebCollectionJob(db, input, target = { environmentI
   const businessDate = String(input?.businessDate || "").trim();
   // 商品入口由服务端展开普通商品、套件和组合装三任务；快照类资源不带日范围。
   const productResources = ["products", "product_kits", "product_combinations"];
+  const snapshotResources = [...productResources, "inventory"];
   const triggerable = providerId === "kuaimai"
-    ? new Set(["orders", "order_items", "sales_items", "products"])
+    ? new Set(["orders", "order_items", "sales_items", "products", "inventory"])
     : providerId === "douyin-ecommerce"
       ? new Set(["store_daily", "product_daily", "live_daily", "video_daily"])
       : null;
@@ -356,7 +358,7 @@ export async function triggerWebCollectionJob(db, input, target = { environmentI
       : providerId === "kuaimai" && type === "orders"
         ? "v2"
         : "v1";
-    const rangeKind = productResources.includes(type) ? "current_snapshot" : "daily_fact";
+    const rangeKind = snapshotResources.includes(type) ? "current_snapshot" : "daily_fact";
     return {
       providerId,
       storeId,

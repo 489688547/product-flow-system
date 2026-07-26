@@ -2,7 +2,12 @@ import { projectKuaimaiErpRecords } from "../../../../../../src/domain/kuaimaiEr
 import { scaleSalesFact } from "../../../../../../src/domain/demoSalesTransform.js";
 import { ensureSalesTables, insertSalesRows, replaceSalesFactsForDates } from "../../../../sales.js";
 import { resolveRepairedSalesDays } from "../../data-services/_shared/salesRepairResolution.js";
-import { appendGoodsFlowEvents, saveGoodsFlowExceptions, saveInventoryDaily } from "../../goods-flow/_shared/storage.js";
+import {
+  appendGoodsFlowEvents,
+  replaceInventoryDailySnapshot,
+  saveGoodsFlowExceptions,
+  saveInventoryDaily
+} from "../../goods-flow/_shared/storage.js";
 import { upsertProductCatalog } from "../../product-catalog/_shared/storage.js";
 
 const WRITE_BATCH_SIZE = 50;
@@ -51,13 +56,38 @@ async function readExistingRecords(db, resourceType, records) {
   for (let index = 0; index < records.length; index += WRITE_BATCH_SIZE) {
     const chunk = records.slice(index, index + WRITE_BATCH_SIZE);
     const placeholders = chunk.map(() => "?").join(", ");
-    const result = await db.prepare(`SELECT source_key, content_hash FROM erp_source_records
+    const result = await db.prepare(`SELECT source_key, content_hash, payload FROM erp_source_records
       WHERE resource_type = ? AND source_key IN (${placeholders})`)
       .bind(resourceType, ...chunk.map(record => record.sourceKey))
       .all();
-    for (const row of result?.results || []) existing.set(row.source_key, row.content_hash);
+    for (const row of result?.results || []) {
+      existing.set(row.source_key, {
+        contentHash: row.content_hash,
+        payload: row.payload
+      });
+    }
   }
   return existing;
+}
+
+function comparablePayload(value) {
+  let payload = value;
+  if (typeof payload === "string") {
+    try {
+      payload = JSON.parse(payload);
+    } catch {
+      return null;
+    }
+  }
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+  return JSON.stringify(Object.fromEntries(
+    Object.entries(payload).sort(([left], [right]) => left.localeCompare(right))
+  ));
+}
+
+function unchangedSourceRecord(existing, incoming) {
+  return existing?.contentHash === incoming.contentHash
+    && comparablePayload(existing.payload) === comparablePayload(incoming.payload);
 }
 
 export async function readBatchRecords(db, batchId) {
@@ -88,9 +118,22 @@ export async function readBatchRecords(db, batchId) {
   return records;
 }
 
-async function projectCompletedBatch(controlDb, businessDb, resourceType, batchId, actor, now, target) {
+async function projectCompletedBatch(
+  controlDb,
+  businessDb,
+  resourceType,
+  batchId,
+  actor,
+  now,
+  target,
+  collectedAt
+) {
   const records = await readBatchRecords(controlDb, batchId);
-  const projection = projectKuaimaiErpRecords(resourceType, records, { batchId, now });
+  const projection = projectKuaimaiErpRecords(resourceType, records, {
+    batchId,
+    now,
+    snapshotDate: collectedAt
+  });
   let catalog = { products: 0, skus: 0 };
   if (projection.catalog.items.length) {
     const result = await upsertProductCatalog(businessDb, projection.catalog, {
@@ -101,7 +144,16 @@ async function projectCompletedBatch(controlDb, businessDb, resourceType, batchI
     catalog = result.counts;
   }
   if (projection.events.length) await appendGoodsFlowEvents(businessDb, projection.events.map(event => ({ ...event, createdBy: String(actor).slice(0, 120) })));
-  if (projection.inventoryDaily.length) await saveInventoryDaily(businessDb, projection.inventoryDaily, now);
+  if (projection.inventoryDaily.length) {
+    if (resourceType === "inventory_snapshot") {
+      await replaceInventoryDailySnapshot(businessDb, projection.inventoryDaily, {
+        projectionId: batchId,
+        now
+      });
+    } else {
+      await saveInventoryDaily(businessDb, projection.inventoryDaily, now);
+    }
+  }
   const salesRows = target?.environmentId === "display"
     ? projection.salesDaily.map(row => scaleSalesFact(row))
     : projection.salesDaily;
@@ -120,6 +172,7 @@ async function projectCompletedBatch(controlDb, businessDb, resourceType, batchI
     catalogSkus: catalog.skus || 0,
     goodsFlowEvents: projection.events.length,
     inventoryDaily: projection.inventoryDaily.length,
+    inventoryQuality: projection.inventoryQuality,
     salesRows: sales.rows,
     salesDates: sales.dates,
     exceptions: projection.exceptions.length,
@@ -239,11 +292,12 @@ export async function ingestErpCollection(controlDb, input, {
   const counts = { inserted: 0, updated: 0, unchanged: 0, issues: input.issues.length };
   const changedRecords = [];
   for (const record of input.records) {
-    const previousHash = existingRecords.get(record.sourceKey);
-    if (!previousHash) counts.inserted += 1;
-    else if (previousHash === record.contentHash) counts.unchanged += 1;
+    const previous = existingRecords.get(record.sourceKey);
+    const unchanged = unchangedSourceRecord(previous, record);
+    if (!previous) counts.inserted += 1;
+    else if (unchanged) counts.unchanged += 1;
     else counts.updated += 1;
-    if (previousHash !== record.contentHash) changedRecords.push(record);
+    if (!unchanged) changedRecords.push(record);
   }
   const summary = {
     idempotencyKey: input.idempotencyKey,
@@ -252,22 +306,62 @@ export async function ingestErpCollection(controlDb, input, {
     chunkRecords: input.records.length,
     ...counts
   };
+  const projectionRequested = input.batch.status === "completed";
+  const storedBatch = projectionRequested
+    ? { ...input.batch, id: batchId, status: "pending" }
+    : { ...input.batch, id: batchId };
   await runBatches(controlDb, [
-    batchStatement(controlDb, { ...input.batch, id: batchId }, { actor: String(actor).slice(0, 120), now }, summary, archiveId, target),
+    batchStatement(
+      controlDb,
+      storedBatch,
+      { actor: String(actor).slice(0, 120), now },
+      summary,
+      archiveId,
+      target
+    ),
     ...(input.archive ? [archiveStatement(
       controlDb,
       input.archive,
       archiveId,
       batchId,
-      input.batch.status === "pending" ? "processing" : "processed",
+      projectionRequested || input.batch.status === "pending" ? "processing" : "processed",
       now
     )] : []),
     ...changedRecords.map(record => recordStatement(controlDb, record, input.batch.resourceType, batchId, now)),
     ...input.issues.map(issue => issueStatement(controlDb, issue, input.batch.resourceType, batchId, now))
   ]);
-  const projection = input.batch.status === "completed"
-    ? await projectCompletedBatch(controlDb, businessDb, input.batch.resourceType, batchId, actor, now, target)
+  const projection = projectionRequested
+    ? await projectCompletedBatch(
+      controlDb,
+      businessDb,
+      input.batch.resourceType,
+      batchId,
+      actor,
+      now,
+      target,
+      input.batch.collectedAt
+    )
     : null;
+  if (projectionRequested) {
+    await runBatches(controlDb, [
+      batchStatement(
+        controlDb,
+        { ...input.batch, id: batchId, status: "completed" },
+        { actor: String(actor).slice(0, 120), now },
+        { ...summary, projection },
+        archiveId,
+        target
+      ),
+      ...(input.archive ? [archiveStatement(
+        controlDb,
+        input.archive,
+        archiveId,
+        batchId,
+        "processed",
+        now
+      )] : [])
+    ]);
+  }
   return {
     batchId,
     archiveId,

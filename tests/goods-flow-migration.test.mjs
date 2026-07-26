@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 
 const migrationUrl = new URL("../migrations/0005_goods_flow_core.sql", import.meta.url);
+const inventoryStageMigrationUrl = new URL("../migrations/0015_data_center_supply_chain_facts.sql", import.meta.url);
 
 test("goods-flow migration creates the seven durable Phase 0 tables", () => {
   assert.equal(existsSync(migrationUrl), true);
@@ -34,4 +35,17 @@ test("goods-flow migration indexes source, inventory, term and exception lookups
   ]) {
     assert.match(sql, new RegExp(`CREATE INDEX IF NOT EXISTS ${index}`, "i"));
   }
+});
+
+test("inventory full-snapshot projection uses an isolated staging table with a fail-closed display policy", () => {
+  assert.equal(existsSync(inventoryStageMigrationUrl), true);
+  const sql = readFileSync(inventoryStageMigrationUrl, "utf8");
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS goods_flow_inventory_daily_stage/i);
+  assert.match(sql, /PRIMARY KEY\s*\(projection_id,\s*snapshot_date,\s*sku_id,\s*warehouse_id\)/i);
+
+  const catalog = readFileSync(
+    new URL("../functions/api/platform/_shared/demoDataCatalog.js", import.meta.url),
+    "utf8"
+  );
+  assert.match(catalog, /table\("goods_flow_inventory_daily_stage",\s*"skip"/);
 });

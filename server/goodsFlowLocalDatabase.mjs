@@ -123,12 +123,45 @@ export function createGoodsFlowLocalDatabase(snapshot = {}) {
           const from = normalized.match(/ from ((?:goods_flow|product_catalog)_[a-z_]+)/);
           if (!from) throw new Error(`Unsupported local goods-flow SQL: ${normalized}`);
           let results = [...tables[from[1]].values()];
+          if (normalized.includes("max(snapshot_date) as latest_date")) {
+            if (normalized.includes("where snapshot_date <= ?")) {
+              results = results.filter(row => row.snapshot_date <= statement.values[0]);
+            }
+            return {
+              results: [{
+                latest_date: results.map(row => row.snapshot_date).filter(Boolean).sort().at(-1) || null
+              }]
+            };
+          }
           if (normalized.includes("where platform = ?")) results = results.filter(row => row.platform === statement.values[0]);
           if (normalized.includes("where snapshot_date <= ?")) results = results.filter(row => row.snapshot_date <= statement.values[0]);
+          let bindingIndex = 0;
+          if (normalized.includes("snapshot_date = ?")) {
+            results = results.filter(row => row.snapshot_date === statement.values[bindingIndex]);
+            bindingIndex += 1;
+          } else if (normalized.includes("snapshot_date <= ?")) {
+            bindingIndex += 1;
+          }
+          if (normalized.includes("sku_id = ?")) {
+            results = results.filter(row => row.sku_id === statement.values[bindingIndex]);
+            bindingIndex += 1;
+          }
+          if (normalized.includes("warehouse_id = ?")) {
+            results = results.filter(row => row.warehouse_id === statement.values[bindingIndex]);
+          }
           if (normalized.includes("where month = ?")) results = results.filter(row => row.month === statement.values[0]);
           if (normalized.includes("where id = ?")) results = results.filter(row => row.id === statement.values[0]);
           if (normalized.includes("where stocktake_id = ?")) results = results.filter(row => row.stocktake_id === statement.values[0]);
           if (normalized.includes("where key = ?")) results = results.filter(row => row.key === statement.values[0]);
+          if (normalized.includes("order by snapshot_date desc, sku_id, warehouse_id")) {
+            results.sort((left, right) => (
+              String(right.snapshot_date).localeCompare(String(left.snapshot_date))
+              || String(left.sku_id).localeCompare(String(right.sku_id))
+              || String(left.warehouse_id).localeCompare(String(right.warehouse_id))
+            ));
+          }
+          const limit = normalized.match(/ limit (\d+)$/);
+          if (limit) results = results.slice(0, Number(limit[1]));
           return { results };
         },
         async first() {

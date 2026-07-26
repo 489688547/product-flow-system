@@ -9,6 +9,7 @@ import {
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 import {
   WEB_COLLECTION_ADAPTERS,
+  createKuaimaiProcessor,
   createProviderProcessorRegistry
 } from "../scripts/web-data-collector/providers/index.mjs";
 import { createDouyinProcessor } from "../scripts/web-data-collector/providers/douyin/index.mjs";
@@ -54,10 +55,10 @@ test("orchestrator schedules all extension-implemented Kuaimai resources after 0
   await orchestrator.prepare({ now: "2026-07-22T05:01:00+08:00" });
   const plan = api.calls.find(([name]) => name === "ensurePlan")[1];
   assert.deepEqual(plan.map(item => item.resourceType), [
-    "orders", "order_items", "sales_items", "products", "product_kits", "product_combinations"
+    "orders", "order_items", "sales_items", "products", "product_kits", "product_combinations", "inventory"
   ]);
   assert.deepEqual(plan.map(item => item.businessDate), [
-    "2026-07-21", "2026-07-21", "2026-07-21", "2026-07-22", "2026-07-22", "2026-07-22"
+    "2026-07-21", "2026-07-21", "2026-07-21", "2026-07-22", "2026-07-22", "2026-07-22", "2026-07-22"
   ]);
 });
 
@@ -108,8 +109,8 @@ test("download validation rejects a parsed range from another business date", ()
   );
 });
 
-test("current product snapshots do not require an event date range", () => {
-  for (const resourceType of ["products", "product_kits", "product_combinations"]) {
+test("current product and inventory snapshots do not require an event date range", () => {
+  for (const resourceType of ["products", "product_kits", "product_combinations", "inventory_snapshot"]) {
     assert.doesNotThrow(() => assertCollectionFileMatchesTask({
       resourceType,
       businessDate: "2026-07-24",
@@ -117,6 +118,32 @@ test("current product snapshots do not require an event date range", () => {
       rangeEnd: null
     }));
   }
+});
+
+test("Kuaimai inventory jobs are parsed as inventory_snapshot before controlled ingest", async () => {
+  const processed = [];
+  const processor = createKuaimaiProcessor(async input => {
+    processed.push(input);
+    return { batchId: "inventory-batch-1" };
+  });
+
+  await processor.process({
+    job: {
+      id: "job-inventory",
+      providerId: "kuaimai",
+      resourceType: "inventory",
+      businessDate: "2026-07-26"
+    },
+    result: { safeFileName: "库存状态导出.xlsx" }
+  });
+
+  assert.deepEqual(processed, [{
+    jobId: "job-inventory",
+    fileName: "库存状态导出.xlsx",
+    resourceType: "inventory_snapshot",
+    businessDate: "2026-07-26",
+    onValidated: undefined
+  }]);
 });
 
 test("commerce fact uploader uses the runner grant and fixed ingest route", async () => {

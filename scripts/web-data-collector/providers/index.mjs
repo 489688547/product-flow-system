@@ -8,7 +8,8 @@ export const WEB_COLLECTION_ADAPTERS = Object.freeze([
       Object.freeze({ type: "sales_items", rangeKind: "daily_fact", scheduleVersion: "v3" }),
       Object.freeze({ type: "products", rangeKind: "current_snapshot", scheduleVersion: "v1" }),
       Object.freeze({ type: "product_kits", rangeKind: "current_snapshot", scheduleVersion: "v1" }),
-      Object.freeze({ type: "product_combinations", rangeKind: "current_snapshot", scheduleVersion: "v1" })
+      Object.freeze({ type: "product_combinations", rangeKind: "current_snapshot", scheduleVersion: "v1" }),
+      Object.freeze({ type: "inventory", rangeKind: "current_snapshot", scheduleVersion: "v1" })
     ])
   })
 ]);
@@ -44,10 +45,13 @@ export function createKuaimaiProcessor(processDownload) {
   return Object.freeze({
     id: "kuaimai",
     process({ job, result, onValidated }) {
+      const resourceType = job.resourceType === "inventory"
+        ? "inventory_snapshot"
+        : job.resourceType;
       return processDownload({
         jobId: job.id,
         fileName: result.safeFileName || result.fileName,
-        resourceType: job.resourceType,
+        resourceType,
         businessDate: job.businessDate,
         onValidated
       });

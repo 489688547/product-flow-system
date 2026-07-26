@@ -98,9 +98,9 @@ export function assertBusinessDateMatchesRange({ businessDate, rangeStart, range
   }
 }
 
-// 商品快照类导出是当前时点全量，不携带业务日期范围，跳过按日校验。
+// 商品与库存快照是当前时点全量，不携带业务日期范围，跳过按日校验。
 export function assertCollectionFileMatchesTask({ resourceType, businessDate, rangeStart, rangeEnd } = {}) {
-  if (["products", "product_kits", "product_combinations"].includes(String(resourceType || ""))) return;
+  if (["products", "product_kits", "product_combinations", "inventory_snapshot"].includes(String(resourceType || ""))) return;
   assertBusinessDateMatchesRange({ businessDate, rangeStart, rangeEnd });
 }
 

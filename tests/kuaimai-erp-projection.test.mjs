@@ -8,7 +8,7 @@ function record(sourceKey, payload, overrides = {}) {
   return {
     sourceKey,
     occurredAt: overrides.occurredAt || null,
-    modifiedAt: overrides.modifiedAt || now,
+    modifiedAt: Object.hasOwn(overrides, "modifiedAt") ? overrides.modifiedAt : now,
     shopId: overrides.shopId || null,
     warehouseId: overrides.warehouseId || null,
     contentHash: overrides.contentHash || "a".repeat(64),
@@ -97,10 +97,137 @@ test("inventory snapshot projects into daily inventory without inventing missing
     productCode: "P-001", skuCode: "SKU-001", quantity: "18", warehouseName: "华东仓"
   }, { warehouseId: "WH-1", modifiedAt: "2026-07-21T23:00:00+08:00" })], { batchId: "batch-stock", now });
   assert.equal(projection.inventoryDaily.length, 1);
-  assert.equal(projection.inventoryDaily[0].date, "2026-07-21");
+  assert.equal(projection.inventoryDaily[0].date, "2026-07-22");
+  assert.equal(projection.inventoryDaily[0].sourceUpdatedAt, "2026-07-21T23:00:00+08:00");
   assert.equal(projection.inventoryDaily[0].erpQuantity, 18);
   assert.equal(projection.inventoryDaily[0].warehouseId, "WH-1");
   assert.equal(projection.inventoryDaily[0].unitCost, null);
+});
+
+test("inventory projection reads official Chinese columns and preserves zero stock", () => {
+  const projection = projectKuaimaiErpRecords("inventory_snapshot", [record("杭州仓::S-1", {
+    仓库名称: "杭州仓",
+    系统规格ID: "S-1",
+    规格商家编码: "SKU-1",
+    "69码": "6978705011208",
+    可用库存: "0",
+    成本价: "6.50"
+  }, {
+    warehouseId: "杭州仓",
+    modifiedAt: "2026-07-26T05:12:00+08:00"
+  })], {
+    batchId: "batch-inventory",
+    now: "2026-07-26T05:12:00.000Z"
+  });
+
+  assert.equal(projection.inventoryDaily.length, 1);
+  assert.equal(projection.inventoryDaily[0].skuId, "kuaimai:sku:SKU-1");
+  assert.equal(projection.inventoryDaily[0].skuCode, "SKU-1");
+  assert.equal(projection.inventoryDaily[0].warehouseId, "杭州仓");
+  assert.equal(projection.inventoryDaily[0].erpQuantity, 0);
+  assert.equal(projection.inventoryDaily[0].sellableQuantity, 0);
+  assert.equal(projection.inventoryDaily[0].unitCost, 6.5);
+  assert.equal(projection.inventoryDaily[0].sourceUpdatedAt, "2026-07-26T05:12:00+08:00");
+  assert.equal(projection.inventoryDaily[0].confidence, "partial");
+  assert.deepEqual(projection.inventoryQuality, {
+    sourceRows: 1,
+    projectedRows: 1,
+    snapshotDate: "2026-07-26",
+    quantityCoverage: 1,
+    skuCoverage: 1,
+    warehouseCoverage: 1,
+    sourceUpdatedAt: "2026-07-26T05:12:00+08:00",
+    complete: true,
+    confidence: "partial"
+  });
+});
+
+test("inventory projection reads the normalized purchase price index", () => {
+  const projection = projectKuaimaiErpRecords("inventory_snapshot", [record("杭州仓::SKU-1", {
+    skuCode: "SKU-1",
+    warehouseName: "杭州仓",
+    quantity: "18",
+    sellableQuantity: "16",
+    purchasePrice: "6.50"
+  }, {
+    warehouseId: "杭州仓",
+    modifiedAt: null
+  })], {
+    batchId: "batch-inventory-cost",
+    now: "2026-07-26T05:12:00.000Z"
+  });
+
+  assert.equal(projection.inventoryDaily[0].unitCost, 6.5);
+});
+
+test("inventory projection uses Shanghai snapshot day and leaves unknown product mapping empty", () => {
+  const projection = projectKuaimaiErpRecords("inventory_snapshot", [record("杭州仓::S-1", {
+    仓库名称: "杭州仓",
+    系统规格ID: "S-1",
+    可用库存: "8"
+  }, {
+    warehouseId: "杭州仓",
+    modifiedAt: null
+  })], {
+    batchId: "batch-inventory",
+    now: "2026-07-25T21:12:00.000Z"
+  });
+
+  assert.equal(projection.inventoryDaily[0].date, "2026-07-26");
+  assert.equal(projection.inventoryDaily[0].productId, null);
+  assert.equal(projection.inventoryDaily[0].skuId, "kuaimai:sku:S-1");
+  assert.equal(projection.inventoryDaily[0].skuCode, "S-1");
+});
+
+test("inventory snapshot keeps the same SKU in multiple warehouses without inventing product IDs", () => {
+  const projection = projectKuaimaiErpRecords("inventory_snapshot", [
+    record("杭州仓::S-1", {
+      仓库名称: "杭州仓",
+      系统规格ID: "S-1",
+      可用库存: "8"
+    }, {
+      warehouseId: "杭州仓",
+      modifiedAt: "2026-06-01T09:00:00+08:00"
+    }),
+    record("广州仓::S-1", {
+      仓库名称: "广州仓",
+      系统规格ID: "S-1",
+      可用库存: "5"
+    }, {
+      warehouseId: "广州仓",
+      modifiedAt: "2026-07-20T09:00:00+08:00"
+    })
+  ], {
+    batchId: "batch-multi-warehouse",
+    now: "2026-07-25T21:12:00.000Z"
+  });
+
+  assert.deepEqual(
+    projection.inventoryDaily.map(row => ({
+      date: row.date,
+      productId: row.productId,
+      skuId: row.skuId,
+      warehouseId: row.warehouseId,
+      sourceUpdatedAt: row.sourceUpdatedAt
+    })),
+    [
+      {
+        date: "2026-07-26",
+        productId: null,
+        skuId: "kuaimai:sku:S-1",
+        warehouseId: "杭州仓",
+        sourceUpdatedAt: "2026-06-01T09:00:00+08:00"
+      },
+      {
+        date: "2026-07-26",
+        productId: null,
+        skuId: "kuaimai:sku:S-1",
+        warehouseId: "广州仓",
+        sourceUpdatedAt: "2026-07-20T09:00:00+08:00"
+      }
+    ]
+  );
+  assert.notEqual(projection.inventoryDaily[0].id, projection.inventoryDaily[1].id);
 });
 
 test("movement, purchase and aftersales resources become idempotent goods-flow events", () => {

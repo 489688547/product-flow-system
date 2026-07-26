@@ -24,11 +24,39 @@ JSON object with:
 
 Orders, order items and rich sales items require a valid business occurrence timestamp. Kuaimai uses order creation time in Asia/Shanghai. `sales_items` comes from 《销售主题分析-按订单商品明细》 and only writes facts after the whole batch is completed. Quantity, net sales, net cost and gross profit use the governed formulas in `docs/product/data-definitions.md`; unmapped product codes become safe quality exceptions rather than guessed mappings.
 
+`inventory_snapshot` accepts current official inventory exports only. The whole local file must be validated before the
+first request; every row needs a stable SKU identity, warehouse identity and a registered official quantity column.
+Before storing control records, the server normalizes the official `实际总库存` and `实际可用数` columns to
+`quantity` and `sellableQuantity`; both fields must survive the minimum-index allowlist so replay projects the
+official quantities rather than zero values.
+The normalized `purchasePrice` minimum index projects to inventory `unitCost`; an absent source cost remains unknown
+and must not be replaced with zero.
+The projection date is the batch collection day in Asia/Shanghai, while row-level ERP modification time remains
+`sourceUpdatedAt`. Missing product identity remains `null`; the writer never derives a product from a warehouse/SKU
+source key. A partial snapshot is rejected before upload and again after the final server response.
+The Kuaimai adapter uses the official warehouse-inventory export. Kuaimai may label its OOXML workbook with a `.csv`
+suffix, so the company Mac detects the ZIP/OOXML signature before choosing a parser.
+It projects only after the whole file has passed local validation and the collection batch requests `completed`.
+While projection is running, the control batch/archive remain `pending/processing`; they advance to
+`completed/processed` only after the business projection succeeds. The server requires one snapshot date and unique
+`SKU × warehouse` rows, writes staging rows in D1 batches of at most 50 statements, and atomically replaces the target
+date only after all staging rows are present. A failed staging chunk leaves the last trusted live snapshot unchanged
+and the control state replayable. Source-record idempotency compares both the provider row hash and the normalized
+minimum-index payload; when an allowlist upgrade preserves a newly governed field, replaying the same file updates the
+stored index and projection instead of treating the row as unchanged. Replaying the same collection batch uses the
+same projection ID and remains idempotent.
+
 Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values. The server repeats the allowlist normalization before persistence as defense in depth.
 
 ## Response
 
-HTTP `201` returns `data.archiveId`, `data.batchId` and normalized batch status. The standard ingest route also returns `counts`; `sales-facts` returns `projection.sourceRecords`, `projection.storedSourceRecords=0`, fact row count and projected dates. Repeating the same file hash or idempotency key replaces the same exact dates and does not accumulate duplicate facts.
+HTTP `201` returns `data.archiveId`, `data.batchId` and normalized batch status. The standard ingest route also returns
+`counts`. A completed `inventory_snapshot` additionally returns
+`projection.inventoryDaily` and `projection.inventoryQuality` with
+`sourceRows`, `projectedRows`, `snapshotDate`, `quantityCoverage`, `skuCoverage`, `warehouseCoverage`, `sourceUpdatedAt`,
+`complete` and `confidence`. `sales-facts` returns `projection.sourceRecords`,
+`projection.storedSourceRecords=0`, fact row count and projected dates. Repeating the same file hash or idempotency
+key replaces the same exact dates and does not accumulate duplicate facts.
 
 Archive metadata, runner authorization and collection batch control stay in the formal control database. Standard business projections use the target environment persisted on the control job. Display-target sales facts pass through the shared two-times transformation; a stale display version fails before projection writes.
 
@@ -43,7 +71,8 @@ Archive metadata, runner authorization and collection batch control stay in the 
 - `ERP_COLLECTION_SALES_FACTS_EMPTY`: a completed rich sales batch did not produce any trusted aggregate facts.
 - `ERP_COLLECTION_SALES_FACT_INVALID` / `ERP_COLLECTION_SALES_FACTS_TOO_LARGE`: an aggregate fact lacks a valid 69 code/date, exceeds the 1,000-row pack (5,000 for the legacy single-pack format) or the 50-pack batch bound.
 - `ERP_COLLECTION_SALES_FACTS_DATES_REQUIRED` / `ERP_COLLECTION_SALES_FACTS_DATES_INVALID`: a multi-pack first pack misses the full rewrite date list, or a later pack illegally carries one.
-- `ERP_COLLECTION_BATCH_PARTIAL`: a sales export still has blocking validation errors and cannot be reported as synchronized.
+- `ERP_COLLECTION_BATCH_PARTIAL`: a sales export or current inventory snapshot still has blocking validation errors and cannot be reported as synchronized.
+- `GOODS_FLOW_INVENTORY_SNAPSHOT_INVALID`: a completed inventory snapshot is empty, mixes snapshot dates, lacks a stable SKU/warehouse identity, or contains duplicate `SKU × warehouse` rows.
 - `ERP_COLLECTION_INGEST_FAILED`: unexpected storage failure; response and logs must not expose source rows or credentials.
 
 ## Compatibility and deprecation
@@ -56,7 +85,7 @@ D1 stores archive metadata, necessary minimum query indexes, business projection
 
 ## Observability
 
-Audit by batch ID, provider, resource type, file hash, range, row count, status, actor and timestamps. Log stable error codes and counts only; never log raw rows, customer data, cookies, tokens or credentials.
+Audit by batch ID, provider, resource type, file hash, range, row count, status, actor and timestamps. Inventory projection observability also records the safe projection ID, snapshot date, staging chunk count and projected row count. Log stable error codes and counts only; never log raw rows, customer data, cookies, tokens or credentials.
 
 ## Contract tests
 
@@ -67,3 +96,4 @@ Audit by batch ID, provider, resource type, file hash, range, row count, status,
 - `tests/kuaimai-erp-collection-migration.test.mjs`
 - `tests/kuaimai-erp-local-archive.test.mjs`
 - `tests/kuaimai-erp-local-archive-api.test.mjs`
+- `tests/goods-flow-inventory-storage.test.mjs`

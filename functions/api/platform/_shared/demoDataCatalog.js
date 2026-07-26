@@ -109,6 +109,7 @@ const BUSINESS_TABLES = [
     maskJsonFields: ["payload"]
   }),
   table("goods_flow_inventory_daily", "copy", ["id"], 63),
+  table("goods_flow_inventory_daily_stage", "skip", ["projection_id", "snapshot_date", "sku_id", "warehouse_id"], 630),
   table("goods_flow_stocktakes", "mask", ["id"], 64, {
     maskFields: {
       submitted_by: "identity",
@@ -124,6 +125,18 @@ const BUSINESS_TABLES = [
   table("goods_flow_exceptions", "mask", ["id"], 68, {
     maskFields: { resolved_by: "identity" },
     maskJsonFields: ["details"]
+  }),
+  table("supply_chain_workflow_entities", "mask", ["resource_type", "id"], 69, {
+    maskFields: { created_by: "identity", updated_by: "identity" },
+    maskJsonFields: ["payload"]
+  }),
+  table("supply_chain_workflow_events", "mask", ["id"], 690, {
+    maskFields: {
+      actor_id: "identity",
+      actor_name: "identity",
+      actor_department: "identity"
+    },
+    maskJsonFields: ["fields"]
   }),
 
   table("collaboration_items", "mask", ["id"], 70, {
