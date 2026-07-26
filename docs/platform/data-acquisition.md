@@ -59,9 +59,10 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 - Provider adapter 必须覆盖同一官方操作在真实页面出现的已验证弹窗容器变体。快麦销售主题导出当前同时支持普通 `el-dialog` 与确认型 `el-message-box`；商品导出依次处理格式弹窗、字段弹窗和最终确认弹窗，再进入下载中心。所有动作只在当前可见容器内按精确按钮文字执行，不能退化为全页模糊点击。
 - 快麦商品刷新是一个三资源当前快照组：`products` 对应“导出普通商品”，`product_kits` 对应“导出套件”，`product_combinations` 对应“导出组合装”。三者各自拥有任务、归档、批次和游标；只有三个 job 全部完成本机归档、D1 ingest 和商品投影，商品页才刷新并宣告成功。子商品身份读取“子商品商家编码”，数量读取“组合比例”，不得从名称或编码格式推断。
 - 快麦当前库存使用资源 `inventory`、窗口 `current_snapshot`、schema `v1`，固定从
-  `/index.html#/stock/newstatu/` 的官方库存状态页导出。授权人员手动触发与每日 `05:00`
+  `/index.html#/stock/warehouse_status/` 的官方仓库库存页查询后选择“按库存导出”。授权人员手动触发与每日 `05:00`
   计划共享同一服务端任务、租约和幂等边界；Chrome 只执行固定页面和官方导出，本机负责等待、
   哈希归档、解析为 `inventory_snapshot`、完整性校验及受控 ingest。
+- 快麦可能把 OOXML 工作簿命名为 `.csv`；公司 Mac 必须按文件签名识别实际格式，不能仅按扩展名解析。
 - 库存批次必须同时覆盖仓库、稳定 SKU 和官方数量列；缺失或部分有效时返回
   `ERP_COLLECTION_BATCH_PARTIAL`，不得推进游标或覆盖上一可信快照。快照日期来自批次采集日
   （Asia/Shanghai），行级 ERP 修改时间仅写入 `sourceUpdatedAt`。无真实商品编码时

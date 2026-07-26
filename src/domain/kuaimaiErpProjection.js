@@ -262,10 +262,10 @@ function inventoryProjection(resourceType, records, now, snapshotDate) {
   return records.map(record => {
     const sourceUpdatedAt = text(record.modifiedAt, 80) || null;
     const quantity = numberOrNull(firstValue(record.payload, [
-      "quantity", "库存数量", "实际库存", "库存", "可用库存", "可售库存", "可销售库存"
+      "quantity", "实际总库存", "库存数量", "实际库存", "库存", "可用库存", "实际可用数", "可售库存", "可销售库存"
     ]));
     const sellableQuantity = numberOrNull(firstValue(record.payload, [
-      "sellableQuantity", "可用库存", "可售库存", "可销售库存"
+      "sellableQuantity", "实际可用数", "可用库存", "可售库存", "可销售库存"
     ])) ?? quantity;
     const unitCost = numberOrNull(firstValue(record.payload, [
       "unitCost", "成本价", "库存成本价", "采购价"

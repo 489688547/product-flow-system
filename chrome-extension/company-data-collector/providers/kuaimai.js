@@ -9,7 +9,7 @@ export const KUAIMAI_SALES_ROUTE = "/index.html#/report/sale_multidimension_next
 
 export const KUAIMAI_PRODUCT_ROUTE = "/index.html#/prod/parallel/";
 
-export const KUAIMAI_INVENTORY_ROUTE = "/index.html#/stock/newstatu/";
+export const KUAIMAI_INVENTORY_ROUTE = "/index.html#/stock/warehouse_status/";
 
 export const KUAIMAI_DOWNLOAD_CENTER_ROUTE = "/index.html#/index/download_center/";
 
@@ -124,17 +124,22 @@ export const KUAIMAI_PRODUCT_SELECTORS = Object.freeze({
 export const KUAIMAI_INVENTORY_SELECTORS = Object.freeze({
   queryButton: "button",
   exportControl: "button, a.taskbar-menu_item.j-tip-left, .J_Click.toolbar-menu_item",
-  exportDialog: ".modal-dialog, .el-dialog, .el-message-box",
-  exportDialogButton: ".modal-dialog button, .el-dialog button, .el-message-box button"
+  exportTrigger: ".el-dropdown",
+  exportOption: ".el-dropdown-menu__item",
+  exportDialog: ".modal-dialog, .el-dialog, .el-message-box, .ui-lhgdialog",
+  exportDialogButton: "button, input[type='button'], input[type='submit']"
 });
 
-const KUAIMAI_INVENTORY_EXPORT_LABELS = Object.freeze([
+export const KUAIMAI_INVENTORY_EXPORT_OPTION = "按库存导出";
+
+export const KUAIMAI_INVENTORY_EXPORT_LABELS = Object.freeze([
+  "导出库存Excel",
   "Excel导出",
-  "导出库存",
-  "导出"
+  "导出库存"
 ]);
 
 const KUAIMAI_INVENTORY_DOWNLOAD_PREFIXES = Object.freeze([
+  "快麦导出_库存状态(按sku)",
   "快麦ERP库存状态导出",
   "库存状态导出",
   "库存导出"
@@ -161,6 +166,14 @@ export function matchesKuaimaiControlText(text, label) {
   if (!expected || !normalized.endsWith(expected)) return false;
   if (expected === "导出订单" && normalized.endsWith("导出订单明细")) return false;
   return true;
+}
+
+export function matchesKuaimaiInventoryExportLabel(text) {
+  const normalized = String(text || "").replace(/\s+/g, " ").trim();
+  if (normalized.endsWith("快速导出库存Excel")) return false;
+  return KUAIMAI_INVENTORY_EXPORT_LABELS.some(label =>
+    matchesKuaimaiControlText(normalized, label)
+  );
 }
 
 function parseKuaimaiExportTime(value) {
@@ -284,7 +297,7 @@ export function classifyKuaimaiInventoryPage({ url = "", markers = {} } = {}) {
     return { state: "schema_changed", errorCode: "KUAIMAI_INVENTORY_PAGE_SCHEMA_CHANGED" };
   }
   if (
-    hash.startsWith("#/stock/newstatu/")
+    hash.startsWith("#/stock/warehouse_status/")
     && markers.queryButton
     && markers.exportControl
   ) {
@@ -334,7 +347,7 @@ export function buildKuaimaiTaskUrl(baseUrl, task) {
   }
   if (task?.resourceType === "inventory") {
     const url = new URL(baseUrl);
-    url.hash = "#/stock/newstatu/";
+    url.hash = "#/stock/warehouse_status/";
     return url.href;
   }
   const startTime = Date.parse(`${businessDate}T00:00:00+08:00`);
@@ -383,6 +396,7 @@ export function buildKuaimaiActionPlan(task) {
   }
   if (task?.resourceType === "inventory") {
     return [
+      { action: "query_inventory" },
       { action: "export_inventory_snapshot" },
       { action: "confirm_inventory_export" },
       { action: "download_from_center", resourceType: "inventory" }

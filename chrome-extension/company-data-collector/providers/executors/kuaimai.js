@@ -24,6 +24,16 @@ function findRequiredTextElement(selector, value, matchesText, code) {
   return element;
 }
 
+async function waitForRequiredTextElement(selector, value, matchesText, code) {
+  const deadline = Date.now() + 5000;
+  do {
+    const element = exactTextElement(selector, value, matchesText);
+    if (element) return element;
+    await wait(100);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("页面控件不可用。"), { code });
+}
+
 function assertAppliedKuaimaiRange(selectors, context) {
   const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_TIME_BASIS_MISSING");
   const startTime = findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING");
@@ -216,7 +226,6 @@ async function waitForKuaimaiProductPage(provider, selectors, matchesText) {
 async function inventoryPageProbe(provider, selectors, matchesText) {
   const bodyText = String(document.body?.innerText || "");
   const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
-  const exportLabels = ["Excel导出", "导出库存", "导出"];
   return provider.classifyInventoryPage({
     url: location.href,
     markers: {
@@ -226,7 +235,7 @@ async function inventoryPageProbe(provider, selectors, matchesText) {
       humanVerification: verificationTerms.some(term => bodyText.includes(term)),
       queryButton: Boolean(exactTextElement(selectors.queryButton, "查询", matchesText)),
       exportControl: Array.from(document.querySelectorAll(selectors.exportControl))
-        .some(element => exportLabels.some(label => matchesText(element.textContent, label)))
+        .some(element => provider.matchesInventoryExportLabel(element.textContent))
     }
   });
 }
@@ -376,34 +385,68 @@ async function downloadFromKuaimaiCenter({
 
 async function runKuaimaiAction(action, selectors, matchesText, context) {
   switch (action.action) {
+    case "query_inventory": {
+      const button = findRequiredTextElement(
+        context.inventorySelectors.queryButton,
+        "查询",
+        matchesText,
+        "KUAIMAI_INVENTORY_QUERY_MISSING"
+      );
+      button.click();
+      await wait(1800);
+      return;
+    }
     case "export_inventory_snapshot": {
       const inventorySelectors = context.inventorySelectors;
-      const labels = ["Excel导出", "导出库存", "导出"];
       const exportControl = Array.from(document.querySelectorAll(inventorySelectors.exportControl))
         .find(element =>
           element.getClientRects().length > 0
-          && labels.some(label => matchesText(element.textContent, label))
+          && context.kuaimai.matchesKuaimaiInventoryExportLabel(element.textContent)
         );
       if (!exportControl) {
         throw Object.assign(new Error("库存官方导出入口不可用。"), {
           code: "KUAIMAI_INVENTORY_EXPORT_MISSING"
         });
       }
-      context.exportStartedAt = Date.now();
+      const exportTrigger = exportControl.closest(inventorySelectors.exportTrigger) || exportControl;
+      exportTrigger.dispatchEvent(new MouseEvent("mouseenter", {
+        bubbles: false,
+        cancelable: true,
+        view: window
+      }));
+      exportControl.dispatchEvent(new MouseEvent("mouseenter", {
+        bubbles: false,
+        cancelable: true,
+        view: window
+      }));
+      exportControl.dispatchEvent(new MouseEvent("mouseover", {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      }));
       exportControl.click();
+      const exportOption = await waitForRequiredTextElement(
+        inventorySelectors.exportOption,
+        kuaimai.KUAIMAI_INVENTORY_EXPORT_OPTION,
+        matchesText,
+        "KUAIMAI_INVENTORY_EXPORT_OPTION_MISSING"
+      );
+      context.exportStartedAt = Date.now();
+      exportOption.click();
       await wait(500);
       return;
     }
     case "confirm_inventory_export": {
       const inventorySelectors = context.inventorySelectors;
-      const dialog = Array.from(document.querySelectorAll(inventorySelectors.exportDialog))
-        .find(element => element.getClientRects().length > 0);
-      if (!dialog) return;
+      const dialogs = Array.from(document.querySelectorAll(inventorySelectors.exportDialog))
+        .filter(element => element.getClientRects().length > 0);
+      if (!dialogs.length) return;
       const labels = ["立即导出", "确定", "导出"];
-      const confirmation = Array.from(dialog.querySelectorAll(inventorySelectors.exportDialogButton))
+      const confirmation = dialogs
+        .flatMap(dialog => Array.from(dialog.querySelectorAll(inventorySelectors.exportDialogButton)))
         .find(element =>
           element.getClientRects().length > 0
-          && labels.some(label => matchesText(element.textContent, label))
+          && labels.some(label => matchesText(element.value || element.textContent, label))
         );
       if (!confirmation) {
         throw Object.assign(new Error("库存导出确认按钮不可用。"), {

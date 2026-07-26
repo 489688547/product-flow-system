@@ -64,11 +64,11 @@ const RESOURCE_SCHEMAS = {
   inventory_snapshot: {
     identities: [
       ["仓库ID", "仓库编号", "仓库名称", "仓库"],
-      ["系统规格ID", "规格ID", "SKU ID", "商家编码", "规格编码", "SKU编码", "69码", "条码"]
+      ["系统规格ID", "规格ID", "SKU ID", "规格商家编码", "商家编码", "规格编码", "SKU编码", "69码", "条码"]
     ],
     modifiedAt: ["库存更新时间", "修改时间", "更新时间", "盘点时间"],
     warehouse: ["仓库ID", "仓库编号", "仓库名称", "仓库"],
-    quantity: ["可用库存", "可售库存", "可销售库存", "库存数量", "实际库存", "库存"],
+    quantity: ["实际总库存", "可用库存", "实际可用数", "可售库存", "可销售库存", "库存数量", "实际库存", "库存"],
     requireAllIdentities: true
   },
   inventory_movements: {
