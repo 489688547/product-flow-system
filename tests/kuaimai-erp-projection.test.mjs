@@ -142,6 +142,24 @@ test("inventory projection reads official Chinese columns and preserves zero sto
   });
 });
 
+test("inventory projection reads the normalized purchase price index", () => {
+  const projection = projectKuaimaiErpRecords("inventory_snapshot", [record("杭州仓::SKU-1", {
+    skuCode: "SKU-1",
+    warehouseName: "杭州仓",
+    quantity: "18",
+    sellableQuantity: "16",
+    purchasePrice: "6.50"
+  }, {
+    warehouseId: "杭州仓",
+    modifiedAt: null
+  })], {
+    batchId: "batch-inventory-cost",
+    now: "2026-07-26T05:12:00.000Z"
+  });
+
+  assert.equal(projection.inventoryDaily[0].unitCost, 6.5);
+});
+
 test("inventory projection uses Shanghai snapshot day and leaves unknown product mapping empty", () => {
   const projection = projectKuaimaiErpRecords("inventory_snapshot", [record("杭州仓::S-1", {
     仓库名称: "杭州仓",
