@@ -243,11 +243,18 @@ test("supplier workspace covers capability sourcing evaluation concentration and
 
 test("inventory workspace exposes multi-warehouse stocktake BOM and clearance controls", () => {
   const inventory = read("src/features/supply-chain/InventoryWorkspace.jsx");
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
   for (const label of ["SKU × 仓库库存余额", "理论与实盘", "5%", "BOM 与物料消耗", "我方提供", "供应商自带", "清仓候选"]) {
     assert.match(inventory, new RegExp(label.replace("×", "\\×")));
   }
   assert.match(inventory, /classifyStocktakeVariance/);
   assert.match(inventory, /catalogItems/);
+  assert.match(inventory, /从快麦获取最新库存/);
+  assert.match(inventory, /triggerKuaimaiInventoryCollection/);
+  assert.match(inventory, /kuaimaiInventoryCollectionProgress/);
+  assert.match(inventory, /loadWebCollectionStatus/);
+  assert.match(inventory, /onInventoryUpdated/);
+  assert.match(page, /onInventoryUpdated=\{goodsFlow\.refresh\}/);
 });
 
 test("quality workspace separates standards inspections and six-step incident closure", () => {

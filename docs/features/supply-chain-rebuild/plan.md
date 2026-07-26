@@ -31,6 +31,7 @@
 - `src/domain/supplyChainWorkflow.js`：纯角色范围、任务优先级、货流节点、建议和质量状态规则。
 - `src/domain/supplyChain.js`：兼容已有汇总，逐步委托给新领域规则。
 - `src/state/supplyChainDataApi.js`：共享商品、库存、销售、采购、质量和任务的只读消费客户端。
+- `src/state/webCollectionApi.js`：调用已登记的快麦库存当前快照任务并把任务阶段转换为供应链可读状态；不包含页面地址、选择器或 D1 写入逻辑。
 - `src/state/supplyChainApi.js`：兼容旧供应链业务状态，不新增整状态写入。
 - `src/features/supply-chain/SupplyChainAppPage.jsx`：工作区装配和权限范围。
 - `src/features/supply-chain/` 新工作区组件：按业务职责拆分，避免继续扩大 App 页面。
@@ -144,7 +145,7 @@ UI 额外验证：
 4. 库存预警、采购建议和责任分工。
 5. 采购申请、付款关联、生产在途和收货。
 6. 供应商、报价、成本与依赖风险。
-7. 库存盘点、BOM、清仓和运费核对。
+7. 库存盘点、BOM、清仓和运费核对；供应链库存页只消费 `kuaimai / inventory / current_snapshot` 的共享任务契约，Chrome 页面适配、公司 Mac 解析和 D1 投影由数据中心采集能力交付。
 8. 质量标准、质检、问题闭环和供应商质量评价。
 9. 应收应付、数据规则和完整跨模块验收。
 

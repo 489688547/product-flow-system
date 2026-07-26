@@ -353,6 +353,7 @@ export function SupplyChainAppPage({ section = "workbench" }) {
         stocktakePermissions={{ canSubmitCount, canConfirmDifference, canConfirmAmount }}
         createStocktake={goodsFlow.createStocktake}
         transitionStocktake={goodsFlow.transitionStocktake}
+        onInventoryUpdated={goodsFlow.refresh}
       />
     ),
     quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,

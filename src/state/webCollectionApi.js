@@ -57,7 +57,7 @@ export async function registerDouyinStore(input, fetchImpl = fetch) {
 }
 
 const REGISTERED_TRIGGER_RESOURCES = Object.freeze({
-  kuaimai: new Set(["orders", "order_items", "sales_items", "products"]),
+  kuaimai: new Set(["orders", "order_items", "sales_items", "products", "inventory"]),
   "douyin-ecommerce": new Set(["store_daily", "product_daily", "live_daily", "video_daily"])
 });
 
@@ -121,6 +121,50 @@ export function triggerKuaimaiProductCollection({ date, force = false }, fetchIm
     businessDate: date,
     force
   }, fetchImpl);
+}
+
+export function triggerKuaimaiInventoryCollection({ date, force = false }, fetchImpl = fetch) {
+  return triggerWebCollection({
+    providerId: "kuaimai",
+    resourceType: "inventory",
+    businessDate: date,
+    force
+  }, fetchImpl);
+}
+
+export function kuaimaiInventoryCollectionProgress(status, jobId) {
+  const job = (status?.jobs || []).find(item => item.id === jobId) || null;
+  if (!job) return { status: "running", label: "等待库存采集任务", job };
+  const code = String(job.errorCode || "");
+  if (job.status === "waiting_human") {
+    return {
+      status: "waiting_human",
+      label: /LOGIN_REQUIRED/i.test(code) ? "请先在 Chrome 登录快麦" : "请在 Chrome 完成快麦验证",
+      job
+    };
+  }
+  if (job.status === "schema_changed") {
+    return { status: "schema_changed", label: "快麦库存页面结构已变化", job };
+  }
+  if (["failed", "cancelled"].includes(job.status)) {
+    return { status: "failed", label: "库存采集失败，请查看数据同步", job };
+  }
+  if (job.status === "success") {
+    return { status: "success", label: "ERP 库存已更新", job };
+  }
+  const stages = new Set([job.status, job.stage].filter(Boolean));
+  const label = stages.has("ingesting")
+    ? "正在写入库存数据"
+    : stages.has("validating")
+      ? "正在校验库存文件"
+      : stages.has("downloading")
+        ? "正在下载库存文件"
+        : stages.has("exporting")
+          ? "Chrome 正在导出库存"
+          : stages.has("opening") || stages.has("claimed")
+            ? "正在打开快麦库存页面"
+            : "等待 Chrome 领取";
+  return { status: "running", label, job };
 }
 
 function productCollectionFailure(jobs) {

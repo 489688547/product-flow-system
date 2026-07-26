@@ -1,7 +1,13 @@
 import { useState } from "react";
-import { FileSpreadsheet, Upload } from "lucide-react";
+import { FileSpreadsheet, RefreshCw, Upload } from "lucide-react";
+import { currentShanghaiDate } from "../../domain/productCatalogSales.js";
 import { inventorySourceLabel, parseInventoryImportRows } from "../../domain/supplyChain.js";
 import { useSupplyChain } from "../../state/SupplyChainProvider.jsx";
+import {
+  kuaimaiInventoryCollectionProgress,
+  loadWebCollectionStatus,
+  triggerKuaimaiInventoryCollection
+} from "../../state/webCollectionApi.js";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
 import { StocktakeWorkspace } from "./StocktakeWorkspace.jsx";
@@ -31,7 +37,8 @@ export function InventoryWorkspace({
   stocktakes = [],
   stocktakePermissions = {},
   createStocktake,
-  transitionStocktake
+  transitionStocktake,
+  onInventoryUpdated
 }) {
   const { state, dispatch } = useSupplyChain();
   const [pending, setPending] = useState(null);
@@ -40,6 +47,42 @@ export function InventoryWorkspace({
   const [snapshotDate, setSnapshotDate] = useState(new Date().toISOString().slice(0, 10));
   const [warehouse, setWarehouse] = useState("兰山云仓");
   const [activeGroup, setActiveGroup] = useState("balance");
+  const [collectionBusy, setCollectionBusy] = useState(false);
+  const [collectionProgress, setCollectionProgress] = useState(null);
+  const [collectionError, setCollectionError] = useState("");
+
+  async function collectLatestInventory() {
+    setCollectionBusy(true);
+    setCollectionError("");
+    setCollectionProgress({ status: "running", label: "正在创建库存采集任务", job: null });
+    try {
+      const result = await triggerKuaimaiInventoryCollection({
+        date: currentShanghaiDate(),
+        force: false
+      });
+      const jobId = result?.job?.id || result?.jobs?.[0]?.id;
+      if (!jobId) throw new Error("库存采集任务创建不完整，请查看数据同步。");
+
+      for (let attempt = 0; attempt < 180; attempt += 1) {
+        const progress = kuaimaiInventoryCollectionProgress(await loadWebCollectionStatus(), jobId);
+        setCollectionProgress(progress);
+        if (progress.status === "success") {
+          await onInventoryUpdated?.();
+          return result;
+        }
+        if (["waiting_human", "schema_changed", "failed"].includes(progress.status)) {
+          throw new Error(progress.label);
+        }
+        await new Promise(resolve => window.setTimeout(resolve, 2000));
+      }
+      throw new Error("等待快麦库存采集超时，请查看数据同步。");
+    } catch (collectionFailure) {
+      setCollectionError(collectionFailure?.message || "快麦库存采集失败。");
+      throw collectionFailure;
+    } finally {
+      setCollectionBusy(false);
+    }
+  }
 
   async function handleFile(file) {
     if (!file) return;
@@ -177,7 +220,26 @@ export function InventoryWorkspace({
       {GROUPS.map(([key, label]) => <button key={key} type="button" className={activeGroup === key ? "active" : ""} onClick={() => scrollToGroup(key)}>{label}</button>)}
     </nav>
     <section className="section-panel" id="inventory-group-balance">
-      <div className="section-head"><div><h2>SKU × 仓库库存余额</h2><p>理论与实盘分开保留：ERP账面永不被实盘覆盖；校准库存按最近月度盘点锚点延伸。</p></div></div>
+      <div className="section-head">
+        <div><h2>SKU × 仓库库存余额</h2><p>理论与实盘分开保留：ERP账面永不被实盘覆盖；校准库存按最近月度盘点锚点延伸。</p></div>
+        {canEdit ? (
+          <Button
+            variant="primary"
+            disabled={collectionBusy}
+            disabledReason="库存采集正在进行"
+            onClick={() => collectLatestInventory().catch(() => {})}
+          >
+            <RefreshCw size={16} className={collectionBusy ? "is-spinning" : ""} aria-hidden="true" />
+            {collectionBusy ? collectionProgress?.label || "Chrome 采集中…" : "从快麦获取最新库存"}
+          </Button>
+        ) : null}
+      </div>
+      {collectionProgress && !collectionError ? (
+        <p className={`supply-message ${collectionProgress.status === "success" ? "success" : ""}`} role="status">
+          {collectionProgress.label}
+        </p>
+      ) : null}
+      {collectionError ? <p className="supply-message error" role="alert">{collectionError}</p> : null}
       <DataTable className="goods-flow-inventory-table" minWidth={960} columns={projectionColumns} rows={projectionRows} empty={<div className="empty-state compact-empty">还没有统一库存投影。先导入 ERP 库存快照；首次线下盘点前会明确标记“未盘点”。</div>} />
     </section>
     <StocktakeWorkspace
