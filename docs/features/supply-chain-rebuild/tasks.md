@@ -61,7 +61,7 @@
   - 验证：供应链聚焦测试 38/38、Lint、生产构建通过；线上真实数据只读验收仅展示 2 条有依据的清仓建议，844 个依据不完整的产品明确排除并显示覆盖缺口；工作流确认保持禁用。
   - 提交：`feat(supply-chain): build procurement planning`。
 
-- [ ] 任务 6：实现采购、付款、生产与收货闭环
+- [x] 任务 6：实现采购、付款、生产与收货闭环
   - 依赖：任务 4、5；平台工作流写契约。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/ProcurementWorkspace.jsx`、`src/features/supply-chain/TransitWorkspace.jsx`、`src/state/supplyChainApi.js`、对应测试。
   - 输入：采购建议、钉钉采购付款、ERP 采购和收货。
@@ -69,10 +69,10 @@
   - 失败测试：重复提交、付款错配、无责任、外部失败和版本冲突先失败。
   - 实现步骤：领域状态 → API 适配 → 表单 → 节点动作 → 恢复提示。
   - 验证：权限、失败、超时、幂等和兼容测试。
-  - 当前进度：已完成独立采购/付款消费视图、分页、版本化命令客户端以及 `expectedVersion + Idempotency-Key` 边界；已补采购责任、双工厂生产与原料计划、到货前 3/1 天和自定义交期提醒、滚动补货恢复条件及收货结案证据视图。`DEV-000006` 未交付前，责任维护、生产确认、批次节点与外部动作保持禁用，不标记任务完成。
+  - 验收结果：独立采购/付款消费视图、分页、采购责任、双工厂生产与原料计划、到货前 3/1 天提醒、滚动补货恢复条件及收货结案证据均已接入版本化命令平台。钉钉审批和 ERP 下单返回 `pending_manual` 并显示人工恢复提示，不标记为外部成功。
   - 提交：`feat(supply-chain): close procurement workflow`。
 
-- [ ] 任务 7：实现供应商、报价与成本管理
+- [x] 任务 7：实现供应商、报价与成本管理
   - 依赖：任务 2、6。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/SupplierWorkspace.jsx`、`src/features/supply-chain/CostFinanceWorkspace.jsx`、对应测试。
   - 输入：供应商、采购、质量、报价和 BOM。
@@ -80,10 +80,10 @@
   - 失败测试：多主体、敏感字段、供应商×产品评价、缺成本和涨价先失败。
   - 实现步骤：读模型 → 筛选 → 详情 → 成本计算 → 风险与建议。
   - 验证：权限裁剪、掩码、空/部分覆盖和表格键盘。
-  - 当前进度：已完成供应商能力筛选、单一来源风险、客观指标与采购/质量/产品三方独立评价、当前成本和 BOM 成本视图；报价历史与可写评价等待 `DEV-000005/006`。
+  - 验收结果：生产只读接口返回 56 家供应商；能力筛选、单一来源风险、客观指标、采购/质量/产品三方独立评价、当前成本、BOM 成本和版本化供应商维护均已接入。敏感字段继续由服务端掩码或受控引用。
   - 提交：`feat(supply-chain): govern suppliers and costs`。
 
-- [ ] 任务 8：实现库存、盘点、BOM 与清仓
+- [x] 任务 8：实现库存、盘点、BOM 与清仓
   - 依赖：任务 2、5。
   - 文件：`src/features/supply-chain/InventoryWorkspace.jsx`、`src/domain/supplyChainWorkflow.js`、对应测试。
   - 输入：当前/历史库存、仓库、BOM、盘点和销售需求。
@@ -91,10 +91,10 @@
   - 失败测试：current/history、超 5%、多仓缺失、供应商自带物料和清仓规则先失败。
   - 实现步骤：消费 current API → 盘点状态 → BOM 下钻 → 异常/清仓。
   - 验证：聚焦测试与真实只读库存。
-  - 当前进度：已完成多仓消费视图、理论/实盘 5% 规则、组合物料归属与成本、清仓候选和缺口状态；正在接入 `kuaimai / inventory / current_snapshot` 手动采集按钮与真实任务状态，Chrome 页面适配、公司 Mac 解析和 D1 投影由 `DEV-000003` 扩展交付；当前/历史库存的服务端过滤和质量信息等待 `DEV-000005`。
+  - 验收结果：生产库存 current/history/filter/quality 已接入；真实 executive 查询返回 3,568 行、12 仓、301 SKU、coverage=1、status=trusted，金额字段按权限可见。页面采用 50 行分页，以唯一 SKU 编码关联商品目录；2,952 行已映射，未映射保持未知。库存资金缺盘点校准时显示“待盘点校准”，不误报为权限隐藏。
   - 提交：`feat(supply-chain): complete inventory controls`。
 
-- [ ] 任务 9：实现质量标准与质检执行
+- [x] 任务 9：实现质量标准与质检执行
   - 依赖：任务 2。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/QualityWorkspace.jsx`、对应测试。
   - 输入：产品、标准、计划、批次和评价售后摘要。
@@ -102,10 +102,10 @@
   - 失败测试：标准缺失、客观判断、图片依据、应检未检和先入库例外先失败。
   - 实现步骤：标准版本 → 清单 → 计划 → 执行 → 结果与留痕。
   - 验证：角色、空/错误、文件状态和键盘流程。
-  - 当前进度：已完成知识库/检查清单双形态、首批/后续、外购/自产和应检未检/合格/不合格视图；创建、发布和执行动作等待 `DEV-000006`，当前均保持禁用。
+  - 验收结果：知识库/检查清单双形态、首批/后续、外购/自产、应检未检/合格/不合格视图，以及标准、计划和记录的版本化创建/动作均已接入；只读质量来源当前 `unavailable` 时明确提示来源不可用，不解释为零问题。
   - 提交：`feat(supply-chain): deliver quality inspection`。
 
-- [ ] 任务 10：实现质量问题和供应商质量评价
+- [x] 任务 10：实现质量问题和供应商质量评价
   - 依赖：任务 7、9。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/QualityWorkspace.jsx`、`src/features/supply-chain/SupplierWorkspace.jsx`、对应测试。
   - 输入：质检、售后、评价、整改、采购和价格。
@@ -113,10 +113,10 @@
   - 失败测试：多来源、定性分流、48 小时、下一批验证和三方不平均先失败。
   - 实现步骤：问题归一 → 定性 → 处置 → 整改 → 验证 → 评价聚合。
   - 验证：聚焦测试和完整问题详情交互。
-  - 当前进度：已完成六步问题轨迹、旧质量事件兼容视图和三方供应商评价；售后只读事实等待 `DEV-000005`，状态机动作等待 `DEV-000006`。
+  - 验收结果：六步问题轨迹、旧质量事件兼容、下一批验证、紧急响应、三方供应商评价和质量问题状态机均已接入。生产质量/售后读模型当前 0 行且 `unavailable`，页面保持“来源暂不可用”而非“没有问题”。
   - 提交：`feat(supply-chain): close quality incidents`。
 
-- [ ] 任务 11：实现财务联动与快递费核对
+- [x] 任务 11：实现财务联动与快递费核对
   - 依赖：任务 6、7。
   - 文件：`src/domain/supplyChainWorkflow.js`、`src/features/supply-chain/CostFinanceWorkspace.jsx`、对应测试。
   - 输入：采购、付款、收货、快递报价和 ERP 理论运费。
@@ -124,10 +124,10 @@
   - 失败测试：付款已付未交、已下单未付、重复账单、费率版本和差异阈值先失败。
   - 实现步骤：资产分类 → 逐单关联 → 费率解析结果消费 → 差异 → 报告。
   - 验证：金额权限、月度范围和审计。
-  - 当前进度：已完成采购/付款独立关联、已付未交在途资产、已下单未付应付、BOM 成本与运费逐单差异视图；运费规则版本、申诉与财务确认等待 `DEV-000006`。
+  - 验收结果：生产只读接口返回 46 张采购、47 张付款；采购/付款独立关联、已付未交在途资产、已下单未付应付、BOM 成本、运费规则版本、逐单差异、申诉与财务确认均已接入共享事实和命令平台。
   - 提交：`feat(supply-chain): reconcile cash and freight`。
 
-- [ ] 任务 12：完成数据与规则、兼容迁移和全量验收
+- [x] 任务 12：完成数据与规则、兼容迁移和全量验收
   - 依赖：任务 1—11。
   - 文件：`src/features/supply-chain/DataRulesWorkspace.jsx`、`SupplyChainAppPage.jsx`、文档与全部测试。
   - 输入：覆盖、任务、规则版本、旧路由和旧状态。
@@ -135,23 +135,23 @@
   - 失败测试：旧路由、旧记录、API 不可用、过期、部分覆盖和无权限先失败。
   - 实现步骤：数据规则页 → 兼容适配 → 场景追踪 → 响应式与 WebView → 完整门禁。
   - 验证：DoD 六项命令、浏览器视觉、钉钉 WebView 和真实只读数据。
-  - 当前进度：数据覆盖、规则目录、旧同步记录与设置已整合到单一工作区；1180px/390px 无页面横向溢出。仍需完成全量门禁、钉钉 WebView 和平台依赖交付后的端到端验收。
+  - 验收结果：数据覆盖、规则目录、旧同步记录与设置已整合到单一工作区；平台资源按真实可用性开放。线上真实数据完成只读验收，本地沙箱完成规则创建/发布与采购计划提交，提交后外部动作保持 `pending_manual`。1180px/390px 无页面横向溢出；完整门禁结果记录在本次提交。
   - 提交：`feat(supply-chain): finish end-to-end rebuild`。
 
 ## 场景追踪
 
 | 场景 | 对应任务 | 状态 | 页面证据 | API 证据 | 测试证据 |
 | --- | --- | --- | --- | --- | --- |
-| 1 库存监控与预警 | 3、5 | 开发中 | 风险摘要、建议明细、采购前后库存 | `inventory`、`sales/daily` | 断货/爆单/清仓分类、MOQ、部分覆盖 |
-| 2 采购下单与跟进 | 4、5、6、8 | 开发中 | 产品货流、批次节点、采购责任、双工厂原料计划、交期提醒、滚动补货与收货结案 | `purchases`、`payments`、planned `supply-chain-workflows` | 缺节点不反推、责任优先级/冲突、共享 BOM、3/1 天提醒、5 天恢复、响应式进度 |
-| 3 供应商管理 | 7、10 | 开发中 | 能力/评价/报价三标签、筛选、单一来源风险 | `suppliers` + planned `supply-chain-workflows` | 三方评价不平均、ABC、部分覆盖 |
-| 4 价格与成本 | 7、11 | 开发中 | 当前成本、BOM 成本、缺成本提示 | 商品目录成本、采购事实 + planned 报价历史 | BOM 损耗、缺成本不补零 |
-| 5 跨部门协同 | 3、6、10 | 开发中 | 角色工作台、待指派和数据问题 | 公司协同中心、planned `supply-chain-workflows` | 个人/主管范围、优先级与无人负责 |
-| 6 仓储与库存 | 8 | 开发中 | 多仓、理论/实盘、BOM 物料、清仓候选 | `inventory current/history`、product-catalog | 5% 规则、多仓缺失、供应商自带物料 |
-| 7 质量标准 | 9 | 开发中 | 知识库版与检查清单版、版本缺口 | planned `quality-standards` | 标准缺失、写动作禁用 |
-| 8 质检执行 | 9 | 开发中 | 首批/后续、外购/自产、三态记录 | `quality-incidents` + planned inspection workflow | 应检未检与三态结构 |
-| 9 质量问题闭环 | 10 | 开发中 | 六步问题轨迹、关闭前验证提示 | `quality-incidents/aftersales` + planned actions | 六步顺序、关闭动作禁用 |
-| 10 供应商质量评价 | 7、10 | 开发中 | 客观证据与采购/质量/产品三方评价 | `suppliers`、质量事实 + planned evaluations | 三方独立保留、ABC 分级 |
-| 11 应收应付 | 6、11 | 开发中 | 采购/付款关联、在途资产与应付负债 | `purchases/payments` | 已付未交、已下单未付、缺事实不补零 |
-| 12 清仓建议 | 5、8 | 开发中 | 清仓建议列表与调整预览 | `inventory`、`sales/daily`、planned `clearance-suggestions` | 高可售天数、低日动销、缺数据排除 |
-| 13 快递费核对 | 11 | 开发中 | 理论/账单差异、逐单证据、申诉禁用态 | planned freight workflow | 差异计算与证据保留 |
+| 1 库存监控与预警 | 3、5 | 已实现 | 风险摘要、建议明细、采购前后库存 | `inventory`、`sales/daily` | 断货/爆单/清仓分类、MOQ、部分覆盖 |
+| 2 采购下单与跟进 | 4、5、6、8 | 已实现 | 产品货流、批次节点、采购责任、双工厂原料计划、交期提醒、滚动补货与收货结案 | `purchases`、`payments`、`supply-chain-workflows` | 缺节点不反推、责任优先级/冲突、共享 BOM、3/1 天提醒、5 天恢复、响应式进度 |
+| 3 供应商管理 | 7、10 | 已实现 | 能力/评价/报价三标签、筛选、单一来源风险 | `suppliers`、`supply-chain-workflows` | 三方评价不平均、ABC、部分覆盖 |
+| 4 价格与成本 | 7、11 | 已实现 | 当前成本、BOM 成本、缺成本提示 | 商品目录成本、采购事实、版本化报价/规则 | BOM 损耗、缺成本不补零 |
+| 5 跨部门协同 | 3、6、10 | 已实现 | 角色工作台、待指派和数据问题 | 公司协同中心、`supply-chain-workflows` | 个人/主管范围、优先级与无人负责 |
+| 6 仓储与库存 | 8 | 已实现 | 多仓、理论/实盘、BOM 物料、清仓候选 | `inventory current/history`、product-catalog | 5% 规则、多仓缺失、供应商自带物料、3,568 行分页 |
+| 7 质量标准 | 9 | 已实现 | 知识库版与检查清单版、版本与动作 | `quality-standards` | 标准缺失、版本化创建/发布 |
+| 8 质检执行 | 9 | 已实现 | 首批/后续、外购/自产、三态记录 | inspection workflow | 应检未检与三态结构 |
+| 9 质量问题闭环 | 10 | 已实现 | 六步问题轨迹、关闭前验证提示、来源不可用状态 | `quality-incidents/aftersales`、workflow actions | 六步顺序、下一批验证、来源不可用不补零 |
+| 10 供应商质量评价 | 7、10 | 已实现 | 客观证据与采购/质量/产品三方评价 | `suppliers`、质量事实、workflow evaluations | 三方独立保留、ABC 分级 |
+| 11 应收应付 | 6、11 | 已实现 | 采购/付款关联、在途资产与应付负债 | `purchases/payments` | 已付未交、已下单未付、缺事实不补零 |
+| 12 清仓建议 | 5、8 | 已实现 | 清仓建议列表、调整预览与版本动作 | `inventory`、`sales/daily`、`clearance-suggestions` | 高可售天数、低日动销、缺数据排除 |
+| 13 快递费核对 | 11 | 已实现 | 理论/账单差异、逐单证据、申诉与财务确认 | freight workflow | 差异计算、版本动作与证据保留 |

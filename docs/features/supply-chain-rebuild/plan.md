@@ -49,7 +49,7 @@
 - `GET /api/platform/v1/data-services/sales`
 - `GET /api/platform/v1/web-collection/jobs`
 
-### `DEV-000005` 增补
+### `DEV-000005` 已交付
 
 - `GET /api/platform/v1/goods-flow/inventory?mode=current|history&asOf&skuId&warehouseId&cursor`
 - `GET /api/platform/v1/data-services/sales/daily?from&to&productId&inventoryUnitId&platform&cursor`
@@ -60,12 +60,12 @@
 - `GET /api/platform/v1/goods-flow/aftersales`
 - `GET /api/platform/v1/data-tasks`
 
-### `DEV-000006` 增补
+### `DEV-000006` 已交付
 
 - 命名空间：`/api/platform/v1/supply-chain-workflows`
 - 能力：责任与采购规则、采购建议、计划/批次/里程碑、采购付款关联、供应商业务档案、BOM/规则版本、质量标准/质检/问题闭环、清仓和运费核对。
 - 写入约束：`Idempotency-Key`、`expectedVersion`、服务端授权与审计；外部钉钉/ERP 动作只能由服务端适配器执行。
-- 当前状态：`ready/planned`。交付前供应链页面只展示来源事实、未知状态和禁用动作，不调用模拟接口、不在浏览器保存业务命令。
+- 当前状态：共享命令平台已接通。供应链消费层按资源加载列表、创建实体和执行动作，所有写入使用幂等键、乐观版本和服务端身份；钉钉审批与 ERP 下单仍以 `pending_manual` 结束，不调用浏览器直连或模拟外部成功。
 
 ### 消费客户端
 
@@ -104,7 +104,7 @@
 - 现有 `/api/supply-chain` 状态只读兼容，旧采购、付款、供应商、质量记录通过稳定来源 ID 映射到新视图。
 - 新页面不执行 legacy whole-state 覆盖写。
 - 共享事实的 D1 迁移由 `DEV-000005` 负责，并声明展示数据库策略。
-- `DEV-000006` 交付前，涉及写入的新功能保持明确禁用或使用已有已验证动作，不保存到浏览器假数据；交付后由消费客户端适配版本冲突、幂等重放、外部动作失败和协同恢复事项。
+- 涉及写入的新功能统一调用共享工作流命令平台；消费客户端适配版本冲突、幂等重放、外部动作失败和协同恢复事项，不保存到浏览器假数据。
 - 历史节点缺证据时显示“历史状态未知”，不根据当前状态反推。
 
 ## 风险与回滚

@@ -78,6 +78,70 @@ export async function loadSupplyChainInventory({
   return normalizedCollection(payload);
 }
 
+function qualityRank(status) {
+  return ({ trusted: 0, partial: 1, stale: 2, unavailable: 3 })[status] ?? 1;
+}
+
+function mergeCollectionQuality(left, right) {
+  if (!left) return { ...(right || normalizedQuality({})) };
+  if (!right) return { ...left };
+  const status = qualityRank(left?.status) >= qualityRank(right?.status) ? left?.status : right?.status;
+  const timestamps = [left?.lastSuccessfulSyncAt, right?.lastSuccessfulSyncAt].filter(Boolean).sort();
+  const coverages = [left?.coverage, right?.coverage].filter(Number.isFinite);
+  return {
+    ...(left || {}),
+    ...(right || {}),
+    status: status || "partial",
+    lastSuccessfulSyncAt: timestamps.at(-1) || null,
+    coverage: coverages.length ? Math.min(...coverages) : null,
+    confidence: left?.confidence === "insufficient" || right?.confidence === "insufficient"
+      ? "insufficient"
+      : left?.confidence === "partial" || right?.confidence === "partial"
+        ? "partial"
+        : right?.confidence || left?.confidence || null,
+    missing: [...new Set([...(left?.missing || []), ...(right?.missing || [])])]
+  };
+}
+
+async function loadAllCollectionPages(loader, options = {}) {
+  const items = [];
+  const seenCursors = new Set();
+  let cursor = options.cursor || "";
+  let first = null;
+  let quality = null;
+  let pagesLoaded = 0;
+  for (;;) {
+    const page = await loader({ ...options, cursor });
+    first ||= page;
+    items.push(...page.items);
+    quality = mergeCollectionQuality(quality, page.quality);
+    pagesLoaded += 1;
+    const nextCursor = String(page.page?.nextCursor || "");
+    if (!nextCursor || seenCursors.has(nextCursor) || pagesLoaded >= 100) {
+      const truncated = Boolean(nextCursor && !seenCursors.has(nextCursor));
+      return {
+        ...first,
+        items,
+        quality: truncated
+          ? mergeCollectionQuality(quality, { status: "partial", missing: ["pagination_limit"] })
+          : quality,
+        page: { nextCursor: truncated ? nextCursor : null },
+        meta: {
+          ...(first?.meta || {}),
+          pagesLoaded,
+          rowCount: items.length
+        }
+      };
+    }
+    seenCursors.add(nextCursor);
+    cursor = nextCursor;
+  }
+}
+
+export function loadSupplyChainInventoryAll(options = {}) {
+  return loadAllCollectionPages(loadSupplyChainInventory, options);
+}
+
 function validSalesContract(contract) {
   return contract?.timeBasis === "create_time"
     && contract?.timezone === "Asia/Shanghai"
@@ -109,6 +173,10 @@ export async function loadSupplyChainSalesDaily({
     ...normalizedCollection(payload),
     contract: payload.contract
   };
+}
+
+export function loadSupplyChainSalesDailyAll(options = {}) {
+  return loadAllCollectionPages(loadSupplyChainSalesDaily, options);
 }
 
 async function loadGoodsFlowCollection(resource, { filters = {}, fetchImpl = fetch, signal } = {}) {
@@ -148,12 +216,13 @@ function workspaceRequests(workspace, filters, fetchImpl, signal) {
   };
   const requests = {
     workbench: {
-      inventory: () => loadSupplyChainInventory({ ...inventoryFilters, ...common }),
-      sales: () => loadSupplyChainSalesDaily({ ...salesFilters, ...common })
+      inventory: () => loadSupplyChainInventoryAll({ ...inventoryFilters, ...common }),
+      sales: () => loadSupplyChainSalesDailyAll({ ...salesFilters, ...common }),
+      tasks: () => loadSupplyChainDataTasks({ filters, ...common })
     },
     planning: {
-      inventory: () => loadSupplyChainInventory({ ...inventoryFilters, ...common }),
-      sales: () => loadSupplyChainSalesDaily({ ...salesFilters, ...common }),
+      inventory: () => loadSupplyChainInventoryAll({ ...inventoryFilters, ...common }),
+      sales: () => loadSupplyChainSalesDailyAll({ ...salesFilters, ...common }),
       purchases: () => loadSupplyChainPurchases({ filters, ...common })
     },
     suppliers: {
@@ -164,7 +233,7 @@ function workspaceRequests(workspace, filters, fetchImpl, signal) {
       payments: () => loadSupplyChainPayments({ filters, ...common })
     },
     inventory: {
-      inventory: () => loadSupplyChainInventory({ ...inventoryFilters, ...common })
+      inventory: () => loadSupplyChainInventoryAll({ ...inventoryFilters, ...common })
     },
     quality: {
       qualityIncidents: () => loadSupplyChainQualityIncidents({ filters, ...common }),

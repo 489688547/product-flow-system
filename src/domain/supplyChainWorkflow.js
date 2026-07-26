@@ -641,6 +641,73 @@ export function classifyStocktakeVariance({
   };
 }
 
+export function summarizeInventoryFunds(rows = []) {
+  const sourceRows = Array.isArray(rows) ? rows : [];
+  const amountVisible = sourceRows.some(row => Object.prototype.hasOwnProperty.call(row || {}, "inventoryCashTied"));
+  const costVisible = sourceRows.some(row => Object.prototype.hasOwnProperty.call(row || {}, "unitCost"));
+  if (!amountVisible && !costVisible) {
+    return { status: "hidden", amount: null };
+  }
+  const knownAmounts = sourceRows
+    .map(row => row?.inventoryCashTied)
+    .filter(value => value !== null && value !== undefined && Number.isFinite(Number(value)));
+  if (!knownAmounts.length) {
+    return { status: "uncalibrated", amount: null };
+  }
+  return {
+    status: "available",
+    amount: knownAmounts.reduce((sum, value) => sum + Number(value), 0)
+  };
+}
+
+export function linkInventoryFactsToCatalog(rows = [], catalogItems = []) {
+  const candidatesByCode = new Map();
+  for (const product of Array.isArray(catalogItems) ? catalogItems : []) {
+    for (const sku of Array.isArray(product?.skus) ? product.skus : []) {
+      const reference = { productId: product.id, inventoryUnitId: sku.id };
+      const identity = `${reference.productId}|${reference.inventoryUnitId}`;
+      for (const rawCode of [sku.barcode, sku.merchantSkuCode, sku.sourceSkuId]) {
+        const code = String(rawCode || "").trim();
+        if (!code) continue;
+        if (!candidatesByCode.has(code)) candidatesByCode.set(code, new Map());
+        candidatesByCode.get(code).set(identity, reference);
+      }
+    }
+  }
+
+  return (Array.isArray(rows) ? rows : []).map(row => {
+    const code = String(row?.skuCode || row?.inventoryUnitCode || row?.code || "").trim();
+    const candidates = candidatesByCode.get(code);
+    const matched = candidates?.size === 1 ? [...candidates.values()][0] : null;
+    const sourceProductId = row?.productId || null;
+    const compatibleMatch = matched && (!sourceProductId || sourceProductId === matched.productId) ? matched : null;
+    return {
+      ...row,
+      productId: sourceProductId || compatibleMatch?.productId || null,
+      inventoryUnitId: row?.inventoryUnitId || compatibleMatch?.inventoryUnitId || null,
+      sourceInventoryUnitId: row?.sourceInventoryUnitId || row?.skuId || null
+    };
+  });
+}
+
+export function canonicalizeFactProductIds(rows = [], products = []) {
+  const productIdByCatalogId = new Map(
+    (Array.isArray(products) ? products : [])
+      .map(product => [String(product?.catalogProductId || "").trim(), product?.id])
+      .filter(([catalogProductId, productId]) => catalogProductId && productId)
+  );
+  return (Array.isArray(rows) ? rows : []).map(row => {
+    const currentProductId = String(row?.productId || "").trim();
+    const productId = productIdByCatalogId.get(currentProductId);
+    if (!productId || productId === currentProductId) return row;
+    return {
+      ...row,
+      sourceProductId: row?.sourceProductId || currentProductId,
+      productId
+    };
+  });
+}
+
 function normalizedRatingValues(perspectives) {
   return Object.values(perspectives || {})
     .flatMap(value => value && typeof value === "object" ? Object.values(value) : [])

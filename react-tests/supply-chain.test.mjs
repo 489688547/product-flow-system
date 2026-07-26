@@ -19,14 +19,17 @@ import {
   calculateBomCost,
   calculateBundleRequirements,
   calculateProcurementSuggestion,
+  canonicalizeFactProductIds,
   classifyFinancialPosition,
   classifyStocktakeVariance,
   classifyStockRisk,
   evaluateSupplierPerformance,
   evaluateRollingReplenishmentRecovery,
+  linkInventoryFactsToCatalog,
   reconcileFreightCharge,
   normalizeSupplyChainSection,
   resolveProcurementResponsibility,
+  summarizeInventoryFunds,
   summarizeInventorySnapshotCoverage
 } from "../src/domain/supplyChainWorkflow.js";
 
@@ -52,6 +55,78 @@ test("legacy supply chain sections resolve to the closest new workspace", () => 
   assert.equal(normalizeSupplyChainSection("records"), "rules");
   assert.equal(normalizeSupplyChainSection("settings"), "rules");
   assert.equal(normalizeSupplyChainSection("unknown"), "workbench");
+});
+
+test("inventory funds distinguish permission masking from an uncalibrated snapshot", () => {
+  assert.deepEqual(summarizeInventoryFunds([
+    { unitCost: 12, inventoryCashTied: null },
+    { unitCost: 7, inventoryCashTied: null }
+  ]), {
+    status: "uncalibrated",
+    amount: null
+  });
+
+  assert.deepEqual(summarizeInventoryFunds([
+    { inventoryCashTied: 120 },
+    { inventoryCashTied: 80 }
+  ]), {
+    status: "available",
+    amount: 200
+  });
+
+  assert.deepEqual(summarizeInventoryFunds([
+    { erpQuantity: 10 },
+    { erpQuantity: 20 }
+  ]), {
+    status: "hidden",
+    amount: null
+  });
+});
+
+test("inventory facts inherit product identity only from a unique catalog SKU code", () => {
+  const catalogItems = [
+    {
+      id: "product:one",
+      skus: [{ id: "catalog-sku:one", barcode: "6970000000001", merchantSkuCode: "ERP-1" }]
+    },
+    {
+      id: "product:two",
+      skus: [{ id: "catalog-sku:two", barcode: "6970000000002", merchantSkuCode: "ERP-DUP" }]
+    },
+    {
+      id: "product:three",
+      skus: [{ id: "catalog-sku:three", barcode: "6970000000003", merchantSkuCode: "ERP-DUP" }]
+    }
+  ];
+
+  const rows = linkInventoryFactsToCatalog([
+    { skuId: "inventory-sku:1", skuCode: "ERP-1", productId: null },
+    { skuId: "inventory-sku:2", skuCode: "ERP-DUP", productId: null },
+    { skuId: "inventory-sku:3", skuCode: "UNKNOWN", productId: "source-product" }
+  ], catalogItems);
+
+  assert.equal(rows[0].productId, "product:one");
+  assert.equal(rows[0].inventoryUnitId, "catalog-sku:one");
+  assert.equal(rows[0].sourceInventoryUnitId, "inventory-sku:1");
+  assert.equal(rows[1].productId, null);
+  assert.equal(rows[1].inventoryUnitId, null);
+  assert.equal(rows[2].productId, "source-product");
+});
+
+test("shared facts use the lifecycle product identity when a catalog product is linked", () => {
+  const rows = canonicalizeFactProductIds([
+    { id: "fact:one", productId: "catalog:one" },
+    { id: "fact:two", productId: "catalog:two" },
+    { id: "fact:unknown", productId: "catalog:unknown" }
+  ], [
+    { id: "lifecycle:one", catalogProductId: "catalog:one" },
+    { id: "catalog:two", catalogProductId: "catalog:two" }
+  ]);
+
+  assert.equal(rows[0].productId, "lifecycle:one");
+  assert.equal(rows[0].sourceProductId, "catalog:one");
+  assert.equal(rows[1].productId, "catalog:two");
+  assert.equal(rows[2].productId, "catalog:unknown");
 });
 
 test("goods flow progress never infers missing earlier milestones from a later receipt", () => {

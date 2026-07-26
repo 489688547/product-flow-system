@@ -17,13 +17,16 @@ export function PlanningProcurementWorkspace({
   risks = [],
   supplyLinks = [],
   purchases = [],
+  payments = [],
   inventoryCoverage,
   inventoryReadError = "",
-  workflowAvailable = false,
+  workflow,
   canSyncApprovals = false,
   canEditApprovalMapping = false
 }) {
   const [activeTab, setActiveTab] = useState("planning");
+  const procurementAvailable = ["purchase-plans", "purchase-batches", "purchase-payment-links"]
+    .every(resource => workflow?.resourceAvailable?.(resource) === true);
   return (
     <div className="supply-planning-procurement">
       <div className="supply-workspace-tabs" role="tablist" aria-label="计划与采购工作区">
@@ -51,17 +54,17 @@ export function PlanningProcurementWorkspace({
             supplyLinks={supplyLinks}
             inventoryCoverage={inventoryCoverage}
             inventoryReadError={inventoryReadError}
-            workflowAvailable={workflowAvailable}
+            workflow={workflow}
           />
         </div>
       ) : activeTab === "approvals" ? (
         <div id="supply-approvals-panel" role="tabpanel">
-          {!workflowAvailable ? (
+          {!procurementAvailable ? (
             <div className="supply-coverage-notice is-partial" role="status">
               <TriangleAlert size={17} aria-hidden="true" />
               <span>
                 <strong>版本化采购工作流尚未启用</strong>
-                <small>DEV-000006 交付前，新建采购计划、ERP 下单和节点推进保持禁用；现有钉钉审批同步与映射可继续使用。</small>
+                <small>采购计划、批次或付款关联暂不可写；现有钉钉审批同步与映射仍可继续使用。</small>
               </span>
             </div>
           ) : (
@@ -77,6 +80,9 @@ export function PlanningProcurementWorkspace({
             canSync={canSyncApprovals}
             canEditMapping={canEditApprovalMapping}
             products={products}
+            purchases={purchases}
+            payments={payments}
+            workflow={workflow}
           />
         </div>
       ) : (
@@ -85,7 +91,7 @@ export function PlanningProcurementWorkspace({
             products={products}
             purchases={purchases}
             supplyLinks={supplyLinks}
-            workflowAvailable={workflowAvailable}
+            workflow={workflow}
           />
         </div>
       )}

@@ -22,7 +22,10 @@ test("every app shows the real account when local code is operating online", () 
 
   assert.match(banner, /loginMode !== "local-online-account"/);
   assert.match(banner, /本地代码 · 线上真实环境/);
-  assert.match(banner, /当前账号：\{sessionUser\.name\}/);
+  assert.match(banner, /VITE_LOCAL_D1_SANDBOX/);
+  assert.match(banner, /本地沙箱 · 本地数据/);
+  assert.match(banner, /写入只影响本机/);
+  assert.match(banner, /当前账号：\$\{sessionUser\.name\}/);
   assert.match(banner, /数据修改、钉钉和快麦操作都会立即在线上生效/);
   assert.match(banner, /role="status"/);
   assert.match(app, /LocalOnlineEnvironmentBanner/);

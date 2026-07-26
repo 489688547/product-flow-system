@@ -1,3 +1,7 @@
+import { useState } from "react";
+import { Button } from "../../ui/Button.jsx";
+import { Modal } from "../../ui/Modal.jsx";
+
 const STATUS_LABELS = Object.freeze({
   trusted: "可信",
   partial: "部分覆盖",
@@ -13,7 +17,52 @@ const RULES = Object.freeze([
   { name: "采购建议", value: "覆盖最长周期并结合同比、活动、MOQ 与产能", version: "procurement-v1" }
 ]);
 
-export function DataRulesWorkspace({ sources = [], workflowAvailable = false, children }) {
+export function DataRulesWorkspace({ sources = [], workflowAvailable = false, workflow, children }) {
+  const [ruleOpen, setRuleOpen] = useState(false);
+  const [ruleForm, setRuleForm] = useState({ name: "清仓阈值", value: "", effectiveFrom: "" });
+  const workflowRules = workflow?.workflows?.["business-rules"]?.items || [];
+  async function saveRule() {
+    if (!ruleForm.name.trim() || !ruleForm.value.trim()) return;
+    try {
+      await workflow.create({
+        resource: "business-rules",
+        id: `business-rule:${Date.now()}`,
+        fields: {
+          name: ruleForm.name.trim(),
+          value: ruleForm.value.trim(),
+          effectiveFrom: ruleForm.effectiveFrom || new Date().toISOString().slice(0, 10)
+        }
+      });
+      setRuleOpen(false);
+      setRuleForm({ name: "清仓阈值", value: "", effectiveFrom: "" });
+    } catch {
+      // The page-level workflow notice presents the safe error and request ID.
+    }
+  }
+
+  async function publishRule(entity) {
+    try {
+      await workflow.act({
+        resource: "business-rules",
+        id: entity.id,
+        action: "publish",
+        expectedVersion: entity.version,
+        reason: "业务规则复核通过"
+      });
+    } catch {
+      // The page-level workflow notice presents the safe error and request ID.
+    }
+  }
+
+  const effectiveRules = [
+    ...RULES,
+    ...workflowRules.map(entity => ({
+      name: entity.fields?.name || entity.id,
+      value: entity.fields?.value || "规则值待补",
+      version: `v${entity.version}`,
+      entity
+    }))
+  ];
   return (
     <div className="supply-work-grid supply-data-rules">
       <section className="section-panel">
@@ -31,18 +80,30 @@ export function DataRulesWorkspace({ sources = [], workflowAvailable = false, ch
           <article>
             <div><strong>工作流命令</strong><span className={`status-badge ${workflowAvailable ? "success" : "neutral"}`}>{workflowAvailable ? "已接通" : "计划中"}</span></div>
             <p>责任规则、采购计划、供应商评价、质量标准与运费核对</p>
-            <b>{workflowAvailable ? "版本化写入已开放" : "DEV-000006 未交付"}</b>
-            <small>未接通前所有新动作保持禁用</small>
+            <b>{workflowAvailable ? "版本化写入已开放" : "工作流服务暂不可用"}</b>
+            <small>{workflowAvailable ? "所有写入带权限、幂等、版本与审计" : "服务恢复前保留只读数据，不伪造操作结果"}</small>
           </article>
         </div>
       </section>
       <section className="section-panel">
-        <div className="section-head"><div><h2>规则目录</h2><p>规则值、版本与数据口径集中可见；版本化编辑由共享工作流服务提供。</p></div></div>
+        <div className="section-head"><div><h2>规则目录</h2><p>规则值、版本与数据口径集中可见；版本化编辑由共享工作流服务提供。</p></div><Button variant="primary" disabled={!workflow?.resourceAvailable?.("business-rules")} disabledReason="业务规则服务暂不可用" onClick={() => setRuleOpen(true)}>新增规则版本</Button></div>
         <div className="supply-rule-list">
-          {RULES.map(rule => <article key={rule.name}><div><strong>{rule.name}</strong><small>{rule.version}</small></div><p>{rule.value}</p></article>)}
+          {effectiveRules.map((rule, index) => <article key={`${rule.name}:${rule.version}:${index}`}><div><strong>{rule.name}</strong><small>{rule.version}</small></div><p>{rule.value}</p>{rule.entity?.status === "draft" ? <Button className="compact" disabled={Boolean(workflow?.busy)} onClick={() => publishRule(rule.entity)}>发布本版</Button> : rule.entity ? <span className="status-badge success">{rule.entity.status === "published" ? "已发布" : rule.entity.status}</span> : null}</article>)}
         </div>
       </section>
       {children}
+      <Modal
+        open={ruleOpen}
+        title="新增业务规则版本"
+        onClose={() => setRuleOpen(false)}
+        footer={<><Button onClick={() => setRuleOpen(false)}>取消</Button><Button variant="primary" disabled={!ruleForm.name.trim() || !ruleForm.value.trim() || Boolean(workflow?.busy)} onClick={saveRule}>{workflow?.busy ? "保存中…" : "保存草稿"}</Button></>}
+      >
+        <div className="form-grid supply-form-grid">
+          <label>规则名称<select value={ruleForm.name} onChange={event => setRuleForm(current => ({ ...current, name: event.target.value }))}>{RULES.map(rule => <option key={rule.name}>{rule.name}</option>)}</select></label>
+          <label>生效日期<input type="date" value={ruleForm.effectiveFrom} onChange={event => setRuleForm(current => ({ ...current, effectiveFrom: event.target.value }))} /></label>
+          <label className="full">规则值与说明<textarea rows="5" value={ruleForm.value} onChange={event => setRuleForm(current => ({ ...current, value: event.target.value }))} placeholder="记录阈值、适用范围和例外条件" /></label>
+        </div>
+      </Modal>
     </div>
   );
 }

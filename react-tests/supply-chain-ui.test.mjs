@@ -139,7 +139,7 @@ test("overview and sync records expose cash inventory and source truth separatel
   for (const label of ["审批实付", "ERP库存价值", "实盘库存价值", "ERP库存", "实盘库存"]) {
     assert.match(overview, new RegExp(label));
   }
-  for (const label of ["供应商档案", "钉钉审批", "快麦销售成本", "ERP库存快照", "盘点导入", "原辅料库存", "异常库存", "质量导入", "文件快照"]) {
+  for (const label of ["供应商档案", "钉钉审批", "快麦销售成本", "旧 ERP 库存文件", "盘点导入", "原辅料库存", "异常库存", "质量导入", "历史文件快照"]) {
     assert.match(page, new RegExp(label));
   }
   assert.match(page, /dingtalk-inventory-docs/);
@@ -174,7 +174,7 @@ test("transit workspace renders product summaries and an evidence-backed courier
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.goods-flow-progress/);
 });
 
-test("planning workspace explains procurement suggestions and keeps planned workflow writes disabled", () => {
+test("planning workspace explains and persists versioned procurement suggestions", () => {
   const planning = read("src/features/supply-chain/PlanningWorkspace.jsx");
   const workspace = read("src/features/supply-chain/PlanningProcurementWorkspace.jsx");
   const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
@@ -183,12 +183,14 @@ test("planning workspace explains procurement suggestions and keeps planned work
     assert.match(planning, new RegExp(label));
   }
   assert.match(planning, /calculateProcurementSuggestion/);
-  assert.match(planning, /工作流接入后可确认/);
+  assert.match(planning, /确认采购建议/);
+  assert.match(planning, /workflow\.create/);
+  assert.match(planning, /workflow\.act/);
   assert.match(planning, /调整依据/);
   assert.match(workspace, /库存风险与建议/);
   assert.match(workspace, /采购与付款/);
   assert.match(workspace, /ApprovalWorkspace/);
-  assert.match(workspace, /DEV-000006/);
+  assert.doesNotMatch(workspace, /DEV-000006/);
   assert.match(workspace, /role="tablist"/);
   assert.match(page, /PlanningProcurementWorkspace/);
   assert.match(css, /\.supply-planning-layout/);
@@ -214,7 +216,8 @@ test("planning and procurement exposes responsibility production reminders and r
     "连续 5 天销量平稳",
     "收货结案"
   ]) assert.match(operations, new RegExp(label));
-  assert.match(operations, /disabled=\{!workflowAvailable\}/);
+  assert.match(operations, /workflow\.create|workflow\.act/);
+  assert.doesNotMatch(operations, /DEV-000006/);
   assert.doesNotMatch(operations, /Math\.random|模拟数据|示例订单/);
 });
 
@@ -223,7 +226,7 @@ test("planning explains that ERP inventory exists when the shared inventory API 
   const composition = read("src/features/supply-chain/PlanningProcurementWorkspace.jsx");
   const planning = read("src/features/supply-chain/PlanningWorkspace.jsx");
   assert.match(page, /summarizeInventorySnapshotCoverage/);
-  assert.match(page, /inventoryReadError=\{goodsFlow\.error\}/);
+  assert.match(page, /inventoryReadError=\{platform\.factErrors\.find/);
   assert.match(composition, /inventoryCoverage=\{inventoryCoverage\}/);
   assert.match(planning, /ERP 库存快照已存在/);
   assert.match(planning, /编码待匹配/);
@@ -254,6 +257,9 @@ test("inventory workspace exposes multi-warehouse stocktake BOM and clearance co
   assert.match(inventory, /kuaimaiInventoryCollectionProgress/);
   assert.match(inventory, /loadWebCollectionStatus/);
   assert.match(inventory, /onInventoryUpdated/);
+  assert.match(inventory, /TablePagination/);
+  assert.match(inventory, /INVENTORY_PAGE_SIZE = 50/);
+  assert.match(inventory, /visibleProjectionRows/);
   assert.match(page, /onInventoryUpdated=\{goodsFlow\.refresh\}/);
 });
 
@@ -263,7 +269,11 @@ test("quality workspace separates standards inspections and six-step incident cl
     assert.match(quality, new RegExp(label));
   }
   assert.match(quality, /role="tablist"/);
-  assert.match(quality, /DEV-000006/);
+  assert.match(quality, /workflow\.create|workflow\.act/);
+  assert.match(quality, /issueQuality/);
+  assert.match(quality, /aftersalesQuality/);
+  assert.match(quality, /来源暂不可用/);
+  assert.doesNotMatch(quality, /DEV-000006/);
 });
 
 test("cost and finance workspace separates payable assets cost and freight reconciliation", () => {
@@ -274,6 +284,8 @@ test("cost and finance workspace separates payable assets cost and freight recon
   }
   assert.match(finance, /classifyFinancialPosition/);
   assert.match(finance, /reconcileFreightCharge/);
+  assert.match(finance, /workflow\.create|workflow\.act/);
+  assert.doesNotMatch(finance, /DEV-000006/);
   assert.match(page, /CostFinanceWorkspace/);
 });
 
@@ -284,5 +296,25 @@ test("data and rules workspace exposes source coverage and versioned business ru
     assert.match(rules, new RegExp(label));
   }
   assert.match(rules, /trusted|partial|stale|unavailable/);
+  assert.doesNotMatch(rules, /DEV-000006/);
   assert.match(page, /DataRulesWorkspace/);
+});
+
+test("data rules page distinguishes shared trusted facts from legacy file snapshots", () => {
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  assert.doesNotMatch(page, /快麦库存接口验证前/);
+  assert.match(page, /共享事实按真实覆盖状态展示/);
+  assert.match(page, /旧 ERP 库存文件/);
+});
+
+test("supply chain page consumes shared facts and workflow services instead of hard-coded disabled flags", () => {
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  const supplier = read("src/features/supply-chain/SupplierWorkspace.jsx");
+  const transit = read("src/features/supply-chain/TransitWorkspace.jsx");
+  assert.match(page, /useSupplyChainPlatformWorkspace/);
+  assert.match(page, /platform\.facts\.inventory/);
+  assert.match(page, /platform\.facts\.sales/);
+  assert.doesNotMatch(page, /workflowAvailable=\{false\}/);
+  assert.match(supplier, /workflow\.create|workflow\.act/);
+  assert.match(transit, /workflow\.act/);
 });

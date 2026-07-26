@@ -18,7 +18,7 @@ const mappingStatus = row => {
   return { label: "供应商与产品待关联", tone: "warning" };
 };
 
-export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
+export function ApprovalWorkspace({ canSync, canEditMapping, products, purchases = [], payments = [], workflow }) {
   const { state, dispatch, syncApprovals } = useSupplyChain();
   const [syncing, setSyncing] = useState(false);
   const [notice, setNotice] = useState("");
@@ -26,14 +26,20 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
   const [mappingRecord, setMappingRecord] = useState(null);
   const [page, setPage] = useState(1);
   const [mappingSelection, setMappingSelection] = useState({ supplierId: "", productId: "" });
+  const [linkingPayment, setLinkingPayment] = useState(null);
+  const [linkPurchaseId, setLinkPurchaseId] = useState("");
+  const effectivePurchases = purchases.length ? purchases : state.purchaseApprovals;
+  const effectivePayments = payments.length ? payments : state.paymentApprovals;
+  const paymentLinkAvailable = workflow?.resourceAvailable?.("purchase-payment-links") === true;
+  const workflowLinks = workflow?.workflows?.["purchase-payment-links"]?.items || [];
   const paymentsByPurchase = useMemo(() => {
     const map = new Map();
-    state.paymentApprovals.forEach(payment => {
-      const id = payment.purchaseProcessInstanceId || "unmapped";
+    effectivePayments.forEach(payment => {
+      const id = payment.purchaseId || payment.purchaseProcessInstanceId || "unmapped";
       map.set(id, [...(map.get(id) || []), payment]);
     });
     return map;
-  }, [state.paymentApprovals]);
+  }, [effectivePayments]);
   async function handleSync() {
     setSyncing(true); setError(""); setNotice("");
     try {
@@ -57,11 +63,12 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
     ] });
     setMappingRecord(null);
   }
-  const rows = state.purchaseApprovals.map(purchase => {
-    const payments = paymentsByPurchase.get(purchase.processInstanceId) || [];
-    const actualPaid = payments.filter(item => approved(item.status)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  const rows = effectivePurchases.map(purchase => {
+    const purchaseId = purchase.purchaseId || purchase.processInstanceId || purchase.id;
+    const linkedPayments = paymentsByPurchase.get(purchaseId) || [];
+    const actualPaid = linkedPayments.filter(item => approved(item.status)).reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const requestedAmount = Number(purchase.approvedAmount || purchase.requestedAmount || 0);
-    return { ...purchase, id: purchase.id || purchase.processInstanceId, payments, actualPaid, requestedAmount, overpaid: requestedAmount > 0 && actualPaid > requestedAmount + 0.01 };
+    return { ...purchase, id: purchaseId, payments: linkedPayments, actualPaid, requestedAmount, overpaid: requestedAmount > 0 && actualPaid > requestedAmount + 0.01 };
   });
   const overpaidCount = rows.filter(row => row.overpaid).length;
   const visibleRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -74,6 +81,43 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
     { key: "mapping", header: "映射", render: row => { const status = mappingStatus(row); return <span className={`status-badge ${status.tone}`}>{status.label}</span>; } },
     { key: "actions", header: "操作", render: row => canEditMapping && row.mappingStatus === "unmapped" ? <TableActions><Button className="compact" onClick={() => openMapping(row)}>处理映射</Button></TableActions> : "—" }
   ];
+  const unmappedPayments = paymentsByPurchase.get("unmapped") || [];
+
+  async function savePaymentLink() {
+    if (!linkingPayment || !linkPurchaseId) return;
+    const paymentId = linkingPayment.paymentId || linkingPayment.processInstanceId || linkingPayment.id;
+    try {
+      const existing = workflowLinks.find(entity => String(entity.fields?.paymentId || "") === String(paymentId));
+      let entity = existing;
+      if (!entity) {
+        const created = await workflow.create({
+          resource: "purchase-payment-links",
+          id: `purchase-payment-link:${paymentId}`,
+          fields: {
+            purchaseId: linkPurchaseId,
+            paymentId,
+            purchaseApprovalInstanceId: effectivePurchases.find(item => String(item.purchaseId || item.processInstanceId || item.id) === String(linkPurchaseId))?.processInstanceId || null,
+            paymentApprovalInstanceId: linkingPayment.processInstanceId || null
+          }
+        });
+        entity = created.entity;
+      }
+      if (entity.status === "unlinked") {
+        await workflow.act({
+          resource: "purchase-payment-links",
+          id: entity.id,
+          action: "link",
+          expectedVersion: entity.version,
+          reason: "财务确认采购与付款关联",
+          fields: { purchaseId: linkPurchaseId, paymentId }
+        });
+      }
+      setLinkingPayment(null);
+      setLinkPurchaseId("");
+    } catch {
+      // The page-level workflow notice presents the safe error and request ID.
+    }
+  }
   return (
     <section className="supply-flat-workspace">
       {canSync ? (
@@ -90,6 +134,7 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
       {rows.length > PAGE_SIZE ? <TablePagination total={rows.length} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} /> : null}
       {overpaidCount ? <p className="supply-message warning">有 {overpaidCount} 张采购申请出现付款超申请，请财务核对是否为重复关联或分次付款口径。</p> : null}
       {paymentsByPurchase.get("unmapped")?.length ? <p className="supply-message warning">有 {paymentsByPurchase.get("unmapped").length} 张付款审批未从钉钉关联审批字段识别到采购单。</p> : null}
+      {unmappedPayments.length ? <section className="supply-coverage-notice is-partial" role="status"><span><strong>{unmappedPayments.length} 张付款待关联采购单</strong><small>采购与付款保持独立，财务确认后以稳定 purchaseId / paymentId 建立关联。</small></span>{canEditMapping ? <Button disabled={!paymentLinkAvailable} disabledReason="采购付款关联服务暂不可用" onClick={() => { setLinkingPayment(unmappedPayments[0]); setLinkPurchaseId(""); }}>处理第一张</Button> : null}</section> : null}
       <Modal
         title="处理采购审批映射"
         open={Boolean(mappingRecord)}
@@ -104,6 +149,17 @@ export function ApprovalWorkspace({ canSync, canEditMapping, products }) {
           <label>系统供应商<select value={mappingSelection.supplierId} onChange={event => setMappingSelection(current => ({ ...current, supplierId: event.target.value }))}><option value="">请选择</option>{state.suppliers.map(supplier => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></label>
           <label>钉钉产品值<input value={mappingRecord?.unmappedValues?.product || "未在审批中指定"} disabled /></label>
           <label>系统产品<select value={mappingSelection.productId} onChange={event => setMappingSelection(current => ({ ...current, productId: event.target.value }))}><option value="">请选择</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
+        </div>
+      </Modal>
+      <Modal
+        title="关联采购与付款"
+        open={Boolean(linkingPayment)}
+        onClose={() => setLinkingPayment(null)}
+        footer={<><Button onClick={() => setLinkingPayment(null)}>取消</Button><Button variant="primary" disabled={!linkPurchaseId || Boolean(workflow?.busy)} onClick={savePaymentLink}>{workflow?.busy ? "保存中…" : "确认关联"}</Button></>}
+      >
+        <div className="form-grid supply-form-grid">
+          <label>付款单<input value={linkingPayment?.title || linkingPayment?.processInstanceId || linkingPayment?.id || "—"} disabled /></label>
+          <label>采购单<select value={linkPurchaseId} onChange={event => setLinkPurchaseId(event.target.value)}><option value="">请选择采购单</option>{effectivePurchases.map(purchase => { const id = purchase.purchaseId || purchase.processInstanceId || purchase.id; return <option key={id} value={id}>{purchase.title || purchase.reason || id}</option>; })}</select></label>
         </div>
       </Modal>
     </section>

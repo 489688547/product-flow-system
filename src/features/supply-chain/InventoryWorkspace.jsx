@@ -10,9 +10,12 @@ import {
 } from "../../state/webCollectionApi.js";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
+import { Modal } from "../../ui/Modal.jsx";
+import { TablePagination } from "../../ui/TablePagination.jsx";
 import { StocktakeWorkspace } from "./StocktakeWorkspace.jsx";
 import { rowsFromInventorySpreadsheet } from "./inventoryImportRows.js";
-import { classifyStocktakeVariance } from "../../domain/supplyChainWorkflow.js";
+import { classifyStocktakeVariance, summarizeInventoryFunds } from "../../domain/supplyChainWorkflow.js";
+import { AppCollaborationButton } from "../collaboration/AppCollaborationButton.jsx";
 
 function displayNumber(value) {
   return value === null || value === undefined ? "—" : Number(value).toLocaleString("zh-CN", { maximumFractionDigits: 2 });
@@ -28,6 +31,7 @@ const GROUPS = [
   ["bom", "BOM 与物料"],
   ["risks", "风险与物料"]
 ];
+const INVENTORY_PAGE_SIZE = 50;
 
 export function InventoryWorkspace({
   products,
@@ -38,7 +42,8 @@ export function InventoryWorkspace({
   stocktakePermissions = {},
   createStocktake,
   transitionStocktake,
-  onInventoryUpdated
+  onInventoryUpdated,
+  workflow
 }) {
   const { state, dispatch } = useSupplyChain();
   const [pending, setPending] = useState(null);
@@ -50,6 +55,12 @@ export function InventoryWorkspace({
   const [collectionBusy, setCollectionBusy] = useState(false);
   const [collectionProgress, setCollectionProgress] = useState(null);
   const [collectionError, setCollectionError] = useState("");
+  const [bomOpen, setBomOpen] = useState(false);
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [bomForm, setBomForm] = useState({ productId: "", inventoryUnitId: "", ratio: "1", providedByUs: true });
+  const bomAvailable = workflow?.resourceAvailable?.("bom-definitions") === true;
+  const clearanceAvailable = workflow?.resourceAvailable?.("clearance-suggestions") === true;
+  const clearanceEntities = workflow?.workflows?.["clearance-suggestions"]?.items || [];
 
   async function collectLatestInventory() {
     setCollectionBusy(true);
@@ -126,6 +137,67 @@ export function InventoryWorkspace({
     document.getElementById(`inventory-group-${key}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  async function saveBomDefinition() {
+    if (!bomForm.productId || !bomForm.inventoryUnitId || !(Number(bomForm.ratio) > 0)) return;
+    try {
+      await workflow.create({
+        resource: "bom-definitions",
+        id: `bom:${bomForm.productId}:${Date.now()}`,
+        fields: {
+          productId: bomForm.productId,
+          effectiveFrom: new Date().toISOString().slice(0, 10),
+          components: [{
+            inventoryUnitId: bomForm.inventoryUnitId,
+            ratio: Number(bomForm.ratio),
+            providedByUs: bomForm.providedByUs
+          }]
+        }
+      });
+      setBomOpen(false);
+      setBomForm({ productId: "", inventoryUnitId: "", ratio: "1", providedByUs: true });
+    } catch {
+      // The page-level workflow notice presents the safe error and request ID.
+    }
+  }
+
+  async function updateClearance(row) {
+    const inventoryUnitId = row.inventoryUnitId || row.skuId || null;
+    const existing = clearanceEntities.find(entity => String(entity.fields?.inventoryUnitId || "") === String(inventoryUnitId || ""));
+    try {
+      if (!existing) {
+        await workflow.create({
+          resource: "clearance-suggestions",
+          id: `clearance:${inventoryUnitId}:${Date.now()}`,
+          fields: {
+            productId: row.productId || null,
+            inventoryUnitId,
+            warehouseId: row.warehouseId || null,
+            daysOfSupply: row.daysOfSupply,
+            suggestedAction: "send_to_operations",
+            inputFacts: [{
+              type: "inventory",
+              id: `${row.date || "current"}:${inventoryUnitId}:${row.warehouseId}`,
+              version: 1,
+              asOf: row.date || null,
+              coverage: row.confidence || "partial",
+              confidence: row.confidence || "partial"
+            }]
+          }
+        });
+      } else if (existing.status === "draft") {
+        await workflow.act({
+          resource: "clearance-suggestions",
+          id: existing.id,
+          action: "confirm",
+          expectedVersion: existing.version,
+          reason: "采购复核清仓候选"
+        });
+      }
+    } catch {
+      // The page-level workflow notice presents the safe error and request ID.
+    }
+  }
+
   const snapshotColumns = [
     { key: "source", header: "数据来源", render: row => <span><strong>{inventorySourceLabel(row.sourceType)}</strong><small className="table-secondary">{row.sourceDocument || "文件快照"}</small></span> },
     { key: "date", header: "数据日期", render: row => row.stocktakeDate || "—" },
@@ -192,17 +264,22 @@ export function InventoryWorkspace({
     { key: "cost", header: <span className="num">单位成本</span>, render: row => <span className="num">{row.ownership === "供应商自带" ? "供应商承担" : displayMoney(row.purchasePrice)}</span> }
   ];
   const clearanceRows = projectionRows.filter(row => Number(row.daysOfSupply) > 45).sort((left, right) => Number(right.daysOfSupply) - Number(left.daysOfSupply));
+  const inventoryPages = Math.max(1, Math.ceil(projectionRows.length / INVENTORY_PAGE_SIZE));
+  const safeInventoryPage = Math.min(inventoryPage, inventoryPages);
+  const visibleProjectionRows = projectionRows.slice(
+    (safeInventoryPage - 1) * INVENTORY_PAGE_SIZE,
+    safeInventoryPage * INVENTORY_PAGE_SIZE
+  );
 
   const pendingStocktakeCount = projectionRows.filter(row => row.stocktakeStatus !== "calibrated").length;
-  const fundsHidden = projectionRows.some(row => row.inventoryCashTied === null || row.inventoryCashTied === undefined);
-  const fundsTotal = projectionRows.reduce((sum, row) => sum + Number(row.inventoryCashTied || 0), 0);
+  const funds = summarizeInventoryFunds(projectionRows);
   const activeRiskCount = state.inventoryRisks.filter(row => row.status === "active").length;
 
   return <div className="supply-work-grid">
     <div className="goods-flow-headlines" aria-label="库存概览">
       <div className="goods-flow-headline">
         <span>库存资金</span>
-        <strong>{fundsHidden ? "按权限隐藏" : `¥${fundsTotal.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</strong>
+        <strong>{funds.status === "hidden" ? "按权限隐藏" : funds.status === "uncalibrated" ? "待盘点校准" : `¥${funds.amount.toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</strong>
         <p>SKU × 仓库校准库存的资金占用合计</p>
       </div>
       <div className="goods-flow-headline">
@@ -240,7 +317,15 @@ export function InventoryWorkspace({
         </p>
       ) : null}
       {collectionError ? <p className="supply-message error" role="alert">{collectionError}</p> : null}
-      <DataTable className="goods-flow-inventory-table" minWidth={960} columns={projectionColumns} rows={projectionRows} empty={<div className="empty-state compact-empty">还没有统一库存投影。先导入 ERP 库存快照；首次线下盘点前会明确标记“未盘点”。</div>} />
+      <DataTable className="goods-flow-inventory-table" minWidth={960} columns={projectionColumns} rows={visibleProjectionRows} empty={<div className="empty-state compact-empty">还没有统一库存投影。先导入 ERP 库存快照；首次线下盘点前会明确标记“未盘点”。</div>} />
+      {projectionRows.length > INVENTORY_PAGE_SIZE ? (
+        <TablePagination
+          total={projectionRows.length}
+          page={safeInventoryPage}
+          pageSize={INVENTORY_PAGE_SIZE}
+          onPageChange={setInventoryPage}
+        />
+      ) : null}
     </section>
     <StocktakeWorkspace
       anchorId="inventory-group-snapshots"
@@ -263,7 +348,7 @@ export function InventoryWorkspace({
       <DataTable minWidth={980} columns={snapshotColumns} rows={state.inventorySnapshots} empty={<div className="empty-state compact-empty">还没有成品库存快照。可导入快麦库存表或钉钉盘点表。</div>} />
     </section>
     <section className="section-panel" id="inventory-group-bom">
-      <div className="section-head"><div><h2>BOM 与物料消耗</h2><p>以成品下钻组成 SKU 和用量；我方提供物料进入库存扣减，供应商自带物料不伪造库存。</p></div></div>
+      <div className="section-head"><div><h2>BOM 与物料消耗</h2><p>以成品下钻组成 SKU 和用量；我方提供物料进入库存扣减，供应商自带物料不伪造库存。</p></div>{canEdit ? <Button variant="secondary" disabled={!bomAvailable} disabledReason="BOM 版本服务暂不可用" onClick={() => setBomOpen(true)}>维护 BOM 规则</Button> : null}</div>
       <DataTable minWidth={940} columns={bomColumns} rows={bomRows} empty={<div className="empty-state compact-empty">商品目录尚未提供已确认 BOM；待数据中心和版本化规则接通后展示。</div>} />
     </section>
     <section className="section-panel" id="inventory-group-risks">
@@ -279,7 +364,14 @@ export function InventoryWorkspace({
           projectionColumns[1],
           projectionColumns[4],
           projectionColumns[6],
-          { key: "coverage", header: "规则覆盖", render: () => <span><strong>库存规则已覆盖</strong><small className="table-secondary">过季、节日、日动销待销售事实补齐</small></span> }
+          { key: "coverage", header: "规则覆盖", render: () => <span><strong>库存规则已覆盖</strong><small className="table-secondary">过季、节日、日动销待销售事实补齐</small></span> },
+          { key: "action", header: "复核", render: row => {
+            const entity = clearanceEntities.find(item => String(item.fields?.inventoryUnitId || "") === String(row.inventoryUnitId || row.skuId || ""));
+            return <span className="table-inline-actions">
+              <Button className="compact" disabled={!clearanceAvailable || Boolean(workflow?.busy) || entity?.status === "confirmed"} disabledReason={!clearanceAvailable ? "清仓建议服务暂不可用" : entity?.status === "confirmed" ? "清仓建议已确认" : ""} onClick={() => updateClearance(row)}>{entity?.status === "draft" ? "确认建议" : entity?.status === "confirmed" ? "已确认" : "生成建议"}</Button>
+              {entity?.status === "confirmed" ? <AppCollaborationButton draft={{ title: `制定清仓方案：${productById.get(row.productId)?.name || row.skuCode}`, description: `采购已确认清仓候选，可售天数 ${row.daysOfSupply} 天。请运营制定具体清仓方案。`, category: "供应链协同", ownerDepartment: "运营部" }} /> : null}
+            </span>;
+          } }
         ]}
         rows={clearanceRows}
         empty={<div className="empty-state compact-empty">当前可信库存中没有可售天数高于 45 天的清仓候选。</div>}
@@ -289,5 +381,18 @@ export function InventoryWorkspace({
       <div className="section-head"><div><h2>原辅料库存明细</h2><p>按产品、物料和仓库保留数量、单价与金额；不同计量口径不做数量合计。</p></div></div>
       <DataTable minWidth={980} columns={materialColumns} rows={state.materialInventorySnapshots} empty={<div className="empty-state compact-empty">还没有原辅料库存记录。</div>} />
     </section>
+    <Modal
+      open={bomOpen}
+      title="维护 BOM 规则"
+      onClose={() => setBomOpen(false)}
+      footer={<><Button onClick={() => setBomOpen(false)}>取消</Button><Button variant="primary" disabled={!bomForm.productId || !bomForm.inventoryUnitId || !(Number(bomForm.ratio) > 0) || Boolean(workflow?.busy)} onClick={saveBomDefinition}>{workflow?.busy ? "保存中…" : "保存 BOM 版本"}</Button></>}
+    >
+      <div className="form-grid supply-form-grid">
+        <label className="full">成品<select value={bomForm.productId} onChange={event => setBomForm(current => ({ ...current, productId: event.target.value }))}><option value="">请选择成品</option>{catalogItems.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+        <label>组成库存单位 ID<input value={bomForm.inventoryUnitId} onChange={event => setBomForm(current => ({ ...current, inventoryUnitId: event.target.value }))} /></label>
+        <label>单位用量<input type="number" min="0.0001" step="0.0001" value={bomForm.ratio} onChange={event => setBomForm(current => ({ ...current, ratio: event.target.value }))} /></label>
+        <label className="full"><input type="checkbox" checked={bomForm.providedByUs} onChange={event => setBomForm(current => ({ ...current, providedByUs: event.target.checked }))} />我方提供并纳入库存扣减</label>
+      </div>
+    </Modal>
   </div>;
 }

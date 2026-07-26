@@ -1,6 +1,43 @@
 import { PackageSearch } from "lucide-react";
 import { useMemo, useState } from "react";
+import { Button } from "../../ui/Button.jsx";
 import { GoodsFlowProgress } from "./GoodsFlowProgress.jsx";
+
+const WORKFLOW_STAGE_ORDER = Object.freeze([
+  "purchase_request",
+  "approval",
+  "purchase_order",
+  "production",
+  "shipment",
+  "arrival",
+  "inspection",
+  "receipt",
+  "closed"
+]);
+const STATUS_STAGE = Object.freeze({
+  draft: "purchase_request",
+  applied: "purchase_request",
+  approved: "approval",
+  ordered: "purchase_order",
+  producing: "production",
+  shipped: "shipment",
+  arrived: "arrival",
+  inspecting: "inspection",
+  received: "receipt",
+  closed: "closed"
+});
+
+const NEXT_ACTION = Object.freeze({
+  draft: ["apply", "提交采购申请"],
+  applied: ["approve", "确认审批通过"],
+  approved: ["order", "登记 ERP 下单"],
+  ordered: ["start_production", "开始生产 / 备货"],
+  producing: ["ship", "确认发运"],
+  shipped: ["arrive", "确认到仓"],
+  arrived: ["inspect", "开始质检"],
+  inspecting: ["receive", "确认收货入库"],
+  received: ["close", "结案"]
+});
 
 function purchaseId(row, index) {
   return String(row.id || row.purchaseId || row.processInstanceId || `purchase-${index}`);
@@ -44,15 +81,49 @@ function productNames(row, productById) {
   return names.length ? names.join("、") : row.title || row.purpose || "产品待关联";
 }
 
-export function TransitWorkspace({ purchases = [], products = [] }) {
+function workflowMilestones(entity) {
+  const currentStage = STATUS_STAGE[entity.status] || "purchase_request";
+  const currentIndex = WORKFLOW_STAGE_ORDER.indexOf(currentStage);
+  return WORKFLOW_STAGE_ORDER.map((stage, index) => ({
+    stage,
+    status: index < currentIndex || entity.status === "closed"
+      ? "complete"
+      : index === currentIndex
+        ? "active"
+        : "waiting_data",
+    actualAt: entity.fields?.milestones?.find(item => item.stage === stage)?.actualAt || null,
+    plannedAt: entity.fields?.milestones?.find(item => item.stage === stage)?.plannedAt || null,
+    source: "supply_chain_workflow"
+  }));
+}
+
+export function TransitWorkspace({ purchases = [], products = [], workflow }) {
   const productById = useMemo(() => new Map(products.map(item => [item.id, item])), [products]);
-  const batches = useMemo(() => purchases.map((row, index) => ({
+  const workflowBatches = workflow?.workflows?.["purchase-batches"]?.items || [];
+  const legacyBatches = useMemo(() => purchases.map((row, index) => ({
     id: purchaseId(row, index),
     title: productNames(row, productById),
     supplierName: row.supplierName || "供应商待关联",
     expectedAt: row.expectedArrivalAt || row.deliveryDate || null,
-    milestones: legacyMilestones(row)
+    milestones: legacyMilestones(row),
+    entity: null
   })), [productById, purchases]);
+  const batches = useMemo(() => {
+    const result = new Map(legacyBatches.map(row => [row.id, row]));
+    workflowBatches.forEach(entity => {
+      const fields = entity.fields || {};
+      result.set(String(entity.id), {
+        ...(result.get(String(entity.id)) || {}),
+        id: String(entity.id),
+        title: fields.productName || productNames(fields, productById),
+        supplierName: fields.supplierName || "供应商待关联",
+        expectedAt: fields.expectedArrivalAt || null,
+        milestones: workflowMilestones(entity),
+        entity
+      });
+    });
+    return [...result.values()];
+  }, [legacyBatches, productById, workflowBatches]);
   const [selectedId, setSelectedId] = useState(() => batches[0]?.id || "");
   const selected = batches.find(item => item.id === selectedId) || batches[0] || null;
   const [selectedStage, setSelectedStage] = useState(null);
@@ -61,6 +132,28 @@ export function TransitWorkspace({ purchases = [], products = [] }) {
   function selectBatch(id) {
     setSelectedId(id);
     setSelectedStage(null);
+  }
+
+  async function advanceBatch() {
+    const entity = selected?.entity;
+    const next = entity ? NEXT_ACTION[entity.status] : null;
+    if (!next) return;
+    try {
+      await workflow.act({
+        resource: "purchase-batches",
+        id: entity.id,
+        action: next[0],
+        expectedVersion: entity.version,
+        fields: {
+          milestoneEvidence: {
+            stage: next[0],
+            recordedAt: new Date().toISOString()
+          }
+        }
+      });
+    } catch {
+      // The page-level workflow notice owns the safe error presentation.
+    }
   }
 
   return (
@@ -92,6 +185,11 @@ export function TransitWorkspace({ purchases = [], products = [] }) {
               <h3 id="transit-batch-title">{selected.title}</h3>
               <p>{selected.supplierName} · 批次 {selected.id}</p>
             </div>
+            {selected.entity && NEXT_ACTION[selected.entity.status] ? (
+              <Button variant="primary" disabled={Boolean(workflow?.busy)} onClick={advanceBatch}>
+                {workflow?.busy ? "正在更新…" : NEXT_ACTION[selected.entity.status][1]}
+              </Button>
+            ) : null}
             <GoodsFlowProgress milestones={selected.milestones} onSelectStage={setSelectedStage} />
             {activeStage ? (
               <div className="transit-stage-detail" role="status">

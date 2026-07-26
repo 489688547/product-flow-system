@@ -11,11 +11,36 @@ test("sandbox entry points exist in package.json scripts", () => {
   assert.equal(pkg.scripts["seed:sandbox"], "node scripts/seed-local-sandbox.mjs");
 });
 
-test("sandbox start uses the local D1 flag and restores the online config", () => {
+test("sandbox start uses an isolated temporary Pages project and restores legacy config swaps", () => {
   assert.match(startSource, /--local-d1/);
   assert.match(startSource, /LOCAL_D1_SANDBOX/);
   assert.match(startSource, /wrangler\.local\.toml/);
   assert.match(startSource, /restoreConfigIfSwapped/);
+  assert.match(startSource, /symlinkSync\([^)]*["']functions["']/);
+  assert.match(startSource, /copyFileSync\(WRANGLER_SANDBOX_CONFIG/);
+  assert.match(startSource, /devVarsPath/);
+});
+
+test("sandbox uses the same per-start server session without exposing the personal token", () => {
+  const launchSection = startSource.slice(
+    startSource.indexOf('console.log(useLocalD1 ? "正在启动'),
+    startSource.indexOf("await waitForPort(PAGES_PORT)")
+  );
+  const localBlock = launchSection.match(/if \(useLocalD1\) \{([\s\S]*?)\n  \} else \{/i)?.[1] || "";
+  assert.ok(launchSection.indexOf("prepareRemoteRuntime({") < launchSection.indexOf("if (useLocalD1) {"));
+  assert.match(launchSection, /requestSecret\s*=\s*runtime\.requestSecret/);
+  assert.match(
+    launchSection,
+    /prepareRemoteRuntime\(\{\s*PRODUCTION_DATA_ACCESS_TOKEN:\s*sharedEnv\.values\.PRODUCTION_DATA_ACCESS_TOKEN\s*\}\)/
+  );
+  assert.match(localBlock, /"--cwd", runtimeTempDir/);
+  assert.match(localBlock, /"--persist-to", resolve\(ROOT, "\.wrangler", "state"\)/);
+  assert.doesNotMatch(localBlock, /"--env-file"/);
+  assert.doesNotMatch(localBlock, /swapToSandboxConfig/);
+  assert.match(startSource, /await waitForAuthenticatedApi\(requestSecret\)/);
+  assert.match(startSource, /writeFileSync\(envPath,[\s\S]*mode:\s*0o600/);
+  assert.doesNotMatch(startSource, /console\.log\([^)]*PRODUCTION_DATA_ACCESS_TOKEN/);
+  assert.match(startSource, /VITE_LOCAL_D1_SANDBOX:\s*useLocalD1\s*\?\s*"1"\s*:\s*"0"/);
 });
 
 test("seed script never reads plaintext tokens or .env files", () => {

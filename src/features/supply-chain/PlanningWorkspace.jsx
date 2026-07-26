@@ -41,12 +41,13 @@ function matchingSupplyLink(productId, links) {
     || null;
 }
 
-function buildPlanningRows({ products, summary, salesRows, risks, supplyLinks }) {
+function buildPlanningRows({ products, summary, salesRows, risks, supplyLinks, workflowAvailable }) {
   const summaryByProduct = new Map((summary?.byProduct || []).map(item => [item.productId, item]));
   const productByCode = new Map(products.flatMap(product => productCodes(product).map(code => [code, product.id])));
   const salesByProduct = new Map();
   for (const row of salesRows) {
-    const productId = productByCode.get(String(row.code || row.skuCode || "").trim());
+    const productId = String(row.productId || "")
+      || productByCode.get(String(row.code || row.skuCode || "").trim());
     if (!productId) continue;
     const current = salesByProduct.get(productId) || [];
     current.push(row);
@@ -91,7 +92,8 @@ function buildPlanningRows({ products, summary, salesRows, risks, supplyLinks })
         leadTime: longestLeadTimeDays !== null,
         moq: link?.minimumOrderQuantity !== null && link?.minimumOrderQuantity !== undefined || link?.moq !== null && link?.moq !== undefined,
         capacity: link?.capacityPerBatch !== null && link?.capacityPerBatch !== undefined || link?.dailyCapacity !== null && link?.dailyCapacity !== undefined
-      }
+      },
+      workflowAvailable
     });
     return {
       id: product.id,
@@ -132,11 +134,12 @@ export function PlanningWorkspace({
   supplyLinks = [],
   inventoryCoverage,
   inventoryReadError = "",
-  workflowAvailable = false
+  workflow
 }) {
+  const workflowAvailable = workflow?.resourceAvailable?.("procurement-suggestions") === true;
   const rows = useMemo(
-    () => buildPlanningRows({ products, summary, salesRows, risks, supplyLinks }),
-    [products, risks, salesRows, summary, supplyLinks]
+    () => buildPlanningRows({ products, summary, salesRows, risks, supplyLinks, workflowAvailable }),
+    [products, risks, salesRows, summary, supplyLinks, workflowAvailable]
   );
   const actionableRows = rows.filter(row => ["replenish", "spike", "clearance"].includes(row.risk.kind));
   const unknownRows = rows.filter(row => row.risk.kind === "unknown");
@@ -145,6 +148,7 @@ export function PlanningWorkspace({
   const selected = visibleRows.find(row => row.id === selectedId) || visibleRows[0] || null;
   const [adjustedQuantity, setAdjustedQuantity] = useState("");
   const [adjustmentReason, setAdjustmentReason] = useState("");
+  const [saving, setSaving] = useState(false);
   const counts = {
     replenish: rows.filter(row => row.risk.kind === "replenish").length,
     spike: rows.filter(row => row.risk.kind === "spike").length,
@@ -162,6 +166,67 @@ export function PlanningWorkspace({
     : Math.max(0, Number(adjustedQuantity) || 0);
   const changed = selected ? finalQuantity !== selected.suggestion.suggestedQuantity : false;
   const canConfirm = Boolean(selected?.suggestion.canConfirm && workflowAvailable && (!changed || adjustmentReason.trim()));
+  const existingSuggestion = (workflow?.workflows?.["procurement-suggestions"]?.items || [])
+    .find(item => String(item?.fields?.productId || "") === String(selected?.id || "")
+      && !["rejected", "superseded"].includes(String(item?.status || "")));
+
+  async function confirmSuggestion() {
+    if (!canConfirm || !selected || saving) return;
+    setSaving(true);
+    try {
+      let entity = existingSuggestion;
+      if (!entity) {
+        const created = await workflow.create({
+          resource: "procurement-suggestions",
+          id: `procurement-suggestion:${selected.id}:${new Date().toISOString().slice(0, 10)}`,
+          fields: {
+            productId: selected.id,
+            productName: selected.name,
+            suggestedQuantity: selected.suggestion.suggestedQuantity,
+            adjustedQuantity: finalQuantity,
+            confirmedQuantity: null,
+            adjustmentReason: adjustmentReason.trim() || null,
+            inputFacts: [{
+              type: "product",
+              id: selected.id,
+              version: 1,
+              asOf: new Date().toISOString(),
+              coverage: selected.suggestion.quality.status,
+              confidence: selected.suggestion.quality.status
+            }]
+          }
+        });
+        entity = created.entity;
+      }
+      if (changed && entity.status === "draft") {
+        const adjusted = await workflow.act({
+          resource: "procurement-suggestions",
+          id: entity.id,
+          action: "adjust",
+          expectedVersion: entity.version,
+          reason: adjustmentReason.trim(),
+          fields: {
+            adjustedQuantity: finalQuantity,
+            adjustmentReason: adjustmentReason.trim()
+          }
+        });
+        entity = adjusted.entity;
+      }
+      if (entity.status === "draft") {
+        await workflow.act({
+          resource: "procurement-suggestions",
+          id: entity.id,
+          action: "confirm",
+          expectedVersion: entity.version,
+          fields: { confirmedQuantity: finalQuantity }
+        });
+      }
+    } catch {
+      // The shared hook exposes the safe error and request ID in the page notice.
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="supply-planning-workspace">
@@ -254,8 +319,8 @@ export function PlanningWorkspace({
               <label>调整依据
                 <textarea rows="3" value={adjustmentReason} placeholder={changed ? "调整数量后必须填写判断依据" : "数量未调整时可不填"} onChange={event => setAdjustmentReason(event.target.value)} />
               </label>
-              <Button variant="primary" disabled={!canConfirm} disabledReason={!workflowAvailable ? "版本化采购建议工作流尚未接入" : selected.suggestion.quality.missing.length ? "采购依据数据尚未完整" : changed && !adjustmentReason.trim() ? "请填写调整依据" : "当前无法确认"}>
-                工作流接入后可确认
+              <Button variant="primary" disabled={!canConfirm || saving || existingSuggestion?.status === "confirmed"} disabledReason={!workflowAvailable ? "采购建议服务暂不可用" : selected.suggestion.quality.missing.length ? "采购依据数据尚未完整" : changed && !adjustmentReason.trim() ? "请填写调整依据" : existingSuggestion?.status === "confirmed" ? "该建议已经确认" : "当前无法确认"} onClick={confirmSuggestion}>
+                {saving ? "正在保存…" : existingSuggestion?.status === "confirmed" ? "采购建议已确认" : "确认采购建议"}
               </Button>
             </div>
           </aside>

@@ -1,6 +1,15 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync
+} from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -20,12 +29,7 @@ const children = new Set();
 let stopping = false;
 let runtimeTempDir = "";
 
-function swapToSandboxConfig() {
-  writeFileSync(WRANGLER_BACKUP, readFileSync(WRANGLER_CONFIG, "utf8"));
-  writeFileSync(WRANGLER_CONFIG, readFileSync(WRANGLER_SANDBOX_CONFIG, "utf8"));
-}
-
-// 沙箱模式临时改写 wrangler.toml；无论正常退出还是上次被强杀，都要恢复线上配置。
+// 兼容旧启动器残留：若历史沙箱进程曾被强杀，先恢复线上配置。
 function restoreConfigIfSwapped() {
   if (!existsSync(WRANGLER_BACKUP)) return;
   try {
@@ -130,13 +134,25 @@ async function waitForAuthenticatedApi(secret, timeoutMs = 90_000) {
   throw new Error(`远程 API 未通过连续验证：${lastFailure}`);
 }
 
-function prepareRemoteRuntime() {
+function prepareRemoteRuntime(extraEnvironment = {}) {
   runtimeTempDir = mkdtempSync(join(tmpdir(), "product-flow-local-online-"));
   const requestSecret = randomBytes(32).toString("base64url");
   const envPath = join(runtimeTempDir, "runtime.env");
-  writeFileSync(envPath, `LOCAL_ONLINE_REQUEST_SECRET=${requestSecret}\n`, { mode: 0o600 });
+  const runtimeEnvironment = {
+    ...extraEnvironment,
+    LOCAL_ONLINE_REQUEST_SECRET: requestSecret
+  };
+  const envSource = Object.entries(runtimeEnvironment)
+    .map(([key, value]) => `${key}=${JSON.stringify(String(value))}`)
+    .join("\n");
+  writeFileSync(envPath, `${envSource}\n`, { mode: 0o600 });
+  const devVarsPath = join(runtimeTempDir, ".dev.vars");
+  writeFileSync(devVarsPath, `${envSource}\n`, { mode: 0o600 });
+  copyFileSync(WRANGLER_SANDBOX_CONFIG, join(runtimeTempDir, "wrangler.toml"));
+  symlinkSync(resolve(ROOT, "functions"), join(runtimeTempDir, "functions"), "dir");
   return {
     bundlePath: join(runtimeTempDir, "index.js"),
+    devVarsPath,
     envPath,
     requestSecret
   };
@@ -173,31 +189,29 @@ async function main() {
     throw new Error(`本地环境启动已阻止：${branchBase.reason}`);
   }
   const useLocalD1 = process.argv.includes("--local-d1") || process.env.LOCAL_D1_SANDBOX === "1";
-  // 上次沙箱运行若被强杀，先恢复线上配置再启动。
+  // 上次旧版沙箱运行若被强杀，先恢复线上配置再启动。
   restoreConfigIfSwapped();
-  if (useLocalD1) {
-    // 沙箱模式：Pages 不支持 --config 指定自定义路径，临时将沙箱配置（本地 D1）
-    // 换入 wrangler.toml，退出时在 shutdown() 中恢复原配置。
-    swapToSandboxConfig();
-  }
   const sharedEnvPath = resolveSharedEnvPath(ROOT);
   const sharedEnv = loadSharedEnv(ROOT, { envPath: sharedEnvPath });
   if (!sharedEnv.values.PRODUCTION_DATA_ACCESS_TOKEN) {
     throw new Error("本地线上账号缺少 PRODUCTION_DATA_ACCESS_TOKEN。");
   }
   console.log(useLocalD1 ? "正在启动本地代码 · 本地沙箱环境（本地 D1，不连生产库）..." : "正在启动本地代码 · 线上真实环境...");
-  let requestSecret = "";
+  const runtime = prepareRemoteRuntime({
+    PRODUCTION_DATA_ACCESS_TOKEN: sharedEnv.values.PRODUCTION_DATA_ACCESS_TOKEN
+  });
+  const requestSecret = runtime.requestSecret;
   if (useLocalD1) {
     startChild("Wrangler", executable("wrangler"), [
-      "pages", "dev",
+      "pages", "dev", resolve(ROOT, "dist"),
+      "--cwd", runtimeTempDir,
       "--port", String(PAGES_PORT),
       "--ip", HOST,
+      "--persist-to", resolve(ROOT, ".wrangler", "state"),
       "--live-reload",
-      "--env-file", sharedEnvPath
+      "--show-interactive-dev-session=false"
     ]);
   } else {
-    const runtime = prepareRemoteRuntime();
-    requestSecret = runtime.requestSecret;
     const functionsBuildArgs = [
       "pages", "functions", "build", "functions",
       "--outdir", runtimeTempDir,
@@ -219,10 +233,11 @@ async function main() {
     ]);
   }
   await waitForPort(PAGES_PORT);
-  if (!useLocalD1) await waitForAuthenticatedApi(requestSecret);
+  await waitForAuthenticatedApi(requestSecret);
   startChild("Vite", executable("vite"), ["--host", HOST, "--port", String(VITE_PORT)], {
     ...process.env,
     VITE_API_TARGET: `http://${HOST}:${PAGES_PORT}`,
+    VITE_LOCAL_D1_SANDBOX: useLocalD1 ? "1" : "0",
     ...(requestSecret ? { LOCAL_ONLINE_REQUEST_SECRET: requestSecret } : {})
   });
   await waitForPort(VITE_PORT);

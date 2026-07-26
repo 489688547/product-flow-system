@@ -2,13 +2,21 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   loadSupplyChainInventory,
+  loadSupplyChainInventoryAll,
   loadSupplyChainSalesDaily,
   loadSupplyChainWorkspaceData
 } from "../src/state/supplyChainDataApi.js";
 import {
+  createSupplyChainWorkflowEntity,
   executeSupplyChainWorkflowAction,
-  loadSupplyChainWorkflowCollection
+  loadSupplyChainWorkflowCollection,
+  loadSupplyChainWorkflowResources,
+  supplyChainWorkflowResultNotice
 } from "../src/state/supplyChainApi.js";
+import {
+  mergeSupplyChainWorkflowEntity,
+  supplyChainWorkflowResourcesForWorkspace
+} from "../src/state/supplyChainPlatformState.js";
 
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -40,6 +48,35 @@ test("inventory client sends current snapshot filters to the shared goods-flow A
   assert.equal(calls[0].options.credentials, "include");
   assert.equal(payload.items[0].calibratedQuantity, 18);
   assert.equal(payload.quality.status, "trusted");
+});
+
+test("inventory workspace client follows every server cursor before presenting a current snapshot", async () => {
+  const urls = [];
+  const payload = await loadSupplyChainInventoryAll({
+    mode: "current",
+    asOf: "2026-07-26",
+    fetchImpl: async url => {
+      urls.push(url);
+      const cursor = new URL(url, "https://example.test").searchParams.get("cursor");
+      if (!cursor) {
+        return jsonResponse({
+          data: [{ skuId: "sku:1", warehouseId: "warehouse:1" }],
+          quality: { status: "trusted", coverage: 1, missing: [] },
+          page: { nextCursor: "page-2" }
+        });
+      }
+      return jsonResponse({
+        data: [{ skuId: "sku:2", warehouseId: "warehouse:2" }],
+        quality: { status: "trusted", coverage: 1, missing: [] },
+        page: { nextCursor: null }
+      });
+    }
+  });
+
+  assert.equal(payload.items.length, 2);
+  assert.equal(payload.page.nextCursor, null);
+  assert.equal(payload.meta.pagesLoaded, 2);
+  assert.match(urls[1], /cursor=page-2/);
 });
 
 test("daily sales client rejects a response that drifts from the company demand contract", async () => {
@@ -125,6 +162,9 @@ test("workspace loader keeps trusted inventory when another shared contract is u
         error: { code: "DATA_STORAGE_UNAVAILABLE", retryable: true, requestId: "req-sales" }
       }, 503);
     }
+    if (url.startsWith("/api/platform/v1/data-tasks")) {
+      return jsonResponse({ items: [], quality: { status: "trusted", coverage: 1 } });
+    }
     throw new Error(`unexpected URL ${url}`);
   };
 
@@ -209,7 +249,7 @@ test("workflow action requires idempotency version and keeps actor server-owned"
     }
   });
 
-  assert.equal(calls[0].url, "/api/platform/v1/supply-chain-workflows/procurement-suggestions/suggestion%3A1/actions");
+  assert.equal(calls[0].url, "/api/platform/v1/supply-chain-workflows/procurement-suggestions/suggestion:1/actions");
   assert.equal(calls[0].options.headers["Idempotency-Key"], "idem-2");
   assert.deepEqual(JSON.parse(calls[0].options.body), {
     expectedVersion: 2,
@@ -218,4 +258,180 @@ test("workflow action requires idempotency version and keeps actor server-owned"
     fields: { adjustedQuantity: 800 }
   });
   assert.equal(payload.entity.version, 3);
+});
+
+test("workflow client creates a versioned entity with an idempotency key and no client-owned actor", async () => {
+  const calls = [];
+  const payload = await createSupplyChainWorkflowEntity({
+    resource: "purchase-plans",
+    id: "purchase-plan:2026-07:001",
+    fields: {
+      title: "7 月补货计划",
+      suggestedQuantity: 800
+    },
+    idempotencyKey: "create-plan-001",
+    fetchImpl: async (url, options) => {
+      calls.push({ url, options });
+      return jsonResponse({
+        synced: true,
+        entity: {
+          id: "purchase-plan:2026-07:001",
+          resource: "purchase-plans",
+          status: "draft",
+          version: 1,
+          fields: {
+            title: "7 月补货计划",
+            suggestedQuantity: 800
+          }
+        },
+        event: {
+          eventId: "event:create-plan-001",
+          action: "create",
+          fromStatus: null,
+          toStatus: "draft"
+        },
+        idempotentReplay: false
+      }, 201);
+    }
+  });
+
+  assert.equal(calls[0].url, "/api/platform/v1/supply-chain-workflows/purchase-plans");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].options.credentials, "include");
+  assert.equal(calls[0].options.headers["Idempotency-Key"], "create-plan-001");
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    id: "purchase-plan:2026-07:001",
+    fields: {
+      title: "7 月补货计划",
+      suggestedQuantity: 800
+    }
+  });
+  assert.equal(payload.entity.version, 1);
+
+  await assert.rejects(
+    createSupplyChainWorkflowEntity({
+      resource: "purchase-plans",
+      id: "purchase-plan:forged",
+      fields: { actorId: "forged-user" },
+      idempotencyKey: "create-plan-forged",
+      fetchImpl: async () => jsonResponse({})
+    }),
+    error => error.code === "SUPPLY_WORKFLOW_INPUT_INVALID"
+  );
+});
+
+test("workflow resource loader keeps successful resources available when another one fails", async () => {
+  const payload = await loadSupplyChainWorkflowResources({
+    resources: ["purchase-plans", "freight-reconciliations"],
+    fetchImpl: async url => {
+      if (url.endsWith("/purchase-plans")) {
+        return jsonResponse({
+          synced: true,
+          items: [{ id: "purchase-plan:1", version: 2, status: "confirmed", fields: {} }],
+          nextCursor: "",
+          scope: { resource: "purchase-plans", department: "供应链部" },
+          coverage: { status: "complete", asOf: "2026-07-26T10:00:00.000Z", sourceVersions: [2] }
+        });
+      }
+      return jsonResponse({
+        synced: false,
+        error: {
+          code: "SUPPLY_WORKFLOW_ACTION_DENIED",
+          message: "当前部门无权修改该供应链工作流。",
+          requestId: "req-freight",
+          retryable: false
+        }
+      }, 403);
+    }
+  });
+
+  assert.equal(payload.resources["purchase-plans"].available, true);
+  assert.equal(payload.resources["purchase-plans"].items.length, 1);
+  assert.equal(payload.resources["freight-reconciliations"].available, false);
+  assert.equal(payload.errors[0].resource, "freight-reconciliations");
+  assert.equal(payload.errors[0].requestId, "req-freight");
+});
+
+test("workflow result notice never presents a pending external action as completed", () => {
+  assert.deepEqual(
+    supplyChainWorkflowResultNotice({
+      entity: {
+        id: "purchase-plan:1",
+        status: "submitted",
+        fields: {
+          externalAction: {
+            required: true,
+            type: "dingtalk_approval",
+            status: "pending_manual"
+          }
+        }
+      }
+    }),
+    {
+      tone: "warning",
+      title: "采购计划已保存",
+      message: "钉钉审批仍需人工完成，系统未标记为外部成功。",
+      pendingManual: true
+    }
+  );
+
+  assert.equal(
+    supplyChainWorkflowResultNotice({
+      entity: { id: "purchase-plan:1", status: "confirmed", fields: {} }
+    }).pendingManual,
+    false
+  );
+});
+
+test("each supply-chain workspace loads only the facts and workflow resources it can consume", () => {
+  assert.deepEqual(
+    supplyChainWorkflowResourcesForWorkspace("planning"),
+    [
+      "responsibility-rules",
+      "procurement-rules",
+      "procurement-suggestions",
+      "purchase-plans",
+      "purchase-batches",
+      "purchase-payment-links",
+      "clearance-suggestions"
+    ]
+  );
+  assert.deepEqual(
+    supplyChainWorkflowResourcesForWorkspace("quality"),
+    [
+      "quality-standards",
+      "inspection-plans",
+      "inspection-records",
+      "quality-incidents"
+    ]
+  );
+  assert.deepEqual(supplyChainWorkflowResourcesForWorkspace("unknown"), []);
+});
+
+test("a workflow mutation replaces only the returned resource entity and preserves its availability", () => {
+  const current = {
+    "purchase-plans": {
+      available: true,
+      items: [
+        { id: "plan:1", version: 1, status: "draft", fields: { title: "旧版本" } },
+        { id: "plan:2", version: 1, status: "draft", fields: { title: "另一个计划" } }
+      ],
+      coverage: { status: "complete", asOf: "2026-07-26T09:00:00.000Z", sourceVersions: [1] }
+    }
+  };
+  const next = mergeSupplyChainWorkflowEntity(current, {
+    id: "plan:1",
+    resource: "purchase-plans",
+    version: 2,
+    status: "confirmed",
+    fields: { title: "已确认版本" },
+    updatedAt: "2026-07-26T10:00:00.000Z"
+  });
+
+  assert.equal(next["purchase-plans"].available, true);
+  assert.equal(next["purchase-plans"].items.length, 2);
+  assert.equal(next["purchase-plans"].items[0].version, 2);
+  assert.equal(next["purchase-plans"].items[0].fields.title, "已确认版本");
+  assert.equal(next["purchase-plans"].items[1].id, "plan:2");
+  assert.equal(current["purchase-plans"].items[0].version, 1);
 });
