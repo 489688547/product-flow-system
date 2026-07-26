@@ -37,14 +37,14 @@
       "calibratedInventoryValue": 0,
       "stocktakeStatus": "unverified",
       "sourceUpdatedAt": "2026-06-01T00:00:00.000Z",
-      "confidence": "complete"
+      "confidence": "partial"
     }
   ],
   "quality": {
     "status": "trusted",
     "lastSuccessfulSyncAt": "2026-07-26T13:00:00.000Z",
     "coverage": 1,
-    "confidence": "complete",
+    "confidence": "partial",
     "missing": [],
     "latestSnapshotDate": "2026-07-26",
     "freshnessDays": 0
@@ -60,6 +60,8 @@
 ```
 
 `date` 是批次采集/投影日期；行级 ERP 更新时间单独保存在 `sourceUpdatedAt`。没有真实商品稳定 ID 时 `productId=null`，不得以仓库与 SKU 拼接值伪造商品 ID。无金额权限时服务端删除成本和金额字段。
+
+`quality.coverage` 表示当前快照中是否存在可用的来源库存数量；`confidence` 表示库存是否经过盘点校准。快麦官方完整快照即使尚未盘点，行级 `confidence=partial` 仍计入来源数量覆盖，因此可以同时返回 `coverage=1`、`status=trusted` 和 `confidence=partial`。只有 `confidence=insufficient` 的行才计为来源数量缺失；`trusted` 只证明快照完整且新鲜，不代表已经完成盘点。
 
 ## 供应商、采购、付款、质量与售后读取
 

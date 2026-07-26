@@ -28,15 +28,18 @@ function inventoryQuality(rows, { latestDate, referenceDate }) {
       freshnessDays: null
     };
   }
+  const covered = rows.filter(row => row.confidence !== "insufficient").length;
   const complete = rows.filter(row => row.confidence === "complete").length;
-  const coverage = complete / rows.length;
+  const coverage = covered / rows.length;
   const freshnessDays = Math.max(0, daysBetween(latestDate, referenceDate));
   return {
     status: coverage < 1 ? "partial" : freshnessDays > 1 ? "stale" : "trusted",
     lastSuccessfulSyncAt: rows.map(row => row.updatedAt).filter(Boolean).sort().at(-1) || null,
     coverage,
-    confidence: coverage === 1 ? "complete" : complete ? "partial" : "insufficient",
-    missing: coverage === 1 ? [] : ["inventory_confidence"],
+    confidence: coverage < 1
+      ? covered ? "partial" : "insufficient"
+      : complete === rows.length ? "complete" : "partial",
+    missing: coverage === 1 ? [] : ["inventory_quantity_coverage"],
     latestSnapshotDate: latestDate,
     freshnessDays
   };

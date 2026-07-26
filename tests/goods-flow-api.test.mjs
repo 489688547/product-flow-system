@@ -109,6 +109,52 @@ test("inventory rejects invalid modes and exposes unavailable quality without fa
   assert.ok(empty.body.quality.missing.includes("inventory_snapshot"));
 });
 
+test("inventory quality treats projected partial confidence as covered source quantity", async () => {
+  const rows = ["sku-covered", "sku-missing"].map((skuId, index) => ({
+    id: `2026-07-26:${skuId}:warehouse-a`,
+    snapshot_date: "2026-07-26",
+    product_id: null,
+    sku_id: skuId,
+    sku_code: skuId,
+    warehouse_id: "warehouse-a",
+    erp_quantity: index ? 0 : 8,
+    counted_quantity: null,
+    calibrated_quantity: index ? 0 : 8,
+    unit_cost: 2,
+    calibrated_inventory_value: index ? 0 : 16,
+    sellable_quantity: index ? 0 : 8,
+    days_of_supply: null,
+    age_bucket: null,
+    inventory_cash_tied: null,
+    stocktake_id: null,
+    stocktake_status: "unverified",
+    source_updated_at: "2026-07-26T05:00:00.000Z",
+    confidence: index ? "insufficient" : "partial",
+    created_at: "2026-07-26T05:10:00.000Z",
+    updated_at: "2026-07-26T05:10:00.000Z"
+  }));
+  const db = createGoodsFlowD1Mock({ goods_flow_inventory_daily: rows });
+
+  const mixed = await call(inventory, {
+    session: sessions.executive,
+    db,
+    url: "https://flow.example.com/api/platform/v1/goods-flow/inventory?mode=current&asOf=2026-07-26"
+  });
+  assert.equal(mixed.body.quality.status, "partial");
+  assert.equal(mixed.body.quality.coverage, 0.5);
+  assert.equal(mixed.body.quality.confidence, "partial");
+
+  rows[1].confidence = "partial";
+  const completeSource = await call(inventory, {
+    session: sessions.executive,
+    db,
+    url: "https://flow.example.com/api/platform/v1/goods-flow/inventory?mode=current&asOf=2026-07-26"
+  });
+  assert.equal(completeSource.body.quality.status, "trusted");
+  assert.equal(completeSource.body.quality.coverage, 1);
+  assert.equal(completeSource.body.quality.confidence, "partial");
+});
+
 test("goods-flow routes require session and configured D1", async () => {
   assert.equal((await call(dashboard)).response.status, 401);
   const missing = await call(dashboard, { session: sessions.finance });
