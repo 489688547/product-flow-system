@@ -268,7 +268,7 @@ function inventoryProjection(resourceType, records, now, snapshotDate) {
       "sellableQuantity", "实际可用数", "可用库存", "可售库存", "可销售库存"
     ])) ?? quantity;
     const unitCost = numberOrNull(firstValue(record.payload, [
-      "unitCost", "成本价", "库存成本价", "采购价"
+      "unitCost", "purchasePrice", "成本价", "库存成本价", "采购价"
     ]));
     return {
       id: `kuaimai-inventory-${encodedStablePart(record.sourceKey)}-${projectedDate}`,
