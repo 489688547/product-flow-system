@@ -31,6 +31,12 @@ The projection date is the batch collection day in Asia/Shanghai, while row-leve
 source key. A partial snapshot is rejected before upload and again after the final server response.
 The Kuaimai adapter uses the official warehouse-inventory export. Kuaimai may label its OOXML workbook with a `.csv`
 suffix, so the company Mac detects the ZIP/OOXML signature before choosing a parser.
+It projects only after the whole file has passed local validation and the collection batch requests `completed`.
+While projection is running, the control batch/archive remain `pending/processing`; they advance to
+`completed/processed` only after the business projection succeeds. The server requires one snapshot date and unique
+`SKU × warehouse` rows, writes staging rows in D1 batches of at most 50 statements, and atomically replaces the target
+date only after all staging rows are present. A failed staging chunk leaves the last trusted live snapshot unchanged
+and the control state replayable. Replaying the same collection batch uses the same projection ID and is idempotent.
 
 Secret-like keys and buyer, recipient, mobile, address, waybill, identity and free-text remark fields are rejected. The local collector removes those columns before hashing and upload, even when the provider masks their values. The server repeats the allowlist normalization before persistence as defense in depth.
 
@@ -58,6 +64,7 @@ Archive metadata, runner authorization and collection batch control stay in the 
 - `ERP_COLLECTION_SALES_FACT_INVALID` / `ERP_COLLECTION_SALES_FACTS_TOO_LARGE`: an aggregate fact lacks a valid 69 code/date, exceeds the 1,000-row pack (5,000 for the legacy single-pack format) or the 50-pack batch bound.
 - `ERP_COLLECTION_SALES_FACTS_DATES_REQUIRED` / `ERP_COLLECTION_SALES_FACTS_DATES_INVALID`: a multi-pack first pack misses the full rewrite date list, or a later pack illegally carries one.
 - `ERP_COLLECTION_BATCH_PARTIAL`: a sales export or current inventory snapshot still has blocking validation errors and cannot be reported as synchronized.
+- `GOODS_FLOW_INVENTORY_SNAPSHOT_INVALID`: a completed inventory snapshot is empty, mixes snapshot dates, lacks a stable SKU/warehouse identity, or contains duplicate `SKU × warehouse` rows.
 - `ERP_COLLECTION_INGEST_FAILED`: unexpected storage failure; response and logs must not expose source rows or credentials.
 
 ## Compatibility and deprecation
@@ -70,7 +77,7 @@ D1 stores archive metadata, necessary minimum query indexes, business projection
 
 ## Observability
 
-Audit by batch ID, provider, resource type, file hash, range, row count, status, actor and timestamps. Log stable error codes and counts only; never log raw rows, customer data, cookies, tokens or credentials.
+Audit by batch ID, provider, resource type, file hash, range, row count, status, actor and timestamps. Inventory projection observability also records the safe projection ID, snapshot date, staging chunk count and projected row count. Log stable error codes and counts only; never log raw rows, customer data, cookies, tokens or credentials.
 
 ## Contract tests
 
@@ -81,3 +88,4 @@ Audit by batch ID, provider, resource type, file hash, range, row count, status,
 - `tests/kuaimai-erp-collection-migration.test.mjs`
 - `tests/kuaimai-erp-local-archive.test.mjs`
 - `tests/kuaimai-erp-local-archive-api.test.mjs`
+- `tests/goods-flow-inventory-storage.test.mjs`
