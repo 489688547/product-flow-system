@@ -139,6 +139,12 @@ Provider 更新只接受 `providerId`、`model`、`reasoningEffort` 和 `enabled
 
 AI 草稿路由 `/api/platform/v1/development-backlog/ai-draft` 使用 `company-platform/development-backlog-draft` 和 `invokeAiFeature`，只返回未落库结构化草稿。表 `development_backlog_items`、`development_backlog_events` 固定使用控制数据库，展示目录策略为 `skip`。完整契约见 `docs/platform/apis/development-backlog-v1.md`。
 
+### 供应链共享事实与工作流
+
+供应链只读事实统一使用 `/api/platform/v1/goods-flow/*`、`/api/platform/v1/data-services/sales/daily` 和 `/api/platform/v1/data-tasks`。库存 current/history/filter/quality、采购付款独立关系、供应商、质量、售后和销售日需求的完整定义见 `docs/platform/apis/goods-flow-v1.md` 与 `docs/platform/apis/data-services-sales-v1.md`。
+
+责任规则、采购建议与计划、采购批次、供应商商务档案、BOM、质量标准与闭环、清仓和运费核对统一使用 `/api/platform/v1/supply-chain-workflows/*`。所有写入必须携带幂等键与乐观版本，服务端按责任部门授权并追加不可变事件。完整契约见 `docs/platform/apis/supply-chain-workflows-v1.md`。
+
 聊天请求只接受最多 12 条 `{ role, content }` 文本消息和弱 `appHint.screen` 路由提示；客户端提交的身份、部门、数据权限和公司状态字段全部忽略。单条用户消息最多 4,000 字符、助手历史最多 8,000 字符、总计最多 24,000 字符，最后一条必须是用户消息。包含明确财务关键词和具体金额/比例的手工粘贴内容在 Provider 调用前返回 `AI_FINANCE_TRANSFER_BLOCKED`。
 
 成功响应使用 SSE：`meta` 声明 request ID 和允许/阻止域，`text_delta` 返回正文增量，`sources` 返回 App、数据域、更新时间和记录数，`usage` 返回 token，`error` 返回稳定安全错误，`done` 声明回答是否完整。每个用户同一时间只允许一个生成请求；取消、失败和完成都会释放租约。审计只保存数据域、记录数、更新时间、token、耗时和结果码，不保存消息、回答或上下文。

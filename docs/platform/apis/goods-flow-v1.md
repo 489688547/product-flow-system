@@ -4,7 +4,7 @@
 
 `/api/platform/v1/goods-flow/*` 是供应链、数据中心、经营驾驶舱和公司 AI 共用的货流事实边界。页面不得直接读取 D1，也不得在供应链 feature 内复制库存事实。
 
-当前已实现库存日投影、盘点、账期和 CCC 的基础契约。本次只扩展现有库存投影能力；`current/history/filter/quality` 的细粒度读取仍属于 DEV-000005 后续 P0，未完成前不得标记为已接通。快麦库存来源保持 `integrating`，生产成功重放和查询验收完成前不得显示健康。
+当前已实现库存日投影、盘点、账期、CCC、库存 `current/history/filter/quality`，以及供应商、采购、付款、质量问题和售后安全读取。快麦开放平台仍保持 `integrating`；当前库存来自公司 Mac 的官方文件采集与受控投影，不能因库存查询健康而把快麦 API 标记为已接通。
 
 ## 认证与授权
 
@@ -18,7 +18,7 @@
 
 ### `GET /api/platform/v1/goods-flow/inventory`
 
-当前支持可选查询参数 `through=YYYY-MM-DD`，返回截止日期内的库存日事实。响应：
+支持 `mode=current|history`、`asOf=YYYY-MM-DD`、`skuId`、`warehouseId` 和 `cursor`。兼容参数 `through` 等同 `asOf`。`current` 先确定不晚于 `asOf` 的最新完整快照日期，再返回该日期的全部行；不得按每个 SKU 的最后更新时间拼出混合日期快照。`history` 返回历史行并稳定分页。响应：
 
 ```json
 {
@@ -40,16 +40,36 @@
       "confidence": "complete"
     }
   ],
+  "quality": {
+    "status": "trusted",
+    "lastSuccessfulSyncAt": "2026-07-26T13:00:00.000Z",
+    "coverage": 1,
+    "confidence": "complete",
+    "missing": [],
+    "latestSnapshotDate": "2026-07-26",
+    "freshnessDays": 0
+  },
+  "page": { "nextCursor": null },
   "meta": {
     "requestId": "request-id",
     "updatedAt": "2026-07-26T13:00:00.000Z",
     "coverage": { "stocktake": 0 },
-    "version": 1
+    "version": 2
   }
 }
 ```
 
 `date` 是批次采集/投影日期；行级 ERP 更新时间单独保存在 `sourceUpdatedAt`。没有真实商品稳定 ID 时 `productId=null`，不得以仓库与 SKU 拼接值伪造商品 ID。无金额权限时服务端删除成本和金额字段。
+
+## 供应商、采购、付款、质量与售后读取
+
+- `GET /api/platform/v1/goods-flow/suppliers`
+- `GET /api/platform/v1/goods-flow/purchases`
+- `GET /api/platform/v1/goods-flow/payments`
+- `GET /api/platform/v1/goods-flow/quality-incidents`
+- `GET /api/platform/v1/goods-flow/aftersales`
+
+统一返回 `{ synced, items, quality, page, meta }`。采购与付款保持独立，并通过稳定 `purchaseId` 关联。货流事件优先于 legacy 状态；供应商主档与质量问题当前仍有 legacy 安全投影时，`quality.status=partial` 并列出缺失来源。售后只返回标准化状态、金额、时间和库存单位引用，不返回客户、订单号、原始 payload 或凭据。没有来源事实时返回空集合与 `unavailable`，不得补样例。
 
 ## 完整当前快照投影
 
@@ -72,6 +92,8 @@
 - `GOODS_FLOW_WRITE_DENIED`：只读身份尝试写入，HTTP 403。
 - `GOODS_FLOW_STORAGE_UNAVAILABLE`：业务 D1 或所需表不可用。
 - `GOODS_FLOW_INVENTORY_SNAPSHOT_INVALID`：完整库存快照为空、混合日期、缺少稳定 SKU/仓库、或存在重复 `SKU × 仓库`，HTTP 400。
+- `GOODS_FLOW_INVENTORY_QUERY_INVALID`：库存模式、日期、筛选或游标无效，HTTP 400。
+- `GOODS_FLOW_QUERY_INVALID`：货流集合筛选或游标无效，HTTP 400。
 - `ERP_COLLECTION_INGEST_FAILED` / `ERP_COLLECTION_INTERNAL_ERROR`：ERP 入库或投影发生未预期失败；响应与日志不得暴露原始行或凭据。
 
 ## 兼容、迁移与回滚

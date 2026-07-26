@@ -27,8 +27,8 @@ const sessions = {
   data: { userId: "data-1", name: "数据同事", department: "数据中心" }
 };
 
-async function call(handler, { method = "GET", session, db, body, params = {}, headers = {} } = {}) {
-  const request = new Request("https://flow.example.com/api/platform/v1/goods-flow/test", {
+async function call(handler, { method = "GET", session, db, body, params = {}, headers = {}, url = "https://flow.example.com/api/platform/v1/goods-flow/test" } = {}) {
+  const request = new Request(url, {
     method,
     headers: body ? { "content-type": "application/json", ...headers } : headers,
     body: body === undefined ? undefined : JSON.stringify(body)
@@ -36,6 +36,78 @@ async function call(handler, { method = "GET", session, db, body, params = {}, h
   const response = await handler({ request, env: db ? { PRODUCT_FLOW_DB: db } : {}, data: session ? { session } : {}, params });
   return { response, body: await response.json() };
 }
+
+test("inventory current uses one latest complete snapshot while history supports filters and quality", async () => {
+  const rows = [
+    ["2026-07-25", "sku-1", "warehouse-a", 4],
+    ["2026-07-26", "sku-1", "warehouse-a", 8],
+    ["2026-07-26", "sku-1", "warehouse-b", 6],
+    ["2026-07-26", "sku-2", "warehouse-a", 3]
+  ].map(([date, skuId, warehouseId, quantity]) => ({
+    id: `${date}:${skuId}:${warehouseId}`,
+    snapshot_date: date,
+    product_id: null,
+    sku_id: skuId,
+    sku_code: skuId,
+    warehouse_id: warehouseId,
+    erp_quantity: quantity,
+    counted_quantity: null,
+    calibrated_quantity: quantity,
+    unit_cost: 2,
+    calibrated_inventory_value: quantity * 2,
+    sellable_quantity: quantity,
+    days_of_supply: null,
+    age_bucket: null,
+    inventory_cash_tied: null,
+    stocktake_id: null,
+    stocktake_status: "unverified",
+    source_updated_at: "2026-06-01T00:00:00.000Z",
+    confidence: "complete",
+    created_at: `${date}T05:10:00.000Z`,
+    updated_at: `${date}T05:10:00.000Z`
+  }));
+  const db = createGoodsFlowD1Mock({ goods_flow_inventory_daily: rows });
+
+  const current = await call(inventory, {
+    session: sessions.executive,
+    db,
+    url: "https://flow.example.com/api/platform/v1/goods-flow/inventory?mode=current&asOf=2026-07-26"
+  });
+  assert.equal(current.response.status, 200);
+  assert.deepEqual([...new Set(current.body.data.map(row => row.date))], ["2026-07-26"]);
+  assert.equal(current.body.data.length, 3);
+  assert.equal(current.body.quality.status, "trusted");
+  assert.equal(current.body.quality.coverage, 1);
+  assert.equal(current.body.quality.lastSuccessfulSyncAt, "2026-07-26T05:10:00.000Z");
+
+  const filteredHistory = await call(inventory, {
+    session: sessions.executive,
+    db,
+    url: "https://flow.example.com/api/platform/v1/goods-flow/inventory?mode=history&skuId=sku-1&warehouseId=warehouse-a"
+  });
+  assert.deepEqual(filteredHistory.body.data.map(row => row.date), ["2026-07-26", "2026-07-25"]);
+  assert.equal(filteredHistory.body.page.nextCursor, null);
+});
+
+test("inventory rejects invalid modes and exposes unavailable quality without fabricating rows", async () => {
+  const db = createGoodsFlowD1Mock();
+  const invalid = await call(inventory, {
+    session: sessions.supply,
+    db,
+    url: "https://flow.example.com/api/platform/v1/goods-flow/inventory?mode=latest-per-sku"
+  });
+  assert.equal(invalid.response.status, 400);
+  assert.equal(invalid.body.error.code, "GOODS_FLOW_INVENTORY_QUERY_INVALID");
+
+  const empty = await call(inventory, {
+    session: sessions.supply,
+    db,
+    url: "https://flow.example.com/api/platform/v1/goods-flow/inventory?mode=current"
+  });
+  assert.deepEqual(empty.body.data, []);
+  assert.equal(empty.body.quality.status, "unavailable");
+  assert.ok(empty.body.quality.missing.includes("inventory_snapshot"));
+});
 
 test("goods-flow routes require session and configured D1", async () => {
   assert.equal((await call(dashboard)).response.status, 401);

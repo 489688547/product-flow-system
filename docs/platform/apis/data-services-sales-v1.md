@@ -33,6 +33,25 @@ The contract fixes `timeBasis=create_time`, `timezone=Asia/Shanghai`, and `exclu
 
 The existing `/api/data-center/sales` detailed internal route remains unchanged. Consumers should treat new response fields as additive and ignore fields they do not recognize.
 
+## Supply-chain daily demand
+
+`GET /api/platform/v1/data-services/sales/daily` returns the atomic daily demand dataset used by supply-chain planning. `from` and `to` are required and inclusive, with a maximum range of 370 days. Optional filters are `productId`, `inventoryUnitId`, `platform`, and `cursor`.
+
+The response contract is fixed:
+
+```json
+{
+  "timeBasis": "create_time",
+  "timezone": "Asia/Shanghai",
+  "excludeOther": true,
+  "grain": ["date", "inventoryUnitId", "platform"]
+}
+```
+
+Each item contains `date`, `productId`, `inventoryUnitId`, `inventoryUnitCode`, `platform`, `grossQuantity`, `returnQuantity`, `netQuantity`, `grossSales`, `netSales`, `salesCost`, `refundAmount`, and `promotionIds`.
+
+The current `product_sales_daily` table stores net quantity and refund amount but does not retain return quantity or promotion IDs. Therefore `returnQuantity` and `netQuantity` are `null`, `promotionIds` is empty, and the same fields are listed in `quality.missing`. Unknown or conflicting product mappings remain `null`; they are not synthesized from codes. Empty, 其它, 其他, 未知, and 未知平台 rows are excluded.
+
 ## Performance, observability, and rollback
 
 Discovery performs one coverage aggregate and one month grouping. Range queries aggregate in D1 and return one row, so broad historical periods do not transfer detailed facts. Error responses include a request ID; no SQL, credential, customer, or raw provider payload is logged. Rollback removes the v1 route and its UI consumer without database migration.

@@ -150,10 +150,13 @@ test("goods flow declares its production D1 schema without claiming Kuaimai inve
     "goods_flow_stocktake_lines",
     "goods_flow_receivable_terms",
     "goods_flow_ccc_monthly",
-    "goods_flow_exceptions"
+    "goods_flow_exceptions",
+    "supply_chain_workflow_entities",
+    "supply_chain_workflow_events"
   ]);
   assert.equal(existsSync(resolve(root, "migrations/0005_goods_flow_core.sql")), true);
   assert.equal(existsSync(resolve(root, "migrations/0015_data_center_supply_chain_facts.sql")), true);
+  assert.equal(existsSync(resolve(root, "migrations/0016_supply_chain_workflows.sql")), true);
 
   const registry = JSON.parse(readFileSync(resolve(root, "docs/platform/integration-registry.json"), "utf8"));
   const kuaimai = registry.platforms.find(entry => entry.id === "kuaimai");
