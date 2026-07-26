@@ -518,6 +518,38 @@ export function evaluateRollingReplenishmentRecovery({
   };
 }
 
+const ERP_INVENTORY_SOURCES = new Set([
+  "kuaimai-import",
+  "dingtalk-stocktake-import",
+  "dingtalk-finished-inventory"
+]);
+
+function inventoryIdentityCodes(product) {
+  return [
+    ...(product?.skuCodes || []).flatMap(value => {
+      if (typeof value === "object") return [value?.code, value?.barcode, value?.merchantSkuCode];
+      return [value];
+    }),
+    ...(product?.skus || []).flatMap(sku => [sku?.barcode, sku?.merchantSkuCode])
+  ].map(value => String(value || "").trim()).filter(Boolean);
+}
+
+export function summarizeInventorySnapshotCoverage({ snapshots = [], products = [] } = {}) {
+  const productCodes = new Set(products.flatMap(inventoryIdentityCodes));
+  const inventoryRows = snapshots.filter(row => ERP_INVENTORY_SOURCES.has(String(row?.sourceType || "").trim()));
+  const matchedRows = inventoryRows.filter(row => productCodes.has(String(row?.skuCode || "").trim())).length;
+  const dates = inventoryRows
+    .map(row => String(row?.stocktakeDate || row?.snapshotDate || row?.date || "").slice(0, 10))
+    .filter(value => /^\d{4}-\d{2}-\d{2}$/.test(value))
+    .sort();
+  return {
+    totalRows: inventoryRows.length,
+    matchedRows,
+    unmatchedRows: inventoryRows.length - matchedRows,
+    latestDate: dates.at(-1) || null
+  };
+}
+
 export function classifyStockRisk({
   daysOfSupply,
   longestLeadTimeDays,

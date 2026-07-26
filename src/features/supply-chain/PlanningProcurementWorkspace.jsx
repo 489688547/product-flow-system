@@ -17,6 +17,8 @@ export function PlanningProcurementWorkspace({
   risks = [],
   supplyLinks = [],
   purchases = [],
+  inventoryCoverage,
+  inventoryReadError = "",
   workflowAvailable = false,
   canSyncApprovals = false,
   canEditApprovalMapping = false
@@ -47,6 +49,8 @@ export function PlanningProcurementWorkspace({
             salesRows={salesRows}
             risks={risks}
             supplyLinks={supplyLinks}
+            inventoryCoverage={inventoryCoverage}
+            inventoryReadError={inventoryReadError}
             workflowAvailable={workflowAvailable}
           />
         </div>

@@ -218,6 +218,19 @@ test("planning and procurement exposes responsibility production reminders and r
   assert.doesNotMatch(operations, /Math\.random|模拟数据|示例订单/);
 });
 
+test("planning explains that ERP inventory exists when the shared inventory API is unavailable", () => {
+  const page = read("src/features/supply-chain/SupplyChainAppPage.jsx");
+  const composition = read("src/features/supply-chain/PlanningProcurementWorkspace.jsx");
+  const planning = read("src/features/supply-chain/PlanningWorkspace.jsx");
+  assert.match(page, /summarizeInventorySnapshotCoverage/);
+  assert.match(page, /inventoryReadError=\{goodsFlow\.error\}/);
+  assert.match(composition, /inventoryCoverage=\{inventoryCoverage\}/);
+  assert.match(planning, /ERP 库存快照已存在/);
+  assert.match(planning, /编码待匹配/);
+  assert.match(planning, /共享库存接口/);
+  assert.doesNotMatch(planning, /ERP 库存不存在/);
+});
+
 test("supplier workspace covers capability sourcing evaluation concentration and cost evidence", () => {
   const supplier = read("src/features/supply-chain/SupplierWorkspace.jsx");
   for (const label of ["档案与能力", "评价与风险", "报价与成本", "能力或供货范围", "单一来源风险", "客观指标", "采购评价", "质量评价", "产品评价", "历史采购价格"]) {

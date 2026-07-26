@@ -130,6 +130,8 @@ export function PlanningWorkspace({
   salesRows = [],
   risks = [],
   supplyLinks = [],
+  inventoryCoverage,
+  inventoryReadError = "",
   workflowAvailable = false
 }) {
   const rows = useMemo(
@@ -180,12 +182,24 @@ export function PlanningWorkspace({
           采购建议可查看和调整预览；版本化工作流接入后可确认并生成采购计划。
         </p>
       ) : null}
+      {inventoryCoverage?.totalRows > 0 ? (
+        <div className="supply-coverage-notice is-partial" role="status">
+          <TriangleAlert size={17} aria-hidden="true" />
+          <span>
+            <strong>ERP 库存快照已存在 {inventoryCoverage.totalRows} 条，最新 {inventoryCoverage.latestDate || "日期待确认"}</strong>
+            <small>
+              {inventoryCoverage.matchedRows} 条已匹配商品，{inventoryCoverage.unmatchedRows} 条编码待匹配。
+              {inventoryReadError ? "共享库存接口当前不可读，采购建议仅使用已匹配快照；接口恢复后自动读取当前库存。" : "采购建议只使用已匹配且具备需求依据的库存。"}
+            </small>
+          </span>
+        </div>
+      ) : null}
       {unknownRows.length ? (
         <div className="supply-coverage-notice is-partial" role="status">
           <TriangleAlert size={17} aria-hidden="true" />
           <span>
             <strong>{unknownRows.length} 个产品未进入采购建议</strong>
-            <small>缺少库存、销量或周期依据；待数据中心事实补齐后自动重算，不按 0 参与风险判断。</small>
+            <small>缺少已匹配库存、销量或周期依据；待编码映射和共享事实恢复后自动重算，不按 0 参与风险判断。</small>
           </span>
         </div>
       ) : null}

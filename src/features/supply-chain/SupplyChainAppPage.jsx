@@ -21,7 +21,7 @@ import { SupplyChainWorkbench } from "./SupplyChainWorkbench.jsx";
 import { TransitWorkspace } from "./TransitWorkspace.jsx";
 import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
 import { catalogBackedProduct } from "../../domain/productCatalog.js";
-import { normalizeSupplyChainSection } from "../../domain/supplyChainWorkflow.js";
+import { normalizeSupplyChainSection, summarizeInventorySnapshotCoverage } from "../../domain/supplyChainWorkflow.js";
 
 function departmentOf(user) {
   return String(user?.department || "").trim();
@@ -233,6 +233,10 @@ export function SupplyChainAppPage({ section = "workbench" }) {
   const linkedCatalogIds = useMemo(() => new Set(lifecycleProducts.map(product => product.catalogProductId).filter(Boolean)), [lifecycleProducts]);
   const catalogProducts = useMemo(() => catalogItems.filter(item => !linkedCatalogIds.has(item.id)).map(item => ({ id: item.id, catalogProductId: item.id, name: item.name, stage: 1, status: item.active ? "ERP 启用" : "ERP 停用", skuCodes: (item.skus || []).filter(sku => sku.barcodeType === "sales_barcode").map(sku => ({ code: sku.barcode, price: sku.salePrice ?? "" })) })), [catalogItems, linkedCatalogIds]);
   const products = useMemo(() => [...lifecycleProducts, ...catalogProducts], [catalogProducts, lifecycleProducts]);
+  const inventoryCoverage = useMemo(() => summarizeInventorySnapshotCoverage({
+    snapshots: state.inventorySnapshots,
+    products: catalogItems
+  }), [catalogItems, state.inventorySnapshots]);
   const codes = useMemo(() => [...new Set(products.flatMap(product => (product.skuCodes || []).map(value => typeof value === "object" ? value.code : value).filter(Boolean)))], [products]);
   useEffect(() => {
     let active = true;
@@ -329,6 +333,8 @@ export function SupplyChainAppPage({ section = "workbench" }) {
         risks={state.inventoryRisks}
         supplyLinks={state.productSupplierLinks}
         purchases={state.purchaseApprovals}
+        inventoryCoverage={inventoryCoverage}
+        inventoryReadError={goodsFlow.error}
         workflowAvailable={false}
         canSyncApprovals={financeRole || supplyEditor}
         canEditApprovalMapping={supplyEditor}
@@ -356,7 +362,13 @@ export function SupplyChainAppPage({ section = "workbench" }) {
         workflowAvailable={false}
         sources={[
           { name: "商品主数据", status: catalogItems.length ? "trusted" : "unavailable", description: "共享 product-catalog 商品、SKU 与组合关系", countLabel: `${catalogItems.length} 个商品`, updatedAt: catalogMeta?.lastSuccessfulSyncAt },
-          { name: "ERP 库存", status: goodsFlow.error ? "unavailable" : goodsFlow.stale ? "stale" : goodsFlow.inventory.length ? "trusted" : "partial", description: "SKU × 仓库当前库存与盘点校准", countLabel: `${goodsFlow.inventory.length} 条库存`, updatedAt: goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt },
+          {
+            name: "ERP 库存",
+            status: goodsFlow.inventory.length ? goodsFlow.stale ? "stale" : "trusted" : inventoryCoverage.totalRows ? "partial" : "unavailable",
+            description: goodsFlow.error && inventoryCoverage.totalRows ? "ERP 库存快照已存在；共享库存接口当前不可读" : "SKU × 仓库当前库存与盘点校准",
+            countLabel: goodsFlow.inventory.length ? `${goodsFlow.inventory.length} 条当前库存` : `${inventoryCoverage.totalRows} 条库存快照 · ${inventoryCoverage.matchedRows} 条已匹配`,
+            updatedAt: goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt || inventoryCoverage.latestDate
+          },
           { name: "销售需求", status: salesRows.length ? "trusted" : "partial", description: "订单创建时间下的日销量与销售成本", countLabel: `${salesRows.length} 条销售事实`, updatedAt: null },
           { name: "采购与付款", status: state.purchaseApprovals.length || state.paymentApprovals.length ? "partial" : "unavailable", description: "钉钉审批与 ERP 采购投影", countLabel: `${state.purchaseApprovals.length} 张采购 · ${state.paymentApprovals.length} 张付款`, updatedAt: null },
           { name: "质量与售后", status: state.qualityIssues.length ? "partial" : "unavailable", description: "质量导入、售后与评价事实", countLabel: `${state.qualityIssues.length} 个质量事件`, updatedAt: null }

@@ -26,7 +26,8 @@ import {
   evaluateRollingReplenishmentRecovery,
   reconcileFreightCharge,
   normalizeSupplyChainSection,
-  resolveProcurementResponsibility
+  resolveProcurementResponsibility,
+  summarizeInventorySnapshotCoverage
 } from "../src/domain/supplyChainWorkflow.js";
 
 test("supply chain workspaces follow the task-first product structure", () => {
@@ -348,6 +349,25 @@ test("rolling replenishment closes only after five stable sales days and safe in
     currentInventory: 1000,
     safetyInventory: 800
   }).status, "tracking");
+});
+
+test("inventory coverage distinguishes existing ERP snapshots from unmatched product codes", () => {
+  const result = summarizeInventorySnapshotCoverage({
+    snapshots: [
+      { skuCode: "A", stocktakeDate: "2026-05-31", sourceType: "dingtalk-finished-inventory" },
+      { skuCode: "B", stocktakeDate: "2026-05-30", sourceType: "dingtalk-stocktake-import" },
+      { skuCode: "C", stocktakeDate: "2026-04-30", sourceType: "other-source" }
+    ],
+    products: [
+      { id: "p1", skuCodes: [{ code: "A" }] }
+    ]
+  });
+  assert.deepEqual(result, {
+    totalRows: 2,
+    matchedRows: 1,
+    unmatchedRows: 1,
+    latestDate: "2026-05-31"
+  });
 });
 
 test("catalog supplier links resolve to the lifecycle product when available", () => {
