@@ -130,6 +130,7 @@ export function todoSyncStatus(task) {
   const todo = task?.dingTodo;
   if (todo?.lastError) return "同步失败";
   if (!todo?.id) return "未同步";
+  if (todo?.simulated) return "展示模拟";
   if (!todo?.sourceId) return "待确认";
   const current = buildTaskTodoSnapshot(task, todo.executorUnionIds || [], todo.draft);
   if (!sameSnapshot(current, todo.snapshot)) return "待更新";
@@ -152,6 +153,7 @@ export function applyTaskTodoSyncSuccess(task, { payload, executors = [], snapsh
       sourceId: todo?.sourceId || payload?.sourceId || "",
       source: todo?.source || "",
       bizTag: todo?.bizTag || "",
+      simulated: Boolean(todo?.simulated),
       creatorUnionId: todo?.creatorUnionId || payload?.creatorUnionId || "",
       syncedAt,
       executorUnionIds: payload?.executorUnionIds || [],

@@ -8,13 +8,20 @@ import {
   updateDingTodoTask
 } from "../_shared/dingtalk.js";
 import { getValidDingUserToken } from "../../auth/_shared/ding-user-token.js";
-import { readCompanyState } from "../../state.js";
+import { readCompanyState, writeCompanyState } from "../../state.js";
 import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 import { shouldSimulateExternalAction } from "../../platform/_shared/externalActionMode.js";
+import { applyTaskTodoSyncSuccess } from "../../../../src/domain/taskTodo.js";
 import {
   auditDisplayExternalAction,
   simulateDingTodoSync
 } from "../../platform/_shared/displayExternalActionAdapter.js";
+import {
+  ensureProductionAccessTables,
+  finishProductionAudit,
+  saveProductionSnapshot,
+  startProductionAudit
+} from "../../platform/_shared/productionDataAccess.js";
 
 function requestError(message, status) {
   const error = new Error(message);
@@ -24,6 +31,19 @@ function requestError(message, status) {
 
 export function safeDingTalkError(error, fallback) {
   const status = Number(error?.status) || 500;
+  if (error?.code === "DINGTALK_TODO_BINDING_CONFLICT") {
+    return {
+      status: 409,
+      body: {
+        synced: false,
+        providerSynced: true,
+        todoId: String(error?.todoId || ""),
+        code: "DINGTALK_TODO_BINDING_CONFLICT",
+        message: "钉钉待办已创建，但系统绑定保存冲突，请重试同步。",
+        retryable: true
+      }
+    };
+  }
   if ([401, 428].includes(status)) {
     return {
       status,
@@ -53,6 +73,112 @@ export function safeDingTalkError(error, fallback) {
     };
   }
   return { status, body: { synced: false, code: "DINGTALK_PROVIDER_FAILED", message: fallback, retryable: true } };
+}
+
+function taskSourceParts(sourceId) {
+  const match = String(sourceId || "").trim().match(/^task:([^:]+):([^:]+)$/);
+  return match ? { productId: match[1], taskId: match[2] } : null;
+}
+
+function taskExecutorUsers(state, executorUnionIds = []) {
+  const wanted = new Set(executorUnionIds.map(value => String(value || "").trim()).filter(Boolean));
+  return (state?.orgCache?.users || []).filter(user => wanted.has(String(user?.unionid || user?.unionId || "").trim()));
+}
+
+function bindingConflict(todoId) {
+  const error = new Error("钉钉待办已创建，但系统绑定保存冲突，请重试同步。");
+  error.status = 409;
+  error.code = "DINGTALK_TODO_BINDING_CONFLICT";
+  error.retryable = true;
+  error.todoId = String(todoId || "");
+  return error;
+}
+
+async function writeTaskTodoState({ db, state, stored, session, sourceEnvironment, writeState }) {
+  await ensureProductionAccessTables(db);
+  const snapshotId = await saveProductionSnapshot(db, stored);
+  const audit = await startProductionAudit({
+    db,
+    action: "dingtalk-todo-binding-write",
+    access: {
+      userId: session.userId || "company-session",
+      unionId: session.unionId || "",
+      name: session.name || "公司会话"
+    },
+    unlock: { reason: "钉钉待办绑定保存" },
+    snapshotId,
+    before: stored,
+    sourceEnvironment
+  });
+  try {
+    const saved = await writeState(
+      db,
+      state,
+      session.name || session.unionId || "公司会话",
+      { baseUpdatedAt: stored.updatedAt }
+    );
+    await finishProductionAudit(db, audit.id, saved);
+    return { ...saved, auditId: audit.id };
+  } catch (error) {
+    await finishProductionAudit(db, audit.id, stored, "failed").catch(() => {});
+    throw error;
+  }
+}
+
+export async function persistTaskTodoSyncResult({
+  db,
+  sourceId,
+  payload,
+  todo,
+  session = {},
+  syncedAt = new Date().toISOString(),
+  maxAttempts = 3,
+  sourceEnvironment = "production",
+  readState = readCompanyState,
+  writeState = writeCompanyState,
+  writeBinding = writeTaskTodoState
+}) {
+  const source = taskSourceParts(sourceId);
+  if (!source) throw requestError("待办来源标识无效。", 400);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const stored = await readState(db);
+    if (!stored?.state) throw requestError("产品流程共享数据尚未初始化。", 409);
+    const task = (stored.state.tasks || []).find(item => (
+      String(item.id) === source.taskId
+      && String(item.productId) === source.productId
+    ));
+    if (!task) throw requestError("待同步的产品任务不存在。", 404);
+
+    const executors = taskExecutorUsers(stored.state, payload?.executorUnionIds || []);
+    const persistedTask = applyTaskTodoSyncSuccess(task, {
+      payload,
+      executors,
+      todo,
+      syncedAt
+    });
+    const nextState = {
+      ...stored.state,
+      tasks: (stored.state.tasks || []).map(item => item === task ? persistedTask : item)
+    };
+
+    try {
+      const saved = await writeBinding({
+        db,
+        state: nextState,
+        stored,
+        session,
+        sourceEnvironment,
+        writeState
+      });
+      return { ...saved, task: persistedTask };
+    } catch (error) {
+      const isConflict = Number(error?.status) === 409 || error?.code === "SHARED_STATE_VERSION_CONFLICT";
+      if (!isConflict) throw error;
+      if (attempt === maxAttempts - 1) throw bindingConflict(todo?.id || todo?.taskId);
+    }
+  }
+  throw bindingConflict(todo?.id || todo?.taskId);
 }
 
 function isTaskTodoSourceForTask(value, sourceId) {
@@ -149,7 +275,15 @@ export async function onRequest({ request, env, data = {} }) {
     if (shouldSimulateExternalAction(data)) {
       const todo = simulateDingTodoSync(authorizedBody);
       await auditDisplayExternalAction({ env, data, kind: "dingtalk_todo_sync", resultId: todo.id });
-      return jsonResponse({ synced: true, todo });
+      const saved = await persistTaskTodoSyncResult({
+        db,
+        sourceId: body.sourceId,
+        payload: authorizedBody,
+        todo,
+        session: data.session,
+        sourceEnvironment: data.dataEnvironment?.id || "display"
+      });
+      return jsonResponse({ synced: true, todo, task: saved.task, version: saved.version, updatedAt: saved.updatedAt });
     }
     let todo;
     if (!authorizedBody.todoId) {
@@ -174,7 +308,15 @@ export async function onRequest({ request, env, data = {} }) {
     } else {
       todo = await syncDingTodoTask(await getDingAccessToken(env), authorizedBody);
     }
-    return jsonResponse({ synced: true, todo });
+    const saved = await persistTaskTodoSyncResult({
+      db,
+      sourceId: body.sourceId,
+      payload: authorizedBody,
+      todo,
+      session: data.session,
+      sourceEnvironment: data.dataEnvironment?.id || "production"
+    });
+    return jsonResponse({ synced: true, todo, task: saved.task, version: saved.version, updatedAt: saved.updatedAt });
   } catch (error) {
     const safe = safeDingTalkError(error, "钉钉待办同步失败，请稍后重试。");
     return jsonResponse(safe.body, safe.status);
