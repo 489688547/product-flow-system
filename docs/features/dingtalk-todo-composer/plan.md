@@ -28,13 +28,15 @@
 - `loadMyDingTalkGroups(fetchImpl?) -> Promise<{groups}>`
 - `createTodoComposerDraft({task, product}) -> {subject, descriptionHtml, priority, dueDate, dueClock}`
 - `buildTaskTodoPayload(..., draft) -> DingTalkTodoInput`
-- `reconcileTaskTodosFromDingTalk(tasks, cards) -> tasks`：按 todoId/sourceId 匹配，以钉钉卡片覆盖同步快照；无匹配或查询失败保持原状态。
+- `reconcileTaskTodosFromDingTalk(tasks, cards) -> tasks`：按 todoId/sourceId 匹配，以钉钉卡片覆盖同步快照，并按远端字段快照归一完成状态；无匹配、重复快照或查询失败保持原状态。
 - `GET /api/dingtalk/groups -> {groups:[{id,name,memberCount,myRole}], nextCursor, hasMore}`
 - `POST /api/dingtalk/todo/sync`：必须具备有效企业会话且不是只读账号；服务端从会话覆盖创建人，从 D1 共享状态校验 `sourceId` 对应的产品任务，并只接受与任务记录一致的 `todoId`。客户端传入的创建人、操作人、资源人和恢复人员不作为授权依据。
-- 待办同步请求成功返回 `{synced:true,todo}`；无会话由全局中间件返回 401，只读返回 403，任务不存在返回 404，D1 未绑定或状态未初始化返回 501/409，钉钉失败保留供应商错误摘要并使用对应 HTTP 状态。
-- 兼容旧任务：没有 `dingTodo.id` 时按稳定 `sourceId` 创建或执行有界恢复；有 ID 时仅使用服务端任务记录中的 ID 更新。日志和供应商响应不得写入令牌、手机号或原始敏感数据。
+- 待办同步请求成功返回 `{synced:true,todo}`；无会话由全局中间件返回 401，只读返回 403，任务不存在返回 404，D1 未绑定或状态未初始化返回 501/409。钉钉失败只返回白名单错误码、安全提示和可重试标识，不向浏览器透传供应商原始响应。
+- 新任务：使用服务端保存的钉钉用户访问凭证调用原生个人待办创建接口；正文、截止时间和 unionId 执行人随创建请求发送，非默认优先级再通过个人待办 MCP 串行设置。
+- 兼容旧任务：只有服务端任务记录中的 `dingTodo.sourceId` 与请求稳定来源一致或属于受控恢复版本时才复用 ID。只有旧 ID、没有匹配来源的记录进入“待确认”，重新同步时忽略旧 ID 并创建原生个人待办。日志和供应商响应不得写入令牌、手机号或原始敏感数据。
+- `GET /api/dingtalk/todo/list`：串行、有界查询当前用户未完成和已完成的个人待办，并在过渡期补充本应用企业工作待办；响应按 todoId 去重，客户端只回流已绑定产品任务。
 - `TodoSyncModal.onSync({executors,draft})`
-- `ProductFlowProvider` 在登录完成、窗口聚焦和 60 秒周期读取 `/api/dingtalk/todo/list`，只在远端快照变化时持久化产品任务。
+- `ProductFlowProvider` 在登录完成、窗口聚焦和带抖动的周期内读取 `/api/dingtalk/todo/list`；查询窗口内一次回流，超出窗口的待办按服务端返回的有界游标逐轮覆盖，只在远端快照变化时持久化产品任务。
 
 ## 数据迁移
 
@@ -43,6 +45,7 @@
 ## 风险与回滚
 
 - 钉钉我的群服务异常：保留关键词搜索和按人员选择；错误可重试。
+- 钉钉待办查询量过大：个人待办与迁移期工作待办独立降级，未完成和已完成列表串行执行并分别限制单次分页数量；响应明确返回各来源授权、成功、截断覆盖和下一轮游标，浏览器后续轮转页码或 OpenAPI `nextToken`，避免历史待办永久饿死。浏览器仅在当前账号存在已分配待办时自动刷新，同标签页共享 single-flight、跨标签页使用刷新租约，首次和周期请求增加随机抖动，遇到来源级或顶层 429 均退避 2 分钟，避免超过企业 40 QPS 权益或在 Cloudflare 边缘超过 CPU 限额。
 - 富文本与钉钉正文能力差异：始终发送经过清洗的可读纯文本，避免原始 HTML。
 - 共享 Modal 回归：通过现有 Modal 消费者测试和键盘浏览器验收；必要时仅回滚焦点管理提交。
 - 回滚不删除 `dingTodo.draft`，旧版本会忽略该字段。
@@ -56,7 +59,7 @@
 - `npm run check:integrations`
 - `npm test`
 - `npm run build`
-- 浏览器验收 1440×900、390×844 和键盘路径；不发送真实待办。
+- 浏览器验收 1440×900、390×844 和键盘路径；真实联调仅向授权测试账号发送带明确标识的临时待办，并在验证后删除。
 
 ## 任务顺序
 

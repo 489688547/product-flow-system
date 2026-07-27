@@ -35,7 +35,7 @@ test("new todo snapshots include the editable draft without invalidating legacy 
   assert.equal("draft" in legacy, false);
   const draft = { subject: "自定义标题", descriptionHtml: "<p>正文</p>", priority: 30, dueDate: "2026-07-22", dueClock: "16:30" };
   assert.deepEqual(buildTaskTodoSnapshot(task, ["union-a"], draft).draft, draft);
-  const synced = { ...task, dingTodo: { id: "todo-1", snapshot: buildTaskTodoSnapshot(task, ["union-a"], draft), executorUnionIds: ["union-a"], draft } };
+  const synced = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", snapshot: buildTaskTodoSnapshot(task, ["union-a"], draft), executorUnionIds: ["union-a"], draft } };
   assert.equal(todoSyncStatus(synced), "已同步");
   assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, draft: { ...draft, priority: 40 } } }), "待更新");
 });
@@ -86,8 +86,12 @@ test("todo sync state detects unsynced, stale, completed and failed tasks", () =
     ownerDept: task.ownerDept,
     executorUnionIds: ["union-a"]
   };
-  const synced = { ...task, dingTodo: { id: "todo-1", snapshot, executorUnionIds: ["union-a"] } };
+  const synced = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", snapshot, executorUnionIds: ["union-a"] } };
   assert.equal(todoSyncStatus(synced), "已同步");
+  assert.equal(todoSyncStatus({
+    ...synced,
+    dingTodo: { ...synced.dingTodo, sourceId: "" }
+  }), "待确认");
   assert.equal(todoSyncStatus({ ...synced, due: "2026-07-13" }), "待更新");
   assert.equal(todoSyncStatus({ ...synced, done: true }), "待更新");
   assert.equal(todoSyncStatus({ ...synced, done: true, dingTodo: { ...synced.dingTodo, snapshot: { ...snapshot, done: true } } }), "已完成");
@@ -109,6 +113,31 @@ test("task todo payload requires a due date and keeps a stable system source id"
   assert.equal(payload.dueTime, new Date("2026-07-12T18:00:00+08:00").getTime());
   assert.equal(payload.done, false);
   assert.throws(() => buildTaskTodoPayload({ product, task: { ...task, due: "" }, creator, executors, detailUrl: "https://flow.example.com" }), /截止日期/);
+});
+
+test("task todo payload only reuses an id verified against the stable product source", () => {
+  const product = { id: "p1", name: "鹦鹉谷物棒" };
+  const creator = { unionid: "creator-union" };
+  const executors = [{ name: "赵雨涵", unionid: "executor-union" }];
+  const baseTask = { id: "t1", title: "整理 PRD", due: "2026-07-12", done: false };
+  const options = { product, creator, executors, detailUrl: "https://flow.example.com/#progress" };
+
+  assert.equal(buildTaskTodoPayload({
+    ...options,
+    task: { ...baseTask, dingTodo: { id: "legacy-teambition-id" } }
+  }).todoId, "");
+  assert.equal(buildTaskTodoPayload({
+    ...options,
+    task: { ...baseTask, dingTodo: { id: "app-todo-id", sourceId: "task:p1:t1" } }
+  }).todoId, "app-todo-id");
+  assert.equal(buildTaskTodoPayload({
+    ...options,
+    task: { ...baseTask, dingTodo: { id: "recovered-app-todo-id", sourceId: "task:p1:t1:r1" } }
+  }).todoId, "recovered-app-todo-id");
+  assert.equal(buildTaskTodoPayload({
+    ...options,
+    task: { ...baseTask, dingTodo: { id: "foreign-app-todo-id", sourceId: "task:p1:t10" } }
+  }).todoId, "");
 });
 
 test("legacy month-day deadlines normalize before DingTalk todo sync", () => {
@@ -229,17 +258,36 @@ test("todo sync only persists the edited deadline and draft after DingTalk succe
   };
   const payload = {
     todoId: "todo-1",
+    creatorUnionId: "creator-union",
     executorUnionIds: ["u1"],
     draft: { subject: "本次编辑", dueDate: "2026-07-22" }
   };
   const success = applyTaskTodoSyncSuccess(task, {
     payload,
     executors: [{ unionid: "u1", name: "甲" }],
-    todo: { id: "todo-1" },
+    todo: { id: "todo-1", sourceId: "task:p1:t1", source: "todo_open_app" },
     syncedAt: "2026-07-18T10:00:00.000Z"
   });
   assert.equal(success.due, "2026-07-22");
   assert.equal(success.dingTodo.draft.subject, "本次编辑");
+  assert.equal(success.dingTodo.sourceId, "task:p1:t1");
+  assert.equal(success.dingTodo.source, "todo_open_app");
+  assert.equal(success.dingTodo.creatorUnionId, "creator-union");
+
+  const partial = applyTaskTodoSyncSuccess(task, {
+    payload,
+    executors: [{ unionid: "u1", name: "甲" }],
+    todo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      prioritySynced: false,
+      priorityWarning: "待办已创建，优先级稍后重试"
+    },
+    syncedAt: "2026-07-18T10:00:30.000Z"
+  });
+  assert.equal(partial.dingTodo.id, "todo-1");
+  assert.equal(partial.dingTodo.lastError, "待办已创建，优先级稍后重试");
 
   const failure = applyTaskTodoSyncFailure(task, new Error("网络失败"), "2026-07-18T10:01:00.000Z");
   assert.equal(failure.due, "2026-07-20");
@@ -284,12 +332,102 @@ test("DingTalk remains authoritative when a synced product task is edited remote
   assert.equal(reconciled[0].dingTodo.draft.dueClock, "16:30");
   assert.deepEqual(reconciled[0].dingTodo.executorUnionIds, ["new-executor"]);
   assert.equal(reconciled[0].dingTodo.lastError, "");
+  assert.equal(reconciled[0].dingTodo.sourceId, "task:p1:t1");
   assert.equal(todoSyncStatus(reconciled[0]), "已完成");
+});
+
+test("DingTalk personal completion stage marks the local task complete", () => {
+  const tasks = [{
+    id: "t1",
+    productId: "p1",
+    done: false,
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      syncedAt: "2026-07-18T10:00:00.000Z",
+      draft: {
+        subject: "PRD 评审",
+        descriptionHtml: "<p>评审正文</p>",
+        priority: 40,
+        dueDate: "2026-07-28",
+        dueClock: "18:00"
+      }
+    }
+  }];
+
+  const reconciled = dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, [{
+    taskId: "todo-1",
+    finalStatusStage: 2,
+    modifiedTime: new Date("2026-07-18T10:01:00.000Z").getTime()
+  }]);
+
+  assert.equal(reconciled[0].done, true);
+  assert.equal(todoSyncStatus(reconciled[0]), "已完成");
+});
+
+test("DingTalk personal completion without a modified timestamp still flows back once", () => {
+  const tasks = [{
+    id: "t1",
+    productId: "p1",
+    done: false,
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      syncedAt: "2026-07-18T10:00:00.000Z",
+      draft: {
+        subject: "PRD 评审",
+        descriptionHtml: "<p>评审正文</p>",
+        priority: 40,
+        dueDate: "2026-07-28",
+        dueClock: "18:00"
+      }
+    }
+  }];
+  const card = {
+    taskId: "todo-1",
+    subject: "PRD 评审",
+    dueTime: new Date("2026-07-28T18:00:00+08:00").getTime(),
+    priority: 40,
+    finalStatusStage: 2,
+    isDone: true
+  };
+
+  const reconciled = dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, [card]);
+  assert.equal(reconciled[0].done, true);
+  assert.match(reconciled[0].dingTodo.remoteSnapshotKey, /todo-1/);
+  assert.equal(dingTalkDomain.reconcileTaskTodosFromDingTalk(reconciled, [card]), reconciled);
 });
 
 test("DingTalk reconciliation preserves task identity when no remote card matches", () => {
   const tasks = [{ id: "t1", productId: "p1", done: false }];
   assert.equal(dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, [{ taskId: "other" }]), tasks);
+});
+
+test("legacy source-less todo ids cannot adopt an unrelated remote task", () => {
+  const tasks = [{
+    id: "t1",
+    productId: "p1",
+    done: false,
+    dingTodo: { id: "legacy-id-without-source" }
+  }];
+  const unrelatedCard = {
+    taskId: "legacy-id-without-source",
+    subject: "其他系统待办",
+    isDone: true
+  };
+
+  assert.equal(dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, [unrelatedCard]), tasks);
+});
+
+test("only assigned users need to poll DingTalk product-task statuses", () => {
+  const tasks = [
+    { id: "unsynced" },
+    { id: "assigned", dingTodo: { id: "todo-1", executorUnionIds: ["union-a"] } },
+    { id: "other", dingTodo: { id: "todo-2", executorUnionIds: ["union-b"] } }
+  ];
+  assert.equal(dingTalkDomain.userHasAssignedDingTalkTodo(tasks, "union-a"), true);
+  assert.equal(dingTalkDomain.userHasAssignedDingTalkTodo(tasks, "union-c"), false);
+  assert.equal(dingTalkDomain.userHasAssignedDingTalkTodo(tasks, ""), false);
 });
 
 test("stale DingTalk snapshots cannot overwrite a newer successful composer draft", () => {
@@ -318,4 +456,73 @@ test("stale DingTalk snapshots cannot overwrite a newer successful composer draf
     isDone: true
   }];
   assert.equal(dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, stale), tasks);
+});
+
+test("remote polling cannot clear a partial DingTalk sync warning", () => {
+  const tasks = [{
+    id: "t1",
+    productId: "p1",
+    done: false,
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      lastError: "待办已创建，但优先级同步失败，请重试。",
+      failedAt: "2026-07-18T10:00:00.000Z",
+      syncWarningKind: "partial_sync",
+      draft: {
+        subject: "PRD 评审",
+        descriptionHtml: "<p>正文</p>",
+        priority: 40,
+        dueDate: "2026-07-28",
+        dueClock: "18:00"
+      }
+    }
+  }];
+  const [reconciled] = dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, [{
+    taskId: "todo-1",
+    subject: "PRD 评审",
+    priority: 20,
+    isDone: false
+  }]);
+
+  assert.match(reconciled.dingTodo.lastError, /优先级同步失败/);
+  assert.equal(reconciled.dingTodo.draft.priority, 40);
+  assert.equal(reconciled.dingTodo.draft.subject, "PRD 评审");
+  assert.equal(todoSyncStatus(reconciled), "同步失败");
+});
+
+test("a failed retry keeps the pending partial-sync target protected from polling", () => {
+  const pending = {
+    id: "t1",
+    productId: "p1",
+    done: false,
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      executorUnionIds: ["new-executor"],
+      draft: {
+        subject: "待重试标题",
+        descriptionHtml: "<p>待重试正文</p>",
+        priority: 40,
+        dueDate: "2026-07-28",
+        dueClock: "18:00"
+      },
+      lastError: "优先级同步失败",
+      syncWarningKind: "partial_sync"
+    }
+  };
+  const failedRetry = applyTaskTodoSyncFailure(pending, new Error("网络失败"), "2026-07-18T10:02:00.000Z");
+  const [reconciled] = dingTalkDomain.reconcileTaskTodosFromDingTalk([failedRetry], [{
+    taskId: "todo-1",
+    subject: "钉钉旧标题",
+    priority: 20,
+    executorIds: ["old-executor"],
+    isDone: false
+  }]);
+
+  assert.equal(failedRetry.dingTodo.syncWarningKind, "partial_sync");
+  assert.equal(reconciled.dingTodo.draft.subject, "待重试标题");
+  assert.equal(reconciled.dingTodo.draft.priority, 40);
+  assert.deepEqual(reconciled.dingTodo.executorUnionIds, ["new-executor"]);
+  assert.equal(reconciled.dingTodo.lastError, "网络失败");
 });

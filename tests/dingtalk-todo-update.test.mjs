@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { syncDingTodoTask, updateDingTodoTask } from "../functions/api/dingtalk/_shared/dingtalk.js";
-import { authorizeTaskTodoSyncRequest, onRequest as syncTodoRoute } from "../functions/api/dingtalk/todo/sync.js";
+import {
+  authorizeTaskTodoSyncRequest,
+  onRequest as syncTodoRoute,
+  safeDingTalkError
+} from "../functions/api/dingtalk/todo/sync.js";
 
 function okJson(body) {
   return { ok: true, json: async () => body };
@@ -11,10 +15,23 @@ function errorJson(status, body) {
   return { ok: false, status, json: async () => body };
 }
 
+test("todo sync maps provider authorization expiry to a safe re-login response", () => {
+  const error = new Error("raw provider credential detail");
+  error.status = 401;
+  error.detail = { response: "private token response" };
+  const result = safeDingTalkError(error, "同步失败");
+
+  assert.equal(result.status, 401);
+  assert.equal(result.body.code, "DINGTALK_USER_AUTH_REQUIRED");
+  assert.equal(result.body.message, "请重新使用钉钉登录后再同步待办。");
+  assert.equal(result.body.retryable, true);
+  assert.doesNotMatch(JSON.stringify(result), /raw provider|private token/);
+});
+
 test("todo sync authorization binds the actor and todo id to session-backed task state", () => {
   const state = {
     products: [{ id: "p1", productManagerUnionId: "owner-union" }],
-    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "todo-state" } }]
+    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1" } }]
   };
   const input = {
     sourceId: "task:p1:t1",
@@ -38,6 +55,92 @@ test("todo sync authorization binds the actor and todo id to session-backed task
   assert.throws(() => authorizeTaskTodoSyncRequest({ ...input, todoId: "todo-other" }, { unionId: "session-union", role: "product" }, state), /待办 ID/);
 });
 
+test("todo sync authorization does not reuse an unverified legacy todo id", () => {
+  const state = {
+    products: [{ id: "p1" }],
+    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "legacy-teambition-id" } }]
+  };
+  const authorized = authorizeTaskTodoSyncRequest({
+    sourceId: "task:p1:t1",
+    executorUnionIds: ["executor-union"]
+  }, { unionId: "session-union", role: "product" }, state);
+
+  assert.equal(authorized.todoId, "");
+});
+
+test("todo sync authorization reuses only a controlled recovery source for the same task", () => {
+  const state = {
+    products: [{ id: "p1" }],
+    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "recovered-id", sourceId: "task:p1:t1:r1" } }]
+  };
+  const authorized = authorizeTaskTodoSyncRequest({
+    sourceId: "task:p1:t1",
+    todoId: "recovered-id",
+    executorUnionIds: ["executor-union"]
+  }, { unionId: "session-union", role: "product" }, state);
+
+  assert.equal(authorized.todoId, "recovered-id");
+});
+
+test("personal todo updates are restricted to the server-recorded creator", () => {
+  const baseState = {
+    products: [{ id: "p1" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      dingTodo: {
+        id: "personal-id",
+        sourceId: "task:p1:t1",
+        source: "todo_personal_user",
+        creatorUnionId: "creator-union"
+      }
+    }]
+  };
+  const input = {
+    sourceId: "task:p1:t1",
+    todoId: "personal-id",
+    executorUnionIds: ["executor-union"]
+  };
+
+  assert.equal(
+    authorizeTaskTodoSyncRequest(input, { unionId: "creator-union", role: "product" }, baseState).todoId,
+    "personal-id"
+  );
+  assert.throws(
+    () => authorizeTaskTodoSyncRequest(input, { unionId: "other-union", role: "product" }, baseState),
+    /只有.*创建人/
+  );
+  const missingOwnerState = {
+    ...baseState,
+    tasks: [{ ...baseState.tasks[0], dingTodo: { ...baseState.tasks[0].dingTodo, creatorUnionId: "" } }]
+  };
+  assert.throws(() => authorizeTaskTodoSyncRequest(
+    input,
+    { unionId: "creator-union", role: "product" },
+    missingOwnerState
+  ), /缺少创建人/);
+
+  const replaceableState = {
+    products: [{ id: "p1", productManagerUnionId: "manager-union" }],
+    tasks: [{
+      ...baseState.tasks[0],
+      dingTodo: {
+        ...baseState.tasks[0].dingTodo,
+        creatorUnionId: "",
+        executorUnionIds: ["executor-union"]
+      }
+    }]
+  };
+  const replacement = authorizeTaskTodoSyncRequest(
+    input,
+    { unionId: "manager-union", role: "product" },
+    replaceableState
+  );
+  assert.equal(replacement.todoId, "");
+  assert.equal(replacement.replacementOfTodoId, "personal-id");
+  assert.equal(replacement.sourceId, "task:p1:t1:r1");
+});
+
 test("todo sync authorization rejects readonly, missing, and forged task sources", () => {
   const state = { products: [{ id: "p1" }], tasks: [{ id: "t1", productId: "p1" }] };
   const input = { sourceId: "task:p1:t1", executorUnionIds: ["executor-union"] };
@@ -50,7 +153,7 @@ test("todo sync route uses the signed-in actor and the server-stored todo id", a
   const parts = [
     { part_key: "version", part_index: 0, payload: JSON.stringify("test"), updated_at: "2026-07-18", updated_by: "产品负责人" },
     { part_key: "products", part_index: 0, payload: JSON.stringify([{ id: "p1", productManagerUnionId: "owner-union" }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
-    { part_key: "tasks", part_index: 0, payload: JSON.stringify([{ id: "t1", productId: "p1", dingTodo: { id: "todo-state" } }]), updated_at: "2026-07-18", updated_by: "产品负责人" }
+    { part_key: "tasks", part_index: 0, payload: JSON.stringify([{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1" } }]), updated_at: "2026-07-18", updated_by: "产品负责人" }
   ];
   const db = {
     prepare(sql) {
@@ -117,7 +220,7 @@ test("updateDingTodoTask keeps the DingTalk task id and updates task state", asy
   assert.equal(calls[0].options.method, "PUT");
   assert.match(calls[0].url, /\/v1\.0\/todo\/users\/creator-union\/tasks\/todo-1\?operatorId=creator-union$/);
   assert.equal(calls[0].body.done, true);
-  assert.equal(calls[0].body.priority, 40);
+  assert.equal("priority" in calls[0].body, false);
   assert.deepEqual(calls[0].body.executorIds, ["executor-union"]);
 });
 

@@ -27,6 +27,7 @@ test("progress page allows opening the composer before a deadline exists", () =>
 test("product flow automatically refreshes remote DingTalk task changes", () => {
   assert.match(provider, /reconcileTaskTodosFromDingTalk/);
   assert.match(provider, /createDingTalkTodoRefreshController/);
+  assert.match(provider, /userHasAssignedDingTalkTodo/);
   assert.match(provider, /window\.addEventListener\("focus"/);
   assert.match(provider, /todoRefreshController\.invalidate\(\)/);
 });
@@ -41,23 +42,25 @@ function todoListResponse(todos) {
   return { ok: true, json: async () => ({ synced: true, todos }) };
 }
 
-test("todo refresh accepts only the latest overlapping response", async () => {
-  const first = deferred();
-  const second = deferred();
-  const responses = [first.promise, second.promise];
+test("todo refresh coalesces overlapping triggers into one DingTalk request", async () => {
+  const pending = deferred();
+  let fetchCount = 0;
   const applied = [];
   const controller = createDingTalkTodoRefreshController({
-    fetchImpl: async () => responses.shift(),
+    fetchImpl: async () => {
+      fetchCount += 1;
+      return pending.promise;
+    },
     onTodos: todos => applied.push(todos)
   });
 
   const firstRefresh = controller.refresh();
   const secondRefresh = controller.refresh();
-  second.resolve(todoListResponse([{ taskId: "new" }]));
+  assert.equal(fetchCount, 1);
+  pending.resolve(todoListResponse([{ taskId: "current" }]));
+  assert.equal(await firstRefresh, true);
   assert.equal(await secondRefresh, true);
-  first.resolve(todoListResponse([{ taskId: "old" }]));
-  assert.equal(await firstRefresh, false);
-  assert.deepEqual(applied, [[{ taskId: "new" }]]);
+  assert.deepEqual(applied, [[{ taskId: "current" }]]);
 });
 
 test("successful local sync can invalidate an in-flight todo refresh", async () => {
@@ -73,6 +76,27 @@ test("successful local sync can invalidate an in-flight todo refresh", async () 
   pending.resolve(todoListResponse([{ taskId: "stale" }]));
   assert.equal(await refresh, false);
   assert.deepEqual(applied, []);
+});
+
+test("product todo refresh surfaces personal reauthorization without discarding work cards", async () => {
+  const warnings = [];
+  const applied = [];
+  const controller = createDingTalkTodoRefreshController({
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        synced: true,
+        todos: [{ taskId: "legacy-work-1", isDone: true }],
+        warnings: [{ code: "DINGTALK_USER_AUTH_REQUIRED", message: "请重新使用钉钉登录" }]
+      })
+    }),
+    onTodos: todos => applied.push(todos),
+    onWarnings: items => warnings.push(items)
+  });
+
+  assert.equal(await controller.refresh(), true);
+  assert.deepEqual(applied, [[{ taskId: "legacy-work-1", isDone: true }]]);
+  assert.equal(warnings[0][0].code, "DINGTALK_USER_AUTH_REQUIRED");
 });
 
 test("shared rich text editor supports compact text-only disabled mode", () => {

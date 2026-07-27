@@ -130,6 +130,7 @@ export function todoSyncStatus(task) {
   const todo = task?.dingTodo;
   if (todo?.lastError) return "同步失败";
   if (!todo?.id) return "未同步";
+  if (!todo?.sourceId) return "待确认";
   const current = buildTaskTodoSnapshot(task, todo.executorUnionIds || [], todo.draft);
   if (!sameSnapshot(current, todo.snapshot)) return "待更新";
   return task.done ? "已完成" : "已同步";
@@ -138,27 +139,41 @@ export function todoSyncStatus(task) {
 export function applyTaskTodoSyncSuccess(task, { payload, executors = [], snapshot, todo = {}, syncedAt }) {
   const due = String(payload?.draft?.dueDate || task?.due || "");
   const effectiveTask = { ...task, due };
+  const syncWarning = String(
+    todo?.syncWarning
+    || (todo?.prioritySynced === false
+      ? todo?.priorityWarning || "待办已创建，但优先级同步失败，请重试。"
+      : "")
+  );
   return {
     ...effectiveTask,
     dingTodo: {
       id: todo?.id || todo?.taskId || payload?.todoId || "",
+      sourceId: todo?.sourceId || payload?.sourceId || "",
+      source: todo?.source || "",
+      bizTag: todo?.bizTag || "",
+      creatorUnionId: todo?.creatorUnionId || payload?.creatorUnionId || "",
       syncedAt,
       executorUnionIds: payload?.executorUnionIds || [],
       executorNames: executors.map(user => user.name).filter(Boolean),
       draft: payload?.draft,
       snapshot: snapshot || buildTaskTodoSnapshot(effectiveTask, payload?.executorUnionIds || [], payload?.draft),
-      lastError: ""
+      lastError: syncWarning,
+      failedAt: syncWarning ? syncedAt : "",
+      syncWarningKind: syncWarning ? "partial_sync" : ""
     }
   };
 }
 
 export function applyTaskTodoSyncFailure(task, error, failedAt = new Date().toISOString()) {
+  const keepsPendingPartialSync = task?.dingTodo?.syncWarningKind === "partial_sync";
   return {
     ...task,
     dingTodo: {
       ...(task?.dingTodo || {}),
       lastError: error?.message || "钉钉待办同步失败。",
-      failedAt
+      failedAt,
+      syncWarningKind: keepsPendingPartialSync ? "partial_sync" : ""
     }
   };
 }

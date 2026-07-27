@@ -16,7 +16,9 @@ import {
   queryDingMeetingMinutesText,
   queryDingMeetingMinutesTextWithFallback,
   queryDingScheduleConferenceHistory,
-  createDingTodoTask
+  createDingPersonalTodoTask,
+  createDingTodoTask,
+  updateDingPersonalTodoTask
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
 
 function okJson(body) {
@@ -64,6 +66,108 @@ test("createDingTodoTask posts to the DingTalk todo endpoint with operatorId", a
   assert.equal(result.id, "todo-1");
   assert.match(calls[0].url, /\/v1\.0\/todo\/users\/creator-union\/tasks\?operatorId=creator-union$/);
   assert.equal(calls[0].options.headers["x-acs-dingtalk-access-token"], "token-1");
+});
+
+test("createDingPersonalTodoTask creates a native-completable personal todo", async () => {
+  const calls = [];
+  const result = await createDingPersonalTodoTask("user-token-1", {
+    sourceId: "task:p1:t1",
+    executorUnionIds: ["executor-union"],
+    participantUnionIds: ["participant-union"],
+    subject: "整理 PRD",
+    description: "请在钉钉内完成",
+    dueTime: 1783401600000
+  }, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    return okJson({ taskId: "personal-todo-1", createdTime: 1783300000000 });
+  });
+
+  assert.equal(result.id, "personal-todo-1");
+  assert.equal(result.taskId, "personal-todo-1");
+  assert.equal(result.sourceId, "task:p1:t1");
+  assert.equal(result.source, "todo_personal_user");
+  assert.match(calls[0].url, /\/v1\.0\/todo\/users\/me\/personalTasks$/);
+  assert.equal(calls[0].options.headers["x-acs-dingtalk-access-token"], "user-token-1");
+  assert.deepEqual(calls[0].body.executorIds, ["executor-union"]);
+  assert.deepEqual(calls[0].body.participantIds, ["participant-union"]);
+  assert.equal("priority" in calls[0].body, false);
+  assert.equal("detailUrl" in calls[0].body, false);
+  assert.equal("sourceId" in calls[0].body, false);
+});
+
+test("createDingPersonalTodoTask applies non-default priority through the personal todo tool", async () => {
+  const calls = [];
+  const result = await createDingPersonalTodoTask("user-token-1", {
+    sourceId: "task:p1:t1",
+    executorUnionIds: ["executor-union"],
+    subject: "高优先级 PRD",
+    priority: 40
+  }, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    return calls.length === 1
+      ? okJson({ taskId: "personal-todo-1" })
+      : okJson({ result: { structuredContent: { success: true } } });
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].body.params.name, "update_todo_task");
+  assert.deepEqual(calls[1].body.params.arguments, {
+    TodoUpdateRequest: { taskId: "personal-todo-1", priority: 40 }
+  });
+  assert.equal(result.prioritySynced, true);
+  assert.equal(result.priorityWarning, "");
+});
+
+test("createDingPersonalTodoTask preserves the created task when priority sync fails", async () => {
+  const calls = [];
+  const result = await createDingPersonalTodoTask("user-token-1", {
+    sourceId: "task:p1:t1",
+    executorUnionIds: ["executor-union"],
+    subject: "高优先级 PRD",
+    priority: 40
+  }, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    if (calls.length === 1) return okJson({ taskId: "personal-todo-1" });
+    return {
+      ok: false,
+      status: 502,
+      json: async () => ({ error: { message: "priority unavailable" } })
+    };
+  });
+
+  assert.equal(calls.length, 2);
+  assert.equal(result.id, "personal-todo-1");
+  assert.equal(result.prioritySynced, false);
+  assert.equal(result.priorityWarning, "待办已创建，但优先级同步失败，请重试。");
+  assert.doesNotMatch(JSON.stringify(result), /priority unavailable/);
+});
+
+test("updateDingPersonalTodoTask updates native title deadline priority and completion", async () => {
+  const calls = [];
+  const result = await updateDingPersonalTodoTask("user-token-1", {
+    todoId: "personal-todo-1",
+    sourceId: "task:p1:t1",
+    subject: "更新后的 PRD",
+    dueTime: 1783401600000,
+    priority: 30,
+    done: true
+  }, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    return okJson({ result: { structuredContent: { success: true } } });
+  });
+
+  assert.equal(result.id, "personal-todo-1");
+  assert.equal(result.source, "todo_personal_user");
+  assert.equal(calls[0].body.params.name, "update_todo_task");
+  assert.deepEqual(calls[0].body.params.arguments, {
+    TodoUpdateRequest: {
+      taskId: "personal-todo-1",
+      subject: "更新后的 PRD",
+      dueTime: 1783401600000,
+      priority: 30,
+      isDone: true
+    }
+  });
 });
 
 test("buildDingCalendarEventPayload creates a primary-calendar meeting event", () => {
