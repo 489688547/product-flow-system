@@ -81,6 +81,21 @@ export function createWebCollectionD1Mock() {
             ))
           };
         }
+        // 被放弃的排队任务：没有租约，只按排队时长判定。必须排在下面的兜底分支之前，
+        // 否则会落到「返回全部任务」上，把所有任务误扫成失败。
+        if (
+          query.includes("from web_collection_jobs")
+          && query.includes("status = 'queued'")
+          && query.includes("coalesce(updated_at, created_at)")
+        ) {
+          const abandonedBefore = state.values[0];
+          return {
+            results: [...tables.web_collection_jobs.values()].filter(row => (
+              row.status === "queued"
+              && String(row.updated_at || row.created_at) < abandonedBefore
+            ))
+          };
+        }
         if (query.includes("from web_collection_jobs")) return { results: [...tables.web_collection_jobs.values()] };
         if (query.includes("from web_collection_runs")) return { results: [...tables.web_collection_runs.values()] };
         if (query.includes("from web_collection_cursors")) return { results: [...tables.web_collection_cursors.values()] };
@@ -183,9 +198,10 @@ export function createWebCollectionD1Mock() {
           return { success: true };
         }
         if (query.startsWith("update web_collection_jobs set status = 'failed'")) {
-          const [errorSummary, completedAt, updatedAt, id] = state.values;
+          // 自愈同时处理僵尸任务与被放弃的排队任务，错误码按参数传入。
+          const [errorCode, errorSummary, completedAt, updatedAt, id] = state.values;
           Object.assign(tables.web_collection_jobs.get(id), {
-            status: "failed", stage: "failed", error_code: "WEB_COLLECTION_STAGE_EXPIRED",
+            status: "failed", stage: "failed", error_code: errorCode,
             error_summary: errorSummary, lease_expires_at: null, completed_at: completedAt, updated_at: updatedAt
           });
           return { success: true };

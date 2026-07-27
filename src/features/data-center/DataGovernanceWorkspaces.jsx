@@ -151,9 +151,12 @@ export function SyncRunsWorkspace({ quality, focusTarget = "", canTrigger = fals
         resourceType: salesRecovery.job?.resourceType || "order_items",
         force: true
       });
-      setTriggerMessage(result.requeued
-        ? "采集任务已重新排队，Chrome 插件将在下一轮轮询时领取。"
-        : "采集任务已在队列中，Chrome 插件将在下一轮轮询时领取。");
+      // 采集器离线时没有任何执行器会轮询，不能承诺「下一轮轮询时领取」。
+      setTriggerMessage(salesRecovery.runnerOnline
+        ? result.requeued
+          ? "采集任务已重新排队，Chrome 插件将在下一轮轮询时领取。"
+          : "采集任务已在队列中，Chrome 插件将在下一轮轮询时领取。"
+        : "任务已排队，但公司 Mac 采集器当前离线，没有设备会领取。请先启动采集器；排队超过 24 小时会自动标记失败，届时可再次触发。");
       await refreshWebCollection();
     } catch (error) {
       setTriggerError(error.message || "Chrome 采集任务触发失败。");
