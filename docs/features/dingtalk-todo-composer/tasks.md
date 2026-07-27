@@ -58,16 +58,16 @@
   - 验证：聚焦测试、全量 DoD、浏览器验收。
   - 提交：`fix: harden todo composer accessibility`。
 
-- [ ] 真实送达与反向同步修复（个人待办真实送达但不可查询，已切换企业工作待办，待生产闭环验收）
+- [x] 真实送达与反向同步修复（企业工作待办已完成生产双向闭环验收）
   - 依赖：待办编排 UI、企业工作待办读写权限、个人待办写权限、当前用户 OAuth 凭证。
   - 文件：`functions/api/dingtalk/todo/`、`functions/api/dingtalk/_shared/dingtalk.js`、`src/domain/dingTalk.js`、`src/domain/taskTodo.js`、样式、平台规则和回归测试。
   - 输入：企业工作待办、稳定 `sourceId`、当前登录执行者的未完成/已完成企业待办列表，以及过渡期个人待办。
   - 输出：有界查询、真实 todoId、来源元数据、完成状态、远端字段快照和旧记录“待确认”迁移。
   - 失败测试：完成列表未映射 `isDone`、无限分页、无来源旧 ID 被复用的断言失败。
   - 实现步骤：限制分页 → 服务端串行查询与浏览器单飞刷新 → 创建可查询的企业工作待办 → 保存来源元数据 → 个人待办受控迁移 → 旧 ID 来源隔离 → 状态文案。
-  - 验证：本地线上真实模式用授权账号创建工作待办、钉钉完成、系统读回 `isDone=true`，再由系统恢复未完成并确认钉钉 `isDone=false`；测试待办保持未完成，不擅自删除；全量 Definition of Done 通过后提交。
+  - 验证：本地线上真实模式和生产环境均使用授权账号验证；钉钉完成后系统读回 `isDone=true`，再由系统恢复未完成并确认钉钉 `isDone=false`；复用同一 todoId，测试待办保持未完成且未删除；全量 Definition of Done、Cloudflare Functions build 和生产 readiness 均通过。
 
-- [ ] 服务端原子绑定与展示模拟状态
+- [x] 服务端原子绑定与展示模拟状态
   - 依赖：真实送达与反向同步修复。
   - 文件：`functions/api/dingtalk/todo/sync.js`、`src/domain/taskTodo.js`、`src/state/ProductFlowProvider.jsx`、`src/styles.css`、API 与领域回归测试、功能文档。
   - 输入：钉钉返回 todoId、当前任务稳定来源、服务端最新共享状态基线、展示环境模拟结果。
