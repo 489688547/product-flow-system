@@ -7,7 +7,7 @@ const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8"
 test("App renders permission-filtered navigation through accessible expandable groups", () => {
   const app = read("src/App.jsx");
   assert.match(app, /groupSidebarNavigation\(visibleNavigation\)/);
-  assert.match(app, /expandedGroupForScreen\(visibleNavigation, activeScreen\)/);
+  assert.match(app, /activeCollapsibleGroup\(visibleNavigation, activeScreen\)/);
   assert.match(app, /className="sidebar-group-toggle"/);
   assert.match(app, /aria-expanded=\{isExpanded\}/);
   assert.match(app, /aria-controls=\{groupId\}/);

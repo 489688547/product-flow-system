@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { canViewNavigation, DEFAULT_PERMISSIONS } from "../src/domain/permissions.js";
-import { expandedGroupForScreen, groupSidebarNavigation } from "../src/domain/sidebarNavigation.js";
+import { activeCollapsibleGroup, groupSidebarNavigation } from "../src/domain/sidebarNavigation.js";
 
 const navigation = [
   ["home", "公司首页", null, "公司经营", "home"],
@@ -86,9 +86,11 @@ test("keeps only multi-route business apps collapsible for executive accounts", 
   assert.equal(groups.find(group => group.label === "平台").collapsible, false);
 });
 
-test("auto expands an active child but not the first visible overview", () => {
+test("resolves the collapsible group owning the active screen for accordion expansion", () => {
   const visible = visibleFor({ department: "运营部", title: "运营负责人" });
-  assert.equal(expandedGroupForScreen(visible, "supply-quality"), "供应链管理");
-  assert.equal(expandedGroupForScreen(visible, "supply-workbench"), "");
-  assert.equal(expandedGroupForScreen(visible, "home"), "");
+  assert.equal(activeCollapsibleGroup(visible, "supply-quality"), "供应链管理");
+  // 首项也归属本组：停在工作台时分组不该在脚下收起。
+  assert.equal(activeCollapsibleGroup(visible, "supply-workbench"), "供应链管理");
+  // 公司经营/平台不可折叠，返回空表示无需改动展开状态。
+  assert.equal(activeCollapsibleGroup(visible, "home"), "");
 });

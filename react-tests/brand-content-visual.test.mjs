@@ -33,9 +33,19 @@ test("brand content styling stays restrained and does not recreate top navigatio
   assert.doesNotMatch(css, /border-left\s*:\s*[2-9]px/);
 });
 
-test("desktop sidebar flows with the document instead of scrolling internally", async () => {
+test("desktop sidebar scrolls independently so switching tabs never drags the nav away", async () => {
   const css = await read("src/styles.css");
-  assert.doesNotMatch(css, /\.sidebar nav\s*\{[^}]*overflow-y:\s*auto/s);
-  assert.match(css, /\.sidebar \{ min-height: 100dvh;/);
-  assert.doesNotMatch(css, /\.sidebar \{ position: sticky/);
+  // 左右共用文档滚动条时，showScreen 的 window.scrollTo(0,0) 会把刚点击的导航项一起甩走。
+  assert.match(css, /\.sidebar \{ position: sticky; top: 0; height: 100dvh;/);
+  assert.match(css, /\.sidebar nav\s*\{[^}]*overflow-y:\s*auto/s);
+  // cbdd44b：侧栏滚到底后滚轮量必须接力给页面，不能重新引入 overscroll-behavior: contain。
+  assert.doesNotMatch(css, /\.sidebar nav\s*\{[^}]*overscroll-behavior:\s*contain/s);
+});
+
+test("horizontal clipping uses clip so sticky sidebar and topbar keep working", async () => {
+  const css = await read("src/styles.css");
+  // overflow-x: hidden 会把 html/body/main 变成滚动容器，令后代的 position: sticky 静默失效。
+  assert.match(css, /html, body \{ overflow-x: clip; \}/);
+  assert.match(css, /^main \{[^}]*overflow-x: clip;/m);
+  assert.doesNotMatch(css, /^(html, body|main) \{[^}]*overflow-x:\s*hidden/m);
 });
