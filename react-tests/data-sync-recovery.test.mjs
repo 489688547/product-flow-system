@@ -7,9 +7,11 @@ import {
   countDataSyncIssues
 } from "../src/domain/dataSyncRecovery.js";
 import {
+  kuaimaiInventoryCollectionProgress,
   kuaimaiProductCollectionProgress,
   loadWebCollectionStatus,
   registerDouyinStore,
+  triggerKuaimaiInventoryCollection,
   triggerKuaimaiProductCollection,
   triggerKuaimaiSalesCollection,
   triggerWebCollection,
@@ -230,6 +232,39 @@ test("product catalog client triggers the complete Chrome snapshot group", async
     force: false
   });
   assert.deepEqual(result.jobs.map(job => job.id), ["products", "kits", "combinations"]);
+});
+
+test("inventory client triggers one current snapshot and reports projection stages", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    return new Response(JSON.stringify({
+      data: { job: { id: "inventory-job", resourceType: "inventory", status: "queued" } }
+    }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  const result = await triggerKuaimaiInventoryCollection({ date: "2026-07-26" }, fetchImpl);
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    action: "trigger",
+    providerId: "kuaimai",
+    resourceType: "inventory",
+    businessDate: "2026-07-26",
+    force: false
+  });
+  assert.equal(result.job.id, "inventory-job");
+  assert.deepEqual(kuaimaiInventoryCollectionProgress({
+    jobs: [{ id: "inventory-job", resourceType: "inventory", status: "ingesting", stage: "ingesting" }]
+  }, "inventory-job"), {
+    status: "running",
+    label: "正在写入库存数据",
+    job: { id: "inventory-job", resourceType: "inventory", status: "ingesting", stage: "ingesting" }
+  });
+  assert.equal(kuaimaiInventoryCollectionProgress({
+    jobs: [{ id: "inventory-job", resourceType: "inventory", status: "success" }]
+  }, "inventory-job").status, "success");
+  assert.equal(kuaimaiInventoryCollectionProgress({
+    jobs: [{ id: "inventory-job", resourceType: "inventory", status: "waiting_human", errorCode: "KUAIMAI_LOGIN_REQUIRED" }]
+  }, "inventory-job").label, "请先在 Chrome 登录快麦");
 });
 
 test("product collection progress completes only when all three jobs succeed", () => {

@@ -14,6 +14,8 @@
 3. 补齐入口：`npm run start:sandbox` 与 `npm run seed:sandbox` 写入 `package.json`（此前文档已引用但脚本缺失）。
 4. `scripts/seed-local-sandbox.mjs` 新增可选 `--with-state`：从生产库只读复制 `product_flow_state` 与 `product_flow_state_parts` 两张白名单表，让沙箱打开即见线上业务数据；凭据、令牌、审计类表一律不复制。沙箱中的修改只写本机，不回传生产。
 5. Preview 与 Production 继续共享生产 D1 与同一保险箱密钥，既有就绪检查与环境一致性门禁不变。
+6. 沙箱的 Pages Functions 从系统临时目录启动：临时目录只读链接仓库 `functions/`，复制 `wrangler.local.toml`，并通过权限为 `0600` 的 `.dev.vars` 注入本次会话密钥和个人令牌。浏览器、命令参数和日志均不暴露令牌；退出时删除临时目录。D1 持久化仍固定指向仓库 `.wrangler/state`。
+7. 沙箱启动必须连续三次通过真实本地会话验证后才启动 Vite。页面顶部固定显示“本地沙箱 · 本地数据”和“写入只影响本机”；本地线上模式继续显示“本地代码 · 线上真实环境”，两者不得共用误导文案。
 
 ## 备选方案
 
@@ -23,6 +25,7 @@
 ## 影响
 
 - 测试与生产数据在数据层面天然零同步：沙箱是独立本地 SQLite，schema 由同一批 `migrations/*.sql` 应用，不存在双库漂移。
+- 沙箱不再临时覆盖项目根目录的 `wrangler.toml`，即使进程异常退出也不会把本地 D1 配置遗留给下一次线上启动；启动器仍保留对旧版残留备份的恢复兼容。
 - 测试性写入的规则以 `AGENTS.md` 与 `CLOUDFLARE_PAGES.md` 为持久事实源；`tests/local-sandbox.test.mjs` 锁定入口脚本与播种白名单。
 - 沙箱仍不能验证真实钉钉、快麦等外部平台动作；该类验证继续走本地线上模式。
 

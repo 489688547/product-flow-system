@@ -11,19 +11,57 @@ import { useGoodsFlow } from "../../state/GoodsFlowProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable } from "../../ui/DataTable.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
-import { ApprovalWorkspace } from "./ApprovalWorkspace.jsx";
-import { CashCycleWorkspace } from "./CashCycleWorkspace.jsx";
-import { ComingPhaseWorkspace } from "./ComingPhaseWorkspace.jsx";
-import { GoodsFlowOverview } from "./GoodsFlowOverview.jsx";
+import { CostFinanceWorkspace } from "./CostFinanceWorkspace.jsx";
+import { DataRulesWorkspace } from "./DataRulesWorkspace.jsx";
 import { InventoryWorkspace } from "./InventoryWorkspace.jsx";
-import { ProductSupplyWorkspace } from "./ProductSupplyWorkspace.jsx";
+import { PlanningProcurementWorkspace } from "./PlanningProcurementWorkspace.jsx";
 import { QualityWorkspace } from "./QualityWorkspace.jsx";
 import { SupplierWorkspace } from "./SupplierWorkspace.jsx";
+import { SupplyChainWorkbench } from "./SupplyChainWorkbench.jsx";
+import { TransitWorkspace } from "./TransitWorkspace.jsx";
 import { useProductCatalog } from "../../state/ProductCatalogProvider.jsx";
+import { useSupplyChainPlatformWorkspace } from "../../state/useSupplyChainPlatformWorkspace.js";
 import { catalogBackedProduct } from "../../domain/productCatalog.js";
+import { canonicalizeFactProductIds, linkInventoryFactsToCatalog, normalizeSupplyChainSection, summarizeInventorySnapshotCoverage } from "../../domain/supplyChainWorkflow.js";
 
 function departmentOf(user) {
   return String(user?.department || "").trim();
+}
+
+function shanghaiDate(offsetDays = 0) {
+  const now = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  now.setUTCDate(now.getUTCDate() + offsetDays);
+  return now.toISOString().slice(0, 10);
+}
+
+function legacySalesRow(row) {
+  return {
+    ...row,
+    code: row.inventoryUnitCode || row.code || "",
+    skuCode: row.inventoryUnitCode || row.code || "",
+    qty: row.netQuantity ?? row.grossQuantity ?? row.quantity ?? null,
+    quantity: row.netQuantity ?? row.grossQuantity ?? row.quantity ?? null,
+    sales: row.netSales ?? row.grossSales ?? null,
+    cost: row.salesCost ?? null,
+    refund: row.refundAmount ?? null
+  };
+}
+
+function legacyInventoryRow(row) {
+  return {
+    ...row,
+    productId: row.productId || "",
+    catalogProductId: row.productId || "",
+    catalogSkuId: row.inventoryUnitId || row.skuId || "",
+    skuCode: row.skuCode || "",
+    warehouseId: row.warehouseId || "",
+    stocktakeDate: row.date || "",
+    erpQuantity: row.erpQuantity,
+    countedQuantity: row.countedQuantity,
+    calibratedQuantity: row.calibratedQuantity,
+    unitCost: row.unitCost,
+    sourceType: "goods-flow-inventory"
+  };
 }
 
 function latestDate(rows, keys) {
@@ -72,7 +110,7 @@ function SyncRecordsWorkspace({ salesRows, canEdit }) {
     { name: "供应商档案", role: "钉钉供应链文件夹的名称、类别与供货范围", status: state.suppliers.length ? "文件快照" : "待导入", count: `${state.suppliers.length} 家供应商`, updatedAt: latestDate(state.suppliers, ["importedAt", "updatedAt"]) },
     { name: "钉钉审批", role: "采购申请、付款审批与关联关系", status: successfulApprovals.length ? "已连接" : "待首次同步", count: `${state.purchaseApprovals.length} 张采购 · ${state.paymentApprovals.length} 张付款`, updatedAt: latestDate(successfulApprovals, ["completedAt"]) },
     { name: "快麦销售成本", role: "SKU 销量与库存消耗", status: salesRows.length ? "已读取" : "待导入 / 同步", count: `${salesRows.length} 条成本记录`, updatedAt: salesRows.length ? "随销售数据刷新" : "尚无数据" },
-    { name: "ERP库存快照", role: "SKU × 仓库当前库存", status: erpSnapshots.length ? "文件快照" : "待导入", count: `${erpSnapshots.length} 条库存记录`, updatedAt: latestDate(erpSnapshots, ["stocktakeDate", "importedAt"]) },
+    { name: "旧 ERP 库存文件", role: "兼容历史人工导入；当前库存以共享 goods-flow 快照为准", status: erpSnapshots.length ? "历史文件快照" : "无历史文件", count: `${erpSnapshots.length} 条历史库存记录`, updatedAt: latestDate(erpSnapshots, ["stocktakeDate", "importedAt"]) },
     { name: "盘点导入", role: "ERP 与实盘数量及金额校准", status: stocktakes.length ? "已校准" : "待盘点", count: `${stocktakes.length} 条盘点记录`, updatedAt: latestDate(stocktakes, ["stocktakeDate", "importedAt"]) },
     { name: "原辅料库存", role: "产品 × 物料 × 仓库的数量与金额", status: state.materialInventorySnapshots.length ? "文件快照" : "待导入", count: `${state.materialInventorySnapshots.length} 条物料记录`, updatedAt: latestDate(state.materialInventorySnapshots, ["snapshotDate", "importedAt"]) },
     { name: "异常库存", role: "可售天数、预计到货与异常处理", status: state.inventoryRisks.some(row => row.status === "active") ? "有待处理" : state.inventoryRisks.length ? "已记录" : "待导入", count: `${state.inventoryRisks.filter(row => row.status === "active").length} 条处理中`, updatedAt: latestDate(state.inventoryRisks, ["importedAt"]) },
@@ -90,7 +128,7 @@ function SyncRecordsWorkspace({ salesRows, canEdit }) {
         <div className="section-head">
           <div>
             <h2>数据源中心</h2>
-            <p>每个数字都标明来源和新鲜度；快麦库存接口验证前只显示文件快照，不伪装自动同步。</p>
+            <p>共享事实按真实覆盖状态展示；旧文件导入仅保留为兼容快照，不覆盖当前 goods-flow 库存。</p>
           </div>
           {canEdit ? (
             <label className={`upload-field ${importing ? "is-busy" : ""}`}>
@@ -221,50 +259,75 @@ function SupplySettingsWorkspace({ canEdit }) {
   );
 }
 
-function ProcurementWorkspace({ summary, products, catalogItems, lifecycleProducts, supplyEditor, financeEditor }) {
-  const [view, setView] = useState("suppliers");
-  const views = [
-    ["suppliers", "供应商档案"],
-    ["approvals", "采购与付款"],
-    ["products", "产品供应关系"]
-  ];
-  return (
-    <div className="supply-flat-workspace">
-      <div className="supply-procurement-switcher" role="tablist" aria-label="采购与供应商功能">
-        {views.map(([key, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={view === key} className={view === key ? "active" : ""} onClick={() => setView(key)}>{label}</button>
-        ))}
-      </div>
-      {view === "suppliers" ? <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} /> : null}
-      {view === "approvals" ? <ApprovalWorkspace canSync={financeEditor} canEditMapping={supplyEditor} products={products} /> : null}
-      {view === "products" ? <ProductSupplyWorkspace catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} canEdit={supplyEditor} /> : null}
-    </div>
-  );
-}
-
-export function SupplyChainAppPage({ section = "overview" }) {
+export function SupplyChainAppPage({ section = "workbench" }) {
   const [salesRows, setSalesRows] = useState([]);
   const { user } = useAuth();
   const { state: productState } = useProductFlow();
-  const { items: catalogItems } = useProductCatalog();
+  const { items: catalogItems, meta: catalogMeta } = useProductCatalog();
   const { state, loading, error } = useSupplyChain();
   const goodsFlow = useGoodsFlow();
+  const activeSection = normalizeSupplyChainSection(section);
+  const platformFilters = useMemo(() => ({
+    from: shanghaiDate(-7),
+    to: shanghaiDate(-1),
+    asOf: shanghaiDate(0)
+  }), []);
+  const platform = useSupplyChainPlatformWorkspace({
+    workspace: activeSection,
+    filters: platformFilters
+  });
   const lifecycleProducts = useMemo(() => (productState.products || []).map(product => catalogBackedProduct(product, catalogItems)), [catalogItems, productState.products]);
   const linkedCatalogIds = useMemo(() => new Set(lifecycleProducts.map(product => product.catalogProductId).filter(Boolean)), [lifecycleProducts]);
   const catalogProducts = useMemo(() => catalogItems.filter(item => !linkedCatalogIds.has(item.id)).map(item => ({ id: item.id, catalogProductId: item.id, name: item.name, stage: 1, status: item.active ? "ERP 启用" : "ERP 停用", skuCodes: (item.skus || []).filter(sku => sku.barcodeType === "sales_barcode").map(sku => ({ code: sku.barcode, price: sku.salePrice ?? "" })) })), [catalogItems, linkedCatalogIds]);
   const products = useMemo(() => [...lifecycleProducts, ...catalogProducts], [catalogProducts, lifecycleProducts]);
+  const sharedInventoryRows = useMemo(
+    () => canonicalizeFactProductIds(
+      linkInventoryFactsToCatalog(platform.facts.inventory?.items || [], catalogItems),
+      products
+    ),
+    [catalogItems, platform.facts.inventory, products]
+  );
+  const effectiveInventorySnapshots = useMemo(
+    () => sharedInventoryRows.length ? sharedInventoryRows.map(legacyInventoryRow) : state.inventorySnapshots,
+    [sharedInventoryRows, state.inventorySnapshots]
+  );
+  const inventoryCoverage = useMemo(() => summarizeInventorySnapshotCoverage({
+    snapshots: effectiveInventorySnapshots,
+    products: catalogItems
+  }), [catalogItems, effectiveInventorySnapshots]);
   const codes = useMemo(() => [...new Set(products.flatMap(product => (product.skuCodes || []).map(value => typeof value === "object" ? value.code : value).filter(Boolean)))], [products]);
   useEffect(() => {
     let active = true;
     fetchSalesForCodes(codes).then(rows => { if (active) setSalesRows(rows); }).catch(() => { if (active) setSalesRows([]); });
     return () => { active = false; };
   }, [codes]);
-  const summary = useMemo(() => buildSupplyChainSummary({ supplyState: state, products, salesRows }), [products, salesRows, state]);
+  const effectiveSalesRows = useMemo(
+    () => platform.facts.sales
+      ? canonicalizeFactProductIds((platform.facts.sales.items || []).map(legacySalesRow), products)
+      : salesRows,
+    [platform.facts.sales, products, salesRows]
+  );
+  const effectivePurchases = platform.facts.purchases?.items || state.purchaseApprovals;
+  const effectivePayments = platform.facts.payments?.items || state.paymentApprovals;
+  const effectiveSuppliers = platform.facts.suppliers?.items || state.suppliers;
+  const effectiveQualityIssues = platform.facts.qualityIncidents?.items || state.qualityIssues;
+  const effectiveAftersales = platform.facts.aftersales?.items || [];
+  const summaryState = useMemo(() => ({
+    ...state,
+    suppliers: effectiveSuppliers,
+    purchaseApprovals: effectivePurchases,
+    paymentApprovals: effectivePayments,
+    qualityIssues: effectiveQualityIssues,
+    inventorySnapshots: effectiveInventorySnapshots
+  }), [effectiveInventorySnapshots, effectivePayments, effectivePurchases, effectiveQualityIssues, effectiveSuppliers, state]);
+  const summary = useMemo(
+    () => buildSupplyChainSummary({ supplyState: summaryState, products, salesRows: effectiveSalesRows }),
+    [effectiveSalesRows, products, summaryState]
+  );
   const dept = departmentOf(user);
   const executive = canAccessCompanyPlatform(user);
   const supplyEditor = executive || ["供应链", "供应链部", "供应链团队", "采购部"].includes(dept);
   const financeRole = executive || ["财务", "财务部"].includes(dept);
-  const financeEditor = financeRole || supplyEditor;
   const warehouseEditor = ["仓库", "仓储部"].includes(dept);
   const canSubmitCount = executive || supplyEditor || warehouseEditor;
   const canConfirmDifference = executive || supplyEditor;
@@ -273,35 +336,200 @@ export function SupplyChainAppPage({ section = "overview" }) {
   const canRecalculateCcc = executive || supplyEditor || financeRole;
   const canFreezeCcc = financeRole;
   const qualityEditor = executive || dept === "质量管理部";
+  const actor = useMemo(() => ({
+    id: user?.id || user?.userid || user?.userId || "",
+    departments: [dept].filter(Boolean),
+    roles: [user?.title, user?.role].filter(Boolean),
+    executive
+  }), [dept, executive, user?.id, user?.role, user?.title, user?.userId, user?.userid]);
+  const workbenchItems = useMemo(() => {
+    const inventoryItems = state.inventoryRisks
+      .filter(row => row.status === "active")
+      .map(row => ({
+        id: `inventory:${row.id}`,
+        kind: "inventory",
+        title: row.title || `${row.productName || row.skuCode || "库存"}需要处理`,
+        reason: row.reason || row.message || "库存或到货状态异常",
+        ownerId: row.ownerId || "",
+        ownerName: row.ownerName || "",
+        ownerDepartment: row.ownerDepartment || "供应链部",
+        dueAt: row.dueAt || row.expectedArrivalAt || null,
+        status: "open",
+        screen: "supply-planning",
+        actionLabel: "处理"
+      }));
+    const purchaseItems = effectivePurchases
+      .filter(row => ["RUNNING", "PENDING"].includes(String(row.status || "").toUpperCase()))
+      .map(row => ({
+        id: `purchase:${row.processInstanceId || row.id}`,
+        kind: "purchase",
+        title: row.title || row.purpose || "采购申请待跟进",
+        reason: row.supplierName || "等待审批或采购处理",
+        ownerId: row.ownerId || "",
+        ownerName: row.ownerName || "",
+        ownerDepartment: row.ownerDepartment || "供应链部",
+        dueAt: row.dueAt || null,
+        status: "open",
+        screen: "supply-planning"
+      }));
+    const qualityItems = effectiveQualityIssues
+      .filter(row => !["closed", "complete"].includes(String(row.status || "").toLowerCase()))
+      .map(row => ({
+        id: `quality:${row.id}`,
+        kind: "quality",
+        title: row.content || row.category || "质量问题待闭环",
+        reason: row.productName || row.skuCode || "需要定性并跟进整改",
+        ownerId: row.ownerId || "",
+        ownerName: row.ownerName || "",
+        ownerDepartment: row.ownerDepartment || "质量管理部",
+        dueAt: row.dueAt || null,
+        status: "open",
+        screen: "supply-quality"
+      }));
+    const taskItems = (platform.facts.tasks?.items || []).map(row => ({
+      id: `data-task:${row.id}`,
+      kind: "data_quality",
+      title: row.title || row.errorSummary || "数据任务需要处理",
+      reason: row.recoveryAction || row.errorSummary || "查看同步记录并恢复",
+      ownerDepartment: row.ownerDepartment || "数据中心",
+      dueAt: row.dueAt || null,
+      status: row.status === "success" ? "closed" : "open",
+      screen: "supply-rules",
+      actionLabel: "查看"
+    }));
+    const workflowItems = [
+      ...(platform.workflows["procurement-suggestions"]?.items || []).map(entity => ({
+        id: `workflow:${entity.id}`,
+        kind: "purchase",
+        title: entity.fields?.productName ? `${entity.fields.productName}采购建议` : "采购建议待处理",
+        reason: entity.status === "confirmed" ? "建议已确认，等待生成采购计划" : "采购建议待确认",
+        ownerDepartment: entity.ownerDepartment || "供应链部",
+        dueAt: entity.fields?.dueAt || null,
+        status: entity.status === "archived" ? "closed" : "open",
+        screen: "supply-planning",
+        actionLabel: "处理"
+      })),
+      ...(platform.workflows["purchase-batches"]?.items || []).map(entity => ({
+        id: `workflow:${entity.id}`,
+        kind: "purchase",
+        title: entity.fields?.productName || entity.fields?.title || "采购批次待推进",
+        reason: `当前节点：${entity.status}`,
+        ownerDepartment: entity.ownerDepartment || "供应链部",
+        dueAt: entity.fields?.expectedArrivalAt || null,
+        status: ["closed", "archived"].includes(entity.status) ? "closed" : "open",
+        screen: "supply-transit",
+        actionLabel: "查看进度"
+      })),
+      ...(platform.workflows["quality-incidents"]?.items || []).map(entity => ({
+        id: `workflow:${entity.id}`,
+        kind: "quality",
+        title: entity.fields?.content || entity.fields?.title || "质量问题待闭环",
+        reason: `当前步骤：${entity.status}`,
+        ownerDepartment: entity.ownerDepartment || "质量管理部",
+        dueAt: entity.fields?.dueAt || null,
+        status: ["closed", "archived"].includes(entity.status) ? "closed" : "open",
+        screen: "supply-quality",
+        actionLabel: "处理"
+      }))
+    ];
+    const dataItems = goodsFlow.error ? [{
+      id: "data:goods-flow",
+      kind: "data_quality",
+      title: "货流共享数据需要恢复",
+      reason: goodsFlow.error,
+      ownerDepartment: "数据中心",
+      status: "open",
+      screen: "supply-rules"
+    }] : [];
+    return [...inventoryItems, ...purchaseItems, ...qualityItems, ...workflowItems, ...taskItems, ...dataItems];
+  }, [effectivePurchases, effectiveQualityIssues, goodsFlow.error, platform.facts.tasks?.items, platform.workflows, state.inventoryRisks]);
+  const workbenchQuality = useMemo(() => ({
+    status: platform.factQuality.status || (goodsFlow.error ? "stale" : goodsFlow.stale ? "stale" : "trusted"),
+    lastSuccessfulSyncAt: platform.factQuality.lastSuccessfulSyncAt || goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt || null,
+    missing: [...new Set([
+      ...(platform.factQuality.missing || []),
+      ...(goodsFlow.error ? ["货流事实"] : [])
+    ])]
+  }), [goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt, goodsFlow.error, goodsFlow.stale, platform.factQuality]);
   const content = {
-    overview: <GoodsFlowOverview dashboard={goodsFlow.dashboard} legacySummary={summary} stale={goodsFlow.stale} loading={goodsFlow.loading} error={goodsFlow.error} onRefresh={goodsFlow.refresh} />,
-    demand: <ComingPhaseWorkspace title="需求计划" phase="Phase 1" description="形成 SKU × 周的 13 周滚动预测，先从核心 SKU 开始。" availableEvidence={[`${products.length} 个商品主档`, `${salesRows.length} 条销售成本记录`]} requiredSources={["近 104 周 SKU 销量", "投放计划与大促日历", "内容排期和新品首单判断"]} />,
-    procurement: <ProcurementWorkspace summary={summary} products={products} catalogItems={catalogItems} lifecycleProducts={lifecycleProducts} supplyEditor={supplyEditor} financeEditor={financeEditor} />,
-    transit: <ComingPhaseWorkspace title="生产与在途" phase="Phase 2" description="把采购单从下单、排产、产完、发运到到仓串成可跟催的节点链。" availableEvidence={[`${state.purchaseApprovals.length} 张采购申请`, `${state.suppliers.length} 家供应商`]} requiredSources={["每笔 PO 的承诺交期", "五个节点的实际时间", "延误后的可售天数影响"]} />,
+    workbench: <SupplyChainWorkbench actor={actor} items={workbenchItems} dataQuality={workbenchQuality} />,
+    planning: (
+      <PlanningProcurementWorkspace
+        products={products}
+        summary={summary}
+        salesRows={effectiveSalesRows}
+        risks={state.inventoryRisks}
+        supplyLinks={state.productSupplierLinks}
+        purchases={effectivePurchases}
+        payments={effectivePayments}
+        inventoryCoverage={inventoryCoverage}
+        inventoryReadError={platform.factErrors.find(item => item.resource === "inventory")?.message || goodsFlow.error}
+        workflow={platform}
+        canSyncApprovals={financeRole || supplyEditor}
+        canEditApprovalMapping={supplyEditor}
+      />
+    ),
+    suppliers: <SupplierWorkspace summary={summary} canEdit={supplyEditor} catalogItems={catalogItems} suppliers={effectiveSuppliers} workflow={platform} />,
+    transit: <TransitWorkspace purchases={effectivePurchases} products={products} workflow={platform} />,
     inventory: (
       <InventoryWorkspace
         products={products}
+        catalogItems={catalogItems}
         summary={summary}
         canEdit={supplyEditor}
-        projectionRows={goodsFlow.inventory}
+        projectionRows={sharedInventoryRows.length ? sharedInventoryRows : goodsFlow.inventory}
         stocktakes={goodsFlow.stocktakes}
         stocktakePermissions={{ canSubmitCount, canConfirmDifference, canConfirmAmount }}
         createStocktake={goodsFlow.createStocktake}
         transitionStocktake={goodsFlow.transitionStocktake}
+        onInventoryUpdated={goodsFlow.refresh}
+        workflow={platform}
       />
     ),
-    fulfillment: <ComingPhaseWorkspace title="履约物流" phase="Phase 2" description="核对 48 小时发货、快递费用和破损对包装的影响。" availableEvidence={[`${products.length} 个商品主档`, `${state.inventorySnapshots.length} 条库存快照`]} requiredSources={["仓配发货时间", "快递账单与运单", "破损和包装复审记录"]} />,
-    quality: <QualityWorkspace products={products} canEdit={qualityEditor} />,
-    cash: <CashCycleWorkspace dashboard={goodsFlow.dashboard} terms={goodsFlow.terms} canEditTerms={canEditTerms} canRecalculateCcc={canRecalculateCcc} canFreezeCcc={canFreezeCcc} onSaveTerm={goodsFlow.saveTerm} onRecalculate={goodsFlow.recalculateCcc} onFreeze={goodsFlow.freezeCcc} />,
-    records: <SyncRecordsWorkspace salesRows={salesRows} canEdit={supplyEditor} />,
-    settings: <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
+    quality: (
+      <QualityWorkspace
+        products={products}
+        canEdit={qualityEditor}
+        issues={effectiveQualityIssues}
+        aftersales={effectiveAftersales}
+        issueQuality={platform.facts.qualityIncidents?.quality}
+        aftersalesQuality={platform.facts.aftersales?.quality}
+        workflow={platform}
+      />
+    ),
+    finance: <CostFinanceWorkspace dashboard={goodsFlow.dashboard} terms={goodsFlow.terms} summary={summary} purchases={effectivePurchases} payments={effectivePayments} canEditTerms={canEditTerms} canRecalculateCcc={canRecalculateCcc} canFreezeCcc={canFreezeCcc} onSaveTerm={goodsFlow.saveTerm} onRecalculate={goodsFlow.recalculateCcc} onFreeze={goodsFlow.freezeCcc} workflow={platform} />,
+    rules: (
+      <DataRulesWorkspace
+        workflowAvailable={["responsibility-rules", "procurement-rules", "bom-definitions", "business-rules"].every(platform.resourceAvailable)}
+        workflow={platform}
+        sources={[
+          { name: "商品主数据", status: catalogItems.length ? "trusted" : "unavailable", description: "共享 product-catalog 商品、SKU 与组合关系", countLabel: `${catalogItems.length} 个商品`, updatedAt: catalogMeta?.lastSuccessfulSyncAt },
+          {
+            name: "ERP 库存",
+            status: goodsFlow.inventory.length ? goodsFlow.stale ? "stale" : "trusted" : inventoryCoverage.totalRows ? "partial" : "unavailable",
+            description: goodsFlow.error && inventoryCoverage.totalRows ? "ERP 库存快照已存在；共享库存接口当前不可读" : "SKU × 仓库当前库存与盘点校准",
+            countLabel: sharedInventoryRows.length ? `${sharedInventoryRows.length} 条当前库存` : goodsFlow.inventory.length ? `${goodsFlow.inventory.length} 条当前库存` : `${inventoryCoverage.totalRows} 条库存快照 · ${inventoryCoverage.matchedRows} 条已匹配`,
+            updatedAt: platform.facts.inventory?.quality?.lastSuccessfulSyncAt || goodsFlow.dashboard?.meta?.lastSuccessfulSyncAt || inventoryCoverage.latestDate
+          },
+          { name: "销售需求", status: platform.facts.sales?.quality?.status || (effectiveSalesRows.length ? "trusted" : "partial"), description: "订单创建时间下的日销量与销售成本", countLabel: `${effectiveSalesRows.length} 条销售事实`, updatedAt: platform.facts.sales?.quality?.lastSuccessfulSyncAt || null },
+          { name: "采购与付款", status: effectivePurchases.length || effectivePayments.length ? "partial" : "unavailable", description: "钉钉审批与 ERP 采购投影", countLabel: `${effectivePurchases.length} 张采购 · ${effectivePayments.length} 张付款`, updatedAt: null },
+          { name: "质量与售后", status: effectiveQualityIssues.length || effectiveAftersales.length ? "partial" : "unavailable", description: "质量导入、售后与评价事实", countLabel: `${effectiveQualityIssues.length} 个质量事件 · ${effectiveAftersales.length} 条售后`, updatedAt: null }
+        ]}
+      >
+        <SyncRecordsWorkspace salesRows={effectiveSalesRows} canEdit={supplyEditor} />
+        <SupplySettingsWorkspace canEdit={supplyEditor || executive} />
+      </DataRulesWorkspace>
+    )
   };
   return (
     <section className="page supply-chain-app">
       <PageHeader title="供应链管理" description="用现金循环连接需求、采购、库存、履约与质量判断。" />
       {error ? <p className="supply-message error" role="alert">{error}</p> : null}
-      {section !== "overview" && goodsFlow.error ? <p className="supply-message warning" role="status">{goodsFlow.error}</p> : null}
-      {loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[section]}
+      {platform.notice ? <p className={`supply-message ${platform.notice.tone === "error" ? "error" : platform.notice.pendingManual ? "warning" : "success"}`} role="status">{platform.notice.message}{platform.notice.requestId ? ` · 请求 ${platform.notice.requestId}` : ""}</p> : null}
+      {platform.factErrors.map(item => <p key={`${item.resource}:${item.requestId}`} className="supply-message warning" role="status">{item.message}{item.requestId ? ` · 请求 ${item.requestId}` : ""}</p>)}
+      {platform.workflowErrors.map(item => <p key={`${item.resource}:${item.requestId}`} className="supply-message warning" role="status">{item.message}{item.requestId ? ` · 请求 ${item.requestId}` : ""}</p>)}
+      {activeSection !== "workbench" && goodsFlow.error && !sharedInventoryRows.length ? <p className="supply-message warning" role="status">{goodsFlow.error}</p> : null}
+      {loading && platform.loading ? <div className="supply-loading" aria-label="正在加载供应链数据"><span /><span /><span /></div> : content[activeSection]}
     </section>
   );
 }

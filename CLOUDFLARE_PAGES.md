@@ -143,6 +143,8 @@ npm run seed:sandbox -- --with-state   # 可选：再从生产库只读复制共
 npm run start:sandbox                  # 等价于 npm start -- --local-d1
 ```
 
+沙箱 Pages Functions 在系统临时目录运行，使用 `0600` 的临时 `.dev.vars` 建立本次服务端会话，不把个人令牌放入浏览器、命令参数或日志；本地 D1 状态仍持久化在项目 `.wrangler/state`。只有会话连续验证成功后才会启动 Vite，页面顶部必须显示“本地沙箱 · 本地数据”。
+
 - 播种脚本应用全部迁移，并从生产库**只读**复制当前个人令牌对应的身份行与令牌哈希行（不读取 .env 明文令牌）。
 - `--with-state` 只复制 `product_flow_state` 与 `product_flow_state_parts` 两张白名单表；凭据、令牌、审计类表一律不复制。超大 payload 会按 `part_index` 无损切片写入多行（服务端读取时自动拼接），业务数据原样保留。沙箱中的任何修改都只写本机，不会回传生产。
 - 沙箱模式启动时会临时把 `wrangler.local.toml` 换入 `wrangler.toml`（Pages 不支持自定义配置路径），退出时自动恢复线上配置；备份写入 `.wrangler-toml.online-backup`，进程被强杀后下次启动也会自愈。
