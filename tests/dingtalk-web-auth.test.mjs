@@ -87,6 +87,28 @@ test("browser login start redirects to DingTalk with a protected callback state"
   assert.match(response.headers.get("set-cookie"), /HttpOnly/);
 });
 
+test("browser login start uses the deployment client id without touching D1", async () => {
+  let d1Calls = 0;
+  const response = await startBrowserLogin({
+    request: new Request("https://flow.example.com/api/auth/dingtalk/start"),
+    env: {
+      DINGTALK_APP_KEY: "deployment-app-key",
+      DINGTALK_APP_SECRET: "deployment-app-secret",
+      PLATFORM_CREDENTIAL_MASTER_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      PRODUCT_FLOW_DB: {
+        prepare() {
+          d1Calls += 1;
+          throw new Error("OAuth start must not query D1");
+        }
+      }
+    }
+  });
+
+  assert.equal(response.status, 302);
+  assert.equal(new URL(response.headers.get("location")).searchParams.get("client_id"), "deployment-app-key");
+  assert.equal(d1Calls, 0);
+});
+
 test("Cloudflare preview login starts OAuth on the registered production origin", async () => {
   const response = await startBrowserLogin({
     request: new Request("https://codex-brand-content-collabor.product-flow-system.pages.dev/api/auth/dingtalk/start"),
