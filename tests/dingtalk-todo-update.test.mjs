@@ -1,6 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { syncDingTodoTask, updateDingTodoTask } from "../functions/api/dingtalk/_shared/dingtalk.js";
+import {
+  syncDingTodoTask,
+  updateDingTodoTask,
+  updateDingTodoTaskExecutorStatus
+} from "../functions/api/dingtalk/_shared/dingtalk.js";
 import {
   authorizeTaskTodoSyncRequest,
   onRequest as syncTodoRoute,
@@ -194,6 +198,58 @@ test("todo sync authorization does not reuse an unverified legacy todo id", () =
   assert.equal(authorized.todoId, "");
 });
 
+test("todo sync authorization migrates a trusted personal todo to a queryable work todo", () => {
+  const state = {
+    products: [{ id: "p1", productManagerUnionId: "creator-union" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      dingTodo: {
+        id: "personal-id",
+        sourceId: "task:p1:t1",
+        source: "todo_personal_user",
+        creatorUnionId: "creator-union",
+        executorUnionIds: ["creator-union"]
+      }
+    }]
+  };
+
+  const authorized = authorizeTaskTodoSyncRequest({
+    sourceId: "task:p1:t1",
+    todoId: "personal-id",
+    executorUnionIds: ["creator-union"]
+  }, { unionId: "creator-union", role: "product" }, state);
+
+  assert.equal(authorized.todoId, "");
+  assert.equal(authorized.todoSource, "");
+  assert.equal(authorized.replacementOfTodoId, "personal-id");
+  assert.equal(authorized.sourceId, "task:p1:t1:r1");
+});
+
+test("todo sync authorization reuses a recorded work todo id when only the recovery source is malformed", () => {
+  const state = {
+    products: [{ id: "p1" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      dingTodo: {
+        id: "stale-work-id",
+        sourceId: "task:p1:t1:r1:r1",
+        source: "todo_open_app"
+      }
+    }]
+  };
+
+  const authorized = authorizeTaskTodoSyncRequest({
+    sourceId: "task:p1:t1",
+    todoId: "stale-work-id",
+    executorUnionIds: ["creator-union"]
+  }, { unionId: "creator-union", role: "product" }, state);
+
+  assert.equal(authorized.todoId, "stale-work-id");
+  assert.equal(authorized.sourceId, "task:p1:t1");
+});
+
 test("todo sync authorization reuses only a controlled recovery source for the same task", () => {
   const state = {
     products: [{ id: "p1" }],
@@ -208,7 +264,7 @@ test("todo sync authorization reuses only a controlled recovery source for the s
   assert.equal(authorized.todoId, "recovered-id");
 });
 
-test("personal todo updates are restricted to the server-recorded creator", () => {
+test("personal todo migration is restricted to a trusted task owner", () => {
   const baseState = {
     products: [{ id: "p1" }],
     tasks: [{
@@ -228,13 +284,16 @@ test("personal todo updates are restricted to the server-recorded creator", () =
     executorUnionIds: ["executor-union"]
   };
 
-  assert.equal(
-    authorizeTaskTodoSyncRequest(input, { unionId: "creator-union", role: "product" }, baseState).todoId,
-    "personal-id"
+  const creatorReplacement = authorizeTaskTodoSyncRequest(
+    input,
+    { unionId: "creator-union", role: "product" },
+    baseState
   );
+  assert.equal(creatorReplacement.todoId, "");
+  assert.equal(creatorReplacement.replacementOfTodoId, "personal-id");
   assert.throws(
     () => authorizeTaskTodoSyncRequest(input, { unionId: "other-union", role: "product" }, baseState),
-    /只有.*创建人/
+    /产品负责人、原创建人或执行人/
   );
   const missingOwnerState = {
     ...baseState,
@@ -244,7 +303,7 @@ test("personal todo updates are restricted to the server-recorded creator", () =
     input,
     { unionId: "creator-union", role: "product" },
     missingOwnerState
-  ), /缺少创建人/);
+  ), /产品负责人、原创建人或执行人/);
 
   const replaceableState = {
     products: [{ id: "p1", productManagerUnionId: "manager-union" }],
@@ -327,9 +386,72 @@ test("todo sync route uses the signed-in actor and the server-stored todo id", a
       data: { session: { unionId: "session-union", role: "product" } }
     });
     assert.equal(response.status, 200);
-    const todoCall = calls.find(call => call.options.method === "PUT");
+    const todoCall = calls.find(call => call.options.method === "PUT" && !call.url.includes("/executorStatus"));
     assert.match(todoCall.url, /\/users\/session-union\/tasks\/todo-state\?operatorId=session-union$/);
     assert.doesNotMatch(todoCall.url, /forged-creator/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("todo sync route creates a queryable work todo for an unbound product task", async () => {
+  const parts = [
+    { part_key: "version", part_index: 0, payload: JSON.stringify("test"), updated_at: "2026-07-18", updated_by: "产品负责人" },
+    { part_key: "products", part_index: 0, payload: JSON.stringify([{ id: "p1" }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
+    { part_key: "tasks", part_index: 0, payload: JSON.stringify([{ id: "t1", productId: "p1", title: "任务", due: "2026-07-27" }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
+    ...["demands", "deliverables", "reviews", "feedbackIssues", "productPlans"].map(part_key => ({
+      part_key,
+      part_index: 0,
+      payload: "[]",
+      updated_at: "2026-07-18",
+      updated_by: "产品负责人"
+    }))
+  ];
+  const db = {
+    async batch() {
+      return [{ success: true, meta: { changes: 1 } }];
+    },
+    prepare() {
+      const statement = {
+        bind() { return statement; },
+        async run() { return { success: true }; },
+        async all() { return { results: parts }; },
+        async first() { return null; }
+      };
+      return statement;
+    }
+  };
+  const originalFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, options = {}) => {
+    calls.push({ url: String(url), options });
+    if (String(url).includes("/gettoken")) return okJson({ errcode: 0, access_token: "token-1" });
+    return okJson({ id: "work-todo-new" });
+  };
+  try {
+    const response = await syncTodoRoute({
+      request: new Request("https://flow.example.com/api/dingtalk/todo/sync", {
+        method: "POST",
+        body: JSON.stringify({
+          sourceId: "task:p1:t1",
+          executorUnionIds: ["executor-union"],
+          subject: "任务",
+          description: "正文",
+          detailUrl: "https://flow.example.com/#progress",
+          dueTime: 1784301600000,
+          draft: { subject: "任务", dueDate: "2026-07-27", dueClock: "18:00" }
+        })
+      }),
+      env: { PRODUCT_FLOW_DB: db, DINGTALK_APP_KEY: "key", DINGTALK_APP_SECRET: "secret" },
+      data: { session: { unionId: "session-union", role: "product", name: "产品负责人" } }
+    });
+    assert.equal(response.status, 200);
+    const todoCall = calls.find(call => call.options.method === "POST" && call.url.includes("/v1.0/todo/users/"));
+    assert.match(todoCall.url, /\/users\/session-union\/tasks\?operatorId=session-union$/);
+    assert.doesNotMatch(todoCall.url, /personalTasks/);
+    const body = await response.json();
+    assert.equal(body.task.dingTodo.id, "work-todo-new");
+    assert.equal(body.task.dingTodo.sourceId, "task:p1:t1");
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -360,6 +482,26 @@ test("updateDingTodoTask keeps the DingTalk task id and updates task state", asy
   assert.deepEqual(calls[0].body.executorIds, ["executor-union"]);
 });
 
+test("updateDingTodoTaskExecutorStatus uses the dedicated executor completion endpoint", async () => {
+  const calls = [];
+  const result = await updateDingTodoTaskExecutorStatus("token-1", {
+    todoId: "todo-1",
+    creatorUnionId: "creator-union",
+    executorUnionIds: ["executor-union"],
+    done: false
+  }, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    return okJson({ result: true });
+  });
+
+  assert.equal(result.id, "todo-1");
+  assert.equal(result.done, false);
+  assert.match(calls[0].url, /\/users\/creator-union\/tasks\/todo-1\/executorStatus\?operatorId=creator-union$/);
+  assert.deepEqual(calls[0].body, {
+    executorStatusList: [{ id: "executor-union", isDone: false }]
+  });
+});
+
 test("syncDingTodoTask creates once and updates when a DingTalk id exists", async () => {
   const calls = [];
   const base = {
@@ -381,7 +523,8 @@ test("syncDingTodoTask creates once and updates when a DingTalk id exists", asyn
   });
 
   assert.equal(calls[0].options.method, "POST");
-  assert.equal(calls[1].options.method, "PUT");
+  assert.match(calls[1].url, /executorStatus/);
+  assert.equal(calls[2].options.method, "PUT");
 });
 
 test("syncDingTodoTask recovers an existing DingTalk task after duplicate sourceId", async () => {
@@ -412,7 +555,7 @@ test("syncDingTodoTask recovers an existing DingTalk task after duplicate source
   assert.equal(result.recovered, true);
   assert.match(calls[1].url, /\/v1\.0\/todo\/users\/creator-union\/org\/tasks\/query$/);
   assert.deepEqual(JSON.parse(calls[1].options.body), { isDone: false });
-  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "PUT"]);
+  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "PUT", "PUT"]);
 });
 
 test("syncDingTodoTask also recovers a completed task with the same sourceId", async () => {
@@ -437,7 +580,7 @@ test("syncDingTodoTask also recovers a completed task with the same sourceId", a
 
   assert.equal(result.id, "todo-done");
   assert.equal(result.recovered, true);
-  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "PUT"]);
+  assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "PUT", "PUT"]);
 });
 
 test("syncDingTodoTask recovers a task owned by an additional recovery user", async () => {
@@ -515,4 +658,29 @@ test("syncDingTodoTask creates one deterministic replacement when the original s
   assert.equal(result.replacedOrphanedSource, true);
   assert.equal(JSON.parse(calls.at(-1).options.body).sourceId, "task:p1:missing:r1");
   assert.deepEqual(calls.map(call => call.options.method), ["POST", "POST", "POST", "POST", "POST", "POST"]);
+});
+
+test("syncDingTodoTask increments an existing recovery source instead of nesting suffixes", async () => {
+  const calls = [];
+  const result = await syncDingTodoTask("token-1", {
+    creatorUnionId: "creator-union",
+    executorUnionIds: ["executor-union"],
+    sourceId: "task:p1:t1:r1",
+    subject: "整理 PRD",
+    detailUrl: "https://flow.example.com/#progress",
+    dueTime: 1784301600000
+  }, async (url, options) => {
+    calls.push({ url, options });
+    if (options.method === "POST" && !url.endsWith("/org/tasks/query")) {
+      const body = JSON.parse(options.body);
+      if (body.sourceId === "task:p1:t1:r1") {
+        return errorJson(400, { message: "task existed sourceId is task:p1:t1:r1" });
+      }
+      return okJson({ id: "todo-replacement" });
+    }
+    return okJson({ todoCards: [] });
+  });
+
+  assert.equal(result.sourceId, "task:p1:t1:r2");
+  assert.equal(JSON.parse(calls.at(-1).options.body).sourceId, "task:p1:t1:r2");
 });
