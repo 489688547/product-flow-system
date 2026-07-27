@@ -27,10 +27,25 @@ function latest(items = []) {
     - timestamp(left.updatedAt || left.completedAt || left.startedAt || left.lastSeenAt))[0] || null;
 }
 
-function runnerOnline(runner, now) {
+export function runnerOnline(runner, now = new Date()) {
   if (!runner || runner.status === "disabled") return false;
   const seenAt = timestamp(runner.lastSeenAt);
   return Boolean(seenAt) && Math.max(0, now.valueOf() - seenAt) <= 5 * 60 * 1000;
+}
+
+// 采集阶段的中文说明。stage 会落后于 status（例如已领取但仍写着 queued），
+// 直接拼接原始值会印出「正在执行 queued 阶段」这种自相矛盾的话。
+const STAGE_TEXT = Object.freeze({
+  queued: "等待领取", claimed: "已领取", opening: "正在打开页面", collecting: "正在读取页面",
+  exporting: "正在生成报表", downloading: "正在下载报表", validating: "正在校验文件", ingesting: "正在入库"
+});
+
+function stageText(job) {
+  const stage = String(job?.stage || "");
+  const status = String(job?.status || "");
+  // status 已进入运行态时，落后的 queued 阶段值不可信，改用 status 描述。
+  const effective = stage && !(stage === "queued" && status && status !== "queued") ? stage : status;
+  return STAGE_TEXT[effective] || "采集";
 }
 
 function extensionOnline(runner) {
@@ -50,7 +65,14 @@ function recovery(input) {
   };
 }
 
-export function buildKuaimaiSalesRecovery({
+// 在解析结果上补出 runnerOnline，供界面判断「重新触发」是否真的会被领取。
+// 采集器离线时排队任务无人认领，按钮不得承诺「下一轮轮询时领取」。
+export function buildKuaimaiSalesRecovery(options = {}) {
+  const resolved = resolveKuaimaiSalesRecovery(options);
+  return { ...resolved, runnerOnline: runnerOnline(resolved.runner, options.now || new Date()) };
+}
+
+function resolveKuaimaiSalesRecovery({
   date = "",
   anomalyStatus = "",
   runners = [],
@@ -220,7 +242,7 @@ export function buildKuaimaiSalesRecovery({
       tone: "warning",
       label: "Chrome 采集中",
       title: `${date} 快麦订单明细正在采集`,
-      instruction: `${runnerName} 正在执行 ${job.stage || status} 阶段，请等待完成后刷新状态。`,
+      instruction: `${runnerName}${stageText(job)}，请等待完成后刷新状态。`,
       primaryAction: { type: "refresh", label: "刷新采集进度" },
       showConnectorLink: false,
       runner,

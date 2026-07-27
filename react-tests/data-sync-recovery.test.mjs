@@ -493,3 +493,37 @@ test("sales recovery keeps file import available when status cannot be read", ()
   assert.equal(recovery.label, "采集状态读取失败");
   assert.equal(recovery.canImportFile, true);
 });
+
+test("running collection describes the real stage instead of echoing a lagging queued value", () => {
+  // 领取后 stage 可能仍写着 queued；直接拼接会印出「正在执行 queued 阶段」这种自相矛盾的话。
+  const recovery = buildKuaimaiSalesRecovery({
+    date: "2026-07-22",
+    runners: [runner],
+    jobs: [{
+      id: "items", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-22",
+      status: "downloading", stage: "queued"
+    }],
+    now
+  });
+  assert.equal(recovery.label, "Chrome 采集中");
+  assert.equal(recovery.instruction.includes("queued"), false, "不得把原始阶段值印给用户");
+  assert.equal(recovery.instruction.includes("等待领取"), false, "运行中不得说成等待领取");
+  assert.match(recovery.instruction, /正在下载报表/);
+});
+
+test("recovery exposes runner liveness so retrigger cannot promise an absent executor", () => {
+  const job = {
+    id: "items", providerId: "kuaimai", resourceType: "order_items",
+    businessDate: "2026-07-22", status: "failed", stage: "failed"
+  };
+  const offline = buildKuaimaiSalesRecovery({
+    date: "2026-07-22",
+    runners: [{ ...runner, lastSeenAt: "2026-07-21T01:04:00.000Z" }],
+    jobs: [job],
+    now
+  });
+  assert.equal(offline.runnerOnline, false);
+
+  const live = buildKuaimaiSalesRecovery({ date: "2026-07-22", runners: [runner], jobs: [job], now });
+  assert.equal(live.runnerOnline, true);
+});

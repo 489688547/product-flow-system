@@ -852,3 +852,47 @@ test("Kuaimai Chrome trigger rejects missing sessions, readonly users and non-tr
   assert.equal(otherResource.response.status, 400);
   assert.equal(otherResource.body.error.code, "WEB_COLLECTION_TRIGGER_INVALID");
 });
+
+test("queued work abandoned beyond a day self-heals into a retriggerable failure", async () => {
+  const db = createWebCollectionD1Mock();
+  const base = {
+    provider_id: "kuaimai", store_id: "", resource_type: "order_items",
+    range_kind: "daily_fact", range_start: null, range_end: null, time_zone: "Asia/Shanghai",
+    schedule_version: "v1", selector_version: null, target_environment: "production",
+    target_environment_version: 1, runner_id: null, error_code: null, error_summary: null,
+    started_at: null, completed_at: null, lease_expires_at: null, attempt: 0
+  };
+  const old = new Date(Date.now() - 30 * 60 * 60 * 1000).toISOString();
+  const recent = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+  // 公司 Mac 整夜关机，05:00 的计划任务从未被领取；没有租约，旧规则永远扫不到它。
+  db.tables.web_collection_jobs.set("abandoned", {
+    ...base, id: "abandoned", business_date: "2026-07-24", status: "queued", stage: "queued",
+    idempotency_key: "kuaimai:order_items:2026-07-24:v1", created_at: old, updated_at: old
+  });
+  // 今早刚排队的任务仍在合理等待窗口内，机器稍后醒来应照常领取，不得被扫成失败。
+  db.tables.web_collection_jobs.set("waiting", {
+    ...base, id: "waiting", business_date: "2026-07-26", status: "queued", stage: "queued",
+    idempotency_key: "kuaimai:order_items:2026-07-26:v1", created_at: recent, updated_at: recent
+  });
+
+  const status = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    db, session: executive
+  });
+  assert.equal(status.response.status, 200);
+  const abandoned = db.tables.web_collection_jobs.get("abandoned");
+  assert.equal(abandoned.status, "failed");
+  assert.equal(abandoned.error_code, "WEB_COLLECTION_QUEUE_ABANDONED");
+  assert.equal(db.tables.web_collection_jobs.get("waiting").status, "queued");
+
+  // 关键保证：次日手动补采必须仍然可行。failed 在可重排列表内，重排后回到 queued 并刷新计时。
+  const retriggered = await jsonCall(onJobs, "https://flow.example.com/api/platform/v1/web-collection/jobs", {
+    db, session: executive, method: "POST",
+    body: { action: "trigger", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-24", force: true }
+  });
+  assert.equal(retriggered.response.status, 200);
+  assert.equal(retriggered.body.data.requeued, true);
+  const requeued = db.tables.web_collection_jobs.get("abandoned");
+  assert.equal(requeued.status, "queued");
+  assert.equal(requeued.error_code, null);
+  assert.ok(requeued.updated_at > old, "重排必须刷新 updated_at，否则立刻又被判为放弃");
+});

@@ -419,6 +419,11 @@ const RUNNING_JOB_STATES = Object.freeze([
   "claimed", "opening", "collecting", "exporting", "downloading", "validating", "ingesting"
 ]);
 
+// 从未被领取的任务没有租约（lease_expires_at 为 NULL），不会被运行中僵尸任务的规则命中。
+// 公司 Mac 是笔记本，夜间休眠时 05:00 的计划任务无人领取；等它次日醒来仍应正常领取，
+// 因此窗口取满 24 小时——超过一天仍无人领取，说明这一轮已被放弃，必须落到终态让页面显示实情。
+const QUEUED_ABANDONED_MS = 24 * 60 * 60 * 1000;
+
 // 自愈：把「运行中 + 租约已过 + attempt≥3」的僵尸任务转成 failed，恢复重试与展示。
 // 只处理公司 Mac 已无法按 claim 逻辑（attempt<3）重领的任务，不与正常重领抢占。
 export async function expireUnrecoverableWebCollectionJobs(db, { now = new Date() } = {}) {
@@ -427,24 +432,37 @@ export async function expireUnrecoverableWebCollectionJobs(db, { now = new Date(
   const stuck = await db.prepare(`SELECT id, runner_id, attempt, started_at FROM web_collection_jobs
     WHERE status IN (${placeholders}) AND lease_expires_at IS NOT NULL AND lease_expires_at < ? AND attempt >= 3`)
     .bind(...RUNNING_JOB_STATES, iso).all();
-  const rows = stuck?.results || [];
-  if (!rows.length) return { expired: 0, jobIds: [] };
-  const errorSummary = "采集阶段超过租约且重试已用尽，已自动标记失败，可重新触发。";
+  const abandonedBefore = new Date(now.getTime() - QUEUED_ABANDONED_MS).toISOString();
+  const abandoned = await db.prepare(`SELECT id, runner_id, attempt, started_at FROM web_collection_jobs
+    WHERE status = 'queued' AND COALESCE(updated_at, created_at) < ?`).bind(abandonedBefore).all();
+  const expiredRows = stuck?.results || [];
+  const abandonedRows = abandoned?.results || [];
+  if (!expiredRows.length && !abandonedRows.length) return { expired: 0, abandoned: 0, jobIds: [] };
   const statements = [];
-  for (const row of rows) {
+  const failJob = (row, errorCode, errorSummary) => {
     statements.push(db.prepare(`UPDATE web_collection_jobs SET status = 'failed', stage = 'failed',
-      error_code = 'WEB_COLLECTION_STAGE_EXPIRED', error_summary = ?, lease_expires_at = NULL,
+      error_code = ?, error_summary = ?, lease_expires_at = NULL,
       completed_at = ?, updated_at = ? WHERE id = ?`)
-      .bind(errorSummary, iso, iso, row.id));
+      .bind(errorCode, errorSummary, iso, iso, row.id));
     statements.push(db.prepare(`INSERT INTO web_collection_runs
       (id, job_id, runner_id, attempt, status, stage, batch_id, archive_id, file_hash, row_count,
         error_code, error_summary, started_at, completed_at, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-      .bind(randomId("web-run"), row.id, row.runner_id || null, Number(row.attempt || 3), "failed", "failed",
-        null, null, null, null, "WEB_COLLECTION_STAGE_EXPIRED", errorSummary, row.started_at || iso, iso, iso));
+      .bind(randomId("web-run"), row.id, row.runner_id || null, Number(row.attempt || 0), "failed", "failed",
+        null, null, null, null, errorCode, errorSummary, row.started_at || iso, iso, iso));
+  };
+  for (const row of expiredRows) {
+    failJob(row, "WEB_COLLECTION_STAGE_EXPIRED", "采集阶段超过租约且重试已用尽，已自动标记失败，可重新触发。");
+  }
+  for (const row of abandonedRows) {
+    failJob(row, "WEB_COLLECTION_QUEUE_ABANDONED", "任务排队超过 24 小时仍无采集器领取，已自动标记失败，可重新触发。");
   }
   await db.batch(statements);
-  return { expired: rows.length, jobIds: rows.map(row => row.id) };
+  return {
+    expired: expiredRows.length,
+    abandoned: abandonedRows.length,
+    jobIds: [...expiredRows, ...abandonedRows].map(row => row.id)
+  };
 }
 
 async function ownedJob(db, runner, jobId) {
