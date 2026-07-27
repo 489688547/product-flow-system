@@ -2,6 +2,15 @@ import { buildTaskTodoSnapshot, normalizeTaskDueDate } from "./taskTodo.js";
 
 const TODO_PRIORITIES = new Set([10, 20, 30, 40]);
 
+function isTaskTodoSourceForTask(value, sourceId) {
+  const actual = String(value || "").trim();
+  if (actual === sourceId) return true;
+  const recoverySuffix = actual.startsWith(`${sourceId}:r`)
+    ? actual.slice(sourceId.length + 2)
+    : "";
+  return /^\d+$/.test(recoverySuffix);
+}
+
 function escapeHtml(value = "") {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -183,9 +192,13 @@ export function buildTaskTodoPayload({ product, task, creator, executors = [], r
     .filter(Boolean))];
   if (!executorUnionIds.length) throw new Error("请至少选择一位具有钉钉身份的执行人。");
 
+  const sourceId = `task:${product.id}:${task.id}`;
+  const todoId = isTaskTodoSourceForTask(task.dingTodo?.sourceId, sourceId)
+    ? String(task.dingTodo?.id || "")
+    : "";
   return {
-    todoId: task.dingTodo?.id || "",
-    sourceId: `task:${product.id}:${task.id}`,
+    todoId,
+    sourceId,
     subject: composer.subject,
     description,
     descriptionHtml: composer.descriptionHtml,
@@ -248,6 +261,30 @@ function todoSnapshotTime(value) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function dingTodoRemoteSnapshotKey(card = {}) {
+  return JSON.stringify({
+    id: dingTodoCardId(card),
+    sourceId: String(card.sourceId || ""),
+    subject: Object.hasOwn(card, "subject") ? String(card.subject || "") : null,
+    description: Object.hasOwn(card, "description") ? String(card.description || "") : null,
+    priority: Object.hasOwn(card, "priority") ? Number(card.priority) : null,
+    dueTime: Object.hasOwn(card, "dueTime") ? Number(card.dueTime) : null,
+    executorIds: dingTodoExecutors(card),
+    isDone: Object.hasOwn(card, "isDone") ? Boolean(card.isDone) : null,
+    finalStatusStage: Object.hasOwn(card, "finalStatusStage") ? Number(card.finalStatusStage) : null
+  });
+}
+
+export function userHasAssignedDingTalkTodo(tasks = [], unionId = "") {
+  const wantedUnionId = String(unionId || "").trim();
+  if (!wantedUnionId) return false;
+  return (Array.isArray(tasks) ? tasks : []).some(task => {
+    if (!String(task?.dingTodo?.id || "").trim()) return false;
+    return (Array.isArray(task?.dingTodo?.executorUnionIds) ? task.dingTodo.executorUnionIds : [])
+      .some(value => String(value || "").trim() === wantedUnionId);
+  });
+}
+
 export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
   const remoteById = new Map();
   const remoteBySource = new Map();
@@ -262,21 +299,25 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
   const nextTasks = (Array.isArray(tasks) ? tasks : []).map(task => {
     const todoId = String(task?.dingTodo?.id || "").trim();
     const sourceId = `task:${task?.productId || ""}:${task?.id || ""}`;
-    const card = remoteById.get(todoId) || remoteBySource.get(sourceId);
+    const hasTrustedLocalSource = isTaskTodoSourceForTask(task?.dingTodo?.sourceId, sourceId);
+    const card = (hasTrustedLocalSource ? remoteById.get(todoId) : null) || remoteBySource.get(sourceId);
     if (!card) return task;
 
+    const remoteSnapshotKey = dingTodoRemoteSnapshotKey(card);
+    if (remoteSnapshotKey === task.dingTodo?.remoteSnapshotKey) return task;
     const remoteUpdatedAt = remoteModifiedAt(card);
     const localUpdatedAt = Math.max(
       todoSnapshotTime(task.dingTodo?.remoteUpdatedAt),
       todoSnapshotTime(task.dingTodo?.syncedAt)
     );
-    if (localUpdatedAt && (!remoteUpdatedAt || todoSnapshotTime(remoteUpdatedAt) <= localUpdatedAt)) return task;
+    if (localUpdatedAt && remoteUpdatedAt && todoSnapshotTime(remoteUpdatedAt) <= localUpdatedAt) return task;
 
     const remoteId = dingTodoCardId(card) || todoId;
     const remoteDue = Number(card.dueTime) > 0 ? shanghaiDateAndClock(card.dueTime) : null;
     const previousDraft = task.dingTodo?.draft || createTodoComposerDraft({ task });
+    const hasPendingPartialSync = task.dingTodo?.syncWarningKind === "partial_sync";
     const remotePriority = TODO_PRIORITIES.has(Number(card.priority)) ? Number(card.priority) : previousDraft.priority;
-    const draft = {
+    const remoteDraft = {
       ...previousDraft,
       subject: Object.hasOwn(card, "subject") ? String(card.subject || "") : previousDraft.subject,
       descriptionHtml: Object.hasOwn(card, "description")
@@ -286,9 +327,16 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
       dueDate: remoteDue?.dueDate || previousDraft.dueDate || task.due || "",
       dueClock: remoteDue?.dueClock || previousDraft.dueClock || "18:00"
     };
-    const executorUnionIds = dingTodoExecutors(card) || task.dingTodo?.executorUnionIds || [];
+    const draft = hasPendingPartialSync ? previousDraft : remoteDraft;
+    const executorUnionIds = hasPendingPartialSync
+      ? (task.dingTodo?.executorUnionIds || [])
+      : (dingTodoExecutors(card) || task.dingTodo?.executorUnionIds || []);
     const sameExecutors = JSON.stringify(executorUnionIds) === JSON.stringify(task.dingTodo?.executorUnionIds || []);
-    const done = Object.hasOwn(card, "isDone") ? Boolean(card.isDone) : Boolean(task.done);
+    const done = Object.hasOwn(card, "isDone")
+      ? Boolean(card.isDone)
+      : Object.hasOwn(card, "finalStatusStage")
+        ? Number(card.finalStatusStage) === 2
+        : Boolean(task.done);
     const effectiveTask = {
       ...task,
       due: draft.dueDate || task.due || "",
@@ -297,12 +345,17 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
     const dingTodo = {
       ...(task.dingTodo || {}),
       id: remoteId,
+      sourceId: String(card.sourceId || task.dingTodo?.sourceId || sourceId),
+      source: String(card.source || task.dingTodo?.source || ""),
+      bizTag: String(card.bizTag || task.dingTodo?.bizTag || ""),
       executorUnionIds,
       executorNames: sameExecutors ? (task.dingTodo?.executorNames || []) : [],
       draft,
       remoteUpdatedAt,
-      lastError: "",
-      failedAt: ""
+      remoteSnapshotKey,
+      lastError: hasPendingPartialSync ? task.dingTodo.lastError || "" : "",
+      failedAt: hasPendingPartialSync ? task.dingTodo.failedAt || "" : "",
+      syncWarningKind: hasPendingPartialSync ? "partial_sync" : ""
     };
     dingTodo.snapshot = buildTaskTodoSnapshot(effectiveTask, executorUnionIds, draft);
     const nextTask = { ...effectiveTask, dingTodo };

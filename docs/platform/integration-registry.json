@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-23",
+  "updatedAt": "2026-07-27",
   "platforms": [
     {
       "id": "dingtalk",
@@ -12,7 +12,7 @@
       "keywords": ["钉钉", "DingTalk", "免登", "待办", "通讯录", "群聊", "开放平台"],
       "codePaths": ["functions/api/dingtalk/**", "functions/api/auth/dingtalk/**", "functions/api/supply-chain/approvals/sync.js", "functions/api/platform/v1/collaboration-items/**/dingtalk.js", "functions/api/platform/v1/platform-connections.js", "functions/api/platform/_shared/platformCredentials.js", "functions/api/platform/_shared/externalActionMode.js", "functions/api/platform/_shared/displayExternalActionAdapter.js", "src/state/dingtalk*.js", "src/features/**/DingTalk*.jsx", "src/features/data-center/PlatformConnectionsWorkspace.jsx", "scripts/import-dingtalk-supply-inventory.mjs", "scripts/lib/dingtalkSupplyInventory.mjs", "server.mjs"],
       "envVars": ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET", "DINGTALK_CORP_ID", "DINGTALK_TOKEN_ENCRYPTION_KEY"],
-      "domains": ["open.dingtalk.com", "api.dingtalk.com", "oapi.dingtalk.com"],
+      "domains": ["open.dingtalk.com", "api.dingtalk.com", "oapi.dingtalk.com", "mcp-gw.dingtalk.com"],
       "apiRoutes": ["/api/dingtalk/", "/api/auth/dingtalk/", "/api/supply-chain/approvals/sync", "/api/platform/v1/collaboration-items/:id/dingtalk", "/api/platform/v1/platform-connections"],
       "publicDocs": [
         { "label": "钉钉开放平台能力中心", "url": "https://open.dingtalk.com/" }

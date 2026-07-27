@@ -7,6 +7,7 @@ import { platformApiUrl } from "./platformApi.js";
 import { buildDecisionTodoPayload, buildPersonalTodoPayload } from "../domain/platformNotifications.js";
 import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
 import { getBrowserStorage, persistLocalState, tryGetStorageItem } from "./resilientLocalStorage.js";
+import { fetchDingTalkTodoStatuses } from "./dingTalkTodoClient.js";
 
 const PlatformContext = createContext(null);
 const STORAGE_KEY = "platformExecutionState";
@@ -337,10 +338,9 @@ export function PlatformProvider({ children, enabled = true }) {
     }
   }, [applySourceStatus, dispatch, state.personalTodos, syncPersonalTodoRecord]);
 
-  const refreshPersonalTodoStatuses = useCallback(async () => {
-    const response = await fetch("/api/dingtalk/todo/list");
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok || !payload.synced) throw new Error(payload.message || "钉钉待办状态查询失败。");
+  const refreshPersonalTodoStatuses = useCallback(async ({ force = false } = {}) => {
+    const payload = await fetchDingTalkTodoStatuses({ force });
+    if (payload.skipped) return { todos: state.personalTodos, audits: [], effects: [], skipped: true };
     const result = applyRemoteTodoSnapshots(state.personalTodos, payload.todos || [], currentUser, new Date());
     result.todos.forEach(nextTodo => {
       const previous = state.personalTodos.find(item => item.id === nextTodo.id);
@@ -371,6 +371,11 @@ export function PlatformProvider({ children, enabled = true }) {
       ));
       if (todo) applySourceStatus(todo, ["complete_milestone", "complete_product_task"].includes(effect.type), "dingtalk");
     });
+    if (payload.warnings?.length) {
+      const warning = new Error(payload.warnings.map(item => item.message).filter(Boolean).join(" "));
+      warning.code = payload.warnings[0]?.code || "DINGTALK_PARTIAL_COVERAGE";
+      throw warning;
+    }
     return result;
   }, [applySourceStatus, currentUser, dispatch, state.personalTodos]);
 

@@ -6,6 +6,7 @@ import { useProductFlow } from "../../state/ProductFlowProvider.jsx";
 import { Button, IconAction } from "../../ui/Button.jsx";
 import { HeaderFilter } from "../../ui/HeaderFilter.jsx";
 import { DwsTodoPreview } from "./DwsTodoPreview.jsx";
+import { dingTalkTodoInitialDelay, dingTalkTodoRefreshDelay } from "../../state/dingTalkTodoClient.js";
 
 // 钉钉待办状态轮询间隔：5 分钟一次，避免高频调用钉钉接口。
 const PERSONAL_TODO_STATUS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -116,9 +117,18 @@ export function PersonalTodoWorkbench({ todos, onNavigate }) {
 
   useEffect(() => {
     if (!currentUnionId || !linkedCount) return undefined;
-    refreshRef.current().catch(() => {});
-    const timer = window.setInterval(() => refreshRef.current().catch(() => {}), PERSONAL_TODO_STATUS_REFRESH_INTERVAL_MS);
-    return () => window.clearInterval(timer);
+    const initialTimer = window.setTimeout(
+      () => refreshRef.current().catch(() => {}),
+      dingTalkTodoInitialDelay()
+    );
+    const timer = window.setInterval(
+      () => refreshRef.current().catch(() => {}),
+      dingTalkTodoRefreshDelay(PERSONAL_TODO_STATUS_REFRESH_INTERVAL_MS)
+    );
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.clearInterval(timer);
+    };
   }, [currentUnionId, linkedCount]);
 
   const projects = useMemo(() => [...new Map(todos.filter(todo => todo.projectName).map(todo => [todo.projectId || todo.projectName, { id: todo.projectId || todo.projectName, name: todo.projectName }])).values()], [todos]);
@@ -140,7 +150,7 @@ export function PersonalTodoWorkbench({ todos, onNavigate }) {
     setRefreshing(true);
     setError("");
     try {
-      await refreshPersonalTodoStatuses();
+      await refreshPersonalTodoStatuses({ force: true });
     } catch (refreshError) {
       setError(refreshError.message || "钉钉状态刷新失败，不影响平台待办使用。");
     } finally {

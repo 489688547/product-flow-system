@@ -1,4 +1,3 @@
-import { jsonResponse, optionsResponse } from "./dingtalk/_shared/dingtalk.js";
 import { readSession } from "./auth/_shared/session.js";
 import { authorizeProductionToken, productionAccessError } from "./platform/_shared/productionDataAccess.js";
 import {
@@ -7,6 +6,21 @@ import {
   resolveDataEnvironment,
   withDataEnvironmentHeaders
 } from "./platform/_shared/dataEnvironment.js";
+
+const JSON_HEADERS = {
+  "content-type": "application/json; charset=utf-8",
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
+  "access-control-allow-headers": "content-type"
+};
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
+function optionsResponse() {
+  return new Response(null, { status: 204, headers: JSON_HEADERS });
+}
 
 const PUBLIC_PATHS = new Set([
   "/api/auth/session",

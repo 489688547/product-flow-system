@@ -431,7 +431,7 @@ main { min-width: 0; overflow-x: hidden; }
 .icon-action.synced { background: var(--success-soft); border-color: color-mix(in oklch, var(--success), white 68%); color: var(--success); }
 .todo-sync-action { min-width: 92px; justify-content: center; }
 .todo-sync-action[data-status="已同步"], .todo-sync-action[data-status="已完成"] { background: var(--success-soft); border-color: color-mix(in oklch, var(--success), white 68%); color: var(--success); }
-.todo-sync-action[data-status="待更新"] { background: var(--warning-soft); border-color: color-mix(in oklch, var(--warning), white 65%); color: var(--warning); }
+.todo-sync-action[data-status="待更新"], .todo-sync-action[data-status="待确认"] { background: var(--warning-soft); border-color: color-mix(in oklch, var(--warning), white 65%); color: var(--warning); }
 .todo-sync-action[data-status="同步失败"] { background: var(--danger-soft); border-color: color-mix(in oklch, var(--danger), white 68%); color: var(--danger); }
 .task-check { min-height: 40px; min-width: 82px; padding: 0 9px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-weight: 650; cursor: pointer; white-space: nowrap; }
 .task-check:hover { background: var(--surface-subtle); border-color: var(--border-strong); }
@@ -607,7 +607,7 @@ main { min-width: 0; overflow-x: hidden; }
 .meeting-context span, .meeting-attendee-summary { color: var(--text-tertiary); font-size: 12px; }
 .todo-context b { font-weight: 750; color: var(--text-secondary); }
 .todo-context b.status-同步失败 { color: var(--danger); }
-.todo-context b.status-待更新 { color: var(--warning); }
+.todo-context b.status-待更新, .todo-context b.status-待确认 { color: var(--warning); }
 .todo-context b.status-已同步, .todo-context b.status-已完成 { color: var(--success); }
 .todo-composer-fields { margin-top: var(--space-4); display: grid; grid-template-columns: minmax(150px, .5fr) minmax(280px, 1fr); gap: var(--space-3); }
 .todo-composer-fields > label, .todo-composer-deadline { min-width: 0; display: grid; align-content: start; gap: 6px; color: var(--text-secondary); font-weight: 650; }

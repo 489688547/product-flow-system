@@ -15,13 +15,18 @@ import {
 } from "../domain/productFlow.js";
 import { normalizeClientState } from "./stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../domain/sessionUser.js";
-import { createTaskMeetingRecord, reconcileTaskTodosFromDingTalk } from "../domain/dingTalk.js";
+import {
+  createTaskMeetingRecord,
+  reconcileTaskTodosFromDingTalk,
+  userHasAssignedDingTalkTodo
+} from "../domain/dingTalk.js";
 import { applyTaskTodoSyncFailure, applyTaskTodoSyncSuccess } from "../domain/taskTodo.js";
 import { sharedStateApiUrl } from "./stateApi.js";
 import { createDemandRecord } from "../domain/demandDate.js";
 import { useAuth } from "./AuthProvider.jsx";
 import { normalizeProductPlans, validateProductPlan } from "../domain/productPlanning.js";
 import { createDingTalkTodoRefreshController } from "./dingTalkTodoRefresh.js";
+import { dingTalkTodoInitialDelay, dingTalkTodoRefreshDelay } from "./dingTalkTodoClient.js";
 import { createSharedStateSyncSession } from "./sharedStateSync.js";
 import { productFlowStateFingerprint } from "./productFlowStateFingerprint.js";
 import { environmentStorageKey, migrateLegacyProductionCache } from "./dataEnvironmentClient.js";
@@ -73,6 +78,7 @@ export function ProductFlowProvider({ children }) {
   const { user: authUser } = useAuth();
   const [state, setState] = useState(loadLocalState);
   const [sharedError, setSharedError] = useState("");
+  const [todoSyncWarning, setTodoSyncWarning] = useState("");
   const [loading, setLoading] = useState(true);
   const latestState = useRef(state);
   latestState.current = state;
@@ -92,6 +98,10 @@ export function ProductFlowProvider({ children }) {
   }) : null, [authUser]);
   const currentUser = useMemo(() => resolveCurrentUser(sessionAccount, state.orgCache), [sessionAccount, state.orgCache]);
   const orgCache = useMemo(() => ensureCurrentUserInOrgCache(state.orgCache, currentUser), [state.orgCache, currentUser]);
+  const shouldRefreshTaskTodos = useMemo(
+    () => userHasAssignedDingTalkTodo(state.tasks || [], authUser?.unionId),
+    [authUser?.unionId, state.tasks]
+  );
   const commitState = useCallback(updater => {
     setState(current => {
       const nextState = typeof updater === "function" ? updater(current) : updater;
@@ -102,11 +112,13 @@ export function ProductFlowProvider({ children }) {
     });
   }, []);
   const todoRefreshController = useMemo(() => createDingTalkTodoRefreshController({
-    fetchImpl: (...args) => fetch(...args),
     onTodos: todos => commitState(current => {
       const tasks = reconcileTaskTodosFromDingTalk(current.tasks || [], todos);
       return tasks === current.tasks ? current : { ...current, tasks };
-    })
+    }),
+    onWarnings: warnings => setTodoSyncWarning(
+      warnings.map(item => String(item?.message || "")).filter(Boolean).join(" ")
+    )
   }), [commitState]);
 
   useEffect(() => {
@@ -160,7 +172,7 @@ export function ProductFlowProvider({ children }) {
   );
 
   useEffect(() => {
-    if (loading || !authUser?.unionId) return undefined;
+    if (loading || !authUser?.unionId || !shouldRefreshTaskTodos) return undefined;
     let active = true;
     const refresh = () => {
       if (!active) return;
@@ -168,16 +180,17 @@ export function ProductFlowProvider({ children }) {
         // A temporary read failure must not overwrite the last successful local snapshot.
       });
     };
-    refresh();
-    const interval = window.setInterval(refresh, 60_000);
+    const initialTimer = window.setTimeout(refresh, dingTalkTodoInitialDelay());
+    const interval = window.setInterval(refresh, dingTalkTodoRefreshDelay());
     window.addEventListener("focus", refresh);
     return () => {
       active = false;
       todoRefreshController.invalidate();
+      window.clearTimeout(initialTimer);
       window.clearInterval(interval);
       window.removeEventListener("focus", refresh);
     };
-  }, [authUser?.unionId, loading, refreshTaskTodoStatuses, todoRefreshController]);
+  }, [authUser?.unionId, loading, refreshTaskTodoStatuses, shouldRefreshTaskTodos, todoRefreshController]);
 
   useEffect(() => {
     persistLocalState(localCache, localKey(STORAGE_KEY), state);
@@ -481,7 +494,7 @@ export function ProductFlowProvider({ children }) {
     currentUser,
     orgCache,
     loading,
-    sharedError,
+    sharedError: sharedError || todoSyncWarning,
     updateDemand,
     addDemand,
     deleteDemand,
@@ -509,7 +522,7 @@ export function ProductFlowProvider({ children }) {
     addFeedbackIssue,
     updateSettings,
     updateTaskTemplates
-  }), [state, currentUser, orgCache, loading, sharedError, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, updateDeliverable, deleteDeliverable, addProductPlan, updateProductPlan, deleteProductPlan, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
+  }), [state, currentUser, orgCache, loading, sharedError, todoSyncWarning, updateDemand, addDemand, deleteDemand, convertDemand, returnProductToDemand, setCurrentProduct, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, syncTaskTodo, scheduleTaskMeeting, advanceProductStage, setProductStage, syncProductDefaults, addDeliverable, updateDeliverable, deleteDeliverable, addProductPlan, updateProductPlan, deleteProductPlan, updateReviewMinutes, addFeedbackIssue, updateSettings, updateTaskTemplates]);
 
   return <ProductFlowContext.Provider value={value}>{children}</ProductFlowContext.Provider>;
 }

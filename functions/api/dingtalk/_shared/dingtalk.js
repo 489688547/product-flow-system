@@ -753,6 +753,52 @@ export async function createDingTodoTask(accessToken, input = {}, fetchImpl = fe
   );
 }
 
+export async function createDingPersonalTodoTask(userAccessToken, input = {}, fetchImpl = fetch) {
+  if (!input.executorUnionIds?.length) {
+    const err = new Error("请至少选择一个待办执行人。");
+    err.status = 400;
+    throw err;
+  }
+  const body = {
+    subject: String(input.subject || "").slice(0, 1024),
+    description: String(input.description || "").slice(0, 4096),
+    dueTime: Number(input.dueTime) || 0,
+    executorIds: input.executorUnionIds.filter(Boolean),
+    participantIds: (input.participantUnionIds || []).filter(Boolean)
+  };
+  const result = await requestDingOpenApi(
+    userAccessToken,
+    "POST",
+    "/v1.0/todo/users/me/personalTasks",
+    body,
+    fetchImpl
+  );
+  const taskId = String(result?.taskId || result?.id || "");
+  const priority = Number(input.priority) || 20;
+  let prioritySynced = true;
+  let priorityWarning = "";
+  if (taskId && priority !== 20) {
+    try {
+      await callDingTodoMcpTool(userAccessToken, "update_todo_task", {
+        TodoUpdateRequest: { taskId, priority }
+      }, fetchImpl);
+    } catch {
+      prioritySynced = false;
+      priorityWarning = "待办已创建，但优先级同步失败，请重试。";
+    }
+  }
+  return {
+    ...result,
+    id: taskId,
+    taskId,
+    sourceId: String(input.sourceId || ""),
+    source: "todo_personal_user",
+    creatorUnionId: String(input.creatorUnionId || ""),
+    prioritySynced,
+    priorityWarning
+  };
+}
+
 export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
   const creatorUnionId = String(input.creatorUnionId || "");
   const resourceUnionId = String(input.resourceUnionId || creatorUnionId);
@@ -774,7 +820,6 @@ export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fe
     dueTime: Number(input.dueTime) || 0,
     executorIds: input.executorUnionIds.filter(Boolean),
     participantIds: (input.participantUnionIds || []).filter(Boolean),
-    priority: Number(input.priority) || 20,
     done: Boolean(input.done)
   };
   const result = await requestDingOpenApi(
@@ -861,15 +906,20 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
   }
 }
 
-export async function listDingTodoTasks(accessToken, unionId, { isDone = false, fetchImpl = fetch } = {}) {
+export async function listDingTodoTasks(
+  accessToken,
+  unionId,
+  { isDone = false, maxPages = 100, nextToken: initialNextToken = "", fetchImpl = fetch } = {}
+) {
   const userUnionId = String(unionId || "").trim();
   if (!userUnionId) {
     const err = new Error("当前登录账号缺少 unionId，无法查询钉钉待办。");
     err.status = 400;
     throw err;
   }
+  const pageLimit = Math.max(1, Math.min(100, Number(maxPages) || 1));
   const cards = [];
-  let nextToken = "";
+  let nextToken = String(initialNextToken || "");
   let page = 0;
   do {
     const body = { isDone: Boolean(isDone) };
@@ -881,11 +931,106 @@ export async function listDingTodoTasks(accessToken, unionId, { isDone = false, 
       body,
       fetchImpl
     );
-    cards.push(...(Array.isArray(result.todoCards) ? result.todoCards : []));
+    cards.push(...(Array.isArray(result.todoCards) ? result.todoCards : [])
+      .map(card => ({ ...card, isDone: Boolean(isDone) })));
     nextToken = String(result.nextToken || "");
     page += 1;
-  } while (nextToken && page < 100);
+  } while (nextToken && page < pageLimit);
+  cards.truncated = Boolean(nextToken);
+  cards.nextToken = nextToken;
   return cards;
+}
+
+const DING_TODO_MCP_ENDPOINT = "https://mcp-gw.dingtalk.com/server/0f51140eddcd913106c5821a4d0cd577b2d1a0b6cb452dd0e51ab41facf3a83c";
+
+async function callDingTodoMcpTool(userAccessToken, toolName, args = {}, fetchImpl = fetch) {
+  const token = String(userAccessToken || "").trim();
+  if (!token) {
+    const err = new Error("缺少钉钉用户授权，无法读取个人待办。");
+    err.status = 401;
+    throw err;
+  }
+  const response = await fetchImpl(DING_TODO_MCP_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "accept": "application/json",
+      "authorization": `Bearer ${token}`,
+      "x-user-access-token": token
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: { name: toolName, arguments: args }
+    })
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || data.error || data.result?.isError) {
+    const err = new Error(data.error?.message || data.result?.content?.[0]?.text || "钉钉个人待办接口调用失败");
+    err.status = response.ok ? 502 : response.status;
+    err.detail = data;
+    throw err;
+  }
+  return data;
+}
+
+export async function listDingPersonalTodoTasks(
+  userAccessToken,
+  { isDone = false, maxPages = 3, startPage = 1, fetchImpl = fetch } = {}
+) {
+  const pageLimit = Math.max(1, Math.min(10, Number(maxPages) || 1));
+  const firstPage = Math.max(1, Math.min(100, Number(startPage) || 1));
+  const cards = [];
+  let truncated = false;
+  let lastPage = firstPage - 1;
+  for (let offset = 0; offset < pageLimit; offset += 1) {
+    const page = firstPage + offset;
+    lastPage = page;
+    const status = String(Boolean(isDone));
+    const raw = await callDingTodoMcpTool(userAccessToken, "get_user_todos_in_current_org", {
+      isDone: status,
+      todoStatus: status,
+      pageNum: String(page),
+      pageSize: "20"
+    }, fetchImpl);
+    const unwrapped = unwrapDingMcpResult(raw);
+    const result = unwrapped?.result || unwrapped;
+    cards.push(...(Array.isArray(result?.todoCards) ? result.todoCards : [])
+      .map(card => ({ ...card, isDone: Boolean(isDone), source: card.source || "todo_personal_user" })));
+    truncated = Boolean(result?.hasMore);
+    if (!truncated) break;
+  }
+  cards.truncated = truncated;
+  cards.nextPage = truncated && lastPage < 100 ? lastPage + 1 : 1;
+  return cards;
+}
+
+export async function updateDingPersonalTodoTask(userAccessToken, input = {}, fetchImpl = fetch) {
+  const taskId = String(input.todoId || input.taskId || "").trim();
+  if (!taskId) {
+    const err = new Error("缺少钉钉个人待办 ID，无法更新待办。");
+    err.status = 400;
+    throw err;
+  }
+  const request = {
+    taskId,
+    subject: String(input.subject || "").slice(0, 1024),
+    dueTime: Number(input.dueTime) || 0,
+    priority: Number(input.priority) || 20,
+    isDone: Boolean(input.done)
+  };
+  await callDingTodoMcpTool(userAccessToken, "update_todo_task", {
+    TodoUpdateRequest: request
+  }, fetchImpl);
+  return {
+    id: taskId,
+    taskId,
+    sourceId: String(input.sourceId || ""),
+    source: "todo_personal_user",
+    creatorUnionId: String(input.creatorUnionId || ""),
+    updated: true
+  };
 }
 
 export function buildDingCalendarEventPayload({
