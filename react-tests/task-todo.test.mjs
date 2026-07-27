@@ -176,6 +176,28 @@ test("task todo payload only reuses an id verified against the stable product so
   }).todoId, "");
 });
 
+test("task todo payload keeps a server-bound id from a legacy nested recovery source", () => {
+  const payload = buildTaskTodoPayload({
+    product: { id: "p1", name: "产品" },
+    task: {
+      id: "t1",
+      productId: "p1",
+      title: "整理 PRD",
+      due: "2026-07-28",
+      dingTodo: {
+        id: "todo-nested-recovery",
+        sourceId: "task:p1:t1:r1:r1"
+      }
+    },
+    creator: { unionid: "creator-union" },
+    executors: [{ unionid: "executor-union" }],
+    detailUrl: "https://flow.example.com/#progress",
+    now: new Date("2026-07-27T10:00:00+08:00")
+  });
+
+  assert.equal(payload.todoId, "todo-nested-recovery");
+});
+
 test("legacy month-day deadlines normalize before DingTalk todo sync", () => {
   const now = new Date("2026-07-11T10:00:00+08:00");
   assert.equal(normalizeTaskDueDate("07-14", now), "2026-07-14");

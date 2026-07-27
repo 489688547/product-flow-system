@@ -832,11 +832,49 @@ export async function updateDingTodoTask(accessToken, input = {}, fetchImpl = fe
   return { ...result, id: todoId, updated: true };
 }
 
+export async function updateDingTodoTaskExecutorStatus(accessToken, input = {}, fetchImpl = fetch) {
+  const creatorUnionId = String(input.resourceUnionId || input.creatorUnionId || "").trim();
+  const operatorUnionId = String(input.operatorUnionId || creatorUnionId).trim();
+  const todoId = String(input.todoId || "").trim();
+  const executorUnionIds = [...new Set((input.executorUnionIds || [])
+    .map(value => String(value || "").trim())
+    .filter(Boolean))];
+  if (!creatorUnionId || !operatorUnionId || !todoId) {
+    const err = new Error("缺少钉钉创建人 unionId 或待办 ID，无法更新完成状态。");
+    err.status = 400;
+    throw err;
+  }
+  if (!executorUnionIds.length) {
+    const err = new Error("请至少选择一个待办执行人。");
+    err.status = 400;
+    throw err;
+  }
+  const done = Boolean(input.done);
+  const result = await requestDingOpenApi(
+    accessToken,
+    "PUT",
+    `/v1.0/todo/users/${encodeURIComponent(creatorUnionId)}/tasks/${encodeURIComponent(todoId)}/executorStatus?operatorId=${encodeURIComponent(operatorUnionId)}`,
+    {
+      executorStatusList: executorUnionIds.map(id => ({ id, isDone: done }))
+    },
+    fetchImpl
+  );
+  return { ...result, id: todoId, done, executorStatusUpdated: true };
+}
+
 export function isDuplicateTodoSourceError(error) {
   const text = [error?.message, error?.detail?.message, error?.detail?.errmsg]
     .filter(Boolean)
     .join(" ");
   return /task existed sourceId/i.test(text);
+}
+
+function nextTodoRecoverySourceId(sourceId) {
+  const value = String(sourceId || "");
+  const match = value.match(/^(.*):r(\d+)$/);
+  return match
+    ? `${match[1]}:r${Number(match[2]) + 1}`
+    : `${value}:r1`;
 }
 
 export async function findDingTodoBySourceId(accessToken, unionId, sourceId, fetchImpl = fetch) {
@@ -856,7 +894,11 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
     err.status = 400;
     throw err;
   }
-  if (input.todoId) return updateDingTodoTask(accessToken, input, fetchImpl);
+  if (input.todoId) {
+    const status = await updateDingTodoTaskExecutorStatus(accessToken, input, fetchImpl);
+    const updated = await updateDingTodoTask(accessToken, input, fetchImpl);
+    return { ...updated, ...status, updated: true };
+  }
   try {
     return await createDingTodoTask(accessToken, input, fetchImpl);
   } catch (error) {
@@ -876,7 +918,7 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
     let existing = await findAcrossRecoveryUsers(input.sourceId);
     let todoId = String(existing?.id || existing?.taskId || existing?.todoTaskId || "");
     if (!todoId) {
-      const replacementSourceId = `${String(input.sourceId || "")}:r1`;
+      const replacementSourceId = nextTodoRecoverySourceId(input.sourceId);
       try {
         const replacement = await createDingTodoTask(accessToken, {
           ...input,
@@ -896,13 +938,15 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
       }
     }
     const resourceUnionId = String(existing.creatorId || existing.resourceUnionId || input.creatorUnionId || "");
-    const updated = await updateDingTodoTask(accessToken, {
+    const updateInput = {
       ...input,
       todoId,
       resourceUnionId,
       operatorUnionId: resourceUnionId
-    }, fetchImpl);
-    return { ...updated, recovered: true };
+    };
+    const status = await updateDingTodoTaskExecutorStatus(accessToken, updateInput, fetchImpl);
+    const updated = await updateDingTodoTask(accessToken, updateInput, fetchImpl);
+    return { ...updated, ...status, updated: true, recovered: true };
   }
 }
 
