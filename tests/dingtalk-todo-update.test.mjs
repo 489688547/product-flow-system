@@ -4,6 +4,7 @@ import { syncDingTodoTask, updateDingTodoTask } from "../functions/api/dingtalk/
 import {
   authorizeTaskTodoSyncRequest,
   onRequest as syncTodoRoute,
+  persistTaskTodoSyncResult,
   safeDingTalkError
 } from "../functions/api/dingtalk/todo/sync.js";
 
@@ -26,6 +27,131 @@ test("todo sync maps provider authorization expiry to a safe re-login response",
   assert.equal(result.body.message, "请重新使用钉钉登录后再同步待办。");
   assert.equal(result.body.retryable, true);
   assert.doesNotMatch(JSON.stringify(result), /raw provider|private token/);
+});
+
+test("todo sync persists the provider result server-side and retries one shared-state conflict", async () => {
+  const original = {
+    version: "test",
+    products: [{ id: "p1" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      title: "整理 PRD",
+      due: "2026-07-27",
+      done: false,
+      ownerDept: "产品部",
+      deliverable: "PRD"
+    }],
+    orgCache: {
+      users: [{ unionid: "executor-union", name: "周荣庆" }]
+    }
+  };
+  const latest = {
+    ...original,
+    currentId: "p2",
+    products: [...original.products, { id: "p2", name: "并发新增产品" }]
+  };
+  const reads = [
+    { state: original, version: "test", updatedAt: "2026-07-27T09:00:00.000Z" },
+    { state: latest, version: "test", updatedAt: "2026-07-27T09:00:01.000Z" }
+  ];
+  const writes = [];
+
+  const saved = await persistTaskTodoSyncResult({
+    db: {},
+    sourceId: "task:p1:t1",
+    payload: {
+      sourceId: "task:p1:t1",
+      creatorUnionId: "creator-union",
+      executorUnionIds: ["executor-union"],
+      draft: {
+        subject: "产品 PRD 同步",
+        descriptionHtml: "<p>正文</p>",
+        priority: 30,
+        dueDate: "2026-07-28",
+        dueClock: "18:00"
+      }
+    },
+    todo: {
+      id: "todo-real-1",
+      sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      creatorUnionId: "creator-union"
+    },
+    session: { name: "周荣庆" },
+    syncedAt: "2026-07-27T09:01:00.000Z",
+    readState: async () => reads.shift(),
+    writeBinding: async ({ state, stored, session }) => {
+      writes.push({
+        state,
+        updatedBy: session.name,
+        options: { baseUpdatedAt: stored.updatedAt }
+      });
+      if (writes.length === 1) {
+        const error = new Error("conflict");
+        error.status = 409;
+        error.code = "SHARED_STATE_VERSION_CONFLICT";
+        throw error;
+      }
+      return { version: "test", updatedAt: "2026-07-27T09:01:00.001Z" };
+    }
+  });
+
+  assert.equal(writes.length, 2);
+  assert.equal(writes[1].options.baseUpdatedAt, "2026-07-27T09:00:01.000Z");
+  assert.equal(writes[1].state.currentId, "p2");
+  assert.equal(writes[1].state.products.length, 2);
+  assert.equal(saved.task.due, "2026-07-28");
+  assert.equal(saved.task.dingTodo.id, "todo-real-1");
+  assert.equal(saved.task.dingTodo.source, "todo_personal_user");
+  assert.equal(saved.task.dingTodo.creatorUnionId, "creator-union");
+  assert.deepEqual(saved.task.dingTodo.executorNames, ["周荣庆"]);
+  assert.equal(saved.updatedAt, "2026-07-27T09:01:00.001Z");
+});
+
+test("todo sync reports a binding conflict instead of claiming success after repeated state conflicts", async () => {
+  const state = {
+    version: "test",
+    products: [{ id: "p1" }],
+    tasks: [{ id: "t1", productId: "p1", title: "整理 PRD", due: "2026-07-27", done: false }],
+    orgCache: { users: [] }
+  };
+  let attempts = 0;
+
+  await assert.rejects(
+    persistTaskTodoSyncResult({
+      db: {},
+      sourceId: "task:p1:t1",
+      payload: {
+        sourceId: "task:p1:t1",
+        creatorUnionId: "creator-union",
+        executorUnionIds: ["creator-union"],
+        draft: { subject: "整理 PRD", dueDate: "2026-07-27" }
+      },
+      todo: { id: "todo-real-1", sourceId: "task:p1:t1", source: "todo_personal_user" },
+      session: { name: "周荣庆" },
+      readState: async () => ({
+        state,
+        version: "test",
+        updatedAt: `2026-07-27T09:00:0${attempts}.000Z`
+      }),
+      writeBinding: async () => {
+        attempts += 1;
+        const error = new Error("conflict");
+        error.status = 409;
+        error.code = "SHARED_STATE_VERSION_CONFLICT";
+        throw error;
+      },
+      maxAttempts: 2
+    }),
+    error => {
+      assert.equal(error.code, "DINGTALK_TODO_BINDING_CONFLICT");
+      assert.equal(error.todoId, "todo-real-1");
+      assert.equal(error.retryable, true);
+      return true;
+    }
+  );
+  assert.equal(attempts, 2);
 });
 
 test("todo sync authorization binds the actor and todo id to session-backed task state", () => {
@@ -153,9 +279,19 @@ test("todo sync route uses the signed-in actor and the server-stored todo id", a
   const parts = [
     { part_key: "version", part_index: 0, payload: JSON.stringify("test"), updated_at: "2026-07-18", updated_by: "产品负责人" },
     { part_key: "products", part_index: 0, payload: JSON.stringify([{ id: "p1", productManagerUnionId: "owner-union" }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
-    { part_key: "tasks", part_index: 0, payload: JSON.stringify([{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1" } }]), updated_at: "2026-07-18", updated_by: "产品负责人" }
+    { part_key: "tasks", part_index: 0, payload: JSON.stringify([{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1" } }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
+    ...["demands", "deliverables", "reviews", "feedbackIssues", "productPlans"].map(part_key => ({
+      part_key,
+      part_index: 0,
+      payload: "[]",
+      updated_at: "2026-07-18",
+      updated_by: "产品负责人"
+    }))
   ];
   const db = {
+    async batch() {
+      return [{ success: true, meta: { changes: 1 } }];
+    },
     prepare(sql) {
       const statement = {
         values: [],

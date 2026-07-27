@@ -326,27 +326,50 @@ export function ProductFlowProvider({ children }) {
   }, []);
 
   const syncTaskTodo = useCallback(async ({ taskId, payload, executors, snapshot }) => {
+    let result = null;
+    let providerSynced = false;
     try {
       const response = await fetch("/api/dingtalk/todo/sync", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(payload)
       });
-      const result = await response.json().catch(() => ({}));
+      result = await response.json().catch(() => ({}));
       if (!response.ok || !result.synced) {
         const detail = result.detail?.message || result.detail?.errmsg || result.detail?.errorMessage || "";
         throw new Error([result.message || "钉钉待办同步失败。", detail].filter(Boolean).join(" "));
       }
-      const syncedAt = new Date().toISOString();
+      providerSynced = true;
       todoRefreshController.invalidate();
-      commitState(current => ({
-        ...current,
-        tasks: (current.tasks || []).map(item => item.id === taskId
-          ? applyTaskTodoSyncSuccess(item, { payload, executors, snapshot, todo: result.todo, syncedAt })
-          : item)
-      }));
+      const stateResponse = await fetch(stateApiUrl);
+      const statePayload = await stateResponse.json().catch(() => ({}));
+      if (!stateResponse.ok || !statePayload.synced || !statePayload.state) {
+        throw new Error(statePayload.message || "待办已同步，正在等待共享状态刷新。");
+      }
+      const normalized = normalizeClientState(statePayload.state);
+      const remoteState = sharedSyncSession.current.acceptRemote({ ...statePayload, state: normalized });
+      setState(remoteState);
+      persistLocalState(localCache, localKey(STORAGE_KEY), remoteState);
+      tryRemoveStorageItem(localCache, localKey(DIRTY_STORAGE_KEY));
+      setSharedError("");
       return result.todo;
     } catch (error) {
+      if (providerSynced) {
+        const syncedAt = new Date().toISOString();
+        sharedSyncSession.current.invalidate();
+        setState(current => {
+          const nextState = {
+            ...current,
+            tasks: (current.tasks || []).map(item => item.id === taskId
+              ? result.task || applyTaskTodoSyncSuccess(item, { payload, executors, snapshot, todo: result.todo, syncedAt })
+              : item)
+          };
+          persistLocalState(localCache, localKey(STORAGE_KEY), nextState);
+          return nextState;
+        });
+        setSharedError("钉钉待办已同步，但共享状态刷新失败；请刷新页面后继续编辑。");
+        return result.todo;
+      }
       commitState(current => ({
         ...current,
         tasks: (current.tasks || []).map(item => item.id === taskId
@@ -355,7 +378,7 @@ export function ProductFlowProvider({ children }) {
       }));
       throw error;
     }
-  }, []);
+  }, [stateApiUrl, todoRefreshController]);
 
   const scheduleTaskMeeting = useCallback(async ({ taskId, payload, attendees }) => {
     const response = await fetch("/api/dingtalk/calendar/create", {

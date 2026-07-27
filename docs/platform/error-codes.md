@@ -102,6 +102,7 @@
 - `COLLABORATION_IDEMPOTENCY_CONFLICT`：同一幂等键与现有业务来源不一致。
 - `COLLABORATION_STORAGE_UNAVAILABLE`：缺少 D1 绑定或协同表写入不可用。
 - `DINGTALK_TODO_SYNC_FAILED`：协同状态已保存，但钉钉待办同步失败。
+- `DINGTALK_TODO_BINDING_CONFLICT`：钉钉待办已经创建或更新，但系统连续发生共享状态版本冲突，真实 todoId 尚未可靠绑定；HTTP 409，可重试，客户端不得显示“已同步”。
 
 数据中心 API 使用：
 

@@ -13,6 +13,11 @@ export function createSharedStateSyncSession({ fingerprint = JSON.stringify } = 
       return Boolean(baselineUpdatedAt);
     },
 
+    invalidate() {
+      baselineUpdatedAt = "";
+      baselineFingerprint = "";
+    },
+
     acceptRemote(payload) {
       if (!payload?.synced || !payload.state || !payload.updatedAt) {
         baselineUpdatedAt = "";

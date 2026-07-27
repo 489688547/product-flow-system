@@ -204,7 +204,9 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
             className="compact todo-sync-action"
             data-status={syncStatus}
             data-testid="sync-task-todo"
-            title={`${syncStatus}，点击${task.dingTodo?.id ? "更新" : "编辑并发送"}钉钉待办`}
+            title={syncStatus === "展示模拟"
+              ? "展示环境仅模拟待办，未发送到真实钉钉；点击编辑模拟内容"
+              : `${syncStatus}，点击${task.dingTodo?.id ? "更新" : "编辑并发送"}钉钉待办`}
             onClick={() => setTodoTask(task)}
           ><Send size={16} />{syncStatus}</Button>
         ) : null}
