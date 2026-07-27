@@ -22,9 +22,9 @@ export function groupSidebarNavigation(navigation = []) {
   }));
 }
 
-export function expandedGroupForScreen(navigation = [], screen = "") {
+// 手风琴模式下返回当前页面所属的可折叠分组：进入该分组即只保留它展开，侧栏高度可控。
+export function activeCollapsibleGroup(navigation = [], screen = "") {
   const group = groupSidebarNavigation(navigation)
     .find(candidate => candidate.items.some(([key]) => key === screen));
-  if (!group?.collapsible || group.items[0]?.[0] === screen) return "";
-  return group.label;
+  return group?.collapsible ? group.label : "";
 }

@@ -7,7 +7,7 @@ import { useAuth } from "./state/AuthProvider.jsx";
 import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
 import { featureFlagEnabled } from "./domain/featureFlags.js";
-import { expandedGroupForScreen, groupSidebarNavigation } from "./domain/sidebarNavigation.js";
+import { activeCollapsibleGroup, groupSidebarNavigation } from "./domain/sidebarNavigation.js";
 import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
 import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
 import { LocalOnlineEnvironmentBanner } from "./ui/LocalOnlineEnvironmentBanner.jsx";
@@ -216,22 +216,29 @@ export default function App() {
   const screenAllowed = visibleScreenKeys.has(screen) || screen === "ai-assistant" || (screen === "packages" && visibleScreenKeys.has("archive"));
   const activeScreen = screenAllowed ? screen : defaultScreen;
   const [expandedAppGroups, setExpandedAppGroups] = useState(() => {
-    const stored = readStoredExpandedGroups();
-    const group = expandedGroupForScreen(visibleNavigation, activeScreen);
-    return group && !stored.includes(group) ? [...stored, group] : stored;
+    const group = activeCollapsibleGroup(visibleNavigation, activeScreen);
+    return group ? [group] : readStoredExpandedGroups();
   });
   const sidebarNavigationGroups = useMemo(() => groupSidebarNavigation(visibleNavigation), [visibleNavigation]);
   const accountMeta = [currentUser?.department, currentUser?.title].filter(Boolean).join(" / ") || "组织信息待同步";
   const accountName = currentUser?.name || "未登录";
   useEffect(() => {
-    const group = expandedGroupForScreen(visibleNavigation, activeScreen);
-    if (group) setExpandedAppGroups(current => current.includes(group) ? current : [...current, group]);
+    // 手风琴：进入某个业务分组时只保留它展开，避免分组只增不减把侧栏撑得远超一屏。
+    const group = activeCollapsibleGroup(visibleNavigation, activeScreen);
+    if (group) setExpandedAppGroups(current => current.length === 1 && current[0] === group ? current : [group]);
   }, [activeScreen, visibleNavigation]);
   useEffect(() => {
     try {
       window.localStorage.setItem(SIDEBAR_EXPANDED_GROUPS_KEY, JSON.stringify(expandedAppGroups));
     } catch { /* 隐私模式等写入失败时仅保留会话内状态 */ }
   }, [expandedAppGroups]);
+  useEffect(() => {
+    // 深链接或分组展开后激活项可能落在侧栏滚动区外；已可见时 nearest 不会产生位移。
+    const frame = globalThis.requestAnimationFrame?.(() => {
+      document.querySelector(".sidebar nav button.active")?.scrollIntoView({ block: "nearest" });
+    });
+    return () => globalThis.cancelAnimationFrame?.(frame);
+  }, [activeScreen]);
   useEffect(() => {
     if (!accountMenuOpen) return undefined;
     const close = event => {
