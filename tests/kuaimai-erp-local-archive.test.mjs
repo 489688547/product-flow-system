@@ -13,6 +13,7 @@ import {
 } from "../scripts/kuaimai-erp-collector/archive.mjs";
 import {
   collectorLaunchAgentPlist,
+  installLaunchAgent,
   readCollectorToken,
   storeCollectorToken
 } from "../scripts/kuaimai-erp-collector/automation.mjs";
@@ -162,4 +163,47 @@ test("scanner distinguishes kit and combination snapshots from ordinary product 
     uploads.map(value => value.batch.resourceType).sort(),
     ["product_combinations", "product_kits"]
   );
+});
+
+test("LaunchAgent installed from a Git worktree records the main repository path", async () => {
+  // 之前的常驻任务是从 .worktrees/kuaimai-erp-history 安装的；该 worktree 被删除后
+  // node 找不到模块，launchctl 只留下退出码 1，采集静默停摆。写入 plist 的必须是稳定路径。
+  const worktreeEntry = "/Company/product-flow-system/.worktrees/kuaimai-erp-history/scripts/kuaimai-erp-collector/index.mjs";
+  const written = [];
+  const command = async (bin, args) => {
+    if (bin === "/usr/bin/git") {
+      return {
+        stdout: [
+          "/Company/product-flow-system/.worktrees/kuaimai-erp-history",
+          "/Company/product-flow-system/.git"
+        ].join("\n")
+      };
+    }
+    written.push({ bin, args });
+    return { stdout: "" };
+  };
+  const home = await mkdtemp(path.join(os.tmpdir(), "kuaimai-agent-"));
+  const result = await installLaunchAgent({
+    nodePath: "/usr/local/bin/node",
+    collectorPath: worktreeEntry,
+    root: "/Users/roger/Desktop/公司数据中心/快麦ERP",
+    baseUrl: "https://product-flow-system.pages.dev",
+    home,
+    command
+  });
+  const plist = await readFile(result.plistPath, "utf8");
+  assert.match(plist, /<string>\/Company\/product-flow-system\/scripts\/kuaimai-erp-collector\/index\.mjs<\/string>/);
+  assert.equal(plist.includes(".worktrees"), false, "plist 不得写入临时 worktree 路径");
+});
+
+test("LaunchAgent writes a log so a failing background run can be diagnosed", () => {
+  const plist = collectorLaunchAgentPlist({
+    nodePath: "/usr/local/bin/node",
+    collectorPath: "/Company/product-flow-system/scripts/kuaimai-erp-collector/index.mjs",
+    root: "/Users/roger/Desktop/公司数据中心/快麦ERP",
+    baseUrl: "https://product-flow-system.pages.dev"
+  });
+  assert.match(plist, /<key>StandardOutPath<\/key>/);
+  assert.match(plist, /<key>StandardErrorPath<\/key>/);
+  assert.match(plist, /com\.company\.kuaimai-erp-collector\.log/);
 });
