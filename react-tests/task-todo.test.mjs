@@ -40,6 +40,42 @@ test("new todo snapshots include the editable draft without invalidating legacy 
   assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, draft: { ...draft, priority: 40 } } }), "待更新");
 });
 
+test("display-mode todo sync stays visibly simulated instead of claiming DingTalk delivery", () => {
+  const task = {
+    id: "t1",
+    title: "整理 PRD",
+    due: "2026-07-22",
+    done: false,
+    deliverable: "PRD",
+    ownerDept: "产品部"
+  };
+  const payload = {
+    sourceId: "task:p1:t1",
+    creatorUnionId: "creator-union",
+    executorUnionIds: ["executor-union"],
+    draft: {
+      subject: "整理 PRD",
+      descriptionHtml: "<p>正文</p>",
+      priority: 20,
+      dueDate: "2026-07-22",
+      dueClock: "18:00"
+    }
+  };
+  const synced = applyTaskTodoSyncSuccess(task, {
+    payload,
+    executors: [{ name: "周荣庆" }],
+    todo: {
+      id: "display-todo-1",
+      sourceId: "task:p1:t1",
+      simulated: true
+    },
+    syncedAt: "2026-07-27T09:00:00.000Z"
+  });
+
+  assert.equal(synced.dingTodo.simulated, true);
+  assert.equal(todoSyncStatus(synced), "展示模拟");
+});
+
 test("company-wide tasks are visible to every department", () => {
   const tasks = [{ id: "company", title: "全员任务", ownerDept: "所有部门", done: false }];
   const user = { department: "产品部" };

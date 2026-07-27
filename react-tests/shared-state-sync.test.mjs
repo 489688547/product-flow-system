@@ -48,6 +48,18 @@ test("shared state sync skips states that are unchanged from the accepted or sav
   assert.equal(session.buildWrite(structuredClone(changedState)), null);
 });
 
+test("invalidating a shared sync session blocks writes until a new server baseline is loaded", async () => {
+  const { createSharedStateSyncSession } = await loadSyncModule();
+  const session = createSharedStateSyncSession();
+  const state = { products: [{ id: "p1" }] };
+  session.acceptRemote({ synced: true, state, updatedAt: "2026-07-21T12:00:00.000Z" });
+
+  session.invalidate();
+
+  assert.equal(session.canSave(), false);
+  assert.throws(() => session.buildWrite(state), /线上数据基线/);
+});
+
 test("product flow fingerprints ignore organization refresh timestamps but keep business changes", async () => {
   const module = await import("../src/state/productFlowStateFingerprint.js").catch(() => ({}));
   assert.equal(typeof module.productFlowStateFingerprint, "function");
