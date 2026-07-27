@@ -44,3 +44,29 @@ test("Douyin restores only pre-authenticated Chrome official-report collection",
   assert.equal(douyin.apiRoutes.includes("/api/platform/v1/commerce-facts/ingest"), true);
   assert.equal(douyin.evidence.includes("docs/decisions/2026-07-24-douyin-preauthenticated-chrome-collection.md"), true);
 });
+
+test("ADR directory is not a provider code path", () => {
+  const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+  // docs/decisions/** 曾挂在 aliyun 名下，使每个 ADR 都被强制声明 Integration-Impact: aliyun。
+  // 决策记录是跨领域文档，不属于任何 Provider 的代码路径。
+  for (const platform of registry.platforms) {
+    assert.equal(
+      platform.codePaths.some(path => path === "docs/decisions/**" || path.startsWith("docs/decisions/")),
+      false,
+      `${platform.id} 不应把 docs/decisions 登记为代码路径`
+    );
+  }
+});
+
+test("durable rule declarations accept every source of truth named in AGENTS.md", async () => {
+  const { checkRuleWriteback } = await import("../scripts/integration-registry.mjs");
+  const body = paths => `Rule-Writeback: ${paths}\nRule-Writeback-Reason: 同步持久规则`;
+
+  for (const path of ["AGENTS.md", "DESIGN.md", "PRODUCT.md", "docs/product/x.md", "docs/platform/y.md", "docs/decisions/z.md"]) {
+    const { errors } = checkRuleWriteback({ paths: [path], body: body(path) });
+    assert.deepEqual(errors, [], `${path} 应被接受为长期规则文件`);
+  }
+  // 普通实现文件仍然不能充当规则反写目标
+  const rejected = checkRuleWriteback({ paths: ["src/styles.css"], body: body("src/styles.css") });
+  assert.equal(rejected.errors.some(error => error.includes("只能声明长期规则文件")), true);
+});

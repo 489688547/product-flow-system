@@ -769,8 +769,7 @@ const integrationRegistry = {
         "开放平台"
       ],
       "codePaths": [
-        "docs/platform/integrations.md",
-        "docs/decisions/**"
+        "docs/platform/integrations.md"
       ],
       "envVars": [],
       "domains": [

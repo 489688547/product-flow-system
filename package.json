@@ -16,6 +16,7 @@
     "configure:pages-environment-parity": "node scripts/configure-pages-environment-parity.mjs",
     "configure:demo-data-environment": "node scripts/configure-demo-data-environment.mjs",
     "check:integrations": "node --test tests/integration-registry.test.mjs && node scripts/check-integration-impact.mjs",
+    "check:pr": "node scripts/check-integration-impact.mjs --preflight",
     "generate:platform-manifests": "node scripts/generate-platform-manifests.mjs",
     "check:environment-capabilities": "node scripts/generate-platform-manifests.mjs --check",
     "collect:user-insights": "node scripts/user-insights-collector/index.mjs",
