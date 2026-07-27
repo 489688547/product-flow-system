@@ -1,13 +1,9 @@
 import {
-  createDingPersonalTodoTask,
   getDingAccessToken,
   jsonResponse,
   optionsResponse,
-  syncDingTodoTask,
-  updateDingPersonalTodoTask,
-  updateDingTodoTask
+  syncDingTodoTask
 } from "../_shared/dingtalk.js";
-import { getValidDingUserToken } from "../../auth/_shared/ding-user-token.js";
 import { readCompanyState, writeCompanyState } from "../../state.js";
 import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 import { shouldSimulateExternalAction } from "../../platform/_shared/externalActionMode.js";
@@ -209,28 +205,33 @@ export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {
   if (!product || !task) throw requestError("待同步的产品任务不存在。", 404);
 
   const requestedTodoId = String(input.todoId || "").trim();
-  const storedTodoId = isTaskTodoSourceForTask(task.dingTodo?.sourceId, sourceId)
-    ? String(task.dingTodo?.id || "").trim()
-    : "";
-  if (requestedTodoId && requestedTodoId !== storedTodoId) {
+  const recordedTodoId = String(task.dingTodo?.id || "").trim();
+  const storedTodoSource = String(task.dingTodo?.source || "");
+  const recordedWorkTodoRequested = requestedTodoId
+    && requestedTodoId === recordedTodoId
+    && storedTodoSource.startsWith("todo_open_");
+  const storedTodoId = (
+    isTaskTodoSourceForTask(task.dingTodo?.sourceId, sourceId)
+    || recordedWorkTodoRequested
+  ) ? recordedTodoId : "";
+  if (requestedTodoId && requestedTodoId !== recordedTodoId) {
     throw requestError("待办 ID 与产品任务记录不一致。", 403);
   }
-  const storedTodoSource = String(task.dingTodo?.source || "");
   const storedCreatorUnionId = String(task.dingTodo?.creatorUnionId || "").trim();
   const storedExecutorUnionIds = Array.isArray(task.dingTodo?.executorUnionIds)
     ? task.dingTodo.executorUnionIds.map(value => String(value || "").trim())
     : [];
   const productManagerUnionId = String(product.productManagerUnionId || "").trim();
-  const canReplaceOwnerlessPersonalTodo = storedTodoId
+  const canReplacePersonalTodo = storedTodoId
     && storedTodoSource === "todo_personal_user"
-    && !storedCreatorUnionId
-    && (productManagerUnionId === creatorUnionId || storedExecutorUnionIds.includes(creatorUnionId));
+    && (
+      storedCreatorUnionId === creatorUnionId
+      || productManagerUnionId === creatorUnionId
+      || storedExecutorUnionIds.includes(creatorUnionId)
+    );
   if (storedTodoId && storedTodoSource === "todo_personal_user") {
-    if (!storedCreatorUnionId && !canReplaceOwnerlessPersonalTodo) {
-      throw requestError("该个人待办缺少创建人标识，请由产品负责人或原执行人重新同步。", 409);
-    }
-    if (storedCreatorUnionId && storedCreatorUnionId !== creatorUnionId) {
-      throw requestError("只有该个人待办的创建人可以更新。", 403);
+    if (!canReplacePersonalTodo) {
+      throw requestError("该个人待办无法反向查询，请由产品负责人、原创建人或执行人重新同步为工作待办。", 403);
     }
   }
   const {
@@ -248,12 +249,12 @@ export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {
   void ignoredTodoId;
   return {
     ...safeInput,
-    sourceId: canReplaceOwnerlessPersonalTodo
+    sourceId: canReplacePersonalTodo
       ? nextRecoverySourceId(sourceId, task.dingTodo?.sourceId)
       : sourceId,
-    todoId: canReplaceOwnerlessPersonalTodo ? "" : storedTodoId,
-    todoSource: canReplaceOwnerlessPersonalTodo ? "" : storedTodoSource,
-    replacementOfTodoId: canReplaceOwnerlessPersonalTodo ? storedTodoId : "",
+    todoId: canReplacePersonalTodo ? "" : storedTodoId,
+    todoSource: canReplacePersonalTodo ? "" : storedTodoSource,
+    replacementOfTodoId: canReplacePersonalTodo ? storedTodoId : "",
     creatorUnionId,
     recoveryUnionIds: productManagerUnionId && productManagerUnionId !== creatorUnionId
       ? [productManagerUnionId]
@@ -285,29 +286,7 @@ export async function onRequest({ request, env, data = {} }) {
       });
       return jsonResponse({ synced: true, todo, task: saved.task, version: saved.version, updatedAt: saved.updatedAt });
     }
-    let todo;
-    if (!authorizedBody.todoId) {
-      todo = await createDingPersonalTodoTask(
-        await getValidDingUserToken(request, env),
-        authorizedBody
-      );
-    } else if (authorizedBody.todoSource === "todo_personal_user") {
-      const personal = await updateDingPersonalTodoTask(
-        await getValidDingUserToken(request, env),
-        authorizedBody
-      );
-      try {
-        const updated = await updateDingTodoTask(await getDingAccessToken(env), authorizedBody);
-        todo = { ...updated, ...personal };
-      } catch {
-        todo = {
-          ...personal,
-          syncWarning: "钉钉个人待办已更新，但正文或执行人同步未完成，请稍后重试。"
-        };
-      }
-    } else {
-      todo = await syncDingTodoTask(await getDingAccessToken(env), authorizedBody);
-    }
+    const todo = await syncDingTodoTask(await getDingAccessToken(env), authorizedBody);
     const saved = await persistTaskTodoSyncResult({
       db,
       sourceId: body.sourceId,
