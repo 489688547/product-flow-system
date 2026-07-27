@@ -242,7 +242,6 @@ test("todo sync authorization reuses a recorded work todo id when only the recov
 
   const authorized = authorizeTaskTodoSyncRequest({
     sourceId: "task:p1:t1",
-    todoId: "stale-work-id",
     executorUnionIds: ["creator-union"]
   }, { unionId: "creator-union", role: "product" }, state);
 

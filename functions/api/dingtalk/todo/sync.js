@@ -180,10 +180,10 @@ export async function persistTaskTodoSyncResult({
 function isTaskTodoSourceForTask(value, sourceId) {
   const actual = String(value || "").trim();
   if (actual === sourceId) return true;
-  const recoverySuffix = actual.startsWith(`${sourceId}:r`)
-    ? actual.slice(sourceId.length + 2)
+  const recoverySuffix = actual.startsWith(`${sourceId}:`)
+    ? actual.slice(sourceId.length)
     : "";
-  return /^\d+$/.test(recoverySuffix);
+  return /^(?::r\d+)+$/.test(recoverySuffix);
 }
 
 function nextRecoverySourceId(sourceId, storedSourceId) {
