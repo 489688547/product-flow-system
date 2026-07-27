@@ -207,9 +207,14 @@ const SHARED_BOUNDARY_PATHS = [
   /^docs\/platform\/error-codes\.md$/
 ];
 
+// 与 AGENTS.md「Source of truth」一节保持一致：PRODUCT.md 与 docs/product/ 承载产品意图，
+// DESIGN.md 承载持久界面规则，三者同样是可声明的长期规则文件。
 function isDurableRulePath(path) {
   return path === "AGENTS.md"
+    || path === "DESIGN.md"
+    || path === "PRODUCT.md"
     || path.startsWith(".agents/skills/")
+    || path.startsWith("docs/product/")
     || path.startsWith("docs/platform/")
     || path.startsWith("docs/decisions/");
 }
