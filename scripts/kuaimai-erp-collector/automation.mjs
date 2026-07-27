@@ -3,6 +3,7 @@ import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { readCollectorGitLayout, resolveStableCollectorPath } from "../lib/collectorLaunchAgent.mjs";
 
 export const KEYCHAIN_SERVICE = "com.company.kuaimai-erp-collector";
 export const LAUNCH_AGENT_LABEL = "com.company.kuaimai-erp-collector";
@@ -64,6 +65,8 @@ export async function readCollectorToken({
 export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl }) {
   const argumentsList = [nodePath, collectorPath, "scan", "--root", root, "--base-url", baseUrl]
     .map(value => `      <string>${xml(value)}</string>`).join("\n");
+  // 没有日志时，常驻任务失败只在 launchctl 留下一个退出码，无法定位原因。
+  const logPath = path.join(root, "处理报告", `${LAUNCH_AGENT_LABEL}.log`);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -80,6 +83,10 @@ ${argumentsList}
     <true/>
     <key>ProcessType</key>
     <string>Background</string>
+    <key>StandardOutPath</key>
+    <string>${xml(logPath)}</string>
+    <key>StandardErrorPath</key>
+    <string>${xml(logPath)}</string>
   </dict>
 </plist>
 `;
@@ -93,11 +100,23 @@ export async function installLaunchAgent({
   home = os.homedir(),
   command = systemCommand
 }) {
+  // 从 Git worktree 安装会把临时路径写死进 plist，worktree 删除后常驻任务静默失效。
+  const { worktreeRoot, gitCommonDir } = await readCollectorGitLayout(command, collectorPath);
+  const stableCollectorPath = resolveStableCollectorPath({
+    collectorPath,
+    worktreeRoot,
+    gitCommonDir,
+    errorCode: "KUAIMAI_COLLECTOR_ENTRYPOINT_OUTSIDE_REPOSITORY"
+  });
   const agentsDirectory = path.join(home, "Library", "LaunchAgents");
   const plistPath = path.join(agentsDirectory, `${LAUNCH_AGENT_LABEL}.plist`);
   await mkdir(agentsDirectory, { recursive: true, mode: 0o700 });
   const temporaryPath = `${plistPath}.tmp`;
-  await writeFile(temporaryPath, collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl }), { mode: 0o600 });
+  await writeFile(
+    temporaryPath,
+    collectorLaunchAgentPlist({ nodePath, collectorPath: stableCollectorPath, root, baseUrl }),
+    { mode: 0o600 }
+  );
   await rename(temporaryPath, plistPath);
   await chmod(plistPath, 0o600);
   await command("/bin/launchctl", ["bootout", `gui/${process.getuid()}`, plistPath]).catch(() => {});

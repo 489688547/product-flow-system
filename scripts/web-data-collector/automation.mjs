@@ -3,6 +3,10 @@ import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  readCollectorGitLayout,
+  resolveStableCollectorPath as resolveStableEntrypoint
+} from "../lib/collectorLaunchAgent.mjs";
 
 export const EXTENSION_ID = "hdmcandfaiolchakodkabdjjhfiojmae";
 export const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`;
@@ -69,6 +73,8 @@ export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseU
     safeBrowserMode
   ]
     .map(value => `      <string>${xml(value)}</string>`).join("\n");
+  // 没有日志时，常驻任务失败只在 launchctl 留下一个退出码，无法定位原因。
+  const logPath = path.join(root, "处理报告", `${LAUNCH_AGENT_LABEL}.log`);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -85,23 +91,22 @@ ${argumentsList}
     <true/>
     <key>ProcessType</key>
     <string>Background</string>
+    <key>StandardOutPath</key>
+    <string>${xml(logPath)}</string>
+    <key>StandardErrorPath</key>
+    <string>${xml(logPath)}</string>
   </dict>
 </plist>
 `;
 }
 
 export function resolveStableCollectorPath({ collectorPath, worktreeRoot, gitCommonDir }) {
-  const checkoutRoot = path.resolve(String(worktreeRoot || ""));
-  const entrypoint = path.resolve(String(collectorPath || ""));
-  const relativeEntrypoint = path.relative(checkoutRoot, entrypoint);
-  if (!relativeEntrypoint || relativeEntrypoint.startsWith("..") || path.isAbsolute(relativeEntrypoint)) {
-    throw Object.assign(new Error("网页采集入口不在当前 Git 工作区内。"), { code: "WEB_COLLECTION_ENTRYPOINT_OUTSIDE_REPOSITORY" });
-  }
-  const resolvedCommonDir = path.resolve(checkoutRoot, String(gitCommonDir || ""));
-  const repositoryRoot = path.basename(resolvedCommonDir) === ".git"
-    ? path.dirname(resolvedCommonDir)
-    : checkoutRoot;
-  return path.join(repositoryRoot, relativeEntrypoint);
+  return resolveStableEntrypoint({
+    collectorPath,
+    worktreeRoot,
+    gitCommonDir,
+    errorCode: "WEB_COLLECTION_ENTRYPOINT_OUTSIDE_REPOSITORY"
+  });
 }
 
 export async function installLaunchAgent({
@@ -113,15 +118,7 @@ export async function installLaunchAgent({
   home = os.homedir(),
   command = systemCommand
 }) {
-  const git = await command("/usr/bin/git", [
-    "-C",
-    path.dirname(collectorPath),
-    "rev-parse",
-    "--path-format=absolute",
-    "--show-toplevel",
-    "--git-common-dir"
-  ]);
-  const [worktreeRoot, gitCommonDir] = String(git.stdout || "").trim().split(/\r?\n/);
+  const { worktreeRoot, gitCommonDir } = await readCollectorGitLayout(command, collectorPath);
   const stableCollectorPath = resolveStableCollectorPath({ collectorPath, worktreeRoot, gitCommonDir });
   const directory = path.join(home, "Library", "LaunchAgents");
   const plistPath = path.join(directory, `${LAUNCH_AGENT_LABEL}.plist`);
