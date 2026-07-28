@@ -1,11 +1,9 @@
 import {
   getDingAccessToken,
   jsonResponse,
-  listDingPersonalTodoTasks,
-  listDingTodoTasks,
+  listDingUserTodoTasks,
   optionsResponse
 } from "../_shared/dingtalk.js";
-import { getValidDingUserToken } from "../../auth/_shared/ding-user-token.js";
 
 function safeLaneWarning(source, error) {
   const status = Number(error?.status) || 500;
@@ -30,7 +28,14 @@ export async function collectDingTodoCards({
 } = {}) {
   const warnings = [];
   const coverage = {
-    personal: { authorized: Boolean(personalAuthorized), ok: false, truncated: false, nextPage: 1 },
+    personal: {
+      authorized: Boolean(personalAuthorized),
+      ok: false,
+      truncated: false,
+      nextPage: 1,
+      pendingNextToken: "",
+      completedNextToken: ""
+    },
     work: { ok: false, truncated: false, pendingNextToken: "", completedNextToken: "" }
   };
   let personal = [];
@@ -43,6 +48,8 @@ export async function collectDingTodoCards({
       coverage.personal.ok = true;
       coverage.personal.truncated = Boolean(result?.truncated);
       coverage.personal.nextPage = Number(result?.nextPage) || 1;
+      coverage.personal.pendingNextToken = String(result?.pendingNextToken || "");
+      coverage.personal.completedNextToken = String(result?.completedNextToken || "");
       if (coverage.personal.truncated) {
         warnings.push({
           source: "personal",
@@ -108,77 +115,16 @@ export async function onRequest({ request, env, data = {} }) {
   const workPendingToken = safeCursor("workPendingToken");
   const workCompletedToken = safeCursor("workCompletedToken");
 
-  let userAccessToken = "";
-  let personalAuthorized = true;
-  try {
-    userAccessToken = await getValidDingUserToken(request, env);
-  } catch (error) {
-    if (![401, 428].includes(error.status)) {
-      const warning = safeLaneWarning("personal", error);
-      const result = await collectDingTodoCards({
-        loadWork: async () => {
-          const accessToken = await getDingAccessToken(env);
-          const pending = await listDingTodoTasks(accessToken, unionId, {
-            isDone: false,
-            maxPages: 1,
-            nextToken: workPendingToken
-          });
-          const completed = await listDingTodoTasks(accessToken, unionId, {
-            isDone: true,
-            maxPages: 1,
-            nextToken: workCompletedToken
-          });
-          return {
-            cards: [...pending, ...completed],
-            truncated: pending.truncated || completed.truncated,
-            pendingNextToken: pending.nextToken,
-            completedNextToken: completed.nextToken
-          };
-        }
-      });
-      return jsonResponse({
-        synced: true,
-        personalTodoAuthorized: true,
-        todos: result.todos,
-        warnings: [warning, ...result.warnings],
-        coverage: result.coverage,
-        nextCursor: {
-          personalPage,
-          workPendingToken: result.coverage.work.pendingNextToken,
-          workCompletedToken: result.coverage.work.completedNextToken
-        }
-      });
-    }
-    personalAuthorized = false;
-  }
-
   const result = await collectDingTodoCards({
-    personalAuthorized,
-    loadPersonal: userAccessToken ? async () => {
-      const pending = await listDingPersonalTodoTasks(userAccessToken, {
-        isDone: false,
-        maxPages: 1,
-        startPage: personalPage
-      });
-      const completed = await listDingPersonalTodoTasks(userAccessToken, {
-        isDone: true,
-        maxPages: 1,
-        startPage: personalPage
-      });
-      return {
-        cards: [...pending, ...completed],
-        truncated: pending.truncated || completed.truncated,
-        nextPage: Math.max(pending.nextPage, completed.nextPage)
-      };
-    } : undefined,
-    loadWork: async () => {
+    personalAuthorized: true,
+    loadPersonal: async () => {
       const accessToken = await getDingAccessToken(env);
-      const pending = await listDingTodoTasks(accessToken, unionId, {
+      const pending = await listDingUserTodoTasks(accessToken, unionId, {
         isDone: false,
         maxPages: 1,
         nextToken: workPendingToken
       });
-      const completed = await listDingTodoTasks(accessToken, unionId, {
+      const completed = await listDingUserTodoTasks(accessToken, unionId, {
         isDone: true,
         maxPages: 1,
         nextToken: workCompletedToken
@@ -186,22 +132,31 @@ export async function onRequest({ request, env, data = {} }) {
       return {
         cards: [...pending, ...completed],
         truncated: pending.truncated || completed.truncated,
+        nextPage: personalPage,
         pendingNextToken: pending.nextToken,
         completedNextToken: completed.nextToken
       };
     }
   });
+  if (!result.coverage.personal.ok) {
+    return jsonResponse({
+      synced: false,
+      code: "DINGTALK_TODO_LIST_UNAVAILABLE",
+      message: "钉钉待办状态暂时无法读取，请稍后重试。",
+      retryable: true
+    }, 502);
+  }
 
   return jsonResponse({
     synced: true,
-    personalTodoAuthorized: personalAuthorized,
+    personalTodoAuthorized: true,
     todos: result.todos,
     warnings: result.warnings,
     coverage: result.coverage,
     nextCursor: {
       personalPage: result.coverage.personal.nextPage,
-      workPendingToken: result.coverage.work.pendingNextToken,
-      workCompletedToken: result.coverage.work.completedNextToken
+      workPendingToken: result.coverage.personal.pendingNextToken,
+      workCompletedToken: result.coverage.personal.completedNextToken
     }
   });
 }
