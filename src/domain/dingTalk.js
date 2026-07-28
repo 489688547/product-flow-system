@@ -1,6 +1,7 @@
 import { buildTaskTodoSnapshot, normalizeTaskDueDate } from "./taskTodo.js";
 
 const TODO_PRIORITIES = new Set([10, 20, 30, 40]);
+export const DING_TODO_ACTION_VERSION = 1;
 
 function isTaskTodoSourceForTask(value, sourceId) {
   const actual = String(value || "").trim();
@@ -210,6 +211,7 @@ export function buildTaskTodoPayload({ product, task, creator, executors = [], r
     detailUrl: String(detailUrl || ""),
     dueTime,
     draft: { ...composer, dueDate: due },
+    actionVersion: DING_TODO_ACTION_VERSION,
     done: Boolean(task.done)
   };
 }

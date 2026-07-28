@@ -709,6 +709,11 @@ export function buildDingTodoPayload({
   dueTime = 0,
   priority = 20
 } = {}) {
+  const completionUrl = new URL(String(detailUrl || ""), "https://product-flow.invalid");
+  completionUrl.searchParams.set("todoAction", "complete");
+  const completionUrlValue = completionUrl.origin === "https://product-flow.invalid"
+    ? `${completionUrl.pathname}${completionUrl.search}${completionUrl.hash}`
+    : completionUrl.toString();
   return {
     sourceId: String(sourceId || ""),
     subject: String(subject || "").slice(0, 1024),
@@ -720,6 +725,13 @@ export function buildDingTodoPayload({
       appUrl: String(detailUrl || ""),
       pcUrl: String(detailUrl || "")
     },
+    actionList: [{
+      actionKey: "complete_product_task",
+      actionType: 2,
+      title: "完成任务",
+      url: completionUrlValue,
+      pcUrl: completionUrlValue
+    }],
     dueTime: Number(dueTime) || 0,
     isOnlyShowExecutor: true,
     priority
@@ -888,6 +900,40 @@ export async function findDingTodoBySourceId(accessToken, unionId, sourceId, fet
   return null;
 }
 
+async function retireReplacedWorkTodo(accessToken, input, result, fetchImpl) {
+  const replacementOfTodoId = String(input.replacementOfTodoId || "").trim();
+  const replacementTodoSource = String(input.replacementTodoSource || "");
+  if (!replacementOfTodoId || !replacementTodoSource.startsWith("todo_open_")) return result;
+  const replacementCreatorUnionId = String(
+    input.replacementCreatorUnionId || input.creatorUnionId || ""
+  ).trim();
+  const replacementExecutorUnionIds = Array.isArray(input.replacementExecutorUnionIds)
+    ? input.replacementExecutorUnionIds
+    : input.executorUnionIds;
+  const retireInput = {
+    ...input,
+    todoId: replacementOfTodoId,
+    resourceUnionId: replacementCreatorUnionId,
+    operatorUnionId: replacementCreatorUnionId,
+    executorUnionIds: replacementExecutorUnionIds,
+    done: true
+  };
+  try {
+    await updateDingTodoTaskExecutorStatus(accessToken, retireInput, fetchImpl);
+    await updateDingTodoTask(accessToken, retireInput, fetchImpl);
+  } catch {
+    const error = new Error("新版钉钉待办已创建，但旧待办未能退出未完成列表，请重试。");
+    error.status = 502;
+    error.code = "DINGTALK_TODO_REPLACEMENT_RETIRE_FAILED";
+    throw error;
+  }
+  return {
+    ...result,
+    replacedTodoId: replacementOfTodoId,
+    replacementRetired: true
+  };
+}
+
 export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetch) {
   if (!Number(input.dueTime)) {
     const err = new Error("请先设置任务截止日期，再同步到钉钉待办。");
@@ -897,10 +943,20 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
   if (input.todoId) {
     const status = await updateDingTodoTaskExecutorStatus(accessToken, input, fetchImpl);
     const updated = await updateDingTodoTask(accessToken, input, fetchImpl);
-    return { ...updated, ...status, updated: true };
+    return {
+      ...updated,
+      ...status,
+      actionVersion: Number(input.actionVersion) || 0,
+      updated: true
+    };
   }
   try {
-    return await createDingTodoTask(accessToken, input, fetchImpl);
+    const created = await createDingTodoTask(accessToken, input, fetchImpl);
+    const result = {
+      ...created,
+      actionVersion: Number(input.actionVersion) || 0
+    };
+    return retireReplacedWorkTodo(accessToken, input, result, fetchImpl);
   } catch (error) {
     if (!isDuplicateTodoSourceError(error)) throw error;
     const recoveryUnionIds = [...new Set([
@@ -924,12 +980,14 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
           ...input,
           sourceId: replacementSourceId
         }, fetchImpl);
-        return {
+        const result = {
           ...replacement,
           sourceId: replacementSourceId,
+          actionVersion: Number(input.actionVersion) || 0,
           recovered: true,
           replacedOrphanedSource: true
         };
+        return retireReplacedWorkTodo(accessToken, input, result, fetchImpl);
       } catch (replacementError) {
         if (!isDuplicateTodoSourceError(replacementError)) throw replacementError;
         existing = await findAcrossRecoveryUsers(replacementSourceId);
@@ -946,7 +1004,14 @@ export async function syncDingTodoTask(accessToken, input = {}, fetchImpl = fetc
     };
     const status = await updateDingTodoTaskExecutorStatus(accessToken, updateInput, fetchImpl);
     const updated = await updateDingTodoTask(accessToken, updateInput, fetchImpl);
-    return { ...updated, ...status, updated: true, recovered: true };
+    const result = {
+      ...updated,
+      ...status,
+      actionVersion: Number(input.actionVersion) || 0,
+      updated: true,
+      recovered: true
+    };
+    return retireReplacedWorkTodo(accessToken, input, result, fetchImpl);
   }
 }
 

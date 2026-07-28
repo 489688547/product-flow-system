@@ -40,6 +40,7 @@ export function simulateDingTodo(input = {}) {
     id,
     taskId: id,
     sourceId: String(input.sourceId || ""),
+    actionVersion: Number(input.actionVersion) || 0,
     updated: Boolean(input.todoId),
     simulated: true
   };

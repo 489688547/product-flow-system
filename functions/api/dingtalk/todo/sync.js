@@ -27,6 +27,17 @@ function requestError(message, status) {
 
 export function safeDingTalkError(error, fallback) {
   const status = Number(error?.status) || 500;
+  if (error?.code === "DINGTALK_TODO_REPLACEMENT_RETIRE_FAILED") {
+    return {
+      status: 502,
+      body: {
+        synced: false,
+        code: "DINGTALK_TODO_REPLACEMENT_RETIRE_FAILED",
+        message: "新版待办已创建，但旧待办尚未退出未完成列表，请重试。",
+        retryable: true
+      }
+    };
+  }
   if (error?.code === "DINGTALK_TODO_BINDING_CONFLICT") {
     return {
       status: 409,
@@ -229,10 +240,25 @@ export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {
       || productManagerUnionId === creatorUnionId
       || storedExecutorUnionIds.includes(creatorUnionId)
     );
+  const requestedActionVersion = Math.max(0, Number(input.actionVersion) || 0);
+  const storedActionVersion = Math.max(0, Number(task.dingTodo?.actionVersion) || 0);
+  const requiresWorkTodoActionUpgrade = Boolean(
+    storedTodoId
+    && storedTodoSource.startsWith("todo_open_")
+    && requestedActionVersion > storedActionVersion
+  );
+  const canReplaceWorkTodo = requiresWorkTodoActionUpgrade && (
+    storedCreatorUnionId === creatorUnionId
+    || productManagerUnionId === creatorUnionId
+    || storedExecutorUnionIds.includes(creatorUnionId)
+  );
   if (storedTodoId && storedTodoSource === "todo_personal_user") {
     if (!canReplacePersonalTodo) {
       throw requestError("该个人待办无法反向查询，请由产品负责人、原创建人或执行人重新同步为工作待办。", 403);
     }
+  }
+  if (requiresWorkTodoActionUpgrade && !canReplaceWorkTodo) {
+    throw requestError("该工作待办需要由产品负责人、原创建人或执行人升级完成入口。", 403);
   }
   const {
     creatorUnionId: ignoredCreator,
@@ -249,12 +275,19 @@ export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {
   void ignoredTodoId;
   return {
     ...safeInput,
-    sourceId: canReplacePersonalTodo
+    sourceId: canReplacePersonalTodo || canReplaceWorkTodo
       ? nextRecoverySourceId(sourceId, task.dingTodo?.sourceId)
       : sourceId,
-    todoId: canReplacePersonalTodo ? "" : storedTodoId,
-    todoSource: canReplacePersonalTodo ? "" : storedTodoSource,
-    replacementOfTodoId: canReplacePersonalTodo ? storedTodoId : "",
+    todoId: canReplacePersonalTodo || canReplaceWorkTodo ? "" : storedTodoId,
+    todoSource: canReplacePersonalTodo || canReplaceWorkTodo ? "" : storedTodoSource,
+    replacementOfTodoId: canReplacePersonalTodo || canReplaceWorkTodo ? storedTodoId : "",
+    replacementTodoSource: canReplaceWorkTodo ? storedTodoSource : "",
+    replacementCreatorUnionId: canReplaceWorkTodo
+      ? storedCreatorUnionId || creatorUnionId
+      : "",
+    replacementExecutorUnionIds: canReplaceWorkTodo
+      ? storedExecutorUnionIds
+      : [],
     creatorUnionId,
     recoveryUnionIds: productManagerUnionId && productManagerUnionId !== creatorUnionId
       ? [productManagerUnionId]

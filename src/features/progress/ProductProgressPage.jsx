@@ -1,4 +1,4 @@
-import { CalendarCheck2, CalendarPlus, Flag, GripVertical, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
+import { CalendarCheck2, CalendarPlus, CheckCircle2, Flag, GripVertical, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   deliverablesForTask,
@@ -18,12 +18,12 @@ import { DeliverablePreviewModal } from "../../ui/DeliverablePreviewModal.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { ProductPicker } from "../../ui/ProductPicker.jsx";
-import { buildTaskMeetingPayload, buildTaskTodoPayload } from "../../domain/dingTalk.js";
+import { buildTaskMeetingPayload, buildTaskTodoPayload, createTodoComposerDraft } from "../../domain/dingTalk.js";
 import { buildProductScheduleSummary } from "../../domain/dashboardSummary.js";
 import { formatExpectedLaunchMonth } from "../../domain/expectedLaunch.js";
 import { buildProductGmvProgress, normalizeMonthlyGmvTarget } from "../../domain/productGmv.js";
 import { preferredProgressProductId, productManagerAssignment } from "../../domain/productOwnership.js";
-import { buildTaskTodoSnapshot, todoSyncStatus } from "../../domain/taskTodo.js";
+import { buildTaskTodoSnapshot, parseTaskTodoDeepLink, todoSyncStatus } from "../../domain/taskTodo.js";
 import { MeetingScheduleModal } from "./MeetingScheduleModal.jsx";
 import { ProductGradingModal } from "./ProductGradingModal.jsx";
 import { ProductScheduleSummary } from "./ProductScheduleSummary.jsx";
@@ -59,8 +59,14 @@ function validProgressStage(stage) {
   return Math.min(STAGES.length - 1, Math.max(1, Number(stage) || 1));
 }
 
+function taskRowId(taskId) {
+  return `product-task-${String(taskId || "").replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
 export function ProductProgressPage({ focusStage, onNavigate }) {
   const { state, loading, currentUser, orgCache, setCurrentProduct, setProductStage, updateProduct, gradeProduct, addTask, reorderTasks, updateTask, deleteTask, addDeliverable, updateDeliverable, deleteDeliverable, syncTaskTodo, scheduleTaskMeeting, returnProductToDemand } = useProductFlow();
+  const deepLinkFocus = parseTaskTodoDeepLink(window.location.href);
+  const activeFocus = deepLinkFocus ? { ...focusStage, ...deepLinkFocus } : focusStage;
   const selectionInitialized = useRef(false);
   const lastFocusTick = useRef(0);
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -79,34 +85,60 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
   const [stageChangeConfirmOpen, setStageChangeConfirmOpen] = useState(false);
+  const [completingFocusedTask, setCompletingFocusedTask] = useState(false);
+  const [completionFeedback, setCompletionFeedback] = useState("");
+  const focusedTask = useMemo(() => (
+    activeFocus?.taskId
+      ? state.tasks.find(task => (
+        String(task.id) === String(activeFocus.taskId)
+        && String(task.productId) === String(activeFocus.productId)
+      )) || null
+      : null
+  ), [activeFocus?.productId, activeFocus?.taskId, state.tasks]);
 
   useEffect(() => {
     if (loading) return;
-    const hasExplicitFocus = Boolean(focusStage?.productId && lastFocusTick.current !== focusStage.tick);
+    const hasExplicitFocus = Boolean(activeFocus?.productId && lastFocusTick.current !== activeFocus.tick);
     const selectionMissing = !state.products.some(product => product.id === selectedProductId);
     if (!selectionInitialized.current || hasExplicitFocus || selectionMissing) {
-      const explicitProductId = hasExplicitFocus ? focusStage.productId : "";
+      const explicitProductId = hasExplicitFocus ? activeFocus.productId : "";
       const preferredId = preferredProgressProductId(state.products, currentUser, explicitProductId);
       setSelectedProductId(preferredId);
       selectionInitialized.current = true;
-      if (hasExplicitFocus) lastFocusTick.current = focusStage.tick;
+      if (hasExplicitFocus) lastFocusTick.current = activeFocus.tick;
     }
-  }, [currentUser, focusStage?.productId, focusStage?.tick, loading, selectedProductId, state.products]);
+  }, [activeFocus?.productId, activeFocus?.tick, currentUser, loading, selectedProductId, state.products]);
 
   useEffect(() => {
     if (!selectedProduct) return;
-    if (focusStage?.productId === selectedProduct.id && Number.isInteger(focusStage.stage)) {
-      setSelectedStage(validProgressStage(focusStage.stage));
+    const explicitStage = Number.isInteger(activeFocus?.stage)
+      ? activeFocus.stage
+      : focusedTask?.stage;
+    if (activeFocus?.productId === selectedProduct.id && explicitStage) {
+      setSelectedStage(validProgressStage(explicitStage));
       return;
     }
     setSelectedStage(validProgressStage(selectedProduct.stage));
-  }, [focusStage, selectedProduct?.id, selectedProduct?.stage]);
+  }, [activeFocus?.productId, activeFocus?.stage, focusedTask?.stage, selectedProduct?.id, selectedProduct?.stage]);
 
   useEffect(() => {
     setMonthlyGmvDraft(selectedProduct?.monthlyGmvTarget ? String(selectedProduct.monthlyGmvTarget) : "");
   }, [selectedProduct?.id, selectedProduct?.monthlyGmvTarget]);
 
   const tasks = useMemo(() => tasksForProductStage(state, selectedProduct, selectedStage), [state, selectedProduct, selectedStage]);
+  useEffect(() => {
+    if (!focusedTask || focusedTask.stage !== selectedStage) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(taskRowId(focusedTask.id))?.scrollIntoView({
+        block: "center",
+        behavior: "smooth"
+      });
+      if (activeFocus?.action === "complete" && !focusedTask.done) {
+        document.getElementById("dingtalk-todo-complete-action")?.focus();
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeFocus?.action, focusedTask, selectedStage]);
   const productSchedule = selectedProduct
     ? buildProductScheduleSummary(selectedProduct, state.productPlans, state.demands, new Date(), state.tasks).schedule
     : { state: "unplanned", percent: null, launchDate: "" };
@@ -124,6 +156,49 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     const nextTarget = normalizeMonthlyGmvTarget(monthlyGmvDraft);
     setMonthlyGmvDraft(nextTarget ? String(nextTarget) : "");
     if (nextTarget !== monthlyGmvTarget) updateProduct(selectedProduct.id, { monthlyGmvTarget: nextTarget });
+  };
+  const syncFocusedTaskCompletion = async () => {
+    if (!focusedTask || focusedTask.done || completingFocusedTask) return;
+    setCompletionFeedback("");
+    setCompletingFocusedTask(true);
+    try {
+      const executorIds = [...new Set(
+        (focusedTask.dingTodo?.executorUnionIds || [])
+          .map(value => String(value || "").trim())
+          .filter(Boolean)
+      )];
+      const usersByUnionId = new Map(orgUsers(orgCache).map(user => [
+        String(user.unionid || user.unionId || "").trim(),
+        user
+      ]));
+      const executors = executorIds.map(unionId => (
+        usersByUnionId.get(unionId) || { unionid: unionId, name: "钉钉执行人" }
+      ));
+      const draft = createTodoComposerDraft({ product: selectedProduct, task: focusedTask });
+      const effectiveTask = { ...focusedTask, due: draft.dueDate, done: true };
+      const detailUrl = new URL(window.location.href);
+      detailUrl.searchParams.set("productId", selectedProduct.id);
+      detailUrl.searchParams.set("taskId", focusedTask.id);
+      detailUrl.searchParams.delete("todoAction");
+      detailUrl.hash = "progress";
+      const recoveryUsers = orgUsers(orgCache).filter(user => user.name === selectedProduct.productManager);
+      const payload = buildTaskTodoPayload({
+        product: selectedProduct,
+        task: effectiveTask,
+        creator: currentUser,
+        executors,
+        recoveryUsers,
+        detailUrl: detailUrl.toString(),
+        draft
+      });
+      const snapshot = buildTaskTodoSnapshot(effectiveTask, payload.executorUnionIds, payload.draft);
+      await syncTaskTodo({ taskId: focusedTask.id, payload, executors, snapshot });
+      setCompletionFeedback("任务和钉钉待办均已完成。");
+    } catch (error) {
+      setCompletionFeedback(error?.message || "完成待办失败，请重试。");
+    } finally {
+      setCompletingFocusedTask(false);
+    }
   };
   const handleAddTask = () => {
     addTask({
@@ -160,7 +235,11 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     setDraggedTaskId("");
   };
   const getTaskRowProps = task => ({
-    className: draggedTaskId === task.id ? "task-row-dragging" : "",
+    id: taskRowId(task.id),
+    className: [
+      draggedTaskId === task.id ? "task-row-dragging" : "",
+      focusedTask?.id === task.id ? "task-row-focused" : ""
+    ].filter(Boolean).join(" "),
     onDragOver: event => {
       if (!draggedTaskId || draggedTaskId === task.id) return;
       event.preventDefault();
@@ -249,6 +328,29 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           </div>
         )}
       />
+      {activeFocus?.action === "complete" ? (
+        <section className={`task-todo-deeplink ${focusedTask?.done ? "is-complete" : ""}`} aria-label="钉钉待办完成入口">
+          <span className="task-todo-deeplink-icon"><CheckCircle2 size={22} /></span>
+          <div>
+            <strong>{focusedTask ? `完成“${focusedTask.title}”` : "没有找到对应的产品任务"}</strong>
+            <p>{focusedTask
+              ? focusedTask.done
+                ? "这条任务已完成，钉钉状态会保持同步。"
+                : "从钉钉待办卡片进入，确认后会同时完成系统任务和钉钉待办。"
+              : "链接中的任务可能已删除或不属于当前产品。"}</p>
+            {completionFeedback ? <small role={completionFeedback.includes("均已完成") ? "status" : "alert"}>{completionFeedback}</small> : null}
+          </div>
+          {focusedTask ? (
+            <Button
+              id="dingtalk-todo-complete-action"
+              variant="primary"
+              disabled={focusedTask.done || completingFocusedTask || Boolean(focusedTask.required && !deliverablesForTask(state, focusedTask.id).length)}
+              disabledReason={focusedTask.required && !deliverablesForTask(state, focusedTask.id).length ? "请先添加交付物，再完成必需任务" : ""}
+              onClick={syncFocusedTaskCompletion}
+            >{focusedTask.done ? "已完成" : completingFocusedTask ? "正在同步…" : "完成并同步钉钉"}</Button>
+          ) : null}
+        </section>
+      ) : null}
       <div className="stage-grid">
         {progressStages.map(stage => {
           const policy = productStagePolicy(state, selectedProduct, stage.index);
@@ -438,6 +540,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           const detailUrl = new URL(window.location.href);
           detailUrl.searchParams.set("productId", selectedProduct.id);
           detailUrl.searchParams.set("taskId", todoTask.id);
+          detailUrl.searchParams.delete("todoAction");
           detailUrl.hash = "progress";
           const recoveryUsers = orgUsers(orgCache).filter(user => user.name === selectedProduct.productManager);
           const payload = buildTaskTodoPayload({ product: selectedProduct, task: effectiveTask, creator: currentUser, executors, recoveryUsers, detailUrl: detailUrl.toString(), draft });

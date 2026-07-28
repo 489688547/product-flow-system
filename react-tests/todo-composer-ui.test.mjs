@@ -8,6 +8,7 @@ const page = fs.readFileSync(new URL("../src/features/progress/ProductProgressPa
 const editor = fs.readFileSync(new URL("../src/ui/RichTextEditor.jsx", import.meta.url), "utf8");
 const sharedModal = fs.readFileSync(new URL("../src/ui/Modal.jsx", import.meta.url), "utf8");
 const provider = fs.readFileSync(new URL("../src/state/ProductFlowProvider.jsx", import.meta.url), "utf8");
+const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
 test("todo composer exposes editable title priority deadline body and preview", () => {
   assert.match(modal, /TodoComposerFields/);
@@ -22,6 +23,15 @@ test("progress page allows opening the composer before a deadline exists", () =>
   assert.doesNotMatch(page, /updateTask\(todoTask\.id, \{ due: draft\.dueDate \}\)/);
   assert.match(provider, /applyTaskTodoSyncSuccess/);
   assert.match(provider, /applyTaskTodoSyncFailure/);
+});
+
+test("progress page exposes a focused completion action for DingTalk card deep links", () => {
+  assert.match(app, /parseTaskTodoDeepLink\(window\.location\.href\)/);
+  assert.match(app, /if \(!screenAllowed\) showScreen\(defaultScreen\)/);
+  assert.match(page, /activeFocus\?\.action === "complete"/);
+  assert.match(page, /完成并同步钉钉/);
+  assert.match(page, /syncFocusedTaskCompletion/);
+  assert.match(page, /document\.getElementById/);
 });
 
 test("product flow automatically refreshes remote DingTalk task changes", () => {
