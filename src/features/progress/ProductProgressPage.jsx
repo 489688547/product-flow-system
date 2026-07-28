@@ -30,6 +30,7 @@ import { ProductScheduleSummary } from "./ProductScheduleSummary.jsx";
 import { ProductGmvSummary } from "../sales/ProductGmvSummary.jsx";
 import { useProductSalesRows } from "../sales/useProductSalesRows.js";
 import { TaskCategorySelect } from "./TaskCategorySelect.jsx";
+import { TaskCompletionProgress } from "./TaskCompletionProgress.jsx";
 import { TaskDeliverableModal } from "./TaskDeliverableModal.jsx";
 import { TaskDeliverables } from "./TaskDeliverables.jsx";
 import { TaskTemplateModal } from "./TaskTemplateModal.jsx";
@@ -156,7 +157,7 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     addTask({
       productId: selectedProduct.id,
       stage: selectedStage,
-      category: "会前准备",
+      category: "待办任务",
       title: "新任务",
       ownerDept: "产品部",
       deliverable: "待补充"
@@ -222,14 +223,18 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     { key: "due", header: "截止", render: task => <DatePickerField ariaLabel={`${task.title}截止日期`} value={task.due || ""} onChange={due => updateTask(task.id, { due })} /> },
     { key: "actions", header: "操作", render: task => {
       const categoryActions = taskCategoryActions(task.category);
-      const completionBlocked = Boolean(task.required && !deliverablesForTask(state, task.id).length && !task.done);
+      const taskDeliverables = deliverablesForTask(state, task.id);
       const hasMeeting = Boolean(task.dingMeeting?.eventId);
       const syncStatus = todoSyncStatus(task);
       return <TableActions>
-        <label className={`task-check ${task.done ? "checked" : ""} ${completionBlocked ? "blocked" : ""}`} title={completionBlocked ? "请先添加交付物，再完成必需任务" : undefined}>
-          <input aria-label={`${task.title}完成状态`} type="checkbox" disabled={completionBlocked} checked={Boolean(task.done)} onChange={event => updateTask(task.id, { done: event.target.checked })} />
-          <span>{task.done ? "已完成" : "未完成"}</span>
-        </label>
+        <TaskCompletionProgress
+          task={task}
+          product={selectedProduct}
+          deliverables={taskDeliverables}
+          currentUser={currentUser}
+          users={orgUsers(orgCache)}
+          onChange={patch => updateTask(task.id, patch)}
+        />
         {categoryActions.todo ? (
           <Button
             className="compact todo-sync-action"

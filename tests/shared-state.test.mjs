@@ -195,6 +195,82 @@ test("company state compare-and-set accepts a baseline only once", async () => {
   assert.equal(stored.state.products[0].name, "先写成功");
 });
 
+test("shared state accepts task completion only from the product manager after executors finish", async () => {
+  const stateModule = await loadStateModule();
+  const before = {
+    products: [{ id: "p1", productManagerUnionId: "manager-1" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      required: false,
+      done: false,
+      dingTodo: {
+        executorUnionIds: ["executor-1", "manager-1"],
+        executorStatuses: [{ unionId: "executor-1", isDone: true }],
+        executorStatusCoverage: { complete: true }
+      }
+    }],
+    deliverables: []
+  };
+  const next = {
+    ...before,
+    tasks: [{ ...before.tasks[0], done: true }]
+  };
+
+  assert.doesNotThrow(() => stateModule.validateTaskCompletionTransitions(
+    before,
+    next,
+    { unionId: "manager-1" }
+  ));
+  assert.throws(
+    () => stateModule.validateTaskCompletionTransitions(before, next, { unionId: "executor-1" }),
+    error => error.code === "TASK_PRODUCT_MANAGER_REQUIRED" && error.status === 403
+  );
+});
+
+test("shared state blocks final acceptance until status coverage and required deliverables are complete", async () => {
+  const stateModule = await loadStateModule();
+  const baseTask = {
+    id: "t1",
+    productId: "p1",
+    required: true,
+    done: false,
+    dingTodo: {
+      executorUnionIds: ["executor-1"],
+      executorStatuses: [],
+      executorStatusCoverage: { complete: false }
+    }
+  };
+  const before = {
+    products: [{ id: "p1", productManagerUnionId: "manager-1" }],
+    tasks: [baseTask],
+    deliverables: []
+  };
+  const accepted = task => ({ ...before, tasks: [{ ...task, done: true }] });
+
+  assert.throws(
+    () => stateModule.validateTaskCompletionTransitions(before, accepted(baseTask), { unionId: "manager-1" }),
+    error => error.code === "TASK_EXECUTOR_STATUS_INCOMPLETE"
+  );
+
+  const executorsDone = {
+    ...baseTask,
+    dingTodo: {
+      ...baseTask.dingTodo,
+      executorStatuses: [{ unionId: "executor-1", isDone: true }],
+      executorStatusCoverage: { complete: true }
+    }
+  };
+  assert.throws(
+    () => stateModule.validateTaskCompletionTransitions(
+      { ...before, tasks: [executorsDone] },
+      accepted(executorsDone),
+      { unionId: "manager-1" }
+    ),
+    error => error.code === "TASK_DELIVERABLE_REQUIRED"
+  );
+});
+
 test("shared state revision migration preserves existing part data and bootstraps the compare-and-set manifest", () => {
   const migration = readFileSync(new URL("../migrations/0006_shared_state_revision.sql", import.meta.url), "utf8");
 

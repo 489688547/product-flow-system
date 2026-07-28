@@ -9,6 +9,10 @@ import {
   startProductionAudit
 } from "./platform/_shared/productionDataAccess.js";
 import { requestBusinessDatabase } from "./platform/_shared/dataEnvironment.js";
+import {
+  effectiveTaskExecutorIds,
+  taskCompletionProgress
+} from "../../src/domain/taskCompletion.js";
 
 const STATE_ID = "company";
 const MAX_PART_BYTES = 1_000_000;
@@ -23,6 +27,37 @@ function stateError(message, status, code, retryable = false) {
   error.code = code;
   error.retryable = retryable;
   return error;
+}
+
+export function validateTaskCompletionTransitions(beforeState = {}, nextState = {}, session = {}) {
+  const previousTasks = new Map((beforeState.tasks || []).map(task => [String(task.id), task]));
+  const previousProducts = new Map((beforeState.products || []).map(product => [String(product.id), product]));
+  const actorUnionId = String(session.unionId || "").trim();
+
+  (nextState.tasks || []).forEach(nextTask => {
+    const previousTask = previousTasks.get(String(nextTask.id));
+    if (previousTask?.done || !nextTask?.done) return;
+    const product = previousProducts.get(String(nextTask.productId)) || {};
+    if (!actorUnionId || actorUnionId !== String(product.productManagerUnionId || "").trim()) {
+      throw stateError("仅产品负责人可以确认任务最终完成。", 403, "TASK_PRODUCT_MANAGER_REQUIRED");
+    }
+    const progress = taskCompletionProgress(previousTask || nextTask, product);
+    if (progress.executorsTotal > 0 && !progress.coverageComplete) {
+      throw stateError("执行人的钉钉完成状态尚未读取完整。", 409, "TASK_EXECUTOR_STATUS_INCOMPLETE", true);
+    }
+    if (!progress.allExecutorsDone) {
+      throw stateError("仍有执行人未在钉钉完成待办。", 409, "TASK_EXECUTORS_INCOMPLETE", true);
+    }
+    const expectedExecutorCount = effectiveTaskExecutorIds(previousTask || nextTask, product).length;
+    if (progress.executorsDone !== expectedExecutorCount) {
+      throw stateError("仍有执行人未在钉钉完成待办。", 409, "TASK_EXECUTORS_INCOMPLETE", true);
+    }
+    const hasDeliverable = (nextState.deliverables || [])
+      .some(file => String(file?.taskId || "") === String(nextTask.id || ""));
+    if (nextTask.required && !hasDeliverable) {
+      throw stateError("必需任务需要先添加交付物。", 409, "TASK_DELIVERABLE_REQUIRED");
+    }
+  });
 }
 
 function stateErrorResponse(error) {
@@ -231,6 +266,7 @@ export async function onRequest({ request, env, data = {} }) {
     if (body.baseUpdatedAt !== before.updatedAt) {
       throw stateError("线上数据已被其他页面更新，本次修改未覆盖线上数据，请刷新后重新操作。", 409, "SHARED_STATE_VERSION_CONFLICT", true);
     }
+    validateTaskCompletionTransitions(before.state, body.state, data.session || {});
 
     await ensureProductionAccessTables(db);
     const snapshotId = await saveProductionSnapshot(db, before);

@@ -6,15 +6,16 @@ import {
 } from "../src/domain/dingTalk.js";
 import { normalizeTaskCategory, taskCategoryActions, TASK_CATEGORIES } from "../src/domain/productFlow.js";
 
-test("workflow exposes the four task categories used by product progress", () => {
-  assert.deepEqual(TASK_CATEGORIES, ["会前准备", "会议", "决策", "待办任务"]);
+test("workflow exposes only todo and meeting task categories", () => {
+  assert.deepEqual(TASK_CATEGORIES, ["待办任务", "会议"]);
 });
 
-test("legacy task categories migrate into the four current categories", () => {
+test("legacy task categories migrate into todo or meeting", () => {
   assert.equal(normalizeTaskCategory("会议/决策"), "会议");
   assert.equal(normalizeTaskCategory("会后交付"), "待办任务");
   assert.equal(normalizeTaskCategory("准入条件"), "待办任务");
-  assert.equal(normalizeTaskCategory("决策"), "决策");
+  assert.equal(normalizeTaskCategory("会前准备"), "待办任务");
+  assert.equal(normalizeTaskCategory("决策"), "待办任务");
 });
 
 test("task category actions expose only the relevant DingTalk operation", () => {
