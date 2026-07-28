@@ -416,7 +416,8 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /className=\{`task-check/);
   assert.match(page, /type="checkbox"/);
   assert.match(page, /focusStage/);
-  assert.match(page, /setSelectedStage\(validProgressStage\(focusStage\.stage\)\)/);
+  assert.match(page, /const explicitStage = Number\.isInteger\(activeFocus\?\.stage\)/);
+  assert.match(page, /setSelectedStage\(validProgressStage\(explicitStage\)\)/);
   assert.match(page, /产品负责人/);
   assert.match(page, /departmentFilter="产品"/);
   assert.match(page, /productManager/);

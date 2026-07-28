@@ -11,7 +11,7 @@
 ## 文件职责
 
 - `src/domain/dingTalk.js`：草稿默认值、校验、截止时间、富文本清洗、正文转换和待办 payload。
-- `src/domain/taskTodo.js`：统一构造成功绑定、同步状态与展示模拟状态。
+- `src/domain/taskTodo.js`：统一构造成功绑定、同步状态与展示模拟状态，同时解析受控产品任务深链；未知动作只定位不写入。
 - `src/domain/dingTalkGroups.js`：我的群和搜索客户端。
 - `functions/api/dingtalk/_shared/groups.js`：我的群 MCP 适配与标准化。
 - `functions/api/dingtalk/groups/index.js`：登录态保护的我的群路由。
@@ -41,10 +41,12 @@
 - `GET /api/dingtalk/todo/list`：串行、有界查询当前用户未完成和已完成的企业工作待办；过渡期独立尝试个人待办查询，但个人查询结果不作为新任务主链路。响应按 todoId 去重，客户端只回流已绑定产品任务。
 - `TodoSyncModal.onSync({executors,draft})`
 - `ProductFlowProvider` 在登录完成、窗口聚焦和带抖动的周期内读取 `/api/dingtalk/todo/list`；查询窗口内一次回流，超出窗口的待办按服务端返回的有界游标逐轮覆盖，只在远端快照变化时持久化产品任务。
+- 新建工作待办携带跳转型 `actionList`；“完成任务”仍进入已登录业务页确认，避免 GET 链接或消息预取直接产生写入。
+- `dingTodo.actionVersion=1` 表示绑定卡片具有完成入口。服务端发现可信旧工作待办版本落后时，使用受控恢复来源创建新卡片，成功后再把旧卡片的整体状态和执行者状态更新为完成；旧卡片退出未完成列表但保留历史。
 
 ## 数据迁移
 
-不迁移数据库。`dingTodo.draft` 为可选增量字段；缺失时从产品任务生成。富文本、优先级、真实 todoId 和弹窗内修改的任务截止日期由服务端在钉钉成功后原子持久化；浏览器返回状态只做即时渲染，不再承担唯一绑定写入。
+不迁移数据库。`dingTodo.draft` 和 `dingTodo.actionVersion` 均为可选增量字段；缺失动作版本的工作待办在下一次授权同步时迁移。富文本、优先级、真实 todoId 和弹窗内修改的任务截止日期由服务端在钉钉成功后原子持久化；浏览器返回状态只做即时渲染，不再承担唯一绑定写入。
 
 ## 风险与回滚
 
@@ -54,6 +56,7 @@
 - 共享 Modal 回归：通过现有 Modal 消费者测试和键盘浏览器验收；必要时仅回滚焦点管理提交。
 - 钉钉已创建但共享状态连续冲突：返回部分成功错误并记录安全 todoId；重试时按稳定来源或已落库绑定恢复同一条待办，避免重复创建。
 - 回滚不删除 `dingTodo.draft`，旧版本会忽略该字段。
+- 完成入口回滚时保留 `actionVersion` 和已完成旧卡片；旧版本忽略新字段，当前绑定仍可按 todoId 回流。
 
 ## 验证命令
 

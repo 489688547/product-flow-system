@@ -1,4 +1,23 @@
 const ALL_DEPARTMENT_LABELS = new Set(["全员", "全部", "所有", "所有部门", "公司"]);
+const DING_TODO_ACTION_VERSION = 1;
+
+export function parseTaskTodoDeepLink(value = "") {
+  let url;
+  try {
+    url = new URL(String(value || ""), "https://product-flow.invalid");
+  } catch {
+    return null;
+  }
+  if (url.hash.replace(/^#/, "").split(/[/?]/)[0] !== "progress") return null;
+  const productId = String(url.searchParams.get("productId") || "").trim();
+  const taskId = String(url.searchParams.get("taskId") || "").trim();
+  if (!productId || !taskId) return null;
+  return {
+    productId,
+    taskId,
+    action: url.searchParams.get("todoAction") === "complete" ? "complete" : "view"
+  };
+}
 
 function departmentTokens(value) {
   return String(value || "")
@@ -132,6 +151,10 @@ export function todoSyncStatus(task) {
   if (!todo?.id) return "未同步";
   if (todo?.simulated) return "展示模拟";
   if (!todo?.sourceId) return "待确认";
+  if (
+    String(todo.source || "").startsWith("todo_open_")
+    && Number(todo.actionVersion || 0) < DING_TODO_ACTION_VERSION
+  ) return "待更新";
   const current = buildTaskTodoSnapshot(task, todo.executorUnionIds || [], todo.draft);
   if (!sameSnapshot(current, todo.snapshot)) return "待更新";
   return task.done ? "已完成" : "已同步";
@@ -153,6 +176,7 @@ export function applyTaskTodoSyncSuccess(task, { payload, executors = [], snapsh
       sourceId: todo?.sourceId || payload?.sourceId || "",
       source: todo?.source || "",
       bizTag: todo?.bizTag || "",
+      actionVersion: Number(todo?.actionVersion || payload?.actionVersion) || 0,
       simulated: Boolean(todo?.simulated),
       creatorUnionId: todo?.creatorUnionId || payload?.creatorUnionId || "",
       syncedAt,

@@ -33,6 +33,23 @@ test("todo sync maps provider authorization expiry to a safe re-login response",
   assert.doesNotMatch(JSON.stringify(result), /raw provider|private token/);
 });
 
+test("todo sync exposes a safe retryable error when legacy-card retirement fails", () => {
+  const error = new Error("internal provider detail");
+  error.status = 502;
+  error.code = "DINGTALK_TODO_REPLACEMENT_RETIRE_FAILED";
+
+  const result = safeDingTalkError(error, "同步失败");
+
+  assert.equal(result.status, 502);
+  assert.deepEqual(result.body, {
+    synced: false,
+    code: "DINGTALK_TODO_REPLACEMENT_RETIRE_FAILED",
+    message: "新版待办已创建，但旧待办尚未退出未完成列表，请重试。",
+    retryable: true
+  });
+  assert.doesNotMatch(JSON.stringify(result), /internal provider/);
+});
+
 test("todo sync persists the provider result server-side and retries one shared-state conflict", async () => {
   const original = {
     version: "test",
@@ -247,6 +264,35 @@ test("todo sync authorization reuses a recorded work todo id when only the recov
 
   assert.equal(authorized.todoId, "stale-work-id");
   assert.equal(authorized.sourceId, "task:p1:t1");
+});
+
+test("todo sync authorization upgrades a legacy work card to the completion-action version", () => {
+  const state = {
+    products: [{ id: "p1", productManagerUnionId: "creator-union" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      dingTodo: {
+        id: "legacy-work-id",
+        sourceId: "task:p1:t1",
+        source: "todo_open_app",
+        creatorUnionId: "creator-union",
+        executorUnionIds: ["creator-union"]
+      }
+    }]
+  };
+
+  const authorized = authorizeTaskTodoSyncRequest({
+    sourceId: "task:p1:t1",
+    todoId: "legacy-work-id",
+    actionVersion: 1,
+    executorUnionIds: ["creator-union"]
+  }, { unionId: "creator-union", role: "product" }, state);
+
+  assert.equal(authorized.todoId, "");
+  assert.equal(authorized.sourceId, "task:p1:t1:r1");
+  assert.equal(authorized.replacementOfTodoId, "legacy-work-id");
+  assert.equal(authorized.replacementTodoSource, "todo_open_app");
 });
 
 test("todo sync authorization reuses only a controlled recovery source for the same task", () => {
@@ -524,6 +570,69 @@ test("syncDingTodoTask creates once and updates when a DingTalk id exists", asyn
   assert.equal(calls[0].options.method, "POST");
   assert.match(calls[1].url, /executorStatus/);
   assert.equal(calls[2].options.method, "PUT");
+});
+
+test("syncDingTodoTask creates the actionable replacement before retiring a legacy work card", async () => {
+  const calls = [];
+  const result = await syncDingTodoTask("token-1", {
+    creatorUnionId: "creator-union",
+    executorUnionIds: ["executor-union"],
+    sourceId: "task:p1:t1:r1",
+    subject: "整理 PRD",
+    detailUrl: "https://flow.example.com/?productId=p1&taskId=t1#progress",
+    dueTime: 1783850400000,
+    done: false,
+    actionVersion: 1,
+    replacementOfTodoId: "legacy-work-id",
+    replacementTodoSource: "todo_open_app"
+  }, async (url, options) => {
+    calls.push({ url, options, body: options.body ? JSON.parse(options.body) : null });
+    return calls.length === 1
+      ? okJson({ id: "actionable-work-id" })
+      : okJson({ result: true });
+  });
+
+  assert.equal(result.id, "actionable-work-id");
+  assert.equal(result.actionVersion, 1);
+  assert.equal(result.replacedTodoId, "legacy-work-id");
+  assert.equal(calls[0].options.method, "POST");
+  assert.equal(calls[0].body.actionList[0].title, "完成任务");
+  assert.match(calls[1].url, /legacy-work-id\/executorStatus/);
+  assert.deepEqual(calls[1].body, {
+    executorStatusList: [{ id: "executor-union", isDone: true }]
+  });
+  assert.match(calls[2].url, /legacy-work-id\?operatorId=creator-union$/);
+  assert.equal(calls[2].body.done, true);
+});
+
+test("syncDingTodoTask keeps a failed legacy-card retirement retryable", async () => {
+  const calls = [];
+  await assert.rejects(
+    syncDingTodoTask("token-1", {
+      creatorUnionId: "creator-union",
+      executorUnionIds: ["executor-union"],
+      sourceId: "task:p1:t1:r1",
+      subject: "整理 PRD",
+      detailUrl: "https://flow.example.com/?productId=p1&taskId=t1#progress",
+      dueTime: 1783850400000,
+      done: false,
+      actionVersion: 1,
+      replacementOfTodoId: "legacy-work-id",
+      replacementTodoSource: "todo_open_app"
+    }, async (url, options) => {
+      calls.push({ url, options });
+      if (calls.length === 1) return okJson({ id: "actionable-work-id" });
+      return errorJson(503, { code: "Unavailable", message: "temporary failure" });
+    }),
+    error => {
+      assert.equal(error.code, "DINGTALK_TODO_REPLACEMENT_RETIRE_FAILED");
+      assert.equal(error.status, 502);
+      return true;
+    }
+  );
+
+  assert.equal(calls.length, 2);
+  assert.match(calls[1].url, /legacy-work-id\/executorStatus/);
 });
 
 test("syncDingTodoTask recovers an existing DingTalk task after duplicate sourceId", async () => {

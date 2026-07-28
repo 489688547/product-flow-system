@@ -8,6 +8,7 @@ import {
   buildTaskTodoSnapshot,
   riskMetaForTask,
   normalizeTaskDueDate,
+  parseTaskTodoDeepLink,
   taskMatchesDepartment,
   taskMatchesUserDepartments,
   todoSyncStatus
@@ -122,15 +123,20 @@ test("todo sync state detects unsynced, stale, completed and failed tasks", () =
     ownerDept: task.ownerDept,
     executorUnionIds: ["union-a"]
   };
-  const synced = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", snapshot, executorUnionIds: ["union-a"] } };
-  assert.equal(todoSyncStatus(synced), "已同步");
+  const synced = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", source: "todo_open_app", snapshot, executorUnionIds: ["union-a"] } };
+  assert.equal(todoSyncStatus(synced), "待更新");
+  assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, actionVersion: 1 } }), "已同步");
   assert.equal(todoSyncStatus({
     ...synced,
     dingTodo: { ...synced.dingTodo, sourceId: "" }
   }), "待确认");
   assert.equal(todoSyncStatus({ ...synced, due: "2026-07-13" }), "待更新");
   assert.equal(todoSyncStatus({ ...synced, done: true }), "待更新");
-  assert.equal(todoSyncStatus({ ...synced, done: true, dingTodo: { ...synced.dingTodo, snapshot: { ...snapshot, done: true } } }), "已完成");
+  assert.equal(todoSyncStatus({
+    ...synced,
+    done: true,
+    dingTodo: { ...synced.dingTodo, actionVersion: 1, snapshot: { ...snapshot, done: true } }
+  }), "已完成");
   assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, lastError: "network" } }), "同步失败");
 });
 
@@ -148,7 +154,26 @@ test("task todo payload requires a due date and keeps a stable system source id"
   assert.deepEqual(payload.recoveryUnionIds, ["owner-union"]);
   assert.equal(payload.dueTime, new Date("2026-07-12T18:00:00+08:00").getTime());
   assert.equal(payload.done, false);
+  assert.equal(payload.actionVersion, 1);
   assert.throws(() => buildTaskTodoPayload({ product, task: { ...task, due: "" }, creator, executors, detailUrl: "https://flow.example.com" }), /截止日期/);
+});
+
+test("todo card deep link focuses the exact product task and only accepts the completion action", () => {
+  assert.deepEqual(parseTaskTodoDeepLink(
+    "https://flow.example.com/cloudflare-entry?productId=p1&taskId=t1&todoAction=complete#progress"
+  ), {
+    productId: "p1",
+    taskId: "t1",
+    action: "complete"
+  });
+  assert.deepEqual(parseTaskTodoDeepLink(
+    "https://flow.example.com/cloudflare-entry?productId=p1&taskId=t1&todoAction=unknown#progress"
+  ), {
+    productId: "p1",
+    taskId: "t1",
+    action: "view"
+  });
+  assert.equal(parseTaskTodoDeepLink("https://flow.example.com/?productId=p1&taskId=t1#planning"), null);
 });
 
 test("task todo payload only reuses an id verified against the stable product source", () => {
