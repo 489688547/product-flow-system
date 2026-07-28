@@ -34,9 +34,60 @@ function resultMessage(run) {
   return run.errorSummary || [run.errorCode, run.stage ? `阶段 ${run.stage}` : ""].filter(Boolean).join(" · ") || "采集未完成，请查看任务状态。";
 }
 
-export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], now = new Date() } = {}) {
+// 抖店文件不进快麦的归档索引，但本机目录结构是确定的，可由 run 自身字段推出：
+// <抖店罗盘>/<providerId>/<storeId>/<resourceType>/<年>/<月>/<业务日>/<contentHash>.xlsx
+// 规则已用生产文件逐一核对。
+const DERIVED_ARCHIVE_ROOTS = Object.freeze({ "douyin-ecommerce": "抖店罗盘" });
+
+function derivedArchivePath(job, run) {
+  const root = DERIVED_ARCHIVE_ROOTS[String(job?.providerId || "")];
+  const hash = String(run?.archiveId || "");
+  const businessDate = safeDate(job?.businessDate);
+  const storeId = String(job?.storeId || "");
+  const resourceType = String(job?.resourceType || "");
+  if (!root || !hash || !businessDate || !storeId || !resourceType) return "";
+  const [year, month] = businessDate.split("-");
+  return `${root}/${job.providerId}/${storeId}/${resourceType}/${year}/${month}/${businessDate}/${hash}.xlsx`;
+}
+
+// run.archive_id 存的是内容哈希而不是归档记录 id：按 id 关联在生产上命中 0 条，
+// 按 contentHash 才对得上。字段名与实际内容不一致，这里以实际内容为准。
+function archiveLookup(archives) {
+  return new Map((archives || [])
+    .filter(archive => archive?.contentHash)
+    .map(archive => [String(archive.contentHash), archive]));
+}
+
+function artifactFor(job, run, archiveByHash) {
+  if (String(run?.status || "") !== "success") return { artifactPath: "", artifactSource: "" };
+  const hash = String(run?.archiveId || "");
+  if (!hash) return { artifactPath: "", artifactSource: "" };
+  const indexed = archiveByHash.get(hash);
+  if (indexed?.relativePath) {
+    return { artifactPath: String(indexed.relativePath), artifactSource: "archive-index" };
+  }
+  const derived = derivedArchivePath(job, run);
+  // 推不出来就如实留空，不退化成猜测。
+  return derived ? { artifactPath: derived, artifactSource: "derived-path" } : { artifactPath: "", artifactSource: "" };
+}
+
+function retryTargetFor(job) {
+  const providerId = String(job?.providerId || "");
+  const resourceType = String(job?.resourceType || "");
+  const businessDate = safeDate(job?.businessDate);
+  if (!providerId || !resourceType || !businessDate) return null;
+  return {
+    providerId,
+    storeId: String(job?.storeId || ""),
+    resourceType,
+    businessDate
+  };
+}
+
+export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], archives = [], now = new Date() } = {}) {
   const nowValue = now instanceof Date ? now.valueOf() : Date.parse(String(now || ""));
   const jobById = new Map(jobs.map(job => [job.id, job]));
+  const archiveByHash = archiveLookup(archives);
   const terminalRows = runs.map(run => {
     const job = jobById.get(run.jobId) || {};
     const businessDate = safeDate(job.businessDate);
@@ -52,7 +103,10 @@ export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], no
       stage: run.stage || "",
       startedAt: run.startedAt || null,
       completedAt: run.completedAt || null,
-      message: resultMessage(run)
+      message: resultMessage(run),
+      ...artifactFor(job, run, archiveByHash),
+      retryTarget: run.status === "success" ? null : retryTargetFor(job),
+      canRetry: run.status !== "success" && Boolean(retryTargetFor(job))
     };
   });
   const terminalJobIds = new Set(runs.map(run => run.jobId));
