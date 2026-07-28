@@ -49,13 +49,26 @@ export async function checkDeployedSmoke({
     cache: "no-store",
     redirect: "manual"
   });
-  const oauthHtml = await oauthEntry.text();
+  const oauthEntryStatus = oauthEntry.status;
+  let oauthStatic = oauthEntry;
+  if ([301, 302, 307, 308].includes(oauthEntryStatus)) {
+    const redirectUrl = new URL(oauthEntry.headers.get("location") || "", `${url}/`);
+    if (redirectUrl.origin !== new URL(url).origin || redirectUrl.pathname !== "/auth/dingtalk-start") {
+      throw new Error("钉钉 OAuth 入口没有跳转到固定站点的同源静态页面。");
+    }
+    oauthStatic = await fetchImpl(redirectUrl.href, {
+      headers: { accept: "text/html" },
+      cache: "no-store",
+      redirect: "manual"
+    });
+  }
+  const oauthHtml = await oauthStatic.text();
   if (
-    !oauthEntry.ok
-    || !String(oauthEntry.headers.get("content-type") || "").includes("text/html")
+    !oauthStatic.ok
+    || !String(oauthStatic.headers.get("content-type") || "").includes("text/html")
     || !/data-oauth-status|runDingTalkOAuthStart/.test(oauthHtml)
   ) {
-    throw new Error(`钉钉 OAuth 静态入口未就绪（HTTP ${oauthEntry.status}）。`);
+    throw new Error(`钉钉 OAuth 静态入口未就绪（HTTP ${oauthStatic.status}）。`);
   }
 
   const bootstrap = await fetchImpl(`${url}/api/auth/dingtalk/bootstrap`, {
@@ -79,7 +92,10 @@ export async function checkDeployedSmoke({
     cache: "no-store"
   });
   const sessionBody = await readJson(session);
-  if (!session.ok || typeof sessionBody.authenticated !== "boolean") {
+  const safeAnonymousSession = session.status === 401
+    && sessionBody.authenticated === false
+    && (sessionBody.user === null || sessionBody.user === undefined);
+  if ((!session.ok && !safeAnonymousSession) || typeof sessionBody.authenticated !== "boolean") {
     throw new Error(`认证会话检查未返回安全状态（HTTP ${session.status}）。`);
   }
 
@@ -94,7 +110,8 @@ export async function checkDeployedSmoke({
     commit: deployedCommit,
     checkedAt: new Date().toISOString(),
     oauth: {
-      entryStatus: oauthEntry.status,
+      entryStatus: oauthEntryStatus,
+      staticStatus: oauthStatic.status,
       callbackOrigin: callback.origin
     },
     sessionAuthenticated: sessionBody.authenticated,

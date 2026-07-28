@@ -19,6 +19,9 @@
 - 两个 Pages 项目复用同一个 `PRODUCT_FLOW_DB` 与 `DEMO_FLOW_DB`，并要求必要 Secret 名称完整；
   浏览器仍不得直接访问 D1 或 Secret。
 - 两站部署后分别验证目标 commit、静态钉钉 OAuth 入口、同源 callback、认证安全状态和 readiness。
+  `/api/auth/dingtalk/start` 可以用 `308` 跳到固定同源 `/auth/dingtalk-start`，但 smoke 必须继续读取并
+  校验最终静态 HTML；匿名 `/api/auth/session` 可以用 `401` 返回明确的
+  `{ authenticated:false, user:null }`，其他跳转目标或认证响应仍失败关闭。
 - 测试站使用真实业务数据和真实服务端权限，不是沙箱；试验性写入仍使用本地沙箱。
 - 旧项目 `product-flow-system` 只在新双站、钉钉入口和公司 Mac 消费端全部通过后删除。
 
