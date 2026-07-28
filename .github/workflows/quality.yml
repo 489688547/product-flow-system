@@ -3,7 +3,7 @@ name: quality
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev]
 
 permissions:
   contents: read
@@ -20,6 +20,8 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - if: github.event_name == 'pull_request'
+        run: node scripts/check-pr-branch-flow.mjs
       - run: npm run check:branch-base
       - run: npm ci
       - run: npm run audit:dependencies

@@ -5,11 +5,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const REQUIRED_PAGES_SECRETS = Object.freeze([
+  "DEMO_DATA_MASKING_KEY",
   "DINGTALK_APP_KEY",
   "DINGTALK_APP_SECRET",
-  "KUAIMAI_ACCESS_TOKEN",
-  "KUAIMAI_APP_KEY",
-  "KUAIMAI_APP_SECRET",
   "PLATFORM_CREDENTIAL_MASTER_KEY"
 ]);
 
@@ -157,6 +155,52 @@ export function inspectRemotePagesParity({
   };
 }
 
+export function inspectDualPagesProjects({
+  productionProject,
+  developmentProject,
+  requiredSecrets = REQUIRED_PAGES_SECRETS
+} = {}) {
+  const projects = [
+    ["production", productionProject],
+    ["development", developmentProject]
+  ];
+  const inspected = {};
+  for (const [environment, project] of projects) {
+    const projectName = String(project?.projectName || "").trim();
+    if (!projectName) {
+      throw new Error(`Pages 双项目环境不一致：${environment} 缺少项目名称`);
+    }
+    try {
+      inspected[environment] = inspectRemotePagesParity({
+        ...project,
+        requiredSecrets
+      });
+    } catch (error) {
+      throw new Error(`Pages 项目 ${projectName} 环境不一致：${error?.message || error}`);
+    }
+  }
+  const errors = [];
+  for (const binding of ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"]) {
+    const productionId = inspected.production.databaseIds[binding];
+    const developmentId = inspected.development.databaseIds[binding];
+    if (productionId !== developmentId) {
+      errors.push(`${developmentProject.projectName} 的 ${binding} 与生产项目不一致`);
+    }
+  }
+  if (errors.length) {
+    throw new Error(`Pages 双项目环境不一致：${errors.join("；")}`);
+  }
+  return {
+    projects: {
+      production: productionProject.projectName,
+      development: developmentProject.projectName
+    },
+    databaseIds: inspected.production.databaseIds,
+    sameDatabase: true,
+    inspections: inspected
+  };
+}
+
 function wrangler(args, cwd) {
   return execFileSync("npx", ["wrangler", ...args], {
     cwd,
@@ -172,10 +216,21 @@ function remoteCheck(root, projectName, requiredSecrets) {
     const configSource = readFileSync(resolve(downloadDir, "wrangler.toml"), "utf8");
     const previewSecretOutput = wrangler(["pages", "secret", "list", "--project-name", projectName, "--env", "preview"], root);
     const productionSecretOutput = wrangler(["pages", "secret", "list", "--project-name", projectName, "--env", "production"], root);
-    return inspectRemotePagesParity({ configSource, previewSecretOutput, productionSecretOutput, requiredSecrets });
+    return {
+      projectName,
+      configSource,
+      previewSecretOutput,
+      productionSecretOutput,
+      requiredSecrets
+    };
   } finally {
     rmSync(downloadDir, { recursive: true, force: true });
   }
+}
+
+function cliValue(flag, fallback = "") {
+  const index = process.argv.indexOf(flag);
+  return index >= 0 ? String(process.argv[index + 1] || "").trim() : fallback;
 }
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -186,8 +241,14 @@ if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
     const manifest = JSON.parse(readFileSync(resolve(root, "docs/platform/environment-capabilities.json"), "utf8"));
     const requiredSecrets = requiredPagesSecrets(manifest);
     if (process.argv.includes("--remote")) {
-      remoteCheck(root, "product-flow-system", requiredSecrets);
-      console.log("Pages 远程环境一致性检查通过：Preview 与 Production 的正式/展示 D1 绑定一致，必要 Secret 名称完整。");
+      const productionProjectName = cliValue("--production-project", "deshan-tiyes-system");
+      const developmentProjectName = cliValue("--development-project", "deshan-tiyes-system-dev");
+      const result = inspectDualPagesProjects({
+        productionProject: remoteCheck(root, productionProjectName, requiredSecrets),
+        developmentProject: remoteCheck(root, developmentProjectName, requiredSecrets),
+        requiredSecrets
+      });
+      console.log(`Pages 双项目环境一致性检查通过：${result.projects.production} 与 ${result.projects.development} 使用相同正式/展示 D1，必要 Secret 名称完整。`);
     } else {
       console.log("Pages 环境契约检查通过：本地、Preview、Production 使用一致且相互隔离的正式/展示 D1 声明。");
     }

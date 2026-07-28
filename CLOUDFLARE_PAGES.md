@@ -2,7 +2,12 @@
 
 ## GitHub 仓库内容
 
-这个项目可以直接接入 Cloudflare Pages：
+这个项目通过两个固定 Cloudflare Pages Git 项目发布：
+
+- `dev` → `deshan-tiyes-system-dev` → `https://deshan-tiyes-system-dev.pages.dev`
+- `main` → `deshan-tiyes-system` → `https://deshan-tiyes-system.pages.dev`
+
+普通功能 PR 只能进入 `dev`；在固定测试站验收后，正式发布只允许 `dev → main`。两个项目都使用：
 
 - 前端发布目录：`dist`
 - Cloudflare Functions：`functions/api/dingtalk/config.js`、`functions/api/dingtalk/login.js`
@@ -22,12 +27,15 @@ Cloudflare 的 Git 仓库构建环境当前使用 Wrangler 3.x 打包 Pages Func
 
 ## Cloudflare Pages 设置
 
-在 Cloudflare Pages 连接 GitHub 仓库后：
+在两个 Cloudflare Pages 项目连接同一个 GitHub 仓库后：
 
 - Framework preset：`None`
 - Build command：`npm run build`
 - Build output directory：`dist`
 - Functions directory：默认 `functions`
+- 正式项目 Production branch：`main`
+- 测试项目 Production branch：`dev`
+- 两项目关闭其他分支自动部署；临时 Preview 地址不作为产品验收入口
 
 平台连接保险箱需要一个仅存在于 Cloudflare 的加密主密钥：
 
@@ -35,7 +43,10 @@ Cloudflare 的 Git 仓库构建环境当前使用 Wrangler 3.x 打包 Pages Func
 PLATFORM_CREDENTIAL_MASTER_KEY=32 字节 Base64URL 随机值
 ```
 
-真实值使用 Pages Secret 保存，不能写入 GitHub 或普通环境变量。Production 和 Preview 都要设置；如果两个环境绑定同一个 D1，公司管理员在数据中心保存一次钉钉或快麦连接后即可共同读取。旧的 `DINGTALK_APP_KEY`、`DINGTALK_APP_SECRET` 和快麦变量继续作为兼容回退，不再是新增连接的主要入口。环境能力清单和生产就绪页面只检查配置名称，不展示密钥值。
+真实值使用 Pages Secret 保存，不能写入 GitHub 或普通环境变量。两个项目的 Production 和 Preview
+都要设置。已有凭据保险箱密文时只能复用现有 `PLATFORM_CREDENTIAL_MASTER_KEY`，禁止生成新密钥覆盖；
+双项目检查只输出 Secret 名称，不输出值。两个项目绑定同一个 D1，公司管理员在数据中心保存一次平台
+连接后即可共同读取。旧的 Provider 环境变量只作为兼容回退，不再是新增连接的主要入口。
 
 ## 公司共享数据库
 
@@ -91,19 +102,20 @@ npm run verify:production
 
 ## 钉钉后台设置
 
-Cloudflare 部署完成后会得到一个公开 HTTPS 地址，例如：
+Cloudflare 正式项目固定地址为：
 
 ```text
-https://product-flow-system.pages.dev
+https://deshan-tiyes-system.pages.dev
 ```
 
 回到钉钉开发平台，把网页应用里的移动端首页地址和 PC 端首页地址都改成：
 
 ```text
-https://product-flow-system.pages.dev/?corpId=$CORPID$
+https://deshan-tiyes-system.pages.dev/?corpId=$CORPID$
 ```
 
-保存后进入「版本管理与发布」，创建新版本并发布。钉钉提示发布后，工作台里打开的才是新地址。
+安全 redirect 与 SSO 白名单同时登记正式站和测试站对应的 callback，但工作台移动端/PC 首页只指向
+正式站。保存后进入「版本管理与发布」，创建新版本并发布。钉钉提示发布后，工作台里打开的才是新地址。
 
 ## 本地调试
 
@@ -127,11 +139,25 @@ http://127.0.0.1:8127/
 DINGTALK_APP_KEY=...
 DINGTALK_APP_SECRET=...
 DINGTALK_PORT=8127
-PRODUCTION_DATA_API_URL=https://product-flow-system.pages.dev
+PRODUCTION_DATA_API_URL=https://deshan-tiyes-system.pages.dev
 PRODUCTION_DATA_ACCESS_TOKEN=仅属于当前授权账号的个人令牌
 ```
 
 缺少或撤销个人令牌时，本地会话直接失败，不会降级为硬编码最高权限账号。正式生产域名即使误配本地开关和令牌也不会启用本地账号模式。
+
+## 固定站部署后验收
+
+两个固定站的每次 `dev` 或 `main` 更新都会运行 `deployed-smoke`：
+
+- `cloudflare-entry.html` 必须报告目标 Git commit。
+- `/api/auth/dingtalk/start` 必须命中静态入口，避免冷启动 D1/Worker CPU 故障。
+- OAuth bootstrap 必须返回所属固定站的同源 callback。
+- 未登录会话必须返回安全状态。
+- 受控 readiness 必须对当前受影响平台无阻断。
+
+CI 或 Cloudflare deployment 显示成功不等于验收完成。钉钉登录、公司 Mac 采集器和固定站真实请求
+分别验证；旧项目只在这些依赖全部切换后删除。完整决策见
+`docs/decisions/2026-07-28-main-dev-gitops.md`。
 
 ## 本地沙箱模式（本地 D1）
 

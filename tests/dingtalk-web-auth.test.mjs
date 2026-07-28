@@ -145,6 +145,46 @@ test("Cloudflare preview login starts OAuth on the registered production origin"
   assert.equal(response.headers.get("set-cookie"), null);
 });
 
+test("the fixed production and development sites keep DingTalk callbacks on their own origin", async () => {
+  for (const origin of [
+    "https://deshan-tiyes-system.pages.dev",
+    "https://deshan-tiyes-system-dev.pages.dev"
+  ]) {
+    const response = await bootstrapBrowserLogin({
+      request: new Request(`${origin}/api/auth/dingtalk/bootstrap`),
+      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    });
+    const payload = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(
+      new URL(payload.authorizeUrl).searchParams.get("redirect_uri"),
+      `${origin}/api/auth/dingtalk/callback`
+    );
+  }
+});
+
+test("branch preview deployments redirect to the matching fixed Pages project", async () => {
+  const cases = [
+    [
+      "https://abc123.deshan-tiyes-system.pages.dev/api/auth/dingtalk/start",
+      "https://deshan-tiyes-system.pages.dev/api/auth/dingtalk/start"
+    ],
+    [
+      "https://abc123.deshan-tiyes-system-dev.pages.dev/api/auth/dingtalk/start",
+      "https://deshan-tiyes-system-dev.pages.dev/api/auth/dingtalk/start"
+    ]
+  ];
+  for (const [requestUrl, expectedLocation] of cases) {
+    const response = await startBrowserLogin({
+      request: new Request(requestUrl),
+      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    });
+    assert.equal(response.status, 302);
+    assert.equal(response.headers.get("location"), expectedLocation);
+    assert.equal(response.headers.get("set-cookie"), null);
+  }
+});
+
 test("group authorization remembers only a safe same-origin return path", async () => {
   const response = await startBrowserLogin({
     request: new Request("https://flow.example.com/api/auth/dingtalk/start?returnTo=%2F%3FproductId%3Dp1%23progress"),

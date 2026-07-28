@@ -13,6 +13,12 @@ const REQUIRED_PROVIDER_SECRETS = Object.freeze([
   "KUAIMAI_APP_SECRET"
 ]);
 const OPTIONAL_PROVIDER_SECRETS = Object.freeze(["KUAIMAI_REFRESH_TOKEN"]);
+const REQUIRED_SHARED_PROJECT_SECRETS = Object.freeze([
+  "DEMO_DATA_MASKING_KEY",
+  "DINGTALK_APP_KEY",
+  "DINGTALK_APP_SECRET",
+  "PLATFORM_CREDENTIAL_MASTER_KEY"
+]);
 
 function defaultRun(command, args, options = {}) {
   return execFileSync(command, args, {
@@ -95,6 +101,40 @@ export function configurePagesEnvironmentParity({
   };
 }
 
+export function configureDualPagesProjects({
+  envPath,
+  productionProject = "deshan-tiyes-system",
+  developmentProject = "deshan-tiyes-system-dev",
+  run = defaultRun
+} = {}) {
+  const resolvedEnvPath = resolve(envPath || ".env");
+  const cwd = dirname(resolvedEnvPath);
+  const current = parseLocalEnv(readFileSync(resolvedEnvPath, "utf8"));
+  const missing = REQUIRED_SHARED_PROJECT_SECRETS.filter(name => !String(current[name] || "").trim());
+  if (missing.length) {
+    throw new Error(`本地 .env 缺少必要双项目配置：${missing.join("、")}`);
+  }
+  if (!validMasterKey(current.PLATFORM_CREDENTIAL_MASTER_KEY)) {
+    throw new Error("本地平台连接保险箱主密钥无效，禁止生成或轮换后覆盖现有项目。");
+  }
+  const projects = [productionProject, developmentProject].map(value => String(value || "").trim());
+  if (projects.some(value => !value) || new Set(projects).size !== projects.length) {
+    throw new Error("正式与测试 Pages 项目名称必须存在且互不相同。");
+  }
+  for (const projectName of projects) {
+    for (const environment of ["preview", "production"]) {
+      for (const name of REQUIRED_SHARED_PROJECT_SECRETS) {
+        putSecret(run, cwd, projectName, environment, name, current[name]);
+      }
+    }
+  }
+  return {
+    configuredProjects: projects,
+    configuredEnvironments: ["preview", "production"],
+    configuredNames: [...REQUIRED_SHARED_PROJECT_SECRETS].sort()
+  };
+}
+
 const scriptPath = fileURLToPath(import.meta.url);
 if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
   try {
@@ -102,8 +142,16 @@ if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
     const envFlag = process.argv.indexOf("--env-file");
     const requestedEnvPath = envFlag >= 0 ? process.argv[envFlag + 1] : "";
     const envPath = requestedEnvPath ? resolve(requestedEnvPath) : resolveSharedEnvPath(root);
-    const result = configurePagesEnvironmentParity({ envPath });
-    console.log(`Pages Secret 配置完成：${result.configuredEnvironments.join("、")}；已配置名称 ${result.configuredNames.join("、")}。`);
+    const legacyFlag = process.argv.indexOf("--legacy-project");
+    if (legacyFlag >= 0) {
+      const projectName = String(process.argv[legacyFlag + 1] || "").trim();
+      if (!projectName) throw new Error("--legacy-project 必须提供项目名。");
+      const result = configurePagesEnvironmentParity({ envPath, projectName });
+      console.log(`Pages Secret 配置完成：${projectName}；${result.configuredEnvironments.join("、")}；已配置名称 ${result.configuredNames.join("、")}。`);
+    } else {
+      const result = configureDualPagesProjects({ envPath });
+      console.log(`Pages 双项目 Secret 配置完成：${result.configuredProjects.join("、")}；${result.configuredEnvironments.join("、")}；已配置名称 ${result.configuredNames.join("、")}。`);
+    }
   } catch (error) {
     console.error(error?.message || error);
     process.exitCode = 1;

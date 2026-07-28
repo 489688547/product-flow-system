@@ -74,7 +74,7 @@ const LOCAL_COLLABORATION_ACTOR = {
 
 loadDotEnv();
 productionDataClient = createProductionDataClient({
-  apiUrl: process.env.PRODUCTION_DATA_API_URL || "https://product-flow-system.pages.dev",
+  apiUrl: process.env.PRODUCTION_DATA_API_URL || "https://deshan-tiyes-system.pages.dev",
   accessToken: process.env.PRODUCTION_DATA_ACCESS_TOKEN || ""
 });
 

@@ -13,7 +13,7 @@ async function loadScript() {
 test("deployed readiness accepts a ready production response", async () => {
   const { checkDeployedReadiness } = await loadScript();
   const payload = await checkDeployedReadiness({
-    baseUrl: "https://product-flow-system.pages.dev",
+    baseUrl: "https://deshan-tiyes-system.pages.dev",
     accessToken: "token",
     fetchImpl: async () => new Response(JSON.stringify({ environment: "production", ready: true, capabilities: [] }), { status: 200 })
   });
@@ -23,7 +23,7 @@ test("deployed readiness accepts a ready production response", async () => {
 test("deployed readiness fails with the exact blocking configuration names", async () => {
   const { checkDeployedReadiness } = await loadScript();
   await assert.rejects(() => checkDeployedReadiness({
-    baseUrl: "https://product-flow-system.pages.dev",
+    baseUrl: "https://deshan-tiyes-system.pages.dev",
     accessToken: "token",
     fetchImpl: async () => new Response(JSON.stringify({
       environment: "production",
@@ -36,7 +36,7 @@ test("deployed readiness fails with the exact blocking configuration names", asy
 test("deployed readiness blocks warnings for every explicitly affected platform", async () => {
   const { checkDeployedReadiness } = await loadScript();
   await assert.rejects(() => checkDeployedReadiness({
-    baseUrl: "https://product-flow-system.pages.dev",
+    baseUrl: "https://deshan-tiyes-system.pages.dev",
     accessToken: "token",
     requiredPlatforms: ["kuaimai"],
     fetchImpl: async () => new Response(JSON.stringify({
@@ -55,7 +55,7 @@ test("deployed readiness blocks warnings for every explicitly affected platform"
 test("deployed readiness does not promote unrelated warnings to blocking", async () => {
   const { checkDeployedReadiness } = await loadScript();
   const payload = await checkDeployedReadiness({
-    baseUrl: "https://product-flow-system.pages.dev",
+    baseUrl: "https://deshan-tiyes-system.pages.dev",
     accessToken: "token",
     requiredPlatforms: ["dingtalk"],
     oauthConcurrency: 2,
@@ -91,7 +91,7 @@ test("deployed readiness proves the static OAuth entry and concurrent bootstrap 
   const { checkDeployedReadiness } = await loadScript();
   let bootstrapCalls = 0;
   const payload = await checkDeployedReadiness({
-    baseUrl: "https://product-flow-system.pages.dev",
+    baseUrl: "https://deshan-tiyes-system.pages.dev",
     accessToken: "token",
     requiredPlatforms: ["dingtalk"],
     oauthConcurrency: 3,

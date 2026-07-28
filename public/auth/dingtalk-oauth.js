@@ -1,6 +1,30 @@
 const TRANSIENT_STATUS = new Set([502, 503, 504]);
 const DEFAULT_DELAYS = [0, 250, 750, 1500];
-const PRODUCTION_ORIGIN = "https://product-flow-system.pages.dev";
+const PRODUCTION_ORIGIN = "https://deshan-tiyes-system.pages.dev";
+const DEVELOPMENT_ORIGIN = "https://deshan-tiyes-system-dev.pages.dev";
+const LEGACY_PRODUCTION_ORIGIN = "https://product-flow-system.pages.dev";
+
+function fixedPagesOrigin(current) {
+  if (
+    current.hostname.endsWith(".deshan-tiyes-system-dev.pages.dev")
+    && current.origin !== DEVELOPMENT_ORIGIN
+  ) {
+    return DEVELOPMENT_ORIGIN;
+  }
+  if (
+    current.hostname.endsWith(".deshan-tiyes-system.pages.dev")
+    && current.origin !== PRODUCTION_ORIGIN
+  ) {
+    return PRODUCTION_ORIGIN;
+  }
+  if (
+    current.hostname.endsWith(".product-flow-system.pages.dev")
+    && current.origin !== LEGACY_PRODUCTION_ORIGIN
+  ) {
+    return LEGACY_PRODUCTION_ORIGIN;
+  }
+  return "";
+}
 
 function wait(delay) {
   return new Promise(resolve => setTimeout(resolve, delay));
@@ -81,11 +105,9 @@ export async function runDingTalkOAuthStart({
 } = {}) {
   const current = new URL(windowRef.location.href);
   const returnTo = safeReturnTo(current.searchParams.get("returnTo"));
-  if (
-    current.hostname.endsWith(".product-flow-system.pages.dev")
-    && current.origin !== PRODUCTION_ORIGIN
-  ) {
-    const target = new URL("/api/auth/dingtalk/start", PRODUCTION_ORIGIN);
+  const fixedOrigin = fixedPagesOrigin(current);
+  if (fixedOrigin) {
+    const target = new URL("/api/auth/dingtalk/start", fixedOrigin);
     if (returnTo) target.searchParams.set("returnTo", returnTo);
     windowRef.location.replace(target.toString());
     return;
