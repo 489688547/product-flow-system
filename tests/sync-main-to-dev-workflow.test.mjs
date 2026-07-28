@@ -53,3 +53,13 @@ test("workflow 具备开 PR 所需的写权限，且不越权", async () => {
   // 回同步不需要这些权限，给了就是越权。
   assert.equal(/packages:\s*write|id-token:\s*write/.test(workflow), false);
 });
+
+test("组织禁止 Actions 建 PR 时不把工作流标红，而是说清下一步", async () => {
+  // 实测：分支能推成功，但 gh pr create 被组织策略拒绝。
+  // 此时回同步只差一个人工 PR，把整个工作流标红会掩盖真正的失败。
+  const workflow = await readFile(workflowPath, "utf8");
+  assert.match(workflow, /if gh pr create/);
+  assert.match(workflow, /GITHUB_STEP_SUMMARY/);
+  assert.match(workflow, /::warning::/);
+  assert.match(workflow, /Allow GitHub Actions to create and approve pull requests/);
+});
