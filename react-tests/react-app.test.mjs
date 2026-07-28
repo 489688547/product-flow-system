@@ -439,6 +439,9 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /task\.dingMeeting\?\.eventId/);
   assert.doesNotMatch(page, /type="date"/);
   assert.match(categorySelect, /TASK_CATEGORIES/);
+  assert.match(categorySelect, /normalizeTaskCategory/);
+  assert.match(categorySelect, /const normalizedValue = normalizeTaskCategory\(value\)/);
+  assert.doesNotMatch(categorySelect, /<span>\{value \|\| TASK_CATEGORIES\[0\]\}<\/span>/);
   assert.match(categorySelect, /<FloatingMenu/);
   assert.match(categorySelect, /role="listbox"/);
   assert.match(meetingModal, /orgUsers\(orgCache\)/);
