@@ -473,3 +473,15 @@ test("service worker hardens tab ownership, keep-alive and download matching", a
   assert.match(serviceWorker, /exportStartedAt/);
   assert.match(executor, /exportStartedAt: context\.exportStartedAt \|\| null/);
 });
+
+test("popup shows the business date and stage without inventing a queue total", async () => {
+  const popup = await readFile(new URL("../chrome-extension/company-data-collector/popup.js", import.meta.url), "utf8");
+  // 采集中必须能看出在采哪一天、到哪一步，否则用户只知道「在采集」。
+  assert.match(popup, /activeJob\.businessDate/);
+  assert.match(popup, /stageLabel\(/);
+  assert.match(popup, /正在下载报表/);
+  // stage 落后于 status 时以 status 为准，与网页端同口径。
+  assert.match(popup, /stage === "queued" && status && status !== "queued"/);
+  // 扩展一次只领一个任务，不知道服务端队列里还有多少，显示队列总数会误导。
+  assert.doesNotMatch(popup, /queueRemaining|队列还剩|队列中 /);
+});

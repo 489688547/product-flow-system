@@ -43,7 +43,8 @@ test("four real app pages expose the shared collaboration entry instead of calli
   const paths = [
     "src/features/progress/ProductProgressPage.jsx",
     "src/features/supply-chain/QualityWorkspace.jsx",
-    "src/features/data-center/DataGovernanceWorkspaces.jsx",
+    // 数据中心的协作入口随重排迁到覆盖行：从永远为空的供应链质量事件，改为真实的数据缺口。
+    "src/features/data-center/SyncCoveragePanel.jsx",
     "src/features/brand-content/BrandDataIssuesPage.jsx"
   ];
   for (const path of paths) {

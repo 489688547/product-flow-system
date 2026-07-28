@@ -16,7 +16,8 @@ test("ERP archive client uses the governed platform route", async () => {
 
 test("sync workspace renders local archive states without exposing absolute paths", () => {
   const source = readFileSync("src/features/data-center/DataGovernanceWorkspaces.jsx", "utf8");
-  assert.match(source, /快麦原始归档/);
+  // 归档区块扩展到全部 Provider，不再只讲快麦。
+  assert.match(source, /本机原始归档/);
   assert.match(source, /等待导出/);
   assert.match(source, /归档文件/);
   assert.doesNotMatch(source, /absolutePath/);
