@@ -1,0 +1,75 @@
+name: sync-main-to-dev
+
+# dev → main 发布会在 main 上产生一个合并提交，它不在 dev 上。
+# 下一个发布 PR 会因此被 check:branch-base 拒绝。此前每次发布都要手工开回同步 PR
+# （#124、#127、#135）。这里把这一步自动化。
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-main-to-dev
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 判断 dev 是否已包含 main
+        id: check
+        run: |
+          git fetch origin dev main
+          if git merge-base --is-ancestor origin/main origin/dev; then
+            echo "dev 已包含 main，无需回同步。"
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 创建回同步分支
+        if: steps.check.outputs.needed == 'true'
+        id: branch
+        run: |
+          BRANCH="chore/sync-main-to-dev-${GITHUB_SHA::7}"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH" origin/dev
+          # 合并 main 而不是重置到 main：dev 上可能已有 main 没有的新提交。
+          if ! git merge origin/main --no-edit -m "chore(release): 把 main 的发布合并提交回同步到 dev"; then
+            echo "回同步存在冲突，需要人工处理。"
+            exit 1
+          fi
+          git push --force-with-lease origin "$BRANCH"
+
+      - name: 开回同步 PR
+        if: steps.check.outputs.needed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+        run: |
+          cat > /tmp/pr-body.md <<'EOF'
+          dev → main 发布会在 main 上留下一个合并提交，它不在 dev 上；下一个发布 PR 会因此被
+          `check:branch-base` 拒绝。本 PR 由 `sync-main-to-dev` workflow 自动创建，只做回同步，
+          不含任何功能变更。
+
+          若本 PR 出现冲突，请人工解决后再合并，不要强推 dev。
+
+          Rule-Writeback: none
+          Rule-Writeback-Reason: 仅回同步分支，不改变任何代码、接口或规则
+          Integration-Impact: none
+          Integration-Impact-Reason: 无实质文件变更，不触及注册表匹配路径
+          EOF
+          gh pr create \
+            --base dev \
+            --head "$BRANCH" \
+            --title "chore(release): 把 main 的发布合并提交回同步到 dev" \
+            --body-file /tmp/pr-body.md
