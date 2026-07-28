@@ -388,6 +388,22 @@ test("legacy task and template categories normalize without losing execution sta
   assert.equal(normalized.settings.taskTemplates[0].category, "待办任务");
 });
 
+test("legacy preparation and decision categories normalize to todo tasks", () => {
+  const state = createDefaultState();
+  const normalized = normalizeClientState({
+    ...state,
+    tasks: [
+      { id: "prep", productId: "p1", stage: 1, category: "会前准备", title: "准备材料" },
+      { id: "decision", productId: "p1", stage: 1, category: "决策", title: "确认结论" }
+    ]
+  });
+
+  assert.deepEqual(normalized.tasks.filter(task => ["prep", "decision"].includes(task.id)).map(task => task.category), [
+    "待办任务",
+    "待办任务"
+  ]);
+});
+
 test("task responsibility departments align with current organization names", () => {
   const state = createDefaultState();
   const normalized = normalizeClientState({

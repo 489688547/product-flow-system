@@ -5,6 +5,8 @@ import {
   listDingTodoTasks,
   optionsResponse
 } from "../_shared/dingtalk.js";
+import { readCompanyState } from "../../state.js";
+import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 
 const MAX_BOUND_TASKS = 40;
 const TASK_DETAIL_CONCURRENCY = 4;
@@ -16,15 +18,71 @@ function requestedTaskIds(url) {
     .slice(0, MAX_BOUND_TASKS);
 }
 
-async function loadBoundTaskDetails(accessToken, unionId, taskIds) {
-  const cards = [];
-  for (let offset = 0; offset < taskIds.length; offset += TASK_DETAIL_CONCURRENCY) {
-    const batch = taskIds.slice(offset, offset + TASK_DETAIL_CONCURRENCY);
-    cards.push(...await Promise.all(
-      batch.map(taskId => getDingTodoTask(accessToken, unionId, taskId))
-    ));
+export function buildBoundTodoQueries(state = {}, taskIds = [], actorUnionId = "") {
+  const requested = new Set(taskIds);
+  const products = new Map((state.products || []).map(product => [String(product.id), product]));
+  return (state.tasks || []).flatMap(task => {
+    const taskId = String(task?.dingTodo?.id || "").trim();
+    if (!requested.has(taskId)) return [];
+    const product = products.get(String(task.productId)) || {};
+    const managerUnionId = String(product.productManagerUnionId || "").trim();
+    const creatorUnionId = String(task?.dingTodo?.creatorUnionId || "").trim();
+    const executorUnionIds = [...new Set((task?.dingTodo?.executorUnionIds || [])
+      .map(value => String(value || "").trim())
+      .filter(Boolean))];
+    const actor = String(actorUnionId || "").trim();
+    if (![managerUnionId, creatorUnionId, ...executorUnionIds].includes(actor)) return [];
+    return executorUnionIds
+      .filter(unionId => unionId !== managerUnionId)
+      .map(executorUnionId => ({ taskId, executorUnionId }));
+  }).slice(0, MAX_BOUND_TASKS);
+}
+
+export async function loadBoundTaskDetails(accessToken, queries, getTask = getDingTodoTask) {
+  const results = [];
+  for (let offset = 0; offset < queries.length; offset += TASK_DETAIL_CONCURRENCY) {
+    const batch = queries.slice(offset, offset + TASK_DETAIL_CONCURRENCY);
+    results.push(...await Promise.all(batch.map(async query => {
+      try {
+        const card = await getTask(accessToken, query.executorUnionId, query.taskId);
+        return { ...query, card, ok: true };
+      } catch {
+        return { ...query, card: null, ok: false };
+      }
+    })));
   }
-  return cards;
+  const grouped = new Map();
+  results.forEach(result => {
+    const group = grouped.get(result.taskId) || [];
+    group.push(result);
+    grouped.set(result.taskId, group);
+  });
+  const cards = [...grouped].map(([taskId, group]) => {
+    const first = group.find(item => item.ok)?.card || { taskId };
+    const executorStatuses = group
+      .filter(item => item.ok)
+      .map(item => ({ unionId: item.executorUnionId, isDone: Boolean(item.card?.isDone) }));
+    return {
+      ...first,
+      taskId,
+      executorStatuses,
+      executorStatusCoverage: {
+        complete: executorStatuses.length === group.length,
+        expectedCount: group.length,
+        statusCount: executorStatuses.length
+      }
+    };
+  });
+  const partial = results.some(result => !result.ok);
+  return {
+    cards,
+    warning: partial ? {
+      source: "personal",
+      code: "DINGTALK_EXECUTOR_STATUS_PARTIAL",
+      message: "部分执行人的完成状态暂未读取，负责人验收已暂停。",
+      retryable: true
+    } : null
+  };
 }
 
 function safeLaneWarning(source, error) {
@@ -67,6 +125,7 @@ export async function collectDingTodoCards({
     try {
       const result = await loadPersonal();
       personal = Array.isArray(result?.cards) ? result.cards : [];
+      warnings.push(...(Array.isArray(result?.warnings) ? result.warnings : []));
       coverage.personal.ok = true;
       coverage.personal.truncated = Boolean(result?.truncated);
       coverage.personal.nextPage = Number(result?.nextPage) || 1;
@@ -137,14 +196,25 @@ export async function onRequest({ request, env, data = {} }) {
   const workPendingToken = safeCursor("workPendingToken");
   const workCompletedToken = safeCursor("workCompletedToken");
   const taskIds = requestedTaskIds(url);
+  let boundQueries = [];
+  if (taskIds.length) {
+    const db = requestBusinessDatabase({ env, data });
+    const stored = db ? await readCompanyState(db) : null;
+    boundQueries = buildBoundTodoQueries(stored?.state, taskIds, unionId);
+    if (!boundQueries.length) {
+      return jsonResponse({ synced: false, message: "没有可读取的已绑定待办。" }, 403);
+    }
+  }
 
   const result = await collectDingTodoCards({
     personalAuthorized: true,
     loadPersonal: async () => {
       const accessToken = await getDingAccessToken(env);
       if (taskIds.length) {
+        const detailResult = await loadBoundTaskDetails(accessToken, boundQueries);
         return {
-          cards: await loadBoundTaskDetails(accessToken, unionId, taskIds),
+          cards: detailResult.cards,
+          warnings: detailResult.warning ? [detailResult.warning] : [],
           truncated: false,
           nextPage: personalPage,
           pendingNextToken: "",

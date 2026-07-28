@@ -13,6 +13,10 @@ import { TodoPreview } from "./TodoPreview.jsx";
 
 export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }) {
   const users = useMemo(() => orgUsers(orgCache), [orgCache]);
+  const executorUsers = useMemo(() => users.filter(user => (
+    String(user.unionid || user.unionId || "").trim()
+    !== String(product?.productManagerUnionId || "").trim()
+  )), [product?.productManagerUnionId, users]);
   const [selection, setSelection] = useState(() => initialExecutorSelection([], []));
   const [draft, setDraft] = useState(() => createTodoComposerDraft({ product, task }));
   const [submitting, setSubmitting] = useState(false);
@@ -22,15 +26,15 @@ export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }
 
   useEffect(() => {
     if (!open) return;
-    setSelection(initialExecutorSelection(users, savedExecutorUnionIds));
+    setSelection(initialExecutorSelection(executorUsers, savedExecutorUnionIds));
     setDraft(createTodoComposerDraft({ product, task }));
     setError("");
-  }, [open, task?.id, task?.dingTodo?.syncedAt, product?.id]);
+  }, [executorUsers, open, product?.id, task?.dingTodo?.syncedAt, task?.id]);
 
   useEffect(() => {
     if (!open || !savedExecutorUnionIds.length) return;
-    setSelection(current => hydrateSavedExecutors(current, users, savedExecutorUnionIds));
-  }, [open, savedExecutorKey, users]);
+    setSelection(current => hydrateSavedExecutors(current, executorUsers, savedExecutorUnionIds));
+  }, [executorUsers, open, savedExecutorKey]);
 
   const selectedUsers = selectedExecutorUsers(selection);
   const submit = async () => {
@@ -73,7 +77,7 @@ export function TodoSyncModal({ open, task, product, orgCache, onClose, onSync }
           <span>{task?.ownerDept || "待确定责任部门"} · 当前状态：<b className={`todo-status-text status-${status}`}>{status}</b></span>
         </div>
         <TodoComposerFields draft={draft} onChange={setDraft} disabled={submitting} />
-        <GroupExecutorPicker users={users} selection={selection} onChange={setSelection} disabled={submitting} />
+        <GroupExecutorPicker users={executorUsers} selection={selection} onChange={setSelection} disabled={submitting} />
         <TodoPreview draft={draft} executors={selectedUsers} />
         {error ? <div className="form-error" role="alert">{error}</div> : null}
       </Modal>

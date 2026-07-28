@@ -362,6 +362,8 @@ test("all searchable and custom dropdowns render through a viewport floating lay
 
 test("product progress derives stages and tasks from the selected product level", () => {
   const page = read("src/features/progress/ProductProgressPage.jsx");
+  const taskCompletion = read("src/features/progress/TaskCompletionProgress.jsx");
+  const taskCompletionDomain = read("src/domain/taskCompletion.js");
   const categorySelect = read("src/features/progress/TaskCategorySelect.jsx");
   const meetingModal = read("src/features/progress/MeetingScheduleModal.jsx");
   const datePicker = read("src/ui/DatePickerField.jsx");
@@ -413,8 +415,8 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /stagePolicyTone/);
   assert.match(page, /policy-\$\{stagePolicyTone\(policy\.mode\)\}/);
   assert.match(page, /<ProductPicker/);
-  assert.match(page, /className=\{`task-check/);
-  assert.match(page, /type="checkbox"/);
+  assert.match(page, /<TaskCompletionProgress/);
+  assert.match(taskCompletion, /type="checkbox"/);
   assert.match(page, /focusStage/);
   assert.match(page, /const explicitStage = Number\.isInteger\(activeFocus\?\.stage\)/);
   assert.match(page, /setSelectedStage\(validProgressStage\(explicitStage\)\)/);
@@ -427,9 +429,9 @@ test("product progress derives stages and tasks from the selected product level"
   assert.match(page, /<TaskDeliverables/);
   assert.match(page, /<TaskDeliverableModal/);
   assert.match(page, /deliverablesForTask\(state, task\.id\)/);
-  assert.match(page, /task\.required/);
-  assert.match(page, /completionBlocked/);
-  assert.match(page, /请先添加交付物/);
+  assert.match(taskCompletion, /taskAcceptanceBlockReason/);
+  assert.match(taskCompletion, /blockReason/);
+  assert.match(taskCompletionDomain, /必需任务需要先添加交付物/);
   assert.doesNotMatch(page, /aria-label=\{`\$\{task\.title\}交付物`\}/);
   assert.match(page, /<MeetingScheduleModal/);
   assert.match(page, /data-testid="schedule-task-meeting"/);
