@@ -526,6 +526,37 @@ test("DingTalk personal completion without a modified timestamp still flows back
   assert.equal(dingTalkDomain.reconcileTaskTodosFromDingTalk(reconciled, [card]), reconciled);
 });
 
+test("DingTalk reconciliation hydrates remote completion proof on existing bindings", () => {
+  const card = {
+    taskId: "todo-1",
+    subject: "PRD 评审",
+    isDone: true,
+    modifiedTime: new Date("2026-07-18T10:01:00.000Z").getTime()
+  };
+  const [reconciled] = dingTalkDomain.reconcileTaskTodosFromDingTalk([{
+    id: "t1",
+    productId: "p1",
+    title: "PRD 评审",
+    done: false,
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      actionVersion: 2,
+      syncedAt: "2026-07-18T10:00:00.000Z"
+    }
+  }], [card]);
+  const legacyBinding = {
+    ...reconciled,
+    dingTodo: { ...reconciled.dingTodo }
+  };
+  delete legacyBinding.dingTodo.remoteDone;
+
+  const [hydrated] = dingTalkDomain.reconcileTaskTodosFromDingTalk([legacyBinding], [card]);
+  assert.equal(hydrated.dingTodo.remoteDone, true);
+  assert.equal(todoSyncStatus(hydrated), "已完成");
+});
+
 test("DingTalk reconciliation preserves task identity when no remote card matches", () => {
   const tasks = [{ id: "t1", productId: "p1", done: false }];
   assert.equal(dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, [{ taskId: "other" }]), tasks);
