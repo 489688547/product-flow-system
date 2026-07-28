@@ -80,32 +80,36 @@ test("governance workspaces merge quality into sync and use the focused AI model
   assert.match(page, /DataStandardsWorkspace/);
   assert.doesNotMatch(page, /DataQualityWorkspace/);
   assert.doesNotMatch(page, /quality:\s*</);
-  assert.match(page, /sync: <SyncRunsWorkspace quality=\{quality\} focusTarget=\{syncFocus\} canTrigger=\{canEdit\} \/>/);
-  assert.match(workspaces, /export function SyncRunsWorkspace\(\{ quality, focusTarget = "", canTrigger = false \}\)/);
-  assert.match(workspaces, /待处理问题[\s\S]*执行记录[\s\S]*待处理数据问题/);
-  assert.match(workspaces, /quality\.latestSalesAnomaly/);
-  assert.match(workspaces, /SALES_TARGET_DAY_MISSING/);
-  assert.match(workspaces, /销售数据尚未同步/);
-  assert.match(workspaces, /系统已自动排队 Chrome 采集任务/);
+  assert.match(page, /sync: <SyncRunsWorkspace quality=\{quality\} dailyFacts=/);
+  assert.match(workspaces, /export function SyncRunsWorkspace\(\{ quality, dailyFacts = \[\], focusTarget = "", canTrigger = false \}\)/);
+  // 页面按「能不能信」重排：结论条 → 同步覆盖 → 执行记录 → 本机原始归档，四块各答一个问题。
+  assert.match(workspaces, /SyncConclusionBar[\s\S]*SyncCoveragePanel[\s\S]*执行记录[\s\S]*本机原始归档/);
+  const coveragePanel = read("src/features/data-center/SyncCoveragePanel.jsx");
+  const conclusionBar = read("src/features/data-center/SyncConclusionBar.jsx");
+  assert.match(coveragePanel, /哪几天的数据不能信/);
+  assert.match(workspaces, /每一次跑了什么、结果如何/);
+  assert.match(workspaces, /公司 Mac 上有哪些原始文件/);
+  // 协作入口从永远为空的供应链质量事件迁到真实的数据缺口行。
+  assert.match(coveragePanel, /collaborationDraftFromDataIssue/);
+  // 采集器离线时主动作是重新检测，不是把任务塞进没人领的队列。
+  assert.match(conclusionBar, /重新检测采集器/);
+  assert.match(coveragePanel, /重新检测采集器/);
+  assert.match(coveragePanel, /仍然排队/);
+  // 销售异常卡、抖店采集表、待处理数据问题三个区块已被覆盖表与结论条取代。
+  assert.doesNotMatch(workspaces, /抖店 Chrome 官方报表采集/);
+  assert.doesNotMatch(workspaces, /待处理数据问题/);
+  assert.doesNotMatch(workspaces, /quality\.latestSalesAnomaly/);
+  assert.doesNotMatch(workspaces, /buildKuaimaiSalesRecovery/);
   assert.match(workspaces, /loadWebCollectionStatus/);
-  assert.match(workspaces, /dedicated_browser_online: "专用 Chrome 已连接"/);
-  assert.match(workspaces, /dedicated_browser_offline: "专用 Chrome 未连接"/);
-  assert.match(workspaces, /抖店 Chrome 官方报表采集/);
-  assert.match(workspaces, /公司日常 Chrome 的已登录状态/);
-  assert.doesNotMatch(workspaces, /抖店专用 Chrome 官方报表采集/);
-  assert.doesNotMatch(workspaces, /由公司 Mac 的独立店铺 Profile 采集昨天四类资源/);
+  assert.match(workspaces, /buildSyncCoverage/);
+  assert.match(workspaces, /buildCollectionProgress/);
+  assert.match(workspaces, /buildSyncConclusion/);
   assert.match(workspaces, /buildDataSyncRunRows/);
   assert.match(workspaces, /webCollection\.runs/);
-  assert.match(workspaces, /primaryAction\.label/);
-  assert.match(workspaces, /showKuaimaiLogin/);
-  assert.match(workspaces, /打开快麦 ERP/);
-  assert.match(workspaces, /primaryAction\.type === "retrigger"/);
   assert.match(workspaces, /triggerKuaimaiSalesCollection/);
-  assert.match(workspaces, /导入官方销售报表/);
-  assert.match(workspaces, /#data-sources\/erp/);
-  assert.match(workspaces, /#settings\/sales-data/);
-  assert.doesNotMatch(workspaces, /<h2>同步记录<\/h2>/);
-  assert.match(workspaces, /collaborationDraftFromDataIssue/);
+  assert.match(workspaces, /triggerWebCollection/);
+  assert.match(workspaces, /TablePagination/);
+  assert.match(workspaces, /COVERAGE_WINDOW_DAYS = 14/);
   assert.match(workspaces, /refresh/);
   assert.match(page, /AiModelWorkspace/);
   assert.match(page, /DataCenterSettingsWorkspace/);
