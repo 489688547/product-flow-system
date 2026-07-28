@@ -1,9 +1,31 @@
 import {
+  getDingTodoTask,
   getDingAccessToken,
   jsonResponse,
-  listDingUserTodoTasks,
+  listDingTodoTasks,
   optionsResponse
 } from "../_shared/dingtalk.js";
+
+const MAX_BOUND_TASKS = 40;
+const TASK_DETAIL_CONCURRENCY = 4;
+
+function requestedTaskIds(url) {
+  return [...new Set(url.searchParams.getAll("taskId")
+    .map(value => String(value || "").trim())
+    .filter(value => /^[A-Za-z0-9:_-]{1,128}$/.test(value)))]
+    .slice(0, MAX_BOUND_TASKS);
+}
+
+async function loadBoundTaskDetails(accessToken, unionId, taskIds) {
+  const cards = [];
+  for (let offset = 0; offset < taskIds.length; offset += TASK_DETAIL_CONCURRENCY) {
+    const batch = taskIds.slice(offset, offset + TASK_DETAIL_CONCURRENCY);
+    cards.push(...await Promise.all(
+      batch.map(taskId => getDingTodoTask(accessToken, unionId, taskId))
+    ));
+  }
+  return cards;
+}
 
 function safeLaneWarning(source, error) {
   const status = Number(error?.status) || 500;
@@ -114,17 +136,27 @@ export async function onRequest({ request, env, data = {} }) {
   };
   const workPendingToken = safeCursor("workPendingToken");
   const workCompletedToken = safeCursor("workCompletedToken");
+  const taskIds = requestedTaskIds(url);
 
   const result = await collectDingTodoCards({
     personalAuthorized: true,
     loadPersonal: async () => {
       const accessToken = await getDingAccessToken(env);
-      const pending = await listDingUserTodoTasks(accessToken, unionId, {
+      if (taskIds.length) {
+        return {
+          cards: await loadBoundTaskDetails(accessToken, unionId, taskIds),
+          truncated: false,
+          nextPage: personalPage,
+          pendingNextToken: "",
+          completedNextToken: ""
+        };
+      }
+      const pending = await listDingTodoTasks(accessToken, unionId, {
         isDone: false,
         maxPages: 1,
         nextToken: workPendingToken
       });
-      const completed = await listDingUserTodoTasks(accessToken, unionId, {
+      const completed = await listDingTodoTasks(accessToken, unionId, {
         isDone: true,
         maxPages: 1,
         nextToken: workCompletedToken

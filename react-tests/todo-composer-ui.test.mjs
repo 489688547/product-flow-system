@@ -38,6 +38,8 @@ test("product flow automatically refreshes remote DingTalk task changes", () => 
   assert.match(provider, /reconcileTaskTodosFromDingTalk/);
   assert.match(provider, /createDingTalkTodoRefreshController/);
   assert.match(provider, /userHasAssignedDingTalkTodo/);
+  assert.match(provider, /assignedDingTalkTodoIds/);
+  assert.match(provider, /todoRefreshController\.refresh\(assignedTodoIds\)/);
   assert.match(provider, /window\.addEventListener\("focus"/);
   assert.match(provider, /todoRefreshController\.invalidate\(\)/);
 });

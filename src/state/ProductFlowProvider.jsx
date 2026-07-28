@@ -16,6 +16,7 @@ import {
 import { normalizeClientState } from "./stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../domain/sessionUser.js";
 import {
+  assignedDingTalkTodoIds,
   createTaskMeetingRecord,
   reconcileTaskTodosFromDingTalk,
   userHasAssignedDingTalkTodo
@@ -102,6 +103,10 @@ export function ProductFlowProvider({ children }) {
     () => userHasAssignedDingTalkTodo(state.tasks || [], authUser?.unionId),
     [authUser?.unionId, state.tasks]
   );
+  const assignedTodoIds = useMemo(
+    () => assignedDingTalkTodoIds(state.tasks || [], authUser?.unionId),
+    [authUser?.unionId, state.tasks]
+  );
   const commitState = useCallback(updater => {
     setState(current => {
       const nextState = typeof updater === "function" ? updater(current) : updater;
@@ -167,8 +172,8 @@ export function ProductFlowProvider({ children }) {
   }, [loading]);
 
   const refreshTaskTodoStatuses = useCallback(
-    () => todoRefreshController.refresh(),
-    [todoRefreshController]
+    () => todoRefreshController.refresh(assignedTodoIds),
+    [assignedTodoIds, todoRefreshController]
   );
 
   useEffect(() => {

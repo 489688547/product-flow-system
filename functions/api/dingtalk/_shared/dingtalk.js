@@ -1050,46 +1050,36 @@ export async function listDingTodoTasks(
   return cards;
 }
 
-export async function listDingUserTodoTasks(
+export async function getDingTodoTask(
   accessToken,
   unionId,
-  { isDone = false, maxPages = 100, nextToken: initialNextToken = "", fetchImpl = fetch } = {}
+  taskId,
+  { fetchImpl = fetch } = {}
 ) {
   const userUnionId = String(unionId || "").trim();
+  const safeTaskId = String(taskId || "").trim();
   if (!userUnionId) {
     const err = new Error("当前登录账号缺少 unionId，无法查询钉钉待办。");
     err.status = 400;
     throw err;
   }
-  const pageLimit = Math.max(1, Math.min(100, Number(maxPages) || 1));
-  const cards = [];
-  let nextToken = String(initialNextToken || "");
-  let page = 0;
-  do {
-    const body = {
-      isDone: Boolean(isDone),
-      maxResults: 50,
-      needPersonalTodo: true
-    };
-    if (nextToken) body.nextToken = nextToken;
-    const result = await requestDingOpenApi(
-      accessToken,
-      "POST",
-      `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/organizations/tasks/query`,
-      body,
-      fetchImpl
-    );
-    cards.push(...(Array.isArray(result.todoCards) ? result.todoCards : [])
-      .map(card => ({
-        ...card,
-        isDone: Object.hasOwn(card, "isDone") ? Boolean(card.isDone) : Boolean(isDone)
-      })));
-    nextToken = String(result.nextToken || "");
-    page += 1;
-  } while (nextToken && page < pageLimit);
-  cards.truncated = Boolean(nextToken);
-  cards.nextToken = nextToken;
-  return cards;
+  if (!/^[A-Za-z0-9:_-]{1,128}$/.test(safeTaskId)) {
+    const err = new Error("钉钉待办 ID 不合法。");
+    err.status = 400;
+    throw err;
+  }
+  const task = await requestDingOpenApi(
+    accessToken,
+    "GET",
+    `/v1.0/todo/users/${encodeURIComponent(userUnionId)}/tasks/${encodeURIComponent(safeTaskId)}`,
+    null,
+    fetchImpl
+  );
+  return {
+    ...task,
+    taskId: String(task.taskId || task.id || safeTaskId),
+    isDone: Object.hasOwn(task, "isDone") ? Boolean(task.isDone) : Boolean(task.done)
+  };
 }
 
 const DING_TODO_MCP_ENDPOINT = "https://mcp-gw.dingtalk.com/server/0f51140eddcd913106c5821a4d0cd577b2d1a0b6cb452dd0e51ab41facf3a83c";
