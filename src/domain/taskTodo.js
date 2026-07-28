@@ -1,5 +1,5 @@
 const ALL_DEPARTMENT_LABELS = new Set(["全员", "全部", "所有", "所有部门", "公司"]);
-const DING_TODO_ACTION_VERSION = 1;
+const DING_TODO_ACTION_VERSION = 2;
 
 export function parseTaskTodoDeepLink(value = "") {
   let url;
@@ -15,7 +15,7 @@ export function parseTaskTodoDeepLink(value = "") {
   return {
     productId,
     taskId,
-    action: url.searchParams.get("todoAction") === "complete" ? "complete" : "view"
+    action: "view"
   };
 }
 
@@ -153,7 +153,7 @@ export function todoSyncStatus(task) {
   if (!todo?.sourceId) return "待确认";
   if (
     String(todo.source || "").startsWith("todo_open_")
-    && Number(todo.actionVersion || 0) < DING_TODO_ACTION_VERSION
+    || Number(todo.actionVersion || 0) < DING_TODO_ACTION_VERSION
   ) return "待更新";
   const current = buildTaskTodoSnapshot(task, todo.executorUnionIds || [], todo.draft);
   if (!sameSnapshot(current, todo.snapshot)) return "待更新";
@@ -186,7 +186,10 @@ export function applyTaskTodoSyncSuccess(task, { payload, executors = [], snapsh
       snapshot: snapshot || buildTaskTodoSnapshot(effectiveTask, payload?.executorUnionIds || [], payload?.draft),
       lastError: syncWarning,
       failedAt: syncWarning ? syncedAt : "",
-      syncWarningKind: syncWarning ? "partial_sync" : ""
+      syncWarningKind: syncWarning ? "partial_sync" : "",
+      legacyTodo: Object.prototype.hasOwnProperty.call(todo || {}, "legacyTodo")
+        ? todo.legacyTodo
+        : task?.dingTodo?.legacyTodo || null
     }
   };
 }

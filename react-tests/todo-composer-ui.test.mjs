@@ -25,12 +25,12 @@ test("progress page allows opening the composer before a deadline exists", () =>
   assert.match(provider, /applyTaskTodoSyncFailure/);
 });
 
-test("progress page exposes a focused completion action for DingTalk card deep links", () => {
+test("progress page opens DingTalk todo links without a custom completion action", () => {
   assert.match(app, /parseTaskTodoDeepLink\(window\.location\.href\)/);
   assert.match(app, /if \(!screenAllowed\) showScreen\(defaultScreen\)/);
-  assert.match(page, /activeFocus\?\.action === "complete"/);
-  assert.match(page, /完成并同步钉钉/);
-  assert.match(page, /syncFocusedTaskCompletion/);
+  assert.doesNotMatch(page, /activeFocus\?\.action === "complete"/);
+  assert.doesNotMatch(page, /完成并同步钉钉/);
+  assert.doesNotMatch(page, /syncFocusedTaskCompletion/);
   assert.match(page, /document\.getElementById/);
 });
 

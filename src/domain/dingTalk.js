@@ -1,7 +1,7 @@
 import { buildTaskTodoSnapshot, normalizeTaskDueDate } from "./taskTodo.js";
 
 const TODO_PRIORITIES = new Set([10, 20, 30, 40]);
-export const DING_TODO_ACTION_VERSION = 1;
+export const DING_TODO_ACTION_VERSION = 2;
 
 function isTaskTodoSourceForTask(value, sourceId) {
   const actual = String(value || "").trim();
