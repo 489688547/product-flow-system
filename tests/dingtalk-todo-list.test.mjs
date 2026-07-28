@@ -5,7 +5,12 @@ import {
   listDingPersonalTodoTasks,
   listDingTodoTasks
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
-import { collectDingTodoCards, onRequest } from "../functions/api/dingtalk/todo/list.js";
+import {
+  buildBoundTodoQueries,
+  collectDingTodoCards,
+  loadBoundTaskDetails,
+  onRequest
+} from "../functions/api/dingtalk/todo/list.js";
 
 function okJson(body) {
   return { ok: true, status: 200, json: async () => body };
@@ -210,50 +215,57 @@ test("personal todo collection converts provider token expiry into reauthorizati
   assert.doesNotMatch(JSON.stringify(result), /raw provider|private/);
 });
 
-test("todo list endpoint reads only requested bound tasks for the signed-in user with bounded concurrency", async () => {
-  const originalFetch = globalThis.fetch;
-  const calls = [];
-  let activeTodoCalls = 0;
-  let peakTodoCalls = 0;
-  globalThis.fetch = async (url, options = {}) => {
-    calls.push({ url: String(url), options });
-    if (String(url).includes("/gettoken")) return okJson({ errcode: 0, access_token: "access-token" });
-    activeTodoCalls += 1;
-    peakTodoCalls = Math.max(peakTodoCalls, activeTodoCalls);
-    await Promise.resolve();
-    const taskId = String(url).split("/").at(-1);
-    const response = okJson({
-      id: taskId,
-      subject: taskId,
-      done: taskId.endsWith("done")
-    });
-    activeTodoCalls -= 1;
-    return response;
+test("bound todo queries read every ordinary executor and exclude the product manager", () => {
+  const state = {
+    products: [{ id: "p1", productManagerUnionId: "manager-1" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      dingTodo: {
+        id: "todo-1",
+        creatorUnionId: "creator-1",
+        executorUnionIds: ["executor-1", "manager-1", "executor-2", "executor-1"]
+      }
+    }]
   };
-  try {
-    const response = await onRequest({
-      request: new Request(
-        "https://flow.example.com/api/dingtalk/todo/list"
-        + "?unionId=union-attacker&taskId=task-personal-done&taskId=task-personal-pending"
-      ),
-      env: { DINGTALK_APP_KEY: "key", DINGTALK_APP_SECRET: "secret" },
-      data: { session: { unionId: "union-session", name: "周总" } }
-    });
-    const body = await response.json();
-    assert.equal(response.status, 200);
-    assert.equal(body.synced, true);
-    assert.deepEqual(body.todos.map(item => item.taskId).sort(), ["task-personal-done", "task-personal-pending"]);
-    assert.equal(body.todos.find(item => item.taskId === "task-personal-done").isDone, true);
-    assert.equal(body.todos.find(item => item.taskId === "task-personal-pending").isDone, false);
-    const todoCalls = calls.filter(call => call.url.includes("/v1.0/todo/"));
-    assert.equal(todoCalls.length, 2);
-    assert.equal(todoCalls.every(call => call.url.includes("/users/union-session/tasks/task-personal-")), true);
-    assert.equal(todoCalls.every(call => call.options.method === "GET"), true);
-    assert.equal(todoCalls.some(call => call.url.includes("union-attacker")), false);
-    assert.equal(peakTodoCalls <= 4, true);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+
+  assert.deepEqual(buildBoundTodoQueries(state, ["todo-1"], "manager-1"), [
+    { taskId: "todo-1", executorUnionId: "executor-1" },
+    { taskId: "todo-1", executorUnionId: "executor-2" }
+  ]);
+  assert.deepEqual(buildBoundTodoQueries(state, ["todo-1"], "attacker"), []);
+});
+
+test("bound todo detail loading aggregates per-person completion with bounded concurrency", async () => {
+  let active = 0;
+  let peak = 0;
+  const result = await loadBoundTaskDetails("token", [
+    { taskId: "todo-1", executorUnionId: "executor-1" },
+    { taskId: "todo-1", executorUnionId: "executor-2" },
+    { taskId: "todo-1", executorUnionId: "executor-3" },
+    { taskId: "todo-1", executorUnionId: "executor-4" },
+    { taskId: "todo-1", executorUnionId: "executor-5" }
+  ], async (accessToken, unionId, taskId) => {
+    active += 1;
+    peak = Math.max(peak, active);
+    await Promise.resolve();
+    active -= 1;
+    return { taskId, subject: "多人待办", isDone: unionId.endsWith("1") };
+  });
+
+  assert.equal(peak <= 4, true);
+  assert.deepEqual(result.cards[0].executorStatuses, [
+    { unionId: "executor-1", isDone: true },
+    { unionId: "executor-2", isDone: false },
+    { unionId: "executor-3", isDone: false },
+    { unionId: "executor-4", isDone: false },
+    { unionId: "executor-5", isDone: false }
+  ]);
+  assert.deepEqual(result.cards[0].executorStatusCoverage, {
+    complete: true,
+    expectedCount: 5,
+    statusCount: 5
+  });
 });
 
 test("todo list endpoint requires a session union id", async () => {
@@ -266,28 +278,17 @@ test("todo list endpoint requires a session union id", async () => {
   assert.match((await response.json()).message, /unionId/);
 });
 
-test("todo list endpoint fails closed when a requested task detail cannot be read", async () => {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = async url => {
-    if (String(url).includes("/gettoken")) return okJson({ errcode: 0, access_token: "access-token" });
-    return {
-      ok: false,
-      status: 403,
-      json: async () => ({ message: "private provider detail" })
-    };
-  };
-  try {
-    const response = await onRequest({
-      request: new Request("https://flow.example.com/api/dingtalk/todo/list?taskId=task-personal-1"),
-      env: { DINGTALK_APP_KEY: "key", DINGTALK_APP_SECRET: "secret" },
-      data: { session: { unionId: "union-session", name: "周总" } }
-    });
-    const body = await response.json();
-    assert.equal(response.status, 502);
-    assert.equal(body.synced, false);
-    assert.equal(body.code, "DINGTALK_TODO_LIST_UNAVAILABLE");
-    assert.doesNotMatch(JSON.stringify(body), /private provider detail/);
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+test("bound todo detail loading marks partial coverage without exposing provider errors", async () => {
+  const result = await loadBoundTaskDetails("token", [
+    { taskId: "todo-1", executorUnionId: "executor-1" },
+    { taskId: "todo-1", executorUnionId: "executor-2" }
+  ], async (accessToken, unionId, taskId) => {
+    if (unionId === "executor-2") throw new Error("private provider detail");
+    return { taskId, isDone: true };
+  });
+
+  assert.equal(result.cards[0].executorStatusCoverage.complete, false);
+  assert.equal(result.cards[0].executorStatusCoverage.statusCount, 1);
+  assert.equal(result.warning.code, "DINGTALK_EXECUTOR_STATUS_PARTIAL");
+  assert.doesNotMatch(JSON.stringify(result), /private provider detail/);
 });
