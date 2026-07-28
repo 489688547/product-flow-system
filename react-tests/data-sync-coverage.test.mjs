@@ -105,14 +105,26 @@ test("默认只返回有问题的业务日，健康日不占行", () => {
   assert.ok(all.some(item => item.status === "synced"), "显示全部时健康日必须出现");
 });
 
-test("失败与等待人工优先于销售事实推断", () => {
-  const jobs = [{
-    id: "f1", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-26",
-    status: "waiting_human", stage: "waiting_human", errorCode: "KUAIMAI_LOGIN_REQUIRED"
-  }];
-  const unified = row(coverage({ jobs }), "2026-07-26", "unified");
-  assert.equal(unified.status, "waiting_human");
-  assert.equal(unified.selectable, true);
+test("等待人工在两种口径下的含义不同：统一口径以事实为准，平台口径以任务为准", () => {
+  const jobs = [
+    {
+      id: "f1", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-26",
+      status: "waiting_human", stage: "waiting_human", errorCode: "KUAIMAI_LOGIN_REQUIRED"
+    },
+    {
+      id: "f2", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "store_daily",
+      businessDate: "2026-07-26", status: "waiting_human", stage: "waiting_human", errorCode: "DOUYIN_LOGIN_REQUIRED"
+    }
+  ];
+  const rows = coverage({ jobs });
+  // 统一口径：当天事实偏低，结论是残缺；登录问题作为原因说明而不是结论。
+  const unified = row(rows, "2026-07-26", "unified");
+  assert.equal(unified.status, "incomplete");
+  assert.equal(unified.errorCode, "KUAIMAI_LOGIN_REQUIRED");
+  // 平台口径没有独立事实来源，任务状态就是唯一信号。
+  const platform = row(rows, "2026-07-26", "platform");
+  assert.equal(platform.status, "waiting_human");
+  assert.equal(platform.selectable, true);
 });
 
 test("采集器离线时扩展与登录状态显示为未知，不把过期心跳渲染成已连接", () => {
@@ -227,4 +239,39 @@ test("采集器离线时结论的主动作是重新检测", () => {
     { windowDays: 14 }
   );
   assert.equal(conclusion.primaryAction, "recheck");
+});
+
+test("统一口径以销售事实为准，个别资源采集失败不掩盖当天数据其实是好的", () => {
+  // 生产实测：07-27 的 order_items 失败但 sales_items 成功，当天销售事实健康。
+  // 若把 failed 排在事实检查之前，11 个健康日会因历史失败记录被误报成采集失败。
+  const healthyFacts = [
+    { date: "2026-07-21", sales: 141771, qty: 9000 },
+    { date: "2026-07-22", sales: 143285, qty: 9100 },
+    { date: "2026-07-23", sales: 138113, qty: 8900 },
+    { date: "2026-07-24", sales: 126605, qty: 8600 }
+  ];
+  const jobs = [
+    { id: "a", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-24", status: "failed", errorCode: "KUAIMAI_TIME_RANGE_NOT_APPLIED" },
+    { id: "b", providerId: "kuaimai", resourceType: "sales_items", businessDate: "2026-07-24", status: "success" }
+  ];
+  const rows = buildSyncCoverage({
+    jobs, stores: [], dailyFacts: healthyFacts,
+    range: { from: "2026-07-21", to: "2026-07-24" }, includeHealthy: true
+  });
+  const day = rows.find(item => item.businessDate === "2026-07-24" && item.caliber === "unified");
+  assert.equal(day.status, "synced", "销售事实健康的日子不得因个别资源失败被判为采集失败");
+  // 失败信息不丢，降级为附注。
+  assert.equal(day.failedResources.length, 1);
+  assert.match(day.note, /order_items|采集失败/);
+});
+
+test("销售事实缺失时，失败任务作为原因说明而不是掩盖缺口", () => {
+  const jobs = [{ id: "a", providerId: "kuaimai", resourceType: "order_items", businessDate: "2026-07-25", status: "failed", errorCode: "KUAIMAI_LOGIN_REQUIRED" }];
+  const rows = buildSyncCoverage({
+    jobs, stores: [], dailyFacts,
+    range: { from: "2026-07-24", to: "2026-07-25" }, includeHealthy: true
+  });
+  const day = rows.find(item => item.businessDate === "2026-07-25" && item.caliber === "unified");
+  assert.equal(day.status, "missing");
+  assert.equal(day.errorCode, "KUAIMAI_LOGIN_REQUIRED");
 });
