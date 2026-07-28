@@ -275,3 +275,53 @@ test("销售事实缺失时，失败任务作为原因说明而不是掩盖缺�
   assert.equal(day.status, "missing");
   assert.equal(day.errorCode, "KUAIMAI_LOGIN_REQUIRED");
 });
+
+test("采集成功但入库失败时，覆盖行指向具体文件并要求重新入库而不是重新采集", () => {
+  // 生产实测 2026-07-27：order_items 采集 success、归档成功、入库超时，当日只剩中位数的 8%。
+  // 重新采集是白费——文件已经在本机，坏的是入库。
+  const jobs = [{
+    id: "j1", providerId: "kuaimai", resourceType: "order_items",
+    businessDate: "2026-07-27", status: "success", stage: "success"
+  }];
+  const archives = [{
+    id: "arch-0727", resourceType: "order_items", status: "failed",
+    errorCode: "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT",
+    fileName: "快麦ERP交易订单明细导出20260727051545.xlsx",
+    businessDateStart: "2026-07-27", businessDateEnd: "2026-07-27"
+  }];
+  const rows = buildSyncCoverage({
+    jobs, archives, stores: [], dailyFacts,
+    range: { from: "2026-07-26", to: "2026-07-27" }
+  });
+  const day = rows.find(item => item.businessDate === "2026-07-27" && item.caliber === "unified");
+  assert.equal(day.status, "incomplete");
+  assert.equal(day.blockedBy?.stage, "ingest", "缺口应归因到入库环节");
+  assert.equal(day.blockedBy.fileName, "快麦ERP交易订单明细导出20260727051545.xlsx");
+  assert.equal(day.recoveryAction, "reingest");
+  assert.match(day.blockedBy.explanation, /已采集|已下载/);
+  assert.match(day.blockedBy.explanation, /入库/);
+});
+
+test("没有对应归档时缺口仍归因到采集环节，动作维持重新采集", () => {
+  const rows = buildSyncCoverage({
+    jobs: [], archives: [], stores: [], dailyFacts,
+    range: { from: "2026-07-25", to: "2026-07-25" }
+  });
+  const day = rows.find(item => item.businessDate === "2026-07-25" && item.caliber === "unified");
+  assert.equal(day.status, "missing");
+  assert.equal(day.blockedBy, null);
+  assert.equal(day.recoveryAction, "recollect");
+});
+
+test("归档没有业务日期时不得张冠李戴地关联到任意一天", () => {
+  const archives = [{
+    id: "old", resourceType: "order_items", status: "archived", errorCode: null,
+    fileName: "历史文件.xlsx", businessDateStart: null, businessDateEnd: null
+  }];
+  const rows = buildSyncCoverage({
+    jobs: [], archives, stores: [], dailyFacts,
+    range: { from: "2026-07-25", to: "2026-07-25" }
+  });
+  const day = rows.find(item => item.businessDate === "2026-07-25" && item.caliber === "unified");
+  assert.equal(day.blockedBy, null);
+});

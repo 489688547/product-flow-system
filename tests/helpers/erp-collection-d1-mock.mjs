@@ -66,6 +66,21 @@ export function createErpCollectionD1Mock() {
               .slice(0, limit)
           };
         }
+        if (query.includes("from erp_file_archives") && query.includes("order by a.archived_at")) {
+          // 归档列表左连批次，带出业务日期范围；无批次的历史文件保持 null。
+          return {
+            results: [...tables.erp_file_archives.values()]
+              .sort((left, right) => right.archived_at.localeCompare(left.archived_at))
+              .map(row => {
+                const batch = row.batch_id ? tables.erp_collection_batches.get(row.batch_id) : null;
+                return {
+                  ...row,
+                  batch_range_start: batch?.range_start || null,
+                  batch_range_end: batch?.range_end || null
+                };
+              })
+          };
+        }
         if (query.includes("from erp_file_archives") && query.includes("order by archived_at")) {
           return { results: [...tables.erp_file_archives.values()].sort((left, right) => right.archived_at.localeCompare(left.archived_at)) };
         }

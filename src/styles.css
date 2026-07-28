@@ -2525,6 +2525,8 @@ main { min-width: 0; overflow-x: clip; }
 .data-sync-coverage-impact { font-size: 12px; color: var(--text-secondary); }
 .data-sync-coverage-evidence { justify-self: start; font-size: 12px; padding: 3px 7px; border-radius: var(--radius-sm); background: var(--surface-subtle); font-variant-numeric: tabular-nums; }
 .data-sync-coverage-note { font-size: 11px; color: var(--warning); }
+.data-sync-coverage-blocked { display: grid; gap: 2px; font-size: 12px; padding: 5px 8px; border-radius: var(--radius-sm); background: var(--surface-subtle); }
+.data-sync-coverage-blocked span { font-size: 11px; color: var(--text-tertiary); word-break: break-all; }
 .data-sync-coverage-detail { font-size: 11px; color: var(--text-tertiary); }
 .data-sync-coverage-action { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
 .data-sync-preflight { display: grid; gap: var(--space-3); }
