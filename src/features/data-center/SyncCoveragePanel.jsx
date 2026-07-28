@@ -57,6 +57,10 @@ function CoverageRow({ row, checked, onToggle, onBackfill, canTrigger, busy }) {
         当日 {money(row.evidence.sales)}，同期中位数 {money(row.evidence.median)}，约为 {Math.round(row.evidence.ratio * 100)}%
       </p> : null}
       {row.note && row.status === "synced" ? <p className="data-sync-coverage-note">{row.note}，但当天销售事实完整</p> : null}
+      {row.blockedBy ? <p className="data-sync-coverage-blocked">
+        {row.blockedBy.explanation}
+        <span>文件：{row.blockedBy.fileName}</span>
+      </p> : null}
       <p className="data-sync-coverage-detail">
         {row.caliber === "platform" && row.storeNames.length ? `${row.storeNames.join("、")} · ` : ""}
         {row.resourceLabels.join(" / ")}
@@ -64,7 +68,8 @@ function CoverageRow({ row, checked, onToggle, onBackfill, canTrigger, busy }) {
     </div>
     <div className="data-sync-coverage-action">
       {canTrigger && row.selectable ? <Button disabled={busy} onClick={() => onBackfill(row)}>
-        <RefreshCw size={14} aria-hidden="true" />补这天
+        <RefreshCw size={14} aria-hidden="true" />
+        {row.recoveryAction === "reingest" ? "重新入库" : "补这天"}
       </Button> : null}
       {row.selectable ? <AppCollaborationButton label="发起协同" draft={collaborationDraftFromDataIssue({
         id: row.key,

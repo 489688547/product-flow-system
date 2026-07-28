@@ -103,11 +103,12 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
   }, []);
   const coverage = useMemo(() => buildSyncCoverage({
     jobs: webCollection.jobs,
+    archives,
     stores: webCollection.stores,
     dailyFacts,
     range: coverageRange,
     includeHealthy
-  }), [coverageRange, dailyFacts, includeHealthy, webCollection.jobs, webCollection.stores]);
+  }), [archives, coverageRange, dailyFacts, includeHealthy, webCollection.jobs, webCollection.stores]);
   const progress = useMemo(() => buildCollectionProgress({
     jobs: webCollection.jobs,
     runners: webCollection.runners

@@ -525,6 +525,9 @@ function archiveRow(row) {
     archivedAt: row.archived_at,
     processedAt: row.processed_at || null,
     errorCode: row.error_code || null,
+    // 没有批次的历史文件保持为 null，不凭空编出日期。
+    businessDateStart: row.batch_range_start || null,
+    businessDateEnd: row.batch_range_end || null,
     ingestionDecision: row.ingestion_decision || "pending",
     ingestionReasonCode: row.ingestion_reason_code || null,
     decisionAt: row.decision_at || null,
@@ -547,10 +550,15 @@ export async function listErpArchives(db, {
     WHERE status = 'processing' AND COALESCE(updated_at, archived_at) <= ?`)
     .bind(ARCHIVE_PROCESSING_TIMEOUT_CODE, now.toISOString(), cutoff)
     .run();
-  const result = await db.prepare(`SELECT id, platform_id, resource_type, content_hash, file_name, size_bytes,
-    relative_path, storage_type, runner_id, status, batch_id, archived_at, processed_at, error_code,
-    ingestion_decision, ingestion_reason_code, decision_at, decision_by, version, updated_at
-    FROM erp_file_archives ORDER BY archived_at DESC LIMIT ?`).bind(Math.min(500, Math.max(1, Number(limit) || 100))).all();
+  // 带出批次的业务日期范围：页面要把「某天为什么缺」指到具体文件，
+  // 而归档表本身没有业务日期，只有通过批次才能定位。
+  const result = await db.prepare(`SELECT a.id, a.platform_id, a.resource_type, a.content_hash, a.file_name,
+    a.size_bytes, a.relative_path, a.storage_type, a.runner_id, a.status, a.batch_id, a.archived_at,
+    a.processed_at, a.error_code, a.ingestion_decision, a.ingestion_reason_code, a.decision_at,
+    a.decision_by, a.version, a.updated_at,
+    b.range_start AS batch_range_start, b.range_end AS batch_range_end
+    FROM erp_file_archives a LEFT JOIN erp_collection_batches b ON b.id = a.batch_id
+    ORDER BY a.archived_at DESC LIMIT ?`).bind(Math.min(500, Math.max(1, Number(limit) || 100))).all();
   return (result?.results || [])
     .filter(row => !resourceType || row.resource_type === resourceType)
     .filter(row => !status || row.status === status)
