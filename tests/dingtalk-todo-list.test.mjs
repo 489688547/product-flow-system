@@ -86,6 +86,7 @@ test("DingTalk reads one bound native personal todo through its task id", async 
 
   assert.equal(todo.taskId, "task-personal-1");
   assert.equal(todo.isDone, true);
+  assert.equal(todo.source, "todo_personal_user");
   assert.equal(todo.subject, "原生个人待办");
   assert.match(calls[0].url, /\/v1\.0\/todo\/users\/union-zhou\/tasks\/task-personal-1$/);
   assert.equal(calls[0].options.method, "GET");

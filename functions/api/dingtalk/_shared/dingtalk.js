@@ -1078,7 +1078,8 @@ export async function getDingTodoTask(
   return {
     ...task,
     taskId: String(task.taskId || task.id || safeTaskId),
-    isDone: Object.hasOwn(task, "isDone") ? Boolean(task.isDone) : Boolean(task.done)
+    isDone: Object.hasOwn(task, "isDone") ? Boolean(task.isDone) : Boolean(task.done),
+    source: "todo_personal_user"
   };
 }
 

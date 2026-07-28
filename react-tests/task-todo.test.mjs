@@ -529,6 +529,7 @@ test("DingTalk personal completion without a modified timestamp still flows back
 test("DingTalk reconciliation hydrates remote completion proof on existing bindings", () => {
   const card = {
     taskId: "todo-1",
+    source: "todo_personal_user",
     subject: "PRD 评审",
     isDone: true,
     modifiedTime: new Date("2026-07-18T10:01:00.000Z").getTime()
@@ -554,6 +555,40 @@ test("DingTalk reconciliation hydrates remote completion proof on existing bindi
 
   const [hydrated] = dingTalkDomain.reconcileTaskTodosFromDingTalk([legacyBinding], [card]);
   assert.equal(hydrated.dingTodo.remoteDone, true);
+  assert.equal(todoSyncStatus(hydrated), "已完成");
+});
+
+test("bound personal todo detail migrates a stale work-card source once", () => {
+  const card = {
+    taskId: "todo-1",
+    source: "todo_personal_user",
+    subject: "PRD 评审",
+    isDone: true,
+    modifiedTime: new Date("2026-07-18T10:01:00.000Z").getTime()
+  };
+  const [current] = dingTalkDomain.reconcileTaskTodosFromDingTalk([{
+    id: "t1",
+    productId: "p1",
+    title: "PRD 评审",
+    done: false,
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      actionVersion: 2,
+      syncedAt: "2026-07-18T10:00:00.000Z"
+    }
+  }], [card]);
+  const staleSource = {
+    ...current,
+    dingTodo: {
+      ...current.dingTodo,
+      source: "todo_open_ding-legacy"
+    }
+  };
+
+  const [hydrated] = dingTalkDomain.reconcileTaskTodosFromDingTalk([staleSource], [card]);
+  assert.equal(hydrated.dingTodo.source, "todo_personal_user");
   assert.equal(todoSyncStatus(hydrated), "已完成");
 });
 

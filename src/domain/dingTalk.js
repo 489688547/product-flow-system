@@ -310,16 +310,22 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
     const card = (hasTrustedLocalSource ? remoteById.get(todoId) : null) || remoteBySource.get(sourceId);
     if (!card) return task;
 
-    const needsRemoteCompletionHydration = !Object.hasOwn(task.dingTodo || {}, "remoteDone");
+    const needsRemoteMetadataHydration = (
+      !Object.hasOwn(task.dingTodo || {}, "remoteDone")
+      || (
+        card.source === "todo_personal_user"
+        && String(task.dingTodo?.source || "").startsWith("todo_open_")
+      )
+    );
     const remoteSnapshotKey = dingTodoRemoteSnapshotKey(card);
-    if (!needsRemoteCompletionHydration && remoteSnapshotKey === task.dingTodo?.remoteSnapshotKey) return task;
+    if (!needsRemoteMetadataHydration && remoteSnapshotKey === task.dingTodo?.remoteSnapshotKey) return task;
     const remoteUpdatedAt = remoteModifiedAt(card);
     const localUpdatedAt = Math.max(
       todoSnapshotTime(task.dingTodo?.remoteUpdatedAt),
       todoSnapshotTime(task.dingTodo?.syncedAt)
     );
     if (
-      !needsRemoteCompletionHydration
+      !needsRemoteMetadataHydration
       && localUpdatedAt
       && remoteUpdatedAt
       && todoSnapshotTime(remoteUpdatedAt) <= localUpdatedAt
