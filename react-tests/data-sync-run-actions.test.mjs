@@ -92,3 +92,25 @@ test("归档索引里查无此文件时如实留空，不退化成猜测", () =>
   assert.equal(row.artifactPath, "");
   assert.equal(row.artifactSource, "");
 });
+
+test("页面结构变化不给重试按钮，只给处理建议", () => {
+  const row = buildDataSyncRunRows({
+    jobs, archives, now,
+    runs: [{ id: "rs", jobId: "j-dy-fail", status: "failed", stage: "collecting", errorCode: "DOUYIN_PAGE_SCHEMA_CHANGED" }]
+  }).find(item => item.id === "web:rs");
+  assert.equal(row.canRetry, false, "重试必然再失败，不该给按钮");
+  assert.match(row.retryHint, /适配/);
+  assert.equal(row.message.includes("DOUYIN_PAGE_SCHEMA_CHANGED"), false, "结果列不再直接印机器码");
+  assert.match(row.message, /页面结构已变化/);
+  assert.match(row.message, /卡在/);
+});
+
+test("需要人工登录时不给重试按钮，先让人处理", () => {
+  const row = buildDataSyncRunRows({
+    jobs, archives, now,
+    runs: [{ id: "rl", jobId: "j-km-ingest", status: "failed", stage: "opening", errorCode: "KUAIMAI_LOGIN_REQUIRED" }]
+  }).find(item => item.id === "web:rl");
+  assert.equal(row.canRetry, false);
+  assert.equal(row.failure.needsHuman, true);
+  assert.match(row.retryHint, /登录/);
+});

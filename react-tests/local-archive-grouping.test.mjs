@@ -108,3 +108,65 @@ test("空归档不构造伪造分组", () => {
   assert.equal(grouped.actionable.count, 0);
   assert.equal(grouped.totalCount, 0);
 });
+
+// 生产真实分布：31 个文件里 18 已入库、11 已按决定跳过、1 处理失败、1 待决定。
+// 29 个不需要任何人做任何事，却和那 2 个平铺在一起。
+const productionShape = [
+  ...Array.from({ length: 18 }, (_, i) => ({
+    id: `ok-${i}`, resourceType: "order_items", fileName: `已入库-${i}.xlsx`, sizeBytes: 40_000_000,
+    relativePath: `原始归档/order_items/2026-07/ok${i}.xlsx`, status: "processed",
+    ingestionDecision: "pending", archivedAt: "2026-07-20T00:00:00.000Z", processedAt: "2026-07-20T01:00:00.000Z"
+  })),
+  ...Array.from({ length: 11 }, (_, i) => ({
+    id: `skip-${i}`, resourceType: "order_items", fileName: `已跳过-${i}.xlsx`, sizeBytes: 120_000_000,
+    relativePath: `原始归档/order_items/2026-07/skip${i}.xlsx`, status: "archived",
+    ingestionDecision: "skipped", ingestionReasonCode: "DETAIL_STORAGE_DEFERRED",
+    archivedAt: "2026-07-22T00:00:00.000Z", processedAt: null
+  })),
+  {
+    id: "failed-0727", resourceType: "order_items", fileName: "快麦ERP交易订单明细导出20260727051545.xlsx",
+    sizeBytes: 9_049_550, relativePath: "原始归档/order_items/2026-07/f0727.xlsx", status: "failed",
+    errorCode: "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT", ingestionDecision: "pending",
+    businessDateStart: "2026-07-27", businessDateEnd: "2026-07-27",
+    archivedAt: "2026-07-26T21:16:13.966Z", processedAt: null
+  },
+  {
+    id: "undecided", resourceType: "order_items", fileName: "kuaimai-sales-report-2026-07-21.xlsx",
+    sizeBytes: 4_000_000, relativePath: "原始归档/order_items/2026-07/undecided.xlsx", status: "archived",
+    ingestionDecision: "pending", archivedAt: "2026-07-22T13:09:58.304Z", processedAt: null
+  }
+];
+
+test("默认只把需要人处理的文件放到台面上，其余收进档案", () => {
+  const grouped = groupLocalArchives(productionShape);
+  assert.equal(grouped.actionable.count, 2, "31 个里只有 2 个需要人做事");
+  assert.deepEqual(grouped.actionable.items.map(item => item.id).sort(), ["failed-0727", "undecided"]);
+  assert.equal(grouped.settled.count, 29);
+  assert.equal(grouped.settled.ingestedCount, 18);
+  assert.equal(grouped.settled.skippedCount, 11);
+});
+
+test("处理失败的文件指向对应业务日，让人去覆盖表重新入库而不是在这里另开一套", () => {
+  const grouped = groupLocalArchives(productionShape);
+  const failed = grouped.actionable.items.find(item => item.id === "failed-0727");
+  assert.equal(failed.needsDecision, false);
+  assert.equal(failed.businessDate, "2026-07-27");
+  assert.match(failed.actionLabel, /重新入库|去处理/);
+});
+
+test("待决定的文件问的是要不要入库，而不是报告一个状态", () => {
+  const grouped = groupLocalArchives(productionShape);
+  const undecided = grouped.actionable.items.find(item => item.id === "undecided");
+  assert.equal(undecided.needsDecision, true);
+  assert.match(undecided.prompt, /是否入库|要不要入库/);
+});
+
+test("全部处理完时台面清空，档案仍可查", () => {
+  const settledOnly = productionShape.filter(item => item.status === "processed" || item.ingestionDecision === "skipped");
+  const grouped = groupLocalArchives(settledOnly);
+  assert.equal(grouped.actionable.count, 0);
+  assert.equal(grouped.actionable.items.length, 0);
+  assert.equal(grouped.settled.count, 29);
+  assert.match(grouped.settled.summary, /已入库 18/);
+  assert.match(grouped.settled.summary, /跳过 11/);
+});

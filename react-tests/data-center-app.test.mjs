@@ -90,7 +90,8 @@ test("governance workspaces merge quality into sync and use the focused AI model
   assert.match(workspaces, /每一次跑了什么、结果如何/);
   assert.match(workspaces, /LocalArchivePanel/);
   const archivePanel = read("src/features/data-center/LocalArchivePanel.jsx");
-  assert.match(archivePanel, /公司 Mac 上有哪些原始文件/);
+  // 副标题必须直说这块要用户做什么，而不是罗列它装了什么。
+  assert.match(archivePanel, /需要你决定是否入库的文件/);
   // 协作入口从永远为空的供应链质量事件迁到真实的数据缺口行。
   assert.match(coveragePanel, /collaborationDraftFromDataIssue/);
   // 采集器离线时主动作是重新检测，不是把任务塞进没人领的队列。

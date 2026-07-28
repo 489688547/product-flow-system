@@ -256,7 +256,10 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
       { key: "range", header: "数据范围", render: row => [row.from, row.to].filter(Boolean).join(" 至 ") || "—" },
       { key: "rows", header: "行数", className: "num", render: row => row.rowCount === null || row.rowCount === undefined ? "—" : row.rowCount },
       { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : row.status === "running" ? "warning" : "danger"}`}>{statusLabel(row.status)}</span> },
-      { key: "message", header: "结果", render: row => row.message || "—" },
+      { key: "message", header: "结果", render: row => <span className="data-sync-run-result">
+        <span>{row.message || "—"}</span>
+        {row.retryHint ? <small>{row.retryHint}</small> : null}
+      </span> },
       { key: "artifact", header: "文件位置", render: row => row.artifactPath
         ? <span className="data-sync-run-artifact">
           <code>{row.artifactPath}</code>
@@ -270,6 +273,9 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
           disabled={Boolean(retryingRun)}
           onClick={() => retryRun(row)}
         ><RefreshCw size={14} aria-hidden="true" />{retryingRun === row.id ? "重新排队中…" : "重新采集"}</Button> : null}
+        {!row.canRetry && row.failure ? <span className="data-sync-run-noretry">
+          {row.failure.needsHuman ? "需先人工处理" : "重试无效"}
+        </span> : null}
       </TableActions> }
     ]} rows={pagedRunRows} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} />
     <TablePagination total={syncRunRows.length} page={runPage} pageSize={RUN_PAGE_SIZE} onPageChange={setRunPage} /></section>
