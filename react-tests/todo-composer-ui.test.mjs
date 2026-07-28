@@ -8,6 +8,7 @@ const page = fs.readFileSync(new URL("../src/features/progress/ProductProgressPa
 const editor = fs.readFileSync(new URL("../src/ui/RichTextEditor.jsx", import.meta.url), "utf8");
 const sharedModal = fs.readFileSync(new URL("../src/ui/Modal.jsx", import.meta.url), "utf8");
 const provider = fs.readFileSync(new URL("../src/state/ProductFlowProvider.jsx", import.meta.url), "utf8");
+const completion = fs.readFileSync(new URL("../src/features/progress/TaskCompletionProgress.jsx", import.meta.url), "utf8");
 const app = fs.readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
 
 test("todo composer exposes editable title priority deadline body and preview", () => {
@@ -37,11 +38,18 @@ test("progress page opens DingTalk todo links without a custom completion action
 test("product flow automatically refreshes remote DingTalk task changes", () => {
   assert.match(provider, /reconcileTaskTodosFromDingTalk/);
   assert.match(provider, /createDingTalkTodoRefreshController/);
-  assert.match(provider, /userHasAssignedDingTalkTodo/);
-  assert.match(provider, /assignedDingTalkTodoIds/);
+  assert.match(provider, /boundDingTalkTodoIdsForUser/);
   assert.match(provider, /todoRefreshController\.refresh\(assignedTodoIds\)/);
   assert.match(provider, /window\.addEventListener\("focus"/);
   assert.match(provider, /todoRefreshController\.invalidate\(\)/);
+});
+
+test("task rows show per-person completion and reserve final acceptance for the product manager", () => {
+  assert.match(page, /TaskCompletionProgress/);
+  assert.match(completion, /taskCompletionProgress/);
+  assert.match(completion, /最终验收/);
+  assert.match(completion, /disabled=\{!isManager/);
+  assert.match(completion, /buildTaskAcceptancePatch/);
 });
 
 function deferred() {

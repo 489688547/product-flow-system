@@ -273,7 +273,9 @@ function dingTodoRemoteSnapshotKey(card = {}) {
     dueTime: Object.hasOwn(card, "dueTime") ? Number(card.dueTime) : null,
     executorIds: dingTodoExecutors(card),
     isDone: Object.hasOwn(card, "isDone") ? Boolean(card.isDone) : null,
-    finalStatusStage: Object.hasOwn(card, "finalStatusStage") ? Number(card.finalStatusStage) : null
+    finalStatusStage: Object.hasOwn(card, "finalStatusStage") ? Number(card.finalStatusStage) : null,
+    executorStatuses: Array.isArray(card.executorStatuses) ? card.executorStatuses : null,
+    executorStatusCoverage: card.executorStatusCoverage || null
   });
 }
 
@@ -289,6 +291,22 @@ export function assignedDingTalkTodoIds(tasks = [], unionId = "") {
     const assigned = (Array.isArray(task?.dingTodo?.executorUnionIds) ? task.dingTodo.executorUnionIds : [])
       .some(value => String(value || "").trim() === wantedUnionId);
     return assigned && /^[A-Za-z0-9:_-]{1,128}$/.test(todoId) ? [todoId] : [];
+  }))];
+}
+
+export function boundDingTalkTodoIdsForUser(tasks = [], products = [], unionId = "") {
+  const actor = String(unionId || "").trim();
+  if (!actor) return [];
+  const productsById = new Map((products || []).map(product => [String(product.id), product]));
+  return [...new Set((tasks || []).flatMap(task => {
+    const todoId = String(task?.dingTodo?.id || "").trim();
+    const product = productsById.get(String(task?.productId)) || {};
+    const allowed = [
+      product.productManagerUnionId,
+      task?.dingTodo?.creatorUnionId,
+      ...(task?.dingTodo?.executorUnionIds || [])
+    ].some(value => String(value || "").trim() === actor);
+    return allowed && /^[A-Za-z0-9:_-]{1,128}$/.test(todoId) ? [todoId] : [];
   }))];
 }
 
@@ -351,15 +369,34 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
       ? (task.dingTodo?.executorUnionIds || [])
       : (dingTodoExecutors(card) || task.dingTodo?.executorUnionIds || []);
     const sameExecutors = JSON.stringify(executorUnionIds) === JSON.stringify(task.dingTodo?.executorUnionIds || []);
-    const done = Object.hasOwn(card, "isDone")
-      ? Boolean(card.isDone)
-      : Object.hasOwn(card, "finalStatusStage")
-        ? Number(card.finalStatusStage) === 2
-        : Boolean(task.done);
+    const hasExecutorStatuses = Array.isArray(card.executorStatuses);
+    const executorStatuses = hasExecutorStatuses
+      ? card.executorStatuses.map(status => ({
+        unionId: String(status?.unionId || "").trim(),
+        isDone: Boolean(status?.isDone)
+      })).filter(status => status.unionId)
+      : (task.dingTodo?.executorStatuses || []);
+    const allKnownExecutorsDone = hasExecutorStatuses
+      && card.executorStatusCoverage?.complete === true
+      && executorStatuses.length > 0
+      && executorStatuses.every(status => status.isDone);
+    const remoteDone = hasExecutorStatuses
+      ? allKnownExecutorsDone
+      : Object.hasOwn(card, "isDone")
+        ? Boolean(card.isDone)
+        : Object.hasOwn(card, "finalStatusStage")
+          ? Number(card.finalStatusStage) === 2
+          : Boolean(task.dingTodo?.remoteDone);
+    const done = hasExecutorStatuses
+      ? Boolean(task.done) && allKnownExecutorsDone
+      : remoteDone;
     const effectiveTask = {
       ...task,
       due: draft.dueDate || task.due || "",
-      done
+      done,
+      ...(task.done && !done ? {
+        acceptance: { accepted: false, acceptedByUnionId: "", acceptedAt: "" }
+      } : {})
     };
     const dingTodo = {
       ...(task.dingTodo || {}),
@@ -369,8 +406,12 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
       bizTag: String(card.bizTag || task.dingTodo?.bizTag || ""),
       executorUnionIds,
       executorNames: sameExecutors ? (task.dingTodo?.executorNames || []) : [],
+      executorStatuses,
+      executorStatusCoverage: hasExecutorStatuses
+        ? card.executorStatusCoverage
+        : task.dingTodo?.executorStatusCoverage,
       draft,
-      remoteDone: done,
+      remoteDone,
       remoteUpdatedAt,
       remoteSnapshotKey,
       lastError: hasPendingPartialSync ? task.dingTodo.lastError || "" : "",

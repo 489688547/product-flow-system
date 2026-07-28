@@ -597,6 +597,44 @@ test("DingTalk reconciliation preserves task identity when no remote card matche
   assert.equal(dingTalkDomain.reconcileTaskTodosFromDingTalk(tasks, [{ taskId: "other" }]), tasks);
 });
 
+test("per-executor DingTalk completion waits for product-manager acceptance and reopens on regression", () => {
+  const task = {
+    id: "t1",
+    productId: "p1",
+    done: false,
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      executorUnionIds: ["executor-1", "executor-2"]
+    }
+  };
+  const allDoneCard = {
+    taskId: "todo-1",
+    executorStatuses: [
+      { unionId: "executor-1", isDone: true },
+      { unionId: "executor-2", isDone: true }
+    ],
+    executorStatusCoverage: { complete: true, expectedCount: 2, statusCount: 2 }
+  };
+  const [awaitingAcceptance] = dingTalkDomain.reconcileTaskTodosFromDingTalk([task], [allDoneCard]);
+  assert.equal(awaitingAcceptance.done, false);
+  assert.deepEqual(awaitingAcceptance.dingTodo.executorStatuses, allDoneCard.executorStatuses);
+
+  const [reopened] = dingTalkDomain.reconcileTaskTodosFromDingTalk([{
+    ...awaitingAcceptance,
+    done: true,
+    acceptance: { accepted: true, acceptedByUnionId: "manager-1", acceptedAt: "2026-07-28T10:00:00.000Z" }
+  }], [{
+    ...allDoneCard,
+    executorStatuses: [
+      { unionId: "executor-1", isDone: false },
+      { unionId: "executor-2", isDone: true }
+    ]
+  }]);
+  assert.equal(reopened.done, false);
+  assert.equal(reopened.acceptance.accepted, false);
+});
+
 test("legacy source-less todo ids cannot adopt an unrelated remote task", () => {
   const tasks = [{
     id: "t1",
@@ -634,6 +672,23 @@ test("assigned users poll only their unique bound DingTalk task ids", () => {
 
   assert.deepEqual(dingTalkDomain.assignedDingTalkTodoIds(tasks, "union-a"), ["task-1"]);
   assert.deepEqual(dingTalkDomain.assignedDingTalkTodoIds(tasks, "union-b"), ["task-2"]);
+});
+
+test("product managers and creators can refresh bound executor statuses", () => {
+  const tasks = [{
+    id: "t1",
+    productId: "p1",
+    dingTodo: {
+      id: "task-1",
+      creatorUnionId: "creator-1",
+      executorUnionIds: ["executor-1"]
+    }
+  }];
+  const products = [{ id: "p1", productManagerUnionId: "manager-1" }];
+
+  assert.deepEqual(dingTalkDomain.boundDingTalkTodoIdsForUser(tasks, products, "manager-1"), ["task-1"]);
+  assert.deepEqual(dingTalkDomain.boundDingTalkTodoIdsForUser(tasks, products, "creator-1"), ["task-1"]);
+  assert.deepEqual(dingTalkDomain.boundDingTalkTodoIdsForUser(tasks, products, "other"), []);
 });
 
 test("stale DingTalk snapshots cannot overwrite a newer successful composer draft", () => {

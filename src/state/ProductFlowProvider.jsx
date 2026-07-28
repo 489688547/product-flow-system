@@ -16,10 +16,9 @@ import {
 import { normalizeClientState } from "./stateModel.js";
 import { ensureCurrentUserInOrgCache, resolveCurrentUser } from "../domain/sessionUser.js";
 import {
-  assignedDingTalkTodoIds,
+  boundDingTalkTodoIdsForUser,
   createTaskMeetingRecord,
-  reconcileTaskTodosFromDingTalk,
-  userHasAssignedDingTalkTodo
+  reconcileTaskTodosFromDingTalk
 } from "../domain/dingTalk.js";
 import { applyTaskTodoSyncFailure, applyTaskTodoSyncSuccess } from "../domain/taskTodo.js";
 import { sharedStateApiUrl } from "./stateApi.js";
@@ -99,14 +98,11 @@ export function ProductFlowProvider({ children }) {
   }) : null, [authUser]);
   const currentUser = useMemo(() => resolveCurrentUser(sessionAccount, state.orgCache), [sessionAccount, state.orgCache]);
   const orgCache = useMemo(() => ensureCurrentUserInOrgCache(state.orgCache, currentUser), [state.orgCache, currentUser]);
-  const shouldRefreshTaskTodos = useMemo(
-    () => userHasAssignedDingTalkTodo(state.tasks || [], authUser?.unionId),
-    [authUser?.unionId, state.tasks]
-  );
   const assignedTodoIds = useMemo(
-    () => assignedDingTalkTodoIds(state.tasks || [], authUser?.unionId),
-    [authUser?.unionId, state.tasks]
+    () => boundDingTalkTodoIdsForUser(state.tasks || [], state.products || [], authUser?.unionId),
+    [authUser?.unionId, state.products, state.tasks]
   );
+  const shouldRefreshTaskTodos = assignedTodoIds.length > 0;
   const commitState = useCallback(updater => {
     setState(current => {
       const nextState = typeof updater === "function" ? updater(current) : updater;
@@ -293,7 +289,7 @@ export function ProductFlowProvider({ children }) {
     commitState(current => {
       const taskWithOrder = {
         id: `task-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-        category: "会前准备",
+        category: "待办任务",
         title: "新任务",
         ownerDept: "产品部",
         deliverable: "待补充",
