@@ -385,13 +385,15 @@ const integrationRegistry = {
       "id": "cloudflare-pages",
       "name": "Cloudflare Pages",
       "status": "connected",
-      "summary": "托管 React 应用与 Pages Functions，并通过 Cloudflare 远程开发 Worker 提供稳定的本地线上 API 运行边界。",
+      "summary": "以 main/dev 双分支和正式/测试两个固定 Git 项目托管 React 与 Pages Functions，并通过 Cloudflare 远程开发 Worker 提供稳定的本地线上 API 运行边界。",
       "capabilities": [
         "静态站点托管",
         "Pages Functions",
         "远程 Worker 本地开发",
         "生产部署",
         "预览环境",
+        "main/dev 固定双站 GitOps",
+        "部署 commit 与 OAuth 冒烟",
         "本地线上账号运行",
         "回滚",
         "环境就绪检查",
@@ -413,6 +415,7 @@ const integrationRegistry = {
         "Functions 路由异常",
         "预览环境配置缺失",
         "测试环境与生产配置漂移",
+        "正式站与测试站 commit 或 Secret 漂移",
         "本地如何使用真实线上账号、数据与外部动作"
       ],
       "keywords": [
@@ -437,6 +440,8 @@ const integrationRegistry = {
         "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
         "scripts/check-deployed-readiness.mjs",
+        "scripts/check-deployed-smoke.mjs",
+        "scripts/check-pages-environment-parity.mjs",
         "vite.config.js",
         "cloudflare-entry.html",
         "404.html",
@@ -456,6 +461,8 @@ const integrationRegistry = {
         "VITE_DATA_CENTER_LEGACY_OVERVIEW_ROLLBACK"
       ],
       "domains": [
+        "deshan-tiyes-system.pages.dev",
+        "deshan-tiyes-system-dev.pages.dev",
         "pages.dev",
         "api.cloudflare.com",
         "dash.cloudflare.com"
@@ -507,11 +514,14 @@ const integrationRegistry = {
         "src/ui/ApplicationErrorBoundary.jsx",
         "docs/features/frontend-runtime-resilience/prd.md",
         "docs/features/environment-parity-production-data/prd.md",
+        "docs/decisions/2026-07-28-main-dev-gitops.md",
         "docs/platform/architecture.md",
         "docs/platform/apis/data-services-sales-v1.md",
         "scripts/start-local-online.mjs",
         "scripts/prepare-pages-build.mjs",
         "scripts/prepare-pages-release.mjs",
+        "scripts/check-deployed-smoke.mjs",
+        "scripts/check-pages-environment-parity.mjs",
         "vite.config.js",
         "wrangler.toml"
       ],

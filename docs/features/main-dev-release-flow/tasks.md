@@ -56,7 +56,7 @@
   - 提交：`feat(release): add fixed-site smoke checks`。
   - 结果：2026-07-28，构建产物写入发布 commit；冒烟检查验证固定站 commit、静态 OAuth 入口、同源 callback、会话安全状态和 readiness，错误 commit/callback/阻断能力均会失败，9/9 聚焦测试及构建/治理检查通过。
 
-- [ ] 反写长期平台规则
+- [x] 反写长期平台规则
   - 依赖：代码契约稳定。
   - 文件：ADR、`AGENTS.md`、feature Skill、Cloudflare 说明、集成注册表、本文件。
   - 输入：已验证分支与环境契约。
@@ -65,6 +65,7 @@
   - 实现步骤：更新 durable rule；生成清单；记录回滚。
   - 验证：`npm run generate:platform-manifests`、治理、集成、环境能力检查。
   - 提交：`docs(platform): define main dev GitOps`。
+  - 结果：2026-07-28，ADR、仓库规则、feature workflow、Cloudflare 操作说明与集成注册表均已反写；静态 OAuth 冷启动契约与双固定站验收规则保持一致。
 
 - [ ] 创建 `dev` 与两个 Git 集成 Pages 项目
   - 依赖：本地质量门禁通过。

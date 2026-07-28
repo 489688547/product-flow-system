@@ -61,7 +61,7 @@ D1、Wrangler 4.112、Node.js、DWS 钉钉开放平台命令。
 - 输出：`{ baseUrl, commit, checkedAt, oauthStatus, readiness }`。
 - 检查：
   - `/cloudflare-entry` 或等价公开元数据返回目标 commit。
-  - `/api/auth/dingtalk/start` 返回 302 且 callback Origin 等于当前站点。
+- `/api/auth/dingtalk/start` 返回静态 HTML 入口，bootstrap 返回钉钉授权地址且 callback Origin 等于当前固定站点。
   - `/api/auth/session` 未登录返回安全未认证响应。
   - `/api/platform/v1/environment-readiness` 使用受控 token 通过。
 
@@ -157,7 +157,7 @@ D1、Wrangler 4.112、Node.js、DWS 钉钉开放平台命令。
 **Interfaces:**
 - Produces: `checkDeployedSmoke(options)` 和 `deployed-smoke` GitHub check。
 
-- [ ] 写失败测试：错误 commit、OAuth 非 302、callback 跨站、readiness blocked 均失败。
+- [ ] 写失败测试：错误 commit、OAuth 静态入口不可用、callback 跨站、readiness blocked 均失败。
 - [ ] 运行测试并确认模块不存在。
 - [ ] 实现只读 smoke，并按 `main`/`dev` 映射固定 URL。
 - [ ] 重跑聚焦测试、Functions build 和 workflow 治理检查。

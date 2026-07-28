@@ -151,7 +151,7 @@
 - 两个固定站点返回正确资源并报告对应 runtime environment。
 - 两站 readiness 对 Cloudflare Pages、D1、钉钉及所有路由平台均无阻断或受影响警告。
 - 两站未登录业务接口返回 401，真实登录后读取相同业务事实和账号权限。
-- 两站 OAuth 启动在冷/热和 20 并发场景稳定返回 302，callback 使用各自站点 Origin。
+- 两站 OAuth 静态入口在冷/热场景稳定返回 HTML，bootstrap 在 20 并发下返回有效钉钉授权地址，callback 使用各自站点 Origin。
 - 钉钉工作台移动端和 PC 端进入新正式站；浏览器 OAuth 与端内免登真实成功。
 - 两个 LaunchAgent 与共享 `.env` 使用新正式站，本机采集器恢复心跳。
 - 全仓库运行代码和活动系统配置不再依赖旧网址。
