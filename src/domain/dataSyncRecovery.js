@@ -40,7 +40,7 @@ const STAGE_TEXT = Object.freeze({
   exporting: "正在生成报表", downloading: "正在下载报表", validating: "正在校验文件", ingesting: "正在入库"
 });
 
-function stageText(job) {
+export function stageText(job) {
   const stage = String(job?.stage || "");
   const status = String(job?.status || "");
   // status 已进入运行态时，落后的 queued 阶段值不可信，改用 status 描述。

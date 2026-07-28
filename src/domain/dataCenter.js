@@ -446,7 +446,10 @@ function median(values) {
   return ordered.length % 2 ? ordered[middle] : (ordered[middle - 1] + ordered[middle]) / 2;
 }
 
-export function detectLatestSalesAnomaly(latestDailyFacts = [], threshold = 0.25, targetBusinessDate = "") {
+// excludeDates 用于把已判定断档或残缺的日期移出基线：连续坏日会把中位数拉低，
+// 使后续坏日显得正常而逃过检测。
+export function detectLatestSalesAnomaly(latestDailyFacts = [], threshold = 0.25, targetBusinessDate = "", excludeDates = []) {
+  const excluded = new Set(excludeDates);
   const facts = latestDailyFacts
     .filter(item => /^\d{4}-\d{2}-\d{2}$/.test(String(item?.date || "")))
     .map(item => ({ date: String(item.date), sales: number(item.sales), qty: number(item.qty) }))
@@ -465,7 +468,7 @@ export function detectLatestSalesAnomaly(latestDailyFacts = [], threshold = 0.25
     };
   }
   if (!latest) return { status: "empty", code: "SALES_COMPLETENESS_NO_DATA", date: "", baselineDays: 0, threshold };
-  const baseline = facts.slice(0, -1).slice(-7);
+  const baseline = facts.slice(0, -1).filter(item => !excluded.has(item.date)).slice(-7);
   if (baseline.length < 3) {
     return {
       status: "insufficient_baseline",

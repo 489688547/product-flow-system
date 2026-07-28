@@ -1,5 +1,6 @@
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { useEffect, useMemo, useRef } from "react";
+import { detectIncompleteBusinessDays } from "../../domain/dataSyncCoverage.js";
 import { buildDataCenterSalesFactViews, buildDataQualitySummary, buildLegacyDataCenterMetricResults, DATA_CENTER_OVERVIEW_METRICS, defaultDataCenterRange, detectLatestSalesAnomaly, previousDataCenterRange } from "../../domain/dataCenter.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
 import { DataOverview } from "./DataOverview.jsx";
@@ -63,11 +64,18 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
   const comparisonVersionsReady = overviewMetricCodes.every(metricCode => comparisonTargetVersions[metricCode] >= 1);
   const comparisonVersionKey = overviewMetricCodes.map(metricCode => `${metricCode}:${comparisonTargetVersions[metricCode] || ""}`).join("|");
   const targetBusinessDate = defaultDataCenterRange().to;
+  // 统一口径缺口按整个窗口统计：既包含整日断档，也包含明显偏低的残缺日。
+  const salesGapDays = useMemo(() => {
+    const facts = salesMeta.latestDailyFacts || [];
+    const detected = detectIncompleteBusinessDays(facts, { threshold: 0.25 });
+    return [...new Set(detected.dates)].sort();
+  }, [salesMeta.latestDailyFacts]);
   const latestSalesAnomaly = useMemo(() => detectLatestSalesAnomaly(
     salesMeta.latestDailyFacts || [],
     0.25,
-    range.to === targetBusinessDate ? targetBusinessDate : ""
-  ), [range.to, salesMeta.latestDailyFacts, targetBusinessDate]);
+    range.to === targetBusinessDate ? targetBusinessDate : "",
+    salesGapDays
+  ), [range.to, salesGapDays, salesMeta.latestDailyFacts, targetBusinessDate]);
   const quality = useMemo(() => ({
     ...buildDataQualitySummary({ state, salesMeta, salesRows }),
     latestSalesAnomaly
@@ -77,10 +85,14 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
   const dataHealthUnavailable = Boolean(error || metricError || comparisonError);
   const completenessVerified = latestSalesAnomaly.status === "healthy";
   const dataHealthOkay = Boolean(latestDataDate) && completenessVerified && !dataHealthUnavailable && dataHealthIssueCount === 0;
-  const dataHealthLabel = latestSalesAnomaly.status === "anomaly"
+  // 检测已扩展到整个覆盖窗口，单日文案无法表达「三天都有问题」，因此按天数计数。
+  const unifiedGapDays = salesGapDays.length;
+  const dataHealthLabel = unifiedGapDays > 1
+    ? `⚠️ ${unifiedGapDays} 天统一口径销售数据不完整 · 去处理`
+    : latestSalesAnomaly.status === "anomaly"
     ? latestSalesAnomaly.code === "SALES_TARGET_DAY_MISSING"
-      ? `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据未同步 · 去处理`
-      : `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}数据疑似不完整 · 去处理`
+      ? `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}销售数据未同步 · 去处理`
+      : `⚠️ ${formatChineseDate(latestSalesAnomaly.date)}销售数据不完整 · 去处理`
     : dataHealthOkay
       ? `✅ 数据截取到 ${latestDataDate}`
       : dataHealthUnavailable
@@ -124,7 +136,7 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
     products: <ProductCatalogWorkspace canEdit={canEdit} />,
     sources: <DataSourcesWorkspace canEdit={canEdit} canManage={canManage} canManagePlatform={canManageConnections} initialCategory={dataAccessCategory} />,
     metrics: <DataStandardsWorkspace />,
-    sync: <SyncRunsWorkspace quality={quality} focusTarget={syncFocus} canTrigger={canEdit} />,
+    sync: <SyncRunsWorkspace quality={quality} dailyFacts={salesMeta.latestDailyFacts || []} focusTarget={syncFocus} canTrigger={canEdit} />,
     services: <AiModelWorkspace />,
     settings: <DataCenterSettingsWorkspace canEdit={canEdit} />
   };
