@@ -208,6 +208,24 @@ test("task todo payload only reuses an id verified against the stable product so
   }).todoId, "");
 });
 
+test("product manager is never sent as an ordinary DingTalk executor", () => {
+  const options = {
+    product: { id: "p1", name: "产品", productManagerUnionId: "manager-1" },
+    task: { id: "t1", title: "整理 PRD", due: "2026-07-28", done: false },
+    creator: { unionid: "creator-1" },
+    detailUrl: "https://flow.example.com/#progress"
+  };
+  const payload = buildTaskTodoPayload({
+    ...options,
+    executors: [{ unionid: "manager-1" }, { unionid: "executor-1" }]
+  });
+  assert.deepEqual(payload.executorUnionIds, ["executor-1"]);
+  assert.throws(
+    () => buildTaskTodoPayload({ ...options, executors: [{ unionid: "manager-1" }] }),
+    /至少选择一位/
+  );
+});
+
 test("task todo payload keeps a server-bound id from a legacy nested recovery source", () => {
   const payload = buildTaskTodoPayload({
     product: { id: "p1", name: "产品" },
@@ -633,6 +651,46 @@ test("per-executor DingTalk completion waits for product-manager acceptance and 
   }]);
   assert.equal(reopened.done, false);
   assert.equal(reopened.acceptance.accepted, false);
+});
+
+test("aggregate executor changes bypass one executor timestamp and partial reads preserve acceptance", () => {
+  const accepted = {
+    id: "t1",
+    productId: "p1",
+    done: true,
+    acceptance: { accepted: true, acceptedByUnionId: "manager-1", acceptedAt: "2026-07-28T10:00:00.000Z" },
+    dingTodo: {
+      id: "todo-1",
+      sourceId: "task:p1:t1",
+      executorUnionIds: ["executor-1", "executor-2"],
+      executorStatuses: [
+        { unionId: "executor-1", isDone: true },
+        { unionId: "executor-2", isDone: true }
+      ],
+      executorStatusCoverage: { complete: true, expectedCount: 2, statusCount: 2 },
+      remoteUpdatedAt: "2026-07-28T10:00:00.000Z",
+      remoteSnapshotKey: "previous"
+    }
+  };
+  const [reopened] = dingTalkDomain.reconcileTaskTodosFromDingTalk([accepted], [{
+    taskId: "todo-1",
+    modifiedTime: new Date("2026-07-28T09:00:00.000Z").getTime(),
+    executorStatuses: [
+      { unionId: "executor-1", isDone: true },
+      { unionId: "executor-2", isDone: false }
+    ],
+    executorStatusCoverage: { complete: true, expectedCount: 2, statusCount: 2 }
+  }]);
+  assert.equal(reopened.done, false);
+
+  const [preserved] = dingTalkDomain.reconcileTaskTodosFromDingTalk([accepted], [{
+    taskId: "todo-1",
+    executorStatuses: [{ unionId: "executor-1", isDone: true }],
+    executorStatusCoverage: { complete: false, expectedCount: 2, statusCount: 1 }
+  }]);
+  assert.equal(preserved.done, true);
+  assert.equal(preserved.acceptance.accepted, true);
+  assert.deepEqual(preserved.dingTodo.executorStatuses, accepted.dingTodo.executorStatuses);
 });
 
 test("legacy source-less todo ids cannot adopt an unrelated remote task", () => {

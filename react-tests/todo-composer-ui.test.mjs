@@ -16,6 +16,8 @@ test("todo composer exposes editable title priority deadline body and preview", 
   assert.match(modal, /TodoPreview/);
   assert.match(modal, /createTodoComposerDraft/);
   assert.match(modal, /onSync\(\{ executors: selectedUsers, draft \}\)/);
+  assert.match(modal, /product\?\.productManagerUnionId/);
+  assert.match(modal, /users=\{executorUsers\}/);
 });
 
 test("progress page allows opening the composer before a deadline exists", () => {

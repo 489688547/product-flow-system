@@ -187,7 +187,7 @@ export function buildTaskTodoPayload({ product, task, creator, executors = [], r
   if (!Number.isFinite(dueTime)) throw new Error("任务截止日期无效，请重新选择后再同步到钉钉待办。");
   const executorUnionIds = [...new Set(executors
     .map(user => String(user?.unionid || user?.unionId || "").trim())
-    .filter(Boolean))];
+    .filter(unionId => unionId && unionId !== String(product?.productManagerUnionId || "").trim()))];
   const recoveryUnionIds = [...new Set(recoveryUsers
     .map(user => String(user?.unionid || user?.unionId || "").trim())
     .filter(Boolean))];
@@ -344,6 +344,7 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
     );
     if (
       !needsRemoteMetadataHydration
+      && !Array.isArray(card.executorStatuses)
       && localUpdatedAt
       && remoteUpdatedAt
       && todoSnapshotTime(remoteUpdatedAt) <= localUpdatedAt
@@ -370,25 +371,38 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
       : (dingTodoExecutors(card) || task.dingTodo?.executorUnionIds || []);
     const sameExecutors = JSON.stringify(executorUnionIds) === JSON.stringify(task.dingTodo?.executorUnionIds || []);
     const hasExecutorStatuses = Array.isArray(card.executorStatuses);
+    const previousExecutorStatuses = new Map((task.dingTodo?.executorStatuses || [])
+      .map(status => [String(status?.unionId || "").trim(), Boolean(status?.isDone)])
+      .filter(([unionId]) => unionId));
     const executorStatuses = hasExecutorStatuses
       ? card.executorStatuses.map(status => ({
         unionId: String(status?.unionId || "").trim(),
         isDone: Boolean(status?.isDone)
-      })).filter(status => status.unionId)
+      })).filter(status => status.unionId).reduce((statuses, status) => {
+        statuses.set(status.unionId, status.isDone);
+        return statuses;
+      }, previousExecutorStatuses)
       : (task.dingTodo?.executorStatuses || []);
+    const normalizedExecutorStatuses = executorStatuses instanceof Map
+      ? [...executorStatuses].map(([unionId, isDone]) => ({ unionId, isDone }))
+      : executorStatuses;
     const allKnownExecutorsDone = hasExecutorStatuses
       && card.executorStatusCoverage?.complete === true
-      && executorStatuses.length > 0
-      && executorStatuses.every(status => status.isDone);
+      && normalizedExecutorStatuses.length > 0
+      && normalizedExecutorStatuses.every(status => status.isDone);
     const remoteDone = hasExecutorStatuses
-      ? allKnownExecutorsDone
+      ? card.executorStatusCoverage?.complete === true
+        ? allKnownExecutorsDone
+        : Boolean(task.dingTodo?.remoteDone)
       : Object.hasOwn(card, "isDone")
         ? Boolean(card.isDone)
         : Object.hasOwn(card, "finalStatusStage")
           ? Number(card.finalStatusStage) === 2
           : Boolean(task.dingTodo?.remoteDone);
     const done = hasExecutorStatuses
-      ? Boolean(task.done) && allKnownExecutorsDone
+      ? card.executorStatusCoverage?.complete === true
+        ? Boolean(task.done) && allKnownExecutorsDone
+        : Boolean(task.done)
       : remoteDone;
     const effectiveTask = {
       ...task,
@@ -406,7 +420,7 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
       bizTag: String(card.bizTag || task.dingTodo?.bizTag || ""),
       executorUnionIds,
       executorNames: sameExecutors ? (task.dingTodo?.executorNames || []) : [],
-      executorStatuses,
+      executorStatuses: normalizedExecutorStatuses,
       executorStatusCoverage: hasExecutorStatuses
         ? card.executorStatusCoverage
         : task.dingTodo?.executorStatusCoverage,
