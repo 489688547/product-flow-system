@@ -66,6 +66,8 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
   const [resultMessage, setResultMessage] = useState("");
   const [resultError, setResultError] = useState("");
   const [runPage, setRunPage] = useState(1);
+  const [retryingRun, setRetryingRun] = useState("");
+  const [copiedArtifact, setCopiedArtifact] = useState("");
   const refreshWebCollection = useCallback(async () => {
     setWebCollectionLoading(true);
     try {
@@ -120,8 +122,9 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
   const syncRunRows = useMemo(() => buildDataSyncRunRows({
     legacyRuns: state.syncRuns,
     jobs: webCollection.jobs,
-    runs: webCollection.runs
-  }), [state.syncRuns, webCollection.jobs, webCollection.runs]);
+    runs: webCollection.runs,
+    archives
+  }), [archives, state.syncRuns, webCollection.jobs, webCollection.runs]);
   const pagedRunRows = useMemo(
     () => syncRunRows.slice((runPage - 1) * RUN_PAGE_SIZE, runPage * RUN_PAGE_SIZE),
     [runPage, syncRunRows]
@@ -194,6 +197,31 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
     await refreshWebCollection();
     setSubmitting(false);
   };
+  const copyArtifact = async row => {
+    try {
+      await navigator.clipboard.writeText(row.artifactPath);
+      setCopiedArtifact(row.id);
+      setTimeout(() => setCopiedArtifact(current => (current === row.id ? "" : current)), 2000);
+    } catch {
+      setCopiedArtifact("");
+    }
+  };
+  // 执行记录里的失败必须能就地重试，不用用户自己到上面的覆盖表里找对应行。
+  const retryRun = async row => {
+    if (!canTrigger || !row.retryTarget || retryingRun) return;
+    setRetryingRun(row.id);
+    setResultMessage("");
+    setResultError("");
+    try {
+      await triggerWebCollection({ ...row.retryTarget, force: true });
+      setResultMessage(`${row.sourceName || row.sourceId} ${row.retryTarget.businessDate} 已重新排队。`);
+      await refreshWebCollection();
+    } catch (error) {
+      setResultError(error.message || "重新采集触发失败。");
+    } finally {
+      setRetryingRun("");
+    }
+  };
   return <div className="data-workspace data-sync-workspace">
     <SyncConclusionBar
       conclusion={conclusion}
@@ -228,7 +256,21 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
       { key: "range", header: "数据范围", render: row => [row.from, row.to].filter(Boolean).join(" 至 ") || "—" },
       { key: "rows", header: "行数", className: "num", render: row => row.rowCount === null || row.rowCount === undefined ? "—" : row.rowCount },
       { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "success" ? "success" : row.status === "running" ? "warning" : "danger"}`}>{statusLabel(row.status)}</span> },
-      { key: "message", header: "结果", render: row => row.message || "—" }
+      { key: "message", header: "结果", render: row => row.message || "—" },
+      { key: "artifact", header: "文件位置", render: row => row.artifactPath
+        ? <span className="data-sync-run-artifact">
+          <code>{row.artifactPath}</code>
+          <Button className="compact" onClick={() => copyArtifact(row)}>
+            {copiedArtifact === row.id ? "已复制" : "复制路径"}
+          </Button>
+        </span>
+        : <span className="data-sync-run-artifact-empty">{row.status === "success" ? "未记录文件" : "—"}</span> },
+      { key: "actions", header: "操作", render: row => <TableActions>
+        {row.canRetry && canTrigger ? <Button
+          disabled={Boolean(retryingRun)}
+          onClick={() => retryRun(row)}
+        ><RefreshCw size={14} aria-hidden="true" />{retryingRun === row.id ? "重新排队中…" : "重新采集"}</Button> : null}
+      </TableActions> }
     ]} rows={pagedRunRows} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} />
     <TablePagination total={syncRunRows.length} page={runPage} pageSize={RUN_PAGE_SIZE} onPageChange={setRunPage} /></section>
     <LocalArchivePanel
