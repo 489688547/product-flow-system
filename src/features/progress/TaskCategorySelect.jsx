@@ -1,12 +1,13 @@
 import { Check, ChevronDown } from "lucide-react";
 import { useId, useRef, useState } from "react";
-import { TASK_CATEGORIES } from "../../domain/productFlow.js";
+import { normalizeTaskCategory, TASK_CATEGORIES } from "../../domain/productFlow.js";
 import { FloatingMenu } from "../../ui/FloatingMenu.jsx";
 
 export function TaskCategorySelect({ value, onChange, label = "选择任务类别", disabled = false }) {
   const anchorRef = useRef(null);
   const optionPrefix = useId();
   const [open, setOpen] = useState(false);
+  const normalizedValue = normalizeTaskCategory(value);
 
   const choose = category => {
     onChange?.(category);
@@ -25,7 +26,7 @@ export function TaskCategorySelect({ value, onChange, label = "选择任务类�
         disabled={disabled}
         onClick={() => setOpen(current => !current)}
       >
-        <span>{value || TASK_CATEGORIES[0]}</span>
+        <span>{normalizedValue}</span>
         <ChevronDown size={14} />
       </button>
       <FloatingMenu
@@ -44,12 +45,12 @@ export function TaskCategorySelect({ value, onChange, label = "选择任务类�
             key={category}
             type="button"
             role="option"
-            aria-selected={category === value}
-            className={category === value ? "active" : ""}
+            aria-selected={category === normalizedValue}
+            className={category === normalizedValue ? "active" : ""}
             onClick={() => choose(category)}
           >
             <span>{category}</span>
-            {category === value ? <Check size={14} /> : null}
+            {category === normalizedValue ? <Check size={14} /> : null}
           </button>
         ))}
       </FloatingMenu>
