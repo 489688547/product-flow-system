@@ -203,6 +203,45 @@ export function normalizeErpArchive(rawArchive) {
   });
 }
 
+export const ERP_ARCHIVE_INGESTION_REASON_CODES = Object.freeze([
+  "TIME_BASIS_MISSING",
+  "DETAIL_STORAGE_DEFERRED",
+  "UNSUPPORTED_REPORT_GRAIN"
+]);
+
+export function normalizeErpArchiveDecision(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    fail("ERP_COLLECTION_ARCHIVE_DECISION_INVALID", "归档入库决策格式无效。");
+  }
+  const archiveId = text(input.archiveId, 320);
+  const expectedVersion = Number(input.expectedVersion);
+  const ingestionDecision = text(input.ingestionDecision, 40);
+  const ingestionReasonCode = nullableText(input.ingestionReasonCode, 80);
+  if (!archiveId || !Number.isInteger(expectedVersion) || expectedVersion < 1) {
+    fail("ERP_COLLECTION_ARCHIVE_DECISION_INVALID", "归档入库决策缺少归档标识或有效版本。");
+  }
+  if (!["pending", "skipped"].includes(ingestionDecision)) {
+    fail("ERP_COLLECTION_ARCHIVE_DECISION_INVALID", "归档入库决策只允许 pending 或 skipped。");
+  }
+  if (
+    ingestionDecision === "skipped"
+    && !ERP_ARCHIVE_INGESTION_REASON_CODES.includes(ingestionReasonCode)
+  ) {
+    fail("ERP_COLLECTION_ARCHIVE_REASON_INVALID", "请选择已登记的不入库原因。", {
+      supported: ERP_ARCHIVE_INGESTION_REASON_CODES
+    });
+  }
+  if (ingestionDecision === "pending" && ingestionReasonCode) {
+    fail("ERP_COLLECTION_ARCHIVE_DECISION_INVALID", "待处理归档不能保留不入库原因。");
+  }
+  return {
+    archiveId,
+    expectedVersion,
+    ingestionDecision,
+    ingestionReasonCode: ingestionDecision === "skipped" ? ingestionReasonCode : null
+  };
+}
+
 function normalizeIssue(issue, resourceType, batchId, index) {
   if (!issue || typeof issue !== "object" || Array.isArray(issue)) fail("ERP_COLLECTION_ISSUE_INVALID", `第 ${index + 1} 条异常格式无效。`);
   const code = text(issue.code, 120);

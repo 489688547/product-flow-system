@@ -7,15 +7,27 @@ import { hashSecret } from "../functions/api/platform/_shared/productionDataAcce
 import { createErpCollectionD1Mock } from "./helpers/erp-collection-d1-mock.mjs";
 
 const session = { userId: "exec-1", name: "负责人", role: "executive", department: "总经办" };
+const readonly = { userId: "readonly-1", name: "访客", role: "readonly", department: "访客" };
 const fileHash = "a".repeat(64);
 
-async function jsonCall(handler, url, { method = "GET", db, session: actor, headers = {}, body } = {}) {
+async function jsonCall(handler, url, {
+  method = "GET",
+  db,
+  session: actor,
+  headers = {},
+  body,
+  now
+} = {}) {
   const request = new Request(url, {
     method,
     headers: { ...(body ? { "content-type": "application/json" } : {}), ...headers },
     body: body ? JSON.stringify(body) : undefined
   });
-  const response = await handler({ request, env: db ? { PRODUCT_FLOW_DB: db } : {}, data: actor ? { session: actor } : {} });
+  const response = await handler({
+    request,
+    env: db ? { PRODUCT_FLOW_DB: db } : {},
+    data: { ...(actor ? { session: actor } : {}), ...(now ? { now } : {}) }
+  });
   return { response, body: await response.json() };
 }
 
@@ -172,4 +184,197 @@ test("collector can sync an archive manifest before row parsing is available", a
   assert.equal(result.response.status, 201);
   assert.equal(db.tables.erp_file_archives.size, 1);
   assert.equal([...db.tables.erp_file_archives.values()][0].batch_id, null);
+});
+
+test("archive reads self-heal processing rows older than 24 hours without changing fresh work", async () => {
+  const db = createErpCollectionD1Mock();
+  db.tables.erp_file_archives.set("expired", {
+    id: "expired",
+    platform_id: "kuaimai",
+    resource_type: "order_items",
+    content_hash: "d".repeat(64),
+    file_name: "已卡住.xlsx",
+    size_bytes: 1024,
+    relative_path: "原始归档/order_items/2026-07/expired.xlsx",
+    storage_type: "local_desktop",
+    runner_id: "runner-1",
+    status: "processing",
+    batch_id: "batch-expired",
+    archived_at: "2026-07-26T00:00:00.000Z",
+    processed_at: null,
+    error_code: null,
+    ingestion_decision: "pending",
+    ingestion_reason_code: null,
+    decision_at: null,
+    decision_by: null,
+    version: 1,
+    created_at: "2026-07-26T00:00:00.000Z",
+    updated_at: "2026-07-26T01:00:00.000Z"
+  });
+  db.tables.erp_file_archives.set("fresh", {
+    ...db.tables.erp_file_archives.get("expired"),
+    id: "fresh",
+    content_hash: "e".repeat(64),
+    file_name: "处理中.xlsx",
+    batch_id: "batch-fresh",
+    archived_at: "2026-07-27T12:00:00.000Z",
+    updated_at: "2026-07-27T13:00:00.000Z"
+  });
+
+  const listed = await jsonCall(
+    onArchives,
+    "https://flow.example.com/api/platform/v1/erp-collection/archives",
+    { db, session, now: new Date("2026-07-28T02:00:00.000Z") }
+  );
+
+  assert.equal(listed.response.status, 200);
+  assert.equal(db.tables.erp_file_archives.get("expired").status, "failed");
+  assert.equal(
+    db.tables.erp_file_archives.get("expired").error_code,
+    "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT"
+  );
+  assert.equal(db.tables.erp_file_archives.get("expired").batch_id, "batch-expired");
+  assert.equal(db.tables.erp_file_archives.get("fresh").status, "processing");
+});
+
+test("authorized users record and revoke explicit archive skip decisions with optimistic versions", async () => {
+  const db = createErpCollectionD1Mock();
+  db.tables.erp_file_archives.set("archive-1", {
+    id: "archive-1",
+    platform_id: "kuaimai",
+    resource_type: "sales_items",
+    content_hash: "f".repeat(64),
+    file_name: "历史明细.xlsx",
+    size_bytes: 2048,
+    relative_path: "原始归档/sales_items/2026-07/history.xlsx",
+    storage_type: "local_desktop",
+    runner_id: "runner-1",
+    status: "archived",
+    batch_id: null,
+    archived_at: "2026-07-22T00:00:00.000Z",
+    processed_at: null,
+    error_code: null,
+    ingestion_decision: "pending",
+    ingestion_reason_code: null,
+    decision_at: null,
+    decision_by: null,
+    version: 1,
+    created_at: "2026-07-22T00:00:00.000Z",
+    updated_at: "2026-07-22T00:00:00.000Z"
+  });
+
+  const skipped = await jsonCall(
+    onArchives,
+    "https://flow.example.com/api/platform/v1/erp-collection/archives",
+    {
+      method: "PATCH",
+      db,
+      session,
+      body: {
+        archiveId: "archive-1",
+        expectedVersion: 1,
+        ingestionDecision: "skipped",
+        ingestionReasonCode: "DETAIL_STORAGE_DEFERRED"
+      }
+    }
+  );
+  assert.equal(skipped.response.status, 200);
+  assert.equal(skipped.body.data.archive.ingestionDecision, "skipped");
+  assert.equal(skipped.body.data.archive.ingestionReasonCode, "DETAIL_STORAGE_DEFERRED");
+  assert.equal(skipped.body.data.archive.decisionBy, "负责人");
+  assert.equal(skipped.body.data.archive.version, 2);
+
+  const stale = await jsonCall(
+    onArchives,
+    "https://flow.example.com/api/platform/v1/erp-collection/archives",
+    {
+      method: "PATCH",
+      db,
+      session,
+      body: {
+        archiveId: "archive-1",
+        expectedVersion: 1,
+        ingestionDecision: "pending"
+      }
+    }
+  );
+  assert.equal(stale.response.status, 409);
+  assert.equal(stale.body.error.code, "ERP_COLLECTION_ARCHIVE_VERSION_CONFLICT");
+
+  const restored = await jsonCall(
+    onArchives,
+    "https://flow.example.com/api/platform/v1/erp-collection/archives",
+    {
+      method: "PATCH",
+      db,
+      session,
+      body: {
+        archiveId: "archive-1",
+        expectedVersion: 2,
+        ingestionDecision: "pending"
+      }
+    }
+  );
+  assert.equal(restored.response.status, 200);
+  assert.equal(restored.body.data.archive.ingestionDecision, "pending");
+  assert.equal(restored.body.data.archive.ingestionReasonCode, null);
+  assert.equal(restored.body.data.archive.version, 3);
+});
+
+test("archive decisions reject readonly users, unknown reasons and non-archived runtime states", async () => {
+  const seed = () => {
+    const db = createErpCollectionD1Mock();
+    db.tables.erp_file_archives.set("archive-1", {
+      id: "archive-1",
+      platform_id: "kuaimai",
+      resource_type: "order_items",
+      content_hash: "9".repeat(64),
+      file_name: "待处理.xlsx",
+      size_bytes: 1,
+      relative_path: "原始归档/order_items/2026-07/pending.xlsx",
+      storage_type: "local_desktop",
+      runner_id: null,
+      status: "archived",
+      batch_id: null,
+      archived_at: "2026-07-22T00:00:00.000Z",
+      processed_at: null,
+      error_code: null,
+      ingestion_decision: "pending",
+      ingestion_reason_code: null,
+      decision_at: null,
+      decision_by: null,
+      version: 1,
+      created_at: "2026-07-22T00:00:00.000Z",
+      updated_at: "2026-07-22T00:00:00.000Z"
+    });
+    return db;
+  };
+  const body = {
+    archiveId: "archive-1",
+    expectedVersion: 1,
+    ingestionDecision: "skipped",
+    ingestionReasonCode: "DETAIL_STORAGE_DEFERRED"
+  };
+
+  const denied = await jsonCall(onArchives, "https://flow.example.com/api/platform/v1/erp-collection/archives", {
+    method: "PATCH", db: seed(), session: readonly, body
+  });
+  assert.equal(denied.response.status, 403);
+
+  const invalid = await jsonCall(onArchives, "https://flow.example.com/api/platform/v1/erp-collection/archives", {
+    method: "PATCH",
+    db: seed(),
+    session,
+    body: { ...body, ingestionReasonCode: "FILE_LOOKS_OLD" }
+  });
+  assert.equal(invalid.response.status, 400);
+  assert.equal(invalid.body.error.code, "ERP_COLLECTION_ARCHIVE_REASON_INVALID");
+
+  const processingDb = seed();
+  processingDb.tables.erp_file_archives.get("archive-1").status = "processing";
+  const wrongState = await jsonCall(onArchives, "https://flow.example.com/api/platform/v1/erp-collection/archives", {
+    method: "PATCH", db: processingDb, session, body
+  });
+  assert.equal(wrongState.response.status, 409);
+  assert.equal(wrongState.body.error.code, "ERP_COLLECTION_ARCHIVE_STATE_CONFLICT");
 });

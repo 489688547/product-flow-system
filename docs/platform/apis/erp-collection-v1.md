@@ -2,13 +2,14 @@
 
 ## Purpose
 
-`POST /api/platform/v1/erp-collection/ingest` accepts preflighted official ERP export indexes through the shared data-acquisition boundary. High-volume Kuaimai sales exports use `POST /api/platform/v1/erp-collection/sales-facts`, which accepts locally aggregated standard facts without copying thousands of detail indexes into D1. Provider files remain in the company Mac archive; credentials, cookies, verification codes, browser sessions and full raw rows never enter the request.
+`POST /api/platform/v1/erp-collection/ingest` accepts preflighted official ERP export indexes through the shared data-acquisition boundary. High-volume Kuaimai sales exports use `POST /api/platform/v1/erp-collection/sales-facts`, which accepts locally aggregated standard facts without copying thousands of detail indexes into D1. Provider files remain in the company Mac archive; credentials, cookies, verification codes, browser sessions and full raw rows never enter the request. Archive runtime status and the explicit decision not to project a file are separate facts: operational failures never become an intentional skip.
 
 ## Authentication and authorization
 
 - Manual calls require the existing authenticated organization session. The installed collector uses a fixed-scope `kuaimai_erp_ingest` token created by an executive session; plaintext is returned once and stored only in macOS Keychain, while D1 stores its SHA-256 hash.
 - Rejects read-only identities.
 - Write access is limited to 总经办、数据中心/数据部、供应链和财务.
+- The same authorized departments may record or revoke an archive ingestion decision. The collector token cannot set that decision.
 - Requires the formal control D1 plus the middleware-selected business D1 and an `Idempotency-Key` header. The control batch persists the server-resolved target environment and version; client payloads cannot choose a binding or database ID.
 
 ## Request
@@ -19,6 +20,18 @@ JSON object with:
 - `archive`: optional local archive manifest with file hash, safe filename, byte size, relative path, runner and status. Absolute paths are ignored.
 - `records`: at most 500 normalized records with stable source key, source timestamps, shop/warehouse references, row SHA-256 and the whitelisted minimum standard index.
 - `issues`: at most 500 preflight quality issues.
+
+`PATCH /api/platform/v1/erp-collection/archives` receives `archiveId`, `expectedVersion`,
+`ingestionDecision` and an optional `ingestionReasonCode`. `ingestionDecision` is `pending` or
+`skipped`. A skipped archive requires exactly one registered reason:
+
+- `TIME_BASIS_MISSING`
+- `DETAIL_STORAGE_DEFERRED`
+- `UNSUPPORTED_REPORT_GRAIN`
+
+Only an `archived` runtime record can be skipped. `processing`, `failed` and `processed` cannot be hidden behind a
+skip decision. Returning a skipped record to `pending` clears the reason, actor and decision timestamp. The route
+uses optimistic versions and records the server-resolved organization actor; file names never determine a decision.
 
 `sales-facts` receives the same `batch` and optional `archive`, aggregated `facts`, and safe `issues`; it does not accept or persist raw detail records. Uploads are chunked at 1,000 facts per pack with idempotency keys `batch.id:projected-sales:N`. A multi-pack upload declares `chunk: { index, total }` (at most 50 packs) on every pack; the first pack also carries `replaceDates` with the batch's complete date list, so the date rewrite happens exactly once and later packs insert idempotently without deleting. The legacy single-pack full upload (no `chunk`, up to 5,000 facts, dates derived from the facts) remains accepted for older runners. The local trusted adapter must first verify the whole file, ignore only explicit provider summary rows, redact personal fields, and aggregate by `69码 × 创建日 × 平台`. The server validates every fact again and atomically replaces only the exact completed business dates.
 
@@ -60,7 +73,7 @@ key replaces the same exact dates and does not accumulate duplicate facts.
 
 Archive metadata, runner authorization and collection batch control stay in the formal control database. Standard business projections use the target environment persisted on the control job. Display-target sales facts pass through the shared two-times transformation; a stale display version fails before projection writes.
 
-`POST /api/platform/v1/erp-collection/runners` creates the one-time fixed-scope token and requires either an executive company session or the existing server-only production personal token resolved to an active executive identity. The personal token is used only during installation and never enters LaunchAgent configuration. `GET /api/platform/v1/erp-collection/archives` returns safe archive and batch metadata to authorized company users; it never returns an absolute local path.
+`POST /api/platform/v1/erp-collection/runners` creates the one-time fixed-scope token and requires either an executive company session or the existing server-only production personal token resolved to an active executive identity. The personal token is used only during installation and never enters LaunchAgent configuration. `GET /api/platform/v1/erp-collection/archives` returns safe archive and batch metadata to authorized company users; it never returns an absolute local path. Before returning the list, the server marks `processing` records whose last update is more than 24 hours old as `failed` with `ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT`. That recovery preserves the local file, linked batch and all previously trusted business facts.
 
 ## Errors
 
@@ -72,6 +85,10 @@ Archive metadata, runner authorization and collection batch control stay in the 
 - `ERP_COLLECTION_SALES_FACT_INVALID` / `ERP_COLLECTION_SALES_FACTS_TOO_LARGE`: an aggregate fact lacks a valid 69 code/date, exceeds the 1,000-row pack (5,000 for the legacy single-pack format) or the 50-pack batch bound.
 - `ERP_COLLECTION_SALES_FACTS_DATES_REQUIRED` / `ERP_COLLECTION_SALES_FACTS_DATES_INVALID`: a multi-pack first pack misses the full rewrite date list, or a later pack illegally carries one.
 - `ERP_COLLECTION_BATCH_PARTIAL`: a sales export or current inventory snapshot still has blocking validation errors and cannot be reported as synchronized.
+- `ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT`: the archive remained in `processing` for more than 24 hours and was stopped without changing trusted facts.
+- `ERP_COLLECTION_ARCHIVE_NOT_FOUND`: the explicit archive decision targets an unknown ID.
+- `ERP_COLLECTION_ARCHIVE_DECISION_INVALID` / `ERP_COLLECTION_ARCHIVE_REASON_INVALID`: the decision, expected version or controlled reason is invalid.
+- `ERP_COLLECTION_ARCHIVE_STATE_CONFLICT` / `ERP_COLLECTION_ARCHIVE_VERSION_CONFLICT`: the runtime state cannot accept a skip decision, or the read version is stale.
 - `GOODS_FLOW_INVENTORY_SNAPSHOT_INVALID`: a completed inventory snapshot is empty, mixes snapshot dates, lacks a stable SKU/warehouse identity, or contains duplicate `SKU × warehouse` rows.
 - `ERP_COLLECTION_INGEST_FAILED`: unexpected storage failure; response and logs must not expose source rows or credentials.
 
@@ -81,7 +98,7 @@ The route is additive under `/api/platform/v1`. Resource types and payload valid
 
 ## Capacity and retention
 
-D1 stores archive metadata, necessary minimum query indexes, business projections, batch metadata and quality issues; it is not the binary-file archive. High-volume daily sales files keep no per-detail D1 source index: the local archive remains trace evidence while D1 stores only the aggregate facts and counts. A verified 15-day Kuaimai order-item sample contains 157,217 rows and approximately 339.84 MiB of serialized records, so full raw history stays under `~/Desktop/公司数据中心/快麦ERP/` until a governed NAS/R2 location is available.
+D1 stores archive metadata, necessary minimum query indexes, business projections, batch metadata and quality issues; it is not the binary-file archive. Archive decisions add only a controlled code, actor, timestamp and integer version to each index row. High-volume daily sales files keep no per-detail D1 source index: the local archive remains trace evidence while D1 stores only the aggregate facts and counts. A verified 15-day Kuaimai order-item sample contains 157,217 rows and approximately 339.84 MiB of serialized records, so full raw history stays under `~/Desktop/公司数据中心/快麦ERP/` until a governed NAS/R2 location is available.
 
 ## Observability
 

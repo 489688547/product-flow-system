@@ -12,6 +12,8 @@ import { upsertProductCatalog } from "../../product-catalog/_shared/storage.js";
 
 const WRITE_BATCH_SIZE = 50;
 const SOURCE_RECORD_PAGE_SIZE = 500;
+const ARCHIVE_PROCESSING_TIMEOUT_MS = 24 * 60 * 60 * 1000;
+const ARCHIVE_PROCESSING_TIMEOUT_CODE = "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT";
 
 // 官方文件/采集导入成功后，尽力复核并结案受影响日期的未结销售修复记录；
 // 结案失败只记录日志，绝不影响本次导入结果。
@@ -506,30 +508,115 @@ export async function authenticateErpCollector(db, request) {
   return { actor: row.name, userId: row.id, department: "collector", runnerId: row.id, scope: row.scope };
 }
 
-export async function listErpArchives(db, { resourceType = "", status = "", limit = 100 } = {}) {
+function archiveRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    platformId: row.platform_id,
+    resourceType: row.resource_type,
+    contentHash: row.content_hash,
+    fileName: row.file_name,
+    sizeBytes: Number(row.size_bytes || 0),
+    relativePath: row.relative_path,
+    storageType: row.storage_type,
+    runnerId: row.runner_id || null,
+    status: row.status,
+    batchId: row.batch_id || null,
+    archivedAt: row.archived_at,
+    processedAt: row.processed_at || null,
+    errorCode: row.error_code || null,
+    ingestionDecision: row.ingestion_decision || "pending",
+    ingestionReasonCode: row.ingestion_reason_code || null,
+    decisionAt: row.decision_at || null,
+    decisionBy: row.decision_by || null,
+    version: Math.max(1, Number(row.version || 1)),
+    updatedAt: row.updated_at
+  };
+}
+
+export async function listErpArchives(db, {
+  resourceType = "",
+  status = "",
+  limit = 100,
+  now: nowInput
+} = {}) {
+  const now = nowInput instanceof Date ? nowInput : new Date();
+  const cutoff = new Date(now.getTime() - ARCHIVE_PROCESSING_TIMEOUT_MS).toISOString();
+  await db.prepare(`UPDATE erp_file_archives
+    SET status = 'failed', error_code = ?, updated_at = ?
+    WHERE status = 'processing' AND COALESCE(updated_at, archived_at) <= ?`)
+    .bind(ARCHIVE_PROCESSING_TIMEOUT_CODE, now.toISOString(), cutoff)
+    .run();
   const result = await db.prepare(`SELECT id, platform_id, resource_type, content_hash, file_name, size_bytes,
-    relative_path, storage_type, runner_id, status, batch_id, archived_at, processed_at, error_code, updated_at
+    relative_path, storage_type, runner_id, status, batch_id, archived_at, processed_at, error_code,
+    ingestion_decision, ingestion_reason_code, decision_at, decision_by, version, updated_at
     FROM erp_file_archives ORDER BY archived_at DESC LIMIT ?`).bind(Math.min(500, Math.max(1, Number(limit) || 100))).all();
   return (result?.results || [])
     .filter(row => !resourceType || row.resource_type === resourceType)
     .filter(row => !status || row.status === status)
-    .map(row => ({
-      id: row.id,
-      platformId: row.platform_id,
-      resourceType: row.resource_type,
-      contentHash: row.content_hash,
-      fileName: row.file_name,
-      sizeBytes: Number(row.size_bytes || 0),
-      relativePath: row.relative_path,
-      storageType: row.storage_type,
-      runnerId: row.runner_id || null,
-      status: row.status,
-      batchId: row.batch_id || null,
-      archivedAt: row.archived_at,
-      processedAt: row.processed_at || null,
-      errorCode: row.error_code || null,
-      updatedAt: row.updated_at
-    }));
+    .map(archiveRow);
+}
+
+function archiveDecisionError(status, code, message) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  return error;
+}
+
+async function findArchiveById(db, archiveId) {
+  return db.prepare(`SELECT id, platform_id, resource_type, content_hash, file_name, size_bytes,
+    relative_path, storage_type, runner_id, status, batch_id, archived_at, processed_at, error_code,
+    ingestion_decision, ingestion_reason_code, decision_at, decision_by, version, updated_at
+    FROM erp_file_archives WHERE id = ? LIMIT 1`)
+    .bind(archiveId)
+    .first();
+}
+
+export async function updateErpArchiveDecision(db, decision, actor = {}) {
+  const current = await findArchiveById(db, decision.archiveId);
+  if (!current) {
+    throw archiveDecisionError(404, "ERP_COLLECTION_ARCHIVE_NOT_FOUND", "归档记录不存在。");
+  }
+  const version = Math.max(1, Number(current.version || 1));
+  if (version !== decision.expectedVersion) {
+    throw archiveDecisionError(409, "ERP_COLLECTION_ARCHIVE_VERSION_CONFLICT", "归档记录已更新，请刷新后重试。");
+  }
+  if (current.status !== "archived") {
+    throw archiveDecisionError(
+      409,
+      "ERP_COLLECTION_ARCHIVE_STATE_CONFLICT",
+      "只有尚未处理的归档可以记录不入库原因。"
+    );
+  }
+  const currentDecision = current.ingestion_decision || "pending";
+  const currentReason = current.ingestion_reason_code || null;
+  if (
+    currentDecision === decision.ingestionDecision
+    && currentReason === decision.ingestionReasonCode
+  ) {
+    return archiveRow(current);
+  }
+  const now = new Date().toISOString();
+  const skipped = decision.ingestionDecision === "skipped";
+  const result = await db.prepare(`UPDATE erp_file_archives
+    SET ingestion_decision = ?, ingestion_reason_code = ?, decision_at = ?, decision_by = ?,
+      version = version + 1, updated_at = ?
+    WHERE id = ? AND version = ?`)
+    .bind(
+      decision.ingestionDecision,
+      decision.ingestionReasonCode,
+      skipped ? now : null,
+      skipped ? String(actor.actor || "unknown").slice(0, 120) : null,
+      now,
+      decision.archiveId,
+      decision.expectedVersion
+    )
+    .run();
+  if (Number(result?.meta?.changes ?? result?.changes ?? 0) !== 1) {
+    throw archiveDecisionError(409, "ERP_COLLECTION_ARCHIVE_VERSION_CONFLICT", "归档记录已更新，请刷新后重试。");
+  }
+  return archiveRow(await findArchiveById(db, decision.archiveId));
 }
 
 export async function upsertErpArchive(db, archive, { actor = "" } = {}) {

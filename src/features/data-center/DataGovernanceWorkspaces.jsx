@@ -3,7 +3,7 @@ import { FileUp, MonitorCheck, RefreshCw } from "lucide-react";
 import { useDataCenter } from "../../state/DataCenterProvider.jsx";
 import { Button } from "../../ui/Button.jsx";
 import { DataTable, TableActions } from "../../ui/DataTable.jsx";
-import { loadErpArchives } from "../../state/erpCollectionApi.js";
+import { loadErpArchives, setErpArchiveDecision } from "../../state/erpCollectionApi.js";
 import {
   loadWebCollectionStatus,
   triggerKuaimaiSalesCollection,
@@ -56,6 +56,8 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
   const [archives, setArchives] = useState([]);
   const [archiveLoading, setArchiveLoading] = useState(true);
   const [archiveError, setArchiveError] = useState("");
+  const [archiveDecisionError, setArchiveDecisionError] = useState("");
+  const [archiveSavingId, setArchiveSavingId] = useState("");
   const [webCollection, setWebCollection] = useState(EMPTY_WEB_COLLECTION_STATUS);
   const [webCollectionLoading, setWebCollectionLoading] = useState(true);
   const [webCollectionError, setWebCollectionError] = useState("");
@@ -75,17 +77,21 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
       setWebCollectionLoading(false);
     }
   }, []);
-  useEffect(() => {
-    let active = true;
+  const refreshArchives = useCallback(async () => {
     setArchiveLoading(true);
-    loadErpArchives().then(payload => {
-      if (!active) return;
+    try {
+      const payload = await loadErpArchives();
       setArchives(Array.isArray(payload.archives) ? payload.archives : []);
       setArchiveError("");
-    }).catch(error => active && setArchiveError(error.message || "本机归档状态读取失败。"))
-      .finally(() => active && setArchiveLoading(false));
-    return () => { active = false; };
+    } catch (error) {
+      setArchiveError(error.message || "本机归档状态读取失败。");
+    } finally {
+      setArchiveLoading(false);
+    }
   }, []);
+  useEffect(() => {
+    void refreshArchives();
+  }, [refreshArchives]);
   useEffect(() => {
     refreshWebCollection();
   }, [refreshWebCollection]);
@@ -127,7 +133,29 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
     return () => cancelAnimationFrame(frame);
   }, [coverage.length, focusTarget]);
   const refreshStatus = async () => {
-    await Promise.allSettled([refresh(), refreshWebCollection()]);
+    await Promise.allSettled([refresh(), refreshWebCollection(), refreshArchives()]);
+  };
+  const saveArchiveDecision = async (item, ingestionDecision, ingestionReasonCode) => {
+    if (!canTrigger || archiveSavingId) return;
+    setArchiveSavingId(item.id);
+    setArchiveDecisionError("");
+    try {
+      await setErpArchiveDecision({
+        archiveId: item.id,
+        expectedVersion: item.version,
+        ingestionDecision,
+        ...(ingestionReasonCode ? { ingestionReasonCode } : {})
+      });
+      await refreshArchives();
+    } catch (error) {
+      setArchiveDecisionError(error.message || "归档入库原因保存失败。");
+    } finally {
+      setArchiveSavingId("");
+    }
+  };
+  const openArchiveRecovery = () => {
+    coverageRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+    setResultMessage("请在缺口清单中选择对应业务日期重新采集；系统不会从文件名猜测日期。");
   };
   // 逐目标串行提交；中途失败必须报告已成功的部分，不能让用户以为整批都失败。
   const submitBackfill = async rows => {
@@ -202,7 +230,17 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
       { key: "message", header: "结果", render: row => row.message || "—" }
     ]} rows={pagedRunRows} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} />
     <TablePagination total={syncRunRows.length} page={runPage} pageSize={RUN_PAGE_SIZE} onPageChange={setRunPage} /></section>
-    <LocalArchivePanel archives={archives} loading={archiveLoading} error={archiveError} retentionDays={state.settings?.rawRetentionDays || 365} />
+    <LocalArchivePanel
+      archives={archives}
+      loading={archiveLoading}
+      error={archiveError}
+      retentionDays={state.settings?.rawRetentionDays || 365}
+      canManage={canTrigger}
+      savingId={archiveSavingId}
+      decisionError={archiveDecisionError}
+      onDecision={saveArchiveDecision}
+      onOpenRecovery={openArchiveRecovery}
+    />
   </div>;
 }
 

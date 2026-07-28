@@ -4,6 +4,7 @@ import test from "node:test";
 
 const migrationPath = new URL("../migrations/0007_kuaimai_erp_collection.sql", import.meta.url);
 const archiveMigrationPath = new URL("../migrations/0008_kuaimai_erp_local_archives.sql", import.meta.url);
+const archiveDispositionMigrationPath = new URL("../migrations/0017_erp_archive_disposition.sql", import.meta.url);
 const environmentPath = new URL("../docs/platform/environment-capabilities.json", import.meta.url);
 
 export const KUAIMAI_ERP_COLLECTION_TABLES = [
@@ -17,7 +18,12 @@ export const KUAIMAI_ERP_COLLECTION_TABLES = [
 test("Kuaimai ERP collection tables stay aligned with the environment capability", () => {
   assert.equal(existsSync(migrationPath), true, "Kuaimai ERP collection migration must exist");
   assert.equal(existsSync(archiveMigrationPath), true, "Kuaimai ERP archive migration must exist");
-  const migration = `${readFileSync(migrationPath, "utf8")}\n${readFileSync(archiveMigrationPath, "utf8")}`;
+  assert.equal(existsSync(archiveDispositionMigrationPath), true, "Kuaimai ERP archive disposition migration must exist");
+  const migration = [
+    readFileSync(migrationPath, "utf8"),
+    readFileSync(archiveMigrationPath, "utf8"),
+    readFileSync(archiveDispositionMigrationPath, "utf8")
+  ].join("\n");
   const environment = JSON.parse(readFileSync(environmentPath, "utf8"));
   const capability = environment.capabilities.find(item => item.id === "kuaimai-erp-file-collection");
   assert.ok(capability, "kuaimai-erp-file-collection capability must exist");
@@ -40,5 +46,10 @@ test("Kuaimai ERP collection tables stay aligned with the environment capability
   assert.match(migration, /UNIQUE\s*\(platform_id, content_hash\)/i);
   assert.match(migration, /token_hash TEXT NOT NULL UNIQUE/i);
   assert.match(migration, /scope TEXT NOT NULL DEFAULT 'kuaimai_erp_ingest'/i);
+  assert.match(migration, /ingestion_decision TEXT NOT NULL DEFAULT 'pending'/i);
+  assert.match(migration, /ingestion_reason_code TEXT/i);
+  assert.match(migration, /decision_at TEXT/i);
+  assert.match(migration, /decision_by TEXT/i);
+  assert.match(migration, /version INTEGER NOT NULL DEFAULT 1/i);
   assert.doesNotMatch(migration, /password|cookie|access_token|refresh_token|verification_code|raw_html/i);
 });

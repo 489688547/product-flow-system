@@ -1,12 +1,21 @@
-import { normalizeErpArchive } from "../../../../../src/domain/kuaimaiErpCollection.js";
+import {
+  normalizeErpArchive,
+  normalizeErpArchiveDecision
+} from "../../../../../src/domain/kuaimaiErpCollection.js";
 import { authorizeErpCollection } from "./_shared/authorization.js";
 import { errorResponse, requestId, routeError, successResponse } from "./_shared/http.js";
-import { authenticateErpCollector, erpCollectionDatabase, listErpArchives, upsertErpArchive } from "./_shared/storage.js";
+import {
+  authenticateErpCollector,
+  erpCollectionDatabase,
+  listErpArchives,
+  updateErpArchiveDecision,
+  upsertErpArchive
+} from "./_shared/storage.js";
 
 export async function onRequest({ request, env, data = {} }) {
   const id = requestId();
   try {
-    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { allow: "GET, POST, OPTIONS" } });
+    if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { allow: "GET, POST, PATCH, OPTIONS" } });
     const db = erpCollectionDatabase(env);
     if (!db) throw routeError(501, "ERP_COLLECTION_STORAGE_UNAVAILABLE", "缺少 Cloudflare D1 数据库绑定 PRODUCT_FLOW_DB。", true);
     if (request.method === "POST") {
@@ -19,13 +28,23 @@ export async function onRequest({ request, env, data = {} }) {
       const result = await upsertErpArchive(db, archive, actor);
       return successResponse(result, id, result.duplicateFile ? 200 : 201);
     }
+    if (request.method === "PATCH") {
+      const actor = authorizeErpCollection(data.session);
+      const body = await request.json().catch(() => {
+        throw routeError(400, "VALIDATION_INVALID_JSON", "请求内容不是有效的 JSON 对象。");
+      });
+      const decision = normalizeErpArchiveDecision(body);
+      const archive = await updateErpArchiveDecision(db, decision, actor);
+      return successResponse({ archive }, id);
+    }
     if (request.method !== "GET") throw routeError(405, "VALIDATION_METHOD_NOT_ALLOWED", "Method not allowed");
     authorizeErpCollection(data.session);
     const url = new URL(request.url);
     const archives = await listErpArchives(db, {
       resourceType: String(url.searchParams.get("resourceType") || "").trim(),
       status: String(url.searchParams.get("status") || "").trim(),
-      limit: url.searchParams.get("limit") || 100
+      limit: url.searchParams.get("limit") || 100,
+      now: data.now
     });
     return successResponse({ archives }, id);
   } catch (error) {
