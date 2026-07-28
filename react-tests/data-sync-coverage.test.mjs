@@ -325,3 +325,26 @@ test("归档没有业务日期时不得张冠李戴地关联到任意一天", ()
   const day = rows.find(item => item.businessDate === "2026-07-25" && item.caliber === "unified");
   assert.equal(day.blockedBy, null);
 });
+
+test("批次范围是带时区的时间戳而非日期，仍应正确归因到业务日", () => {
+  // 生产真实值：range_start = "2026-07-26T00:00:09+08:00"，不是 "2026-07-26"。
+  // 直接做字符串比较永远匹配不上，缺口归因会静默失效。
+  const archives = [{
+    id: "arch", resourceType: "order_items", status: "failed",
+    errorCode: "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT",
+    fileName: "快麦ERP交易订单明细导出20260727051545.xlsx",
+    businessDateStart: "2026-07-26T00:00:09+08:00",
+    businessDateEnd: "2026-07-26T23:59:59+08:00"
+  }];
+  const rows = buildSyncCoverage({
+    jobs: [], archives, stores: [], dailyFacts,
+    range: { from: "2026-07-26", to: "2026-07-27" }
+  });
+  const day26 = rows.find(item => item.businessDate === "2026-07-26" && item.caliber === "unified");
+  assert.equal(day26.blockedBy?.stage, "ingest");
+  assert.equal(day26.recoveryAction, "reingest");
+  // 文件名里的 20260727 是导出时间，不是业务日期，不得据此归因到 07-27。
+  const day27 = rows.find(item => item.businessDate === "2026-07-27" && item.caliber === "unified");
+  assert.equal(day27.blockedBy, null);
+  assert.equal(day27.recoveryAction, "recollect");
+});

@@ -44,8 +44,18 @@ test("missing or unrelated pull request branches fail closed", () => {
     () => validatePullRequestBranchFlow(pullRequest("release", "codex/example")),
     /不支持的 PR 流向/
   );
+  // 前缀只用于区分功能分支与发布分支，不限定作者或工具；无前缀仍然拒绝。
   assert.throws(
-    () => validatePullRequestBranchFlow(pullRequest("dev", "feature/example")),
-    /功能分支必须使用 codex/
+    () => validatePullRequestBranchFlow(pullRequest("dev", "example")),
+    /功能分支需使用/
   );
+});
+
+test("功能分支前缀不限定来源工具", () => {
+  for (const head of ["codex/x", "claude/x", "feat/x", "fix/x", "chore/x", "docs/x"]) {
+    const result = validatePullRequestBranchFlow(pullRequest("dev", head));
+    assert.equal(result.lane, "feature", `${head} 应被识别为功能分支`);
+  }
+  // 功能分支仍然只能进 dev，不能直接进 main。
+  assert.throws(() => validatePullRequestBranchFlow(pullRequest("main", "claude/x")), /功能分支必须提交到 dev/);
 });

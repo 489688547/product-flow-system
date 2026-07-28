@@ -96,10 +96,18 @@ const INGEST_BLOCK_EXPLANATION = Object.freeze({
   ERP_COLLECTION_INTERNAL_ERROR: "文件已采集并归档到公司 Mac，但入库时发生内部错误，未形成销售事实。"
 });
 
+// 批次范围在生产上是带时区的完整时间戳（例如 2026-07-26T00:00:09+08:00），
+// 不是纯日期。直接做字符串比较永远匹配不上，归因会静默失效。
+// 时间戳本身已按 Asia/Shanghai 表达，取其日期部分即为业务日。
+function businessDayOf(value) {
+  const text = String(value || "").trim();
+  return /^\d{4}-\d{2}-\d{2}/.test(text) ? text.slice(0, 10) : "";
+}
+
 function ingestBlockerFor(archives, { businessDate, providerIds }) {
   const blocking = archives.find(archive => {
-    const start = String(archive?.businessDateStart || "");
-    const end = String(archive?.businessDateEnd || start);
+    const start = businessDayOf(archive?.businessDateStart);
+    const end = businessDayOf(archive?.businessDateEnd) || start;
     // 没有业务日期的历史文件不参与关联，避免张冠李戴。
     if (!start) return false;
     if (businessDate < start || businessDate > end) return false;
