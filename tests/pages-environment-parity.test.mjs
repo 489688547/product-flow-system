@@ -5,11 +5,9 @@ import test from "node:test";
 
 const scriptPath = resolve("scripts/check-pages-environment-parity.mjs");
 const requiredSecrets = [
+  "DEMO_DATA_MASKING_KEY",
   "DINGTALK_APP_KEY",
   "DINGTALK_APP_SECRET",
-  "KUAIMAI_ACCESS_TOKEN",
-  "KUAIMAI_APP_KEY",
-  "KUAIMAI_APP_SECRET",
   "PLATFORM_CREDENTIAL_MASTER_KEY"
 ];
 
@@ -34,6 +32,31 @@ function completeConfig() {
     d1("env.production.d1_databases"),
     d1("env.production.d1_databases", { binding: "DEMO_FLOW_DB" })
   ].join("\n");
+}
+
+function secretOutput(names = requiredSecrets) {
+  return names.map(name => `  - ${name}: Value Encrypted`).join("\n");
+}
+
+function remoteProject(projectName, {
+  productDatabaseId = "production-database-id",
+  displayDatabaseId = "display-database-id",
+  previewSecrets = requiredSecrets,
+  productionSecrets = requiredSecrets
+} = {}) {
+  const configSource = [
+    `name = "${projectName}"`,
+    d1("d1_databases", { id: productDatabaseId }),
+    d1("d1_databases", { binding: "DEMO_FLOW_DB", id: displayDatabaseId }),
+    d1("env.production.d1_databases", { id: productDatabaseId }),
+    d1("env.production.d1_databases", { binding: "DEMO_FLOW_DB", id: displayDatabaseId })
+  ].join("\n");
+  return {
+    projectName,
+    configSource,
+    previewSecretOutput: secretOutput(previewSecrets),
+    productionSecretOutput: secretOutput(productionSecrets)
+  };
 }
 
 test("the local Wrangler contract declares distinct production and display D1 in all environments", async () => {
@@ -123,6 +146,55 @@ test("remote inspection reports names only when Preview is incomplete", async ()
   }), error => {
     assert.match(error.message, /DINGTALK_APP_SECRET/);
     assert.doesNotMatch(error.message, /secret-value-must-not-echo/);
+    return true;
+  });
+});
+
+test("production and development Pages projects share the governed D1 and Secret contract", async () => {
+  const { inspectDualPagesProjects } = await import(scriptPath);
+  const result = inspectDualPagesProjects({
+    productionProject: remoteProject("deshan-tiyes-system"),
+    developmentProject: remoteProject("deshan-tiyes-system-dev"),
+    requiredSecrets
+  });
+  assert.deepEqual(result.projects, {
+    production: "deshan-tiyes-system",
+    development: "deshan-tiyes-system-dev"
+  });
+  assert.deepEqual(result.databaseIds, {
+    PRODUCT_FLOW_DB: "production-database-id",
+    DEMO_FLOW_DB: "display-database-id"
+  });
+  assert.equal(result.sameDatabase, true);
+});
+
+test("dual-project inspection fails closed when the development project drifts", async () => {
+  const { inspectDualPagesProjects } = await import(scriptPath);
+  assert.throws(() => inspectDualPagesProjects({
+    productionProject: remoteProject("deshan-tiyes-system"),
+    developmentProject: remoteProject("deshan-tiyes-system-dev", {
+      productDatabaseId: "unexpected-database-id"
+    }),
+    requiredSecrets
+  }), error => {
+    assert.match(error.message, /deshan-tiyes-system-dev|PRODUCT_FLOW_DB/);
+    assert.doesNotMatch(error.message, /Value Encrypted/);
+    return true;
+  });
+});
+
+test("dual-project inspection reports only a missing Secret name", async () => {
+  const { inspectDualPagesProjects } = await import(scriptPath);
+  assert.throws(() => inspectDualPagesProjects({
+    productionProject: remoteProject("deshan-tiyes-system"),
+    developmentProject: remoteProject("deshan-tiyes-system-dev", {
+      previewSecrets: requiredSecrets.filter(name => name !== "DINGTALK_APP_SECRET")
+    }),
+    requiredSecrets
+  }), error => {
+    assert.match(error.message, /deshan-tiyes-system-dev/);
+    assert.match(error.message, /DINGTALK_APP_SECRET/);
+    assert.doesNotMatch(error.message, /Value Encrypted/);
     return true;
   });
 });

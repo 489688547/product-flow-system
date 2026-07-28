@@ -23,7 +23,7 @@
   - 提交：`feat(release): enforce dev promotion lane`。
   - 结果：2026-07-28，分支流向测试 3/3 与治理检查通过。
 
-- [ ] 建立双 Pages 项目环境契约
+- [x] 建立双 Pages 项目环境契约
   - 依赖：分支流向门禁。
   - 文件：`scripts/check-pages-environment-parity.mjs`、`scripts/configure-pages-environment-parity.mjs`、对应测试。
   - 输入：正式/测试项目配置、Secret 名称、环境能力清单。
@@ -32,6 +32,7 @@
   - 实现步骤：扩展解析接口；比较项目；CLI 使用固定项目名。
   - 验证：聚焦测试和环境能力检查。
   - 提交：`feat(platform): verify two Pages projects`。
+  - 结果：2026-07-28，双项目 D1/Secret 漂移检查与现有主密钥安全复用测试 16/16 通过，环境能力检查通过。
 
 - [ ] 迁移运行时默认域名
   - 依赖：双项目契约。
