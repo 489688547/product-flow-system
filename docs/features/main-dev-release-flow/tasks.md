@@ -45,7 +45,7 @@
   - 提交：`feat(runtime): move to deshan fixed hosts`。
   - 结果：2026-07-28，新正式站识别为 production、新测试站识别为 preview；固定站 OAuth callback 保持同源，分支 Preview 回到对应固定站；静态冷启动入口保持不变，55/55 聚焦测试通过。旧站仅保留迁移期兼容，最终切换后删除。
 
-- [ ] 增加部署后固定站冒烟
+- [x] 增加部署后固定站冒烟
   - 依赖：运行时域名契约。
   - 文件：`scripts/check-deployed-smoke.mjs`、`tests/deployed-smoke.test.mjs`、`.github/workflows/deployed-smoke.yml`。
   - 输入：branch、commit、固定 URL、受控 token。
@@ -54,6 +54,7 @@
   - 实现步骤：实现只读检查；workflow 映射 main/dev。
   - 验证：聚焦测试、Functions build、治理检查。
   - 提交：`feat(release): add fixed-site smoke checks`。
+  - 结果：2026-07-28，构建产物写入发布 commit；冒烟检查验证固定站 commit、静态 OAuth 入口、同源 callback、会话安全状态和 readiness，错误 commit/callback/阻断能力均会失败，9/9 聚焦测试及构建/治理检查通过。
 
 - [ ] 反写长期平台规则
   - 依赖：代码契约稳定。

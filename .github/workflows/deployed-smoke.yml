@@ -1,0 +1,39 @@
+name: deployed-smoke
+
+on:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deployed-smoke-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Wait for fixed Pages deployment
+        env:
+          PRODUCTION_DATA_ACCESS_TOKEN: ${{ secrets.PRODUCTION_DATA_ACCESS_TOKEN }}
+          TARGET_URL: ${{ github.ref_name == 'main' && 'https://deshan-tiyes-system.pages.dev' || 'https://deshan-tiyes-system-dev.pages.dev' }}
+        run: |
+          for attempt in $(seq 1 30); do
+            if node scripts/check-deployed-smoke.mjs \
+              --url "$TARGET_URL" \
+              --commit "$GITHUB_SHA" \
+              --require-platform "cloudflare-pages,cloudflare-d1,dingtalk"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
