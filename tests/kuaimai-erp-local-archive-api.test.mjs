@@ -378,3 +378,54 @@ test("archive decisions reject readonly users, unknown reasons and non-archived 
   assert.equal(wrongState.response.status, 409);
   assert.equal(wrongState.body.error.code, "ERP_COLLECTION_ARCHIVE_STATE_CONFLICT");
 });
+
+test("archive rows carry the batch business-date range so a gap can be traced to its file", async () => {
+  // 生产实测：07-27 的 order_items 采集成功、归档成功，但入库超时，当日销售只剩中位数的 8%。
+  // 页面要把「这一天为什么缺」指到具体文件，归档记录必须带出所属批次的业务日期。
+  const db = createErpCollectionD1Mock();
+  db.tables.erp_collection_batches.set("batch-0727", {
+    id: "batch-0727",
+    platform_id: "kuaimai",
+    resource_type: "order_items",
+    range_start: "2026-07-27",
+    range_end: "2026-07-27",
+    status: "failed",
+    created_at: "2026-07-27T05:16:00.000Z",
+    updated_at: "2026-07-27T05:46:00.000Z"
+  });
+  db.tables.erp_file_archives.set("arch-0727", {
+    id: "arch-0727",
+    platform_id: "kuaimai",
+    resource_type: "order_items",
+    content_hash: "4a082b866f".padEnd(64, "0"),
+    file_name: "快麦ERP交易订单明细导出20260727051545.xlsx",
+    size_bytes: 9_049_550,
+    relative_path: "原始归档/order_items/2026-07/hash__快麦ERP交易订单明细导出20260727051545.xlsx",
+    storage_type: "local_desktop",
+    runner_id: "runner-1",
+    status: "failed",
+    batch_id: "batch-0727",
+    archived_at: "2026-07-26T21:16:13.966Z",
+    processed_at: null,
+    error_code: "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT",
+    ingestion_decision: "pending",
+    ingestion_reason_code: null,
+    decision_at: null,
+    decision_by: null,
+    version: 1,
+    created_at: "2026-07-26T21:16:13.966Z",
+    updated_at: "2026-07-27T05:46:00.000Z"
+  });
+
+  const listed = await jsonCall(onArchives, "https://flow.example.com/api/platform/v1/erp-collection/archives", {
+    db, session
+  });
+  assert.equal(listed.response.status, 200);
+  const row = listed.body.data.archives.find(item => item.id === "arch-0727");
+  assert.equal(row.businessDateStart, "2026-07-27");
+  assert.equal(row.businessDateEnd, "2026-07-27");
+  assert.equal(row.errorCode, "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT");
+  // 没有批次的历史文件不得凭空编出日期。
+  assert.equal(listed.body.data.archives.every(item => item.batchId || !item.businessDateStart), true);
+  assert.equal(JSON.stringify(listed.body).includes("/Users/"), false);
+});

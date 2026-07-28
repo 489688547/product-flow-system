@@ -47,8 +47,11 @@ test("sync workspace renders local archive states without exposing absolute path
   const source = readFileSync("src/features/data-center/LocalArchivePanel.jsx", "utf8");
   // 归档区块扩展到全部 Provider，不再只讲快麦。
   assert.match(source, /本机原始归档/);
+  // 31 个文件里 29 个不需要人做事，默认不与待办平铺。
+  assert.match(source, /需要你处理/);
+  assert.match(source, /全部文件都已了结/);
   assert.match(source, /等待导出/);
-  assert.match(source, /需要处理的归档/);
+  assert.match(source, /需要你处理/);
   assert.match(source, /已归档，未纳入标准事实/);
   assert.match(source, /记录不入库原因/);
   assert.match(source, /value="">请选择原因/);

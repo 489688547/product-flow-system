@@ -63,6 +63,7 @@ function decorate(archive) {
     resourceLabel: RESOURCE_LABEL[archive?.resourceType] || String(archive?.resourceType || "未知资源"),
     sizeBytes: Number(archive?.sizeBytes) || 0,
     month: archiveMonth(archive),
+    businessDateStart: archive?.businessDateStart || "",
     archivedAt: archive?.archivedAt || "",
     processedAt: archive?.processedAt || "",
     errorCode: archive?.errorCode || "",
@@ -83,6 +84,7 @@ export function groupLocalArchives(archives = []) {
   const failedItems = items.filter(item => item.state === ARCHIVE_STATE.failed);
   const processingItems = items.filter(item => item.state === ARCHIVE_STATE.processing);
   const skippedItems = items.filter(item => item.state === ARCHIVE_STATE.skipped);
+  const ingestedItems = items.filter(item => item.state === ARCHIVE_STATE.ingested);
   const byResource = new Map();
   for (const item of items) {
     if (!byResource.has(item.resourceType)) {
@@ -131,10 +133,24 @@ export function groupLocalArchives(archives = []) {
       count: failedItems.length + pendingItems.length,
       failedCount: failedItems.length,
       pendingCount: pendingItems.length,
+      bytes: [...failedItems, ...pendingItems].reduce((total, item) => total + item.sizeBytes, 0),
+      // 失败置顶：它意味着某个业务日的数据不完整，比「还没决定要不要入库」更急。
       items: [
         ...failedItems.slice().sort((left, right) => String(right.archivedAt).localeCompare(String(left.archivedAt))),
         ...pendingItems.slice().sort((left, right) => String(right.archivedAt).localeCompare(String(left.archivedAt)))
-      ],
+      ].map(item => {
+        const needsDecision = item.state === ARCHIVE_STATE.pending;
+        return {
+          ...item,
+          needsDecision,
+          businessDate: item.businessDateStart || "",
+          // 失败文件的修复入口在覆盖表那一行，这里只指路，不另开一套重试。
+          actionLabel: needsDecision ? "记录不入库原因" : "去处理：重新入库",
+          prompt: needsDecision
+            ? "这个文件要不要入库？"
+            : "入库未完成，该业务日的数据因此不完整。"
+        };
+      }),
       warning: [
         failedItems.length ? "处理失败的文件尚未形成新事实；上一可信数据保持不变。" : "",
         pendingItems.length ? "其余文件尚未记录是否纳入标准事实。" : ""
@@ -149,6 +165,14 @@ export function groupLocalArchives(archives = []) {
       count: skippedItems.length,
       bytes: skippedItems.reduce((total, item) => total + item.sizeBytes, 0),
       items: skippedItems.slice().sort((left, right) => String(right.archivedAt).localeCompare(String(left.archivedAt)))
+    },
+    settled: {
+      count: ingestedItems.length + skippedItems.length,
+      bytes: [...ingestedItems, ...skippedItems].reduce((total, item) => total + item.sizeBytes, 0),
+      ingestedCount: ingestedItems.length,
+      skippedCount: skippedItems.length,
+      summary: `已入库 ${ingestedItems.length} 个 · 已按决定跳过 ${skippedItems.length} 个`,
+      items: [...ingestedItems, ...skippedItems]
     },
     groups
   };

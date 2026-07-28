@@ -88,6 +88,36 @@ export function detectIncompleteBusinessDays(dailyFacts = [], { threshold = 0.25
   };
 }
 
+// 归档记录带出所属批次的业务日期后，就能把「这天为什么缺」指到具体文件。
+// 采集成功但入库失败时，重新采集是白费——文件已在本机，坏的是入库环节。
+const INGEST_BLOCK_EXPLANATION = Object.freeze({
+  ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT: "文件已采集并归档到公司 Mac，但入库处理超时，未形成销售事实。",
+  ERP_COLLECTION_UPLOAD_FAILED: "文件已采集并归档到公司 Mac，但上传入库失败，未形成销售事实。",
+  ERP_COLLECTION_INTERNAL_ERROR: "文件已采集并归档到公司 Mac，但入库时发生内部错误，未形成销售事实。"
+});
+
+function ingestBlockerFor(archives, { businessDate, providerIds }) {
+  const blocking = archives.find(archive => {
+    const start = String(archive?.businessDateStart || "");
+    const end = String(archive?.businessDateEnd || start);
+    // 没有业务日期的历史文件不参与关联，避免张冠李戴。
+    if (!start) return false;
+    if (businessDate < start || businessDate > end) return false;
+    if (!providerIds.includes(String(archive?.platformId || "kuaimai"))) return false;
+    return String(archive?.status || "") === "failed" || Boolean(archive?.errorCode);
+  });
+  if (!blocking) return null;
+  const code = String(blocking.errorCode || "");
+  return {
+    stage: "ingest",
+    archiveId: String(blocking.id || ""),
+    fileName: String(blocking.fileName || ""),
+    errorCode: code,
+    explanation: INGEST_BLOCK_EXPLANATION[code]
+      || "文件已采集并归档到公司 Mac，但入库未完成，未形成销售事实。"
+  };
+}
+
 function jobsFor(jobs, { providerIds, businessDate }) {
   return jobs.filter(job => (
     providerIds.includes(String(job?.providerId || ""))
@@ -110,7 +140,7 @@ function resourceLabels(caliber, stores) {
   return stores.length ? PLATFORM_RESOURCES.map(item => item.label) : [];
 }
 
-function coverageRow({ caliber, businessDate, dayJobs, positions, incomplete, stores }) {
+function coverageRow({ caliber, businessDate, dayJobs, positions, incomplete, stores, archives }) {
   const definition = CALIBERS[caliber];
   const base = {
     key: `${caliber}:${businessDate}`,
@@ -124,6 +154,8 @@ function coverageRow({ caliber, businessDate, dayJobs, positions, incomplete, st
     evidence: null,
     // 缺口判定来自销售事实与任务记录，与采集器是否在线无关，因此始终可信。
     trustworthy: true,
+    blockedBy: null,
+    recoveryAction: "recollect",
     jobs: dayJobs
   };
   const queued = dayJobs.find(job => String(job.status) === "queued");
@@ -153,9 +185,14 @@ function coverageRow({ caliber, businessDate, dayJobs, positions, incomplete, st
   // 统一口径以销售事实为准：这一栏回答「数据能不能信」，而不是「采集顺不顺利」。
   // 一天有多个资源，个别资源失败不代表当天销售数字不可用；把 failed 排在事实检查之前，
   // 会让健康日被历史失败记录整片掩盖（生产实测 3 天问题被报成 12 天）。
-  if (incomplete.missing.has(businessDate)) return withFailure({ status: "missing", selectable: true });
+  const blocker = ingestBlockerFor(archives, { businessDate, providerIds: [...CALIBERS[caliber].providers] });
+  const withBlocker = extra => withFailure({
+    ...extra,
+    ...(blocker ? { blockedBy: blocker, recoveryAction: "reingest" } : {})
+  });
+  if (incomplete.missing.has(businessDate)) return withBlocker({ status: "missing", selectable: true });
   if (incomplete.detected.dates.includes(businessDate)) {
-    return withFailure({ status: "incomplete", selectable: true, evidence: incomplete.detected.evidenceFor(businessDate) });
+    return withBlocker({ status: "incomplete", selectable: true, evidence: incomplete.detected.evidenceFor(businessDate) });
   }
   // 事实健康时，未完成的采集降级为附注，不改变「可信」这个结论。
   if (blocked) return withFailure({ status: "synced", selectable: false });
@@ -164,6 +201,7 @@ function coverageRow({ caliber, businessDate, dayJobs, positions, incomplete, st
 
 export function buildSyncCoverage({
   jobs = [],
+  archives = [],
   stores = [],
   dailyFacts = [],
   range = { from: "", to: "" },
@@ -189,7 +227,8 @@ export function buildSyncCoverage({
         dayJobs: jobsFor(jobs, { providerIds, businessDate }),
         positions,
         incomplete,
-        stores: connectedStores
+        stores: connectedStores,
+        archives
       }));
     }
   }

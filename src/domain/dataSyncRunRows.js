@@ -1,3 +1,5 @@
+import { explainCollectionFailure } from "./collectionFailureExplainer.js";
+
 const TERMINAL_JOB_STATES = new Set(["success", "failed", "waiting_human", "schema_changed"]);
 
 const RESOURCE_LABELS = Object.freeze({
@@ -31,12 +33,83 @@ function sourceName(job) {
 
 function resultMessage(run) {
   if (run.status === "success") return "Chrome 采集完成，原始文件已归档并入库。";
-  return run.errorSummary || [run.errorCode, run.stage ? `阶段 ${run.stage}` : ""].filter(Boolean).join(" · ") || "采集未完成，请查看任务状态。";
+  // 机器码不再直接示人：翻译成「出了什么事、卡在哪」，原码保留在 failure.code 里供排查。
+  const failure = explainCollectionFailure(run.errorCode, { stage: run.stage });
+  if (failure) return [failure.summary, failure.stuckAt].filter(Boolean).join(" ");
+  return run.errorSummary || "采集未完成，请查看任务状态。";
 }
 
-export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], now = new Date() } = {}) {
+// 抖店文件不进快麦的归档索引，但本机目录结构是确定的，可由 run 自身字段推出：
+// <抖店罗盘>/<providerId>/<storeId>/<resourceType>/<年>/<月>/<业务日>/<contentHash>.xlsx
+// 规则已用生产文件逐一核对。
+const DERIVED_ARCHIVE_ROOTS = Object.freeze({ "douyin-ecommerce": "抖店罗盘" });
+
+function derivedArchivePath(job, run) {
+  const root = DERIVED_ARCHIVE_ROOTS[String(job?.providerId || "")];
+  const hash = String(run?.archiveId || "");
+  const businessDate = safeDate(job?.businessDate);
+  const storeId = String(job?.storeId || "");
+  const resourceType = String(job?.resourceType || "");
+  if (!root || !hash || !businessDate || !storeId || !resourceType) return "";
+  const [year, month] = businessDate.split("-");
+  return `${root}/${job.providerId}/${storeId}/${resourceType}/${year}/${month}/${businessDate}/${hash}.xlsx`;
+}
+
+// run.archive_id 存的是内容哈希而不是归档记录 id：按 id 关联在生产上命中 0 条，
+// 按 contentHash 才对得上。字段名与实际内容不一致，这里以实际内容为准。
+function archiveLookup(archives) {
+  return new Map((archives || [])
+    .filter(archive => archive?.contentHash)
+    .map(archive => [String(archive.contentHash), archive]));
+}
+
+function artifactFor(job, run, archiveByHash) {
+  if (String(run?.status || "") !== "success") return { artifactPath: "", artifactSource: "" };
+  const hash = String(run?.archiveId || "");
+  if (!hash) return { artifactPath: "", artifactSource: "" };
+  const indexed = archiveByHash.get(hash);
+  if (indexed?.relativePath) {
+    return { artifactPath: String(indexed.relativePath), artifactSource: "archive-index" };
+  }
+  const derived = derivedArchivePath(job, run);
+  // 推不出来就如实留空，不退化成猜测。
+  return derived ? { artifactPath: derived, artifactSource: "derived-path" } : { artifactPath: "", artifactSource: "" };
+}
+
+// 页面结构变化、扩展版本过旧、需要人工登录这几类，原样重试必然再失败，
+// 给按钮等于让人白点；此时只给处理建议，不给重试。
+function failureGuidance(job, run) {
+  if (String(run?.status || "") === "success") {
+    return { failure: null, retryTarget: null, canRetry: false, retryHint: "" };
+  }
+  const failure = explainCollectionFailure(run?.errorCode, { stage: run?.stage });
+  const target = retryTargetFor(job);
+  const retryable = failure ? failure.retryable : true;
+  return {
+    failure,
+    retryTarget: target,
+    canRetry: Boolean(target) && retryable,
+    retryHint: failure?.action || ""
+  };
+}
+
+function retryTargetFor(job) {
+  const providerId = String(job?.providerId || "");
+  const resourceType = String(job?.resourceType || "");
+  const businessDate = safeDate(job?.businessDate);
+  if (!providerId || !resourceType || !businessDate) return null;
+  return {
+    providerId,
+    storeId: String(job?.storeId || ""),
+    resourceType,
+    businessDate
+  };
+}
+
+export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], archives = [], now = new Date() } = {}) {
   const nowValue = now instanceof Date ? now.valueOf() : Date.parse(String(now || ""));
   const jobById = new Map(jobs.map(job => [job.id, job]));
+  const archiveByHash = archiveLookup(archives);
   const terminalRows = runs.map(run => {
     const job = jobById.get(run.jobId) || {};
     const businessDate = safeDate(job.businessDate);
@@ -52,7 +125,9 @@ export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], no
       stage: run.stage || "",
       startedAt: run.startedAt || null,
       completedAt: run.completedAt || null,
-      message: resultMessage(run)
+      message: resultMessage(run),
+      ...artifactFor(job, run, archiveByHash),
+      ...failureGuidance(job, run)
     };
   });
   const terminalJobIds = new Set(runs.map(run => run.jobId));

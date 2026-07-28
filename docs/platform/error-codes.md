@@ -311,6 +311,23 @@
 - 501：当前部署缺少必需的平台能力或数据库绑定。
 - 502/503/504：外部依赖失败、不可用或超时。
 
+## 网页采集失败码与用户可读解释
+
+界面不得直接把这些机器码示人。`src/domain/collectionFailureExplainer.js` 是唯一的翻译入口，
+按「出了什么事、卡在哪一步、怎么办」三段输出，并给出 `retryable` 决定是否提供重试按钮。
+未登记的错误码保留原码并允许试一次，不假装认识。
+
+| 分类 | 错误码 | 可自助重试 |
+|---|---|---|
+| 页面交互未生效 | `DOUYIN_DATE_RANGE_NOT_APPLIED`、`DOUYIN_DATE_CONTROL_MISSING`、`KUAIMAI_TIME_RANGE_NOT_APPLIED`、`KUAIMAI_SALES_EXPORT_CONFIRM_MISSING`、`DOUYIN_OFFICIAL_REPORT_BUTTON_MISSING` | 是 |
+| 页面结构变化 | `DOUYIN_PAGE_SCHEMA_CHANGED`、`DOUYIN_REPORT_SCHEMA_CHANGED`、`KUAIMAI_ORDER_PAGE_SCHEMA_CHANGED`、`KUAIMAI_EXPORT_REQUIRED_COLUMNS_MISSING` | 否，重试必然再失败 |
+| 需要人工 | `KUAIMAI_LOGIN_REQUIRED`、`KUAIMAI_HUMAN_VERIFICATION_REQUIRED`、`DOUYIN_LOGIN_REQUIRED`、`DOUYIN_HUMAN_VERIFICATION_REQUIRED` | 否，先由人处理 |
+| 扩展与环境 | `EXTENSION_DOWNLOAD_TIMEOUT`、`EXTENSION_CONTENT_SCRIPT_UNAVAILABLE`、`EXTENSION_ACTION_NOT_REGISTERED`、`EXTENSION_SITE_ACCESS_DENIED` | 视码而定 |
+| 入库阶段 | `ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT`、`ERP_COLLECTION_UPLOAD_FAILED`、`ERP_COLLECTION_INTERNAL_ERROR` | 是，且指向重新入库而不是重新采集 |
+| 任务生命周期 | `WEB_COLLECTION_STAGE_EXPIRED`、`WEB_COLLECTION_QUEUE_ABANDONED` | 是 |
+
+入库阶段失败时文件已在公司 Mac 上，处理动作必须是重新入库；提示重新采集会让用户白跑一趟。
+
 ## 日志与展示
 
 服务端日志记录 request ID、路由、耗时、结果码和安全的依赖摘要。客户端优先展示 `message`，并在需要支持人员协助时展示 request ID。禁止把堆栈、Cookie、Token、手机号或完整外部响应返回给浏览器。
