@@ -68,8 +68,25 @@ jobs:
           Integration-Impact: none
           Integration-Impact-Reason: 无实质文件变更，不触及注册表匹配路径
           EOF
-          gh pr create \
+          # 组织可能禁止 Actions 建 PR。分支此时已推上去，人工开一个 PR 即可完成回同步，
+          # 因此这里不把整个工作流标红，只把下一步说清楚。
+          if gh pr create \
             --base dev \
             --head "$BRANCH" \
             --title "chore(release): 把 main 的发布合并提交回同步到 dev" \
-            --body-file /tmp/pr-body.md
+            --body-file /tmp/pr-body.md; then
+            echo "回同步 PR 已创建。"
+          else
+            {
+              echo "### 回同步分支已推送，但自动建 PR 被拒绝"
+              echo ""
+              echo "分支：\`$BRANCH\`"
+              echo ""
+              echo "多数情况是组织或仓库设置里未开启 **Allow GitHub Actions to create and approve pull requests**"
+              echo "（Settings → Actions → General → Workflow permissions）。"
+              echo ""
+              echo "开启前，请人工基于该分支向 \`dev\` 开一个 PR；正文需带 Rule-Writeback 与"
+              echo "Integration-Impact 声明，否则会被 check:integrations 拒绝。"
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::自动建 PR 被拒绝，分支 $BRANCH 已就绪，请人工开 PR 或开启 Actions 建 PR 权限。"
+          fi
