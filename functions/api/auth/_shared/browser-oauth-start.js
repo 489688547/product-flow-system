@@ -1,4 +1,28 @@
-const PRODUCTION_ORIGIN = "https://product-flow-system.pages.dev";
+const PRODUCTION_ORIGIN = "https://deshan-tiyes-system.pages.dev";
+const DEVELOPMENT_ORIGIN = "https://deshan-tiyes-system-dev.pages.dev";
+const LEGACY_PRODUCTION_ORIGIN = "https://product-flow-system.pages.dev";
+
+function fixedPagesOrigin(requestUrl) {
+  if (
+    requestUrl.hostname.endsWith(".deshan-tiyes-system-dev.pages.dev")
+    && requestUrl.origin !== DEVELOPMENT_ORIGIN
+  ) {
+    return DEVELOPMENT_ORIGIN;
+  }
+  if (
+    requestUrl.hostname.endsWith(".deshan-tiyes-system.pages.dev")
+    && requestUrl.origin !== PRODUCTION_ORIGIN
+  ) {
+    return PRODUCTION_ORIGIN;
+  }
+  if (
+    requestUrl.hostname.endsWith(".product-flow-system.pages.dev")
+    && requestUrl.origin !== LEGACY_PRODUCTION_ORIGIN
+  ) {
+    return LEGACY_PRODUCTION_ORIGIN;
+  }
+  return "";
+}
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -50,11 +74,9 @@ export function createBrowserOauthStartResponse({ request, env, mode = "redirect
   if (request.method !== "GET") return jsonResponse({ message: "Method not allowed" }, 405);
   const requestUrl = new URL(request.url);
   const returnTo = safeReturnTo(requestUrl.searchParams.get("returnTo"));
-  if (
-    requestUrl.hostname.endsWith(".product-flow-system.pages.dev")
-    && requestUrl.origin !== PRODUCTION_ORIGIN
-  ) {
-    const productionStart = new URL("/api/auth/dingtalk/start", PRODUCTION_ORIGIN);
+  const fixedOrigin = fixedPagesOrigin(requestUrl);
+  if (fixedOrigin) {
+    const productionStart = new URL("/api/auth/dingtalk/start", fixedOrigin);
     if (returnTo) productionStart.searchParams.set("returnTo", returnTo);
     if (mode === "json") {
       return jsonResponse({ ready: true, authorizeUrl: productionStart.toString() });

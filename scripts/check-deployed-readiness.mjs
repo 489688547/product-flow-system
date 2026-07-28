@@ -142,7 +142,7 @@ function argumentsList(name) {
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   checkDeployedReadiness({
-    baseUrl: argument("--url") || "https://product-flow-system.pages.dev",
+    baseUrl: argument("--url") || "https://deshan-tiyes-system.pages.dev",
     accessToken: process.env.PRODUCTION_DATA_ACCESS_TOKEN,
     requiredPlatforms: argumentsList("--require-platform")
   }).then(payload => {

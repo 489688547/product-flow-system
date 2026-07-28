@@ -10,6 +10,10 @@ export function detectRuntimeEnvironment(env = {}, requestUrl = "") {
   try {
     const hostname = new URL(requestUrl).hostname;
     if (LOCAL_HOSTS.has(hostname)) return "development";
+    if (hostname === "deshan-tiyes-system.pages.dev") return "production";
+    if (hostname === "deshan-tiyes-system-dev.pages.dev") return "preview";
+    if (hostname.endsWith(".deshan-tiyes-system.pages.dev")) return "preview";
+    if (hostname.endsWith(".deshan-tiyes-system-dev.pages.dev")) return "preview";
     if (hostname === "product-flow-system.pages.dev") return "production";
     if (hostname.endsWith(".product-flow-system.pages.dev")) return "preview";
   } catch {

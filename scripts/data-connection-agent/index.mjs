@@ -3,7 +3,7 @@ import { ensureCompanyChrome } from "./chrome.mjs";
 import { runDataConnectionTasks } from "./core.mjs";
 import { ChromeDevtoolsBrowser } from "../user-insights-collector/chrome-devtools.mjs";
 
-const baseUrl = process.env.DATA_CONNECTION_AGENT_URL || "https://product-flow-system.pages.dev";
+const baseUrl = process.env.DATA_CONNECTION_AGENT_URL || "https://deshan-tiyes-system.pages.dev";
 const token = process.env.DATA_CONNECTION_AGENT_TOKEN || process.env.USER_INSIGHT_COLLECTOR_TOKEN || "";
 const endpoint = process.env.CHROME_DEBUG_ENDPOINT || "http://127.0.0.1:9222";
 const once = process.argv.includes("--once");

@@ -34,7 +34,7 @@
   - 提交：`feat(platform): verify two Pages projects`。
   - 结果：2026-07-28，双项目 D1/Secret 漂移检查与现有主密钥安全复用测试 16/16 通过，环境能力检查通过。
 
-- [ ] 迁移运行时默认域名
+- [x] 迁移运行时默认域名
   - 依赖：双项目契约。
   - 文件：OAuth、readiness、默认客户端、package scripts 与对应测试。
   - 输入：两个新固定 Origin。
@@ -43,6 +43,7 @@
   - 实现步骤：最小替换常量和 host 映射；保留历史验收证据。
   - 验证：OAuth、readiness、数据客户端与 React 聚焦测试。
   - 提交：`feat(runtime): move to deshan fixed hosts`。
+  - 结果：2026-07-28，新正式站识别为 production、新测试站识别为 preview；固定站 OAuth callback 保持同源，分支 Preview 回到对应固定站；静态冷启动入口保持不变，55/55 聚焦测试通过。旧站仅保留迁移期兼容，最终切换后删除。
 
 - [ ] 增加部署后固定站冒烟
   - 依赖：运行时域名契约。
