@@ -60,7 +60,7 @@
 | `/api/platform/v1/collaboration-items/:id/transitions` | 执行协同状态动作 | 状态机和角色双重校验；动作幂等；追加活动 |
 | `/api/platform/v1/collaboration-items/:id/activities` | 读取协同活动记录 | 与事项相同的读取范围；按时间倒序 |
 | `/api/platform/v1/collaboration-items/:id/dingtalk` | 同步协同责任到钉钉待办 | 已确认稳定主负责人；平台统一调用；失败不回滚协同状态 |
-| `/api/platform/v1/product-catalog` | 读取共享 ERP 商品、库存单位、组合关系与同步元数据 | 全员登录后可读；产品/品牌等非授权部门不返回采购成本 |
+| `/api/platform/v1/product-catalog` | 读取共享 ERP 商品、库存单位、组合关系、日期段销售和最新可信库存 | 全员登录后可读；产品/品牌等非授权部门不返回采购成本 |
 | `/api/platform/v1/product-catalog/import` | 导入数据中心确认后的 ERP 商品文件 | 仅总经办、运营部非只读身份；幂等合并，不保存原始整行 |
 | `/api/platform/v1/product-catalog/sync/kuaimai` | 分页读取快麦商品及组合详情并合并共享目录 | 仅总经办、运营部非只读身份；请求体可传详情游标；客户端续跑至完成；不反向修改快麦 |
 | `/api/platform/v1/data-standards` | 查询和发布共享数据口径 | 公司会话；按责任部门服务端授权；受控公式；版本快照与乐观锁；无物理删除 |
@@ -160,7 +160,7 @@ AI 草稿路由 `/api/platform/v1/development-backlog/ai-draft` 使用 `company-
 
 ### 商品主数据契约
 
-`GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是单品自身的商品规格；`items[].components[]` 是组合品的组成规格，包含组件规格编码和正整数组成数量。组合品不要求拥有独立库存 SKU，有有效组成关系时不得因为 `skus=[]` 判定档案缺失。商品主商家编码是商品身份，不冒充库存规格编码。采购成本（包括组件成本）仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、商品规格、内部唯一码、组合品、组件关系及最后成功同步时间、来源和方式。
+`GET /api/platform/v1/product-catalog` 返回 `{ items, runs, meta }`。`items[].skus[]` 是单品自身的商品规格；`items[].components[]` 是组合品的组成规格，包含组件规格编码和正整数组成数量。组合品不要求拥有独立库存 SKU，有有效组成关系时不得因为 `skus=[]` 判定档案缺失。商品主商家编码是商品身份，不冒充库存规格编码。采购成本（包括组件成本）仅对总经办、财务、供应链和采购范围返回。`meta` 包含商品、商品规格、内部唯一码、组合品、组件关系及最后成功同步时间、来源和方式。每个商品同时返回最新可信 `inventory`；单品按确定性 SKU 跨仓汇总校准库存，组合品按组件比例计算最多可组套数量，未知映射不补零。完整契约见 `docs/platform/apis/product-catalog-v1.md`。
 
 商品经营读取使用 `GET /api/platform/v1/product-catalog?from=YYYY-MM-DD&to=YYYY-MM-DD&platform=<平台>`。`from` 与 `to` 必须同时提交、包含边界日期且最多 370 天；`platform` 省略时排除空值、`其它`、`其他`、`未知` 和 `未知平台`。服务端在 D1 先按 `code × platform` 聚合 `product_sales_daily`，再用目录单品规格条码/规格商家编码或已启用的人工销售编码映射确定性关联商品。组合品组件只描述出库消耗，不能被自动当作组合品销售编码；目录编码冲突保持未匹配，人工映射不得掩盖冲突。
 

@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react";
-import { useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { DayPicker } from "react-day-picker";
 import { zhCN } from "react-day-picker/locale";
 import "react-day-picker/style.css";
@@ -72,12 +72,13 @@ export function DateRangePickerField({
   const [draft, setDraft] = useState(() => rangeToDates(value));
   const [month, setMonth] = useState(() => parseLocalDate(value.from) || new Date());
   const validation = validateDraft(draft, { maxDate, maxDays });
-  const maxDateValue = parseLocalDate(maxDate);
+  const maxDateValue = useMemo(() => parseLocalDate(maxDate), [maxDate]);
+  const disabledDays = useMemo(() => maxDateValue ? { after: maxDateValue } : undefined, [maxDateValue]);
 
-  function closeAndFocus() {
+  const closeAndFocus = useCallback(() => {
     setOpen(false);
     window.requestAnimationFrame(() => anchorRef.current?.focus());
-  }
+  }, []);
 
   function openPicker() {
     const next = rangeToDates(value);
@@ -146,7 +147,7 @@ export function DateRangePickerField({
           month={month}
           onMonthChange={setMonth}
           onSelect={setDraft}
-          disabled={maxDateValue ? { after: maxDateValue } : undefined}
+          disabled={disabledDays}
           max={Math.max(0, maxDays - 1)}
           showOutsideDays
         />
