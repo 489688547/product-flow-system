@@ -51,6 +51,60 @@ test("fixed-site smoke proves commit, static OAuth, callback origin, session saf
   assert.equal(result.readiness.ready, true);
 });
 
+test("fixed-site smoke follows only the fixed same-origin OAuth entry redirect", async () => {
+  const { checkDeployedSmoke } = await import(scriptPath);
+  const result = await checkDeployedSmoke({
+    baseUrl,
+    expectedCommit,
+    accessToken: "safe-test-token",
+    fetchImpl: responseMap({
+      "/api/auth/dingtalk/start": new Response(null, {
+        status: 308,
+        headers: { location: "/auth/dingtalk-start" }
+      }),
+      "/auth/dingtalk-start": new Response(
+        "<!doctype html><main data-oauth-status>正在安全连接钉钉</main>",
+        { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
+      )
+    })
+  });
+
+  assert.equal(result.oauth.entryStatus, 308);
+  assert.equal(result.oauth.staticStatus, 200);
+});
+
+test("fixed-site smoke accepts the explicit unauthenticated session response", async () => {
+  const { checkDeployedSmoke } = await import(scriptPath);
+  const result = await checkDeployedSmoke({
+    baseUrl,
+    expectedCommit,
+    accessToken: "safe-test-token",
+    fetchImpl: responseMap({
+      "/api/auth/session": Response.json(
+        { authenticated: false, user: null },
+        { status: 401 }
+      )
+    })
+  });
+
+  assert.equal(result.sessionAuthenticated, false);
+});
+
+test("fixed-site smoke rejects an OAuth entry redirect to another origin", async () => {
+  const { checkDeployedSmoke } = await import(scriptPath);
+  await assert.rejects(checkDeployedSmoke({
+    baseUrl,
+    expectedCommit,
+    accessToken: "safe-test-token",
+    fetchImpl: responseMap({
+      "/api/auth/dingtalk/start": new Response(null, {
+        status: 308,
+        headers: { location: "https://attacker.example/auth/dingtalk-start" }
+      })
+    })
+  }), /OAuth|同源|redirect/i);
+});
+
 test("fixed-site smoke rejects a deployed commit mismatch", async () => {
   const { checkDeployedSmoke } = await import(scriptPath);
   await assert.rejects(checkDeployedSmoke({
