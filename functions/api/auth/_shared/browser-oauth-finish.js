@@ -7,6 +7,7 @@ import {
   authSessionInternals,
   createSession
 } from "./session.js";
+import { controlDatabase } from "../../platform/_shared/dataEnvironment.js";
 
 const CLEAR_OAUTH_COOKIE = "pfs_oauth_state=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
 const CLEAR_RETURN_COOKIE = "pfs_oauth_return=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0";
@@ -37,7 +38,7 @@ export async function finishBrowserOauth({ request, env, mode = "redirect" }) {
   try {
     const { identity, userToken } = await getDingBrowserLogin(code, env);
     const created = await createSession(identity, "browser", env);
-    await saveDingUserToken(env.PRODUCT_FLOW_DB, created.sessionIdHash, userToken, env);
+    await saveDingUserToken(controlDatabase(env), created.sessionIdHash, userToken, env);
     const redirectTo = returnTo ? `${url.origin}${returnTo}` : `${url.origin}/?login=success`;
     const response = mode === "json"
       ? jsonResponse({ authenticated: true, redirectTo })
