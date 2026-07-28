@@ -106,6 +106,24 @@ function request() {
   return new Request("https://product-flow-system.pages.dev/api/platform/v1/environment-readiness");
 }
 
+test("fixed Pages hosts resolve to their governed runtime environments", async () => {
+  const { detectRuntimeEnvironment } = await import(
+    resolve("functions/api/platform/_shared/environmentReadiness.js")
+  );
+  assert.equal(
+    detectRuntimeEnvironment({}, "https://deshan-tiyes-system.pages.dev/api/platform/v1/environment-readiness"),
+    "production"
+  );
+  assert.equal(
+    detectRuntimeEnvironment({}, "https://deshan-tiyes-system-dev.pages.dev/api/platform/v1/environment-readiness"),
+    "preview"
+  );
+  assert.equal(
+    detectRuntimeEnvironment({}, "https://abc123.deshan-tiyes-system.pages.dev/api/platform/v1/environment-readiness"),
+    "preview"
+  );
+});
+
 function createTableDb(tables = []) {
   return {
     prepare(sql) {

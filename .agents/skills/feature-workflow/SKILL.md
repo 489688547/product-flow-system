@@ -13,7 +13,7 @@ Use the repository contract as the source of truth and leave a resumable product
 
 ## Required workflow
 
-1. Before research or edits, run `git fetch origin main` and require `git merge-base --is-ancestor origin/main HEAD`. If the branch is behind, update it from `origin/main` before continuing; never overwrite unrelated or dirty user changes. Then read root `AGENTS.md`, relevant durable docs, current code, and tests, and invoke every required repository Skill before planning the affected boundary.
+1. Before research or edits, run `git fetch origin main dev`. Require `dev` to contain `origin/main`, then require the feature branch to contain the latest `origin/dev`. New `codex/*` feature branches start from `origin/dev` and submit PRs only to `dev`; formal releases use the single `dev → main` lane. If either ancestry check fails, update without overwriting unrelated or dirty user changes. Then read root `AGENTS.md`, relevant durable docs, current code, and tests, and invoke every required repository Skill before planning the affected boundary.
 2. Decide whether the change is truly small under the exception in `AGENTS.md`. Otherwise create `docs/features/<feature-slug>/` by copying all four repository templates:
    - `docs/templates/prd.md` → `prd.md`
    - `docs/templates/design.md` → `design.md`
@@ -39,4 +39,5 @@ Use the repository contract as the source of truth and leave a resumable product
 - Putting feature artifacts in `docs/superpowers/` instead of `docs/features/`.
 - Omitting `tasks.md`, permissions, edge states, migration, or rollback.
 - Writing implementation first and tests after.
+- Opening a feature PR to `main` or using an arbitrary Preview URL as the acceptance site.
 - Copying changing business facts into this Skill instead of updating repository docs.

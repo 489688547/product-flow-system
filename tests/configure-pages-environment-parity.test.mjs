@@ -6,12 +6,20 @@ import test from "node:test";
 
 const scriptPath = resolve("scripts/configure-pages-environment-parity.mjs");
 const providerValues = {
+  DEMO_DATA_MASKING_KEY: "masking-key-value",
   DINGTALK_APP_KEY: "ding-key-value",
   DINGTALK_APP_SECRET: "ding-secret-value",
   KUAIMAI_ACCESS_TOKEN: "kuaimai-access-value",
   KUAIMAI_APP_KEY: "kuaimai-key-value",
   KUAIMAI_APP_SECRET: "kuaimai-secret-value",
   KUAIMAI_REFRESH_TOKEN: "kuaimai-refresh-value"
+};
+
+const sharedProjectValues = {
+  DEMO_DATA_MASKING_KEY: "masking-key-value",
+  DINGTALK_APP_KEY: "ding-key-value",
+  DINGTALK_APP_SECRET: "ding-secret-value",
+  PLATFORM_CREDENTIAL_MASTER_KEY: Buffer.alloc(32, 5).toString("base64url")
 };
 
 function envFile(values = providerValues) {
@@ -97,4 +105,55 @@ test("missing local provider values abort before changing Cloudflare", async () 
 
   assert.throws(() => configurePagesEnvironmentParity({ envPath: path, run: fake.run }), /DINGTALK_APP_SECRET/);
   assert.equal(fake.calls.filter(call => call.args.includes("secret")).length, 0);
+});
+
+test("two Pages projects reuse existing governed secrets even when the encrypted vault has data", async () => {
+  const { configureDualPagesProjects } = await import(scriptPath);
+  const path = envFile(sharedProjectValues);
+  const fake = runner(19);
+
+  const result = configureDualPagesProjects({
+    envPath: path,
+    productionProject: "deshan-tiyes-system",
+    developmentProject: "deshan-tiyes-system-dev",
+    run: fake.run
+  });
+
+  const secretCalls = fake.calls.filter(call => call.args.includes("secret") && call.args.includes("put"));
+  assert.equal(fake.calls.some(call => call.args.includes("d1")), false);
+  assert.equal(secretCalls.length, 16);
+  assert.deepEqual(new Set(secretCalls.map(call => call.args[call.args.indexOf("--project-name") + 1])), new Set([
+    "deshan-tiyes-system",
+    "deshan-tiyes-system-dev"
+  ]));
+  assert.deepEqual(new Set(secretCalls.map(call => call.args[call.args.indexOf("--env") + 1])), new Set([
+    "preview",
+    "production"
+  ]));
+  for (const value of Object.values(sharedProjectValues)) {
+    assert.equal(secretCalls.some(call => call.args.includes(value)), false);
+    assert.doesNotMatch(JSON.stringify(result), new RegExp(value));
+  }
+  assert.deepEqual(result.configuredProjects, [
+    "deshan-tiyes-system",
+    "deshan-tiyes-system-dev"
+  ]);
+  assert.deepEqual(result.configuredNames, Object.keys(sharedProjectValues).sort());
+});
+
+test("dual-project configuration refuses a missing or invalid existing master key", async () => {
+  const { configureDualPagesProjects } = await import(scriptPath);
+  const path = envFile({
+    ...sharedProjectValues,
+    PLATFORM_CREDENTIAL_MASTER_KEY: "not-a-valid-key"
+  });
+  const fake = runner(0);
+
+  assert.throws(() => configureDualPagesProjects({
+    envPath: path,
+    productionProject: "deshan-tiyes-system",
+    developmentProject: "deshan-tiyes-system-dev",
+    run: fake.run
+  }), /主密钥/);
+  assert.equal(fake.calls.length, 0);
 });
