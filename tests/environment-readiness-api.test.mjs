@@ -122,6 +122,10 @@ test("fixed Pages hosts resolve to their governed runtime environments", async (
     detectRuntimeEnvironment({}, "https://abc123.deshan-tiyes-system.pages.dev/api/platform/v1/environment-readiness"),
     "preview"
   );
+  assert.equal(
+    detectRuntimeEnvironment({}, "https://retired.product-flow-system.pages.dev/api/platform/v1/environment-readiness"),
+    "production"
+  );
 });
 
 function createTableDb(tables = []) {

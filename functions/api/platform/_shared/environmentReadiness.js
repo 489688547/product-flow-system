@@ -14,8 +14,6 @@ export function detectRuntimeEnvironment(env = {}, requestUrl = "") {
     if (hostname === "deshan-tiyes-system-dev.pages.dev") return "preview";
     if (hostname.endsWith(".deshan-tiyes-system.pages.dev")) return "preview";
     if (hostname.endsWith(".deshan-tiyes-system-dev.pages.dev")) return "preview";
-    if (hostname === "product-flow-system.pages.dev") return "production";
-    if (hostname.endsWith(".product-flow-system.pages.dev")) return "preview";
   } catch {
     // Invalid or absent request URL falls back to production-safe checks.
   }
