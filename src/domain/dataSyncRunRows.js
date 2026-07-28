@@ -1,3 +1,5 @@
+import { explainCollectionFailure } from "./collectionFailureExplainer.js";
+
 const TERMINAL_JOB_STATES = new Set(["success", "failed", "waiting_human", "schema_changed"]);
 
 const RESOURCE_LABELS = Object.freeze({
@@ -31,7 +33,10 @@ function sourceName(job) {
 
 function resultMessage(run) {
   if (run.status === "success") return "Chrome 采集完成，原始文件已归档并入库。";
-  return run.errorSummary || [run.errorCode, run.stage ? `阶段 ${run.stage}` : ""].filter(Boolean).join(" · ") || "采集未完成，请查看任务状态。";
+  // 机器码不再直接示人：翻译成「出了什么事、卡在哪」，原码保留在 failure.code 里供排查。
+  const failure = explainCollectionFailure(run.errorCode, { stage: run.stage });
+  if (failure) return [failure.summary, failure.stuckAt].filter(Boolean).join(" ");
+  return run.errorSummary || "采集未完成，请查看任务状态。";
 }
 
 // 抖店文件不进快麦的归档索引，但本机目录结构是确定的，可由 run 自身字段推出：
@@ -71,6 +76,23 @@ function artifactFor(job, run, archiveByHash) {
   return derived ? { artifactPath: derived, artifactSource: "derived-path" } : { artifactPath: "", artifactSource: "" };
 }
 
+// 页面结构变化、扩展版本过旧、需要人工登录这几类，原样重试必然再失败，
+// 给按钮等于让人白点；此时只给处理建议，不给重试。
+function failureGuidance(job, run) {
+  if (String(run?.status || "") === "success") {
+    return { failure: null, retryTarget: null, canRetry: false, retryHint: "" };
+  }
+  const failure = explainCollectionFailure(run?.errorCode, { stage: run?.stage });
+  const target = retryTargetFor(job);
+  const retryable = failure ? failure.retryable : true;
+  return {
+    failure,
+    retryTarget: target,
+    canRetry: Boolean(target) && retryable,
+    retryHint: failure?.action || ""
+  };
+}
+
 function retryTargetFor(job) {
   const providerId = String(job?.providerId || "");
   const resourceType = String(job?.resourceType || "");
@@ -105,8 +127,7 @@ export function buildDataSyncRunRows({ legacyRuns = [], jobs = [], runs = [], ar
       completedAt: run.completedAt || null,
       message: resultMessage(run),
       ...artifactFor(job, run, archiveByHash),
-      retryTarget: run.status === "success" ? null : retryTargetFor(job),
-      canRetry: run.status !== "success" && Boolean(retryTargetFor(job))
+      ...failureGuidance(job, run)
     };
   });
   const terminalJobIds = new Set(runs.map(run => run.jobId));
