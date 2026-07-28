@@ -82,16 +82,12 @@ test("product catalog prioritizes governance tasks and opens unresolved sales de
   assert.doesNotMatch(catalogSelect, /"无条码"/);
 });
 
-test("product catalog applies platform and date drafts only after explicit query", () => {
+test("product catalog applies platform and confirmed dates immediately", () => {
   const workspace = read("src/features/data-center/ProductCatalogWorkspace.jsx");
   assert.match(workspace, /DateRangePickerField/);
-  assert.match(workspace, /salesDraft/);
-  assert.match(workspace, /setSalesDraft/);
-  assert.match(workspace, /applySalesQuery/);
-  assert.match(workspace, /查询数据/);
-  assert.match(workspace, /setSalesQuery\(current => \(\{[\s\S]*salesDraft/);
-  assert.doesNotMatch(workspace, /function selectPlatform\(value\)[\s\S]{0,160}setSalesQuery/);
-  assert.doesNotMatch(workspace, /function changeCustomDate\(field, value\)[\s\S]{0,240}setSalesQuery/);
+  assert.match(workspace, /onConfirm=\{range => setSalesQuery\(current => \(\{ \.\.\.current, \.\.\.range, preset: "custom" \}\)\)\}/);
+  assert.match(workspace, /onChange=\{platform => setSalesQuery\(current => \(\{ \.\.\.current, platform \}\)\)\}/);
+  assert.doesNotMatch(workspace, /salesDraft|setSalesDraft|applySalesQuery|查询数据|重新查询/);
 });
 
 test("product catalog keeps rows compact and opens a complete read-only detail", () => {
@@ -133,7 +129,8 @@ test("catalog table styles preserve readable codes and responsive table scrollin
   const styles = read("src/styles.css");
   assert.match(styles, /\.product-catalog-toolbar/);
   assert.match(styles, /\.product-catalog-sales-cell/);
-  assert.match(styles, /\.product-catalog-sales-query/);
+  assert.match(styles, /\.product-catalog-results-controls/);
+  assert.match(styles, /\.product-catalog-inventory-cell/);
   assert.match(styles, /\.catalog-code/);
   assert.match(styles, /\.catalog-summary-cell/);
   assert.match(styles, /white-space:\s*nowrap/);
@@ -156,6 +153,8 @@ test("product catalog terminology distinguishes single specifications from bundl
   const detail = read("src/features/data-center/ProductCatalogDetailDialog.jsx");
   assert.match(workspace, /header: "SKU \/ 组成"/);
   assert.match(workspace, /header: "成本"/);
+  assert.match(workspace, /header: "库存"/);
+  assert.match(workspace, /header: "成本"[\s\S]{0,240}header: "库存"[\s\S]{0,240}状态 \/ 操作/);
   assert.doesNotMatch(workspace, /header: "SKU \/ 库存单位"/);
   assert.doesNotMatch(workspace, /header: "ERP 成本"/);
   assert.doesNotMatch(workspace, /\[Barcode, "库存单位"/);
@@ -170,6 +169,18 @@ test("product catalog terminology distinguishes single specifications from bundl
   assert.match(detail, /catalogDisplayCategory/);
   assert.match(detail, /catalogProductCost/);
   assert.match(detail, /组件成本小计/);
+});
+
+test("product catalog distinguishes inventory quantities from unknown coverage", () => {
+  const workspace = read("src/features/data-center/ProductCatalogWorkspace.jsx");
+  assert.match(workspace, /function inventorySummary/);
+  assert.match(workspace, /最新快照/);
+  assert.match(workspace, /已匹配，当前无库存/);
+  assert.match(workspace, /库存待匹配/);
+  assert.match(workspace, /组件或 SKU 关系不完整/);
+  assert.match(workspace, /库存暂不可用/);
+  assert.match(workspace, /meta\.inventory/);
+  assert.match(workspace, /库存待匹配商品/);
 });
 
 test("shared table pagination is keyboard-readable and reports the visible range", () => {

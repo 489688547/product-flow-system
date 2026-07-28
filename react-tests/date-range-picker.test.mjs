@@ -31,6 +31,18 @@ test("shared date range picker exposes presets, validation and accessible disabl
   assert.match(component, /role="status"/);
 });
 
+test("shared date range picker keeps the floating-menu close callback stable while open", () => {
+  const component = read("src/ui/DateRangePickerField.jsx");
+  assert.match(component, /useCallback/);
+  assert.match(component, /useMemo/);
+  assert.match(component, /const closeAndFocus = useCallback\(/);
+  assert.match(component, /\}, \[\]\);/);
+  assert.match(component, /const maxDateValue = useMemo\(\(\) => parseLocalDate\(maxDate\), \[maxDate\]\)/);
+  assert.match(component, /const disabledDays = useMemo\(\(\) => maxDateValue \? \{ after: maxDateValue \} : undefined, \[maxDateValue\]\)/);
+  assert.match(component, /disabled=\{disabledDays\}/);
+  assert.match(component, /onClose=\{closeAndFocus\}/);
+});
+
 test("shared component catalog and responsive styles document the range picker contract", () => {
   const catalog = read("docs/platform/components.md");
   const styles = read("src/styles.css");
