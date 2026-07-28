@@ -76,11 +76,11 @@
   - 实现步骤：失败测试 → 纯领域绑定构造 → 服务端有限重试写入 → 前端采用服务端任务 → 展示状态文案。
   - 验证：聚焦 API/领域测试、Cloudflare Functions build、全量 Definition of Done、正式库创建/完成/恢复未完成真机闭环。
 
-- [ ] 原生个人待办 checkbox 与双向回流
+- [x] 原生个人待办 checkbox 与双向回流
   - 依赖：真实送达与反向同步、服务端原子绑定。
   - 文件：`functions/api/dingtalk/_shared/dingtalk.js`、`functions/api/dingtalk/todo/sync.js`、`functions/api/dingtalk/todo/list.js`、`src/domain/dingTalk.js`、`src/domain/taskTodo.js`、`src/state/dingTalkTodoClient.js`、`src/state/ProductFlowProvider.jsx`、`src/App.jsx`、`src/features/progress/ProductProgressPage.jsx`、样式、功能文档和回归测试。
   - 输入：当前用户授权、个人待办创建/更新工具、当前绑定交互版本、历史工作待办绑定。
   - 输出：钉钉原生左侧 checkbox、个人待办 taskId 绑定、远端完成回流、旧工作卡片受控替换。
   - 失败测试：同步仍调用工作待办创建接口、请求仍携带 `actionList`、旧工作卡片继续复用、个人授权失效时回退工作待办、远端个人待办完成不更新系统。
   - 实现步骤：失败测试 → 个人待办同步编排 → 用户授权接入 → 旧工作卡片迁移 → 移除自定义完成深链 → 可信绑定 taskId 详情回流 → 真机验收。
-  - 验证：聚焦 API/领域测试、本地线上授权账号原生 checkbox 与双向回流、全量 Definition of Done、生产 GitOps 验证。
+  - 验证：授权账号在钉钉桌面端显示标题左侧原生 checkbox；勾选后，产品进度在受控轮询内同时显示任务“已完成”和钉钉同步“已完成”；绑定复用同一 taskId，测试任务已从系统清理。聚焦 API/领域测试、全量 Definition of Done、Cloudflare Functions build、GitHub main 质量检查、Cloudflare Git 生产部署和 readiness 均通过。
