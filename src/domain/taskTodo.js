@@ -155,6 +155,7 @@ export function todoSyncStatus(task) {
     String(todo.source || "").startsWith("todo_open_")
     || Number(todo.actionVersion || 0) < DING_TODO_ACTION_VERSION
   ) return "待更新";
+  if (task.done && todo.remoteDone === true) return "已完成";
   const current = buildTaskTodoSnapshot(task, todo.executorUnionIds || [], todo.draft);
   if (!sameSnapshot(current, todo.snapshot)) return "待更新";
   return task.done ? "已完成" : "已同步";

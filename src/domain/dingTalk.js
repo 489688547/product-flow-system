@@ -358,6 +358,7 @@ export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {
       executorUnionIds,
       executorNames: sameExecutors ? (task.dingTodo?.executorNames || []) : [],
       draft,
+      remoteDone: done,
       remoteUpdatedAt,
       remoteSnapshotKey,
       lastError: hasPendingPartialSync ? task.dingTodo.lastError || "" : "",
