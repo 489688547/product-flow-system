@@ -83,12 +83,14 @@ test("governance workspaces merge quality into sync and use the focused AI model
   assert.match(page, /sync: <SyncRunsWorkspace quality=\{quality\} dailyFacts=/);
   assert.match(workspaces, /export function SyncRunsWorkspace\(\{ quality, dailyFacts = \[\], focusTarget = "", canTrigger = false \}\)/);
   // 页面按「能不能信」重排：结论条 → 同步覆盖 → 执行记录 → 本机原始归档，四块各答一个问题。
-  assert.match(workspaces, /SyncConclusionBar[\s\S]*SyncCoveragePanel[\s\S]*执行记录[\s\S]*本机原始归档/);
+  assert.match(workspaces, /SyncConclusionBar[\s\S]*SyncCoveragePanel[\s\S]*执行记录[\s\S]*LocalArchivePanel/);
   const coveragePanel = read("src/features/data-center/SyncCoveragePanel.jsx");
   const conclusionBar = read("src/features/data-center/SyncConclusionBar.jsx");
   assert.match(coveragePanel, /哪几天的数据不能信/);
   assert.match(workspaces, /每一次跑了什么、结果如何/);
-  assert.match(workspaces, /公司 Mac 上有哪些原始文件/);
+  assert.match(workspaces, /LocalArchivePanel/);
+  const archivePanel = read("src/features/data-center/LocalArchivePanel.jsx");
+  assert.match(archivePanel, /公司 Mac 上有哪些原始文件/);
   // 协作入口从永远为空的供应链质量事件迁到真实的数据缺口行。
   assert.match(coveragePanel, /collaborationDraftFromDataIssue/);
   // 采集器离线时主动作是重新检测，不是把任务塞进没人领的队列。

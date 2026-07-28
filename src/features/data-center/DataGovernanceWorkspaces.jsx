@@ -18,6 +18,7 @@ import { DOUYIN_COLLECTION_RESOURCES } from "../../domain/dataCenterConnectors.j
 import { defaultDataCenterRange } from "../../domain/dataCenter.js";
 import { buildDataSyncRunRows } from "../../domain/dataSyncRunRows.js";
 import { TablePagination } from "../../ui/TablePagination.jsx";
+import { LocalArchivePanel } from "./LocalArchivePanel.jsx";
 import { SyncConclusionBar } from "./SyncConclusionBar.jsx";
 import { SyncCoveragePanel } from "./SyncCoveragePanel.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
@@ -201,14 +202,7 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
       { key: "message", header: "结果", render: row => row.message || "—" }
     ]} rows={pagedRunRows} empty={<div className="empty-state compact-empty">还没有数据中心同步记录。</div>} />
     <TablePagination total={syncRunRows.length} page={runPage} pageSize={RUN_PAGE_SIZE} onPageChange={setRunPage} /></section>
-    <section className="section-panel"><div className="section-head"><div><h2>本机原始归档</h2><p>公司 Mac 上有哪些原始文件。</p></div><span className={`status-badge ${archiveError ? "danger" : archives.length ? "success" : "neutral"}`}>{archiveLoading ? "读取中" : archiveError ? "读取失败" : archives.length ? `${archives.length} 个归档文件` : "等待导出"}</span></div>
-      <DataTable minWidth={720} columns={[
-        { key: "file", header: "文件", render: row => row.fileName || "—" },
-        { key: "resource", header: "资源", render: row => row.resourceType || "—" },
-        { key: "size", header: "大小", className: "num", render: row => row.sizeBytes ? `${Math.round(row.sizeBytes / 1024)} KB` : "—" },
-        { key: "status", header: "状态", render: row => <span className={`status-badge ${row.status === "processed" ? "success" : "neutral"}`}>{statusLabel(row.status)}</span> }
-      ]} rows={archives} empty={<div className="empty-state compact-empty">{archiveError || "公司 Mac 上还没有原始归档文件。"}</div>} />
-    </section>
+    <LocalArchivePanel archives={archives} loading={archiveLoading} error={archiveError} retentionDays={state.settings?.rawRetentionDays || 365} />
   </div>;
 }
 
