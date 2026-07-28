@@ -5,7 +5,7 @@ import { normalizeMonthlyGmvTarget } from "./productGmv.js";
 export const PRODUCT_LEVELS = ["P0 战略级", "P1 增长级", "P2 验证级", "P3 常规级"];
 export const RESERVE_LEVEL = "O级储备";
 export const DEMAND_POOL_STATUSES = ["待讨论", "讨论中", "已讨论", "暂缓"];
-export const TASK_CATEGORIES = ["会前准备", "会议", "决策", "待办任务"];
+export const TASK_CATEGORIES = ["待办任务", "会议"];
 
 const PRODUCT_COVER_LIBRARY = [
   { keywords: /兔|草架/, url: "https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?auto=format&fit=crop&w=480&q=82" },
@@ -24,6 +24,8 @@ export function generateProductCover(name = "") {
 
 const LEGACY_TASK_CATEGORY_MAP = {
   "会议/决策": "会议",
+  "会前准备": "待办任务",
+  "决策": "待办任务",
   "会后交付": "待办任务",
   "准入条件": "待办任务"
 };
@@ -37,7 +39,7 @@ export function taskCategoryActions(category) {
   const normalized = normalizeTaskCategory(category);
   return {
     meeting: normalized === "会议",
-    todo: normalized === "会前准备" || normalized === "决策" || normalized === "待办任务"
+    todo: normalized === "待办任务"
   };
 }
 
@@ -380,7 +382,7 @@ export const DEFAULT_TASK_TEMPLATES = Object.entries(TASK_TEMPLATE_BLUEPRINTS).f
     id: `${level.slice(0, 2).toLowerCase()}-s${stage}-${index + 1}`,
     level,
     stage,
-    category,
+    category: normalizeTaskCategory(category),
     title,
     ownerDept,
     deliverable,
