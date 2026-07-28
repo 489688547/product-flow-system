@@ -132,19 +132,34 @@ function coverageRow({ caliber, businessDate, dayJobs, positions, incomplete, st
     return { ...base, status: "running", selectable: false };
   }
   const blocked = dayJobs.find(job => BLOCKED_JOB_STATES.has(String(job.status)));
-  if (blocked) return { ...base, status: "waiting_human", selectable: true, errorCode: String(blocked.errorCode || "") };
   const failed = dayJobs.find(job => String(job.status) === "failed");
-  if (failed) return { ...base, status: "failed", selectable: true, errorCode: String(failed.errorCode || "") };
+  const failedResources = dayJobs
+    .filter(job => String(job.status) === "failed")
+    .map(job => String(job.resourceType || ""));
+  const withFailure = extra => ({
+    ...base,
+    ...extra,
+    failedResources,
+    errorCode: String((blocked || failed)?.errorCode || ""),
+    note: failedResources.length ? `${failedResources.join("、")} 采集失败` : ""
+  });
   if (caliber === "platform") {
-    // 平台侧没有独立的销售事实来源，只能按任务状态判定，不做统计推断。
-    if (dayJobs.some(job => String(job.status) === "success")) return { ...base, status: "synced", selectable: false };
-    return { ...base, status: "missing", selectable: true };
+    // 平台侧没有独立的销售事实来源，任务状态是唯一信号。
+    if (blocked) return withFailure({ status: "waiting_human", selectable: true });
+    if (failed) return withFailure({ status: "failed", selectable: true });
+    if (dayJobs.some(job => String(job.status) === "success")) return withFailure({ status: "synced", selectable: false });
+    return withFailure({ status: "missing", selectable: true });
   }
-  if (incomplete.missing.has(businessDate)) return { ...base, status: "missing", selectable: true };
+  // 统一口径以销售事实为准：这一栏回答「数据能不能信」，而不是「采集顺不顺利」。
+  // 一天有多个资源，个别资源失败不代表当天销售数字不可用；把 failed 排在事实检查之前，
+  // 会让健康日被历史失败记录整片掩盖（生产实测 3 天问题被报成 12 天）。
+  if (incomplete.missing.has(businessDate)) return withFailure({ status: "missing", selectable: true });
   if (incomplete.detected.dates.includes(businessDate)) {
-    return { ...base, status: "incomplete", selectable: true, evidence: incomplete.detected.evidenceFor(businessDate) };
+    return withFailure({ status: "incomplete", selectable: true, evidence: incomplete.detected.evidenceFor(businessDate) });
   }
-  return { ...base, status: "synced", selectable: false };
+  // 事实健康时，未完成的采集降级为附注，不改变「可信」这个结论。
+  if (blocked) return withFailure({ status: "synced", selectable: false });
+  return withFailure({ status: "synced", selectable: false });
 }
 
 export function buildSyncCoverage({

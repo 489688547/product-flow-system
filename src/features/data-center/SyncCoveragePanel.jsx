@@ -56,6 +56,7 @@ function CoverageRow({ row, checked, onToggle, onBackfill, canTrigger, busy }) {
       {row.evidence ? <p className="data-sync-coverage-evidence">
         当日 {money(row.evidence.sales)}，同期中位数 {money(row.evidence.median)}，约为 {Math.round(row.evidence.ratio * 100)}%
       </p> : null}
+      {row.note && row.status === "synced" ? <p className="data-sync-coverage-note">{row.note}，但当天销售事实完整</p> : null}
       <p className="data-sync-coverage-detail">
         {row.caliber === "platform" && row.storeNames.length ? `${row.storeNames.join("、")} · ` : ""}
         {row.resourceLabels.join(" / ")}
