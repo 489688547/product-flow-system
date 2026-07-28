@@ -75,3 +75,12 @@
   - 失败测试：钉钉成功后客户端未保存时正式库仍缺绑定；版本冲突后未重读合并；模拟 todoId 显示“已同步”。
   - 实现步骤：失败测试 → 纯领域绑定构造 → 服务端有限重试写入 → 前端采用服务端任务 → 展示状态文案。
   - 验证：聚焦 API/领域测试、Cloudflare Functions build、全量 Definition of Done、正式库创建/完成/恢复未完成真机闭环。
+
+- [ ] 工作待办卡片完成入口与精准深链
+  - 依赖：真实送达与反向同步、服务端原子绑定。
+  - 文件：`functions/api/dingtalk/_shared/dingtalk.js`、`functions/api/dingtalk/todo/sync.js`、`src/domain/dingTalk.js`、`src/domain/taskTodo.js`、`src/App.jsx`、`src/features/progress/ProductProgressPage.jsx`、样式、功能文档和回归测试。
+  - 输入：工作待办 `actionList`、产品/任务深链、当前绑定动作版本。
+  - 输出：卡片“完成任务”入口、精准任务定位、一次确认双端完成、旧卡片受控升级。
+  - 失败测试：创建 payload 缺动作、深链不定位、旧工作卡片继续复用、业务页缺少完成同步按钮。
+  - 实现步骤：失败测试 → 卡片动作 → 深链解析与定位 → 页内完成同步 → 旧卡片版本迁移 → 真机验收。
+  - 验证：聚焦测试、1440×900 与 390×844、本地线上授权账号卡片与双向回流、全量 Definition of Done、生产 GitOps 验证。

@@ -8,6 +8,7 @@ import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
 import { featureFlagEnabled } from "./domain/featureFlags.js";
 import { activeCollapsibleGroup, groupSidebarNavigation } from "./domain/sidebarNavigation.js";
+import { parseTaskTodoDeepLink } from "./domain/taskTodo.js";
 import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
 import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
 import { LocalOnlineEnvironmentBanner } from "./ui/LocalOnlineEnvironmentBanner.jsx";
@@ -197,7 +198,10 @@ function navigationPermissionKey(screen) {
 export default function App() {
   const [route, setRoute] = useState(routeFromHash);
   const { screen, detail: routeDetail } = route;
-  const [progressFocus, setProgressFocus] = useState(null);
+  const [progressFocus, setProgressFocus] = useState(() => {
+    const deepLink = parseTaskTodoDeepLink(window.location.href);
+    return deepLink ? { ...deepLink, tick: Date.now() } : null;
+  });
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
   const aiTriggerRef = useRef(null);
@@ -258,7 +262,7 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (loading || (hasCompanyAccess && platformLoading)) return;
-    if (!screenAllowed) navigate(defaultScreen);
+    if (!screenAllowed) showScreen(defaultScreen);
   }, [defaultScreen, hasCompanyAccess, loading, platformLoading, screenAllowed]);
   function showScreen(nextScreen, detail = "") {
     const resolvedScreen = resolveScreen(nextScreen);
@@ -271,7 +275,14 @@ export default function App() {
     if (window.location.hash !== nextHash) window.location.hash = nextHash;
   }
   function navigate(nextScreen) {
-    if (nextScreen === "progress") setProgressFocus(null);
+    if (nextScreen === "progress") {
+      setProgressFocus(null);
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("productId");
+      nextUrl.searchParams.delete("taskId");
+      nextUrl.searchParams.delete("todoAction");
+      window.history.replaceState(null, "", nextUrl);
+    }
     showScreen(nextScreen);
   }
   function openProgress(productId, stage) {

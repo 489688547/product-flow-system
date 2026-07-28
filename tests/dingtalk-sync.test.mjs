@@ -28,7 +28,7 @@ function okJson(body) {
   };
 }
 
-test("buildDingTodoPayload creates a work todo with detailUrl and unionId executors", () => {
+test("buildDingTodoPayload creates a work todo with a completion entry and unionId executors", () => {
   const payload = buildDingTodoPayload({
     sourceId: "task-1",
     subject: "整理 PRD",
@@ -46,6 +46,13 @@ test("buildDingTodoPayload creates a work todo with detailUrl and unionId execut
     appUrl: "https://flow.example.com/?task=task-1",
     pcUrl: "https://flow.example.com/?task=task-1"
   });
+  assert.deepEqual(payload.actionList, [{
+    actionKey: "complete_product_task",
+    actionType: 2,
+    title: "完成任务",
+    url: "https://flow.example.com/?task=task-1&todoAction=complete",
+    pcUrl: "https://flow.example.com/?task=task-1&todoAction=complete"
+  }]);
   assert.equal(payload.isOnlyShowExecutor, true);
   assert.equal(payload.priority, 20);
 });

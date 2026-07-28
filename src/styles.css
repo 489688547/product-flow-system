@@ -353,6 +353,16 @@ main { min-width: 0; overflow-x: clip; }
 .task-drag-handle:hover { background: var(--surface-hover); color: var(--text-primary); }
 .task-drag-handle:active { cursor: grabbing; }
 .task-row-dragging td { opacity: .55; background: var(--accent-soft); }
+.task-row-focused td { background: color-mix(in oklch, var(--accent-soft), white 28%); }
+.task-row-focused td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+.task-todo-deeplink { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); padding: var(--space-4); border: 1px solid color-mix(in oklch, var(--accent), white 68%); border-radius: var(--radius-panel); background: color-mix(in oklch, var(--accent-soft), white 38%); }
+.task-todo-deeplink.is-complete { border-color: color-mix(in oklch, var(--success), white 68%); background: var(--success-soft); }
+.task-todo-deeplink-icon { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); }
+.task-todo-deeplink.is-complete .task-todo-deeplink-icon { color: var(--success); }
+.task-todo-deeplink strong, .task-todo-deeplink p, .task-todo-deeplink small { display: block; }
+.task-todo-deeplink p { margin: 4px 0 0; color: var(--text-secondary); }
+.task-todo-deeplink small { margin-top: 6px; color: var(--text-secondary); }
+.task-todo-deeplink small[role="alert"] { color: var(--danger); }
 .task-deliverables { min-width: 110px; width: max-content; max-width: 230px; height: 34px; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 .task-deliverable-thumb, .task-deliverable-add, .task-deliverable-more { width: 30px; height: 30px; flex: 0 0 30px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--text-secondary); display: grid; place-items: center; overflow: hidden; }
 .task-deliverable-thumb:hover, .task-deliverable-add:hover { background: var(--primary-soft); border-color: color-mix(in oklch, var(--accent), white 62%); color: var(--primary); }
@@ -986,6 +996,11 @@ main { min-width: 0; overflow-x: clip; }
   .progress-overview-toolbar > .product-gmv-summary,
   .progress-overview-toolbar > .quiet-danger { grid-column: 1; grid-row: auto; }
   .progress-overview-toolbar > .quiet-danger { justify-self: start; }
+  .task-todo-deeplink { grid-template-columns: auto minmax(0, 1fr); }
+  .task-todo-deeplink > .btn,
+  .task-todo-deeplink > .disabled-action-tip { grid-column: 1 / -1; width: 100%; }
+  .task-todo-deeplink > .btn,
+  .task-todo-deeplink > .disabled-action-tip > .btn { min-height: 44px; width: 100%; }
 }
 
 @media (max-width: 640px) {
