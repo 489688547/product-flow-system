@@ -2,6 +2,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
+const FEATURE_BRANCH_PREFIXES = Object.freeze(["codex/", "claude/", "feat/", "fix/", "chore/", "docs/"]);
+
 function branch(value) {
   return String(value || "").trim();
 }
@@ -16,7 +18,9 @@ export function validatePullRequestBranchFlow(event) {
     throw new Error(`不支持的 PR 流向：${head} → ${base}。`);
   }
 
-  if (head.startsWith("codex/")) {
+  // 功能分支前缀只用于区分「功能分支」与「发布分支 dev」，不限定作者或工具。
+  // 原先只认 codex/，会把其他来源的分支挡在门外而没有任何安全收益。
+  if (FEATURE_BRANCH_PREFIXES.some(prefix => head.startsWith(prefix))) {
     if (base !== "dev") {
       throw new Error(`功能分支必须提交到 dev；当前流向为 ${head} → ${base}。`);
     }
@@ -35,7 +39,7 @@ export function validatePullRequestBranchFlow(event) {
   }
 
   if (base === "dev") {
-    throw new Error(`功能分支必须使用 codex/ 前缀；当前来源为 ${head}。`);
+    throw new Error(`功能分支需使用 ${FEATURE_BRANCH_PREFIXES.join("、")} 之一作为前缀；当前来源为 ${head}。`);
   }
 
   throw new Error(`不支持的 PR 流向：${head} → ${base}。`);
