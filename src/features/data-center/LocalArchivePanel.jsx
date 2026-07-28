@@ -104,16 +104,18 @@ export function LocalArchivePanel({
 
   return <section className="section-panel">
     <div className="section-head">
-      <div><h2>本机原始归档</h2><p>公司 Mac 上有哪些原始文件。</p></div>
+      <div><h2>本机原始归档</h2><p>需要你决定是否入库的文件，以及可追溯的原始档案。</p></div>
       <span className={`status-badge ${error ? "danger" : grouped.totalCount ? "success" : "neutral"}`}>
-        {loading ? "读取中" : error ? "读取失败" : grouped.totalCount ? `${grouped.totalCount} 个文件 · ${size(grouped.totalBytes)}` : "等待导出"}
+        {loading ? "读取中" : error ? "读取失败"
+          : grouped.actionable.count ? `${grouped.actionable.count} 个待处理 · 共 ${grouped.totalCount} 个`
+          : grouped.totalCount ? `无待处理 · ${grouped.totalCount} 个 · ${size(grouped.totalBytes)}` : "等待导出"}
       </span>
     </div>
 
     {error ? <div className="empty-state compact-empty">{error}</div> : null}
 
     {!error && grouped.actionable.count ? <div className="local-archive-pending" role="alert">
-      <p><AlertTriangle size={15} aria-hidden="true" /><strong>需要处理的归档 · {grouped.actionable.count} 个</strong></p>
+      <p><AlertTriangle size={15} aria-hidden="true" /><strong>需要你处理 · {grouped.actionable.count} 个</strong></p>
       <p>{grouped.actionable.warning}</p>
       {decisionError ? <p className="form-error">{decisionError}</p> : null}
       <ul className="local-archive-list">
@@ -136,6 +138,10 @@ export function LocalArchivePanel({
         />)}
       </ul>
     </div> : null}
+
+    {!error && !grouped.actionable.count && grouped.totalCount ? <p className="local-archive-settled" role="status">
+      全部文件都已了结：{grouped.settled.summary}，共 {size(grouped.settled.bytes)}，无需处理。
+    </p> : null}
 
     {!error && grouped.totalCount ? <>
       {grouped.processing.count ? <p className="local-archive-processing">

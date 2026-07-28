@@ -2474,6 +2474,7 @@ main { min-width: 0; overflow-x: clip; }
 .data-quality-summary article:last-child { border-right: 0; }
 .data-quality-summary span { color: var(--text-tertiary); font-size: 11px; }
 .data-quality-summary strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.local-archive-settled { font-size: 12px; color: var(--text-secondary); margin-bottom: var(--space-3); }
 .local-archive-hint { font-size: 12px; color: var(--text-secondary); margin-bottom: var(--space-3); }
 .local-archive-pending { display: grid; gap: var(--space-2); padding: var(--space-3); margin-bottom: var(--space-3); border: 1px solid color-mix(in oklch, var(--warning), transparent 62%); border-radius: var(--radius-panel); background: color-mix(in oklch, var(--warning), transparent 92%); }
 .local-archive-pending p { display: flex; align-items: center; gap: 6px; font-size: 12px; }
