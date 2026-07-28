@@ -26,6 +26,9 @@ export function createErpCollectionD1Mock() {
           const [platformId, contentHash] = state.values;
           return [...tables.erp_file_archives.values()].find(row => row.platform_id === platformId && row.content_hash === contentHash) || null;
         }
+        if (query.includes("from erp_file_archives") && query.includes("where id = ?")) {
+          return tables.erp_file_archives.get(state.values[0]) || null;
+        }
         if (query.includes("from erp_collector_tokens") && query.includes("token_hash = ?")) {
           const [tokenHash] = state.values;
           return [...tables.erp_collector_tokens.values()].find(row => row.token_hash === tokenHash && row.status === "active") || null;
@@ -69,6 +72,32 @@ export function createErpCollectionD1Mock() {
         return { results: [] };
       },
       async run() {
+        if (query.startsWith("update erp_file_archives") && query.includes("status = 'failed'")) {
+          const [errorCode, updatedAt, cutoff] = state.values;
+          let changes = 0;
+          for (const row of tables.erp_file_archives.values()) {
+            if (row.status !== "processing" || String(row.updated_at || row.archived_at) > cutoff) continue;
+            row.status = "failed";
+            row.error_code = errorCode;
+            row.updated_at = updatedAt;
+            changes += 1;
+          }
+          return { success: true, meta: { changes } };
+        }
+        if (query.startsWith("update erp_file_archives") && query.includes("ingestion_decision = ?")) {
+          const [decision, reasonCode, decisionAt, decisionBy, updatedAt, id, expectedVersion] = state.values;
+          const row = tables.erp_file_archives.get(id);
+          if (!row || Number(row.version || 1) !== expectedVersion) {
+            return { success: true, meta: { changes: 0 } };
+          }
+          row.ingestion_decision = decision;
+          row.ingestion_reason_code = reasonCode;
+          row.decision_at = decisionAt;
+          row.decision_by = decisionBy;
+          row.version = Number(row.version || 1) + 1;
+          row.updated_at = updatedAt;
+          return { success: true, meta: { changes: 1 } };
+        }
         if (query.startsWith("insert into erp_collection_batches")) {
           const [id, platformId, resourceType, sourceFileName, contentHash, schemaVersion, rangeStart, rangeEnd, rowCount, status, collectedAt, importedAt, importedBy, summary, createdAt, updatedAt, archiveId, targetEnvironment, targetEnvironmentVersion] = state.values;
           const existing = [...tables.erp_collection_batches.values()].find(row => row.platform_id === platformId && row.resource_type === resourceType && row.content_hash === contentHash);
@@ -142,6 +171,11 @@ export function createErpCollectionD1Mock() {
             archived_at: archivedAt,
             processed_at: processedAt || existing?.processed_at || null,
             error_code: status === "archived" ? (existing?.error_code || null) : errorCode,
+            ingestion_decision: existing?.ingestion_decision || "pending",
+            ingestion_reason_code: existing?.ingestion_reason_code || null,
+            decision_at: existing?.decision_at || null,
+            decision_by: existing?.decision_by || null,
+            version: Number(existing?.version || 1),
             created_at: existing?.created_at || createdAt,
             updated_at: updatedAt
           };

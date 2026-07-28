@@ -22,6 +22,19 @@ const archives = [
     id: "a4", resourceType: "orders", fileName: "订单.xlsx", sizeBytes: 1_000_000,
     relativePath: "原始归档/orders/2026-07/hashD__订单.xlsx", status: "processing",
     archivedAt: "2026-07-28T01:00:00.000Z", processedAt: null
+  },
+  {
+    id: "a5", resourceType: "sales_items", fileName: "历史销售明细.xlsx", sizeBytes: 20_000_000,
+    relativePath: "原始归档/sales_items/2026-07/hashE__历史销售明细.xlsx", status: "archived",
+    archivedAt: "2026-07-22T01:00:00.000Z", processedAt: null,
+    ingestionDecision: "skipped", ingestionReasonCode: "DETAIL_STORAGE_DEFERRED",
+    decisionAt: "2026-07-28T02:00:00.000Z", decisionBy: "负责人", version: 2
+  },
+  {
+    id: "a6", resourceType: "orders", fileName: "超时.xlsx", sizeBytes: 500_000,
+    relativePath: "原始归档/orders/2026-07/hashF__超时.xlsx", status: "failed",
+    archivedAt: "2026-07-26T01:00:00.000Z", processedAt: null,
+    errorCode: "ERP_COLLECTION_ARCHIVE_PROCESSING_TIMEOUT"
   }
 ];
 
@@ -39,8 +52,8 @@ test("按资源类型分组并给出各组占用空间，便于判断保留期�
   assert.equal(orderItems.label, "订单明细");
   assert.equal(orderItems.count, 2);
   assert.equal(orderItems.bytes, 17_000_000);
-  assert.equal(grouped.totalBytes, 18_600_000);
-  assert.equal(grouped.totalCount, 4);
+  assert.equal(grouped.totalBytes, 39_100_000);
+  assert.equal(grouped.totalCount, 6);
 });
 
 test("组内按月份归类，与公司 Mac 上的目录结构一致", () => {
@@ -61,6 +74,25 @@ test("状态区分已入库、已下载未入库与处理中，三者含义不�
   assert.equal(byId.get("a2").stateLabel, "已下载未入库");
 });
 
+test("有意跳过的归档不计入告警，并保留受控原因供折叠追溯", () => {
+  const grouped = groupLocalArchives(archives);
+  assert.equal(grouped.skipped.count, 1);
+  assert.equal(grouped.skipped.items[0].id, "a5");
+  assert.equal(grouped.skipped.items[0].state, ARCHIVE_STATE.skipped);
+  assert.equal(grouped.skipped.items[0].reasonLabel, "明细索引暂缓");
+  assert.equal(grouped.pending.items.some(item => item.id === "a5"), false);
+  assert.equal(grouped.actionable.items.some(item => item.id === "a5"), false);
+});
+
+test("失败归档置顶告警，SLA 内处理中保持中性", () => {
+  const grouped = groupLocalArchives(archives);
+  assert.equal(grouped.actionable.items[0].id, "a6");
+  assert.equal(grouped.actionable.failedCount, 1);
+  assert.equal(grouped.processing.count, 1);
+  assert.equal(grouped.processing.items[0].id, "a4");
+  assert.equal(grouped.actionable.items.some(item => item.id === "a4"), false);
+});
+
 test("给出相对路径供在 Finder 定位，且不构造任何绝对路径", () => {
   const grouped = groupLocalArchives(archives);
   const item = grouped.groups.flatMap(group => group.months).flatMap(month => month.items).find(row => row.id === "a1");
@@ -72,5 +104,7 @@ test("空归档不构造伪造分组", () => {
   const grouped = groupLocalArchives([]);
   assert.equal(grouped.groups.length, 0);
   assert.equal(grouped.pending.count, 0);
+  assert.equal(grouped.skipped.count, 0);
+  assert.equal(grouped.actionable.count, 0);
   assert.equal(grouped.totalCount, 0);
 });
