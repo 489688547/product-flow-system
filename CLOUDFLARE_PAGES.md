@@ -156,7 +156,8 @@ PRODUCTION_DATA_ACCESS_TOKEN=仅属于当前授权账号的个人令牌
 - 受控 readiness 必须对当前受影响平台无阻断。
 
 CI 或 Cloudflare deployment 显示成功不等于验收完成。钉钉登录、公司 Mac 采集器和固定站真实请求
-分别验证；旧项目只在这些依赖全部切换后删除。完整决策见
+分别验证。旧项目 `product-flow-system` 已在依赖全部切换后删除；代码、钉钉和采集器不得再引用
+旧域名。完整决策见
 `docs/decisions/2026-07-28-main-dev-gitops.md`。
 
 ## 本地沙箱模式（本地 D1）
