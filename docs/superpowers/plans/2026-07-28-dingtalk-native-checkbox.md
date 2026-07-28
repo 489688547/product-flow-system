@@ -139,10 +139,10 @@ npm test
 npm run build
 ```
 
-- [ ] **Step 2: Publish through a pull request**
+- [x] **Step 2: Publish through a pull request**
 
 Declare `Integration-Impact: dingtalk, cloudflare-pages, cloudflare-d1` and name the durable rule files under `Rule-Writeback`. Run `npm run check:pr` against the exact PR body before pushing.
 
-- [ ] **Step 3: Verify production**
+- [x] **Step 3: Verify production**
 
 Run deployed readiness for DingTalk, Cloudflare Pages, and Cloudflare D1. With the explicitly authorized test account, resync one product task, confirm the DingTalk card has the native left-side checkbox, mark it complete only when authorized for the acceptance step, and confirm product progress reflects completion after refresh/polling.
