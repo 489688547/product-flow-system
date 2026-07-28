@@ -12,7 +12,7 @@
 
 ## 任务
 
-- [ ] 建立 PR 分支流向门禁
+- [x] 建立 PR 分支流向门禁
   - 依赖：无。
   - 文件：`scripts/check-pr-branch-flow.mjs`、`tests/pr-branch-flow.test.mjs`、`.github/workflows/quality.yml`。
   - 输入：GitHub pull request event。
@@ -21,6 +21,7 @@
   - 实现步骤：纯函数验证；CLI 读取 event；quality workflow 调用。
   - 验证：聚焦测试和 `npm run check:governance`。
   - 提交：`feat(release): enforce dev promotion lane`。
+  - 结果：2026-07-28，分支流向测试 3/3 与治理检查通过。
 
 - [ ] 建立双 Pages 项目环境契约
   - 依赖：分支流向门禁。
