@@ -36,7 +36,7 @@ test("new todo snapshots include the editable draft without invalidating legacy 
   assert.equal("draft" in legacy, false);
   const draft = { subject: "自定义标题", descriptionHtml: "<p>正文</p>", priority: 30, dueDate: "2026-07-22", dueClock: "16:30" };
   assert.deepEqual(buildTaskTodoSnapshot(task, ["union-a"], draft).draft, draft);
-  const synced = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", snapshot: buildTaskTodoSnapshot(task, ["union-a"], draft), executorUnionIds: ["union-a"], draft } };
+  const synced = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", source: "todo_personal_user", actionVersion: 2, snapshot: buildTaskTodoSnapshot(task, ["union-a"], draft), executorUnionIds: ["union-a"], draft } };
   assert.equal(todoSyncStatus(synced), "已同步");
   assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, draft: { ...draft, priority: 40 } } }), "待更新");
 });
@@ -123,9 +123,11 @@ test("todo sync state detects unsynced, stale, completed and failed tasks", () =
     ownerDept: task.ownerDept,
     executorUnionIds: ["union-a"]
   };
-  const synced = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", source: "todo_open_app", snapshot, executorUnionIds: ["union-a"] } };
-  assert.equal(todoSyncStatus(synced), "待更新");
-  assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, actionVersion: 1 } }), "已同步");
+  const legacyWork = { ...task, dingTodo: { id: "todo-1", sourceId: "task:p1:t1", source: "todo_open_app", snapshot, executorUnionIds: ["union-a"], actionVersion: 1 } };
+  assert.equal(todoSyncStatus(legacyWork), "待更新");
+  const synced = { ...task, dingTodo: { ...legacyWork.dingTodo, source: "todo_personal_user", actionVersion: 2 } };
+  assert.equal(todoSyncStatus(synced), "已同步");
+  assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, actionVersion: 1 } }), "待更新");
   assert.equal(todoSyncStatus({
     ...synced,
     dingTodo: { ...synced.dingTodo, sourceId: "" }
@@ -135,7 +137,7 @@ test("todo sync state detects unsynced, stale, completed and failed tasks", () =
   assert.equal(todoSyncStatus({
     ...synced,
     done: true,
-    dingTodo: { ...synced.dingTodo, actionVersion: 1, snapshot: { ...snapshot, done: true } }
+    dingTodo: { ...synced.dingTodo, snapshot: { ...snapshot, done: true } }
   }), "已完成");
   assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, lastError: "network" } }), "同步失败");
 });
@@ -154,17 +156,17 @@ test("task todo payload requires a due date and keeps a stable system source id"
   assert.deepEqual(payload.recoveryUnionIds, ["owner-union"]);
   assert.equal(payload.dueTime, new Date("2026-07-12T18:00:00+08:00").getTime());
   assert.equal(payload.done, false);
-  assert.equal(payload.actionVersion, 1);
+  assert.equal(payload.actionVersion, 2);
   assert.throws(() => buildTaskTodoPayload({ product, task: { ...task, due: "" }, creator, executors, detailUrl: "https://flow.example.com" }), /截止日期/);
 });
 
-test("todo card deep link focuses the exact product task and only accepts the completion action", () => {
+test("todo card deep link focuses the exact product task without a custom completion action", () => {
   assert.deepEqual(parseTaskTodoDeepLink(
     "https://flow.example.com/cloudflare-entry?productId=p1&taskId=t1&todoAction=complete#progress"
   ), {
     productId: "p1",
     taskId: "t1",
-    action: "complete"
+    action: "view"
   });
   assert.deepEqual(parseTaskTodoDeepLink(
     "https://flow.example.com/cloudflare-entry?productId=p1&taskId=t1&todoAction=unknown#progress"
@@ -372,6 +374,37 @@ test("todo sync only persists the edited deadline and draft after DingTalk succe
   assert.equal(partial.dingTodo.id, "todo-1");
   assert.equal(partial.dingTodo.lastError, "待办已创建，优先级稍后重试");
 
+  const migrating = applyTaskTodoSyncSuccess(task, {
+    payload,
+    todo: {
+      id: "personal-1",
+      sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      actionVersion: 2,
+      legacyTodo: {
+        id: "work-1",
+        source: "todo_open_app",
+        creatorUnionId: "creator-union",
+        executorUnionIds: ["u1"]
+      }
+    },
+    syncedAt: "2026-07-18T10:00:45.000Z"
+  });
+  assert.equal(migrating.dingTodo.id, "personal-1");
+  assert.equal(migrating.dingTodo.legacyTodo.id, "work-1");
+  const retired = applyTaskTodoSyncSuccess(migrating, {
+    payload: { ...payload, todoId: "personal-1" },
+    todo: {
+      id: "personal-1",
+      sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      actionVersion: 2,
+      legacyTodo: null
+    },
+    syncedAt: "2026-07-18T10:00:50.000Z"
+  });
+  assert.equal(retired.dingTodo.legacyTodo, null);
+
   const failure = applyTaskTodoSyncFailure(task, new Error("网络失败"), "2026-07-18T10:01:00.000Z");
   assert.equal(failure.due, "2026-07-20");
   assert.equal(failure.dingTodo.draft.subject, "上次成功");
@@ -388,6 +421,8 @@ test("DingTalk remains authoritative when a synced product task is edited remote
     done: false,
     dingTodo: {
       id: "todo-1",
+      source: "todo_personal_user",
+      actionVersion: 2,
       executorUnionIds: ["old-executor"],
       executorNames: ["旧执行人"],
       draft: { subject: "旧标题", descriptionHtml: "<p>旧正文</p>", priority: 20, dueDate: "2026-07-20", dueClock: "18:00" },
@@ -427,6 +462,8 @@ test("DingTalk personal completion stage marks the local task complete", () => {
     dingTodo: {
       id: "todo-1",
       sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      actionVersion: 2,
       syncedAt: "2026-07-18T10:00:00.000Z",
       draft: {
         subject: "PRD 评审",
@@ -456,6 +493,8 @@ test("DingTalk personal completion without a modified timestamp still flows back
     dingTodo: {
       id: "todo-1",
       sourceId: "task:p1:t1",
+      source: "todo_personal_user",
+      actionVersion: 2,
       syncedAt: "2026-07-18T10:00:00.000Z",
       draft: {
         subject: "PRD 评审",

@@ -178,7 +178,7 @@ test("todo sync reports a binding conflict instead of claiming success after rep
 test("todo sync authorization binds the actor and todo id to session-backed task state", () => {
   const state = {
     products: [{ id: "p1", productManagerUnionId: "owner-union" }],
-    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1" } }]
+    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1", source: "todo_personal_user", creatorUnionId: "session-union" } }]
   };
   const input = {
     sourceId: "task:p1:t1",
@@ -215,7 +215,7 @@ test("todo sync authorization does not reuse an unverified legacy todo id", () =
   assert.equal(authorized.todoId, "");
 });
 
-test("todo sync authorization migrates a trusted personal todo to a queryable work todo", () => {
+test("todo sync authorization reuses a trusted native personal todo", () => {
   const state = {
     products: [{ id: "p1", productManagerUnionId: "creator-union" }],
     tasks: [{
@@ -237,13 +237,47 @@ test("todo sync authorization migrates a trusted personal todo to a queryable wo
     executorUnionIds: ["creator-union"]
   }, { unionId: "creator-union", role: "product" }, state);
 
-  assert.equal(authorized.todoId, "");
-  assert.equal(authorized.todoSource, "");
-  assert.equal(authorized.replacementOfTodoId, "personal-id");
-  assert.equal(authorized.sourceId, "task:p1:t1:r1");
+  assert.equal(authorized.todoId, "personal-id");
+  assert.equal(authorized.todoSource, "todo_personal_user");
+  assert.equal(authorized.replacementOfTodoId, "");
+  assert.equal(authorized.sourceId, "task:p1:t1");
 });
 
-test("todo sync authorization reuses a recorded work todo id when only the recovery source is malformed", () => {
+test("todo sync authorization resumes retirement after a personal binding was already saved", () => {
+  const state = {
+    products: [{ id: "p1", productManagerUnionId: "creator-union" }],
+    tasks: [{
+      id: "t1",
+      productId: "p1",
+      dingTodo: {
+        id: "personal-id",
+        sourceId: "task:p1:t1",
+        source: "todo_personal_user",
+        actionVersion: 2,
+        creatorUnionId: "creator-union",
+        executorUnionIds: ["creator-union"],
+        legacyTodo: {
+          id: "legacy-work-id",
+          source: "todo_open_app",
+          creatorUnionId: "creator-union",
+          executorUnionIds: ["creator-union"]
+        }
+      }
+    }]
+  };
+
+  const authorized = authorizeTaskTodoSyncRequest({
+    sourceId: "task:p1:t1",
+    todoId: "personal-id",
+    executorUnionIds: ["creator-union"]
+  }, { unionId: "creator-union", role: "product" }, state);
+
+  assert.equal(authorized.todoId, "personal-id");
+  assert.equal(authorized.replacementOfTodoId, "legacy-work-id");
+  assert.equal(authorized.replacementTodoSource, "todo_open_app");
+});
+
+test("todo sync authorization replaces a recorded work todo even when its recovery source is malformed", () => {
   const state = {
     products: [{ id: "p1" }],
     tasks: [{
@@ -252,7 +286,9 @@ test("todo sync authorization reuses a recorded work todo id when only the recov
       dingTodo: {
         id: "stale-work-id",
         sourceId: "task:p1:t1:r1:r1",
-        source: "todo_open_app"
+        source: "todo_open_app",
+        creatorUnionId: "creator-union",
+        executorUnionIds: ["creator-union"]
       }
     }]
   };
@@ -262,11 +298,12 @@ test("todo sync authorization reuses a recorded work todo id when only the recov
     executorUnionIds: ["creator-union"]
   }, { unionId: "creator-union", role: "product" }, state);
 
-  assert.equal(authorized.todoId, "stale-work-id");
+  assert.equal(authorized.todoId, "");
+  assert.equal(authorized.replacementOfTodoId, "stale-work-id");
   assert.equal(authorized.sourceId, "task:p1:t1");
 });
 
-test("todo sync authorization upgrades a legacy work card to the completion-action version", () => {
+test("todo sync authorization upgrades a legacy work card to a native personal todo", () => {
   const state = {
     products: [{ id: "p1", productManagerUnionId: "creator-union" }],
     tasks: [{
@@ -285,12 +322,12 @@ test("todo sync authorization upgrades a legacy work card to the completion-acti
   const authorized = authorizeTaskTodoSyncRequest({
     sourceId: "task:p1:t1",
     todoId: "legacy-work-id",
-    actionVersion: 1,
+    actionVersion: 2,
     executorUnionIds: ["creator-union"]
   }, { unionId: "creator-union", role: "product" }, state);
 
   assert.equal(authorized.todoId, "");
-  assert.equal(authorized.sourceId, "task:p1:t1:r1");
+  assert.equal(authorized.sourceId, "task:p1:t1");
   assert.equal(authorized.replacementOfTodoId, "legacy-work-id");
   assert.equal(authorized.replacementTodoSource, "todo_open_app");
 });
@@ -298,7 +335,7 @@ test("todo sync authorization upgrades a legacy work card to the completion-acti
 test("todo sync authorization reuses only a controlled recovery source for the same task", () => {
   const state = {
     products: [{ id: "p1" }],
-    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "recovered-id", sourceId: "task:p1:t1:r1" } }]
+    tasks: [{ id: "t1", productId: "p1", dingTodo: { id: "recovered-id", sourceId: "task:p1:t1:r1", source: "todo_personal_user", creatorUnionId: "session-union" } }]
   };
   const authorized = authorizeTaskTodoSyncRequest({
     sourceId: "task:p1:t1",
@@ -309,7 +346,7 @@ test("todo sync authorization reuses only a controlled recovery source for the s
   assert.equal(authorized.todoId, "recovered-id");
 });
 
-test("personal todo migration is restricted to a trusted task owner", () => {
+test("personal todo reuse is restricted to a trusted task owner", () => {
   const baseState = {
     products: [{ id: "p1" }],
     tasks: [{
@@ -329,13 +366,13 @@ test("personal todo migration is restricted to a trusted task owner", () => {
     executorUnionIds: ["executor-union"]
   };
 
-  const creatorReplacement = authorizeTaskTodoSyncRequest(
+  const creatorReuse = authorizeTaskTodoSyncRequest(
     input,
     { unionId: "creator-union", role: "product" },
     baseState
   );
-  assert.equal(creatorReplacement.todoId, "");
-  assert.equal(creatorReplacement.replacementOfTodoId, "personal-id");
+  assert.equal(creatorReuse.todoId, "personal-id");
+  assert.equal(creatorReuse.replacementOfTodoId, "");
   assert.throws(
     () => authorizeTaskTodoSyncRequest(input, { unionId: "other-union", role: "product" }, baseState),
     /产品负责人、原创建人或执行人/
@@ -366,9 +403,9 @@ test("personal todo migration is restricted to a trusted task owner", () => {
     { unionId: "manager-union", role: "product" },
     replaceableState
   );
-  assert.equal(replacement.todoId, "");
-  assert.equal(replacement.replacementOfTodoId, "personal-id");
-  assert.equal(replacement.sourceId, "task:p1:t1:r1");
+  assert.equal(replacement.todoId, "personal-id");
+  assert.equal(replacement.replacementOfTodoId, "");
+  assert.equal(replacement.sourceId, "task:p1:t1");
 });
 
 test("todo sync authorization rejects readonly, missing, and forged task sources", () => {
@@ -383,7 +420,7 @@ test("todo sync route uses the signed-in actor and the server-stored todo id", a
   const parts = [
     { part_key: "version", part_index: 0, payload: JSON.stringify("test"), updated_at: "2026-07-18", updated_by: "产品负责人" },
     { part_key: "products", part_index: 0, payload: JSON.stringify([{ id: "p1", productManagerUnionId: "owner-union" }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
-    { part_key: "tasks", part_index: 0, payload: JSON.stringify([{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1" } }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
+    { part_key: "tasks", part_index: 0, payload: JSON.stringify([{ id: "t1", productId: "p1", dingTodo: { id: "todo-state", sourceId: "task:p1:t1", source: "todo_personal_user", creatorUnionId: "session-union", actionVersion: 2 } }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
     ...["demands", "deliverables", "reviews", "feedbackIssues", "productPlans"].map(part_key => ({
       part_key,
       part_index: 0,
@@ -429,17 +466,21 @@ test("todo sync route uses the signed-in actor and the server-stored todo id", a
       }),
       env: { PRODUCT_FLOW_DB: db, DINGTALK_APP_KEY: "key", DINGTALK_APP_SECRET: "secret" },
       data: { session: { unionId: "session-union", role: "product" } }
+    }, {
+      getUserToken: async () => "user-token-1"
     });
     assert.equal(response.status, 200);
-    const todoCall = calls.find(call => call.options.method === "PUT" && !call.url.includes("/executorStatus"));
-    assert.match(todoCall.url, /\/users\/session-union\/tasks\/todo-state\?operatorId=session-union$/);
-    assert.doesNotMatch(todoCall.url, /forged-creator/);
+    const todoCall = calls.find(call => call.url.includes("mcp-gw.dingtalk.com"));
+    const todoBody = JSON.parse(todoCall.options.body);
+    assert.equal(todoBody.params.name, "update_todo_task");
+    assert.equal(todoBody.params.arguments.TodoUpdateRequest.taskId, "todo-state");
+    assert.equal(todoCall.options.headers["x-user-access-token"], "user-token-1");
   } finally {
     globalThis.fetch = originalFetch;
   }
 });
 
-test("todo sync route creates a queryable work todo for an unbound product task", async () => {
+test("todo sync route creates a native personal todo for an unbound product task", async () => {
   const parts = [
     { part_key: "version", part_index: 0, payload: JSON.stringify("test"), updated_at: "2026-07-18", updated_by: "产品负责人" },
     { part_key: "products", part_index: 0, payload: JSON.stringify([{ id: "p1" }]), updated_at: "2026-07-18", updated_by: "产品负责人" },
@@ -489,14 +530,18 @@ test("todo sync route creates a queryable work todo for an unbound product task"
       }),
       env: { PRODUCT_FLOW_DB: db, DINGTALK_APP_KEY: "key", DINGTALK_APP_SECRET: "secret" },
       data: { session: { unionId: "session-union", role: "product", name: "产品负责人" } }
+    }, {
+      getUserToken: async () => "user-token-1"
     });
     assert.equal(response.status, 200);
     const todoCall = calls.find(call => call.options.method === "POST" && call.url.includes("/v1.0/todo/users/"));
-    assert.match(todoCall.url, /\/users\/session-union\/tasks\?operatorId=session-union$/);
-    assert.doesNotMatch(todoCall.url, /personalTasks/);
+    assert.match(todoCall.url, /\/users\/me\/personalTasks$/);
+    assert.equal(todoCall.options.headers["x-acs-dingtalk-access-token"], "user-token-1");
     const body = await response.json();
     assert.equal(body.task.dingTodo.id, "work-todo-new");
     assert.equal(body.task.dingTodo.sourceId, "task:p1:t1");
+    assert.equal(body.task.dingTodo.source, "todo_personal_user");
+    assert.equal(body.task.dingTodo.actionVersion, 2);
   } finally {
     globalThis.fetch = originalFetch;
   }

@@ -18,6 +18,7 @@ import {
   queryDingScheduleConferenceHistory,
   createDingPersonalTodoTask,
   createDingTodoTask,
+  syncDingPersonalTodoTask,
   updateDingPersonalTodoTask
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
 
@@ -175,6 +176,44 @@ test("updateDingPersonalTodoTask updates native title deadline priority and comp
       isDone: true
     }
   });
+});
+
+test("syncDingPersonalTodoTask creates and then updates the native checkbox todo", async () => {
+  const calls = [];
+  const base = {
+    sourceId: "task:p1:t1",
+    creatorUnionId: "creator-union",
+    executorUnionIds: ["executor-union"],
+    subject: "整理 PRD",
+    description: "正文",
+    dueTime: 1783401600000,
+    priority: 30,
+    done: false
+  };
+
+  const created = await syncDingPersonalTodoTask("user-token-1", base, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    return calls.length === 1
+      ? okJson({ taskId: "personal-todo-1" })
+      : okJson({ result: { structuredContent: { success: true } } });
+  });
+  const updated = await syncDingPersonalTodoTask("user-token-1", {
+    ...base,
+    todoId: "personal-todo-1",
+    done: true
+  }, async (url, options) => {
+    calls.push({ url, options, body: JSON.parse(options.body) });
+    return okJson({ result: { structuredContent: { success: true } } });
+  });
+
+  assert.equal(created.id, "personal-todo-1");
+  assert.equal(created.source, "todo_personal_user");
+  assert.equal(created.actionVersion, 2);
+  assert.equal(updated.id, "personal-todo-1");
+  assert.equal(updated.actionVersion, 2);
+  assert.match(calls[0].url, /\/v1\.0\/todo\/users\/me\/personalTasks$/);
+  assert.equal(calls[2].body.params.name, "update_todo_task");
+  assert.equal(calls[2].body.params.arguments.TodoUpdateRequest.isDone, true);
 });
 
 test("buildDingCalendarEventPayload creates a primary-calendar meeting event", () => {

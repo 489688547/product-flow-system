@@ -1,4 +1,4 @@
-import { CalendarCheck2, CalendarPlus, CheckCircle2, Flag, GripVertical, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
+import { CalendarCheck2, CalendarPlus, Flag, GripVertical, Plus, RotateCcw, Send, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   deliverablesForTask,
@@ -85,8 +85,6 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
   const [taskToDelete, setTaskToDelete] = useState(null);
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
   const [stageChangeConfirmOpen, setStageChangeConfirmOpen] = useState(false);
-  const [completingFocusedTask, setCompletingFocusedTask] = useState(false);
-  const [completionFeedback, setCompletionFeedback] = useState("");
   const focusedTask = useMemo(() => (
     activeFocus?.taskId
       ? state.tasks.find(task => (
@@ -133,12 +131,9 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
         block: "center",
         behavior: "smooth"
       });
-      if (activeFocus?.action === "complete" && !focusedTask.done) {
-        document.getElementById("dingtalk-todo-complete-action")?.focus();
-      }
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [activeFocus?.action, focusedTask, selectedStage]);
+  }, [focusedTask, selectedStage]);
   const productSchedule = selectedProduct
     ? buildProductScheduleSummary(selectedProduct, state.productPlans, state.demands, new Date(), state.tasks).schedule
     : { state: "unplanned", percent: null, launchDate: "" };
@@ -156,49 +151,6 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
     const nextTarget = normalizeMonthlyGmvTarget(monthlyGmvDraft);
     setMonthlyGmvDraft(nextTarget ? String(nextTarget) : "");
     if (nextTarget !== monthlyGmvTarget) updateProduct(selectedProduct.id, { monthlyGmvTarget: nextTarget });
-  };
-  const syncFocusedTaskCompletion = async () => {
-    if (!focusedTask || focusedTask.done || completingFocusedTask) return;
-    setCompletionFeedback("");
-    setCompletingFocusedTask(true);
-    try {
-      const executorIds = [...new Set(
-        (focusedTask.dingTodo?.executorUnionIds || [])
-          .map(value => String(value || "").trim())
-          .filter(Boolean)
-      )];
-      const usersByUnionId = new Map(orgUsers(orgCache).map(user => [
-        String(user.unionid || user.unionId || "").trim(),
-        user
-      ]));
-      const executors = executorIds.map(unionId => (
-        usersByUnionId.get(unionId) || { unionid: unionId, name: "钉钉执行人" }
-      ));
-      const draft = createTodoComposerDraft({ product: selectedProduct, task: focusedTask });
-      const effectiveTask = { ...focusedTask, due: draft.dueDate, done: true };
-      const detailUrl = new URL(window.location.href);
-      detailUrl.searchParams.set("productId", selectedProduct.id);
-      detailUrl.searchParams.set("taskId", focusedTask.id);
-      detailUrl.searchParams.delete("todoAction");
-      detailUrl.hash = "progress";
-      const recoveryUsers = orgUsers(orgCache).filter(user => user.name === selectedProduct.productManager);
-      const payload = buildTaskTodoPayload({
-        product: selectedProduct,
-        task: effectiveTask,
-        creator: currentUser,
-        executors,
-        recoveryUsers,
-        detailUrl: detailUrl.toString(),
-        draft
-      });
-      const snapshot = buildTaskTodoSnapshot(effectiveTask, payload.executorUnionIds, payload.draft);
-      await syncTaskTodo({ taskId: focusedTask.id, payload, executors, snapshot });
-      setCompletionFeedback("任务和钉钉待办均已完成。");
-    } catch (error) {
-      setCompletionFeedback(error?.message || "完成待办失败，请重试。");
-    } finally {
-      setCompletingFocusedTask(false);
-    }
   };
   const handleAddTask = () => {
     addTask({
@@ -328,29 +280,6 @@ export function ProductProgressPage({ focusStage, onNavigate }) {
           </div>
         )}
       />
-      {activeFocus?.action === "complete" ? (
-        <section className={`task-todo-deeplink ${focusedTask?.done ? "is-complete" : ""}`} aria-label="钉钉待办完成入口">
-          <span className="task-todo-deeplink-icon"><CheckCircle2 size={22} /></span>
-          <div>
-            <strong>{focusedTask ? `完成“${focusedTask.title}”` : "没有找到对应的产品任务"}</strong>
-            <p>{focusedTask
-              ? focusedTask.done
-                ? "这条任务已完成，钉钉状态会保持同步。"
-                : "从钉钉待办卡片进入，确认后会同时完成系统任务和钉钉待办。"
-              : "链接中的任务可能已删除或不属于当前产品。"}</p>
-            {completionFeedback ? <small role={completionFeedback.includes("均已完成") ? "status" : "alert"}>{completionFeedback}</small> : null}
-          </div>
-          {focusedTask ? (
-            <Button
-              id="dingtalk-todo-complete-action"
-              variant="primary"
-              disabled={focusedTask.done || completingFocusedTask || Boolean(focusedTask.required && !deliverablesForTask(state, focusedTask.id).length)}
-              disabledReason={focusedTask.required && !deliverablesForTask(state, focusedTask.id).length ? "请先添加交付物，再完成必需任务" : ""}
-              onClick={syncFocusedTaskCompletion}
-            >{focusedTask.done ? "已完成" : completingFocusedTask ? "正在同步…" : "完成并同步钉钉"}</Button>
-          ) : null}
-        </section>
-      ) : null}
       <div className="stage-grid">
         {progressStages.map(stage => {
           const policy = productStagePolicy(state, selectedProduct, stage.index);

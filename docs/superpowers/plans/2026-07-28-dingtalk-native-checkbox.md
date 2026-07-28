@@ -1,4 +1,4 @@
-# DingTalk Native Todo Checkbox Implementation Plan
+# 钉钉原生待办复选框实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -29,21 +29,21 @@
 - Consumes: `createDingPersonalTodoTask(userAccessToken, input, fetchImpl)` and `updateDingPersonalTodoTask(userAccessToken, input, fetchImpl)`.
 - Produces: `syncDingPersonalTodoTask(userAccessToken, input, fetchImpl)` returning `{id, taskId, source:"todo_personal_user", actionVersion:2}`.
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Add behavior tests that require a new product-task sync to call `/v1.0/todo/users/me/personalTasks`, never call `/v1.0/todo/users/{unionId}/tasks`, and update an existing personal task through `update_todo_task` without creating a duplicate.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `node --test tests/dingtalk-sync.test.mjs tests/dingtalk-todo-update.test.mjs`
 
 Expected: FAIL because product-task synchronization still calls the enterprise work-todo adapter.
 
-- [ ] **Step 3: Implement the minimal personal sync helper**
+- [x] **Step 3: Implement the minimal personal sync helper**
 
 Create `syncDingPersonalTodoTask` that validates `dueTime`, calls `updateDingPersonalTodoTask` when `todoId` is present, otherwise calls `createDingPersonalTodoTask`, and returns interaction version `2`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `node --test tests/dingtalk-sync.test.mjs tests/dingtalk-todo-update.test.mjs`
 
@@ -61,21 +61,21 @@ Expected: PASS.
 - Consumes: `getValidDingUserToken(request, env)`, `syncDingPersonalTodoTask`, `getDingAccessToken(env)`.
 - Produces: a sync route that creates/updates personal todos and retires a legacy work card only after replacement creation.
 
-- [ ] **Step 1: Write failing route tests**
+- [x] **Step 1: Write failing route tests**
 
 Cover these literal outcomes: a valid user token creates a personal task; missing/expired authorization returns `DINGTALK_USER_AUTH_REQUIRED`; a bound `todo_open_*` card is replaced by a personal task; a bound `todo_personal_user` taskId is reused; retirement failure reports the existing retryable migration error.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `node --test tests/dingtalk-todo-update.test.mjs`
 
 Expected: FAIL because the route resolves only the application access token and treats personal bindings as replacement candidates.
 
-- [ ] **Step 3: Implement route orchestration**
+- [x] **Step 3: Implement route orchestration**
 
 Resolve the valid user token before real external writes. Reuse trusted personal bindings with `actionVersion >= 2`; create a personal replacement for legacy work bindings; use the application token only to retire a replaced work card; persist the new taskId through `persistTaskTodoSyncResult`.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `node --test tests/dingtalk-todo-update.test.mjs react-tests/task-todo.test.mjs`
 
@@ -95,21 +95,21 @@ Expected: PASS.
 - Consumes: personal todo completion snapshots from `reconcileTaskTodosFromDingTalk`.
 - Produces: product progress UI with no `todoAction=complete` confirmation banner and a sync-status version of `2`.
 
-- [ ] **Step 1: Write failing UI/domain tests**
+- [x] **Step 1: Write failing UI/domain tests**
 
 Require the composer payload to request interaction version `2`, personal bindings to show “已同步”, legacy work bindings to show “待更新”, and normal product-detail navigation to remain read-only without a completion confirmation action.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 Run: `node --test react-tests/task-todo.test.mjs react-tests/todo-composer-ui.test.mjs`
 
 Expected: FAIL because version `1` and the custom completion banner are still present.
 
-- [ ] **Step 3: Implement the minimal UI/domain change**
+- [x] **Step 3: Implement the minimal UI/domain change**
 
 Set the interaction version to `2`, remove the custom completion banner and `todoAction=complete` parsing branch, retain product/task selection for ordinary detail links, and leave remote completion reconciliation unchanged.
 
-- [ ] **Step 4: Verify GREEN**
+- [x] **Step 4: Verify GREEN**
 
 Run: `node --test react-tests/task-todo.test.mjs react-tests/todo-composer-ui.test.mjs`
 
@@ -124,7 +124,7 @@ Expected: PASS.
 - Consumes: all preceding implementation and tests.
 - Produces: reviewed pull request, merged `main`, Cloudflare production deployment, and real-account acceptance evidence.
 
-- [ ] **Step 1: Run focused and full verification**
+- [x] **Step 1: Run focused and full verification**
 
 Run:
 

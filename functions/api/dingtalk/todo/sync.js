@@ -2,8 +2,10 @@ import {
   getDingAccessToken,
   jsonResponse,
   optionsResponse,
-  syncDingTodoTask
+  retireReplacedWorkTodo,
+  syncDingPersonalTodoTask
 } from "../_shared/dingtalk.js";
+import { getValidDingUserToken } from "../../auth/_shared/ding-user-token.js";
 import { readCompanyState, writeCompanyState } from "../../state.js";
 import { requestBusinessDatabase } from "../../platform/_shared/dataEnvironment.js";
 import { shouldSimulateExternalAction } from "../../platform/_shared/externalActionMode.js";
@@ -197,11 +199,6 @@ function isTaskTodoSourceForTask(value, sourceId) {
   return /^(?::r\d+)+$/.test(recoverySuffix);
 }
 
-function nextRecoverySourceId(sourceId, storedSourceId) {
-  const match = String(storedSourceId || "").match(/:r(\d+)$/);
-  return `${sourceId}:r${match ? Number(match[1]) + 1 : 1}`;
-}
-
 export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {}) {
   if (session.role === "readonly") throw requestError("只读账号不能同步钉钉待办。", 403);
   const creatorUnionId = String(session.unionId || "").trim();
@@ -232,33 +229,32 @@ export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {
   const storedExecutorUnionIds = Array.isArray(task.dingTodo?.executorUnionIds)
     ? task.dingTodo.executorUnionIds.map(value => String(value || "").trim())
     : [];
+  const pendingLegacyTodo = task.dingTodo?.legacyTodo && typeof task.dingTodo.legacyTodo === "object"
+    ? task.dingTodo.legacyTodo
+    : null;
   const productManagerUnionId = String(product.productManagerUnionId || "").trim();
-  const canReplacePersonalTodo = storedTodoId
+  const canReusePersonalTodo = storedTodoId
     && storedTodoSource === "todo_personal_user"
     && (
       storedCreatorUnionId === creatorUnionId
       || productManagerUnionId === creatorUnionId
       || storedExecutorUnionIds.includes(creatorUnionId)
     );
-  const requestedActionVersion = Math.max(0, Number(input.actionVersion) || 0);
-  const storedActionVersion = Math.max(0, Number(task.dingTodo?.actionVersion) || 0);
-  const requiresWorkTodoActionUpgrade = Boolean(
-    storedTodoId
-    && storedTodoSource.startsWith("todo_open_")
-    && requestedActionVersion > storedActionVersion
+  const requiresPersonalTodoUpgrade = Boolean(
+    storedTodoId && storedTodoSource.startsWith("todo_open_")
   );
-  const canReplaceWorkTodo = requiresWorkTodoActionUpgrade && (
+  const canReplaceWorkTodo = requiresPersonalTodoUpgrade && (
     storedCreatorUnionId === creatorUnionId
     || productManagerUnionId === creatorUnionId
     || storedExecutorUnionIds.includes(creatorUnionId)
   );
   if (storedTodoId && storedTodoSource === "todo_personal_user") {
-    if (!canReplacePersonalTodo) {
-      throw requestError("该个人待办无法反向查询，请由产品负责人、原创建人或执行人重新同步为工作待办。", 403);
+    if (!canReusePersonalTodo) {
+      throw requestError("该个人待办只能由产品负责人、原创建人或执行人更新。", 403);
     }
   }
-  if (requiresWorkTodoActionUpgrade && !canReplaceWorkTodo) {
-    throw requestError("该工作待办需要由产品负责人、原创建人或执行人升级完成入口。", 403);
+  if (requiresPersonalTodoUpgrade && !canReplaceWorkTodo) {
+    throw requestError("该工作待办需要由产品负责人、原创建人或执行人升级为个人待办。", 403);
   }
   const {
     creatorUnionId: ignoredCreator,
@@ -275,19 +271,23 @@ export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {
   void ignoredTodoId;
   return {
     ...safeInput,
-    sourceId: canReplacePersonalTodo || canReplaceWorkTodo
-      ? nextRecoverySourceId(sourceId, task.dingTodo?.sourceId)
-      : sourceId,
-    todoId: canReplacePersonalTodo || canReplaceWorkTodo ? "" : storedTodoId,
-    todoSource: canReplacePersonalTodo || canReplaceWorkTodo ? "" : storedTodoSource,
-    replacementOfTodoId: canReplacePersonalTodo || canReplaceWorkTodo ? storedTodoId : "",
-    replacementTodoSource: canReplaceWorkTodo ? storedTodoSource : "",
+    sourceId,
+    todoId: canReusePersonalTodo ? storedTodoId : "",
+    todoSource: canReusePersonalTodo ? storedTodoSource : "",
+    replacementOfTodoId: canReplaceWorkTodo
+      ? storedTodoId
+      : String(pendingLegacyTodo?.id || ""),
+    replacementTodoSource: canReplaceWorkTodo
+      ? storedTodoSource
+      : String(pendingLegacyTodo?.source || ""),
     replacementCreatorUnionId: canReplaceWorkTodo
       ? storedCreatorUnionId || creatorUnionId
-      : "",
+      : String(pendingLegacyTodo?.creatorUnionId || ""),
     replacementExecutorUnionIds: canReplaceWorkTodo
       ? storedExecutorUnionIds
-      : [],
+      : Array.isArray(pendingLegacyTodo?.executorUnionIds)
+        ? pendingLegacyTodo.executorUnionIds
+        : [],
     creatorUnionId,
     recoveryUnionIds: productManagerUnionId && productManagerUnionId !== creatorUnionId
       ? [productManagerUnionId]
@@ -295,7 +295,7 @@ export function authorizeTaskTodoSyncRequest(input = {}, session = {}, state = {
   };
 }
 
-export async function onRequest({ request, env, data = {} }) {
+export async function onRequest({ request, env, data = {} }, dependencies = {}) {
   if (request.method === "OPTIONS") return optionsResponse();
   if (request.method !== "POST") return jsonResponse({ message: "Method not allowed" }, 405);
 
@@ -319,8 +319,29 @@ export async function onRequest({ request, env, data = {} }) {
       });
       return jsonResponse({ synced: true, todo, task: saved.task, version: saved.version, updatedAt: saved.updatedAt });
     }
-    const todo = await syncDingTodoTask(await getDingAccessToken(env), authorizedBody);
-    const saved = await persistTaskTodoSyncResult({
+    const getUserToken = dependencies.getUserToken || getValidDingUserToken;
+    const syncPersonalTodo = dependencies.syncPersonalTodo || syncDingPersonalTodoTask;
+    const retireWorkTodo = dependencies.retireWorkTodo || retireReplacedWorkTodo;
+    let todo = await syncPersonalTodo(
+      await getUserToken(request, env),
+      authorizedBody
+    );
+    const replacesWorkTodo = Boolean(
+      authorizedBody.replacementOfTodoId
+      && String(authorizedBody.replacementTodoSource || "").startsWith("todo_open_")
+    );
+    if (replacesWorkTodo) {
+      todo = {
+        ...todo,
+        legacyTodo: {
+          id: authorizedBody.replacementOfTodoId,
+          source: authorizedBody.replacementTodoSource,
+          creatorUnionId: authorizedBody.replacementCreatorUnionId,
+          executorUnionIds: authorizedBody.replacementExecutorUnionIds
+        }
+      };
+    }
+    let saved = await persistTaskTodoSyncResult({
       db,
       sourceId: body.sourceId,
       payload: authorizedBody,
@@ -328,6 +349,23 @@ export async function onRequest({ request, env, data = {} }) {
       session: data.session,
       sourceEnvironment: data.dataEnvironment?.id || "production"
     });
+    if (replacesWorkTodo) {
+      const getAppToken = dependencies.getAppToken || getDingAccessToken;
+      todo = await retireWorkTodo(
+        await getAppToken(env),
+        authorizedBody,
+        todo
+      );
+      todo = { ...todo, legacyTodo: null };
+      saved = await persistTaskTodoSyncResult({
+        db,
+        sourceId: body.sourceId,
+        payload: authorizedBody,
+        todo,
+        session: data.session,
+        sourceEnvironment: data.dataEnvironment?.id || "production"
+      });
+    }
     return jsonResponse({ synced: true, todo, task: saved.task, version: saved.version, updatedAt: saved.updatedAt });
   } catch (error) {
     const safe = safeDingTalkError(error, "钉钉待办同步失败，请稍后重试。");

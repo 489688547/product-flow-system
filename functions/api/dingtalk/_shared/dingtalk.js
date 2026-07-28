@@ -900,7 +900,7 @@ export async function findDingTodoBySourceId(accessToken, unionId, sourceId, fet
   return null;
 }
 
-async function retireReplacedWorkTodo(accessToken, input, result, fetchImpl) {
+export async function retireReplacedWorkTodo(accessToken, input, result, fetchImpl = fetch) {
   const replacementOfTodoId = String(input.replacementOfTodoId || "").trim();
   const replacementTodoSource = String(input.replacementTodoSource || "");
   if (!replacementOfTodoId || !replacementTodoSource.startsWith("todo_open_")) return result;
@@ -1139,6 +1139,22 @@ export async function updateDingPersonalTodoTask(userAccessToken, input = {}, fe
     source: "todo_personal_user",
     creatorUnionId: String(input.creatorUnionId || ""),
     updated: true
+  };
+}
+
+export async function syncDingPersonalTodoTask(userAccessToken, input = {}, fetchImpl = fetch) {
+  if (!Number(input.dueTime)) {
+    const err = new Error("请先设置任务截止日期，再同步到钉钉待办。");
+    err.status = 400;
+    throw err;
+  }
+  const result = input.todoId
+    ? await updateDingPersonalTodoTask(userAccessToken, input, fetchImpl)
+    : await createDingPersonalTodoTask(userAccessToken, input, fetchImpl);
+  return {
+    ...result,
+    actionVersion: 2,
+    source: "todo_personal_user"
   };
 }
 
