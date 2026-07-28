@@ -5,18 +5,15 @@ export function createDingTalkTodoRefreshController({ fetchImpl = fetch, onTodos
   let inFlight = null;
 
   return {
-    refresh() {
+    refresh(taskIds = []) {
       if (inFlight) return inFlight;
       const request = ++latestRequest;
       const current = (async () => {
-        const payload = fetchImpl === fetch
-          ? await fetchDingTalkTodoStatuses()
-          : await (async () => {
-            const response = await fetchImpl("/api/dingtalk/todo/list");
-            const body = await response.json().catch(() => ({}));
-            if (!response.ok || !body.synced) throw new Error(body.message || "钉钉待办状态查询失败。");
-            return { ...body, skipped: false };
-          })();
+        const payload = await fetchDingTalkTodoStatuses({
+          fetchImpl,
+          taskIds,
+          force: fetchImpl !== fetch
+        });
         if (payload.skipped) return false;
         if (request !== latestRequest) return false;
         onTodos(Array.isArray(payload.todos) ? payload.todos : []);

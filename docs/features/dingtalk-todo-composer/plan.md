@@ -38,9 +38,9 @@
 - 新任务：通过当前登录人的有效钉钉用户授权调用个人待办创建接口；标题、正文、截止时间、优先级和 unionId 执行人进入受支持的个人待办链路。真实 taskId 与本地稳定 `sourceId` 一起保存，个人待办查询作为双向同步主链路。
 - 已绑定个人待办：复用 taskId 调用个人待办更新工具写标题、截止时间、优先级和完成状态；官方更新工具不支持的字段不得猜测发送。创建时已写入的正文和执行人若发生变化，受控创建替代个人待办并保留旧记录。
 - 兼容旧任务：服务端仅复用来源为 `todo_personal_user`、taskId 与当前任务绑定一致且交互版本为 `2` 的记录。历史企业工作待办或版本较低的绑定进入“待更新”；同步时先创建个人待办并保存新绑定，再用应用访问凭证将旧工作待办整体和执行者状态设为完成。日志和供应商响应不得写入令牌、手机号或原始敏感数据。
-- `GET /api/dingtalk/todo/list`：使用应用访问凭证调用当前用户的 `/organizations/tasks/query`，固定 `needPersonalTodo=true`，串行、有界查询未完成和已完成状态；该通道同时覆盖原生个人待办与历史企业工作待办，响应按 todoId/taskId 去重，客户端只回流已绑定产品任务。
+- `GET /api/dingtalk/todo/list`：产品任务客户端重复传递当前用户已分配的可信 `taskId` 参数；服务端使用应用访问凭证调用 `/users/{unionId}/tasks/{taskId}` 读取详情，最多 40 个去重 ID、并发上限 4，并把 `id/done` 统一为 `taskId/isDone`。未传 taskId 的通用企业待办读取继续使用 `/org/tasks/query`，不依赖当前应用未开放的 `Custom.Todo.Read`。
 - `TodoSyncModal.onSync({executors,draft})`
-- `ProductFlowProvider` 在登录完成、窗口聚焦和带抖动的周期内读取 `/api/dingtalk/todo/list`；查询窗口内一次回流，超出窗口的待办按服务端返回的有界游标逐轮覆盖，只在远端快照变化时持久化产品任务。
+- `ProductFlowProvider` 在登录完成、窗口聚焦和带抖动的周期内，把当前用户已分配的唯一 taskId 传给 `/api/dingtalk/todo/list`；只在远端快照变化时持久化产品任务。
 - 新建产品任务待办不发送 `actionList`，由钉钉原生个人待办提供左侧 checkbox。系统内详情链接仅用于定位，不构造完成写入参数。
 - `dingTodo.actionVersion=2` 表示绑定使用原生个人待办 checkbox。服务端发现可信旧工作待办或旧版本绑定时，先创建个人待办，再把旧工作待办整体和执行者状态更新为完成；旧卡片退出未完成列表但保留历史。
 

@@ -78,9 +78,9 @@
 
 - [ ] 原生个人待办 checkbox 与双向回流
   - 依赖：真实送达与反向同步、服务端原子绑定。
-  - 文件：`functions/api/dingtalk/_shared/dingtalk.js`、`functions/api/dingtalk/todo/sync.js`、`src/domain/dingTalk.js`、`src/domain/taskTodo.js`、`src/App.jsx`、`src/features/progress/ProductProgressPage.jsx`、样式、功能文档和回归测试。
+  - 文件：`functions/api/dingtalk/_shared/dingtalk.js`、`functions/api/dingtalk/todo/sync.js`、`functions/api/dingtalk/todo/list.js`、`src/domain/dingTalk.js`、`src/domain/taskTodo.js`、`src/state/dingTalkTodoClient.js`、`src/state/ProductFlowProvider.jsx`、`src/App.jsx`、`src/features/progress/ProductProgressPage.jsx`、样式、功能文档和回归测试。
   - 输入：当前用户授权、个人待办创建/更新工具、当前绑定交互版本、历史工作待办绑定。
   - 输出：钉钉原生左侧 checkbox、个人待办 taskId 绑定、远端完成回流、旧工作卡片受控替换。
   - 失败测试：同步仍调用工作待办创建接口、请求仍携带 `actionList`、旧工作卡片继续复用、个人授权失效时回退工作待办、远端个人待办完成不更新系统。
-  - 实现步骤：失败测试 → 个人待办同步编排 → 用户授权接入 → 旧工作卡片迁移 → 移除自定义完成深链 → 真机验收。
+  - 实现步骤：失败测试 → 个人待办同步编排 → 用户授权接入 → 旧工作卡片迁移 → 移除自定义完成深链 → 可信绑定 taskId 详情回流 → 真机验收。
   - 验证：聚焦 API/领域测试、本地线上授权账号原生 checkbox 与双向回流、全量 Definition of Done、生产 GitOps 验证。

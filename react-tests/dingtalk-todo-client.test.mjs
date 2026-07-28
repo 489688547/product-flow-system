@@ -77,3 +77,19 @@ test("todo client persists rotating cursors without storing todo content", async
   assert.match(urls[1], /workPendingToken=pending-2/);
   assert.doesNotMatch(JSON.stringify(globalThis.window.localStorage), /private-card/);
 });
+
+test("todo client requests only unique bound task ids", async () => {
+  const { fetchDingTalkTodoStatuses } = await freshClient();
+  let requestUrl = "";
+  await fetchDingTalkTodoStatuses({
+    force: true,
+    taskIds: ["task-a", "task-b", "task-a", "", "unsafe/id"],
+    fetchImpl: async url => {
+      requestUrl = String(url);
+      return okJson({ synced: true, todos: [] });
+    }
+  });
+
+  const url = new URL(requestUrl, "https://flow.example.com");
+  assert.deepEqual(url.searchParams.getAll("taskId"), ["task-a", "task-b"]);
+});

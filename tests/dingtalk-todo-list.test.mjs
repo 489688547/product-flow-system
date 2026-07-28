@@ -1,9 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  getDingTodoTask,
   listDingPersonalTodoTasks,
-  listDingTodoTasks,
-  listDingUserTodoTasks
+  listDingTodoTasks
 } from "../functions/api/dingtalk/_shared/dingtalk.js";
 import { collectDingTodoCards, onRequest } from "../functions/api/dingtalk/todo/list.js";
 
@@ -70,32 +70,25 @@ test("DingTalk todo list rejects missing identity", async () => {
   await assert.rejects(() => listDingTodoTasks("token", ""), /unionId/);
 });
 
-test("DingTalk user todo list includes native personal todos through the organizations query", async () => {
+test("DingTalk reads one bound native personal todo through its task id", async () => {
   const calls = [];
-  const todos = await listDingUserTodoTasks("token", "union-zhou", {
-    isDone: true,
+  const todo = await getDingTodoTask("token", "union-zhou", "task-personal-1", {
     fetchImpl: async (url, options) => {
-      calls.push({ url, body: JSON.parse(options.body) });
+      calls.push({ url, options });
       return okJson({
-        todoCards: [{
-          taskId: "task-personal-1",
-          subject: "原生个人待办",
-          isDone: true,
-          finalStatusStage: 2
-        }],
-        nextToken: ""
+        id: "task-personal-1",
+        subject: "原生个人待办",
+        done: true,
+        modifiedTime: 1785213000000
       });
     }
   });
 
-  assert.deepEqual(todos.map(item => item.taskId), ["task-personal-1"]);
-  assert.equal(todos[0].isDone, true);
-  assert.match(calls[0].url, /\/v1\.0\/todo\/users\/union-zhou\/organizations\/tasks\/query$/);
-  assert.deepEqual(calls[0].body, {
-    isDone: true,
-    maxResults: 50,
-    needPersonalTodo: true
-  });
+  assert.equal(todo.taskId, "task-personal-1");
+  assert.equal(todo.isDone, true);
+  assert.equal(todo.subject, "原生个人待办");
+  assert.match(calls[0].url, /\/v1\.0\/todo\/users\/union-zhou\/tasks\/task-personal-1$/);
+  assert.equal(calls[0].options.method, "GET");
 });
 
 test("personal todo list reads native completion state through the DingTalk todo MCP", async () => {
@@ -216,7 +209,7 @@ test("personal todo collection converts provider token expiry into reauthorizati
   assert.doesNotMatch(JSON.stringify(result), /raw provider|private/);
 });
 
-test("todo list endpoint ignores client identity and queries the signed-in user", async () => {
+test("todo list endpoint reads only requested bound tasks for the signed-in user with bounded concurrency", async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
   let activeTodoCalls = 0;
@@ -227,20 +220,21 @@ test("todo list endpoint ignores client identity and queries the signed-in user"
     activeTodoCalls += 1;
     peakTodoCalls = Math.max(peakTodoCalls, activeTodoCalls);
     await Promise.resolve();
-    const done = JSON.parse(options.body || "{}").isDone === true;
+    const taskId = String(url).split("/").at(-1);
     const response = okJson({
-      todoCards: [{
-        taskId: done ? "task-personal-done" : "task-personal-pending",
-        finalStatusStage: done ? 2 : 0
-      }],
-      nextToken: ""
+      id: taskId,
+      subject: taskId,
+      done: taskId.endsWith("done")
     });
     activeTodoCalls -= 1;
     return response;
   };
   try {
     const response = await onRequest({
-      request: new Request("https://flow.example.com/api/dingtalk/todo/list?unionId=union-attacker"),
+      request: new Request(
+        "https://flow.example.com/api/dingtalk/todo/list"
+        + "?unionId=union-attacker&taskId=task-personal-done&taskId=task-personal-pending"
+      ),
       env: { DINGTALK_APP_KEY: "key", DINGTALK_APP_SECRET: "secret" },
       data: { session: { unionId: "union-session", name: "周总" } }
     });
@@ -252,11 +246,10 @@ test("todo list endpoint ignores client identity and queries the signed-in user"
     assert.equal(body.todos.find(item => item.taskId === "task-personal-pending").isDone, false);
     const todoCalls = calls.filter(call => call.url.includes("/v1.0/todo/"));
     assert.equal(todoCalls.length, 2);
-    assert.equal(todoCalls.every(call => call.url.includes("/users/union-session/organizations/tasks/query")), true);
-    assert.equal(todoCalls.every(call => call.options.method === "POST"), true);
-    assert.equal(todoCalls.every(call => JSON.parse(call.options.body).needPersonalTodo === true), true);
+    assert.equal(todoCalls.every(call => call.url.includes("/users/union-session/tasks/task-personal-")), true);
+    assert.equal(todoCalls.every(call => call.options.method === "GET"), true);
     assert.equal(todoCalls.some(call => call.url.includes("union-attacker")), false);
-    assert.equal(peakTodoCalls, 1);
+    assert.equal(peakTodoCalls <= 4, true);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -272,7 +265,7 @@ test("todo list endpoint requires a session union id", async () => {
   assert.match((await response.json()).message, /unionId/);
 });
 
-test("todo list endpoint fails closed when the authoritative organizations query is unavailable", async () => {
+test("todo list endpoint fails closed when a requested task detail cannot be read", async () => {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async url => {
     if (String(url).includes("/gettoken")) return okJson({ errcode: 0, access_token: "access-token" });
@@ -284,7 +277,7 @@ test("todo list endpoint fails closed when the authoritative organizations query
   };
   try {
     const response = await onRequest({
-      request: new Request("https://flow.example.com/api/dingtalk/todo/list"),
+      request: new Request("https://flow.example.com/api/dingtalk/todo/list?taskId=task-personal-1"),
       env: { DINGTALK_APP_KEY: "key", DINGTALK_APP_SECRET: "secret" },
       data: { session: { unionId: "union-session", name: "周总" } }
     });

@@ -552,6 +552,18 @@ test("only assigned users need to poll DingTalk product-task statuses", () => {
   assert.equal(dingTalkDomain.userHasAssignedDingTalkTodo(tasks, ""), false);
 });
 
+test("assigned users poll only their unique bound DingTalk task ids", () => {
+  const tasks = [
+    { id: "assigned", dingTodo: { id: "task-1", executorUnionIds: ["union-a"] } },
+    { id: "duplicate", dingTodo: { id: "task-1", executorUnionIds: ["union-a"] } },
+    { id: "other", dingTodo: { id: "task-2", executorUnionIds: ["union-b"] } },
+    { id: "unsafe", dingTodo: { id: "task/unsafe", executorUnionIds: ["union-a"] } }
+  ];
+
+  assert.deepEqual(dingTalkDomain.assignedDingTalkTodoIds(tasks, "union-a"), ["task-1"]);
+  assert.deepEqual(dingTalkDomain.assignedDingTalkTodoIds(tasks, "union-b"), ["task-2"]);
+});
+
 test("stale DingTalk snapshots cannot overwrite a newer successful composer draft", () => {
   const tasks = [{
     id: "t1",

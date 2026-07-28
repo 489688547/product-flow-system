@@ -278,13 +278,18 @@ function dingTodoRemoteSnapshotKey(card = {}) {
 }
 
 export function userHasAssignedDingTalkTodo(tasks = [], unionId = "") {
+  return assignedDingTalkTodoIds(tasks, unionId).length > 0;
+}
+
+export function assignedDingTalkTodoIds(tasks = [], unionId = "") {
   const wantedUnionId = String(unionId || "").trim();
-  if (!wantedUnionId) return false;
-  return (Array.isArray(tasks) ? tasks : []).some(task => {
-    if (!String(task?.dingTodo?.id || "").trim()) return false;
-    return (Array.isArray(task?.dingTodo?.executorUnionIds) ? task.dingTodo.executorUnionIds : [])
+  if (!wantedUnionId) return [];
+  return [...new Set((Array.isArray(tasks) ? tasks : []).flatMap(task => {
+    const todoId = String(task?.dingTodo?.id || "").trim();
+    const assigned = (Array.isArray(task?.dingTodo?.executorUnionIds) ? task.dingTodo.executorUnionIds : [])
       .some(value => String(value || "").trim() === wantedUnionId);
-  });
+    return assigned && /^[A-Za-z0-9:_-]{1,128}$/.test(todoId) ? [todoId] : [];
+  }))];
 }
 
 export function reconcileTaskTodosFromDingTalk(tasks = [], cards = []) {

@@ -52,7 +52,19 @@ function writeCursor(cursor = {}) {
   }
 }
 
-export async function fetchDingTalkTodoStatuses({ force = false, fetchImpl = fetch, now = Date.now() } = {}) {
+function safeTaskIds(taskIds = []) {
+  return [...new Set((Array.isArray(taskIds) ? taskIds : [])
+    .map(value => String(value || "").trim())
+    .filter(value => /^[A-Za-z0-9:_-]{1,128}$/.test(value)))]
+    .slice(0, 40);
+}
+
+export async function fetchDingTalkTodoStatuses({
+  force = false,
+  fetchImpl = fetch,
+  now = Date.now(),
+  taskIds = []
+} = {}) {
   if (inFlight) return inFlight;
   if (!force && (now < backoffUntil || now - lastAttemptAt < REFRESH_WINDOW_MS || !claimCrossTabRefresh(now))) {
     return { skipped: true, todos: [] };
@@ -61,6 +73,7 @@ export async function fetchDingTalkTodoStatuses({ force = false, fetchImpl = fet
   const current = (async () => {
     const cursor = readCursor();
     const params = new URLSearchParams({ personalPage: String(cursor.personalPage) });
+    safeTaskIds(taskIds).forEach(taskId => params.append("taskId", taskId));
     if (cursor.workPendingToken) params.set("workPendingToken", cursor.workPendingToken);
     if (cursor.workCompletedToken) params.set("workCompletedToken", cursor.workCompletedToken);
     const response = await fetchImpl(`/api/dingtalk/todo/list?${params}`);
