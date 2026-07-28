@@ -131,18 +131,20 @@ test("browser login start uses the deployment client id without touching D1", as
   assert.equal(d1Calls, 0);
 });
 
-test("Cloudflare preview login starts OAuth on the registered production origin", async () => {
+test("retired Pages previews no longer redirect to a deleted fixed project", async () => {
   const response = await startBrowserLogin({
     request: new Request("https://codex-brand-content-collabor.product-flow-system.pages.dev/api/auth/dingtalk/start"),
     env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
   });
 
   assert.equal(response.status, 302);
+  const location = new URL(response.headers.get("location"));
+  assert.equal(location.origin, "https://login.dingtalk.com");
   assert.equal(
-    response.headers.get("location"),
-    "https://product-flow-system.pages.dev/api/auth/dingtalk/start"
+    location.searchParams.get("redirect_uri"),
+    "https://codex-brand-content-collabor.product-flow-system.pages.dev/api/auth/dingtalk/callback"
   );
-  assert.equal(response.headers.get("set-cookie"), null);
+  assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
 });
 
 test("the fixed production and development sites keep DingTalk callbacks on their own origin", async () => {

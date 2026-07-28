@@ -1,6 +1,5 @@
 const PRODUCTION_ORIGIN = "https://deshan-tiyes-system.pages.dev";
 const DEVELOPMENT_ORIGIN = "https://deshan-tiyes-system-dev.pages.dev";
-const LEGACY_PRODUCTION_ORIGIN = "https://product-flow-system.pages.dev";
 
 function fixedPagesOrigin(requestUrl) {
   if (
@@ -14,12 +13,6 @@ function fixedPagesOrigin(requestUrl) {
     && requestUrl.origin !== PRODUCTION_ORIGIN
   ) {
     return PRODUCTION_ORIGIN;
-  }
-  if (
-    requestUrl.hostname.endsWith(".product-flow-system.pages.dev")
-    && requestUrl.origin !== LEGACY_PRODUCTION_ORIGIN
-  ) {
-    return LEGACY_PRODUCTION_ORIGIN;
   }
   return "";
 }

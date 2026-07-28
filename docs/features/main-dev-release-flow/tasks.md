@@ -43,7 +43,7 @@
   - 实现步骤：最小替换常量和 host 映射；保留历史验收证据。
   - 验证：OAuth、readiness、数据客户端与 React 聚焦测试。
   - 提交：`feat(runtime): move to deshan fixed hosts`。
-  - 结果：2026-07-28，新正式站识别为 production、新测试站识别为 preview；固定站 OAuth callback 保持同源，分支 Preview 回到对应固定站；静态冷启动入口保持不变，55/55 聚焦测试通过。旧站仅保留迁移期兼容，最终切换后删除。
+  - 结果：2026-07-28，新正式站识别为 production、新测试站识别为 preview；固定站 OAuth callback 保持同源，分支 Preview 回到对应固定站；静态冷启动入口保持不变，55/55 聚焦测试通过。旧站迁移期兼容已在项目删除后移除。
 
 - [x] 增加部署后固定站冒烟
   - 依赖：运行时域名契约。
@@ -67,7 +67,7 @@
   - 提交：`docs(platform): define main dev GitOps`。
   - 结果：2026-07-28，ADR、仓库规则、feature workflow、Cloudflare 操作说明与集成注册表均已反写；静态 OAuth 冷启动契约与双固定站验收规则保持一致。
 
-- [ ] 创建 `dev` 与两个 Git 集成 Pages 项目
+- [x] 创建 `dev` 与两个 Git 集成 Pages 项目
   - 依赖：本地质量门禁通过。
   - 文件：GitHub 与 Cloudflare 远程配置。
   - 输入：同一仓库、`main`、`dev`、现有 D1 和 Secret。
@@ -76,8 +76,11 @@
   - 实现步骤：创建 dev；配置保护；连接两个项目；复制配置。
   - 验证：两站 deployment、commit、OAuth 与 readiness。
   - 提交：远程状态，不生成含秘密文件。
+  - 结果：2026-07-28，`dev`/`main` 分支保护已建立，`deshan-tiyes-system-dev` 与
+    `deshan-tiyes-system` 分别固定部署 `dev` 与 `main`，共享受治理 D1 绑定和必要 Secret 名称；
+    GitHub quality、Cloudflare Git deployment 与两站 smoke/readiness 均通过。
 
-- [ ] 切换本机消费者和钉钉
+- [x] 切换本机消费者和钉钉
   - 依赖：两个新站完全就绪。
   - 文件：共享 `.env`、两个 LaunchAgent、钉钉产品全流程应用配置。
   - 输入：新正式/测试 URL 与已确认应用 ID。
@@ -86,8 +89,10 @@
   - 实现步骤：备份；本机配置；DWS dry-run；执行；版本发布；真实登录。
   - 验证：采集器心跳、PC/移动工作台、浏览器 OAuth。
   - 提交：只提交仓库配置；本机和钉钉变更记录安全摘要。
+  - 结果：2026-07-28，共享 `.env` 与两个稳定路径 LaunchAgent 已改用新正式站；公司 Mac 网页采集器
+    在线。钉钉移动端/PC 首页、redirect 与 SSO 已切换到新双站，正式站和测试站真实总经办登录通过。
 
-- [ ] 删除旧 Pages 项目并完成验收
+- [x] 删除旧 Pages 项目并完成验收
   - 依赖：本机和钉钉真实验收通过。
   - 文件：Cloudflare 远程项目、DEV-000010 验收记录。
   - 输入：最终依赖扫描、两站验证证据。
@@ -96,3 +101,6 @@
   - 实现步骤：最终扫描；记录最后成功 commit 与安全配置摘要；完整门禁；删除旧项目；双站复验；提交验收。
   - 验证：Definition of Done、Functions build、两站 smoke/readiness、钉钉与采集器。
   - 提交：更新任务证据和研发待办状态。
+  - 结果：2026-07-28，先保留最后成功部署并按 Cloudflare 官方高部署量项目清理流程删除 491 个历史部署，
+    随后删除旧项目 `product-flow-system`；Cloudflare 仅剩两个固定项目，旧 URL 不可用，新双站与
+    production readiness 复验通过。运行时旧域名识别逻辑及迁移期文案已清除。

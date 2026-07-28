@@ -2,10 +2,10 @@
 
 ## 文档状态
 
-- 状态：已评审
+- 状态：已实施
 - 负责人：总经办 / 产品负责人
 - 对应研发待办：DEV-000010
-- 开发分支：`codex/main-dev-release-flow`
+- 最终清理分支：`codex/remove-legacy-pages-host`
 - 最近更新：2026-07-28
 
 ## 背景与问题
@@ -52,7 +52,7 @@
 - Cloudflare 项目、D1 绑定、Secret 和钉钉开放平台配置只由现有授权管理身份修改。
 - 测试站仍要求真实钉钉登录；数据和外部动作权限完全由服务端真实会话决定。
 
-## 当前流程
+## 实施前流程
 
 1. 功能分支直接向 `main` 提交 PR。
 2. 合并后 Cloudflare 立即更新 `product-flow-system.pages.dev`。
@@ -98,24 +98,24 @@
 - 旧 Pages 项目：`product-flow-system`，迁移完成后停用。
 - 发布提交：同时存在于 `dev` 与 `main`、并在两个固定站点分别通过验收的同一 Git commit。
 
-## 已发现的旧网址依赖
+## 迁移前发现的旧网址依赖
 
-### 必须迁移的运行时依赖
+### 已完成迁移的运行时依赖
 
-- 钉钉“产品全流程”应用移动端与 PC 首页均为
+- 钉钉“产品全流程”应用移动端与 PC 首页原来均为
   `https://product-flow-system.pages.dev/?corpId=$CORPID$`。
 - 钉钉登录重定向 URL 与端内免登 URL 需通过开放平台安全配置切换；DWS 当前只支持整组覆盖，
   因此切换时必须显式登记正式站和测试站所需完整列表。
-- `functions/api/auth/dingtalk/start.js` 固定正式 Origin，并识别旧项目 Preview 域名。
-- `functions/api/platform/_shared/environmentReadiness.js` 用旧域名判断 production/preview。
-- `package.json`、`scripts/check-deployed-readiness.mjs` 默认验证旧站。
+- `functions/api/auth/dingtalk/start.js` 原来固定旧站 Origin，并识别旧项目 Preview 域名。
+- `functions/api/platform/_shared/environmentReadiness.js` 原来用旧域名判断 production/preview。
+- `package.json`、`scripts/check-deployed-readiness.mjs` 原来默认验证旧站。
 - `.env.example`、共享 `.env`、`server.mjs` 和 `scripts/data-connection-agent/index.mjs`
   默认把生产数据 API 指向旧站。
 - `scripts/check-pages-environment-parity.mjs` 与
   `scripts/configure-pages-environment-parity.mjs` 固定旧 Pages 项目名称。
-- 公司 Mac 正在运行的 `com.company.web-data-collector` LaunchAgent 以旧站为 `--base-url`；
-  `com.company.kuaimai-erp-collector` 及其备份 plist 也保存旧站。
-- `CLOUDFLARE_PAGES.md` 的部署、钉钉工作台和本地 API 说明使用旧站。
+- 公司 Mac 的 `com.company.web-data-collector` 与 `com.company.kuaimai-erp-collector`
+  LaunchAgent 原来以旧站为 `--base-url`。
+- `CLOUDFLARE_PAGES.md` 原来使用旧站说明部署、钉钉工作台和本地 API。
 
 ### 已核查但未发现运行依赖
 
