@@ -311,8 +311,10 @@ AI 点评只传输方案中的产品、平台、店铺、现状证据、目标�
 ## 认证
 
 - `/api/auth/session`：读取当前公共会话模型。
-- `/api/auth/dingtalk/start`：启动浏览器钉钉登录。
-- `/api/auth/dingtalk/callback`：校验 state 并建立公司员工会话。
+- `/api/auth/dingtalk/start`：Pages 静态浏览器登录入口；调用 bootstrap 并吸收冷启动前置失败。
+- `/api/auth/dingtalk/bootstrap`：生成钉钉授权地址并写入 HttpOnly OAuth state/returnTo Cookie。
+- `/api/auth/dingtalk/callback`：Pages 静态回调入口；调用 complete 并吸收冷启动前置失败。
+- `/api/auth/dingtalk/complete`：校验 state、交换钉钉身份并建立公司员工会话。
 - `/api/auth/dingtalk/embedded`：钉钉内嵌免登。
 - `/api/auth/logout`：撤销当前服务端会话并清理 Cookie。
 

@@ -43,6 +43,9 @@ const integrationRegistry = {
       "codePaths": [
         "functions/api/dingtalk/**",
         "functions/api/auth/dingtalk/**",
+        "public/api/auth/dingtalk/**",
+        "public/auth/dingtalk-oauth.js",
+        "public/_routes.json",
         "functions/api/supply-chain/approvals/sync.js",
         "functions/api/platform/v1/collaboration-items/**/dingtalk.js",
         "functions/api/platform/v1/platform-connections.js",
@@ -84,6 +87,9 @@ const integrationRegistry = {
       "evidence": [
         "functions/api/dingtalk/",
         "functions/api/auth/dingtalk/",
+        "public/api/auth/dingtalk/",
+        "public/auth/dingtalk-oauth.js",
+        "public/_routes.json",
         "functions/api/supply-chain/approvals/sync.js",
         "functions/api/platform/v1/collaboration-items/[id]/dingtalk.js",
         "functions/api/platform/v1/platform-connections.js",

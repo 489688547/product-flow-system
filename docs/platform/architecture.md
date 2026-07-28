@@ -16,6 +16,7 @@
 
 - `functions/api/_middleware.js`：公共路由识别、OPTIONS 和公司会话认证。
 - `functions/api/auth/`：钉钉登录、Cookie 会话和退出。
+- `public/api/auth/dingtalk/`：钉钉 OAuth 的静态开始/回调韧性入口；敏感状态和会话仍只由服务端 API 管理。
 - `functions/api/dingtalk/`：组织、待办、日历、文档和会议纪要适配。
 - `functions/api/kuaimai/`：订单拉取、聚合、刷新和同步状态。
 - `functions/api/state.js`：产品全周期共享状态持久化。
