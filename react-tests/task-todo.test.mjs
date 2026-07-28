@@ -137,6 +137,11 @@ test("todo sync state detects unsynced, stale, completed and failed tasks", () =
   assert.equal(todoSyncStatus({
     ...synced,
     done: true,
+    dingTodo: { ...synced.dingTodo, remoteDone: true }
+  }), "已完成");
+  assert.equal(todoSyncStatus({
+    ...synced,
+    done: true,
     dingTodo: { ...synced.dingTodo, snapshot: { ...snapshot, done: true } }
   }), "已完成");
   assert.equal(todoSyncStatus({ ...synced, dingTodo: { ...synced.dingTodo, lastError: "network" } }), "同步失败");
@@ -451,6 +456,7 @@ test("DingTalk remains authoritative when a synced product task is edited remote
   assert.deepEqual(reconciled[0].dingTodo.executorUnionIds, ["new-executor"]);
   assert.equal(reconciled[0].dingTodo.lastError, "");
   assert.equal(reconciled[0].dingTodo.sourceId, "task:p1:t1");
+  assert.equal(reconciled[0].dingTodo.remoteDone, true);
   assert.equal(todoSyncStatus(reconciled[0]), "已完成");
 });
 
