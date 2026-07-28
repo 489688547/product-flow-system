@@ -1,1 +1,3 @@
+/api/auth/dingtalk/start /auth/dingtalk-start.html 200
+/api/auth/dingtalk/callback /auth/dingtalk-callback.html 200
 / /cloudflare-entry.html 200

@@ -5,7 +5,91 @@ function normalizeUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
-export async function checkDeployedReadiness({ baseUrl, accessToken, requiredPlatforms = [], fetchImpl = fetch } = {}) {
+function wait(delay) {
+  return new Promise(resolve => setTimeout(resolve, delay));
+}
+
+function oauthFailureMessage(text, status) {
+  try {
+    const payload = JSON.parse(text);
+    return payload.message || payload?.error?.message || `HTTP ${status}`;
+  } catch {
+    return String(text || "").trim().slice(0, 180) || `HTTP ${status}`;
+  }
+}
+
+function transientOauthFailure(response, text) {
+  return [502, 503, 504].includes(response.status)
+    || (
+      response.status === 500
+      && /Worker exceeded resource limits|Error code:\s*1102/i.test(text)
+    );
+}
+
+async function readOauthBootstrap(url, fetchImpl) {
+  const response = await fetchImpl(`${url}/api/auth/dingtalk/bootstrap`, {
+    headers: { accept: "application/json" },
+    cache: "no-store"
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    const error = new Error(`钉钉 OAuth bootstrap 失败：${oauthFailureMessage(text, response.status)}`);
+    error.retryable = transientOauthFailure(response, text);
+    throw error;
+  }
+  const payload = JSON.parse(text);
+  const authorize = new URL(payload.authorizeUrl || "");
+  if (payload.ready !== true || authorize.origin !== "https://login.dingtalk.com") {
+    throw new Error("钉钉 OAuth bootstrap 未返回有效授权地址。");
+  }
+  return payload;
+}
+
+async function checkDingTalkOauth({
+  url,
+  fetchImpl,
+  concurrency = 20,
+  retryDelays = [0, 250, 750, 1500]
+}) {
+  const entry = await fetchImpl(`${url}/api/auth/dingtalk/start`, {
+    headers: { accept: "text/html" },
+    cache: "no-store"
+  });
+  const entryText = await entry.text();
+  if (
+    !entry.ok
+    || !String(entry.headers.get("content-type") || "").includes("text/html")
+    || /Worker exceeded resource limits|Error code:\s*1102/i.test(entryText)
+  ) {
+    throw new Error(`钉钉 OAuth 静态入口未就绪（HTTP ${entry.status}）。`);
+  }
+
+  let lastError = null;
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    if (retryDelays[attempt] > 0) await wait(retryDelays[attempt]);
+    try {
+      await readOauthBootstrap(url, fetchImpl);
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      if (!error.retryable || attempt === retryDelays.length - 1) throw error;
+    }
+  }
+  if (lastError) throw lastError;
+
+  const count = Math.max(1, Math.min(50, Number(concurrency) || 20));
+  await Promise.all(Array.from({ length: count }, () => readOauthBootstrap(url, fetchImpl)));
+  return { entryStatus: entry.status, bootstrapConcurrency: count };
+}
+
+export async function checkDeployedReadiness({
+  baseUrl,
+  accessToken,
+  requiredPlatforms = [],
+  fetchImpl = fetch,
+  oauthConcurrency = 20
+} = {}) {
   const url = normalizeUrl(baseUrl);
   const token = String(accessToken || "").trim();
   if (!url) throw new Error("缺少生产部署 URL。");
@@ -31,6 +115,13 @@ export async function checkDeployedReadiness({ baseUrl, accessToken, requiredPla
       return `${capability.id}${missing.length ? `（${missing.join("、")}）` : ""}`;
     });
     throw new Error(`受影响平台仍有环境警告：${details.join("；")}`);
+  }
+  if (required.has("dingtalk")) {
+    payload.oauth = await checkDingTalkOauth({
+      url,
+      fetchImpl,
+      concurrency: oauthConcurrency
+    });
   }
   return payload;
 }

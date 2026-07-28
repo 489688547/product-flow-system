@@ -26,7 +26,9 @@ const PUBLIC_PATHS = new Set([
   "/api/auth/session",
   "/api/auth/logout",
   "/api/auth/dingtalk/start",
+  "/api/auth/dingtalk/bootstrap",
   "/api/auth/dingtalk/callback",
+  "/api/auth/dingtalk/complete",
   "/api/auth/dingtalk/embedded",
   "/api/dingtalk/config",
   "/api/dingtalk/login"

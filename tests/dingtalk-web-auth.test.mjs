@@ -12,7 +12,9 @@ import { onRequest as stateRequest } from "../functions/api/state.js";
 import { onRequest as dataStandardsRequest } from "../functions/api/platform/v1/data-standards.js";
 import { onRequest as dataStandardItemRequest } from "../functions/api/platform/v1/data-standards/[id].js";
 import { onRequest as startBrowserLogin } from "../functions/api/auth/dingtalk/start.js";
+import { onRequest as bootstrapBrowserLogin } from "../functions/api/auth/dingtalk/bootstrap.js";
 import { onRequest as finishBrowserLogin } from "../functions/api/auth/dingtalk/callback.js";
+import { onRequest as completeBrowserLogin } from "../functions/api/auth/dingtalk/complete.js";
 import { onRequest as embeddedLogin } from "../functions/api/auth/dingtalk/embedded.js";
 import { onRequest as legacyEmbeddedLogin } from "../functions/api/dingtalk/login.js";
 import { onRequest as getCurrentSession } from "../functions/api/auth/session.js";
@@ -85,6 +87,26 @@ test("browser login start redirects to DingTalk with a protected callback state"
   assert.ok(location.searchParams.get("state"));
   assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
   assert.match(response.headers.get("set-cookie"), /HttpOnly/);
+});
+
+test("browser login bootstrap returns the authorize URL while keeping OAuth state HttpOnly", async () => {
+  const response = await bootstrapBrowserLogin({
+    request: new Request("https://flow.example.com/api/auth/dingtalk/bootstrap?returnTo=%2F%23dashboard"),
+    env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(body.ready, true);
+  const location = new URL(body.authorizeUrl);
+  assert.equal(location.origin, "https://login.dingtalk.com");
+  assert.equal(location.searchParams.get("client_id"), "app-key");
+  assert.equal(location.searchParams.get("redirect_uri"), "https://flow.example.com/api/auth/dingtalk/callback");
+  assert.ok(location.searchParams.get("state"));
+  assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
+  assert.match(response.headers.get("set-cookie"), /HttpOnly/);
+  assert.match(response.headers.get("set-cookie"), /pfs_oauth_return=/);
+  assert.equal(response.headers.get("cache-control"), "no-store");
 });
 
 test("browser login start uses the deployment client id without touching D1", async () => {
@@ -216,6 +238,69 @@ test("browser OAuth callback creates a server session for an enterprise employee
     assert.equal(body.authenticated, true);
     assert.equal(body.user.name, "周荣庆");
     assert.equal(body.user.department, "总经办");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("browser OAuth completion returns a same-origin destination and creates the server session", async () => {
+  const db = createAuthD1Mock();
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    const value = String(url);
+    if (value.includes("/v1.0/oauth2/userAccessToken")) {
+      return Response.json({ accessToken: "user-token", unionId: "union-1" });
+    }
+    if (value.includes("/v1.0/contact/users/me")) {
+      return Response.json({ unionId: "union-1", nick: "周荣庆", avatarUrl: "" });
+    }
+    if (value.includes("/gettoken")) {
+      return Response.json({ errcode: 0, access_token: "app-token" });
+    }
+    if (value.includes("/topapi/user/getbyunionid")) {
+      return Response.json({ errcode: 0, result: { userid: "user-1" } });
+    }
+    if (value.includes("/topapi/v2/user/get")) {
+      return Response.json({
+        errcode: 0,
+        result: {
+          userid: "user-1",
+          unionid: "union-1",
+          name: "周荣庆",
+          title: "总经理",
+          dept_id_list: [1],
+          role_list: [{ group_name: "系统角色", name: "主管理员" }],
+          active: true
+        }
+      });
+    }
+    if (value.includes("/topapi/v2/department/get")) {
+      return Response.json({ errcode: 0, result: { dept_id: 1, parent_id: 0, name: "总经办" } });
+    }
+    throw new Error(`unexpected fetch ${value}`);
+  };
+
+  try {
+    const response = await completeBrowserLogin({
+      request: new Request("https://flow.example.com/api/auth/dingtalk/complete?code=auth-code&state=expected", {
+        headers: {
+          cookie: "pfs_oauth_state=expected; pfs_oauth_return=%2F%23dashboard"
+        }
+      }),
+      env: {
+        PRODUCT_FLOW_DB: db,
+        DINGTALK_APP_KEY: "app-key",
+        DINGTALK_APP_SECRET: "app-secret",
+        DINGTALK_CORP_ID: "ding-company"
+      }
+    });
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.authenticated, true);
+    assert.equal(body.redirectTo, "https://flow.example.com/#dashboard");
+    assert.match(response.headers.get("set-cookie"), /pfs_session=/);
+    assert.equal(response.headers.get("cache-control"), "no-store");
   } finally {
     globalThis.fetch = originalFetch;
   }
