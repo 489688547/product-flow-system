@@ -16,7 +16,8 @@ install -m 600 deploy/aliyun/runtime.env.example /opt/product-flow/config/runtim
 chown -R 1000:1000 /opt/product-flow/data
 docker network inspect nginx-proxy-manage_default
 docker compose -f deploy/aliyun/docker-compose.yml config
-docker compose -f deploy/aliyun/docker-compose.yml build
+PFS_BUILD_COMMIT="$(git rev-parse HEAD)" \
+  docker compose -f deploy/aliyun/docker-compose.yml build
 ```
 
 若中国大陆 ECS 无法拉取 Docker Hub 镜像，可从官方镜像安装 Node.js，并使用

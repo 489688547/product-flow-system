@@ -65,7 +65,11 @@ npm run check:environment-capabilities
 npm run check:integrations
 npx wrangler pages functions build
 docker compose -f deploy/aliyun/docker-compose.yml config
-docker build -f Dockerfile.aliyun -t product-flow-system:aliyun .
+docker build \
+  --build-arg PFS_BUILD_COMMIT="$(git rev-parse HEAD)" \
+  -f Dockerfile.aliyun \
+  -t product-flow-system:aliyun \
+  .
 npm run lint
 npm run check:governance
 npm test

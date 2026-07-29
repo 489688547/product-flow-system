@@ -218,12 +218,18 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   const { load } = await import("js-yaml");
   const composeText = await readFile(resolve(root, "deploy/aliyun/docker-compose.yml"), "utf8");
   const dockerfile = await readFile(resolve(root, "Dockerfile.aliyun"), "utf8");
+  const dockerignore = await readFile(resolve(root, ".dockerignore"), "utf8");
   const compose = load(composeText);
   const service = compose.services["product-flow-app"];
 
   assert.equal(service.build.context, "../..");
   assert.equal(service.build.dockerfile, "Dockerfile.aliyun");
+  assert.equal(service.build.args.PFS_BUILD_COMMIT, "${PFS_BUILD_COMMIT:-}");
   assert.match(dockerfile, /FROM node:22-bookworm-slim AS build/);
+  assert.match(dockerfile, /ARG PFS_BUILD_COMMIT/);
+  assert.match(dockerfile, /apt-get install -y --no-install-recommends git/);
+  assert.match(dockerfile, /npm run build && rm -rf \.git/);
+  assert.doesNotMatch(dockerignore, /^\.git$/m);
   assert.match(dockerfile, /CMD \["node", "scripts\/aliyun\/start-runtime\.mjs"\]/);
   assert.deepEqual(service.ports, ["127.0.0.1:8080:8080"]);
   assert.deepEqual(service.networks, ["proxy"]);

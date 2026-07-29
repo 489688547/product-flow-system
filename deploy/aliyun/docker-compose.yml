@@ -4,6 +4,8 @@ services:
     build:
       context: ../..
       dockerfile: Dockerfile.aliyun
+      args:
+        PFS_BUILD_COMMIT: "${PFS_BUILD_COMMIT:-}"
     container_name: product-flow-app
     restart: unless-stopped
     stop_grace_period: 30s

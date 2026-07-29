@@ -213,7 +213,11 @@ Run:
 ```bash
 node --test tests/aliyun-ecs-deployment.test.mjs
 docker compose -f deploy/aliyun/docker-compose.yml config
-docker build -f Dockerfile.aliyun -t product-flow-system:aliyun .
+docker build \
+  --build-arg PFS_BUILD_COMMIT="$(git rev-parse HEAD)" \
+  -f Dockerfile.aliyun \
+  -t product-flow-system:aliyun \
+  .
 ```
 
 Expected: all pass.
