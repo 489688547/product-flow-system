@@ -45,6 +45,20 @@ async function readOauthBootstrap(url, fetchImpl) {
   return payload;
 }
 
+async function readOauthBootstrapWithRetry(url, fetchImpl, retryDelays) {
+  let lastError = null;
+  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
+    if (retryDelays[attempt] > 0) await wait(retryDelays[attempt]);
+    try {
+      return await readOauthBootstrap(url, fetchImpl);
+    } catch (error) {
+      lastError = error;
+      if (!error.retryable || attempt === retryDelays.length - 1) throw error;
+    }
+  }
+  throw lastError;
+}
+
 async function checkDingTalkOauth({
   url,
   fetchImpl,
@@ -64,22 +78,15 @@ async function checkDingTalkOauth({
     throw new Error(`钉钉 OAuth 静态入口未就绪（HTTP ${entry.status}）。`);
   }
 
-  let lastError = null;
-  for (let attempt = 0; attempt < retryDelays.length; attempt += 1) {
-    if (retryDelays[attempt] > 0) await wait(retryDelays[attempt]);
-    try {
-      await readOauthBootstrap(url, fetchImpl);
-      lastError = null;
-      break;
-    } catch (error) {
-      lastError = error;
-      if (!error.retryable || attempt === retryDelays.length - 1) throw error;
-    }
-  }
-  if (lastError) throw lastError;
+  await readOauthBootstrapWithRetry(url, fetchImpl, retryDelays);
 
   const count = Math.max(1, Math.min(50, Number(concurrency) || 20));
-  await Promise.all(Array.from({ length: count }, () => readOauthBootstrap(url, fetchImpl)));
+  await Promise.all(
+    Array.from(
+      { length: count },
+      () => readOauthBootstrapWithRetry(url, fetchImpl, retryDelays)
+    )
+  );
   return { entryStatus: entry.status, bootstrapConcurrency: count };
 }
 
