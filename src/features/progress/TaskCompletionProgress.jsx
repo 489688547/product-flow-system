@@ -1,3 +1,4 @@
+import { useCallback, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import {
   buildTaskAcceptancePatch,
@@ -5,6 +6,7 @@ import {
   taskAcceptanceBlockReason,
   taskCompletionProgress
 } from "../../domain/taskCompletion.js";
+import { FloatingMenu } from "../../ui/FloatingMenu.jsx";
 
 function unionIdOf(user = {}) {
   return String(user.unionid || user.unionId || "").trim();
@@ -18,6 +20,9 @@ export function TaskCompletionProgress({
   users = [],
   onChange
 }) {
+  const anchorRef = useRef(null);
+  const [open, setOpen] = useState(false);
+  const closePopover = useCallback(() => setOpen(false), []);
   const actorUnionId = unionIdOf(currentUser);
   const managerUnionId = String(product?.productManagerUnionId || "").trim();
   const isManager = Boolean(actorUnionId) && actorUnionId === managerUnionId;
@@ -34,13 +39,31 @@ export function TaskCompletionProgress({
   const executorIds = effectiveTaskExecutorIds(task, product);
 
   return (
-    <details className={`task-completion-progress ${task.done ? "is-done" : ""}`}>
-      <summary title="查看每位执行人的完成状态">
-        <span>{task?.dingTodo?.id ? "钉钉 · " : ""}{progress.completed}/{progress.total}</span>
+    <div className={`task-completion-progress ${task.done ? "is-done" : ""}`}>
+      <button
+        ref={anchorRef}
+        type="button"
+        className="task-completion-trigger"
+        title="查看每位执行人的完成状态"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        onClick={() => setOpen(value => !value)}
+      >
+        <span>{progress.completed}/{progress.total}</span>
         <small>{task.done ? "已完成" : progress.allExecutorsDone ? "待负责人验收" : "已完成"}</small>
         <ChevronDown size={14} aria-hidden="true" />
-      </summary>
-      <div className="task-completion-popover">
+      </button>
+      <FloatingMenu
+        anchorRef={anchorRef}
+        open={open}
+        onClose={closePopover}
+        className="task-completion-popover"
+        minWidth={330}
+        maxHeight={360}
+        role="dialog"
+        ariaLabel="执行人完成详情"
+        focusOnOpen
+      >
         {executorIds.map(unionId => (
           <div className="task-completion-person" key={unionId}>
             <input type="checkbox" checked={statuses.get(unionId) === true} readOnly aria-label={`${names.get(unionId) || unionId}钉钉完成状态`} />
@@ -62,7 +85,7 @@ export function TaskCompletionProgress({
           <span>{product?.productManager || "产品负责人"}（最终验收）</span>
           <small>{task.done ? "已完成" : isManager ? (blockReason || "可验收") : "仅负责人操作"}</small>
         </label>
-      </div>
-    </details>
+      </FloatingMenu>
+    </div>
   );
 }
