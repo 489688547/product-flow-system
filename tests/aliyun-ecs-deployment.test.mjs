@@ -53,6 +53,11 @@ test("Aliyun runtime rejects local executive bypass and unsafe paths", async () 
     () => validateRuntimeEnvironment({ ...valid, PFS_WRANGLER_PERSIST_DIR: "./data" }),
     /PFS_WRANGLER_PERSIST_DIR/
   );
+  assert.throws(
+    () => validateRuntimeEnvironment({ ...valid, PFS_RUNTIME_HOST: "118.178.236.192" }),
+    /PFS_RUNTIME_HOST/
+  );
+  assert.equal(validateRuntimeEnvironment(valid).host, "127.0.0.1");
   assert.equal(validateRuntimeEnvironment(valid).port, 8080);
 });
 
@@ -72,7 +77,7 @@ test("Aliyun runtime builds a non-interactive local Pages command without secret
   assert.deepEqual(args, [
     "pages", "dev", "/app/dist",
     "--config", "/app/deploy/aliyun/wrangler.toml",
-    "--ip", "0.0.0.0",
+    "--ip", "127.0.0.1",
     "--port", "8080",
     "--persist-to", "/var/lib/product-flow/wrangler",
     "--env-file", "/run/pfs/runtime.env",
@@ -181,8 +186,20 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.equal(compose.networks.proxy.external, true);
   assert.match(compose.networks.proxy.name, /nginx-proxy-manage_default/);
   assert.equal(service.restart, "unless-stopped");
+  assert.equal(service.environment.PFS_RUNTIME_HOST, "0.0.0.0");
   assert.ok(service.healthcheck);
   assert.equal(JSON.stringify(compose).includes("DINGTALK_APP_SECRET:"), false);
+});
+
+test("Aliyun native systemd service is loopback-only and resource bounded", async () => {
+  const unit = await readFile(resolve(root, "deploy/aliyun/product-flow.service"), "utf8");
+
+  assert.match(unit, /^User=pfs$/m);
+  assert.match(unit, /^Environment=PFS_RUNTIME_HOST=127\.0\.0\.1$/m);
+  assert.match(unit, /^MemoryMax=768M$/m);
+  assert.match(unit, /^NoNewPrivileges=true$/m);
+  assert.match(unit, /^ReadWritePaths=\/opt\/product-flow\/data$/m);
+  assert.doesNotMatch(unit, /DINGTALK_APP_SECRET/);
 });
 
 test("local D1 check requires both databases to contain tables", async () => {

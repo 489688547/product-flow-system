@@ -19,6 +19,18 @@ docker compose -f deploy/aliyun/docker-compose.yml config
 docker compose -f deploy/aliyun/docker-compose.yml build
 ```
 
+若中国大陆 ECS 无法拉取 Docker Hub 镜像，可从官方镜像安装 Node.js，并使用
+加固后的原生 systemd unit：
+
+```bash
+install -m 0644 deploy/aliyun/product-flow.service /etc/systemd/system/product-flow.service
+systemctl daemon-reload
+systemctl enable --now product-flow
+```
+
+原生服务仅监听 `127.0.0.1:8080`，以非特权 `pfs` 用户运行，内存上限为
+768 MiB，应用唯一可写目录是 `/opt/product-flow/data`。
+
 填入 `/opt/product-flow/config/runtime.env` 后，将已校验的 D1 导出目录上传到
 服务器，再执行：
 

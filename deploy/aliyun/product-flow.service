@@ -1,0 +1,32 @@
+[Unit]
+Description=Product Flow System Aliyun runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pfs
+Group=pfs
+WorkingDirectory=/opt/product-flow/app
+Environment=LOCAL_ONLINE_ACCOUNT_MODE=0
+Environment=PFS_RUNTIME_HOST=127.0.0.1
+Environment=PFS_RUNTIME_PORT=8080
+Environment=PFS_WRANGLER_PERSIST_DIR=/opt/product-flow/data/wrangler
+Environment=PFS_RUNTIME_ENV_FILE=/opt/product-flow/config/runtime.env
+Environment=PFS_WRANGLER_CONFIG=/opt/product-flow/app/deploy/aliyun/wrangler.toml
+Environment=PFS_ASSETS_DIR=/opt/product-flow/app/dist
+Environment=PFS_WRANGLER_BIN=/opt/product-flow/app/node_modules/.bin/wrangler
+ExecStart=/opt/node-v22.22.3/bin/node /opt/product-flow/app/scripts/aliyun/start-runtime.mjs
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+MemoryMax=768M
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/opt/product-flow/data
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

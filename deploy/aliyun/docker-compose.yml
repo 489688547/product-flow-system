@@ -15,6 +15,7 @@ services:
       - "${PFS_RUNTIME_ENV_FILE:-/opt/product-flow/config/runtime.env}"
     environment:
       LOCAL_ONLINE_ACCOUNT_MODE: "0"
+      PFS_RUNTIME_HOST: "0.0.0.0"
       PFS_RUNTIME_PORT: "8080"
       PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler"
       PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env"

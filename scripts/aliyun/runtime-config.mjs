@@ -1,6 +1,7 @@
 import { isAbsolute } from "node:path";
 
 const DEFAULTS = Object.freeze({
+  PFS_RUNTIME_HOST: "127.0.0.1",
   PFS_RUNTIME_PORT: "8080",
   PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler",
   PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env",
@@ -25,13 +26,21 @@ function runtimePort(value) {
   return port;
 }
 
+function runtimeHost(value) {
+  const host = String(value || DEFAULTS.PFS_RUNTIME_HOST).trim();
+  if (!["127.0.0.1", "0.0.0.0"].includes(host)) {
+    throw new Error("PFS_RUNTIME_HOST 只能是 127.0.0.1 或 0.0.0.0。");
+  }
+  return host;
+}
+
 export function validateRuntimeEnvironment(env = {}) {
   const localOnline = String(env.LOCAL_ONLINE_ACCOUNT_MODE || "").trim().toLowerCase();
   if (localOnline && !["0", "false"].includes(localOnline)) {
     throw new Error("公网 ECS 运行时禁止启用 LOCAL_ONLINE_ACCOUNT_MODE。");
   }
   return Object.freeze({
-    host: "0.0.0.0",
+    host: runtimeHost(env.PFS_RUNTIME_HOST),
     port: runtimePort(env.PFS_RUNTIME_PORT),
     persistDir: absolutePath(env, "PFS_WRANGLER_PERSIST_DIR"),
     envFile: absolutePath(env, "PFS_RUNTIME_ENV_FILE"),
