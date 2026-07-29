@@ -64,7 +64,11 @@ test("Kuaimai async exports are completed through the bundled download center ad
   // 只换 hash，控件先在、值后到；立刻断言就读到上一天的筛选，于是每次补历史日期
   // 都报 KUAIMAI_TIME_RANGE_NOT_APPLIED，只有当天第一次才通过。
   assert.match(executor, /async function waitForAppliedKuaimaiRange/);
-  assert.match(executor, /await waitForAppliedKuaimaiRange\(selectors, context\)/);
+  assert.match(executor, /await waitForAppliedKuaimaiRange\(selectors, context, context\.searchHash/);
+  // 等不到就重放一次 hash 导航：实测程序化写输入框不会更新 Vue 模型，
+  // 点查询提交的仍是旧筛选，导航是唯一可靠的施加手段。
+  assert.match(executor, /window\.location\.hash = searchHash/);
+  assert.match(executor, /KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS/);
   // 两个范围断言都是异步的，漏掉 await 会让断言被丢弃、失败也不抛，比不校验更危险。
   const salesAssertCalls = [...executor.matchAll(/(await\s+|function\s+)?assertAppliedKuaimaiSalesRange\(/g)];
   assert.ok(salesAssertCalls.length >= 3, "至少有一处声明和两处调用");

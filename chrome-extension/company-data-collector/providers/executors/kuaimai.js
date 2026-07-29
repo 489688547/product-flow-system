@@ -3,7 +3,8 @@ import * as kuaimai from "../kuaimai.js";
 
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS = 15_000;
-const KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS = 15_000;
+const KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS = 20_000;
+const KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS = 4_000;
 const KUAIMAI_DOWNLOAD_CENTER_TIMEOUT_MS = 180_000;
 const KUAIMAI_DOWNLOAD_CENTER_POLL_MS = 2_500;
 
@@ -55,10 +56,19 @@ function assertAppliedKuaimaiRange(selectors, context) {
 // 而复用时控件本来就在，只是还带着上一天的值——立刻断言就会读到旧值，
 // 于是每次补历史日期都报 KUAIMAI_TIME_RANGE_NOT_APPLIED，只有当天第一次
 // （新开标签页，控件和值一起出现）才通过。所以必须等值追上来，而不是立刻判定。
-async function waitForAppliedKuaimaiRange(selectors, context) {
-  const deadline = Date.now() + KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS;
+async function waitForAppliedKuaimaiRange(selectors, context, searchHash = "") {
+  const startedAt = Date.now();
+  const deadline = startedAt + KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS;
+  let replayed = false;
   do {
     if (appliedKuaimaiRangeMatches(selectors, context)) return;
+    // 光等不一定收敛：任务连着跑时页面偶尔就是不重新应用筛选。此时重放一次
+    // hash 导航——实测这是唯一可靠的施加手段（程序化写输入框不会更新 Vue 模型，
+    // 点查询提交的仍是旧筛选）。改 hash 是页内跳转，不会重载文档、不会中断本脚本。
+    if (!replayed && searchHash && Date.now() - startedAt >= KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS) {
+      replayed = true;
+      window.location.hash = searchHash;
+    }
     await wait(200);
   } while (Date.now() < deadline);
   assertAppliedKuaimaiRange(selectors, context);
@@ -593,13 +603,14 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       context.expectedTimeBasis = action.timeBasis;
       context.expectedStartTime = action.startValue;
       context.expectedEndTime = action.endValue;
-      await waitForAppliedKuaimaiRange(selectors, context);
+      context.searchHash = action.searchHash || "";
+      await waitForAppliedKuaimaiRange(selectors, context, context.searchHash);
       return;
     }
     case "wait_for_results":
       await wait(3000);
       // 结果加载完仍要复核一次：中途若被别的筛选覆盖，导出的就不是目标业务日。
-      await waitForAppliedKuaimaiRange(selectors, context);
+      await waitForAppliedKuaimaiRange(selectors, context, context.searchHash || "");
       return;
     case "export_orders": {
       await openKuaimaiExportDialog({

@@ -350,19 +350,24 @@ export function buildKuaimaiTaskUrl(baseUrl, task) {
     url.hash = "#/stock/warehouse_status/";
     return url.href;
   }
-  const startTime = Date.parse(`${businessDate}T00:00:00+08:00`);
-  const endTime = Date.parse(`${businessDate}T23:59:59+08:00`);
   const url = new URL(baseUrl);
+  url.hash = kuaimaiOrderSearchHash(businessDate);
+  return url.href;
+}
+
+// 订单页的筛选只认 hash 参数：实测程序化写输入框的值不会更新 Vue 模型，
+// 点查询提交的仍是旧筛选（写入 07-27 后 URL 里依然是上一次的时间戳）。
+// 因此「施加时间范围」必须靠导航，这也是执行器兜底重放时唯一可靠的手段。
+export function kuaimaiOrderSearchHash(businessDate) {
   const query = new URLSearchParams([
     ["pageNo", "1"],
     ["timeType", "created"],
-    ["startTime", String(startTime)],
-    ["endTime", String(endTime)],
+    ["startTime", String(Date.parse(`${businessDate}T00:00:00+08:00`))],
+    ["endTime", String(Date.parse(`${businessDate}T23:59:59+08:00`))],
     ["field", "created"],
     ["_emitFrom", "search"]
   ]);
-  url.hash = `#/trade/searchlist/?${query}`;
-  return url.href;
+  return `#/trade/searchlist/?${query}`;
 }
 
 export function buildKuaimaiActionPlan(task) {
@@ -417,7 +422,8 @@ export function buildKuaimaiActionPlan(task) {
       action: "verify_time_range",
       timeBasis: "下单时间",
       startValue: `${businessDate} 00:00:00`,
-      endValue: `${businessDate} 23:59:59`
+      endValue: `${businessDate} 23:59:59`,
+      searchHash: kuaimaiOrderSearchHash(businessDate)
     },
     { action: "wait_for_results" },
     { action: exportAction },
