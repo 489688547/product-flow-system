@@ -278,6 +278,27 @@ async function discoverDouyinStore() {
   return identity.storeId;
 }
 
+const SOURCE_STAMP_KEY = "extensionSourceStamp";
+
+// 改完扩展代码必须重载扩展才生效，否则一直跑旧代码。这一点极难察觉——表现为
+// 「改完没效果」，实际排查时只能靠失败耗时之类的间接线索才判断得出来，一天里
+// 因此反复要求人工去扩展页点「重新加载」。本机服务把扩展源码的最新修改时间
+// 随任务轮询带回来，这里发现变化就自行重载。
+async function reloadWhenSourceChanged(sourceStamp) {
+  const stamp = String(sourceStamp || "");
+  if (!stamp) return;
+  const stored = await chrome.storage.local.get(SOURCE_STAMP_KEY);
+  const known = String(stored[SOURCE_STAMP_KEY] || "");
+  if (!known) {
+    await chrome.storage.local.set({ [SOURCE_STAMP_KEY]: stamp });
+    return;
+  }
+  if (known === stamp) return;
+  // 先写入新指纹再重载，否则重启后又会看到「变化」而反复重载。
+  await chrome.storage.local.set({ [SOURCE_STAMP_KEY]: stamp });
+  chrome.runtime.reload();
+}
+
 async function nextTaskPath(storeId = "") {
   const params = new URLSearchParams();
   if (/^[-_a-zA-Z0-9]{1,128}$/.test(String(storeId || ""))) params.set("storeId", storeId);
@@ -479,12 +500,14 @@ async function poll() {
     if (profileStoreId) profileStoreId = await discoverDouyinStore();
     const response = await bridgeFetch(await nextTaskPath(profileStoreId));
     if (!response.ok) throw Object.assign(new Error("本机执行器连接失败。"), { code: `BRIDGE_HTTP_${response.status}` });
-    let { task } = await response.json();
+    let { task, sourceStamp } = await response.json();
     if (!task && !profileStoreId) {
       profileStoreId = await discoverDouyinStore();
       const refreshed = await bridgeFetch(await nextTaskPath(profileStoreId));
-      if (refreshed.ok) ({ task } = await refreshed.json());
+      if (refreshed.ok) ({ task, sourceStamp } = await refreshed.json());
     }
+    // 只在没有任务时重载：跑任务途中重启扩展会让这次采集半途而废。
+    if (!task) await reloadWhenSourceChanged(sourceStamp);
     if (task) await executeTask(task);
     await chrome.storage.local.set({ lastBridgeAt: new Date().toISOString(), lastBridgeError: null });
   } catch (error) {

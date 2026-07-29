@@ -77,13 +77,9 @@ async function waitForAppliedKuaimaiRange(selectors, context, searchHash = "") {
 }
 
 // 「导出」按钮在计算过程中始终可点，所以它不能当完成信号：实测点完「计算数据」
-// 第 2 秒时遮罩还在、表格还是 0 行，导出按钮已经可点。
-//
-// 但「遮罩消失且表格有行」单独也不够。点击后遮罩要过一会儿才挂上，在那之前页面上
-// 还留着上一个任务算好的表格——行数大于 0、又没有遮罩，会被当成本轮已完成，导出的
-// 就是上一天的数据。实测：目标 07-27 的导出里 07-26 占 24777 个单元格、07-27 只有
-// 5498 个，正是上一个任务（07-26）的结果；而一批任务里的第一个（页面无旧结果）
-// 总是成功。所以必须先确认这一轮计算确实开始了。
+// 第 2 秒时遮罩还在、表格还是 0 行，导出按钮已经可点。原先固定等 3.5 秒就导出，
+// 导出的是算到一半的中间结果——07-26 只落了 176 行 ¥8,498，正常是约 530 行 ¥13 万。
+// 真正的完成信号是遮罩消失且表格出现数据行。
 function kuaimaiSalesMasked() {
   return Array.from(document.querySelectorAll(".el-loading-mask"))
     .some(mask => mask.getClientRects().length > 0);
@@ -94,8 +90,12 @@ function kuaimaiSalesTableFingerprint() {
     .map(row => row.textContent.replace(/\s+/g, "")).join("|");
 }
 
-async function waitForKuaimaiSalesCalculation(previousFingerprint) {
-  // 先等遮罩出现，确认本轮计算已启动。
+// 「遮罩消失且表格有行」单独不够：点击「计算数据」后遮罩要过一会儿才挂上，在那之前
+// 页面上还留着上一个任务算好的表格——行数大于 0、又没有遮罩，会被当成本轮已完成，
+// 导出的就是上一天的数据。实测目标 07-27 的导出里 2026-07-26 占 24777 个单元格、
+// 07-27 只有 5498 个，正是上一个任务的结果；而一批任务里的第一个（页面无旧结果）
+// 总是成功。所以必须先确认本轮计算确实启动了。
+async function waitForKuaimaiSalesCalculation(previousFingerprint = "") {
   const startDeadline = Date.now() + KUAIMAI_SALES_CALCULATE_START_TIMEOUT_MS;
   let started = false;
   while (Date.now() < startDeadline) {
@@ -109,9 +109,9 @@ async function waitForKuaimaiSalesCalculation(previousFingerprint) {
   let settled = 0;
   do {
     const rows = document.querySelectorAll("tbody tr").length;
-    const fingerprint = kuaimaiSalesTableFingerprint();
-    // 遮罩没出现过时，只认「表格内容确实换了」，绝不拿旧结果充数。
-    const fresh = started || (previousFingerprint !== "" && fingerprint !== previousFingerprint);
+    // 遮罩始终没出现时，只认「表格内容确实换过」，绝不拿旧结果充数。
+    const fresh = started
+      || (previousFingerprint !== "" && kuaimaiSalesTableFingerprint() !== previousFingerprint);
     if (!kuaimaiSalesMasked() && rows > 0 && fresh) {
       settled += 1;
       // 连续两次都稳定才收工，避免正好命中两段计算之间的空档。
@@ -126,6 +126,246 @@ async function waitForKuaimaiSalesCalculation(previousFingerprint) {
   });
 }
 
+async function openKuaimaiExportDialog({
+  label,
+  missingCode,
+  selectors,
+  matchesText
+}) {
+  const deadline = Date.now() + 5000;
+  do {
+    const confirmation = exactTextElement(
+      selectors.exportConfirmButton,
+      "立即导出",
+      matchesText
+    );
+    if (confirmation) return;
+    const link = exactTextElement(selectors.exportLink, label, matchesText);
+    if (!link) throw Object.assign(new Error("导出入口不可用。"), { code: missingCode });
+    link.click();
+    await wait(500);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("立即导出按钮不可用。"), {
+    code: "KUAIMAI_EXPORT_CONFIRM_MISSING"
+  });
+}
+
+function normalizeControlLabel(value) {
+  return String(value || "").replace(/\s+/g, " ").trim();
+}
+
+function findDialogCheckbox(dialog, field) {
+  const expected = normalizeControlLabel(field);
+  const labels = Array.from(dialog.querySelectorAll("label"));
+  const label = labels.find(candidate => normalizeControlLabel(candidate.textContent) === expected);
+  if (label) {
+    const nested = label.querySelector("input[type='checkbox']");
+    if (nested) return { input: nested, control: label };
+    const targetId = label.getAttribute("for");
+    if (targetId) {
+      const linked = dialog.querySelector(`#${CSS.escape(targetId)}`);
+      if (linked?.matches("input[type='checkbox']")) return { input: linked, control: label };
+    }
+  }
+  const input = Array.from(dialog.querySelectorAll("input[type='checkbox']")).find(candidate =>
+    normalizeControlLabel(candidate.getAttribute("aria-label")) === expected
+  );
+  return input ? { input, control: input } : null;
+}
+
+async function selectKuaimaiOrderExportFields(fields, selectors, matchesText) {
+  const confirmation = exactTextElement(selectors.exportConfirmButton, "立即导出", matchesText);
+  const dialog = confirmation?.closest(selectors.exportDialog);
+  if (!confirmation || !dialog) {
+    throw Object.assign(new Error("订单导出配置弹窗不可用。"), {
+      code: "KUAIMAI_EXPORT_DIALOG_MISSING"
+    });
+  }
+  for (const field of fields || []) {
+    const checkbox = findDialogCheckbox(dialog, field);
+    if (!checkbox) {
+      throw Object.assign(new Error("订单导出字段不可用。"), {
+        code: "KUAIMAI_EXPORT_FIELD_MISSING"
+      });
+    }
+    if (!checkbox.input.checked) {
+      checkbox.control.click();
+      await wait(20);
+    }
+    if (!checkbox.input.checked) {
+      throw Object.assign(new Error("订单导出字段未生效。"), {
+        code: "KUAIMAI_EXPORT_FIELD_NOT_SELECTED"
+      });
+    }
+  }
+}
+
+async function pageProbe(selectors, matchesText) {
+  const bodyText = String(document.body?.innerText || "");
+  const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
+  return {
+    url: location.href,
+    markers: {
+      loginPage: /\/login(?:[/?#]|$)/i.test(location.pathname) || Boolean(document.querySelector("input[type='password']")),
+      humanVerification: verificationTerms.some(term => bodyText.includes(term)),
+      timeBasis: Boolean(document.querySelector(selectors.timeBasis)),
+      startTime: Boolean(document.querySelector(selectors.startTime)),
+      endTime: Boolean(document.querySelector(selectors.endTime)),
+      queryButton: Boolean(exactTextElement(selectors.queryButton, "查询", matchesText)),
+      exportOrders: Boolean(exactTextElement(selectors.exportLink, "导出订单", matchesText)),
+      exportOrderItems: Boolean(exactTextElement(selectors.exportLink, "导出订单明细", matchesText))
+    }
+  };
+}
+
+async function waitForKuaimaiOrderPage(provider, selectors, matchesText) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  let classification;
+  do {
+    classification = provider.classifyPage(await pageProbe(selectors, matchesText));
+    if (["ready", "waiting_login", "waiting_human", "blocked_origin"].includes(classification.state)) {
+      return classification;
+    }
+    await wait(250);
+  } while (Date.now() < deadline);
+  return classification;
+}
+
+async function salesPageProbe(provider, selectors, matchesText) {
+  const bodyText = String(document.body?.innerText || "");
+  const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
+  const base = provider.classifyPage({
+    url: location.href,
+    markers: {
+      loginPage: /\/login(?:[/?#]|$)/i.test(location.pathname) || Boolean(document.querySelector("input[type='password']")),
+      humanVerification: verificationTerms.some(term => bodyText.includes(term))
+    }
+  });
+  if (["waiting_login", "waiting_human", "blocked_origin"].includes(base.state)) return base;
+  const ready = Boolean(document.querySelector(selectors.timeBasis))
+    && Boolean(document.querySelector(selectors.startDate))
+    && Boolean(document.querySelector(selectors.endDate))
+    && Boolean(exactTextElement(selectors.calculateButton, "计算数据", matchesText))
+    && Boolean(exactTextElement(selectors.exportButton, "导出", matchesText))
+    && Boolean(exactTextElement(selectors.reportTab, "按订单商品明细", matchesText));
+  return ready
+    ? { state: "ready" }
+    : { state: "schema_changed", errorCode: "KUAIMAI_SALES_PAGE_SCHEMA_CHANGED" };
+}
+
+async function waitForKuaimaiSalesPage(provider, selectors, matchesText) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  let classification;
+  do {
+    classification = await salesPageProbe(provider, selectors, matchesText);
+    if (["ready", "waiting_login", "waiting_human", "blocked_origin"].includes(classification.state)) {
+      return classification;
+    }
+    await wait(250);
+  } while (Date.now() < deadline);
+  return classification;
+}
+
+function isKuaimaiProductResource(resourceType) {
+  return ["products", "product_kits", "product_combinations"].includes(resourceType);
+}
+
+async function productPageProbe(provider, selectors, matchesText) {
+  const bodyText = String(document.body?.innerText || "");
+  const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
+  return provider.classifyProductPage({
+    url: location.href,
+    markers: {
+      loginPage: /\/login(?:[/?#]|$)/i.test(location.pathname) || Boolean(document.querySelector("input[type='password']")),
+      humanVerification: verificationTerms.some(term => bodyText.includes(term)),
+      productCode: Boolean(document.querySelector(selectors.productCode)),
+      queryButton: Boolean(exactTextElement(selectors.queryButton, "查询", matchesText)),
+      exportMenu: Boolean(exactTextElement(selectors.exportMenu, "导出", matchesText)),
+      exportOption: Array.from(document.querySelectorAll(selectors.exportOption))
+        .some(element => ["导出普通商品", "导出套件", "导出组合装"].some(label => matchesText(element.textContent, label)))
+    }
+  });
+}
+
+async function waitForKuaimaiProductPage(provider, selectors, matchesText) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  let classification;
+  do {
+    classification = await productPageProbe(provider, selectors, matchesText);
+    if (["ready", "waiting_login", "waiting_human", "blocked_origin"].includes(classification.state)) {
+      return classification;
+    }
+    await wait(250);
+  } while (Date.now() < deadline);
+  return classification;
+}
+
+async function inventoryPageProbe(provider, selectors, matchesText) {
+  const bodyText = String(document.body?.innerText || "");
+  const verificationTerms = ["验证码", "安全验证", "拖动滑块", "扫码验证", "设备验证"];
+  return provider.classifyInventoryPage({
+    url: location.href,
+    markers: {
+      loginPage: /\/login(?:[/?#]|$)/i.test(location.pathname)
+        || Boolean(document.querySelector("input[type='password']"))
+        || bodyText.includes("登录超时"),
+      humanVerification: verificationTerms.some(term => bodyText.includes(term)),
+      queryButton: Boolean(exactTextElement(selectors.queryButton, "查询", matchesText)),
+      exportControl: Array.from(document.querySelectorAll(selectors.exportControl))
+        .some(element => provider.matchesInventoryExportLabel(element.textContent))
+    }
+  });
+}
+
+async function waitForKuaimaiInventoryPage(provider, selectors, matchesText) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  let classification;
+  do {
+    classification = await inventoryPageProbe(provider, selectors, matchesText);
+    if (["ready", "waiting_login", "waiting_human", "blocked_origin"].includes(classification.state)) {
+      return classification;
+    }
+    await wait(250);
+  } while (Date.now() < deadline);
+  return classification;
+}
+
+async function visibleProductDialog(selectors, predicate, timeoutCode) {
+  const deadline = Date.now() + KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS;
+  do {
+    const dialog = Array.from(document.querySelectorAll(selectors.exportDialog))
+      .find(element => element.getClientRects().length > 0 && predicate(element));
+    if (dialog) return dialog;
+    await wait(250);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("商品导出弹窗不可用。"), { code: timeoutCode });
+}
+
+function productDialogConfirm(dialog, selectors, matchesText, errorCode) {
+  const button = Array.from(dialog.querySelectorAll(selectors.exportDialogButton))
+    .find(element => matchesText(element.textContent, "确定") && element.getClientRects().length > 0);
+  if (!button) throw Object.assign(new Error("商品导出确认按钮不可用。"), { code: errorCode });
+  return button;
+}
+
+function setNativeInputValue(input, value) {
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  descriptor?.set?.call(input, value);
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  input.dispatchEvent(new Event("blur", { bubbles: true }));
+}
+
+// 销售报表的日期框是 Element UI 只读日期选择器（readOnly=true），写 value 只改 DOM、
+// 不更新 Vue 模型：实测把两端都写成 2026-07-26 后，输入框显示对了，计算请求带的却
+// 仍是页面原范围 2026-07-22 ~ 2026-07-28。导出因此是七天聚合而不是目标业务日，
+// 落库时被判 WEB_COLLECTION_BUSINESS_DATE_MISMATCH，或落成残缺数据。
+// 唯一可靠的方式是打开日期面板点日期格。
+// 两个日期框的浮层都常驻 DOM，Element UI 只是把它们移出视野，getClientRects() 一直
+// 非空，所以「当前可见的那个面板」和「新出现的那个面板」都无法区分它们——实测按这两
+// 种判据去点，结束日期会被点到开始日期的面板上，表现为开始生效、结束仍是旧值。
+// 可靠的关联是位置：每个浮层就贴在自己输入框的正下方（实测开始框 top=149 对应面板
+// top=187，结束框 top=181 对应面板 top=219）。
 function kuaimaiPickerPanelFor(input) {
   const box = input.getBoundingClientRect();
   const panels = Array.from(document.querySelectorAll(".el-picker-panel.el-date-picker"))

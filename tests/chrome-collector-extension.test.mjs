@@ -69,6 +69,28 @@ test("Kuaimai async exports are completed through the bundled download center ad
   // 点查询提交的仍是旧筛选，导航是唯一可靠的施加手段。
   assert.match(executor, /window\.location\.hash = searchHash/);
   assert.match(executor, /KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS/);
+
+  // 执行器的关键函数必须都在。语法检查发现不了「函数被误删」——调用是运行时解析的，
+  // 一次范围过宽的替换删掉了七个函数，node --check 照样通过，直到线上报
+  // EXTENSION_TASK_FAILED 才暴露。
+  for (const name of [
+    "openKuaimaiExportDialog",
+    "selectKuaimaiOrderExportFields",
+    "findDialogCheckbox",
+    "normalizeControlLabel",
+    "pageProbe",
+    "waitForKuaimaiOrderPage",
+    "salesPageProbe",
+    "readDownloadCenterRows",
+    "downloadFromKuaimaiCenter",
+    "prepareKuaimaiSalesReport",
+    "pickKuaimaiDate",
+    "kuaimaiPickerPanelFor",
+    "waitForKuaimaiSalesCalculation",
+    "waitForAppliedKuaimaiRange"
+  ]) {
+    assert.match(executor, new RegExp(`function ${name}\\(`), `执行器缺少函数 ${name}`);
+  }
   // 两个范围断言都是异步的，漏掉 await 会让断言被丢弃、失败也不抛，比不校验更危险。
   const salesAssertCalls = [...executor.matchAll(/(await\s+|function\s+)?assertAppliedKuaimaiSalesRange\(/g)];
   assert.ok(salesAssertCalls.length >= 3, "至少有一处声明和两处调用");
@@ -475,6 +497,11 @@ test("service worker hardens tab ownership, keep-alive and download matching", a
 
   // 专用标签页登记在 storage，绝不扫描或导航员工标签页；
   // 抖音店铺发现只允许查询抖音域名标签页，不得触碰快麦员工标签页。
+  // 扩展要能自愈：源码变了就自行重载，否则一直跑旧代码，且只有人工去扩展页点
+  // 「重新加载」才能恢复。必须只在空闲时重载，跑任务途中重启会让采集半途而废。
+  assert.match(serviceWorker, /chrome\.runtime\.reload\(\)/);
+  assert.match(serviceWorker, /if \(!task\) await reloadWhenSourceChanged/);
+
   assert.match(serviceWorker, /collectorTabId/);
   assert.match(serviceWorker, /chrome\.tabs\.create\(\{ url: targetUrl, active: false \}\)/);
   assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query\([^)]*superboss/);
