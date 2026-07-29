@@ -12,7 +12,7 @@ D1 查询无法阻止共享 Worker 继续增长，也不能保护扫码返回的
 - 静态页调用 `/bootstrap` 与 `/complete` JSON 路由；浏览器只对明确的基础设施前置失败进行有限重试。
 - state、returnTo 与 session Cookie 全部继续由服务端生成，保持 HttpOnly。
 - 保留旧 start/callback Function 作为本地开发与快速回滚兼容，不作为生产公开入口。
-- 生产就绪检查在要求 `dingtalk` 时验证静态入口、一次冷启动恢复和默认 20 并发 bootstrap。
+- 生产就绪检查在要求 `dingtalk` 时验证静态入口、一次冷启动恢复和默认 20 并发 bootstrap；每个并发客户端复用浏览器相同的有限退避重试，避免把可自动恢复的 Cloudflare 1102 误报为登录失败。
 
 ## 后果
 
