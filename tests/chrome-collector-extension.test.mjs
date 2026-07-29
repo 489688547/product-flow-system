@@ -485,3 +485,38 @@ test("popup shows the business date and stage without inventing a queue total", 
   // 扩展一次只领一个任务，不知道服务端队列里还有多少，显示队列总数会误导。
   assert.doesNotMatch(popup, /queueRemaining|队列还剩|队列中 /);
 });
+
+test("douyin executor opens the custom date panel before looking for date inputs", async () => {
+  const executor = await readFile(new URL("providers/executors/douyin.js", extensionRoot), "utf8");
+  // 生产实测：抖音罗盘的开始/结束日期输入框要点开「自定义」后才渲染。
+  // 旧实现直接在未打开的面板里找输入框，因此 15 次失败全部来自这里。
+  assert.match(executor, /DATE_PANEL_TRIGGER_LABELS/);
+  assert.match(executor, /aurora-dorami-date-picker-picker-main/);
+  assert.match(executor, /openCustomDatePanel/);
+  // 打开面板必须发生在取输入框之前。
+  // 取输入框的那行必须排在打开面板之后（常量定义不算）。
+  const openIndex = executor.indexOf("await openCustomDatePanel");
+  const queryIndex = executor.indexOf("querySelectorAll(DATE_INPUT_SELECTOR)");
+  assert.ok(openIndex > 0 && queryIndex > openIndex, "必须先打开面板再找输入框");
+});
+
+test("douyin executor no longer clicks bare yesterday labels outside the date picker", async () => {
+  const executor = await readFile(new URL("providers/executors/douyin.js", extensionRoot), "utf8");
+  // 页面上有 7 个「昨日」，全是数据卡的对比标签（ecom-dorami-data-card-extra-item-label），
+  // 点它们不会切换日期。预设匹配必须限定在日期选择器内。
+  assert.match(executor, /DATE_PICKER_SCOPE/);
+  assert.equal(
+    /exactVisibleText\(\s*YESTERDAY_PRESET_LABELS,\s*"\[role='tab'\], button, \[role='button'\], label, span"/.test(executor),
+    false,
+    "不得再用全页范围匹配「昨日」"
+  );
+});
+
+test("douyin executor writes both start and end date inputs", async () => {
+  const executor = await readFile(new URL("providers/executors/douyin.js", extensionRoot), "utf8");
+  assert.match(executor, /开始日期/);
+  assert.match(executor, /结束日期/);
+  // 面板内没有确认按钮，填完即生效；不得去点并不存在的「确定」。
+  assert.equal(/exactVisibleText\(\s*\[?"确定"/.test(executor), false);
+  assert.match(executor, /填完即生效/);
+});
