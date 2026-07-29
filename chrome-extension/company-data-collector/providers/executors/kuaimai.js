@@ -335,26 +335,42 @@ function setNativeInputValue(input, value) {
 // 仍是页面原范围 2026-07-22 ~ 2026-07-28。导出因此是七天聚合而不是目标业务日，
 // 落库时被判 WEB_COLLECTION_BUSINESS_DATE_MISMATCH，或落成残缺数据。
 // 唯一可靠的方式是打开日期面板点日期格。
-async function closeKuaimaiPickers() {
-  document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, view: window }));
-  document.body.click();
-  await wait(400);
+// 两个日期框的浮层都常驻 DOM，Element UI 只是把它们移出视野，getClientRects() 一直
+// 非空，所以「当前可见的那个面板」和「新出现的那个面板」都无法区分它们——实测按这两
+// 种判据去点，结束日期会被点到开始日期的面板上，表现为开始生效、结束仍是旧值。
+// 可靠的关联是位置：每个浮层就贴在自己输入框的正下方（实测开始框 top=149 对应面板
+// top=187，结束框 top=181 对应面板 top=219）。
+function kuaimaiPickerPanelFor(input) {
+  const box = input.getBoundingClientRect();
+  const panels = Array.from(document.querySelectorAll(".el-picker-panel.el-date-picker"))
+    .filter(panel => panel.getClientRects().length > 0);
+  let best = null;
+  let bestGap = Infinity;
+  for (const panel of panels) {
+    const rect = panel.getBoundingClientRect();
+    const gap = Math.abs(rect.top - box.bottom) + Math.abs(rect.left - box.left);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = panel;
+    }
+  }
+  return bestGap <= 80 ? best : null;
 }
 
+// 销售报表的日期框是 Element UI 只读日期选择器（readOnly=true），写 value 只改 DOM、
+// 不更新 Vue 模型：实测把两端都写成 2026-07-26 后，输入框显示对了，计算请求带的却
+// 仍是页面原范围 2026-07-22 ~ 2026-07-28。导出因此是七天聚合而不是目标业务日。
+// 唯一可靠的方式是打开日期面板点日期格。
 async function pickKuaimaiDate(input, businessDate) {
   const day = String(Number(String(businessDate).slice(8, 10)));
-  // 先关掉上一个面板：两个日期框各有自己的浮层，残留的旧面板会让点击落到错的那个，
-  // 表现为只有开始日期生效、结束日期仍是旧值。
-  await closeKuaimaiPickers();
   for (const type of ["mousedown", "mouseup", "click", "focus"]) {
     input.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
   }
   input.focus();
+  await wait(400);
   const deadline = Date.now() + 5000;
   do {
-    const panels = Array.from(document.querySelectorAll(".el-picker-panel.el-date-picker"))
-      .filter(panel => panel.getClientRects().length > 0);
-    const panel = panels[panels.length - 1];
+    const panel = kuaimaiPickerPanelFor(input);
     const cell = panel && Array.from(panel.querySelectorAll("td")).find(td =>
       td.getClientRects().length > 0
       && !/prev-month|next-month|disabled/.test(td.className)
@@ -363,7 +379,6 @@ async function pickKuaimaiDate(input, businessDate) {
     if (cell) {
       cell.click();
       await wait(500);
-      await closeKuaimaiPickers();
       if (input.value === businessDate) return;
       break;
     }
@@ -400,8 +415,9 @@ async function prepareKuaimaiSalesReport(action, selectors, matchesText, context
   }
   const startDate = findRequired(selectors.startDate, "KUAIMAI_SALES_START_DATE_MISSING");
   const endDate = findRequired(selectors.endDate, "KUAIMAI_SALES_END_DATE_MISSING");
-  if (startDate.value !== action.businessDate) await pickKuaimaiDate(startDate, action.businessDate);
+  // 先收窄结束端：若先把开始日期挪到更早的目标日，区间会短暂跨越更大范围。
   if (endDate.value !== action.businessDate) await pickKuaimaiDate(endDate, action.businessDate);
+  if (startDate.value !== action.businessDate) await pickKuaimaiDate(startDate, action.businessDate);
   await wait(250);
   const reportTab = findRequiredTextElement(
     selectors.reportTab,
