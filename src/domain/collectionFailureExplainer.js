@@ -78,6 +78,12 @@ const CATALOG = Object.freeze({
     action: "重试无效。请在快麦导出设置中确认所需列，或反馈以更新采集适配。",
     retryable: false
   },
+  KUAIMAI_SALES_CALCULATE_TIMEOUT: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "销售报表一直没算完，本次没有导出，避免落下半天的数据。",
+    action: "多为当天数据量大或快麦繁忙，稍后重试即可；连续多次超时请反馈。",
+    retryable: true
+  },
   KUAIMAI_API_TIME_TYPE_INVALID: {
     kind: COLLECTION_FAILURE_KIND.schemaChanged,
     summary: "快麦取数口径不是订单创建时间，本次没有发起请求。",

@@ -5,6 +5,7 @@ const wait = milliseconds => new Promise(resolve => setTimeout(resolve, millisec
 const KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS = 15_000;
 const KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS = 20_000;
 const KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS = 4_000;
+const KUAIMAI_SALES_CALCULATE_TIMEOUT_MS = 180_000;
 const KUAIMAI_DOWNLOAD_CENTER_TIMEOUT_MS = 180_000;
 const KUAIMAI_DOWNLOAD_CENTER_POLL_MS = 2_500;
 
@@ -72,6 +73,31 @@ async function waitForAppliedKuaimaiRange(selectors, context, searchHash = "") {
     await wait(200);
   } while (Date.now() < deadline);
   assertAppliedKuaimaiRange(selectors, context);
+}
+
+// 「导出」按钮在计算过程中始终可点，所以它不能当完成信号：实测点完「计算数据」
+// 第 2 秒时遮罩还在、表格还是 0 行，导出按钮已经可点。原先固定等 3.5 秒就导出，
+// 导出的是算到一半的中间结果——07-26 只落了 176 行 ¥8,498，正常是约 530 行 ¥13 万。
+// 真正的完成信号是遮罩消失且表格出现数据行。
+async function waitForKuaimaiSalesCalculation() {
+  const deadline = Date.now() + KUAIMAI_SALES_CALCULATE_TIMEOUT_MS;
+  let settled = 0;
+  do {
+    const masked = Array.from(document.querySelectorAll(".el-loading-mask"))
+      .some(mask => mask.getClientRects().length > 0);
+    const rows = document.querySelectorAll("tbody tr").length;
+    // 连续两次都稳定才收工，避免正好命中两段计算之间的空档。
+    if (!masked && rows > 0) {
+      settled += 1;
+      if (settled >= 2) return;
+    } else {
+      settled = 0;
+    }
+    await wait(500);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("销售报表计算未在预期时间内完成。"), {
+    code: "KUAIMAI_SALES_CALCULATE_TIMEOUT"
+  });
 }
 
 async function openKuaimaiExportDialog({
@@ -572,7 +598,7 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
         "KUAIMAI_SALES_CALCULATE_MISSING"
       );
       button.click();
-      await wait(3500);
+      await waitForKuaimaiSalesCalculation();
       await assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
       return;
     }
