@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
 import {
   buildPagesDevArgs,
+  prepareRuntimeWorkspace,
   runtimeWorkingDirectory,
   validateRuntimeEnvironment
 } from "./runtime-config.mjs";
@@ -17,8 +18,10 @@ export function startAliyunRuntime(env = process.env, spawnImpl = spawn) {
   requirePath(config.envFile, "运行时环境文件");
   requirePath(config.configPath, "Wrangler 配置");
   requirePath(config.assetsDir, "静态资源目录");
+  requirePath(config.functionsDir, "Pages Functions 目录");
   requirePath(config.wranglerBin, "Wrangler 可执行文件");
   mkdirSync(config.persistDir, { recursive: true, mode: 0o700 });
+  prepareRuntimeWorkspace(config);
 
   const child = spawnImpl(config.wranglerBin, buildPagesDevArgs(config), {
     cwd: runtimeWorkingDirectory(config),

@@ -1,4 +1,13 @@
-import { dirname, isAbsolute } from "node:path";
+import {
+  chmodSync,
+  copyFileSync,
+  lstatSync,
+  mkdirSync,
+  readlinkSync,
+  symlinkSync,
+  unlinkSync
+} from "node:fs";
+import { isAbsolute, join } from "node:path";
 
 const DEFAULTS = Object.freeze({
   PFS_RUNTIME_HOST: "127.0.0.1",
@@ -6,7 +15,9 @@ const DEFAULTS = Object.freeze({
   PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler",
   PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env",
   PFS_WRANGLER_CONFIG: "/app/deploy/aliyun/wrangler.toml",
+  PFS_RUNTIME_WORK_DIR: "/var/lib/product-flow/runtime",
   PFS_ASSETS_DIR: "/app/dist",
+  PFS_FUNCTIONS_DIR: "/app/functions",
   PFS_WRANGLER_BIN: "/app/node_modules/.bin/wrangler"
 });
 
@@ -45,14 +56,16 @@ export function validateRuntimeEnvironment(env = {}) {
     persistDir: absolutePath(env, "PFS_WRANGLER_PERSIST_DIR"),
     envFile: absolutePath(env, "PFS_RUNTIME_ENV_FILE"),
     configPath: absolutePath(env, "PFS_WRANGLER_CONFIG"),
+    workDir: absolutePath(env, "PFS_RUNTIME_WORK_DIR"),
     assetsDir: absolutePath(env, "PFS_ASSETS_DIR"),
+    functionsDir: absolutePath(env, "PFS_FUNCTIONS_DIR"),
     wranglerBin: absolutePath(env, "PFS_WRANGLER_BIN")
   });
 }
 
 export function buildPagesDevArgs(config) {
   return [
-    "pages", "dev", config.assetsDir,
+    "pages", "dev", join(config.workDir, "dist"),
     "--ip", config.host,
     "--port", String(config.port),
     "--persist-to", config.persistDir,
@@ -63,5 +76,27 @@ export function buildPagesDevArgs(config) {
 }
 
 export function runtimeWorkingDirectory(config) {
-  return dirname(config.configPath);
+  return config.workDir;
+}
+
+function ensureDirectorySymlink(linkPath, targetPath) {
+  try {
+    const stat = lstatSync(linkPath);
+    if (!stat.isSymbolicLink()) {
+      throw new Error(`运行时路径必须是符号链接：${linkPath}`);
+    }
+    if (readlinkSync(linkPath) === targetPath) return;
+    unlinkSync(linkPath);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+  symlinkSync(targetPath, linkPath, "dir");
+}
+
+export function prepareRuntimeWorkspace(config) {
+  mkdirSync(config.workDir, { recursive: true, mode: 0o700 });
+  copyFileSync(config.configPath, join(config.workDir, "wrangler.toml"));
+  chmodSync(join(config.workDir, "wrangler.toml"), 0o600);
+  ensureDirectorySymlink(join(config.workDir, "dist"), config.assetsDir);
+  ensureDirectorySymlink(join(config.workDir, "functions"), config.functionsDir);
 }
