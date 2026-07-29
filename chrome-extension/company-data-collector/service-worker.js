@@ -9,6 +9,7 @@ const POLL_ALARM = "company-data-collector-poll";
 const ACTIVE_JOB_KEY = "activeJob";
 // 插件自己创建的专用采集标签页，绝不复用员工正在操作的标签页。
 const COLLECTOR_TAB_KEY = "collectorTabId";
+const COLLECTOR_WINDOW_KEY = "collectorWindowId";
 const TAB_LOAD_TIMEOUT_MS = 30000;
 const CONTENT_SCRIPT_PROBE_TIMEOUT_MS = 10000;
 const CONTENT_SCRIPT_AUTO_INJECTION_TIMEOUT_MS = 1500;
@@ -174,15 +175,48 @@ async function findCollectorTab() {
   }
 }
 
+// 采集页必须独占一个窗口，不能是员工窗口里的后台标签页。后台标签页会被 Chrome
+// 降级渲染，Element UI 的日期浮层定位不出来，选日期直接失败；而且它和员工（或
+// 调试）共用窗口时会被随手导航走，任务跑到一半筛选就被重置。独占窗口里它是活动
+// 标签页，正常渲染，也没人会碰它。窗口不抢焦点。
+async function findCollectorWindow() {
+  const stored = await chrome.storage.local.get(COLLECTOR_WINDOW_KEY);
+  const windowId = Number(stored[COLLECTOR_WINDOW_KEY]);
+  if (!Number.isInteger(windowId)) return null;
+  try {
+    return await chrome.windows.get(windowId, { populate: true });
+  } catch {
+    await chrome.storage.local.remove(COLLECTOR_WINDOW_KEY);
+    return null;
+  }
+}
+
+async function createCollectorWindow(targetUrl) {
+  const created = await chrome.windows.create({
+    url: targetUrl,
+    focused: false,
+    type: "normal",
+    width: 1440,
+    height: 900
+  });
+  const tab = created?.tabs?.[0];
+  if (!tab) throw Object.assign(new Error("采集窗口创建失败。"), { code: "EXTENSION_COLLECTOR_WINDOW_FAILED" });
+  await chrome.storage.local.set({
+    [COLLECTOR_WINDOW_KEY]: created.id,
+    [COLLECTOR_TAB_KEY]: tab.id
+  });
+  return tab;
+}
+
 export async function ensureProviderTab(resource, targetUrl) {
-  // 只复用插件自己创建并登记的专用标签页；没有专用标签页时永远后台新开，
+  // 只复用插件自己创建并登记的专用标签页；没有专用标签页时永远新开独立窗口，
   // 绝不导航复用员工正在使用的快麦页面。
   let tab = await findCollectorTab();
+  if (tab && !(await findCollectorWindow())) tab = null;
   if (!tab) {
-    tab = await chrome.tabs.create({ url: targetUrl, active: false });
-    await chrome.storage.local.set({ [COLLECTOR_TAB_KEY]: tab.id });
+    tab = await createCollectorWindow(targetUrl);
   } else if (tab.url !== targetUrl) {
-    tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
+    tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: true });
   }
   tab = await waitForTabComplete(tab.id);
   if (!await waitForContentScript(tab.id, 500)) {
