@@ -78,6 +78,12 @@ const CATALOG = Object.freeze({
     action: "重试无效。请在快麦导出设置中确认所需列，或反馈以更新采集适配。",
     retryable: false
   },
+  KUAIMAI_SALES_DATE_PICK_FAILED: {
+    kind: COLLECTION_FAILURE_KIND.schemaChanged,
+    summary: "销售报表的日期选择器打不开或选不中目标日期，本次没有导出。",
+    action: "重试无效，多为页面改版所致，需要更新采集适配。",
+    retryable: false
+  },
   KUAIMAI_SALES_CALCULATE_TIMEOUT: {
     kind: COLLECTION_FAILURE_KIND.pageInteraction,
     summary: "销售报表一直没算完，本次没有导出，避免落下半天的数据。",

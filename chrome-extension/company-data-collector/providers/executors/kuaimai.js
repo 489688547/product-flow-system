@@ -330,6 +330,50 @@ function setNativeInputValue(input, value) {
   input.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
+// 销售报表的日期框是 Element UI 只读日期选择器（readOnly=true），写 value 只改 DOM、
+// 不更新 Vue 模型：实测把两端都写成 2026-07-26 后，输入框显示对了，计算请求带的却
+// 仍是页面原范围 2026-07-22 ~ 2026-07-28。导出因此是七天聚合而不是目标业务日，
+// 落库时被判 WEB_COLLECTION_BUSINESS_DATE_MISMATCH，或落成残缺数据。
+// 唯一可靠的方式是打开日期面板点日期格。
+async function closeKuaimaiPickers() {
+  document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, view: window }));
+  document.body.click();
+  await wait(400);
+}
+
+async function pickKuaimaiDate(input, businessDate) {
+  const day = String(Number(String(businessDate).slice(8, 10)));
+  // 先关掉上一个面板：两个日期框各有自己的浮层，残留的旧面板会让点击落到错的那个，
+  // 表现为只有开始日期生效、结束日期仍是旧值。
+  await closeKuaimaiPickers();
+  for (const type of ["mousedown", "mouseup", "click", "focus"]) {
+    input.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+  }
+  input.focus();
+  const deadline = Date.now() + 5000;
+  do {
+    const panels = Array.from(document.querySelectorAll(".el-picker-panel.el-date-picker"))
+      .filter(panel => panel.getClientRects().length > 0);
+    const panel = panels[panels.length - 1];
+    const cell = panel && Array.from(panel.querySelectorAll("td")).find(td =>
+      td.getClientRects().length > 0
+      && !/prev-month|next-month|disabled/.test(td.className)
+      && td.textContent.trim() === day
+    );
+    if (cell) {
+      cell.click();
+      await wait(500);
+      await closeKuaimaiPickers();
+      if (input.value === businessDate) return;
+      break;
+    }
+    await wait(200);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("销售报表日期未能选中。"), {
+    code: "KUAIMAI_SALES_DATE_PICK_FAILED"
+  });
+}
+
 async function prepareKuaimaiSalesReport(action, selectors, matchesText, context) {
   const legacyButton = exactTextElement(selectors.dialogButton, "暂不，继续使用旧版", matchesText);
   if (legacyButton) {
@@ -356,8 +400,8 @@ async function prepareKuaimaiSalesReport(action, selectors, matchesText, context
   }
   const startDate = findRequired(selectors.startDate, "KUAIMAI_SALES_START_DATE_MISSING");
   const endDate = findRequired(selectors.endDate, "KUAIMAI_SALES_END_DATE_MISSING");
-  if (startDate.value !== action.businessDate) setNativeInputValue(startDate, action.businessDate);
-  if (endDate.value !== action.businessDate) setNativeInputValue(endDate, action.businessDate);
+  if (startDate.value !== action.businessDate) await pickKuaimaiDate(startDate, action.businessDate);
+  if (endDate.value !== action.businessDate) await pickKuaimaiDate(endDate, action.businessDate);
   await wait(250);
   const reportTab = findRequiredTextElement(
     selectors.reportTab,
