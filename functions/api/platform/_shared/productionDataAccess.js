@@ -151,16 +151,37 @@ export async function revokeProductionWriteUnlocks(db, access, { now = new Date(
 
 export async function saveProductionSnapshot(db, stored, { now = new Date() } = {}) {
   const id = `snapshot_${crypto.randomUUID?.() || Date.now().toString(36)}`;
-  const serialized = JSON.stringify(stored?.state || {});
-  const parts = splitUtf8(serialized);
-  await db.prepare(`INSERT INTO production_data_snapshots
-    (id, version, state_updated_at, state_updated_by, created_at) VALUES (?, ?, ?, ?, ?)`)
-    .bind(id, String(stored?.version || "unknown"), stored?.updatedAt || "", stored?.updatedBy || "", now.toISOString())
-    .run();
-  for (const [index, payload] of parts.entries()) {
-    await db.prepare(`INSERT INTO production_data_snapshot_parts (snapshot_id, part_index, payload)
-      VALUES (?, ?, ?)`).bind(id, index, payload).run();
+  const result = await db.prepare(`SELECT part_key, part_index, payload
+    FROM product_flow_state_parts WHERE state_id = ? ORDER BY part_key, part_index`)
+    .bind("company")
+    .all();
+  const stateParts = result?.results || [];
+  let payloadParts;
+  if (stateParts.length) {
+    const fragments = ["{"];
+    let previousKey = "";
+    let firstKey = true;
+    for (const part of stateParts) {
+      const key = String(part.part_key);
+      if (key !== previousKey) {
+        fragments.push(`${firstKey ? "" : ","}${JSON.stringify(key)}:`);
+        previousKey = key;
+        firstKey = false;
+      }
+      fragments.push(String(part.payload || ""));
+    }
+    fragments.push("}");
+    payloadParts = fragments.flatMap(fragment => splitUtf8(fragment));
+  } else {
+    payloadParts = splitUtf8(JSON.stringify(stored?.state || {}));
   }
+  await db.batch([
+    db.prepare(`INSERT INTO production_data_snapshots
+      (id, version, state_updated_at, state_updated_by, created_at) VALUES (?, ?, ?, ?, ?)`)
+      .bind(id, String(stored?.version || "unknown"), stored?.updatedAt || "", stored?.updatedBy || "", now.toISOString()),
+    ...payloadParts.map((payload, index) => db.prepare(`INSERT INTO production_data_snapshot_parts
+      (snapshot_id, part_index, payload) VALUES (?, ?, ?)`).bind(id, index, payload))
+  ]);
   await pruneProductionSnapshots(db);
   return id;
 }

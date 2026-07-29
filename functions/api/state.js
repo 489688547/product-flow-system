@@ -16,6 +16,12 @@ import {
 
 const STATE_ID = "company";
 const MAX_PART_BYTES = 1_000_000;
+const STATE_RESPONSE_HEADERS = {
+  "content-type": "application/json; charset=utf-8",
+  "access-control-allow-origin": "*",
+  "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
+  "access-control-allow-headers": "content-type"
+};
 
 function stateDatabase(env = {}, data = {}) {
   return requestBusinessDatabase({ env, data });
@@ -143,6 +149,58 @@ function deserializeStateParts(rows) {
   return Object.fromEntries([...grouped].map(([key, chunks]) => [key, JSON.parse(chunks.join(""))]));
 }
 
+async function readCompanyStateParts(db) {
+  await ensureStateTable(db);
+  const [partResult, manifest] = await Promise.all([
+    db.prepare(`SELECT part_key, part_index, payload, updated_at, updated_by
+      FROM product_flow_state_parts WHERE state_id = ? ORDER BY part_key, part_index`)
+      .bind(STATE_ID)
+      .all(),
+    db.prepare("SELECT version, updated_at, updated_by FROM product_flow_state WHERE id = ?")
+      .bind(STATE_ID)
+      .first()
+  ]);
+  return {
+    parts: partResult?.results || [],
+    manifest
+  };
+}
+
+function streamedCompanyStateResponse(parts, manifest = {}) {
+  const encoder = new TextEncoder();
+  const enqueue = (controller, value) => controller.enqueue(encoder.encode(value));
+  const stream = new ReadableStream({
+    start(controller) {
+      enqueue(controller, '{"synced":true,"state":{');
+      let previousKey = "";
+      let firstKey = true;
+      for (const part of parts) {
+        const key = String(part.part_key);
+        if (key !== previousKey) {
+          enqueue(controller, `${firstKey ? "" : ","}${JSON.stringify(key)}:`);
+          previousKey = key;
+          firstKey = false;
+        }
+        enqueue(controller, String(part.payload || ""));
+      }
+      const updatedAt = parts[0]?.updated_at || manifest?.updated_at || "";
+      const updatedBy = parts[0]?.updated_by || manifest?.updated_by || "";
+      enqueue(controller, `},"version":${JSON.stringify(String(manifest?.version || "unknown"))}`);
+      enqueue(controller, `,"updatedAt":${JSON.stringify(updatedAt)}`);
+      enqueue(controller, `,"updatedBy":${JSON.stringify(updatedBy)}}`);
+      controller.close();
+    }
+  });
+  return new Response(stream, { status: 200, headers: STATE_RESPONSE_HEADERS });
+}
+
+async function readCompanyStateResponse(db) {
+  const { parts, manifest } = await readCompanyStateParts(db);
+  if (parts.length) return streamedCompanyStateResponse(parts, manifest);
+  const stored = await readCompanyState(db);
+  return jsonResponse(stored ? { synced: true, ...stored } : { synced: false, state: null });
+}
+
 function validateStatePayload(state) {
   if (!state || typeof state !== "object" || Array.isArray(state)) {
     const error = new Error("缺少有效的产品流程状态数据。");
@@ -252,8 +310,7 @@ export async function onRequest({ request, env, data = {} }) {
 
   try {
     if (request.method === "GET") {
-      const stored = await readCompanyState(db);
-      return jsonResponse(stored ? { synced: true, ...stored } : { synced: false, state: null });
+      return readCompanyStateResponse(db);
     }
     const body = await request.json().catch(() => ({}));
     const before = await readCompanyState(db);

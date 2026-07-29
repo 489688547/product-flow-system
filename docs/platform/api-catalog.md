@@ -4,9 +4,9 @@
 
 ## 共享状态
 
-`GET /api/state` 返回 `{ synced, state, version, updatedAt, updatedBy }`。客户端只有在成功读取带 `updatedAt` 的共享状态后才允许保存；浏览器脏缓存和代码默认状态不得在启动时自动上传。若本机存在未同步缓存，客户端只能保留本机恢复副本，并以线上状态为当前事实源。
+`GET /api/state` 返回 `{ synced, state, version, updatedAt, updatedBy }`。存在分片状态时，服务端以流式 JSON 直接组合已经持久化的字段分片，不得为生成响应而解析并重新序列化完整业务对象；无分片旧状态保持兼容读取。客户端只有在成功读取带 `updatedAt` 的共享状态后才允许保存；浏览器脏缓存和代码默认状态不得在启动时自动上传。若本机存在未同步缓存，客户端只能保留本机恢复副本，并以线上状态为当前事实源。
 
-`POST /api/state` 接收 `{ state, baseUpdatedAt }`，操作者由当前公司会话确定，客户端提交的 `updatedBy` 不可信。缺少基线返回 `409 SHARED_STATE_BASE_REQUIRED`，基线落后或在写入期间被并发推进返回 `409 SHARED_STATE_VERSION_CONFLICT`，线上尚未初始化返回 `409 SHARED_STATE_NOT_INITIALIZED`；三种情况均不得修改状态。版本比较与推进、旧分片删除和新分片插入在同一个 D1 原子批次完成。成功写入前保存完整写前快照并创建待完成审计，写入后完成审计，响应增加 `auditId` 和新的 `updatedAt`。客户端规范化业务状态没有变化时不得 POST。旧客户端因为不携带基线而只能读取，刷新到新版本后恢复写入。
+`POST /api/state` 接收 `{ state, baseUpdatedAt }`，操作者由当前公司会话确定，客户端提交的 `updatedBy` 不可信。缺少基线返回 `409 SHARED_STATE_BASE_REQUIRED`，基线落后或在写入期间被并发推进返回 `409 SHARED_STATE_VERSION_CONFLICT`，线上尚未初始化返回 `409 SHARED_STATE_NOT_INITIALIZED`；三种情况均不得修改状态。版本比较与推进、旧分片删除和新分片插入在同一个 D1 原子批次完成。成功写入前从当前状态分片生成完整写前快照并创建待完成审计，避免把完整业务状态再次序列化为单个大字符串；写入后完成审计，响应增加 `auditId` 和新的 `updatedAt`。客户端规范化业务状态没有变化时不得 POST。产品封面进入共享状态前必须按产品图片容量策略压缩；旧客户端因为不携带基线而只能读取，刷新到新版本后恢复写入。
 
 | 路径 | 用途 | 主要约束 |
 | --- | --- | --- |

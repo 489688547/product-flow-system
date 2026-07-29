@@ -168,6 +168,48 @@ test("state API persists company data including demand pool and issue submission
   assert.equal(body.updatedBy, "周总");
 });
 
+test("state GET streams persisted parts without parsing the complete business payload", async () => {
+  const stateModule = await loadStateModule();
+  const db = createD1Mock();
+  const marker = "__streamed_large_image__";
+  const payload = {
+    version: "stream-test",
+    demands: [{ id: "d1", image: `data:image/png;base64,${marker.repeat(20_000)}` }],
+    products: [],
+    tasks: [],
+    deliverables: [],
+    reviews: [],
+    feedbackIssues: [],
+    productPlans: []
+  };
+  await stateModule.writeCompanyState(db, payload, "初始状态");
+
+  const originalParse = JSON.parse;
+  JSON.parse = (value, ...args) => {
+    if (typeof value === "string" && value.includes(marker)) {
+      throw new Error("GET must not parse persisted business parts");
+    }
+    return originalParse(value, ...args);
+  };
+  let response;
+  let responseText;
+  try {
+    response = await stateModule.onRequest({
+      request: new Request("https://flow.example.com/api/state"),
+      env: { PRODUCT_FLOW_DB: db }
+    });
+    responseText = await response.text();
+  } finally {
+    JSON.parse = originalParse;
+  }
+
+  assert.equal(response.status, 200);
+  const body = originalParse(responseText);
+  assert.equal(body.synced, true);
+  assert.equal(body.state.demands[0].id, "d1");
+  assert.equal(body.state.demands[0].image.includes(marker), true);
+});
+
 test("company state compare-and-set accepts a baseline only once", async () => {
   const stateModule = await loadStateModule();
   const db = createD1Mock();
