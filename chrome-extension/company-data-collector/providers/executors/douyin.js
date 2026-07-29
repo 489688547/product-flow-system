@@ -10,6 +10,15 @@ const SELECTOR_VERSION = "2026-07-24";
 const WAIT_AFTER_ACTION_MS = 600;
 const WAIT_AFTER_DATE_MS = 3_000;
 const YESTERDAY_PRESET_LABELS = Object.freeze(["近1天", "昨天", "昨日"]);
+// 抖音罗盘改版后，开始/结束日期输入框要点开「自定义」才渲染。
+// 旧实现直接在未打开的面板里找输入框，必然找不到。
+const DATE_PANEL_TRIGGER_LABELS = Object.freeze(["自定义"]);
+const DATE_PANEL_SELECTOR = ".aurora-dorami-date-picker-picker-main";
+// 页面上有 7 个「昨日」，全是数据卡的对比标签；预设匹配必须限定在日期选择器内，
+// 否则会点到纯文本 label，点了没反应却以为已切换。
+const DATE_PICKER_SCOPE = ".aurora-dorami-date-picker-wrapper, [class*='coreHeaderDatepicker'], [class*='datePicker']";
+const DATE_INPUT_SELECTOR = "input[placeholder*='开始日期'], input[placeholder*='结束日期'], input[placeholder*='日期'], input[placeholder*='开始时间'], input[placeholder*='结束时间']";
+const PANEL_OPEN_TIMEOUT_MS = 5_000;
 const STORE_MANAGEMENT_PATH = "/ffa/grs-new/qualification/common-tools";
 const HUMAN_TERMS = Object.freeze({
   captcha: ["验证码", "图形验证"],
@@ -137,31 +146,66 @@ function shanghaiYesterday() {
   return shanghai.toISOString().slice(0, 10);
 }
 
+async function openCustomDatePanel() {
+  if (visible(document.querySelector(DATE_PANEL_SELECTOR))) return true;
+  const trigger = exactVisibleText(
+    DATE_PANEL_TRIGGER_LABELS,
+    ".aurora-tabs-tab, [role='tab'], button, [role='button']"
+  );
+  if (!trigger) return false;
+  (trigger.closest(".aurora-tabs-tab, [role='tab'], button, [role='button']") || trigger).click();
+  const deadline = Date.now() + PANEL_OPEN_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (visible(document.querySelector(DATE_PANEL_SELECTOR))) return true;
+    await wait(200);
+  }
+  return false;
+}
+
+function datePickerPresets() {
+  const scopes = Array.from(document.querySelectorAll(DATE_PICKER_SCOPE));
+  const panel = document.querySelector(DATE_PANEL_SELECTOR);
+  if (panel) scopes.push(panel);
+  const allowed = new Set(YESTERDAY_PRESET_LABELS.map(normalizedText));
+  for (const scope of scopes) {
+    const hit = Array.from(scope.querySelectorAll("[role='tab'], button, [role='button'], label, span"))
+      .find(element => visible(element) && allowed.has(normalizedText(element.textContent)));
+    if (hit) return hit;
+  }
+  return null;
+}
+
 async function applyBusinessDate(businessDate) {
+  // 先打开自定义面板：输入框在面板内，未打开时 DOM 里根本不存在。
+  const opened = await openCustomDatePanel();
+  if (!opened) {
+    throw Object.assign(new Error("抖店报表未能打开自定义日期面板。"), {
+      code: "DOUYIN_DATE_CONTROL_MISSING"
+    });
+  }
+
+  // 目标日就是昨天时，面板内的「近1天」最省事；但只在日期选择器范围内找，
+  // 不再匹配数据卡上的「昨日」对比标签。
   if (businessDate === shanghaiYesterday()) {
-    const yesterday = exactVisibleText(
-      YESTERDAY_PRESET_LABELS,
-      "[role='tab'], button, [role='button'], label, span"
-    );
-    if (yesterday) {
-      const clickTarget = yesterday.closest("[role='tab'], button, [role='button'], label") || yesterday;
+    const preset = datePickerPresets();
+    if (preset) {
+      const clickTarget = preset.closest("[role='tab'], button, [role='button'], label") || preset;
       clickTarget.click();
       await wait(WAIT_AFTER_DATE_MS);
       if (yesterdayPresetSelectionApplied()) return;
-      throw Object.assign(new Error("抖店报表日期未切换到昨日。"), {
-        code: "DOUYIN_DATE_RANGE_NOT_APPLIED"
-      });
     }
   }
 
-  const dateInputs = Array.from(document.querySelectorAll(
-    "input[placeholder*='日期'], input[placeholder*='开始时间'], input[placeholder*='结束时间']"
-  )).filter(visible);
-  if (!dateInputs.length) {
+  // 输入框在面板之外，且宽度只有 1px——日期选择器把真实 input 藏在展示层旁边。
+  // 因此既不能限定在面板内查找，也不能用「有宽高」判可见，只能按可写性筛。
+  const dateInputs = Array.from(document.querySelectorAll(DATE_INPUT_SELECTOR))
+    .filter(input => !input.disabled && !input.readOnly && input.offsetParent !== null);
+  if (dateInputs.length < 2) {
     throw Object.assign(new Error("抖店报表日期控件不可用。"), {
       code: "DOUYIN_DATE_CONTROL_MISSING"
     });
   }
+  // 面板内没有确认按钮，两个输入框填完即生效。
   for (const input of dateInputs.slice(0, 2)) setNativeInputValue(input, businessDate);
   await wait(WAIT_AFTER_DATE_MS);
   if (dateInputs.slice(0, 2).some(input => !String(input.value || "").includes(businessDate))) {
