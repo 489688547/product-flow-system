@@ -1,0 +1,42 @@
+services:
+  product-flow-app:
+    image: product-flow-system:aliyun
+    build:
+      context: ../..
+      dockerfile: deploy/aliyun/Dockerfile
+    container_name: product-flow-app
+    restart: unless-stopped
+    stop_grace_period: 30s
+    cpus: 1.5
+    mem_limit: 768m
+    ports:
+      - "127.0.0.1:8080:8080"
+    env_file:
+      - "${PFS_RUNTIME_ENV_FILE:-/opt/product-flow/config/runtime.env}"
+    environment:
+      LOCAL_ONLINE_ACCOUNT_MODE: "0"
+      PFS_RUNTIME_PORT: "8080"
+      PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler"
+      PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env"
+    volumes:
+      - "${PFS_DATA_DIR:-/opt/product-flow/data}:/var/lib/product-flow"
+      - "${PFS_RUNTIME_ENV_FILE:-/opt/product-flow/config/runtime.env}:/run/pfs/runtime.env:ro"
+    tmpfs:
+      - /tmp:size=128m,mode=1777
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8080/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true
+    name: "${PFS_PROXY_NETWORK:-nginx-proxy-manage_default}"

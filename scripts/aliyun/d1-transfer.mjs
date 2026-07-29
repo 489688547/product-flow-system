@@ -1,0 +1,212 @@
+import { createHash } from "node:crypto";
+import { spawn } from "node:child_process";
+import { access, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { isAbsolute, join, resolve } from "node:path";
+
+export const DATABASES = Object.freeze([
+  Object.freeze({
+    binding: "PRODUCT_FLOW_DB",
+    name: "product-flow-system",
+    file: "product-flow-system.sql"
+  }),
+  Object.freeze({
+    binding: "DEMO_FLOW_DB",
+    name: "product-flow-system-display",
+    file: "product-flow-system-display.sql"
+  })
+]);
+
+const IMPORT_MARKER = ".pfs-import-complete.json";
+
+function requiredAbsolutePath(value, name) {
+  const path = resolve(String(value || ""));
+  if (!value || !isAbsolute(String(value))) throw new Error(`${name} 必须是绝对路径。`);
+  return path;
+}
+
+async function exists(path) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function sha256(path) {
+  const content = await readFile(path);
+  return createHash("sha256").update(content).digest("hex");
+}
+
+async function atomicJson(path, value) {
+  const temporary = `${path}.${process.pid}.tmp`;
+  await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+  await rename(temporary, path);
+}
+
+export function runCommand(command, args, options = {}) {
+  return new Promise((resolvePromise, reject) => {
+    const child = spawn(command, args, { stdio: "inherit", ...options });
+    child.once("error", reject);
+    child.once("exit", (code, signal) => {
+      if (code === 0) return resolvePromise();
+      reject(new Error(`${command} 执行失败（code=${code ?? "null"}, signal=${signal ?? "none"}）。`));
+    });
+  });
+}
+
+export async function exportCloudflareD1({
+  exportDir,
+  run = runCommand,
+  wranglerBin = "npx",
+  now = () => new Date().toISOString()
+}) {
+  const directory = requiredAbsolutePath(exportDir, "exportDir");
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const items = [];
+  for (const database of DATABASES) {
+    const output = join(directory, database.file);
+    await run(wranglerBin, [
+      ...(wranglerBin === "npx" ? ["wrangler"] : []),
+      "d1",
+      "export",
+      database.name,
+      "--remote",
+      "--output",
+      output
+    ]);
+    const metadata = await stat(output);
+    if (metadata.size === 0) throw new Error(`${database.name} 导出文件为空。`);
+    items.push({
+      ...database,
+      bytes: metadata.size,
+      sha256: await sha256(output)
+    });
+  }
+  const manifest = {
+    schemaVersion: 1,
+    createdAt: now(),
+    source: "cloudflare-d1-remote",
+    databases: items
+  };
+  await atomicJson(join(directory, "manifest.json"), manifest);
+  return manifest;
+}
+
+async function verifiedManifest(exportDir) {
+  const manifestPath = join(exportDir, "manifest.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  if (manifest.schemaVersion !== 1 || !Array.isArray(manifest.databases)) {
+    throw new Error("D1 导出清单格式无效。");
+  }
+  for (const database of DATABASES) {
+    const entry = manifest.databases.find(item => item.name === database.name);
+    if (!entry || entry.file !== database.file) {
+      throw new Error(`D1 导出清单缺少 ${database.name}。`);
+    }
+    const actual = await sha256(join(exportDir, entry.file));
+    if (actual !== entry.sha256) {
+      throw new Error(`${database.name} 导出文件 SHA-256 校验失败。`);
+    }
+  }
+  return manifest;
+}
+
+export async function importLocalD1({
+  exportDir,
+  persistDir,
+  configPath = resolve("deploy/aliyun/wrangler.toml"),
+  run = runCommand,
+  wranglerBin = "npx",
+  now = () => new Date().toISOString()
+}) {
+  const source = requiredAbsolutePath(exportDir, "exportDir");
+  const destination = requiredAbsolutePath(persistDir, "persistDir");
+  const config = requiredAbsolutePath(configPath, "configPath");
+  const marker = join(destination, IMPORT_MARKER);
+  if (await exists(marker)) {
+    throw new Error(`目标目录已经完成过导入：${marker}`);
+  }
+  const manifest = await verifiedManifest(source);
+  await mkdir(destination, { recursive: true, mode: 0o700 });
+  for (const database of DATABASES) {
+    await run(wranglerBin, [
+      ...(wranglerBin === "npx" ? ["wrangler"] : []),
+      "d1",
+      "execute",
+      database.name,
+      "--local",
+      "--config",
+      config,
+      "--persist-to",
+      destination,
+      "--file",
+      join(source, database.file),
+      "--yes"
+    ]);
+  }
+  const result = {
+    schemaVersion: 1,
+    importedAt: now(),
+    sourceCreatedAt: manifest.createdAt,
+    databases: manifest.databases.map(({ name, file, bytes, sha256: hash }) => ({
+      name,
+      file,
+      bytes,
+      sha256: hash
+    }))
+  };
+  await atomicJson(marker, result);
+  return result;
+}
+
+function validateOssUri(value) {
+  const uri = String(value || "").trim();
+  if (!uri) return "";
+  if (!/^oss:\/\/[a-z0-9][a-z0-9-]{1,61}[a-z0-9](?:\/.*)?\/$/.test(uri)) {
+    throw new Error("OSS_BACKUP_URI 必须是以 / 结尾的私有 Bucket 地址，例如 oss://bucket/product-flow/。");
+  }
+  return uri;
+}
+
+export async function backupLocalD1({
+  backupDir,
+  persistDir,
+  configPath = resolve("deploy/aliyun/wrangler.toml"),
+  ossUri = "",
+  run = runCommand,
+  wranglerBin = "npx",
+  ossutilBin = "ossutil",
+  now = () => new Date().toISOString()
+}) {
+  const ossDestination = validateOssUri(ossUri);
+  const directory = requiredAbsolutePath(backupDir, "backupDir");
+  const persistence = requiredAbsolutePath(persistDir, "persistDir");
+  const config = requiredAbsolutePath(configPath, "configPath");
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const items = [];
+  for (const database of DATABASES) {
+    const output = join(directory, database.file);
+    await run(wranglerBin, [
+      ...(wranglerBin === "npx" ? ["wrangler"] : []),
+      "d1",
+      "export",
+      database.name,
+      "--local",
+      "--config",
+      config,
+      "--persist-to",
+      persistence,
+      "--output",
+      output
+    ]);
+    const metadata = await stat(output);
+    items.push({ ...database, bytes: metadata.size, sha256: await sha256(output) });
+  }
+  const manifest = { schemaVersion: 1, createdAt: now(), source: "aliyun-ecs-local-d1", databases: items };
+  await atomicJson(join(directory, "manifest.json"), manifest);
+  if (ossDestination) {
+    await run(ossutilBin, ["cp", directory, ossDestination, "--recursive", "--force"]);
+  }
+  return manifest;
+}

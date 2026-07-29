@@ -19,7 +19,7 @@
   - 验证：人工对照 PRD 验收标准与 ADR。
   - 提交：随环境契约任务一起提交。
 
-- [ ] 新增阿里云环境与集成契约
+- [x] 新增阿里云环境与集成契约
   - 依赖：迁移边界文档。
   - 文件：`docs/platform/environment-capabilities.json`、
     `docs/platform/integration-registry.json`、生成模块和契约测试。
@@ -30,7 +30,7 @@
   - 验证：`npm run check:environment-capabilities && npm run check:integrations`。
   - 提交：`feat(platform): register aliyun runtime`
 
-- [ ] 实现双 D1 迁移和本地备份
+- [x] 实现双 D1 迁移和本地备份
   - 依赖：环境契约。
   - 文件：`scripts/aliyun/*.mjs`、`tests/aliyun-ecs-deployment.test.mjs`。
   - 输入：远程 D1 名称、空白持久化目录、可选 OSS URI。
@@ -40,7 +40,7 @@
   - 验证：`node --test tests/aliyun-ecs-deployment.test.mjs`。
   - 提交：`feat(deploy): add d1 migration tools`
 
-- [ ] 实现 ECS 容器运行时
+- [x] 实现 ECS 容器运行时
   - 依赖：迁移脚本。
   - 文件：`deploy/aliyun/*`、运行时脚本和测试。
   - 输入：只读 runtime env、持久化数据卷、代理网络。
