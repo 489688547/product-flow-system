@@ -15,6 +15,10 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
   const registry = await json("docs/platform/integration-registry.json");
   const cloudflareWrangler = await readFile(resolve(root, "wrangler.toml"), "utf8");
   const aliyunWrangler = await readFile(resolve(root, "deploy/aliyun/wrangler.toml"), "utf8");
+  const proxyHost = await readFile(
+    resolve(root, "deploy/aliyun/nginx-proxy-manager/deshan-tiyes.cn.conf"),
+    "utf8"
+  );
   const runtime = environment.capabilities.find(entry => entry.id === "aliyun-ecs-runtime");
   const backup = environment.capabilities.find(entry => entry.id === "aliyun-oss-backup");
   const aliyun = registry.platforms.find(entry => entry.id === "aliyun");
@@ -34,8 +38,12 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
   assert.ok(aliyun.codePaths.includes("scripts/aliyun/**"));
   assert.ok(aliyun.capabilities.includes("ECS 容器运行时"));
   assert.ok(aliyun.capabilities.includes("OSS 私有备份"));
+  assert.ok(aliyun.domains.includes("deshan-tiyes.cn"));
   assert.match(cloudflareWrangler, /compatibility_date = "2026-07-18"/);
   assert.match(aliyunWrangler, /compatibility_date = "2026-07-18"/);
+  assert.match(proxyHost, /server_name deshan-tiyes\.cn www\.deshan-tiyes\.cn;/);
+  assert.match(proxyHost, /set \$server "product-flow-app";/);
+  assert.doesNotMatch(proxyHost, /listen 443/);
 });
 
 test("Aliyun runtime rejects local executive bypass and unsafe paths", async () => {
@@ -135,7 +143,7 @@ test("DingTalk OAuth on the Aliyun HTTPS origin keeps its callback same-origin",
     "../functions/api/auth/_shared/browser-oauth-start.js"
   );
   const response = createBrowserOauthStartResponse({
-    request: new Request("https://deshan-tiyes.top/api/auth/dingtalk/start"),
+    request: new Request("https://deshan-tiyes.cn/api/auth/dingtalk/start"),
     env: {
       DINGTALK_APP_KEY: "test-app-key",
       DINGTALK_APP_SECRET: "test-app-secret"
@@ -146,7 +154,7 @@ test("DingTalk OAuth on the Aliyun HTTPS origin keeps its callback same-origin",
   assert.equal(response.status, 302);
   assert.equal(
     authorize.searchParams.get("redirect_uri"),
-    "https://deshan-tiyes.top/api/auth/dingtalk/callback"
+    "https://deshan-tiyes.cn/api/auth/dingtalk/callback"
   );
 });
 

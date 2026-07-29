@@ -50,7 +50,7 @@
   - 验证：单元测试、`docker compose config`、本地镜像启动与 401 会话检查。
   - 提交：`feat(deploy): add aliyun ecs runtime`
 
-- [ ] 完成 ECS 私有预发布
+- [x] 完成 ECS 私有预发布
   - 依赖：完整本地门禁通过。
   - 文件：无新增业务文件；服务器 `/opt/product-flow/`。
   - 输入：分支镜像、D1 预发布导出、服务器 runtime env。
@@ -63,9 +63,11 @@
 - [ ] 域名与正式切流
   - 依赖：域名实名、ICP备案、OSS Bucket 和实例 RAM 角色。
   - 文件：钉钉控制台、DNS、Nginx Proxy Manager 外部配置。
-  - 输入：`deshan-tiyes.top`、停写窗口。
+  - 输入：`deshan-tiyes.cn`、停写窗口。
   - 输出：HTTPS、真实钉钉登录和 ECS 正式事实源。
   - 失败测试：证书、回调、readiness 或数据库校验失败时保持 Cloudflare。
   - 实现步骤：最终导出/导入、代理、DNS、回调、验收。
   - 验证：新会话、冷暖、20 并发、业务读写和 Cloudflare 回滚请求。
   - 提交：将真实验收证据回写 DEV-000014。
+  - 当前状态：企业实名认证成功；HTTP Host 代理可预配置，ICP备案完成前保持
+    DNS 和钉钉回调不变。

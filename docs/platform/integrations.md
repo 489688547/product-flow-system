@@ -74,7 +74,8 @@ Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状
 API。容器通过 Wrangler 本地 Pages 运行时执行仓库中的 `functions/`，正式与
 展示 binding 分别持久化到 ECS 数据卷；公网环境不得启用
 `LOCAL_ONLINE_ACCOUNT_MODE`。现有 Nginx Proxy Manager 负责 80/443，应用端口
-默认只绑定宿主机回环地址。
+默认只绑定宿主机回环地址。正式阿里云入口登记为 `deshan-tiyes.cn`；ICP备案、
+HTTPS 和钉钉回调白名单完成前只允许 Host 头预验收，不切换 DNS。
 
 D1 迁移使用停写窗口：先停止公司采集器和业务写入，再分别导出正式与展示 D1，
 导入两个空白 SQLite 并核对表数、关键表行数和 SHA-256。Cloudflare 在切流前

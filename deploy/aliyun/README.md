@@ -49,6 +49,29 @@ curl -fsS http://127.0.0.1:8080/ >/dev/null
 docker inspect --format '{{.State.Health.Status}}' product-flow-app
 ```
 
+## 域名代理预配置
+
+`deshan-tiyes.cn` 已完成企业实名认证，但在 ICP 备案、HTTPS 证书和钉钉回调
+白名单完成前不得切换 DNS。可先安装 HTTP 代理配置并用 Host 头验收：
+
+```bash
+install -m 0644 \
+  deploy/aliyun/nginx-proxy-manager/deshan-tiyes.cn.conf \
+  /clouddream/nginx-proxy-manage/data/nginx/proxy_host/99-product-flow.conf
+docker exec nginx-app nginx -t
+docker exec nginx-app s6-svc -h /var/run/s6/services/nginx
+curl -fsS -H 'Host: deshan-tiyes.cn' \
+  http://127.0.0.1/cloudflare-entry >/dev/null
+```
+
+该 Nginx Proxy Manager 镜像由 s6 管理 Nginx，未写入
+`/var/run/nginx.pid`，因此必须用 `s6-svc -h` 热加载，不能使用
+`nginx -s reload`。
+
+公网安全组只开放 80/443；Nginx Proxy Manager 管理端口不得向
+`0.0.0.0/0` 开放。ICP备案完成后由 Nginx Proxy Manager 申请证书并启用
+HTTP→HTTPS，再执行 DNS 和钉钉回调切换。
+
 ## 备份与回滚
 
 ```bash

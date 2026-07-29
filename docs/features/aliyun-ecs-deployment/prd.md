@@ -16,8 +16,9 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 终点。
 
 公司已购买杭州 ECS（2 vCPU、2 GiB 内存、40 GiB 系统盘、3 Mbps 公网带宽）、
-40 GB 中国大陆 OSS 标准存储包和域名 `deshan-tiyes.top`。域名当前未实名，
-因此正式 HTTPS、ICP备案和钉钉回调切换暂不能完成。
+40 GB 中国大陆 OSS 标准存储包和域名 `deshan-tiyes.cn`。域名已完成企业
+实名认证，但 ICP 备案尚未开始，因此正式 HTTPS、DNS 和钉钉回调切换暂不能
+完成。
 
 ## 目标
 
@@ -54,7 +55,7 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 
 ## 目标流程
 
-1. 浏览器通过 `deshan-tiyes.top` 访问 Nginx Proxy Manager。
+1. 浏览器通过 `deshan-tiyes.cn` 访问 Nginx Proxy Manager。
 2. Nginx Proxy Manager 把请求代理到同 Docker 网络的应用容器。
 3. 容器使用 Wrangler/Miniflare/workerd 兼容层运行现有 Pages Functions。
 4. `PRODUCT_FLOW_DB` 与 `DEMO_FLOW_DB` 指向 ECS 数据卷中的两个独立本地 D1

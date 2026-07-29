@@ -808,6 +808,7 @@ const integrationRegistry = {
         "OSS_ENDPOINT"
       ],
       "domains": [
+        "deshan-tiyes.cn",
         "aliyun.com",
         "aliyuncs.com",
         "help.aliyun.com"
