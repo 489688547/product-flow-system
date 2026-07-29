@@ -1,6 +1,6 @@
 name = "product-flow-system-aliyun"
 pages_build_output_dir = "./dist"
-compatibility_date = "2026-07-29"
+compatibility_date = "2026-07-18"
 
 [[d1_databases]]
 binding = "PRODUCT_FLOW_DB"

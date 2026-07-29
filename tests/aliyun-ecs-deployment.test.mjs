@@ -13,6 +13,8 @@ async function json(path) {
 test("Aliyun ECS runtime and OSS backup are declared without access-key material", async () => {
   const environment = await json("docs/platform/environment-capabilities.json");
   const registry = await json("docs/platform/integration-registry.json");
+  const cloudflareWrangler = await readFile(resolve(root, "wrangler.toml"), "utf8");
+  const aliyunWrangler = await readFile(resolve(root, "deploy/aliyun/wrangler.toml"), "utf8");
   const runtime = environment.capabilities.find(entry => entry.id === "aliyun-ecs-runtime");
   const backup = environment.capabilities.find(entry => entry.id === "aliyun-oss-backup");
   const aliyun = registry.platforms.find(entry => entry.id === "aliyun");
@@ -32,6 +34,8 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
   assert.ok(aliyun.codePaths.includes("scripts/aliyun/**"));
   assert.ok(aliyun.capabilities.includes("ECS 容器运行时"));
   assert.ok(aliyun.capabilities.includes("OSS 私有备份"));
+  assert.match(cloudflareWrangler, /compatibility_date = "2026-07-18"/);
+  assert.match(aliyunWrangler, /compatibility_date = "2026-07-18"/);
 });
 
 test("Aliyun runtime rejects local executive bypass and unsafe paths", async () => {
@@ -219,6 +223,7 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   const composeText = await readFile(resolve(root, "deploy/aliyun/docker-compose.yml"), "utf8");
   const dockerfile = await readFile(resolve(root, "Dockerfile.aliyun"), "utf8");
   const dockerignore = await readFile(resolve(root, ".dockerignore"), "utf8");
+  const runbook = await readFile(resolve(root, "deploy/aliyun/README.md"), "utf8");
   const compose = load(composeText);
   const service = compose.services["product-flow-app"];
 
@@ -239,6 +244,9 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.equal(service.environment.PFS_RUNTIME_HOST, "0.0.0.0");
   assert.ok(service.healthcheck);
   assert.equal(JSON.stringify(compose).includes("DINGTALK_APP_SECRET:"), false);
+  assert.match(runbook, /chown -R 1000:1000 \/opt\/product-flow\/data/);
+  assert.match(runbook, /chown 1000:1000 \/opt\/product-flow\/config\/runtime\.env/);
+  assert.match(runbook, /chmod 600 \/opt\/product-flow\/config\/runtime\.env/);
 });
 
 test("Aliyun native systemd service is loopback-only and resource bounded", async () => {

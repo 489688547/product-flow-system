@@ -14,6 +14,8 @@
 install -d -m 700 /opt/product-flow/config /opt/product-flow/data /opt/product-flow/backups
 install -m 600 deploy/aliyun/runtime.env.example /opt/product-flow/config/runtime.env
 chown -R 1000:1000 /opt/product-flow/data
+chown 1000:1000 /opt/product-flow/config/runtime.env
+chmod 600 /opt/product-flow/config/runtime.env
 docker network inspect nginx-proxy-manage_default
 docker compose -f deploy/aliyun/docker-compose.yml config
 PFS_BUILD_COMMIT="$(git rev-parse HEAD)" \
