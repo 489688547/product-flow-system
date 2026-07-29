@@ -5,5 +5,6 @@
 - [x] 实现 bootstrap/complete JSON 边界
 - [x] 实现静态开始页与回调页
 - [x] 扩展生产就绪检查
+- [x] 并发验收复用浏览器的 Cloudflare 1102 有限重试
 - [x] 完成全量门禁
 - [ ] GitOps 合并并验证生产冷启动与并发

@@ -120,3 +120,43 @@ test("deployed readiness proves the static OAuth entry and concurrent bootstrap 
   assert.equal(payload.ready, true);
   assert.equal(bootstrapCalls, 5);
 });
+
+test("deployed readiness retries transient failures for every concurrent OAuth bootstrap", async () => {
+  const { checkDeployedReadiness } = await loadScript();
+  let bootstrapCalls = 0;
+  const payload = await checkDeployedReadiness({
+    baseUrl: "https://deshan-tiyes-system.pages.dev",
+    accessToken: "token",
+    requiredPlatforms: ["dingtalk"],
+    oauthConcurrency: 3,
+    fetchImpl: async url => {
+      const value = String(url);
+      if (value.endsWith("/api/platform/v1/environment-readiness")) {
+        return Response.json({ environment: "production", ready: true, capabilities: [] });
+      }
+      if (value.endsWith("/api/auth/dingtalk/start")) {
+        return new Response("<!doctype html><title>正在连接钉钉</title>", {
+          status: 200,
+          headers: { "content-type": "text/html; charset=UTF-8" }
+        });
+      }
+      bootstrapCalls += 1;
+      if (bootstrapCalls >= 2 && bootstrapCalls <= 4) {
+        return new Response(
+          JSON.stringify({
+            type: "https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1102/",
+            title: "Error 1102: Worker exceeded resource limits"
+          }),
+          { status: 503, headers: { "content-type": "application/problem+json" } }
+        );
+      }
+      return Response.json({
+        ready: true,
+        authorizeUrl: "https://login.dingtalk.com/oauth2/auth?client_id=app-key"
+      });
+    }
+  });
+
+  assert.equal(payload.ready, true);
+  assert.equal(bootstrapCalls, 7);
+});

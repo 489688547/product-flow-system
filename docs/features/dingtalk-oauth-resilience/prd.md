@@ -24,4 +24,4 @@
 2. 静态页面调用受控 JSON 接口；只对网络、502/503/504 和明确的 Cloudflare 1102 自动重试。
 3. 业务校验 4xx、Provider JSON 5xx 不自动重放。
 4. 登录开始仍写 HttpOnly state/returnTo Cookie；完成登录仍写服务器会话 Cookie。
-5. 部署检查验证静态入口，并在 bootstrap 预热后执行 20 并发请求。
+5. 部署检查验证静态入口，并在 bootstrap 预热后执行 20 并发请求；每个并发请求按浏览器相同规则有限重试瞬时网络、502/503/504 与 Cloudflare 1102，重试耗尽仍必须失败。
