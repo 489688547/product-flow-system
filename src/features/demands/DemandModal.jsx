@@ -6,23 +6,34 @@ import { ExpectedLaunchMonthSelect } from "../../ui/ExpectedLaunchMonthSelect.js
 import { Modal } from "../../ui/Modal.jsx";
 import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { RichTextEditor } from "../../ui/RichTextEditor.jsx";
+import { prepareProductImage } from "../../state/productImage.js";
 
 const EMPTY = { name: "", expectedLaunchMonth: "", requester: "", source: "", desc: "", discussion: "", image: "" };
 
 export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSave }) {
   const [form, setForm] = useState(EMPTY);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState("");
   useEffect(() => {
     setForm(demand ? { ...EMPTY, ...demand, requester: demand.requester || demand.owner || "" } : { ...EMPTY, requester: currentUser?.name || "" });
+    setImageBusy(false);
+    setImageError("");
   }, [currentUser?.name, demand, open]);
 
   const missing = !form.name.trim() || !form.expectedLaunchMonth || !form.requester.trim() || !form.source.trim() || !form.desc.replace(/<[^>]+>/g, "").trim();
   const set = patch => setForm(current => ({ ...current, ...patch }));
   const previewImage = form.image || generateProductCover(form.name);
-  const readImage = file => {
+  const readImage = async file => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => set({ image: String(reader.result || "") });
-    reader.readAsDataURL(file);
+    setImageBusy(true);
+    setImageError("");
+    try {
+      set({ image: await prepareProductImage(file) });
+    } catch (error) {
+      setImageError(error?.message || "图片处理失败，请重新选择。");
+    } finally {
+      setImageBusy(false);
+    }
   };
 
   return (
@@ -32,7 +43,7 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
       onClose={onClose}
       footer={<>
         <Button onClick={onClose}>取消</Button>
-        <Button variant="primary" disabled={missing} disabledReason="请填写名称、期望上线、提需人、来源部门和机会描述" onClick={() => onSave(form)}>保存</Button>
+        <Button variant="primary" disabled={missing || imageBusy} disabledReason={imageBusy ? "图片正在压缩" : "请填写名称、期望上线、提需人、来源部门和机会描述"} onClick={() => onSave(form)}>保存</Button>
       </>}
     >
       <section className="demand-cover-field" aria-label="产品图片">
@@ -44,8 +55,9 @@ export function DemandModal({ open, demand, currentUser, orgCache, onClose, onSa
             <label className="btn secondary compact">
               <ImagePlus size={16} aria-hidden="true" />
               {form.image ? "更换图片" : "上传图片"}
-              <input type="file" accept="image/*" onChange={event => { readImage(event.target.files?.[0]); event.target.value = ""; }} />
+              <input type="file" accept="image/*" disabled={imageBusy} onChange={event => { readImage(event.target.files?.[0]); event.target.value = ""; }} />
             </label>
+            {imageError ? <p role="alert">{imageError}</p> : null}
           </div>
         </div>
       </section>

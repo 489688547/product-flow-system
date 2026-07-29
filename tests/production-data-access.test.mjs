@@ -357,6 +357,23 @@ test("production snapshots keep only the newest 30 entries", async () => {
   assert.equal([...db.data.snapshotParts.values()].some(row => row.snapshot_id === "old-0"), false);
 });
 
+test("production snapshots copy persisted state parts without serializing the complete state object", async () => {
+  const { access } = await loadRoutes();
+  const db = createProductionDb();
+  const stored = {
+    ...db.data.state,
+    state: { cannotSerialize: 1n }
+  };
+
+  const snapshotId = await access.saveProductionSnapshot(db, stored, {
+    now: new Date("2026-07-18T10:00:00.000Z")
+  });
+  const snapshot = await access.readProductionSnapshot(db, snapshotId);
+
+  assert.equal(snapshot.state.marker, "before");
+  assert.equal(snapshot.version, "v1");
+});
+
 test("production data access requires the active DingTalk identity to remain executive", async () => {
   const { state } = await loadRoutes();
   const db = createProductionDb();
