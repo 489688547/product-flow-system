@@ -3,6 +3,7 @@ import * as kuaimai from "../kuaimai.js";
 
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS = 15_000;
+const KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS = 15_000;
 const KUAIMAI_DOWNLOAD_CENTER_TIMEOUT_MS = 180_000;
 const KUAIMAI_DOWNLOAD_CENTER_POLL_MS = 2_500;
 
@@ -34,19 +35,33 @@ async function waitForRequiredTextElement(selector, value, matchesText, code) {
   throw Object.assign(new Error("页面控件不可用。"), { code });
 }
 
-function assertAppliedKuaimaiRange(selectors, context) {
+function appliedKuaimaiRangeMatches(selectors, context) {
   const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_TIME_BASIS_MISSING");
   const startTime = findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING");
   const endTime = findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING");
-  if (
-    timeBasis.value !== context.expectedTimeBasis
-    || startTime.value !== context.expectedStartTime
-    || endTime.value !== context.expectedEndTime
-  ) {
-    throw Object.assign(new Error("创建时间范围未生效。"), {
-      code: "KUAIMAI_TIME_RANGE_NOT_APPLIED"
-    });
-  }
+  return timeBasis.value === context.expectedTimeBasis
+    && startTime.value === context.expectedStartTime
+    && endTime.value === context.expectedEndTime;
+}
+
+function assertAppliedKuaimaiRange(selectors, context) {
+  if (appliedKuaimaiRangeMatches(selectors, context)) return;
+  throw Object.assign(new Error("创建时间范围未生效。"), {
+    code: "KUAIMAI_TIME_RANGE_NOT_APPLIED"
+  });
+}
+
+// 补数任务连着跑时会复用同一个标签页，只换 hash。页面「就绪」的判据是控件存在，
+// 而复用时控件本来就在，只是还带着上一天的值——立刻断言就会读到旧值，
+// 于是每次补历史日期都报 KUAIMAI_TIME_RANGE_NOT_APPLIED，只有当天第一次
+// （新开标签页，控件和值一起出现）才通过。所以必须等值追上来，而不是立刻判定。
+async function waitForAppliedKuaimaiRange(selectors, context) {
+  const deadline = Date.now() + KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS;
+  do {
+    if (appliedKuaimaiRangeMatches(selectors, context)) return;
+    await wait(200);
+  } while (Date.now() < deadline);
+  assertAppliedKuaimaiRange(selectors, context);
 }
 
 async function openKuaimaiExportDialog({
@@ -320,19 +335,25 @@ async function prepareKuaimaiSalesReport(action, selectors, matchesText, context
   context.expectedSalesTimeBasis = action.timeBasis;
 }
 
-function assertAppliedKuaimaiSalesRange(selectors, context) {
+function appliedKuaimaiSalesRangeMatches(selectors, context) {
   const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_SALES_TIME_BASIS_MISSING");
   const startDate = findRequired(selectors.startDate, "KUAIMAI_SALES_START_DATE_MISSING");
   const endDate = findRequired(selectors.endDate, "KUAIMAI_SALES_END_DATE_MISSING");
-  if (
-    timeBasis.value !== context.expectedSalesTimeBasis
-    || startDate.value !== context.expectedSalesDate
-    || endDate.value !== context.expectedSalesDate
-  ) {
-    throw Object.assign(new Error("销售报表创建时间范围未生效。"), {
-      code: "KUAIMAI_SALES_TIME_RANGE_NOT_APPLIED"
-    });
-  }
+  return timeBasis.value === context.expectedSalesTimeBasis
+    && startDate.value === context.expectedSalesDate
+    && endDate.value === context.expectedSalesDate;
+}
+
+// 与订单页同因：复用标签页时控件先在、值后到，立刻断言会读到上一次的筛选。
+async function assertAppliedKuaimaiSalesRange(selectors, context) {
+  const deadline = Date.now() + KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS;
+  do {
+    if (appliedKuaimaiSalesRangeMatches(selectors, context)) return;
+    await wait(200);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("销售报表创建时间范围未生效。"), {
+    code: "KUAIMAI_SALES_TIME_RANGE_NOT_APPLIED"
+  });
 }
 
 function readDownloadCenterRows(selectors) {
@@ -533,7 +554,7 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       await prepareKuaimaiSalesReport(action, context.salesSelectors, matchesText, context);
       return;
     case "calculate_sales_report": {
-      assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
+      await assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
       const button = findRequiredTextElement(
         context.salesSelectors.calculateButton,
         "计算数据",
@@ -542,7 +563,7 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       );
       button.click();
       await wait(3500);
-      assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
+      await assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
       return;
     }
     case "export_sales_items": {
@@ -572,12 +593,13 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       context.expectedTimeBasis = action.timeBasis;
       context.expectedStartTime = action.startValue;
       context.expectedEndTime = action.endValue;
-      assertAppliedKuaimaiRange(selectors, context);
+      await waitForAppliedKuaimaiRange(selectors, context);
       return;
     }
     case "wait_for_results":
       await wait(3000);
-      assertAppliedKuaimaiRange(selectors, context);
+      // 结果加载完仍要复核一次：中途若被别的筛选覆盖，导出的就不是目标业务日。
+      await waitForAppliedKuaimaiRange(selectors, context);
       return;
     case "export_orders": {
       await openKuaimaiExportDialog({

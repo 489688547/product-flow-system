@@ -59,6 +59,18 @@ test("Kuaimai async exports are completed through the bundled download center ad
   assert.match(executor, /KUAIMAI_DOWNLOAD_CENTER_TIMEOUT/);
   assert.match(contentScript, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
   assert.match(executor, /assertAppliedKuaimaiRange/);
+
+  // 时间范围必须「等到生效」而不是「立刻判定」。补数任务连着跑会复用同一个标签页、
+  // 只换 hash，控件先在、值后到；立刻断言就读到上一天的筛选，于是每次补历史日期
+  // 都报 KUAIMAI_TIME_RANGE_NOT_APPLIED，只有当天第一次才通过。
+  assert.match(executor, /async function waitForAppliedKuaimaiRange/);
+  assert.match(executor, /await waitForAppliedKuaimaiRange\(selectors, context\)/);
+  // 两个范围断言都是异步的，漏掉 await 会让断言被丢弃、失败也不抛，比不校验更危险。
+  const salesAssertCalls = [...executor.matchAll(/(await\s+|function\s+)?assertAppliedKuaimaiSalesRange\(/g)];
+  assert.ok(salesAssertCalls.length >= 3, "至少有一处声明和两处调用");
+  for (const match of salesAssertCalls) {
+    assert.ok(match[1], `assertAppliedKuaimaiSalesRange 必须被 await 或是声明本身：${match[0]}`);
+  }
   assert.match(executor, /openKuaimaiExportDialog/);
   assert.match(serviceWorker, /downloadFilePrefixes/);
   assert.match(serviceWorker, /registeredTaskUrl/);
