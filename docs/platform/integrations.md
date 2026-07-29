@@ -68,6 +68,23 @@ Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状
 
 生产数据网关继续用于运维修复；其跨环境写入仍需要 15 分钟解锁、版本检查、写前快照和审计。部署后的生产验证、钉钉 WebView 验证和外部平台真实动作验证保持独立，不用本地成功互相替代。
 
+## 阿里云 ECS 与 OSS
+
+阿里云 ECS 是 Pages Functions 与双 SQLite 的过渡生产运行时，不是第二套业务
+API。容器通过 Wrangler 本地 Pages 运行时执行仓库中的 `functions/`，正式与
+展示 binding 分别持久化到 ECS 数据卷；公网环境不得启用
+`LOCAL_ONLINE_ACCOUNT_MODE`。现有 Nginx Proxy Manager 负责 80/443，应用端口
+默认只绑定宿主机回环地址。
+
+D1 迁移使用停写窗口：先停止公司采集器和业务写入，再分别导出正式与展示 D1，
+导入两个空白 SQLite 并核对表数、关键表行数和 SHA-256。Cloudflare 在切流前
+保持生产服务，切流后保留为只读回滚点；禁止长期双写或自动合并两端增量。
+
+OSS 存储图片、附件和数据库 SQL 备份，不承载在线数据库。Bucket 必须私有并阻止
+公共访问；服务器优先使用最小权限 ECS 实例 RAM 角色，仓库、命令参数、日志和
+浏览器不得出现 AccessKey。域名未实名、ICP备案、HTTPS 和钉钉回调白名单未完成
+时，ECS 只允许私有预发布和服务器内验收。
+
 ## 公司 AI Provider 网关
 
 公司级 AI 能力统一经过 `/api/platform/v1/ai/*` 服务端网关。业务 App 不直接调用模型供应商，也不把浏览器中的业务状态作为可信上下文；服务端根据钉钉会话、数据域权限和外发策略读取、脱敏并限额公司数据。灵算首期使用固定 `https://lingsuan.top/responses`、`gpt-5.6-sol` 和 `store: false`，设置页不得覆盖域名、路径或任意 Header；灵算凭据直接复用平台连接保险箱保存和验证，不建立独立凭据存储。

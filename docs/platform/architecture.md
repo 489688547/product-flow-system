@@ -1,6 +1,6 @@
 # 平台总体架构
 
-系统采用模块化单体前端、Cloudflare Pages Functions 和 D1 持久化。当前先保持边界清晰和契约稳定，出现第二个真实系统调用方后再抽取独立包或服务。
+系统采用模块化单体前端与 Pages Functions 接口。当前 Cloudflare Pages/D1 是已上线生产边界；阿里云 ECS 通过 Wrangler 本地 Pages 运行时和双 SQLite 建设过渡生产边界，在完成域名、认证、迁移和公网验收前仅作私有预发布。两条运行时复用同一 Functions 源码，避免产生第二套业务 API。
 
 ## 前端边界
 
@@ -47,6 +47,10 @@
 - 本地完整运行时使用 Vite 热更新与 `/api` 到 Pages Functions 的反向代理；仅运行 Vite 不具备业务 API 能力。
 - Cloudflare Pages/Functions 是生产静态资源和 API 边界。
 - D1 保存公司共享状态、平台实体、会话、组织缓存和销售聚合。
+- 阿里云过渡运行时在 Docker 内使用 Wrangler 本地 Pages Functions，`PRODUCT_FLOW_DB` 与 `DEMO_FLOW_DB` 映射到 ECS 持久化数据卷内两个独立 SQLite；公网环境禁止启用本地线上账号模式。
+- ECS 应用端口只绑定宿主机回环地址并加入 Nginx Proxy Manager 内部网络；域名未实名、备案和配置 HTTPS 前不得宣称公网生产上线。
+- OSS 只保存私有对象与两个数据库的一致性导出备份，不承载在线 SQLite。备份优先使用 ECS 实例 RAM 角色，仓库、命令行和日志不得出现 AccessKey。
+- Cloudflare 与 ECS 不长期双写。最终迁移必须停止采集和业务写入，全量导出、导入并校验后切换；回滚先停止 ECS 写入再恢复固定 Cloudflare 入口。
 - `PRODUCT_FLOW_DB` 是正式控制库与正式业务库，`DEMO_FLOW_DB` 只保存展示业务数据；两者必须是不同的物理 D1。
 - 整状态共享数据以 D1 为事实源；默认状态、旧标签页和旧分支只有在先读取当前基线后才能写，同一基线通过原子比较只能被接受一次，所有成功写入都可通过快照和审计回滚。
 - 钉钉 WebView 是独立的嵌入环境，需要单独验证登录、视口和权限。

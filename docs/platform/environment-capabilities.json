@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-25",
+  "updatedAt": "2026-07-29",
   "capabilities": [
     {
       "id": "shared-production-data",
@@ -57,6 +57,28 @@
       "requiredIn": ["preview", "production"],
       "level": "blocking",
       "envVars": ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET"],
+      "bindings": [],
+      "tables": []
+    },
+    {
+      "id": "aliyun-ecs-runtime",
+      "name": "阿里云 ECS 过渡生产运行时",
+      "description": "ECS 容器通过 Wrangler 本地 Pages 运行时复用现有 Functions，并把正式与展示 D1 binding 持久化为数据卷内两个独立 SQLite；该能力由阿里云专用预检阻断，不改变 Cloudflare Production 的全局 readiness 要求。",
+      "platforms": ["aliyun", "cloudflare-pages", "cloudflare-d1", "dingtalk"],
+      "requiredIn": [],
+      "level": "blocking",
+      "envVars": ["DINGTALK_APP_KEY", "DINGTALK_APP_SECRET", "PLATFORM_CREDENTIAL_MASTER_KEY", "DEMO_DATA_MASKING_KEY"],
+      "bindings": ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"],
+      "tables": []
+    },
+    {
+      "id": "aliyun-oss-backup",
+      "name": "阿里云 OSS 私有备份",
+      "description": "ECS 对两个本地 D1 生成一致性 SQL 导出和 SHA-256 清单，并在私有 Bucket 与实例 RAM 角色就绪后上传 OSS；仓库只登记目标名称和地域，不登记 AccessKey。",
+      "platforms": ["aliyun", "cloudflare-d1"],
+      "requiredIn": [],
+      "level": "warning",
+      "envVars": ["OSS_BACKUP_URI", "OSS_REGION", "OSS_ENDPOINT"],
       "bindings": [],
       "tables": []
     },
