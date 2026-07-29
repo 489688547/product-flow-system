@@ -27,6 +27,7 @@ chown root:pfs /opt/product-flow
 chmod 750 /opt/product-flow
 chown -R root:pfs /opt/product-flow/app
 chmod -R g+rX /opt/product-flow/app
+chown -R pfs:pfs /opt/product-flow/data
 install -m 0644 deploy/aliyun/product-flow.service /etc/systemd/system/product-flow.service
 systemctl daemon-reload
 systemctl enable --now product-flow

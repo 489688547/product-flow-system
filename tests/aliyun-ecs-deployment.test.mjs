@@ -245,6 +245,7 @@ test("Aliyun native systemd service is loopback-only and resource bounded", asyn
   assert.match(runbook, /chmod 750 \/opt\/product-flow/);
   assert.match(runbook, /chown -R root:pfs \/opt\/product-flow\/app/);
   assert.match(runbook, /chmod -R g\+rX \/opt\/product-flow\/app/);
+  assert.match(runbook, /chown -R pfs:pfs \/opt\/product-flow\/data/);
 });
 
 test("local D1 check requires both databases to contain tables", async () => {
