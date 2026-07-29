@@ -473,7 +473,18 @@ async function downloadFromKuaimaiCenter({
       if (!download) {
         throw Object.assign(new Error("快麦下载控件不可用。"), { code: "KUAIMAI_DOWNLOAD_BUTTON_MISSING" });
       }
-      download.click();
+      // 下载链接是 <a href="javascript:void(0)">：点击会让浏览器同时尝试跳转到这个
+      // javascript: URL，被页面 CSP 拦下并记一条扩展错误。文件确实下载得到，功能
+      // 没问题，但每下载一次就攒一条噪音，真正的故障会被淹掉（错误页上几十条全是
+      // 这一条）。挡掉默认跳转即可——preventDefault 只阻止默认行为，页面自己的
+      // 点击处理器照常执行。
+      const suppressNavigation = event => event.preventDefault();
+      download.addEventListener("click", suppressNavigation);
+      try {
+        download.click();
+      } finally {
+        download.removeEventListener("click", suppressNavigation);
+      }
       return;
     }
 
