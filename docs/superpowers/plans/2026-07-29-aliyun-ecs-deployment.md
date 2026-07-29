@@ -177,7 +177,7 @@ git commit -m "feat(deploy): add d1 migration tools"
 ### Task 4: Docker and Compose deployment
 
 **Files:**
-- Create: `deploy/aliyun/Dockerfile`
+- Create: `Dockerfile.aliyun`
 - Create: `deploy/aliyun/docker-compose.yml`
 - Create: `deploy/aliyun/runtime.env.example`
 - Create: `deploy/aliyun/README.md`
@@ -213,7 +213,7 @@ Run:
 ```bash
 node --test tests/aliyun-ecs-deployment.test.mjs
 docker compose -f deploy/aliyun/docker-compose.yml config
-docker build -f deploy/aliyun/Dockerfile -t product-flow-system:aliyun .
+docker build -f Dockerfile.aliyun -t product-flow-system:aliyun .
 ```
 
 Expected: all pass.

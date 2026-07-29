@@ -3,7 +3,7 @@ services:
     image: product-flow-system:aliyun
     build:
       context: ../..
-      dockerfile: deploy/aliyun/Dockerfile
+      dockerfile: Dockerfile.aliyun
     container_name: product-flow-app
     restart: unless-stopped
     stop_grace_period: 30s

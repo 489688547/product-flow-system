@@ -14,7 +14,8 @@
 
 ## 文件职责
 
-- `deploy/aliyun/Dockerfile`：可重复构建前端和 Pages Functions 运行镜像。
+- `Dockerfile.aliyun`：位于仓库根目录，供本地 Docker 与 ACR 云端构建共同使用，
+  可重复构建前端和 Pages Functions 运行镜像。
 - `deploy/aliyun/docker-compose.yml`：资源限制、回环端口、数据卷、健康检查和
   代理网络。
 - `deploy/aliyun/wrangler.toml`：两个本地 D1 binding 与 Pages 静态目录。
@@ -64,7 +65,7 @@ npm run check:environment-capabilities
 npm run check:integrations
 npx wrangler pages functions build
 docker compose -f deploy/aliyun/docker-compose.yml config
-docker build -f deploy/aliyun/Dockerfile -t product-flow-system:aliyun .
+docker build -f Dockerfile.aliyun -t product-flow-system:aliyun .
 npm run lint
 npm run check:governance
 npm test
