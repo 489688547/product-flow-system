@@ -2,7 +2,11 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import { resolve } from "node:path";
-import { buildPagesDevArgs, validateRuntimeEnvironment } from "./runtime-config.mjs";
+import {
+  buildPagesDevArgs,
+  runtimeWorkingDirectory,
+  validateRuntimeEnvironment
+} from "./runtime-config.mjs";
 
 function requirePath(path, label) {
   if (!existsSync(path)) throw new Error(`${label}不存在：${path}`);
@@ -17,6 +21,7 @@ export function startAliyunRuntime(env = process.env, spawnImpl = spawn) {
   mkdirSync(config.persistDir, { recursive: true, mode: 0o700 });
 
   const child = spawnImpl(config.wranglerBin, buildPagesDevArgs(config), {
+    cwd: runtimeWorkingDirectory(config),
     stdio: "inherit",
     env: process.env
   });

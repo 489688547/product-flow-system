@@ -23,6 +23,10 @@ docker compose -f deploy/aliyun/docker-compose.yml build
 加固后的原生 systemd unit：
 
 ```bash
+chown root:pfs /opt/product-flow
+chmod 750 /opt/product-flow
+chown -R root:pfs /opt/product-flow/app
+chmod -R g+rX /opt/product-flow/app
 install -m 0644 deploy/aliyun/product-flow.service /etc/systemd/system/product-flow.service
 systemctl daemon-reload
 systemctl enable --now product-flow

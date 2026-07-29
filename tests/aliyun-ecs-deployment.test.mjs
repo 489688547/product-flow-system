@@ -62,7 +62,11 @@ test("Aliyun runtime rejects local executive bypass and unsafe paths", async () 
 });
 
 test("Aliyun runtime builds a non-interactive local Pages command without secret values", async () => {
-  const { buildPagesDevArgs, validateRuntimeEnvironment } = await import("../scripts/aliyun/runtime-config.mjs");
+  const {
+    buildPagesDevArgs,
+    runtimeWorkingDirectory,
+    validateRuntimeEnvironment
+  } = await import("../scripts/aliyun/runtime-config.mjs");
   const config = validateRuntimeEnvironment({
     PFS_RUNTIME_PORT: "8080",
     PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler",
@@ -76,7 +80,6 @@ test("Aliyun runtime builds a non-interactive local Pages command without secret
 
   assert.deepEqual(args, [
     "pages", "dev", "/app/dist",
-    "--config", "/app/deploy/aliyun/wrangler.toml",
     "--ip", "127.0.0.1",
     "--port", "8080",
     "--persist-to", "/var/lib/product-flow/wrangler",
@@ -84,6 +87,8 @@ test("Aliyun runtime builds a non-interactive local Pages command without secret
     "--show-interactive-dev-session=false",
     "--log-level", "info"
   ]);
+  assert.equal(runtimeWorkingDirectory(config), "/app/deploy/aliyun");
+  assert.equal(args.includes("--config"), false);
   assert.equal(JSON.stringify(args).includes("must-not-appear"), false);
 });
 
@@ -193,6 +198,7 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
 
 test("Aliyun native systemd service is loopback-only and resource bounded", async () => {
   const unit = await readFile(resolve(root, "deploy/aliyun/product-flow.service"), "utf8");
+  const runbook = await readFile(resolve(root, "deploy/aliyun/README.md"), "utf8");
 
   assert.match(unit, /^User=pfs$/m);
   assert.match(unit, /^Environment=PFS_RUNTIME_HOST=127\.0\.0\.1$/m);
@@ -200,6 +206,10 @@ test("Aliyun native systemd service is loopback-only and resource bounded", asyn
   assert.match(unit, /^NoNewPrivileges=true$/m);
   assert.match(unit, /^ReadWritePaths=\/opt\/product-flow\/data$/m);
   assert.doesNotMatch(unit, /DINGTALK_APP_SECRET/);
+  assert.match(runbook, /chown root:pfs \/opt\/product-flow/);
+  assert.match(runbook, /chmod 750 \/opt\/product-flow/);
+  assert.match(runbook, /chown -R root:pfs \/opt\/product-flow\/app/);
+  assert.match(runbook, /chmod -R g\+rX \/opt\/product-flow\/app/);
 });
 
 test("local D1 check requires both databases to contain tables", async () => {

@@ -1,4 +1,4 @@
-import { isAbsolute } from "node:path";
+import { dirname, isAbsolute } from "node:path";
 
 const DEFAULTS = Object.freeze({
   PFS_RUNTIME_HOST: "127.0.0.1",
@@ -53,7 +53,6 @@ export function validateRuntimeEnvironment(env = {}) {
 export function buildPagesDevArgs(config) {
   return [
     "pages", "dev", config.assetsDir,
-    "--config", config.configPath,
     "--ip", config.host,
     "--port", String(config.port),
     "--persist-to", config.persistDir,
@@ -61,4 +60,8 @@ export function buildPagesDevArgs(config) {
     "--show-interactive-dev-session=false",
     "--log-level", "info"
   ];
+}
+
+export function runtimeWorkingDirectory(config) {
+  return dirname(config.configPath);
 }
