@@ -44,6 +44,13 @@ export const SIGNATURE_PARAMS = Object.freeze(["msToken", "a_bogus", "verifyFp",
 // 在 date_type=21 下返回完全相同的结果（首行支付金额均为 1519911）。
 const DATE_TYPE_DAILY = "21";
 
+// 罗盘自己会告诉你每种 date_type 能查多久，不必猜也不该盲目重试：
+//   GET /compass_api/config_center/data_range_v2?data_type=<页面标识>&path=<页面路径>
+// 返回 data_range_map，按 date_type 给出 min_date/max_date。直播概览页实测：
+//   22→3 天、21→7 天、23→30 天、24→90 天、7→今年至今。
+// 各页面窗口不同，接入执行器时应先查询再选 date_type，并据此判断目标业务日可否采集。
+export const DOUYIN_DATA_RANGE_ENDPOINT = "/compass_api/config_center/data_range_v2";
+
 // 单日数据必须逐日不同，否则说明日期没生效。实测 date_type=21 下
 // 07-26 首行支付金额 1519911、07-27 为 1441483，确认日期真正参与查询。
 // 另外罗盘商品卡只保留到 07-26，更早的日期返回 0 行——这是平台的数据保留期，
