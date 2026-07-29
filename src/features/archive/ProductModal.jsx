@@ -8,18 +8,31 @@ import { OrgSelect } from "../../ui/OrgSelect.jsx";
 import { RichTextEditor } from "../../ui/RichTextEditor.jsx";
 import { mergeProductCatalogLink } from "../../domain/productCatalog.js";
 import { ProductCatalogSelect } from "../product-catalog/ProductCatalogSelect.jsx";
+import { prepareProductImage } from "../../state/productImage.js";
 
 export function ProductModal({ open, product, orgCache, catalogItems = [], onClose, onSave }) {
   const [form, setForm] = useState(product || {});
-  useEffect(() => setForm(product || {}), [product, open]);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState("");
+  useEffect(() => {
+    setForm(product || {});
+    setImageBusy(false);
+    setImageError("");
+  }, [product, open]);
   if (!product) return null;
   const set = patch => setForm(current => ({ ...current, ...patch }));
   const catalogItem = catalogItems.find(item => item.id === form.catalogProductId);
-  const readCover = file => {
+  const readCover = async file => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => set({ image: reader.result });
-    reader.readAsDataURL(file);
+    setImageBusy(true);
+    setImageError("");
+    try {
+      set({ image: await prepareProductImage(file) });
+    } catch (error) {
+      setImageError(error?.message || "图片处理失败，请重新选择。");
+    } finally {
+      setImageBusy(false);
+    }
   };
 
   return (
@@ -27,7 +40,7 @@ export function ProductModal({ open, product, orgCache, catalogItems = [], onClo
       open={open}
       title="编辑产品档案"
       onClose={onClose}
-      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" onClick={() => onSave(form)}>保存</Button></>}
+      footer={<><Button onClick={onClose}>取消</Button><Button variant="primary" disabled={imageBusy} disabledReason="图片正在压缩" onClick={() => onSave(form)}>保存</Button></>}
     >
       <div className="product-modal-layout">
         <div className="cover-field">
@@ -35,8 +48,9 @@ export function ProductModal({ open, product, orgCache, catalogItems = [], onClo
           <label className="cover-editable" title="更换封面图片">
             <img src={form.image || product.image} alt={`${form.name || product.name}封面`} width="160" height="160" />
             <span className="cover-edit-overlay" aria-hidden="true"><ImagePlus size={22} /></span>
-            <input type="file" accept="image/*" onChange={event => { readCover(event.target.files?.[0]); event.target.value = ""; }} />
+            <input type="file" accept="image/*" disabled={imageBusy} onChange={event => { readCover(event.target.files?.[0]); event.target.value = ""; }} />
           </label>
+          {imageError ? <p role="alert">{imageError}</p> : null}
         </div>
         <div className="form-grid">
           <label>产品名称<input name="product-name" autoComplete="off" value={form.name || ""} onChange={event => set({ name: event.target.value })} /></label>
