@@ -414,9 +414,33 @@ export function createCdpDouyinController({
     return box;
   }
 
+  // 文本同样要用可信事件写入。今天在快麦与罗盘上反复验证：程序化写 value 只改显示，
+  // 提交时表单模型里还是旧值，而且不报错——这是最难察觉的一类故障。
+  async function trustedTypeText(text) {
+    if (!pageSession) throw douyinError("DOUYIN_PAGE_NOT_OPEN", "抖店登记页面尚未打开。");
+    for (const char of String(text)) {
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyDown", text: char });
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyUp" });
+    }
+  }
+
+  // 清空输入框：全选后输入即覆盖。不用 value = "" ——同样进不了表单模型。
+  async function trustedClearAndType(selectorExpression, text, missingCode, missingMessage) {
+    await trustedClickElement(selectorExpression, missingCode, missingMessage);
+    await pageSession.send("Input.dispatchKeyEvent", {
+      type: "keyDown", modifiers: 4, key: "a", code: "KeyA", windowsVirtualKeyCode: 65
+    });
+    await pageSession.send("Input.dispatchKeyEvent", {
+      type: "keyUp", modifiers: 4, key: "a", code: "KeyA", windowsVirtualKeyCode: 65
+    });
+    await trustedTypeText(text);
+  }
+
   return Object.freeze({
     trustedClickAt,
     trustedClickElement,
+    trustedTypeText,
+    trustedClearAndType,
     async open(url) {
       if (!REGISTERED_URLS.has(url)) {
         throw douyinError("DOUYIN_URL_NOT_REGISTERED", "抖店页面未在采集器登记。");
