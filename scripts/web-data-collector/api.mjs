@@ -6,6 +6,7 @@ function normalizeBaseUrl(value) {
 
 export function createWebCollectionApi({ baseUrl, token, fetchImpl = nodeRequest }) {
   const endpoint = `${normalizeBaseUrl(baseUrl)}/api/platform/v1/web-collection/jobs`;
+  const runsEndpoint = `${normalizeBaseUrl(baseUrl)}/api/platform/v1/web-collection/runs`;
   const runnerToken = String(token || "").trim();
   if (!/^wdc_[a-f0-9]{48}$/i.test(runnerToken)) throw new Error("网页采集 runner token 格式无效。");
 
@@ -29,6 +30,27 @@ export function createWebCollectionApi({ baseUrl, token, fetchImpl = nodeRequest
     return payload.data || payload;
   }
 
+  async function runRequest(path = "", { method = "GET", body, idempotencyKey } = {}) {
+    const response = await fetchImpl(`${runsEndpoint}${path}`, {
+      method,
+      headers: {
+        authorization: `Bearer ${runnerToken}`,
+        ...(body ? { "content-type": "application/json" } : {}),
+        ...(idempotencyKey ? { "idempotency-key": idempotencyKey } : {})
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      const error = new Error(payload?.error?.message || `实验采集控制面请求失败（HTTP ${response.status}）。`);
+      error.code = payload?.error?.code || "COLLECTOR_RUN_API_FAILED";
+      error.status = response.status;
+      error.retryable = Boolean(payload?.error?.retryable);
+      throw error;
+    }
+    return payload.data || payload;
+  }
+
   return Object.freeze({
     heartbeat: input => action({ action: "heartbeat", ...input }),
     assignedStores: () => action({ action: "assigned_stores" }),
@@ -42,6 +64,11 @@ export function createWebCollectionApi({ baseUrl, token, fetchImpl = nodeRequest
     }),
     transition: input => action({ action: "transition", ...input }),
     complete: input => action({ action: "complete", ...input }),
-    recordNotification: input => action({ action: "record_notification", ...input })
+    recordNotification: input => action({ action: "record_notification", ...input }),
+    assignedExperimentalRuns: () => runRequest(),
+    experimentalRunAction: (runId, input, idempotencyKey) => runRequest(
+      `/${encodeURIComponent(runId)}/actions`,
+      { method: "POST", body: input, idempotencyKey }
+    )
   });
 }

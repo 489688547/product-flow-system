@@ -62,7 +62,7 @@
   - 验证：无会话、错误角色、错误设备、重复写、版本冲突、过期和篡改均返回稳定错误。
   - 提交：API、迁移和测试，提交信息 `feat(collector): add template and run APIs`。
 
-- [ ] 正式兼容与双模式编排
+- [x] 正式兼容与双模式编排
   - 依赖：本机存储、服务端 API。
   - 文件：`scripts/web-data-collector/orchestrator.mjs`、`scripts/web-data-collector/api.mjs`、
     `tests/web-data-collector-runtime.test.mjs`。
@@ -71,6 +71,9 @@
   - 失败测试：运行时测试预期因模式路由、开关和实验信任限制缺失失败。
   - 实现步骤：兼容解析旧任务；接实验领取与执行；接事件和检查点；锁定正式事实 writer 边界。
   - 验证：现有快麦/抖店测试不变；关闭实验开关后不领取实验任务；实验结果不能调用正式 writer。
+  - 实际证据：实验 CDP 浏览器 2/2，模板/执行器/检查点/运行时聚焦回归 53/53；
+    Runner 和服务端实验开关默认关闭，显式启用后才领取执行包；失败只回传稳定错误码与固定安全摘要；
+    正式快麦/抖店运行时回归保持通过。
   - 提交：编排和回归测试，提交信息 `feat(collector): route formal and experimental runs`。
 
 - [ ] 可移植契约与交付验证

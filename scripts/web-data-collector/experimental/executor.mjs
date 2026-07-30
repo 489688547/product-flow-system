@@ -417,7 +417,10 @@ export async function executeExperimentalRun({
     startedAt,
     completedAt: new Date().toISOString(),
     outputs,
-    variables
+    variables,
+    quality: variables.quality && typeof variables.quality === "object"
+      ? structuredClone(variables.quality)
+      : null
   };
   runStore?.saveRun({
     runId: bundle.runId,

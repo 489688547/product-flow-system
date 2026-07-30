@@ -4,7 +4,8 @@ import test from "node:test";
 import {
   assertBusinessDateMatchesRange,
   assertCollectionFileMatchesTask,
-  createCommerceFactUploader
+  createCommerceFactUploader,
+  experimentalModeEnabled
 } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 import {
@@ -47,6 +48,13 @@ const job = {
   businessDate: "2026-07-21",
   scheduleVersion: "v1"
 };
+
+test("experimental mode is off by default and requires an explicit runner switch", () => {
+  assert.equal(experimentalModeEnabled(), false);
+  assert.equal(experimentalModeEnabled("0"), false);
+  assert.equal(experimentalModeEnabled("1"), true);
+  assert.equal(experimentalModeEnabled("enabled"), true);
+});
 
 test("orchestrator schedules all extension-implemented Kuaimai resources after 10:00", async () => {
   const api = apiDouble(job);
@@ -344,6 +352,107 @@ test("dedicated runtime fetches assigned stores and completes a short browser ac
     { storeId: "90862283", executor: "dedicated" }
   ]);
   assert.equal(calls.some(([name]) => name === "submitResult"), true);
+});
+
+test("collector runtime executes an assigned experimental bundle through the versioned run API", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  assert.equal(typeof createExperimentalRunCycle, "function", "createExperimentalRunCycle must be implemented");
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        calls.push(["assigned"]);
+        return {
+          runs: [{
+            run: { id: "run-1", version: 1 },
+            executionBundle: {
+              runId: "run-1",
+              runnerId: "runner-1",
+              templateId: "research",
+              version: 1,
+              contentHash: "a".repeat(64),
+              expiresAt: "2026-07-30T10:15:00.000Z",
+              template: { mode: "experimental" }
+            }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input, key) {
+        calls.push(["action", runId, input.action, input.expectedVersion, key]);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3,
+            status: input.action === "start" ? "running" : "completed"
+          }
+        };
+      }
+    },
+    executeRun: async bundle => {
+      calls.push(["execute", bundle.runId]);
+      return {
+        runId: bundle.runId,
+        status: "completed",
+        quality: {
+          requiredFieldsComplete: true,
+          storeMatched: true,
+          businessDateMatched: true,
+          schemaMatched: true,
+          coverage: 1
+        }
+      };
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 1, failed: 0 });
+  assert.deepEqual(calls.map(call => call.slice(0, 3)), [
+    ["assigned"],
+    ["action", "run-1", "start"],
+    ["execute", "run-1"],
+    ["action", "run-1", "complete"]
+  ]);
+  assert.match(calls[1][4], /^collector-run:run-1:start:1$/);
+  assert.match(calls[3][4], /^collector-run:run-1:complete:2$/);
+});
+
+test("collector runtime reports safe failure without sending local output or paths", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        return {
+          runs: [{
+            run: { id: "run-1", version: 1 },
+            executionBundle: { runId: "run-1" }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input) {
+        calls.push(input);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3
+          }
+        };
+      }
+    },
+    executeRun: async () => {
+      throw Object.assign(new Error("failed at /Users/employee/report.xlsx token=secret"), {
+        code: "COLLECTOR_COMMAND_FAILED"
+      });
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 0, failed: 1 });
+  assert.equal(calls.at(-1).action, "fail");
+  assert.equal(calls.at(-1).errorCode, "COLLECTOR_COMMAND_FAILED");
+  assert.doesNotMatch(JSON.stringify(calls.at(-1)), /Users|report\.xlsx|token=|secret/i);
 });
 
 test("dedicated runtime resumes a downloaded checkpoint without repeating browser work", async () => {

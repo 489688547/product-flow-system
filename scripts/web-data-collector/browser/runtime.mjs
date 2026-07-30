@@ -103,3 +103,70 @@ export function createDedicatedBrowserRuntime({
     }
   });
 }
+
+function safeExperimentalError(error) {
+  const candidate = String(error?.code || "COLLECTOR_EXPERIMENT_FAILED").toUpperCase();
+  return {
+    errorCode: /^[A-Z0-9_]{3,80}$/.test(candidate)
+      ? candidate
+      : "COLLECTOR_EXPERIMENT_FAILED",
+    safeSummary: "本机实验采集运行失败，请查看本机诊断。"
+  };
+}
+
+export function createExperimentalRunCycle({ api, executeRun }) {
+  if (
+    typeof api?.assignedExperimentalRuns !== "function"
+    || typeof api?.experimentalRunAction !== "function"
+    || typeof executeRun !== "function"
+  ) {
+    throw new Error("实验采集循环依赖不完整。");
+  }
+  return Object.freeze({
+    async runOnce() {
+      const assignment = await api.assignedExperimentalRuns();
+      const runs = Array.isArray(assignment?.runs) ? assignment.runs : [];
+      let processed = 0;
+      let failed = 0;
+      for (const assigned of runs) {
+        const runId = String(assigned?.run?.id || "");
+        let version = Number(assigned?.run?.version || 0);
+        if (!runId || !version || assigned?.executionBundle?.runId !== runId) continue;
+        try {
+          if (assigned.run.status !== "running") {
+            const started = await api.experimentalRunAction(
+              runId,
+              { action: "start", expectedVersion: version },
+              `collector-run:${runId}:start:${version}`
+            );
+            version = Number(started?.run?.version || version + 1);
+          }
+          const result = await executeRun(assigned.executionBundle);
+          await api.experimentalRunAction(
+            runId,
+            {
+              action: "complete",
+              expectedVersion: version,
+              quality: result?.quality || {}
+            },
+            `collector-run:${runId}:complete:${version}`
+          );
+          processed += 1;
+        } catch (error) {
+          const safe = safeExperimentalError(error);
+          await api.experimentalRunAction(
+            runId,
+            {
+              action: "fail",
+              expectedVersion: version,
+              ...safe
+            },
+            `collector-run:${runId}:fail:${version}`
+          ).catch(() => {});
+          failed += 1;
+        }
+      }
+      return { assigned: runs.length, processed, failed };
+    }
+  });
+}

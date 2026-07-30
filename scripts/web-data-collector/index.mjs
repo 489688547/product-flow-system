@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createHash, randomBytes } from "node:crypto";
 import os from "node:os";
-import { readdir, stat } from "node:fs/promises";
+import { mkdir, readdir, stat } from "node:fs/promises";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -23,7 +23,10 @@ import {
 } from "./automation.mjs";
 import { createCollectorBridge } from "./bridge.mjs";
 import { createBrowserProfileRegistry } from "./browser/profile-registry.mjs";
-import { createDedicatedBrowserRuntime } from "./browser/runtime.mjs";
+import {
+  createDedicatedBrowserRuntime,
+  createExperimentalRunCycle
+} from "./browser/runtime.mjs";
 import {
   DOUYIN_DEDICATED_RESOURCES,
   createCdpDouyinController,
@@ -31,6 +34,9 @@ import {
 } from "./browser/providers/douyin.mjs";
 import { createCheckpointStore } from "./checkpoints.mjs";
 import { createLocalDiagnosticStore } from "./diagnostics.mjs";
+import { createExperimentalCdpBrowser } from "./experimental/browser.mjs";
+import { executeExperimentalRun } from "./experimental/executor.mjs";
+import { createExperimentalRunStore } from "./experimental/store.mjs";
 import { resolveSafeDownload } from "./download.mjs";
 import { notifyCollectionIssue } from "./notification.mjs";
 import { createWebCollectorOrchestrator } from "./orchestrator.mjs";
@@ -59,6 +65,10 @@ export const DEFAULT_MANAGED_PROFILE_ROOT = path.join(
   "Product Flow Collector",
   "Profiles"
 );
+
+export function experimentalModeEnabled(value = "") {
+  return ["1", "true", "enabled"].includes(String(value || "").trim().toLowerCase());
+}
 
 async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
   const personalToken = String(process.env.PRODUCTION_DATA_ACCESS_TOKEN || "").trim();
@@ -207,7 +217,8 @@ async function serve({
   baseUrl,
   downloadsDirectory,
   browserMode = "extension",
-  profileRoot = DEFAULT_MANAGED_PROFILE_ROOT
+  profileRoot = DEFAULT_MANAGED_PROFILE_ROOT,
+  experimentalMode = false
 }) {
   const [runnerToken, pairingKey, processDownload] = await Promise.all([
     readRunnerToken(),
@@ -238,6 +249,12 @@ async function serve({
   const checkpointStore = createCheckpointStore({
     rootDir: path.join(runtimeStateRoot, "Checkpoints")
   });
+  const experimentalRoot = path.join(runtimeStateRoot, "Experimental");
+  const experimentalRunStore = experimentalMode
+    ? createExperimentalRunStore({
+      databasePath: path.join(experimentalRoot, "experimental-runs.sqlite")
+    })
+    : null;
   const diagnosticStore = createLocalDiagnosticStore({
     rootDir: path.join(runtimeStateRoot, "Diagnostics"),
     encryptionKey: createHash("sha256").update(pairingKey).digest()
@@ -260,6 +277,40 @@ async function serve({
       diagnosticPageType: task => DOUYIN_DEDICATED_RESOURCES[task.resourceType]?.pageType || ""
     })
     : null;
+  const experimentalCycle = experimentalMode ? createExperimentalRunCycle({
+    api,
+    executeRun: async bundle => {
+      const profile = profileRegistry.register({
+        providerId: bundle.template.providerId,
+        storeId: bundle.template.profileId,
+        storeName: bundle.templateId
+      });
+      const managedBrowser = await ensureManagedChrome(profile);
+      const workspace = path.join(experimentalRoot, bundle.runId);
+      await mkdir(workspace, { recursive: true, mode: 0o700 });
+      const allowedOrigins = [...new Set(
+        bundle.template.steps
+          .filter(step => step.type === "browser.open")
+          .map(step => new URL(step.url).origin)
+      )];
+      const browser = createExperimentalCdpBrowser({
+        endpoint: managedBrowser.endpoint,
+        allowedOrigins,
+        downloadsDirectory: workspace
+      });
+      try {
+        return await executeExperimentalRun({
+          bundle,
+          browser,
+          workspace,
+          checkpointStore,
+          runStore: experimentalRunStore
+        });
+      } finally {
+        browser.close();
+      }
+    }
+  }) : null;
   const bridge = createCollectorBridge({
     allowedOrigin: EXTENSION_ORIGIN,
     pairingKey,
@@ -279,6 +330,7 @@ async function serve({
       await orchestrator.prepare();
       await diagnosticStore.cleanup();
       await dedicatedRuntime?.runOnce();
+      await experimentalCycle?.runOnce();
     } finally {
       cycleRunning = false;
     }
@@ -288,6 +340,7 @@ async function serve({
   const stop = async () => {
     clearInterval(timer);
     await bridge.close();
+    experimentalRunStore?.close();
   };
   process.once("SIGINT", () => void stop().then(() => process.exit(0)));
   process.once("SIGTERM", () => void stop().then(() => process.exit(0)));
@@ -296,7 +349,8 @@ async function serve({
     host: "127.0.0.1",
     port: bridge.port,
     extensionId: EXTENSION_ID,
-    browserMode
+    browserMode,
+    experimentalMode
   };
 }
 
@@ -308,6 +362,9 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
   const browserMode = argument(argv, "--browser-mode", "extension") === "dedicated"
     ? "dedicated"
     : "extension";
+  const experimentalMode = experimentalModeEnabled(
+    argument(argv, "--experimental-mode", process.env.WEB_COLLECTION_EXPERIMENTAL_MODE || "")
+  );
   const profileRoot = resolve(argument(argv, "--profile-root", DEFAULT_MANAGED_PROFILE_ROOT));
   const extensionPath = EXTENSION_SOURCE_ROOT;
   if (command === "register") return registerRunner(baseUrl);
@@ -332,6 +389,7 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
       archiveRoot: root,
       douyinArchiveRoot: DEFAULT_DOUYIN_ARCHIVE_ROOT,
       browserMode,
+      experimentalMode,
       profileRoot,
       secrets: "macOS Keychain"
     };
@@ -341,7 +399,8 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
     baseUrl,
     downloadsDirectory,
     browserMode,
-    profileRoot
+    profileRoot,
+    experimentalMode
   });
   throw new Error(`未知命令：${command}`);
 }
