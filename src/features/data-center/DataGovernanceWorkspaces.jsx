@@ -162,6 +162,10 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
     setResultMessage("请在缺口清单中选择对应业务日期重新采集；系统不会从文件名猜测日期。");
   };
   // 逐目标串行提交；中途失败必须报告已成功的部分，不能让用户以为整批都失败。
+// 统一口径先补 sales_items：销售事实来自它，order_items 只是订单级明细。
+// 顺序有意义——采集器一次只处理一个任务，先补真正影响覆盖判定的那个。
+const UNIFIED_CALIBER_RESOURCES = Object.freeze(["sales_items", "order_items"]);
+
   const submitBackfill = async rows => {
     if (!canTrigger || submitting) return;
     setSubmitting(true);
@@ -172,8 +176,14 @@ export function SyncRunsWorkspace({ quality, dailyFacts = [], focusTarget = "", 
     for (const row of rows) {
       try {
         if (row.caliber === "unified") {
-          await triggerKuaimaiSalesCollection({ date: row.businessDate, resourceType: "order_items", force: true });
-          queued += 1;
+          // 统一口径的销售事实来自销售主题报表（sales_items），不是订单明细。
+          // 此处原先只补 order_items：任务次次成功，覆盖却纹丝不动，用户反复点「补这天」
+          // 也不会有任何效果——补的根本是另一个资源。order_items 仍然要补，
+          // 它是订单级明细的来源，但必须以 sales_items 为主。
+          for (const resourceType of UNIFIED_CALIBER_RESOURCES) {
+            await triggerKuaimaiSalesCollection({ date: row.businessDate, resourceType, force: true });
+            queued += 1;
+          }
         } else {
           for (const store of webCollection.stores.filter(item => item.providerId === "douyin-ecommerce")) {
             for (const resource of DOUYIN_COLLECTION_RESOURCES) {

@@ -9,6 +9,7 @@ const POLL_ALARM = "company-data-collector-poll";
 const ACTIVE_JOB_KEY = "activeJob";
 // 插件自己创建的专用采集标签页，绝不复用员工正在操作的标签页。
 const COLLECTOR_TAB_KEY = "collectorTabId";
+const COLLECTOR_WINDOW_KEY = "collectorWindowId";
 const TAB_LOAD_TIMEOUT_MS = 30000;
 const CONTENT_SCRIPT_PROBE_TIMEOUT_MS = 10000;
 const CONTENT_SCRIPT_AUTO_INJECTION_TIMEOUT_MS = 1500;
@@ -174,15 +175,48 @@ async function findCollectorTab() {
   }
 }
 
+// 采集页必须独占一个窗口，不能是员工窗口里的后台标签页。后台标签页会被 Chrome
+// 降级渲染，Element UI 的日期浮层定位不出来，选日期直接失败；而且它和员工（或
+// 调试）共用窗口时会被随手导航走，任务跑到一半筛选就被重置。独占窗口里它是活动
+// 标签页，正常渲染，也没人会碰它。窗口不抢焦点。
+async function findCollectorWindow() {
+  const stored = await chrome.storage.local.get(COLLECTOR_WINDOW_KEY);
+  const windowId = Number(stored[COLLECTOR_WINDOW_KEY]);
+  if (!Number.isInteger(windowId)) return null;
+  try {
+    return await chrome.windows.get(windowId, { populate: true });
+  } catch {
+    await chrome.storage.local.remove(COLLECTOR_WINDOW_KEY);
+    return null;
+  }
+}
+
+async function createCollectorWindow(targetUrl) {
+  const created = await chrome.windows.create({
+    url: targetUrl,
+    focused: false,
+    type: "normal",
+    width: 1440,
+    height: 900
+  });
+  const tab = created?.tabs?.[0];
+  if (!tab) throw Object.assign(new Error("采集窗口创建失败。"), { code: "EXTENSION_COLLECTOR_WINDOW_FAILED" });
+  await chrome.storage.local.set({
+    [COLLECTOR_WINDOW_KEY]: created.id,
+    [COLLECTOR_TAB_KEY]: tab.id
+  });
+  return tab;
+}
+
 export async function ensureProviderTab(resource, targetUrl) {
-  // 只复用插件自己创建并登记的专用标签页；没有专用标签页时永远后台新开，
+  // 只复用插件自己创建并登记的专用标签页；没有专用标签页时永远新开独立窗口，
   // 绝不导航复用员工正在使用的快麦页面。
   let tab = await findCollectorTab();
+  if (tab && !(await findCollectorWindow())) tab = null;
   if (!tab) {
-    tab = await chrome.tabs.create({ url: targetUrl, active: false });
-    await chrome.storage.local.set({ [COLLECTOR_TAB_KEY]: tab.id });
+    tab = await createCollectorWindow(targetUrl);
   } else if (tab.url !== targetUrl) {
-    tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: false });
+    tab = await chrome.tabs.update(tab.id, { url: targetUrl, active: true });
   }
   tab = await waitForTabComplete(tab.id);
   if (!await waitForContentScript(tab.id, 500)) {
@@ -276,6 +310,27 @@ async function discoverDouyinStore() {
     lastBridgeError: null
   });
   return identity.storeId;
+}
+
+const SOURCE_STAMP_KEY = "extensionSourceStamp";
+
+// 改完扩展代码必须重载扩展才生效，否则一直跑旧代码。这一点极难察觉——表现为
+// 「改完没效果」，实际排查时只能靠失败耗时之类的间接线索才判断得出来，一天里
+// 因此反复要求人工去扩展页点「重新加载」。本机服务把扩展源码的最新修改时间
+// 随任务轮询带回来，这里发现变化就自行重载。
+async function reloadWhenSourceChanged(sourceStamp) {
+  const stamp = String(sourceStamp || "");
+  if (!stamp) return;
+  const stored = await chrome.storage.local.get(SOURCE_STAMP_KEY);
+  const known = String(stored[SOURCE_STAMP_KEY] || "");
+  if (!known) {
+    await chrome.storage.local.set({ [SOURCE_STAMP_KEY]: stamp });
+    return;
+  }
+  if (known === stamp) return;
+  // 先写入新指纹再重载，否则重启后又会看到「变化」而反复重载。
+  await chrome.storage.local.set({ [SOURCE_STAMP_KEY]: stamp });
+  chrome.runtime.reload();
 }
 
 async function nextTaskPath(storeId = "") {
@@ -479,12 +534,14 @@ async function poll() {
     if (profileStoreId) profileStoreId = await discoverDouyinStore();
     const response = await bridgeFetch(await nextTaskPath(profileStoreId));
     if (!response.ok) throw Object.assign(new Error("本机执行器连接失败。"), { code: `BRIDGE_HTTP_${response.status}` });
-    let { task } = await response.json();
+    let { task, sourceStamp } = await response.json();
     if (!task && !profileStoreId) {
       profileStoreId = await discoverDouyinStore();
       const refreshed = await bridgeFetch(await nextTaskPath(profileStoreId));
-      if (refreshed.ok) ({ task } = await refreshed.json());
+      if (refreshed.ok) ({ task, sourceStamp } = await refreshed.json());
     }
+    // 只在没有任务时重载：跑任务途中重启扩展会让这次采集半途而废。
+    if (!task) await reloadWhenSourceChanged(sourceStamp);
     if (task) await executeTask(task);
     await chrome.storage.local.set({ lastBridgeAt: new Date().toISOString(), lastBridgeError: null });
   } catch (error) {

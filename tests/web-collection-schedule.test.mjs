@@ -23,11 +23,11 @@ const kuaimai = {
 };
 
 test("daily plan waits until 05:00 Shanghai time", () => {
-  assert.deepEqual(createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T04:59:59+08:00" }), []);
+  assert.deepEqual(createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T09:59:59+08:00" }), []);
 });
 
-test("daily plan creates yesterday facts and current snapshots after 05:00", () => {
-  const plan = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T05:01:00+08:00" });
+test("daily plan creates yesterday facts and current snapshots after 10:00", () => {
+  const plan = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T10:01:00+08:00" });
   assert.deepEqual(plan.map(job => [job.resourceType, job.businessDate, job.rangeKind]), [
     ["orders", "2026-07-21", "daily_fact"],
     ["order_items", "2026-07-21", "daily_fact"],
@@ -42,7 +42,7 @@ test("daily plan creates yesterday facts and current snapshots after 05:00", () 
 });
 
 test("late Mac startup produces the same idempotent catch-up plan", () => {
-  const first = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T05:01:00+08:00" });
+  const first = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T10:01:00+08:00" });
   const late = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T12:30:00+08:00" });
   assert.deepEqual(late.map(webCollectionJobKey), first.map(webCollectionJobKey));
 });
@@ -53,7 +53,7 @@ test("store-scoped adapters create isolated daily jobs for every registered stor
     stores: [{ id: "store-a" }, { id: "store-b" }],
     resources: [{ type: "product_daily", rangeKind: "daily_fact", scheduleVersion: "v1" }]
   };
-  const plan = createDailyPlan({ adapters: [douyin], now: "2026-07-22T05:01:00+08:00" });
+  const plan = createDailyPlan({ adapters: [douyin], now: "2026-07-22T10:01:00+08:00" });
 
   assert.deepEqual(plan.map(job => [job.storeId, job.businessDate]), [
     ["store-a", "2026-07-21"],
@@ -71,7 +71,7 @@ test("disabled adapters and resources are not scheduled", () => {
       { ...kuaimai, enabled: false },
       { ...kuaimai, id: "active", resources: [{ ...kuaimai.resources[0], enabled: false }] }
     ],
-    now: "2026-07-22T05:01:00+08:00"
+    now: "2026-07-22T10:01:00+08:00"
   });
   assert.deepEqual(plan, []);
 });
@@ -105,14 +105,14 @@ test("transient failures retry after bounded backoff while human states and exha
 });
 
 test("a repaired sales adapter publishes a new schedule version instead of mutating old failed jobs", () => {
-  const plan = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-23T05:01:00+08:00" });
+  const plan = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-23T10:01:00+08:00" });
   const sales = plan.find(job => job.resourceType === "sales_items");
   assert.equal(sales.scheduleVersion, "v3");
   assert.equal(sales.idempotencyKey, "kuaimai:sales_items:2026-07-22:v3");
 });
 
 test("Kuaimai daily plan includes all three current product snapshots", () => {
-  const plan = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-24T05:01:00+08:00" });
+  const plan = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-24T10:01:00+08:00" });
   assert.deepEqual(
     plan
       .filter(job => ["products", "product_kits", "product_combinations"].includes(job.resourceType))
@@ -125,14 +125,14 @@ test("Kuaimai daily plan includes all three current product snapshots", () => {
   );
 });
 
-test("Kuaimai daily plan includes the current inventory snapshot after 05:00", () => {
+test("Kuaimai daily plan includes the current inventory snapshot after 10:00", () => {
   const before = createDailyPlan({
     adapters: WEB_COLLECTION_ADAPTERS,
-    now: "2026-07-26T04:59:59+08:00"
+    now: "2026-07-26T09:59:59+08:00"
   });
   const after = createDailyPlan({
     adapters: WEB_COLLECTION_ADAPTERS,
-    now: "2026-07-26T05:00:00+08:00"
+    now: "2026-07-26T10:00:00+08:00"
   });
 
   assert.equal(before.some(job => job.resourceType === "inventory"), false);
@@ -154,7 +154,7 @@ test("state transitions reject skipped stages and terminal recovery", () => {
 });
 
 test("only a successful run advances the resource cursor", () => {
-  const job = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T05:01:00+08:00" })[0];
+  const job = createDailyPlan({ adapters: [kuaimai], now: "2026-07-22T10:01:00+08:00" })[0];
   assert.equal(nextCursorForSuccessfulJob({ ...job, status: "failed" }, { id: "run-1" }), null);
   assert.deepEqual(nextCursorForSuccessfulJob({ ...job, id: "job-1", status: "success" }, {
     id: "run-2",
@@ -204,4 +204,16 @@ test("failure notifications remain isolated by store", () => {
   assert.equal(intents.length, 2);
   assert.equal(new Set(intents.map(item => item.dedupeKey)).size, 2);
   assert.deepEqual(intents.map(item => item.storeId), ["store-a", "store-b"]);
+});
+
+test("每日排程不得早于上午 10 点", () => {
+  // 凌晨采集会拿到半成品。快麦销售主题报表虽标称 T+1，但清晨聚合尚未完成：
+  // 2026-07-29 同一业务日、同一套代码、同一个采集器，05:07 采到 188 行 ¥8,880，
+  // 11:55 重采得到 549 行 ¥129,223，只差采集时间。
+  // 半成品最危险的地方是任务显示成功——缺数看得见，半成品会被当成真数。
+  const 上午九点 = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-26T09:59:59+08:00" });
+  assert.deepEqual(上午九点, [], "10 点之前不得排程，上游聚合可能还没完成");
+
+  const 上午十点 = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-26T10:00:00+08:00" });
+  assert.ok(上午十点.length > 0, "10 点起应正常排程");
 });

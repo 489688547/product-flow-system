@@ -59,6 +59,44 @@ test("Kuaimai async exports are completed through the bundled download center ad
   assert.match(executor, /KUAIMAI_DOWNLOAD_CENTER_TIMEOUT/);
   assert.match(contentScript, /COLLECTOR_CONTENT_SCRIPT_PROBE/);
   assert.match(executor, /assertAppliedKuaimaiRange/);
+
+  // 时间范围必须「等到生效」而不是「立刻判定」。补数任务连着跑会复用同一个标签页、
+  // 只换 hash，控件先在、值后到；立刻断言就读到上一天的筛选，于是每次补历史日期
+  // 都报 KUAIMAI_TIME_RANGE_NOT_APPLIED，只有当天第一次才通过。
+  assert.match(executor, /async function waitForAppliedKuaimaiRange/);
+  assert.match(executor, /await waitForAppliedKuaimaiRange\(selectors, context, context\.searchHash/);
+  // 等不到就重放一次 hash 导航：实测程序化写输入框不会更新 Vue 模型，
+  // 点查询提交的仍是旧筛选，导航是唯一可靠的施加手段。
+  assert.match(executor, /window\.location\.hash = searchHash/);
+  assert.match(executor, /KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS/);
+
+  // 执行器的关键函数必须都在。语法检查发现不了「函数被误删」——调用是运行时解析的，
+  // 一次范围过宽的替换删掉了七个函数，node --check 照样通过，直到线上报
+  // EXTENSION_TASK_FAILED 才暴露。
+  for (const name of [
+    "openKuaimaiExportDialog",
+    "selectKuaimaiOrderExportFields",
+    "findDialogCheckbox",
+    "normalizeControlLabel",
+    "pageProbe",
+    "waitForKuaimaiOrderPage",
+    "salesPageProbe",
+    "readDownloadCenterRows",
+    "downloadFromKuaimaiCenter",
+    "prepareKuaimaiSalesReport",
+    "pickKuaimaiDate",
+    "kuaimaiPickerPanelFor",
+    "waitForKuaimaiSalesCalculation",
+    "waitForAppliedKuaimaiRange"
+  ]) {
+    assert.match(executor, new RegExp(`function ${name}\\(`), `执行器缺少函数 ${name}`);
+  }
+  // 两个范围断言都是异步的，漏掉 await 会让断言被丢弃、失败也不抛，比不校验更危险。
+  const salesAssertCalls = [...executor.matchAll(/(await\s+|function\s+)?assertAppliedKuaimaiSalesRange\(/g)];
+  assert.ok(salesAssertCalls.length >= 3, "至少有一处声明和两处调用");
+  for (const match of salesAssertCalls) {
+    assert.ok(match[1], `assertAppliedKuaimaiSalesRange 必须被 await 或是声明本身：${match[0]}`);
+  }
   assert.match(executor, /openKuaimaiExportDialog/);
   assert.match(serviceWorker, /downloadFilePrefixes/);
   assert.match(serviceWorker, /registeredTaskUrl/);
@@ -211,11 +249,14 @@ function createChromeMock({
   downloads = [],
   storage = {},
   contentScriptAvailable = true,
-  scriptInjectionError = null
+  scriptInjectionError = null,
+  windows = []
 } = {}) {
   const store = new Map(Object.entries(storage));
   const tabList = tabs.map(tab => ({ status: "complete", ...tab }));
   const createdTabs = [];
+  const createdWindows = [];
+  const windowList = windows.map(item => ({ ...item }));
   const updatedTabs = [];
   const executedScripts = [];
   let nextTabId = 1000;
@@ -264,6 +305,22 @@ function createChromeMock({
         return { ok: true };
       },
       onUpdated: { addListener() {}, removeListener() {} }
+    },
+    windows: {
+      async get(id) {
+        const found = windowList.find(candidate => candidate.id === id);
+        if (!found) throw new Error(`No window with id: ${id}`);
+        return found;
+      },
+      async create(props) {
+        const tab = { id: ++nextTabId, status: "complete", url: props.url, active: true };
+        const created = { id: 9000 + windowList.length, tabs: [tab], ...props };
+        tabList.push(tab);
+        createdTabs.push(tab);
+        windowList.push(created);
+        createdWindows.push(created);
+        return created;
+      }
     },
     scripting: {
       async executeScript(details) {
@@ -315,7 +372,7 @@ function createChromeMock({
       getURL: path => path
     }
   };
-  return { chrome, store, tabList, createdTabs, updatedTabs, executedScripts, downloadCreatedListeners };
+  return { chrome, store, tabList, createdTabs, createdWindows, updatedTabs, executedScripts, downloadCreatedListeners };
 }
 
 async function importServiceWorker(mock) {
@@ -331,7 +388,13 @@ async function kuaimaiResource(resourceType = "orders") {
 test("service worker only reuses its own registered collector tab, never employee tabs", async () => {
   const employeeTab = { id: 1, url: "https://erpb.superboss.cc/index.html#/trade/searchlist/" };
   const collectorTab = { id: 2, url: "https://erpb.superboss.cc/index.html#/report/sale_multidimension_next/" };
-  const mock = createChromeMock({ tabs: [employeeTab, collectorTab], storage: { collectorTabId: 2 } });
+  // 登记的标签页还必须属于采集器自己的窗口：旧版把采集页开在员工窗口的后台标签页里，
+  // 会被 Chrome 降级渲染（日期浮层定位不出来），也会被随手导航走。
+  const mock = createChromeMock({
+    tabs: [employeeTab, collectorTab],
+    windows: [{ id: 900, tabs: [collectorTab] }],
+    storage: { collectorTabId: 2, collectorWindowId: 900 }
+  });
   const sw = await importServiceWorker(mock);
   const resource = await kuaimaiResource();
   const targetUrl = "https://erpb.superboss.cc/index.html#/trade/searchlist/?pageNo=1";
@@ -354,7 +417,11 @@ test("service worker rebuilds the collector tab in the background when it was cl
   const tab = await sw.ensureProviderTab(resource, targetUrl);
 
   assert.equal(mock.createdTabs.length, 1);
-  assert.equal(mock.createdTabs[0].active, false);
+  // 采集页独占窗口，在自己窗口里是活动标签页：后台标签页会被 Chrome 降级渲染，
+  // Element UI 的日期浮层定位不出来；独占窗口也避免被员工随手导航走。
+  assert.equal(mock.createdWindows.length, 1);
+  assert.equal(mock.createdWindows[0].focused, false, "采集窗口不得抢占员工焦点");
+  assert.equal(mock.createdTabs[0].active, true);
   assert.equal(mock.createdTabs[0].url, targetUrl);
   assert.equal(tab.id, mock.createdTabs[0].id);
   assert.equal(mock.store.get("collectorTabId"), mock.createdTabs[0].id);
@@ -369,7 +436,8 @@ test("service worker always opens a new background tab instead of hijacking empl
   const tab = await sw.ensureProviderTab(resource, "https://erpb.superboss.cc/index.html#/trade/searchlist/?pageNo=1");
 
   assert.equal(mock.createdTabs.length, 1);
-  assert.equal(mock.createdTabs[0].active, false);
+  assert.equal(mock.createdWindows.length, 1);
+  assert.equal(mock.createdWindows[0].focused, false);
   assert.equal(tab.id, mock.createdTabs[0].id);
   assert.equal(mock.store.get("collectorTabId"), tab.id);
 });
@@ -378,7 +446,8 @@ test("service worker self-recovers when Chrome misses automatic content-script i
   const collectorTab = { id: 2, url: "https://erpb.superboss.cc/index.html#/trade/searchlist/" };
   const mock = createChromeMock({
     tabs: [collectorTab],
-    storage: { collectorTabId: 2 },
+    windows: [{ id: 900, tabs: [collectorTab] }],
+    storage: { collectorTabId: 2, collectorWindowId: 900 },
     contentScriptAvailable: false
   });
   const sw = await importServiceWorker(mock);
@@ -459,8 +528,17 @@ test("service worker hardens tab ownership, keep-alive and download matching", a
 
   // 专用标签页登记在 storage，绝不扫描或导航员工标签页；
   // 抖音店铺发现只允许查询抖音域名标签页，不得触碰快麦员工标签页。
+  // 扩展要能自愈：源码变了就自行重载，否则一直跑旧代码，且只有人工去扩展页点
+  // 「重新加载」才能恢复。必须只在空闲时重载，跑任务途中重启会让采集半途而废。
+  assert.match(serviceWorker, /chrome\.runtime\.reload\(\)/);
+  assert.match(serviceWorker, /if \(!task\) await reloadWhenSourceChanged/);
+
   assert.match(serviceWorker, /collectorTabId/);
-  assert.match(serviceWorker, /chrome\.tabs\.create\(\{ url: targetUrl, active: false \}\)/);
+  // 采集页开在独立窗口而不是员工窗口的后台标签页：后台标签页会被 Chrome 降级渲染，
+  // 日期浮层定位不出来；独占窗口也不会被员工随手导航走。窗口不抢焦点。
+  assert.match(serviceWorker, /chrome\.windows\.create\(/);
+  assert.match(serviceWorker, /focused: false/);
+  assert.doesNotMatch(serviceWorker, /chrome\.tabs\.create\(\{ url: targetUrl, active: false \}\)/);
   assert.doesNotMatch(serviceWorker, /chrome\.tabs\.query\([^)]*superboss/);
   // 长任务保活定时器，任务结束后清除。
   assert.match(serviceWorker, /startKeepAlive/);
