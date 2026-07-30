@@ -321,7 +321,7 @@ export function createDouyinDedicatedExecutor({ createController, createExtractR
             from: task.businessDate,
             to: task.businessDate
           });
-          const downloaded = await controller.awaitDownload?.(plan.taskName);
+          const downloaded = await controller.awaitDownload(plan.taskName);
           if (!downloaded) {
             return terminalResult(task, "failed", "DOUYIN_EXTRACT_DOWNLOAD_MISSING", "取数文件未落盘。");
           }
@@ -522,6 +522,57 @@ export function createCdpDouyinController({
       }
       await wait(1_500);
     },
+    // 等待一次下载完成。自助取数与逐页导出都需要它，因此抽成公开方法：
+    // 此前执行器调用的是 controller.awaitDownload?.()，而控制器并没有这个方法，
+    // 可选链让它静默返回 undefined，再被判成「文件未落盘」——自助取数会 100% 失败，
+    // 且失败原因具有误导性。测试没抓到，是因为 stub 里提供了这个方法。
+    async awaitDownload(triggerLabel = "") {
+      const versionResponse = await fetchImpl(`${endpoint}/json/version`);
+      if (!versionResponse.ok) throw douyinError("DOUYIN_BROWSER_UNAVAILABLE", "无法读取专用 Chrome 下载会话。");
+      const browserTarget = await versionResponse.json();
+      if (!browserTarget?.webSocketDebuggerUrl) {
+        throw douyinError("DOUYIN_BROWSER_UNAVAILABLE", "专用 Chrome 下载会话不可用。");
+      }
+      const browserSession = createSession(browserTarget.webSocketDebuggerUrl);
+      let guid = "";
+      let suggestedFilename = "";
+      let resolveDownload;
+      let rejectDownload;
+      const completed = new Promise((resolve, reject) => {
+        resolveDownload = resolve;
+        rejectDownload = reject;
+      });
+      const unsubscribeBegin = browserSession.on("Browser.downloadWillBegin", event => {
+        guid = String(event.guid || "");
+        suggestedFilename = String(event.suggestedFilename || "");
+      });
+      const unsubscribeProgress = browserSession.on("Browser.downloadProgress", event => {
+        if (guid && event.guid !== guid) return;
+        if (event.state === "completed") resolveDownload();
+        if (event.state === "canceled") rejectDownload(
+          douyinError("DOUYIN_DOWNLOAD_CANCELLED", `抖店下载被取消（${triggerLabel}）。`)
+        );
+      });
+      const timeout = setTimeout(() => {
+        rejectDownload(douyinError("DOUYIN_DOWNLOAD_TIMEOUT", `抖店下载超时（${triggerLabel}）。`));
+      }, downloadTimeoutMs);
+      try {
+        await browserSession.send("Browser.setDownloadBehavior", {
+          behavior: "allow",
+          downloadPath: downloadsDirectory,
+          eventsEnabled: true
+        });
+        await completed;
+        const safeFileName = safeDownloadName(suggestedFilename);
+        return { filePath: join(downloadsDirectory, safeFileName), safeFileName };
+      } finally {
+        clearTimeout(timeout);
+        unsubscribeBegin?.();
+        unsubscribeProgress?.();
+        browserSession.close?.();
+      }
+    },
+
     async downloadOfficialReport({ resourceType, pageType, reportVersion }) {
       const resource = DOUYIN_DEDICATED_RESOURCES[resourceType];
       if (!resource || resource.pageType !== pageType || resource.reportVersion !== reportVersion) {
