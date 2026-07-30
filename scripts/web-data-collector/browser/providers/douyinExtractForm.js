@@ -31,8 +31,33 @@ const LOCATORS = Object.freeze({
   submit: `[...document.querySelectorAll("button")]
     .find(el => el.getClientRects().length && el.textContent.trim() === "创建任务")`,
   confirm: `[...document.querySelectorAll("button")]
-    .find(el => el.getClientRects().length && el.textContent.trim() === "确定")`
+    .find(el => el.getClientRects().length && el.textContent.trim() === "确定")`,
+  taskListTab: `[...document.querySelectorAll("div,span,button")]
+    .find(el => el.getClientRects().length && !el.children.length && el.textContent.trim() === "任务列表")`
 });
+
+// 任务列表是标准表格，五列：任务名称、创建人、状态、创建日期、操作（查看/下载/删除）。
+// 只取名称与状态——回找靠名称，判定靠状态，其余列没有业务含义。
+const TASK_ROWS = `[...document.querySelectorAll("tr")]
+  .filter(row => row.getClientRects().length && row.querySelectorAll("td").length >= 4)
+  .map(row => {
+    const cells = [...row.querySelectorAll("td")].map(cell => cell.textContent.trim());
+    return { taskName: cells[0], status: cells[2] };
+  })
+  .filter(row => row.taskName)`;
+
+// 下载入口按所在行的任务名称定位。绝不能取「第一个下载链接」——
+// 队列全平台共用，列表里随时有别人的任务，取第一个会下错文件。
+function downloadLocator(taskName) {
+  return `(() => {
+    const row = [...document.querySelectorAll("tr")]
+      .filter(item => item.getClientRects().length && item.querySelectorAll("td").length >= 4)
+      .find(item => item.querySelector("td")?.textContent.trim() === ${JSON.stringify(taskName)});
+    if (!row) return null;
+    return [...row.querySelectorAll("a,span,button")]
+      .find(el => el.getClientRects().length && el.textContent.trim() === "下载") || null;
+  })()`;
+}
 
 // 日历面板显示的是「YYYY 年 M 月」。补历史时目标月份不在当前视图，必须先翻月。
 const PANEL_MONTHS = `[...document.querySelectorAll("[class*=picker-panel],[class*=picker-body]")]
@@ -148,6 +173,26 @@ export function createDouyinExtractForm({ controller, evaluate, wait, maxMonthSt
       );
       await wait(2000);
       return plan;
+    },
+
+    // 读取任务列表。返回原始行，由 selectExtractTask 按名称回找并判定状态——
+    // 判定逻辑放在可测的域模块里，这里只负责把页面上的东西取回来。
+    async readTasks() {
+      await controller.trustedClickElement(
+        LOCATORS.taskListTab, "DOUYIN_EXTRACT_TASK_TAB_MISSING", "任务列表页签不可用。"
+      );
+      await wait(2500);
+      return (await evaluate(TASK_ROWS)) || [];
+    },
+
+    async downloadTask(taskName) {
+      const located = await controller.trustedClickElement(
+        downloadLocator(taskName),
+        "DOUYIN_EXTRACT_DOWNLOAD_MISSING",
+        `任务「${taskName}」的下载入口不可用。`
+      );
+      await wait(3000);
+      return located;
     }
   });
 }

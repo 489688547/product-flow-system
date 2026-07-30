@@ -24,6 +24,12 @@ function harness({ months = ["2026 年 7 月", "2026 年 8 月"], errors = [] } 
   const evaluate = async expr => {
     if (expr.includes("picker-panel")) return monthList;
     if (expr.includes("errors")) return { values: ["2026-07-25", "2026-07-29"], errors };
+    if (expr.includes("querySelectorAll(\"tr\")")) {
+      return [
+        { taskName: "别人的任务", status: "取数完成" },
+        { taskName: "采集-live-20260725-20260729", status: "排队中 12/78" }
+      ];
+    }
     return null;
   };
   return { controller, evaluate, clicks, typed, form: createDouyinExtractForm({ controller, evaluate, wait: async () => {} }) };
@@ -78,4 +84,21 @@ test("超过单次上限的区间在发起前就拒绝", async () => {
     error => error.code === "DOUYIN_EXTRACT_RANGE_TOO_LONG"
   );
   assert.equal(h.clicks.length, 0, "不得触碰页面");
+});
+
+test("读取任务列表只取名称与状态", async () => {
+  const h = harness();
+  const rows = await h.form.readTasks();
+  assert.deepEqual(rows.map(row => row.taskName), ["别人的任务", "采集-live-20260725-20260729"]);
+});
+
+test("下载按任务名称定位所在行，不取第一个下载链接", async () => {
+  // 队列全平台共用，列表里随时有别人的任务；取第一个会下错别人的文件，
+  // 而下错文件不会报错，只会把别人的数据当成自己的入库。
+  const h = harness();
+  await h.form.downloadTask("采集-live-20260725-20260729");
+  const click = h.clicks.find(c => c.code === "DOUYIN_EXTRACT_DOWNLOAD_MISSING");
+  assert.ok(click, "应触发下载点击");
+  assert.match(click.expr, /采集-live-20260725-20260729/, "定位表达式必须锚定任务名称");
+  assert.match(click.expr, /querySelector\("td"\)\?\.textContent/, "必须按行首任务名称匹配");
 });
