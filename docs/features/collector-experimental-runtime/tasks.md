@@ -22,7 +22,7 @@
     `npx eslint src/domain/collectorTemplates.js tests/collector-template-domain.test.mjs` 通过。
   - 提交：领域文件、测试和任务证据，提交信息 `feat(collector): add versioned template contract`。
 
-- [ ] 本机实验步骤与资源限制
+- [x] 本机实验步骤与资源限制
   - 依赖：领域模板与签名执行包。
   - 文件：`scripts/web-data-collector/experimental/`、`tests/web-data-collector-experimental.test.mjs`。
   - 输入：已验证执行包、浏览器控制器和每次运行独立工作区。
@@ -30,6 +30,9 @@
   - 失败测试：`node --test tests/web-data-collector-experimental.test.mjs`，预期因执行器不存在失败。
   - 实现步骤：先做顺序调度；再加浏览器和本机步骤；最后加条件循环、超时、输出和进程树限制。
   - 验证：所有步骤可恢复；超时终止完整进程树；日志不含 Cookie、Token 或数据库 Secret。
+  - 实际证据：`node --test tests/web-data-collector-experimental.test.mjs` 6/6；
+    真实 Python 与 Node 子进程、浏览器下载句柄、条件循环、超时、输出上限和敏感结果均通过；
+    聚焦 ESLint 通过。
   - 提交：实验执行器与聚焦测试，提交信息 `feat(collector): add local experimental executor`。
 
 - [ ] 实验 SQLite 与版本化检查点
