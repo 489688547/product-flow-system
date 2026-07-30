@@ -1,7 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
 import { spawn } from "node:child_process";
-import { access, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { isAbsolute, join, resolve } from "node:path";
+import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, isAbsolute, join, resolve } from "node:path";
 
 export const DATABASES = Object.freeze([
   Object.freeze({
@@ -22,7 +22,9 @@ const IMPORT_MARKER = ".pfs-import-complete.json";
 const MINIFLARE_D1_NAMESPACE = "miniflare-D1DatabaseObject";
 const SQLITE_QUICK_CHECK_SCRIPT = [
   "import sqlite3, sys",
-  "database = sqlite3.connect('file:' + sys.argv[1] + '?mode=ro', uri=True)",
+  "database = sqlite3.connect(sys.argv[1])",
+  "checkpoint = database.execute('PRAGMA wal_checkpoint(TRUNCATE)').fetchone()",
+  "if checkpoint and checkpoint[0] != 0: raise RuntimeError('SQLite WAL checkpoint busy: ' + str(checkpoint))",
   "result = database.execute('PRAGMA quick_check').fetchone()[0]",
   "database.close()",
   "if result != 'ok': raise RuntimeError('SQLite quick_check failed: ' + str(result))"
@@ -225,6 +227,10 @@ export async function backupLocalD1({
       `.backup ${JSON.stringify(output)}`
     ]);
     await run(pythonBin, ["-c", SQLITE_QUICK_CHECK_SCRIPT, output]);
+    await Promise.all([
+      rm(`${output}-shm`, { force: true }),
+      rm(`${output}-wal`, { force: true })
+    ]);
     const metadata = await stat(output);
     if (metadata.size === 0) throw new Error(`${database.name} SQLite 备份为空。`);
     items.push({
@@ -238,7 +244,8 @@ export async function backupLocalD1({
   const manifest = { schemaVersion: 1, createdAt: now(), source: "aliyun-ecs-local-d1", databases: items };
   await atomicJson(join(directory, "manifest.json"), manifest);
   if (ossDestination) {
-    await run(ossutilBin, ["cp", directory, ossDestination, "--recursive", "--force"]);
+    const snapshotDestination = `${ossDestination}${basename(directory)}/`;
+    await run(ossutilBin, ["cp", directory, snapshotDestination, "--recursive", "--force"]);
   }
   return manifest;
 }

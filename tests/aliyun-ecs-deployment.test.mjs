@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, readlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -281,10 +281,15 @@ test("local D1 backup creates restorable SQLite snapshots before OSS upload", as
   assert.deepEqual(uploaded, [[
     "cp",
     backupDir,
-    "oss://test-bucket/product-flow/backups/",
+    "oss://test-bucket/product-flow/backups/backup/",
     "--recursive",
     "--force"
   ]]);
+  assert.deepEqual((await readdir(backupDir)).sort(), [
+    "manifest.json",
+    "product-flow-system-display.sqlite",
+    "product-flow-system.sqlite"
+  ]);
 
   for (const database of DATABASES) {
     const { stdout } = await execFileAsync("python3", [
