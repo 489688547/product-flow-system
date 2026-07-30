@@ -83,6 +83,28 @@ export function DashboardPage({ onNavigate, onOpenProgress }) {
       >
         {isExecutive ? <HeaderFilter label="部门" value={departmentFilter} onChange={setDepartmentFilter} options={departmentOptions} /> : null}
       </PageHeader>
+      <div className="dashboard-action-grid">
+        <section className="section-panel dashboard-priority-panel">
+          <div className="panel-title"><AlertTriangle size={18} /><h2>需要处理</h2><span>{risks.length} 项风险</span></div>
+          {risks.map(({ task, product, risk }) => (
+            <button className="risk-row" key={task.id} onClick={() => openProgress(product, task.stage)}>
+              <ProductThumb product={product} />
+              <span><strong>{task.title}</strong><small>{product?.name || "未关联产品"} · <em className={`deadline-risk ${risk.tone}`}>{risk.label}</em></small></span>
+            </button>
+          ))}
+          {!risks.length ? <div className="empty-state">{emptyScope}没有两天内截止或逾期任务。</div> : null}
+        </section>
+        <section className="section-panel">
+          <div className="panel-title"><ClipboardList size={18} /><h2>待办事项</h2><span>{departmentTasks.length} 项</span></div>
+          {departmentTasks.slice(0, 8).map(({ task, product }) => (
+            <button className="task-row" key={task.id} onClick={() => openProgress(product, task.stage)}>
+              <ProductThumb product={product} />
+              <span><strong>{task.title}</strong><small>{product?.name || "未关联产品"} · {task.ownerDept} · 截止 {task.due || "未设置"} · {todoSyncStatus(task)}</small></span>
+            </button>
+          ))}
+          {!departmentTasks.length ? <div className="empty-state">{emptyScope}没有未完成待办。</div> : null}
+        </section>
+      </div>
       <div className="dashboard-overview-strip">
         <section className="flow-summary" aria-labelledby="flow-summary-title">
           <span className="flow-summary-title" id="flow-summary-title"><GitBranch aria-hidden="true" /><strong>{productSummaries.length}</strong><small>流程中的产品</small></span>
@@ -107,28 +129,6 @@ export function DashboardPage({ onNavigate, onOpenProgress }) {
         </section>
         <button className="dashboard-compact-metric" onClick={() => onNavigate("demands")}><ClipboardList aria-hidden="true" /><span><strong>{visibleDemandPool(state.demands).length}</strong><small>需求池</small></span></button>
         <button className="dashboard-compact-metric" onClick={openFirstTodo} disabled={!departmentTasks.length} title={!departmentTasks.length ? "当前筛选范围内没有待办事项" : undefined}><ListTodo aria-hidden="true" /><span><strong>{departmentTasks.length}</strong><small>待办事项</small></span></button>
-      </div>
-      <div className="dashboard-grid">
-        <section className="section-panel">
-          <div className="panel-title"><ClipboardList size={18} /><h2>待办事项</h2></div>
-          {departmentTasks.map(({ task, product }) => (
-            <button className="task-row" key={task.id} onClick={() => openProgress(product, task.stage)}>
-              <ProductThumb product={product} />
-              <span><strong>{task.title}</strong><small>{product?.name || "未关联产品"} · {task.ownerDept} · 截止 {task.due || "未设置"} · {todoSyncStatus(task)}</small></span>
-            </button>
-          ))}
-          {!departmentTasks.length ? <div className="empty-state">{emptyScope}没有未完成待办。</div> : null}
-        </section>
-        <section className="section-panel">
-          <div className="panel-title"><AlertTriangle size={18} /><h2>风险提醒</h2></div>
-          {risks.map(({ task, product, risk }) => (
-            <button className="risk-row" key={task.id} onClick={() => openProgress(product, task.stage)}>
-              <ProductThumb product={product} />
-              <span><strong>{task.title}</strong><small>{product?.name || "未关联产品"} · <em className={`deadline-risk ${risk.tone}`}>{risk.label}</em></small></span>
-            </button>
-          ))}
-          {!risks.length ? <div className="empty-state">{emptyScope}没有两天内截止或逾期任务。</div> : null}
-        </section>
       </div>
     </section>
   );
