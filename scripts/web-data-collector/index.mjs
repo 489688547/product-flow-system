@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHash, randomBytes } from "node:crypto";
 import os from "node:os";
+import { readdir, stat } from "node:fs/promises";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -164,6 +165,43 @@ async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
   };
 }
 
+// 改完扩展代码必须重载 Chrome 扩展才生效，否则一直跑旧代码。这一点极难察觉：
+// 表现为「改完没效果」，只能靠失败耗时之类的间接线索才判断得出来。把扩展源码的
+// 最新修改时间当指纹随任务轮询带给扩展，扩展空闲时自行重载。
+const EXTENSION_SOURCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../chrome-extension/company-data-collector");
+let cachedSourceStamp = { at: 0, value: "" };
+
+async function extensionSourceStamp(root) {
+  const now = Date.now();
+  if (now - cachedSourceStamp.at < 5_000) return cachedSourceStamp.value;
+  let newest = 0;
+  const walk = async directory => {
+    let entries = [];
+    try {
+      entries = await readdir(directory, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await walk(full);
+        continue;
+      }
+      if (!/\.(js|json|html|css)$/.test(entry.name)) continue;
+      try {
+        const info = await stat(full);
+        if (info.mtimeMs > newest) newest = info.mtimeMs;
+      } catch {
+        // 单个文件读不到不影响整体指纹
+      }
+    }
+  };
+  await walk(root);
+  cachedSourceStamp = { at: now, value: String(Math.trunc(newest)) };
+  return cachedSourceStamp.value;
+}
+
 async function serve({
   root,
   baseUrl,
@@ -225,6 +263,7 @@ async function serve({
   const bridge = createCollectorBridge({
     allowedOrigin: EXTENSION_ORIGIN,
     pairingKey,
+    getSourceStamp: () => extensionSourceStamp(EXTENSION_SOURCE_ROOT),
     getNextTask: input => orchestrator.nextTask(input),
     registerStore: store => orchestrator.registerStore(store),
     submitResult: result => {
@@ -270,7 +309,7 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
     ? "dedicated"
     : "extension";
   const profileRoot = resolve(argument(argv, "--profile-root", DEFAULT_MANAGED_PROFILE_ROOT));
-  const extensionPath = resolve(dirname(fileURLToPath(import.meta.url)), "../../chrome-extension/company-data-collector");
+  const extensionPath = EXTENSION_SOURCE_ROOT;
   if (command === "register") return registerRunner(baseUrl);
   if (command === "install") {
     await Promise.all([readRunnerToken(), readPairingKey()]);

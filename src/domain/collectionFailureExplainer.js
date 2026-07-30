@@ -78,6 +78,48 @@ const CATALOG = Object.freeze({
     action: "重试无效。请在快麦导出设置中确认所需列，或反馈以更新采集适配。",
     retryable: false
   },
+  KUAIMAI_SALES_DATE_PICK_FAILED: {
+    kind: COLLECTION_FAILURE_KIND.schemaChanged,
+    summary: "销售报表的日期选择器打不开或选不中目标日期，本次没有导出。",
+    action: "重试无效，多为页面改版所致，需要更新采集适配。",
+    retryable: false
+  },
+  KUAIMAI_SALES_CALCULATE_TIMEOUT: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "销售报表一直没算完，本次没有导出，避免落下半天的数据。",
+    action: "多为当天数据量大或快麦繁忙，稍后重试即可；连续多次超时请反馈。",
+    retryable: true
+  },
+  KUAIMAI_API_TIME_TYPE_INVALID: {
+    kind: COLLECTION_FAILURE_KIND.schemaChanged,
+    summary: "快麦取数口径不是订单创建时间，本次没有发起请求。",
+    action: "重试无效。接口对无效口径会静默回落到付款时间，两者相差约 6%，需要更新采集适配。",
+    retryable: false
+  },
+  KUAIMAI_API_BUSINESS_DATE_INVALID: {
+    kind: COLLECTION_FAILURE_KIND.schemaChanged,
+    summary: "业务日格式不合法，本次没有发起请求。",
+    action: "重试无效，需要更新采集适配。",
+    retryable: false
+  },
+  KUAIMAI_API_MALFORMED: {
+    kind: COLLECTION_FAILURE_KIND.schemaChanged,
+    summary: "快麦接口返回的结构不符合预期，无法确认取到了哪些订单。",
+    action: "重试无效，多为接口调整所致，需要更新采集适配。",
+    retryable: false
+  },
+  KUAIMAI_API_REQUEST_FAILED: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "快麦接口拒绝了这次查询。",
+    action: "多为临时故障，重试一次通常可恢复；连续多次失败请反馈。",
+    retryable: true
+  },
+  KUAIMAI_API_TOTAL_MISMATCH: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "实际拉取的订单数与快麦报告的总数不一致，本次未入库任何数据。",
+    action: "为避免只补上一半的数据，本次整批作废，重试即可重新完整拉取。",
+    retryable: true
+  },
   KUAIMAI_LOGIN_REQUIRED: {
     kind: COLLECTION_FAILURE_KIND.needsHuman,
     summary: "快麦登录状态已失效。",

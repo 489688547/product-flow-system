@@ -205,7 +205,7 @@ test("runner registers a safely discovered Douyin store before creating its dail
   assert.equal(db.tables.web_collection_stores.get("douyin-ecommerce:90862283").runner_id, registration.body.data.id);
 
   const result = await ensureRegisteredWebCollectionPlan(db, {
-    now: new Date("2026-07-24T05:30:00+08:00")
+    now: new Date("2026-07-24T10:30:00+08:00")
   });
 
   assert.equal(result.jobs.filter(job => job.providerId === "kuaimai").length, 4);

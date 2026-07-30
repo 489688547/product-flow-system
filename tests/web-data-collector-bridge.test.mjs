@@ -92,6 +92,8 @@ test("loopback bridge exposes only the safe extension task projection", async ()
   await withBridge(async ({ baseUrl }) => {
     const response = await fetch(`${baseUrl}/v1/tasks/next`, { headers: headers() });
     assert.equal(response.status, 200);
+    // sourceStamp 只是扩展源码的最新修改时间，用于让扩展发现自己在跑旧代码后自行
+    // 重载；它不携带任何路径或业务信息，因此不破坏「只暴露安全字段」这条约束。
     assert.deepEqual(await response.json(), {
       task: {
         jobId: "job-1",
@@ -100,7 +102,8 @@ test("loopback bridge exposes only the safe extension task projection", async ()
         resourceType: "orders",
         businessDate: "2026-07-21",
         status: "queued"
-      }
+      },
+      sourceStamp: ""
     });
   });
 });

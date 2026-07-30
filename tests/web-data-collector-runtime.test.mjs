@@ -48,11 +48,11 @@ const job = {
   scheduleVersion: "v1"
 };
 
-test("orchestrator schedules all extension-implemented Kuaimai resources after 05:00", async () => {
+test("orchestrator schedules all extension-implemented Kuaimai resources after 10:00", async () => {
   const api = apiDouble(job);
   const orchestrator = createWebCollectorOrchestrator({ api, processDownload: async () => ({}) });
 
-  await orchestrator.prepare({ now: "2026-07-22T05:01:00+08:00" });
+  await orchestrator.prepare({ now: "2026-07-22T10:01:00+08:00" });
   const plan = api.calls.find(([name]) => name === "ensurePlan")[1];
   assert.deepEqual(plan.map(item => item.resourceType), [
     "orders", "order_items", "sales_items", "products", "product_kits", "product_combinations", "inventory"
@@ -73,7 +73,7 @@ test("orchestrator prefers the server-owned registered-store plan", async () => 
     processDownload: async () => ({})
   });
 
-  const result = await orchestrator.prepare({ now: "2026-07-22T05:01:00+08:00" });
+  const result = await orchestrator.prepare({ now: "2026-07-22T10:01:00+08:00" });
   assert.equal(api.calls.some(([name]) => name === "ensureRegisteredPlan"), true);
   assert.deepEqual(result.jobs, [{ providerId: "douyin-ecommerce", storeId: "store-a" }]);
 });

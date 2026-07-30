@@ -125,7 +125,7 @@ async function readJson(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
-export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, submitResult, registerStore }) {
+export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, submitResult, registerStore, getSourceStamp }) {
   if (!/^chrome-extension:\/\/[a-p]{32}$/.test(String(allowedOrigin || ""))) throw new Error("BRIDGE_ORIGIN_INVALID");
   if (!/^wcp_[a-f0-9]{48}$/i.test(String(pairingKey || ""))) throw new Error("BRIDGE_PAIRING_KEY_INVALID");
   if (
@@ -166,7 +166,12 @@ export function createCollectorBridge({ allowedOrigin, pairingKey, getNextTask, 
       if (request.method === "GET" && url.pathname === "/v1/tasks/next") {
         const storeId = String(url.searchParams.get("storeId") || "").trim();
         if (storeId && !/^[-_a-zA-Z0-9]{1,128}$/.test(storeId)) throw new Error("BRIDGE_STORE_ID_INVALID");
-        json(response, 200, { task: safeTaskProjection(await getNextTask({ storeId })) }, allowedOrigin);
+        // 扩展代码改了必须重载扩展才生效，否则一直跑旧代码——表现为「改完没效果」，
+        // 极难察觉。把扩展源码指纹随轮询带回去，扩展空闲时自行重载。
+        json(response, 200, {
+          task: safeTaskProjection(await getNextTask({ storeId })),
+          sourceStamp: getSourceStamp ? await getSourceStamp() : ""
+        }, allowedOrigin);
         return;
       }
       if (request.method === "POST" && url.pathname === "/v1/providers/douyin-ecommerce/stores/identify") {
