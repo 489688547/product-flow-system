@@ -383,7 +383,40 @@ export function createCdpDouyinController({
     }));
   }
 
+  // 罗盘的日期控件只认可信事件：element.click() 与合成 MouseEvent 都只改显示，
+  // 不进表单模型——实测在自助取数里填好日期后提交仍报「请输入时间」，用真实鼠标
+  // 点击同一个格子则校验立刻通过。扩展没有 debugger 权限发不出可信事件，这正是
+  // 专用浏览器模式存在的意义：CDP 的 Input 域发出的就是可信事件。
+  async function trustedClickAt(x, y) {
+    if (!pageSession) throw douyinError("DOUYIN_PAGE_NOT_OPEN", "抖店登记页面尚未打开。");
+    const point = { x: Math.round(Number(x)), y: Math.round(Number(y)) };
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.y < 0) {
+      throw douyinError("DOUYIN_CLICK_POINT_INVALID", "点击坐标无效。");
+    }
+    const base = { ...point, button: "left", clickCount: 1 };
+    await pageSession.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+    await pageSession.send("Input.dispatchMouseEvent", { type: "mousePressed", ...base });
+    await pageSession.send("Input.dispatchMouseEvent", { type: "mouseReleased", ...base });
+  }
+
+  // 元素位置由页面自己给出，避免在采集器里硬编码坐标——罗盘一改版坐标就失效，
+  // 而且失效时不会报错，只会点空。
+  async function trustedClickElement(selectorExpression, missingCode, missingMessage) {
+    const box = await evaluate(`(() => {
+      const target = ${selectorExpression};
+      if (!target) return null;
+      const rect = target.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    if (!box) throw douyinError(missingCode, missingMessage);
+    await trustedClickAt(box.x, box.y);
+    return box;
+  }
+
   return Object.freeze({
+    trustedClickAt,
+    trustedClickElement,
     async open(url) {
       if (!REGISTERED_URLS.has(url)) {
         throw douyinError("DOUYIN_URL_NOT_REGISTERED", "抖店页面未在采集器登记。");
