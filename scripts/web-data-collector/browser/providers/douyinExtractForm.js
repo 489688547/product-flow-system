@@ -17,14 +17,16 @@ function extractError(code, message) {
 // 元素定位一律返回表达式，由控制器求值后取包围盒再点，避免在采集器里硬编码坐标。
 // 罗盘一改版硬编码坐标就失效，而且失效时不报错、只会点空。
 const LOCATORS = Object.freeze({
+  // 不能加 !el.children.length：页签在不同窗口宽度下渲染结构不同，专用浏览器里
+  // 「取数配置」带子元素，加了这个限制就永远找不到。文本全等已足够唯一。
   configTab: `[...document.querySelectorAll("div,span,button")]
-    .find(el => el.getClientRects().length && !el.children.length && el.textContent.trim() === "取数配置")`,
+    .find(el => el.getClientRects().length && el.textContent.trim() === "取数配置")`,
   taskName: `[...document.querySelectorAll("input[type=text]")]
     .find(el => el.getClientRects().length && /^新建任务|^采集-/.test(el.value || ""))`,
   dimension: value => `document.querySelector('input[type=radio][value=${JSON.stringify(value)}]')?.closest("label")
     || document.querySelector('input[type=radio][value=${JSON.stringify(value)}]')`,
   granularity: label => `[...document.querySelectorAll("label,span,div")]
-    .find(el => el.getClientRects().length && !el.children.length && el.textContent.trim() === ${JSON.stringify(label)})`,
+    .find(el => el.getClientRects().length && el.textContent.trim() === ${JSON.stringify(label)})`,
   startDate: `[...document.querySelectorAll("input")].find(el => /开始日期/.test(el.placeholder || ""))`,
   metric: value => `[...document.querySelectorAll("label")]
     .find(el => el.getClientRects().length && el.querySelector('input[type=checkbox][value=${JSON.stringify(value)}]'))`,
@@ -33,7 +35,7 @@ const LOCATORS = Object.freeze({
   confirm: `[...document.querySelectorAll("button")]
     .find(el => el.getClientRects().length && el.textContent.trim() === "确定")`,
   taskListTab: `[...document.querySelectorAll("div,span,button")]
-    .find(el => el.getClientRects().length && !el.children.length && el.textContent.trim() === "任务列表")`
+    .find(el => el.getClientRects().length && el.textContent.trim() === "任务列表")`
 });
 
 // 任务列表是标准表格，五列：任务名称、创建人、状态、创建日期、操作（查看/下载/删除）。
