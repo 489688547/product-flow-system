@@ -325,9 +325,10 @@ async function executeStep(step, context) {
   throw runtimeError("COLLECTOR_STEP_NOT_SUPPORTED", `采集器步骤尚未支持：${step.type}。`);
 }
 
-async function executeSteps(steps, context) {
+async function executeSteps(steps, context, { startIndex = 0, checkpoint = false } = {}) {
   const outputs = {};
-  for (const step of steps) {
+  for (let index = startIndex; index < steps.length; index += 1) {
+    const step = steps[index];
     if (Date.now() >= context.deadline) {
       throw runtimeError("COLLECTOR_SCRIPT_TIMEOUT", "采集器实验运行超过总时限。");
     }
@@ -335,6 +336,16 @@ async function executeSteps(steps, context) {
     ensureSafeResult(output);
     outputs[step.id] = structuredClone(output);
     context.variables[step.id] = structuredClone(output);
+    if (checkpoint && context.checkpointStore) {
+      await context.checkpointStore.save(context.environment.runId, {
+        stage: "executing",
+        execution: {
+          ...context.execution,
+          nextStepIndex: index + 1,
+          variables: context.variables
+        }
+      });
+    }
   }
   return outputs;
 }
@@ -345,20 +356,36 @@ export async function executeExperimentalRun({
   workspace: inputWorkspace,
   pythonBinary = "/usr/bin/python3",
   spawn = spawnNode,
-  parsers = {}
+  parsers = {},
+  checkpointStore = null,
+  runStore = null
 }) {
   if (bundle?.template?.mode !== "experimental") {
     throw runtimeError("COLLECTOR_TEMPLATE_ACTION_DENIED", "只有实验模板可以进入实验执行器。");
   }
   const workspace = safeWorkspace(inputWorkspace);
   const startedAt = new Date().toISOString();
-  const variables = {};
+  const execution = {
+    templateId: bundle.templateId,
+    templateVersion: bundle.version,
+    contentHash: bundle.contentHash
+  };
+  const checkpoint = checkpointStore
+    ? await checkpointStore.load(bundle.runId, { execution }).catch(error => {
+      if (error?.code === "ENOENT") return null;
+      throw error;
+    })
+    : null;
+  const variables = structuredClone(checkpoint?.execution?.variables || {});
+  const startIndex = checkpoint?.execution?.nextStepIndex || 0;
   const context = {
     browser,
     parsers,
     workspace,
     pythonBinary,
     spawn,
+    checkpointStore,
+    execution,
     variables,
     limits: bundle.template.limits,
     deadline: Date.now() + bundle.template.timeoutSeconds * 1_000,
@@ -367,8 +394,21 @@ export async function executeExperimentalRun({
       templateId: bundle.templateId
     }
   };
-  const outputs = await executeSteps(bundle.template.steps, context);
-  return {
+  const outputs = await executeSteps(bundle.template.steps, context, {
+    startIndex,
+    checkpoint: true
+  });
+  if (checkpointStore) {
+    await checkpointStore.save(bundle.runId, {
+      stage: "completed",
+      execution: {
+        ...execution,
+        nextStepIndex: bundle.template.steps.length,
+        variables
+      }
+    });
+  }
+  const result = {
     runId: bundle.runId,
     templateId: bundle.templateId,
     version: bundle.version,
@@ -379,4 +419,15 @@ export async function executeExperimentalRun({
     outputs,
     variables
   };
+  runStore?.saveRun({
+    runId: bundle.runId,
+    templateId: bundle.templateId,
+    templateVersion: bundle.version,
+    contentHash: bundle.contentHash,
+    status: "completed",
+    trustLevel: "untrusted",
+    outputs,
+    quality: null
+  });
+  return result;
 }

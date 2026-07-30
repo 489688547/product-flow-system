@@ -35,7 +35,7 @@
     聚焦 ESLint 通过。
   - 提交：实验执行器与聚焦测试，提交信息 `feat(collector): add local experimental executor`。
 
-- [ ] 实验 SQLite 与版本化检查点
+- [x] 实验 SQLite 与版本化检查点
   - 依赖：本机实验步骤与资源限制。
   - 文件：`scripts/web-data-collector/experimental/store.mjs`、`scripts/web-data-collector/checkpoints.mjs`、
     `tests/web-data-collector-checkpoints.test.mjs`。
@@ -44,6 +44,9 @@
   - 失败测试：聚焦检查点测试预期因模板版本、内容哈希和实验运行存储缺失失败。
   - 实现步骤：扩展原子检查点；实现本机 SQLite schema；实现保存、恢复、清理和信任等级限制。
   - 验证：重启可恢复；错版本拒绝；实验结果无法标记 `trusted`。
+  - 实际证据：领域、执行器、SQLite、检查点聚焦测试合计 22/22；
+    SQLite 重启读取、`untrusted → validated`、`trusted` 拒绝、模板错版本拒绝、断点跳过已完成网页步骤
+    和聚焦 ESLint 均通过。
   - 提交：本机存储和检查点，提交信息 `feat(collector): persist experimental run checkpoints`。
 
 - [ ] 模板与运行服务端 API
