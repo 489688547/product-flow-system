@@ -16,6 +16,25 @@ export const PRIMARY_DIMENSIONS = Object.freeze({
   video_daily: "video"
 });
 
+// 指标复选框带语义化 value（2026-07-30 在页面上抓取），按 value 选比按标签文字选
+// 稳得多——文案随时可能改，value 是接口字段名。
+//
+// 特别注意 pay_cnt 与 pay_ucnt：成交订单数与成交人数正是 store_daily 靠页面标签
+// 抓错、已从面板撤下的两个指标（面板曾显示 314 万单、257 万人，实际 GMV 仅 6.5 万）。
+// 罗盘首页接口不返回它们，自助取数是目前已知的唯一可信来源。
+export const EXTRACT_METRICS = Object.freeze({
+  transactionAmount: "income_amt",
+  userPaymentAmount: "pay_amt",
+  transactionOrderCount: "pay_cnt",
+  transactionBuyerCount: "pay_ucnt",
+  netTransactionAmount: "net_income_amt",
+  adContributedAmount: "ad_receive_amt",
+  adContributedRatio: "ad_receive_amt_ratio"
+});
+
+// 默认取这几项：既覆盖成交口径，也带上投放金额（支出与广告费用的来源）。
+export const DEFAULT_METRIC_VALUES = Object.freeze(Object.values(EXTRACT_METRICS));
+
 // 单次统计周期最长 3 个月，超出会被表单拒绝。补历史时必须按此切段。
 export const MAX_RANGE_DAYS = 92;
 

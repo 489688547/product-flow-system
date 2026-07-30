@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  DEFAULT_METRIC_VALUES,
+  EXTRACT_METRICS,
   MAX_RANGE_DAYS,
   PRIMARY_DIMENSIONS,
   TASK_TIMEOUT_MS,
@@ -80,4 +82,19 @@ test("超时说明是队列繁忙而非需要改代码", () => {
 test("未超时继续等，不重复创建任务", () => {
   // 队列全平台共用，把还在排队的任务判成失败再重建，只会让队列更长。
   assert.deepEqual(planExtractWait({ startedAt: 0, now: 60_000, state: "pending" }), { action: "wait" });
+});
+
+test("指标按语义化 value 选择，不按标签文字", () => {
+  // 文案随时可能改，value 是接口字段名，稳定得多。
+  assert.equal(EXTRACT_METRICS.transactionOrderCount, "pay_cnt");
+  assert.equal(EXTRACT_METRICS.transactionBuyerCount, "pay_ucnt");
+  assert.ok(DEFAULT_METRIC_VALUES.includes("ad_receive_amt"), "默认应带上投放金额，它是支出与广告费用的来源");
+});
+
+test("默认指标覆盖已撤下的订单数与人数", () => {
+  // 这两个指标因 store_daily 抓错已从面板撤下（曾显示 314 万单、257 万人，
+  // 实际 GMV 仅 6.5 万）。罗盘首页接口不返回它们，自助取数是已知唯一可信来源，
+  // 因此必须默认取到，否则面板永远补不回这两列。
+  assert.ok(DEFAULT_METRIC_VALUES.includes("pay_cnt"));
+  assert.ok(DEFAULT_METRIC_VALUES.includes("pay_ucnt"));
 });
