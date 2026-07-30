@@ -49,8 +49,8 @@
     和聚焦 ESLint 均通过。
   - 提交：本机存储和检查点，提交信息 `feat(collector): persist experimental run checkpoints`。
 
-- [ ] 模板与运行服务端 API
-  - 依赖：领域模板与签名执行包；与 `DEV-000014` 协调环境清单路径后执行。
+- [x] 模板与运行服务端 API
+  - 依赖：领域模板与签名执行包；环境清单继续等待 `DEV-000014` 释放共享路径。
   - 文件：`functions/api/platform/v1/web-collection/templates.js`、
     `functions/api/platform/v1/web-collection/runs.js`、
     `functions/api/platform/v1/web-collection/_shared/storage.js`、
@@ -60,6 +60,9 @@
   - 失败测试：聚焦 API 测试预期因新路由、权限、存储和错误码缺失失败。
   - 实现步骤：先加迁移和 mock；再加存储接口；最后加路由、授权、幂等、审计和签名。
   - 验证：无会话、错误角色、错误设备、重复写、版本冲突、过期和篡改均返回稳定错误。
+  - 实际证据：模板/运行 API、迁移、签名执行包和 Runner 客户端测试 20/20；
+    `npm run test:web-collector` 161/161；质量结果只接受 5 个登记字段，任意输出字段在入库前拒绝；
+    展示数据目录对 4 张控制面表均为 `skip`。
   - 提交：API、迁移和测试，提交信息 `feat(collector): add template and run APIs`。
 
 - [x] 正式兼容与双模式编排

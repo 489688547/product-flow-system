@@ -406,7 +406,7 @@ test("collector runtime executes an assigned experimental bundle through the ver
 
   const result = await cycle.runOnce();
 
-  assert.deepEqual(result, { assigned: 1, processed: 1, failed: 0 });
+  assert.deepEqual(result, { assigned: 1, processed: 1, waitingHuman: 0, failed: 0 });
   assert.deepEqual(calls.map(call => call.slice(0, 3)), [
     ["assigned"],
     ["action", "run-1", "start"],
@@ -449,10 +449,49 @@ test("collector runtime reports safe failure without sending local output or pat
 
   const result = await cycle.runOnce();
 
-  assert.deepEqual(result, { assigned: 1, processed: 0, failed: 1 });
+  assert.deepEqual(result, { assigned: 1, processed: 0, waitingHuman: 0, failed: 1 });
   assert.equal(calls.at(-1).action, "fail");
   assert.equal(calls.at(-1).errorCode, "COLLECTOR_COMMAND_FAILED");
   assert.doesNotMatch(JSON.stringify(calls.at(-1)), /Users|report\.xlsx|token=|secret/i);
+});
+
+test("collector runtime pauses for human verification without recording a failed run", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        return {
+          runs: [{
+            run: { id: "run-human", version: 1 },
+            executionBundle: { runId: "run-human" }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input) {
+        calls.push([runId, input]);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3
+          }
+        };
+      }
+    },
+    executeRun: async () => {
+      throw Object.assign(new Error("验证码页面包含用户手机号"), {
+        code: "COLLECTOR_HUMAN_VERIFICATION_REQUIRED"
+      });
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 0, waitingHuman: 1, failed: 0 });
+  assert.equal(calls.at(-1)[1].action, "wait_human");
+  assert.equal(calls.at(-1)[1].errorCode, "COLLECTOR_HUMAN_VERIFICATION_REQUIRED");
+  assert.equal(calls.at(-1)[1].safeSummary, "请在公司 Mac 完成人工验证后重试。");
+  assert.equal(calls.some(([, input]) => input.action === "fail"), false);
 });
 
 test("dedicated runtime resumes a downloaded checkpoint without repeating browser work", async () => {

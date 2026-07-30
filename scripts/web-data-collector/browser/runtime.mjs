@@ -114,6 +114,18 @@ function safeExperimentalError(error) {
   };
 }
 
+function experimentalErrorNeedsHuman(error) {
+  const code = String(error?.code || "").toUpperCase();
+  return [
+    "_LOGIN_REQUIRED",
+    "_HUMAN_VERIFICATION_REQUIRED",
+    "_SMS_REQUIRED",
+    "_CAPTCHA_REQUIRED",
+    "_SCAN_REQUIRED",
+    "_DEVICE_VERIFICATION_REQUIRED"
+  ].some(suffix => code.endsWith(suffix));
+}
+
 export function createExperimentalRunCycle({ api, executeRun }) {
   if (
     typeof api?.assignedExperimentalRuns !== "function"
@@ -127,6 +139,7 @@ export function createExperimentalRunCycle({ api, executeRun }) {
       const assignment = await api.assignedExperimentalRuns();
       const runs = Array.isArray(assignment?.runs) ? assignment.runs : [];
       let processed = 0;
+      let waitingHuman = 0;
       let failed = 0;
       for (const assigned of runs) {
         const runId = String(assigned?.run?.id || "");
@@ -154,6 +167,20 @@ export function createExperimentalRunCycle({ api, executeRun }) {
           processed += 1;
         } catch (error) {
           const safe = safeExperimentalError(error);
+          if (experimentalErrorNeedsHuman(error)) {
+            await api.experimentalRunAction(
+              runId,
+              {
+                action: "wait_human",
+                expectedVersion: version,
+                errorCode: safe.errorCode,
+                safeSummary: "请在公司 Mac 完成人工验证后重试。"
+              },
+              `collector-run:${runId}:wait-human:${version}`
+            ).catch(() => {});
+            waitingHuman += 1;
+            continue;
+          }
           await api.experimentalRunAction(
             runId,
             {
@@ -166,7 +193,7 @@ export function createExperimentalRunCycle({ api, executeRun }) {
           failed += 1;
         }
       }
-      return { assigned: runs.length, processed, failed };
+      return { assigned: runs.length, processed, waitingHuman, failed };
     }
   });
 }

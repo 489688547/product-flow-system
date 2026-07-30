@@ -74,10 +74,15 @@ export async function authenticateWebCollectionRunner(db, request) {
   const token = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
   if (!token) throw routeError(401, "WEB_COLLECTION_RUNNER_TOKEN_REQUIRED", "采集设备令牌缺失。");
   const tokenHash = await sha256(token);
-  const row = await db.prepare(`SELECT id, name, scope, status FROM web_collection_runners
+  const row = await db.prepare(`SELECT id, name, scope, status, token_hash FROM web_collection_runners
     WHERE token_hash = ? AND status = 'active' LIMIT 1`).bind(tokenHash).first();
   if (!row || row.scope !== RUNNER_SCOPE) throw routeError(401, "WEB_COLLECTION_RUNNER_TOKEN_INVALID", "采集设备令牌无效、已停用或权限范围不符。");
-  return { id: row.id, name: row.name, scope: row.scope };
+  return {
+    id: row.id,
+    name: row.name,
+    scope: row.scope,
+    verificationKey: row.token_hash
+  };
 }
 
 export async function activeWebCollectionRunner(db) {

@@ -35,6 +35,20 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 ## 运行与恢复
 
+- 网页采集同时支持 `formal` 与 `experimental`。未带模板 ID 的现有快麦/抖店任务继续走代码登记的
+  正式 Provider 适配器；实验模式必须由服务端 `COLLECTOR_EXPERIMENTAL_MODE=1` 和公司 Mac
+  `WEB_COLLECTION_EXPERIMENTAL_MODE=1` 双重显式开启，任一关闭都不得领取实验运行。
+- 实验模板允许页面 JavaScript、本机 Python、系统命令、条件、循环、变量、下载和解析，但仅限
+  总经办与数据管理员创建/改版。公司 Mac 在独立工作区执行，使用本机 SQLite 与版本化检查点保存
+  `untrusted/validated` 结果；实验执行器不持有业务数据库权限，也不能调用正式事实 writer。
+- 每个实验执行包绑定 Runner、模板 ID/版本、内容哈希、十五分钟有效期和服务端解析的数据环境版本，
+  并使用 Runner Token 哈希派生的 HMAC-SHA256 签名。Runner 必须先验证签名、内容哈希、有效期和
+  本设备身份；签名或目标环境被改动时拒绝执行。
+- 登录、短信、扫码、滑块与设备确认进入 `waiting_human`，不记为失败且不消耗自动重试。处理后通过
+  版本化 `resume` 恢复；取消进入 `cancelled` 并保留事件。相同幂等键更换动作内容必须拒绝。
+- 模板当前记录、不可变版本、实验运行和事件属于控制面数据，展示数据策略固定为 `skip`。脚本、
+  本机路径、完整输出、Cookie、Token、客户数据和原始页面正文不进入 D1 或展示数据库。
+
 - 已验证的 ERP 网页导出使用仓库内 MV3 插件复用公司日常 Chrome 登录态；首期通过“加载已解压的扩展程序”安装，不依赖 Chrome 应用商店。插件只申请 alarms、storage、tabs、downloads、scripting 和登记平台 host 权限；scripting 仅注入代码包内按 provider 固定登记的 content script，不申请 Cookie、History、WebRequest、Debugger 或 Native Messaging。
 - 抖店默认使用公司日常 Chrome 的 MV3 扩展；扩展按最近核对的稳定 `storeId` 领取任务。需要账号隔离
   时可显式启用专用 Chrome 进程，每个已登记店铺对应一个非默认 `user-data-dir`；DevTools 只绑定

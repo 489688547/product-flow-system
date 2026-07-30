@@ -23,7 +23,7 @@
 - `scripts/web-data-collector/orchestrator.mjs`：按 `formal/experimental` 路由且保持旧任务兼容。
 - `functions/api/platform/v1/web-collection/templates.js`：模板列表、创建、改版和发布。
 - `functions/api/platform/v1/web-collection/runs.js`：实验运行创建、读取和动作。
-- `functions/api/platform/v1/web-collection/_shared/storage.js`：控制面存储接口与 Cloudflare D1 实现。
+- `functions/api/platform/v1/web-collection/_shared/templateStorage.js`：模板、运行和事件的 Cloudflare D1 实现。
 - `migrations/0018_collector_templates.sql`：模板、版本、运行和步骤事件表。
 - `docs/platform/apis/web-collection-v1.md`：认证、权限、请求、响应、错误、兼容和观测契约。
 - `docs/platform/data-acquisition.md`：正式/实验双模式和阿里云可移植长期规则。
@@ -58,8 +58,9 @@ GET    /api/platform/v1/web-collection/runs/:id
 POST   /api/platform/v1/web-collection/runs/:id/actions
 ```
 
-所有写操作要求公司会话、服务端角色校验、`Idempotency-Key` 和乐观版本。Runner 领取接口继续使用登记
-设备 Token，并返回绑定 Runner、模板版本、内容哈希、有效期和运行 ID 的执行包。
+模板写操作要求公司会话、服务端角色校验、`Idempotency-Key` 和乐观版本；运行创建要求有触发权限的
+公司会话，运行状态动作要求所属 Runner Token。Runner 领取接口返回绑定 Runner、模板版本、内容哈希、
+目标环境版本、有效期和运行 ID 的 HMAC 签名执行包。
 
 ## 数据迁移
 

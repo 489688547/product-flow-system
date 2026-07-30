@@ -52,6 +52,13 @@ const SENSITIVE_SOURCE = /document\s*\.\s*cookie|localStorage|sessionStorage|aut
 const SAFE_ID = /^[a-zA-Z0-9][a-zA-Z0-9._:-]{0,127}$/;
 const SAFE_VARIABLE = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
 const MAX_TEMPLATE_STEPS = 200;
+const RUN_QUALITY_FIELDS = new Set([
+  "requiredFieldsComplete",
+  "storeMatched",
+  "businessDateMatched",
+  "schemaMatched",
+  "coverage"
+]);
 
 function collectorError(code, message) {
   return Object.assign(new Error(message), { code });
@@ -86,6 +93,36 @@ function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
   for (const nested of Object.values(value)) deepFreeze(nested);
   return Object.freeze(value);
+}
+
+export function normalizeCollectorRunQuality(value = {}) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw collectorError("COLLECTOR_RUN_QUALITY_INVALID", "采集运行质量结果无效。");
+  }
+  if (Object.keys(value).some(key => !RUN_QUALITY_FIELDS.has(key))) {
+    throw collectorError("COLLECTOR_RUN_QUALITY_INVALID", "采集运行质量结果包含未登记字段。");
+  }
+  const normalized = {};
+  for (const field of [
+    "requiredFieldsComplete",
+    "storeMatched",
+    "businessDateMatched",
+    "schemaMatched"
+  ]) {
+    if (!(field in value)) continue;
+    if (typeof value[field] !== "boolean") {
+      throw collectorError("COLLECTOR_RUN_QUALITY_INVALID", "采集运行质量布尔字段无效。");
+    }
+    normalized[field] = value[field];
+  }
+  if ("coverage" in value) {
+    const coverage = Number(value.coverage);
+    if (!Number.isFinite(coverage) || coverage < 0 || coverage > 1) {
+      throw collectorError("COLLECTOR_RUN_QUALITY_INVALID", "采集运行覆盖率无效。");
+    }
+    normalized.coverage = coverage;
+  }
+  return deepFreeze(normalized);
 }
 
 function normalizeStringArray(value, label, { allowEmpty = true } = {}) {
@@ -296,6 +333,48 @@ export async function collectorTemplateContentHash(template) {
   return [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
+function executionSignatureShape(bundle) {
+  return {
+    runId: String(bundle?.runId || ""),
+    runnerId: String(bundle?.runnerId || ""),
+    templateId: String(bundle?.templateId || ""),
+    version: Number(bundle?.version),
+    contentHash: String(bundle?.contentHash || ""),
+    expiresAt: String(bundle?.expiresAt || ""),
+    targetEnvironment: String(bundle?.targetEnvironment || ""),
+    targetEnvironmentVersion: Number(bundle?.targetEnvironmentVersion)
+  };
+}
+
+async function executionSigningKey(verificationKey, usage) {
+  const value = String(verificationKey || "");
+  if (!/^[a-f0-9]{64}$/i.test(value)) {
+    throw collectorError("COLLECTOR_EXECUTION_SIGNATURE_INVALID", "采集执行包签名密钥无效。");
+  }
+  return globalThis.crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(value.toLowerCase()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    [usage]
+  );
+}
+
+function signaturePayload(bundle) {
+  return new TextEncoder().encode(JSON.stringify(stableValue(executionSignatureShape(bundle))));
+}
+
+function hexBytes(value) {
+  if (!/^[a-f0-9]{64}$/i.test(String(value || ""))) return null;
+  return Uint8Array.from(String(value).match(/.{2}/g).map(byte => Number.parseInt(byte, 16)));
+}
+
+export async function signCollectorExecutionBundle(bundle, { verificationKey } = {}) {
+  const key = await executionSigningKey(verificationKey, "sign");
+  const signature = await globalThis.crypto.subtle.sign("HMAC", key, signaturePayload(bundle));
+  return [...new Uint8Array(signature)].map(value => value.toString(16).padStart(2, "0")).join("");
+}
+
 function canEdit(actor) {
   return actor?.executive === true || EDITOR_ROLES.has(String(actor?.role || ""));
 }
@@ -321,6 +400,7 @@ export function createCollectorTemplateVersion(current, patch = {}, {
 
 export async function verifyCollectorExecutionBundle(bundle, {
   runnerId,
+  verificationKey,
   now = new Date(),
   allowedOrigins = []
 } = {}) {
@@ -344,13 +424,29 @@ export async function verifyCollectorExecutionBundle(bundle, {
   ) {
     throw collectorError("COLLECTOR_TEMPLATE_HASH_MISMATCH", "采集模板版本或内容哈希不匹配。");
   }
+  const signature = hexBytes(bundle.signature);
+  const key = await executionSigningKey(verificationKey, "verify");
+  if (
+    !signature
+    || !await globalThis.crypto.subtle.verify("HMAC", key, signature, signaturePayload(bundle))
+  ) {
+    throw collectorError("COLLECTOR_EXECUTION_SIGNATURE_INVALID", "采集执行包签名无效。");
+  }
+  const targetEnvironment = text(bundle.targetEnvironment, "目标环境");
+  const targetEnvironmentVersion = integer(bundle.targetEnvironmentVersion, "目标环境版本", {
+    min: 1,
+    max: Number.MAX_SAFE_INTEGER
+  });
   return deepFreeze({
     runId: text(bundle.runId, "运行标识"),
     runnerId: String(bundle.runnerId),
     templateId: template.templateId,
     version: template.version,
     contentHash: bundle.contentHash,
+    signature: String(bundle.signature).toLowerCase(),
     expiresAt: new Date(expiresAt).toISOString(),
+    targetEnvironment,
+    targetEnvironmentVersion,
     template
   });
 }

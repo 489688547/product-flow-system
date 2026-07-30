@@ -5,7 +5,9 @@ import {
   collectorTemplateContentHash,
   collectorRunTrustLevel,
   createCollectorTemplateVersion,
+  normalizeCollectorRunQuality,
   normalizeCollectorTemplate,
+  signCollectorExecutionBundle,
   verifyCollectorExecutionBundle
 } from "../src/domain/collectorTemplates.js";
 
@@ -206,11 +208,19 @@ test("execution bundles fail closed for expiry, runner mismatch and template tam
     version: template.version,
     contentHash,
     expiresAt: "2026-07-30T10:15:00.000Z",
-    template
+    template,
+    targetEnvironment: "production",
+    targetEnvironmentVersion: 1
+  };
+  const verificationKey = "a".repeat(64);
+  const signedBundle = {
+    ...bundle,
+    signature: await signCollectorExecutionBundle(bundle, { verificationKey })
   };
 
-  const verified = await verifyCollectorExecutionBundle(bundle, {
+  const verified = await verifyCollectorExecutionBundle(signedBundle, {
     runnerId: "runner-company-mac",
+    verificationKey,
     now: new Date("2026-07-30T10:00:00.000Z"),
     allowedOrigins
   });
@@ -218,16 +228,18 @@ test("execution bundles fail closed for expiry, runner mismatch and template tam
   assert.equal(verified.contentHash, contentHash);
 
   await assert.rejects(
-    verifyCollectorExecutionBundle(bundle, {
+    verifyCollectorExecutionBundle(signedBundle, {
       runnerId: "runner-other",
+      verificationKey,
       now: new Date("2026-07-30T10:00:00.000Z"),
       allowedOrigins
     }),
     error => error?.code === "COLLECTOR_TEMPLATE_ACTION_DENIED"
   );
   await assert.rejects(
-    verifyCollectorExecutionBundle(bundle, {
+    verifyCollectorExecutionBundle(signedBundle, {
       runnerId: "runner-company-mac",
+      verificationKey,
       now: new Date("2026-07-30T10:16:00.000Z"),
       allowedOrigins
     }),
@@ -235,14 +247,27 @@ test("execution bundles fail closed for expiry, runner mismatch and template tam
   );
   await assert.rejects(
     verifyCollectorExecutionBundle({
-      ...bundle,
+      ...signedBundle,
       template: { ...template, timeoutSeconds: 601 }
     }, {
       runnerId: "runner-company-mac",
+      verificationKey,
       now: new Date("2026-07-30T10:00:00.000Z"),
       allowedOrigins
     }),
     error => error?.code === "COLLECTOR_TEMPLATE_HASH_MISMATCH"
+  );
+  await assert.rejects(
+    verifyCollectorExecutionBundle({
+      ...signedBundle,
+      targetEnvironmentVersion: 2
+    }, {
+      runnerId: "runner-company-mac",
+      verificationKey,
+      now: new Date("2026-07-30T10:00:00.000Z"),
+      allowedOrigins
+    }),
+    error => error?.code === "COLLECTOR_EXECUTION_SIGNATURE_INVALID"
   );
 });
 
@@ -269,4 +294,41 @@ test("experimental runs can be validated but only published formal runs can beco
     quality: { ...completeQuality, coverage: 0.7 },
     ingestCompleted: true
   }), "untrusted");
+});
+
+test("collector run quality accepts only the registered completeness fields", () => {
+  assert.deepEqual(normalizeCollectorRunQuality({
+    requiredFieldsComplete: true,
+    storeMatched: true,
+    businessDateMatched: true,
+    schemaMatched: true,
+    coverage: 0.75
+  }), {
+    requiredFieldsComplete: true,
+    storeMatched: true,
+    businessDateMatched: true,
+    schemaMatched: true,
+    coverage: 0.75
+  });
+  assert.throws(
+    () => normalizeCollectorRunQuality({
+      requiredFieldsComplete: true,
+      storeMatched: true,
+      businessDateMatched: true,
+      schemaMatched: true,
+      coverage: 1,
+      output: "raw page text"
+    }),
+    error => error?.code === "COLLECTOR_RUN_QUALITY_INVALID"
+  );
+  assert.throws(
+    () => normalizeCollectorRunQuality({
+      requiredFieldsComplete: true,
+      storeMatched: true,
+      businessDateMatched: true,
+      schemaMatched: true,
+      coverage: 2
+    }),
+    error => error?.code === "COLLECTOR_RUN_QUALITY_INVALID"
+  );
 });
