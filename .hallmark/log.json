@@ -21,7 +21,7 @@
     "enrichment": "none",
     "nav": "two-level App rail and contextual sidebar",
     "brief": "Global information architecture, company home, product overview and data center phase 2",
-    "slop_test": "pending",
-    "responsive": "pending Ego verification"
+    "slop_test": "pass",
+    "responsive": "fixed dev site passed Ego at 390px without horizontal overflow"
   }
 ]
