@@ -10,7 +10,7 @@
 
 ## 任务
 
-- [ ] 建立机器目录和纯领域安全规则
+- [x] 建立机器目录和纯领域安全规则
   - 依赖：无。
   - 文件：`docs/platform/api-registry.json`、`src/domain/apiCatalog.js`、`tests/api-registry.test.mjs`、`react-tests/api-catalog.test.mjs`。
   - 输入：现有 `docs/platform/api-catalog.md`、`docs/platform/apis/*.md`、当前路由和契约测试。
@@ -50,7 +50,7 @@
   - 验证：同一测试命令通过，且 `rg -ni '"[^"]*(password|token|cookie|authorization|secret)[^"]*"\\s*:\\s*"[^[]' docs/platform/api-registry.json` 不输出明文示例。
   - 提交：`feat(handbook): 建立 API 机器目录`。
 
-- [ ] 增加 API 顶部分类与契约文档加载
+- [x] 增加 API 顶部分类与契约文档加载
   - 依赖：机器目录和领域安全规则。
   - 文件：`src/domain/handbook.js`、`src/features/handbook/handbookCatalog.js`、`react-tests/handbook.test.mjs`。
   - 输入：`docs/platform/api-registry.json`、`docs/platform/apis/*.md`。
@@ -76,7 +76,7 @@
   - 验证：`node --test react-tests/handbook.test.mjs` 通过。
   - 提交：`feat(handbook): 增加 API 目录分类`。
 
-- [ ] 实现 App 分组和静态契约详情
+- [x] 实现 App 分组和静态契约详情
   - 依赖：API 分类与机器目录。
   - 文件：`src/features/handbook/ApiCatalogWorkspace.jsx`、`src/features/handbook/api-catalog.css`、`src/features/handbook/HandbookPage.jsx`、`react-tests/api-catalog.test.mjs`。
   - 输入：已校验 `apiRegistry` 和当前说明书选择回调。
@@ -104,7 +104,7 @@
   - 验证：`node --test react-tests/handbook.test.mjs react-tests/api-catalog.test.mjs` 通过。
   - 提交：`feat(handbook): 展示分 App API 契约`。
 
-- [ ] 接入安全只读 GET 实测
+- [x] 接入安全只读 GET 实测
   - 依赖：App 分组和静态契约详情。
   - 文件：`src/state/apiCatalogApi.js`、`src/features/handbook/ApiCatalogWorkspace.jsx`、`src/domain/apiCatalog.js`、`react-tests/api-catalog.test.mjs`。
   - 输入：登记项 `liveTest`、允许查询参数、当前同源 `fetch`。
@@ -145,7 +145,7 @@
   - 验证：`node --test react-tests/api-catalog.test.mjs` 通过。
   - 提交：`feat(handbook): 支持安全只读 API 实测`。
 
-- [ ] 写回目录规则并完成全量验收
+- [x] 写回目录规则并完成全量验收
   - 依赖：安全只读实测。
   - 文件：`docs/platform/api-catalog.md`、证据不足时需要修正的 `docs/platform/apis/*.md`、`docs/features/handbook-api-catalog/tasks.md`。
   - 输入：机器目录、正式契约、实现后的页面状态。

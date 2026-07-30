@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readdir, readFile } from "node:fs/promises";
 
 import {
+  HANDBOOK_CATEGORIES,
   createHandbookDocument,
   extractMarkdownHeadings,
   filterHandbookDocuments,
@@ -77,11 +78,21 @@ test("handbook workspace exposes search, categories, and an empty state", async 
   assert.match(source, /使用手册/);
   assert.match(source, /产品与设计/);
   assert.match(source, /平台能力/);
+  assert.match(source, /API 目录/);
   assert.doesNotMatch(source, /员工使用手册/);
   assert.doesNotMatch(source, /label: "全部"/);
   assert.match(pageSource, /activeDocument\?\.category \?\? "handbook"/);
   assert.match(source, /没有找到匹配的说明/);
   assert.match(source, /<MarkdownDocument/);
+});
+
+test("API catalog is the fourth top-level handbook category", () => {
+  assert.deepEqual(HANDBOOK_CATEGORIES.map(item => item.id), [
+    "handbook",
+    "product",
+    "platform",
+    "api"
+  ]);
 });
 
 test("product and design navigation uses readable Chinese headings", async () => {
@@ -113,6 +124,8 @@ test("product and design catalog excludes agent-only implementation plans", asyn
   );
 
   assert.match(source, /docs\/superpowers\/specs\/\*\.md/);
+  assert.match(source, /docs\/platform\/apis\/\*\.md/);
+  assert.match(source, /api-registry\.json/);
   assert.doesNotMatch(source, /docs\/superpowers\/plans\/\*\.md/);
 });
 

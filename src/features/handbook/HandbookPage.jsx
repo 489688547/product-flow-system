@@ -8,8 +8,14 @@ import {
   resolveHandbookDocument
 } from "../../domain/handbook.js";
 import { PageHeader } from "../../ui/PageHeader.jsx";
+import { ApiCatalogWorkspace } from "./ApiCatalogWorkspace.jsx";
 import { MarkdownDocument } from "./MarkdownDocument.jsx";
-import { DEFAULT_HANDBOOK_SLUG, handbookDocuments } from "./handbookCatalog.js";
+import {
+  DEFAULT_HANDBOOK_SLUG,
+  apiContractLoaders,
+  apiRegistry,
+  handbookDocuments
+} from "./handbookCatalog.js";
 import { IntegrationPlatformMap } from "./IntegrationPlatformMap.jsx";
 import { EnvironmentReadinessPanel } from "./EnvironmentReadinessPanel.jsx";
 import "./handbook.css";
@@ -23,7 +29,8 @@ const KIND_LABELS = {
   product: "产品说明",
   design: "设计书",
   specification: "设计规格",
-  platform: "平台能力"
+  platform: "平台能力",
+  api: "API 契约"
 };
 
 const groupedDocuments = documents => Object.entries(CATEGORY_LABELS)
@@ -49,6 +56,7 @@ export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUs
   const groups = useMemo(() => groupedDocuments(filteredDocuments), [filteredDocuments]);
   const isIntegrationMap = activeDocument?.slug === "platform/external-platform-map";
   const isEnvironmentReadiness = activeDocument?.slug === "platform/environment-readiness";
+  const isApiCatalog = category === "api";
   const isPlatformWorkspace = isIntegrationMap || isEnvironmentReadiness;
   const headings = useMemo(
     () => extractMarkdownHeadings(activeDocument?.content),
@@ -90,7 +98,7 @@ export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUs
             type="search"
             value={query}
             onChange={event => setQuery(event.target.value)}
-            placeholder="搜索说明书"
+            placeholder={isApiCatalog ? "搜索 API、路径或错误码" : "搜索说明书"}
           />
           {query ? (
             <button type="button" aria-label="清除搜索" onClick={() => setQuery("")}>
@@ -113,7 +121,13 @@ export default function HandbookPage({ selectedSlug, onSelectDocument, sessionUs
         </div>
       </div>
 
-      {filteredDocuments.length && activeDocument ? (
+      {isApiCatalog ? (
+        <ApiCatalogWorkspace
+          registry={apiRegistry}
+          contractLoaders={apiContractLoaders}
+          query={query}
+        />
+      ) : filteredDocuments.length && activeDocument ? (
         <div className={`handbook-workspace${isIntegrationMap ? " platform-map-open" : ""}${isEnvironmentReadiness ? " environment-readiness-open" : ""}`}>
           <nav className="handbook-catalog" aria-label="说明书目录">
             {groups.map(group => (

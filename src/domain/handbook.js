@@ -3,7 +3,8 @@ import GithubSlugger from "github-slugger";
 export const HANDBOOK_CATEGORIES = [
   { id: "handbook", label: "使用手册" },
   { id: "product", label: "产品与设计" },
-  { id: "platform", label: "平台能力" }
+  { id: "platform", label: "平台能力" },
+  { id: "api", label: "API 目录" }
 ];
 
 const normalizeWhitespace = value => String(value ?? "").replace(/\s+/g, " ").trim();
