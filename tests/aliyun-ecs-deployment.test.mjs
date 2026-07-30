@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { promisify } from "node:util";
 import test from "node:test";
 
 const root = resolve(import.meta.dirname, "..");
+const execFileAsync = promisify(execFile);
 
 async function json(path) {
   return JSON.parse(await readFile(resolve(root, path), "utf8"));
@@ -226,6 +229,78 @@ test("D1 transfer rejects a changed SQL export and unsafe OSS destination", asyn
   );
 });
 
+test("local D1 backup creates restorable SQLite snapshots before OSS upload", async () => {
+  const {
+    backupLocalD1,
+    DATABASES,
+    localD1DatabasePath
+  } = await import("../scripts/aliyun/d1-transfer.mjs");
+  const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-backup-"));
+  const persistDir = join(tempRoot, "persist");
+  const backupDir = join(tempRoot, "backup");
+  const uploaded = [];
+
+  for (const database of DATABASES) {
+    const source = localD1DatabasePath(persistDir, database);
+    await mkdir(dirname(source), { recursive: true });
+    await execFileAsync("python3", [
+      "-c",
+      [
+        "import sqlite3, sys",
+        "db = sqlite3.connect(sys.argv[1])",
+        "db.execute('CREATE TABLE proof (value TEXT NOT NULL)')",
+        "db.execute('INSERT INTO proof (value) VALUES (?)', (sys.argv[2],))",
+        "db.commit()",
+        "db.close()"
+      ].join("\n"),
+      source,
+      database.name
+    ]);
+  }
+
+  const manifest = await backupLocalD1({
+    backupDir,
+    persistDir,
+    ossUri: "oss://test-bucket/product-flow/backups/",
+    run: async (command, args) => {
+      if (command === "ossutil") {
+        uploaded.push(args);
+        return;
+      }
+      await execFileAsync(command, args);
+    },
+    now: () => "2026-07-30T03:30:00.000Z"
+  });
+
+  assert.deepEqual(manifest.databases.map(item => item.file), [
+    "product-flow-system.sqlite",
+    "product-flow-system-display.sqlite"
+  ]);
+  assert.ok(manifest.databases.every(item => item.bytes > 0));
+  assert.ok(manifest.databases.every(item => /^[a-f0-9]{64}$/.test(item.sha256)));
+  assert.deepEqual(uploaded, [[
+    "cp",
+    backupDir,
+    "oss://test-bucket/product-flow/backups/",
+    "--recursive",
+    "--force"
+  ]]);
+
+  for (const database of DATABASES) {
+    const { stdout } = await execFileAsync("python3", [
+      "-c",
+      [
+        "import sqlite3, sys",
+        "db = sqlite3.connect('file:' + sys.argv[1] + '?mode=ro', uri=True)",
+        "print(db.execute('PRAGMA quick_check').fetchone()[0])",
+        "print(db.execute('SELECT value FROM proof').fetchone()[0])"
+      ].join("\n"),
+      join(backupDir, database.backupFile)
+    ], { encoding: "utf8" });
+    assert.equal(stdout, `ok\n${database.name}\n`);
+  }
+});
+
 test("Aliyun compose binds only to loopback and joins the existing proxy network", async () => {
   const { load } = await import("js-yaml");
   const composeText = await readFile(resolve(root, "deploy/aliyun/docker-compose.yml"), "utf8");
@@ -273,6 +348,29 @@ test("Aliyun native systemd service is loopback-only and resource bounded", asyn
   assert.match(runbook, /chown -R root:pfs \/opt\/product-flow\/app/);
   assert.match(runbook, /chmod -R g\+rX \/opt\/product-flow\/app/);
   assert.match(runbook, /chown -R pfs:pfs \/opt\/product-flow\/data/);
+});
+
+test("Aliyun SQLite backup is scheduled daily without permanent access keys", async () => {
+  const service = await readFile(
+    resolve(root, "deploy/aliyun/product-flow-backup.service"),
+    "utf8"
+  );
+  const timer = await readFile(
+    resolve(root, "deploy/aliyun/product-flow-backup.timer"),
+    "utf8"
+  );
+
+  assert.match(service, /^Environment=HOME=\/root$/m);
+  assert.match(
+    service,
+    /^Environment=OSS_BACKUP_URI=oss:\/\/deshan-tiyes-product-flow-backup-cn-hangzhou\/product-flow\/backups\/$/m
+  );
+  assert.match(service, /scripts\/aliyun\/backup-local-d1\.mjs/);
+  assert.match(service, /^NoNewPrivileges=true$/m);
+  assert.doesNotMatch(service, /ACCESS_KEY|AccessKey|Secret/);
+  assert.match(timer, /^OnCalendar=\*-\*-\* 03:15:00 Asia\/Shanghai$/m);
+  assert.match(timer, /^Persistent=true$/m);
+  assert.match(timer, /^RandomizedDelaySec=15m$/m);
 });
 
 test("local D1 check requires both databases to contain tables", async () => {

@@ -38,7 +38,8 @@
 - `start-runtime.mjs`：校验公开运行时配置并启动 Pages Functions。
 - `export-cloudflare-d1.mjs`：只读导出两个远程 D1。
 - `import-local-d1.mjs`：只向空白 ECS 数据卷导入两个数据库。
-- `backup-local-d1.mjs`：一致性导出、哈希、保留和可选 OSS 上传。
+- `backup-local-d1.mjs`：SQLite Online Backup 一致性快照、哈希和可选 OSS
+  上传；避免宿主机 Wrangler/workerd 的 GLIBC 依赖。
 
 ## 页面状态
 

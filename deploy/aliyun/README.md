@@ -6,7 +6,7 @@
   提供。
 - 两个 D1 binding 都落在 `/opt/product-flow/data` 的本地 SQLite。
 - `runtime.env` 权限必须为 `600`，不得启用 `LOCAL_ONLINE_ACCOUNT_MODE`。
-- OSS 只接收私有对象和一致性 SQL 备份，不承载在线数据库。
+- OSS 只接收私有对象和 SQLite 一致性快照，不承载在线数据库。
 
 ## 首次预发布
 
@@ -74,10 +74,35 @@ HTTP→HTTPS，再执行 DNS 和钉钉回调切换。
 
 ## 备份与回滚
 
+先为 ECS 绑定只允许访问目标备份前缀的实例 RAM 角色，再安装并校验
+`ossutil 2.3.0`。`/root/.ossutilconfig` 只声明实例角色、杭州地域和内网
+Endpoint，不保存 AccessKey：
+
+```ini
+[default]
+mode = Ali-EcsRamRole
+region = cn-hangzhou
+endpoint = oss-cn-hangzhou-internal.aliyuncs.com
+```
+
+手工执行一次备份并检查生成的 SHA-256 清单：
+
 ```bash
 node scripts/aliyun/backup-local-d1.mjs \
   /opt/product-flow/backups/$(date +%Y%m%d-%H%M%S) \
   /opt/product-flow/data/wrangler
+```
+
+备份脚本直接使用 SQLite Online Backup API 生成可恢复的 `.sqlite` 快照，不调用
+宿主机不兼容的 Wrangler/workerd。确认首次上传和恢复校验成功后启用每日任务：
+
+```bash
+install -m 0644 deploy/aliyun/product-flow-backup.service /etc/systemd/system/
+install -m 0644 deploy/aliyun/product-flow-backup.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now product-flow-backup.timer
+systemctl start product-flow-backup.service
+systemctl status product-flow-backup.service --no-pager
 ```
 
 若阿里云入口异常，停止 ECS 写入并恢复 Cloudflare DNS。两端一旦都产生新写入，

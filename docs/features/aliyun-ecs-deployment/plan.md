@@ -9,7 +9,7 @@
 
 保留现有 Pages Functions 代码，通过 Wrangler 的本地 Pages 运行时在 ECS
 执行，D1 binding 映射到持久化数据卷内的本地 SQLite。Nginx Proxy Manager
-负责入口，OSS 只存对象与数据库导出备份。Cloudflare 保持回滚生产通道，
+负责入口，OSS 只存对象与 SQLite 一致性快照。Cloudflare 保持回滚生产通道，
 不做双写。
 
 ## 文件职责
@@ -23,7 +23,10 @@
 - `scripts/aliyun/start-runtime.mjs`：启动并转发进程信号。
 - `scripts/aliyun/export-cloudflare-d1.mjs`：远程全量导出和哈希清单。
 - `scripts/aliyun/import-local-d1.mjs`：空白数据卷导入与重复导入保护。
-- `scripts/aliyun/backup-local-d1.mjs`：本地导出、哈希、保留和 OSS 上传。
+- `scripts/aliyun/backup-local-d1.mjs`：通过 SQLite Online Backup API 生成一致性
+  快照、哈希清单并上传 OSS，不依赖宿主机 Wrangler/workerd。
+- `deploy/aliyun/product-flow-backup.{service,timer}`：每日备份任务、超时和
+  systemd 沙箱边界。
 - `scripts/aliyun/check-local-d1.mjs`：验证两个库的表数与关键表。
 - `tests/aliyun-ecs-deployment.test.mjs`：运行时、迁移、备份和 OAuth 契约。
 
@@ -36,6 +39,7 @@
   `--replace-empty`；默认拒绝覆盖已有状态。
 - 备份清单为 JSON：`createdAt`、`databases[]`、`file`、`bytes`、`sha256`。
 - `OSS_BACKUP_URI` 只允许 `oss://bucket/prefix/`，上传通过 `ossutil cp`。
+- OSS 客户端只使用 ECS 实例 RAM 角色与内网 Endpoint，不保存 AccessKey。
 
 ## 数据迁移
 

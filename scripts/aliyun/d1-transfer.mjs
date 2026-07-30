@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { spawn } from "node:child_process";
 import { access, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
@@ -7,16 +7,29 @@ export const DATABASES = Object.freeze([
   Object.freeze({
     binding: "PRODUCT_FLOW_DB",
     name: "product-flow-system",
-    file: "product-flow-system.sql"
+    file: "product-flow-system.sql",
+    backupFile: "product-flow-system.sqlite"
   }),
   Object.freeze({
     binding: "DEMO_FLOW_DB",
     name: "product-flow-system-display",
-    file: "product-flow-system-display.sql"
+    file: "product-flow-system-display.sql",
+    backupFile: "product-flow-system-display.sqlite"
   })
 ]);
 
 const IMPORT_MARKER = ".pfs-import-complete.json";
+const MINIFLARE_D1_NAMESPACE = "miniflare-D1DatabaseObject";
+const SQLITE_BACKUP_SCRIPT = [
+  "import sqlite3, sys",
+  "source = sqlite3.connect('file:' + sys.argv[1] + '?mode=ro', uri=True)",
+  "target = sqlite3.connect(sys.argv[2])",
+  "source.backup(target)",
+  "result = target.execute('PRAGMA quick_check').fetchone()[0]",
+  "source.close()",
+  "target.close()",
+  "if result != 'ok': raise RuntimeError('SQLite quick_check failed: ' + str(result))"
+].join("\n");
 
 function requiredAbsolutePath(value, name) {
   const path = resolve(String(value || ""));
@@ -42,6 +55,25 @@ async function atomicJson(path, value) {
   const temporary = `${path}.${process.pid}.tmp`;
   await writeFile(temporary, `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
   await rename(temporary, path);
+}
+
+export function localD1DatabasePath(persistDir, database) {
+  const persistence = requiredAbsolutePath(persistDir, "persistDir");
+  if (!database?.binding) throw new Error("database.binding 不能为空。");
+  const key = createHash("sha256").update(MINIFLARE_D1_NAMESPACE).digest();
+  const nameHmac = createHmac("sha256", key)
+    .update(database.binding)
+    .digest()
+    .subarray(0, 16);
+  const hmac = createHmac("sha256", key).update(nameHmac).digest().subarray(0, 16);
+  const objectId = Buffer.concat([nameHmac, hmac]).toString("hex");
+  return join(
+    persistence,
+    "v3",
+    "d1",
+    MINIFLARE_D1_NAMESPACE,
+    `${objectId}.sqlite`
+  );
 }
 
 export function runCommand(command, args, options = {}) {
@@ -172,36 +204,33 @@ function validateOssUri(value) {
 export async function backupLocalD1({
   backupDir,
   persistDir,
-  configPath = resolve("deploy/aliyun/wrangler.toml"),
   ossUri = "",
   run = runCommand,
-  wranglerBin = "npx",
   ossutilBin = "ossutil",
+  pythonBin = "python3",
   now = () => new Date().toISOString()
 }) {
   const ossDestination = validateOssUri(ossUri);
   const directory = requiredAbsolutePath(backupDir, "backupDir");
   const persistence = requiredAbsolutePath(persistDir, "persistDir");
-  const config = requiredAbsolutePath(configPath, "configPath");
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const items = [];
   for (const database of DATABASES) {
-    const output = join(directory, database.file);
-    await run(wranglerBin, [
-      ...(wranglerBin === "npx" ? ["wrangler"] : []),
-      "d1",
-      "export",
-      database.name,
-      "--local",
-      "--config",
-      config,
-      "--persist-to",
-      persistence,
-      "--output",
-      output
-    ]);
+    const source = localD1DatabasePath(persistence, database);
+    const output = join(directory, database.backupFile);
+    if (!(await exists(source))) {
+      throw new Error(`${database.name} 本地 SQLite 文件不存在：${source}`);
+    }
+    await run(pythonBin, ["-c", SQLITE_BACKUP_SCRIPT, source, output]);
     const metadata = await stat(output);
-    items.push({ ...database, bytes: metadata.size, sha256: await sha256(output) });
+    if (metadata.size === 0) throw new Error(`${database.name} SQLite 备份为空。`);
+    items.push({
+      binding: database.binding,
+      name: database.name,
+      file: database.backupFile,
+      bytes: metadata.size,
+      sha256: await sha256(output)
+    });
   }
   const manifest = { schemaVersion: 1, createdAt: now(), source: "aliyun-ecs-local-d1", databases: items };
   await atomicJson(join(directory, "manifest.json"), manifest);

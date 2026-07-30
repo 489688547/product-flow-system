@@ -1,0 +1,20 @@
+[Unit]
+Description=Back up Product Flow SQLite databases to private OSS
+After=network-online.target product-flow.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/product-flow/app
+Environment=HOME=/root
+Environment=PATH=/opt/node-v22.22.3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=OSS_BACKUP_URI=oss://deshan-tiyes-product-flow-backup-cn-hangzhou/product-flow/backups/
+ExecStart=/bin/bash -c 'exec /opt/node-v22.22.3/bin/node scripts/aliyun/backup-local-d1.mjs "/opt/product-flow/backups/$(/usr/bin/date -u +%%Y%%m%%dT%%H%%M%%SZ)" /opt/product-flow/data/wrangler'
+TimeoutStartSec=20min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/opt/product-flow/backups
+
