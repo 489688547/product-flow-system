@@ -45,7 +45,13 @@ export const DOUYIN_DEDICATED_RESOURCES = Object.freeze({
     reportVersion: "douyin-video-v2"
   })
 });
-const REGISTERED_URLS = new Set(Object.values(DOUYIN_DEDICATED_RESOURCES).map(resource => resource.url));
+// 自助取数是独立页面，不属于四个资源各自的落地页，需要单独登记为合法地址。
+export const SELF_SERVICE_URL = "https://compass.jinritemai.com/shop/workshop/appcustom-access?tab=access";
+
+const REGISTERED_URLS = new Set([
+  ...Object.values(DOUYIN_DEDICATED_RESOURCES).map(resource => resource.url),
+  SELF_SERVICE_URL
+]);
 const SELECTOR_VERSION = "2026-07-25";
 
 const INSPECT_SNAPSHOT_EXPRESSION = `(() => {
@@ -205,7 +211,9 @@ export function validateDedicatedDouyinTask(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw douyinError("DOUYIN_TASK_INVALID", "抖店任务格式无效。");
   }
-  if (Object.keys(value).some(field => !TASK_FIELDS.has(field))) {
+  // viaSelfService 决定走自助取数还是逐页导出，属于任务的合法字段。
+  const allowed = new Set([...TASK_FIELDS, "viaSelfService"]);
+  if (Object.keys(value).some(field => !allowed.has(field))) {
     throw douyinError("DOUYIN_TASK_UNSAFE_FIELDS", "抖店任务包含未登记字段。");
   }
   if (
@@ -249,7 +257,7 @@ function validateStoreCapture(capture) {
   };
 }
 
-export function createDouyinDedicatedExecutor({ createController }) {
+export function createDouyinDedicatedExecutor({ createController, createExtractRunner = null }) {
   if (typeof createController !== "function") {
     throw douyinError("DOUYIN_BROWSER_CONTROLLER_REQUIRED", "抖店专用浏览器控制器未配置。");
   }
@@ -300,6 +308,31 @@ export function createDouyinDedicatedExecutor({ createController }) {
         }
         if (String(inspection.storeId || "") !== task.storeId) {
           return terminalResult(task, "failed", "DOUYIN_STORE_MISMATCH", "专用 Chrome 当前登录的店铺与任务不一致。");
+        }
+
+        // 自助取数走独立通道：页面日期控件只认可信事件，扩展发不出，
+        // 而这里是专用浏览器，CDP Input 域可以。它也是唯一能回溯 14 个月的路径。
+        if (task.viaSelfService && createExtractRunner) {
+          await controller.open(SELF_SERVICE_URL);
+          await onCheckpoint("waiting_download");
+          const runner = createExtractRunner({ controller });
+          const { plan } = await runner.run({
+            resourceType: task.resourceType,
+            from: task.businessDate,
+            to: task.businessDate
+          });
+          const downloaded = await controller.awaitDownload?.(plan.taskName);
+          if (!downloaded) {
+            return terminalResult(task, "failed", "DOUYIN_EXTRACT_DOWNLOAD_MISSING", "取数文件未落盘。");
+          }
+          return {
+            kind: "downloaded",
+            jobId: task.jobId,
+            filePath: downloaded.filePath,
+            safeFileName: downloaded.safeFileName,
+            pageType: "shop_compass_self_service",
+            reportVersion: "douyin-self-service-v1"
+          };
         }
 
         await controller.applyBusinessDate(task.businessDate);
