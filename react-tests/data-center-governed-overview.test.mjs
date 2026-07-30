@@ -65,8 +65,8 @@ test("governed cards show readable comparison direction without inventing missin
 
 test("overview uses concise GMV trend and platform distribution with accessible details", () => {
   const overview = read("src/features/data-center/DataOverview.jsx");
-  assert.match(overview, /<h2>经营趋势<\/h2>/);
-  assert.match(overview, /<h2>平台分布<\/h2>/);
+  assert.match(overview, /<h2[^>]*>经营趋势<\/h2>/);
+  assert.match(overview, /<h2[^>]*>平台分布<\/h2>/);
   assert.doesNotMatch(overview, /销售事实视图/);
   assert.doesNotMatch(overview, /平台贡献/);
   assert.match(overview, /GMV/);

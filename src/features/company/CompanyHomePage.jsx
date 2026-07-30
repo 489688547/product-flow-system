@@ -1,4 +1,4 @@
-import { ArrowRight, BadgeDollarSign, Flag, GitBranch, Target } from "lucide-react";
+import { AlertTriangle, ArrowRight, BadgeDollarSign, CircleHelp, Flag, GitBranch, ListTodo, Target } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { personalTodosForUser } from "../../domain/personalTodos.js";
 import { buildExecutiveSummary } from "../../domain/strategyExecution.js";
@@ -67,6 +67,10 @@ export function CompanyHomePage({ onNavigate }) {
   const executiveActions = useMemo(() => buildExecutiveActions(collaborationItems, new Date()), [collaborationItems]);
   const ownedProjects = summary.projects.filter(item => [item.project.owner, item.project.sponsor].includes(currentUser?.name));
   const ownedObjectives = summary.objectives.filter(item => item.objective.owner === currentUser?.name);
+  const pendingTodoCount = myTodos.filter(todo => todo.status === "pending").length;
+  const decisionCount = executiveActions.filter(action => action.reason === "decision_required").length;
+  const operatingRiskCount = summary.offTrackProjects.length + summary.atRiskProjects.length + summary.openRisks.length;
+  const productTodoCount = productState.tasks.filter(task => !task.done).length;
 
   useEffect(() => {
     if (executive) loadItems({ view: "my_scope", limit: 100 }).catch(() => {});
@@ -101,8 +105,14 @@ export function CompanyHomePage({ onNavigate }) {
     <section className="page company-home">
       <PageHeader title="公司首页" description="处理今天需要拍板、协调和升级的经营事项。" />
       {error || collaborationError ? <div className="inline-alert" role="status">{error || collaborationError?.message}</div> : null}
+      <section className="executive-pulse-grid" aria-label="今天的经营行动摘要">
+        <button type="button" className="danger" onClick={() => onNavigate("collaboration")}><CircleHelp aria-hidden="true" /><span><strong>{decisionCount}</strong><small>待拍板</small></span><ArrowRight aria-hidden="true" /></button>
+        <button type="button" onClick={() => document.querySelector(".executive-personal-todos")?.scrollIntoView({ block: "start" })}><ListTodo aria-hidden="true" /><span><strong>{pendingTodoCount}</strong><small>我的待办</small></span><ArrowRight aria-hidden="true" /></button>
+        <button type="button" className="warning" onClick={() => onNavigate("projects")}><AlertTriangle aria-hidden="true" /><span><strong>{operatingRiskCount}</strong><small>经营风险</small></span><ArrowRight aria-hidden="true" /></button>
+        <button type="button" onClick={() => onNavigate("dashboard")}><GitBranch aria-hidden="true" /><span><strong>{productTodoCount}</strong><small>产品待办</small></span><ArrowRight aria-hidden="true" /></button>
+      </section>
       <ExecutiveActionDesk actions={executiveActions} items={collaborationItems} loading={collaborationLoading} onNavigate={onNavigate} />
-      <section className="executive-personal-todos"><div className="panel-title"><Flag size={18} /><h2>我的待办</h2><span>{myTodos.filter(todo => todo.status === "pending").length} 项待处理</span></div><PersonalTodoWorkbench todos={myTodos} onNavigate={onNavigate} /></section>
+      <section className="executive-personal-todos"><div className="panel-title"><Flag size={18} /><h2>我的待办</h2><span>{pendingTodoCount} 项待处理</span></div><PersonalTodoWorkbench todos={myTodos} onNavigate={onNavigate} /></section>
       <CompanyCockpit summary={summary} state={state} onNavigate={onNavigate} />
     </section>
   );
