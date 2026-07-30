@@ -11,6 +11,10 @@ const migration = readFileSync(
   new URL("../migrations/0018_collector_templates.sql", import.meta.url),
   "utf8"
 );
+const environmentManifest = JSON.parse(readFileSync(
+  new URL("../docs/platform/environment-capabilities.json", import.meta.url),
+  "utf8"
+));
 const TABLES = [
   "collector_templates",
   "collector_template_versions",
@@ -41,4 +45,21 @@ test("collector templates and experimental runs are explicitly skipped in displa
     assert.equal(declared.has(table), true, `${table} must declare a display-data policy`);
     assert.equal(demoTablePolicy(table).policy, "skip", table);
   }
+});
+
+test("company web collection declares the experimental runtime switches and storage", () => {
+  const capability = environmentManifest.capabilities.find(
+    entry => entry.id === "company-web-data-collection"
+  );
+
+  assert.ok(capability, "company web collection capability must exist");
+  assert.deepEqual(capability.envVars, [
+    "COLLECTOR_EXPERIMENTAL_MODE",
+    "WEB_COLLECTION_EXPERIMENTAL_MODE"
+  ]);
+  for (const table of TABLES) {
+    assert.equal(capability.tables.includes(table), true, `${table} must be declared`);
+  }
+  assert.match(capability.description, /双开关显式启用/);
+  assert.match(capability.description, /untrusted.*validated/);
 });

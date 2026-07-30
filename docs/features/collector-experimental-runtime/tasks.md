@@ -79,7 +79,7 @@
     正式快麦/抖店运行时回归保持通过。
   - 提交：编排和回归测试，提交信息 `feat(collector): route formal and experimental runs`。
 
-- [ ] 可移植契约与交付验证
+- [x] 可移植契约与交付验证
   - 依赖：双模式编排。
   - 文件：`docs/platform/apis/web-collection-v1.md`、`docs/platform/data-acquisition.md`、
     `docs/decisions/2026-07-30-dual-mode-collector-runtime.md` 和验证失败要求的文件。
@@ -88,4 +88,8 @@
   - 失败测试：存储适配契约测试预期因实现包含 Cloudflare/D1 专属字段或错误码漂移失败。
   - 实现步骤：抽取存储契约测试；运行 Cloudflare 实现；向阿里云事项交付相同测试；更新长期文档。
   - 验证：聚焦、完整 Definition of Done、Pages Functions build 和本机非敏感实验验收全部通过。
+  - 实际证据：`npm run test:web-collector` 164/164；本机实验执行器真实运行 Node 与 Python 子进程、
+    条件、循环、下载句柄、超时与敏感输出拒绝 6/6；`npm run lint`、治理、集成、环境能力、
+    完整 `npm test`、前端构建和 `npx wrangler pages functions build` 全部通过。
+    `company-web-data-collection` 已登记双端实验开关和 4 张控制面表；阿里云 ECS 与 OSS 能力块保持不变。
   - 提交：契约、文档与验证证据，提交信息 `docs(collector): define portable execution boundary`。

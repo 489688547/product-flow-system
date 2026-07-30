@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-29",
+  "updatedAt": "2026-07-30",
   "capabilities": [
     {
       "id": "shared-production-data",
@@ -227,13 +227,23 @@
     {
       "id": "company-web-data-collection",
       "name": "公司网页数据采集运行时",
-      "description": "公司 Mac 通过日常 Chrome 的内置 MV3 插件、本机 loopback 执行器、固定 provider adapter、日计划和任务租约采集已验证网页数据；销售异常可按店铺和业务日期幂等排队，登录恢复后由授权用户人工重排。这是当前快麦与抖店官方报表采集的共享运行时，D1 控制面只保存设备、任务、运行、游标和通知安全元数据。",
+      "description": "公司 Mac 通过日常 Chrome 的内置 MV3 插件、本机 loopback 执行器、固定 provider adapter、日计划和任务租约采集已验证网页数据；销售异常可按店铺和业务日期幂等排队，登录恢复后由授权用户人工重排。这是当前快麦与抖店官方报表采集的共享运行时，并可在服务端与公司 Mac 双开关显式启用后运行版本化实验模板；实验结果只允许 untrusted 或 validated，默认不进入正式经营事实。",
       "platforms": ["cloudflare-pages", "cloudflare-d1", "kuaimai", "douyin-ecommerce", "erp-file-import"],
       "requiredIn": ["preview", "production"],
       "level": "blocking",
-      "envVars": [],
+      "envVars": ["COLLECTOR_EXPERIMENTAL_MODE", "WEB_COLLECTION_EXPERIMENTAL_MODE"],
       "bindings": ["PRODUCT_FLOW_DB"],
-      "tables": ["web_collection_runners", "web_collection_jobs", "web_collection_runs", "web_collection_cursors", "web_collection_notifications"]
+      "tables": [
+        "web_collection_runners",
+        "web_collection_jobs",
+        "web_collection_runs",
+        "web_collection_cursors",
+        "web_collection_notifications",
+        "collector_templates",
+        "collector_template_versions",
+        "collector_experimental_runs",
+        "collector_experimental_run_events"
+      ]
     },
     {
       "id": "product-catalog-storage",
