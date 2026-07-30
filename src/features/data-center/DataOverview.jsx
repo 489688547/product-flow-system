@@ -142,7 +142,7 @@ export function DataOverview({ factViews, range, setRange, metricResults = [], m
         <AlertCircle size={17} /><span><strong>{updating ? "统一口径正在更新" : failed || metricError ? "统一口径结果读取失败" : `还有 ${missingCount} 项口径暂无结果`}</strong><small>{updating ? "旧批次结果继续保留；新批次完整成功后才会切换。" : resultReason(metricError?.code || runForRange?.errorCode || "RESULT_NOT_AVAILABLE")}</small></span>
         {!updating ? <Button type="button" onClick={retryMetricResults}>重新计算</Button> : <span className="status-badge warning">正在更新 {runForRange?.progress || 0}%</span>}
       </section> : null}
-      <div className="data-kpi-grid">{DATA_CENTER_OVERVIEW_METRICS.map(metric => {
+      <div className="data-kpi-grid" role="region" aria-label="核心经营指标">{DATA_CENTER_OVERVIEW_METRICS.map(metric => {
         const result = byMetricCode.get(metric.metricCode);
         const Icon = ICONS[metric.metricCode];
         const coverageRate = result?.coverageRate;
@@ -151,8 +151,8 @@ export function DataOverview({ factViews, range, setRange, metricResults = [], m
         return <article key={metric.metricCode}><Icon size={18} /><span>{metric.label}</span><strong>{formatMetric(result?.value, metric.format)}</strong><MetricComparison current={result} previous={previous} metric={metric} loading={comparisonUpdating} error={comparisonError} compatibilityRollback={compatibilityRollback} />{!result || coverageRate < 1 ? <small className="data-kpi-meta">{result ? <span className="text-warning">覆盖率 {Math.round((coverageRate || 0) * 100)}%</span> : <span>{resultReason(reasonCode)}</span>}</small> : null}</article>;
       })}</div>
       <div className="data-overview-grid">
-        <section className="section-panel data-trend-panel"><div className="section-head"><div><h2>经营趋势</h2><p>{range.from} 至 {range.to}，按日 GMV。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.trendByDay || factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>
-        <section className="section-panel"><div className="section-head"><div><h2>平台分布</h2><p>按 GMV 查看当前日期范围的平台占比。</p></div></div><div className="data-contribution-list">{factViews.byPlatform.slice(0, 6).map(row => { const share = totalGmv ? row.sales / totalGmv * 100 : 0; return <div key={row.platform}><span><strong>{row.platform}</strong><small>{number(share)}%</small></span><i><b style={{ width: `${share}%` }} /></i><em>{money(row.sales)}</em></div>; })}{!factViews.byPlatform.length ? <div className="empty-state compact-empty">暂无平台数据。</div> : null}</div></section>
+        <section className="section-panel data-trend-panel" aria-labelledby="data-trend-title"><div className="section-head"><div><h2 id="data-trend-title">经营趋势</h2><p>{range.from} 至 {range.to}，按日 GMV。</p></div></div>{factViews.byDay.length ? <Trend rows={factViews.trendByDay || factViews.byDay} /> : <div className="empty-state compact-empty">当前日期范围没有销售数据。</div>}</section>
+        <section className="section-panel" aria-labelledby="data-platform-title"><div className="section-head"><div><h2 id="data-platform-title">平台分布</h2><p>按 GMV 查看当前日期范围的平台占比。</p></div></div><div className="data-contribution-list">{factViews.byPlatform.slice(0, 6).map(row => { const share = totalGmv ? row.sales / totalGmv * 100 : 0; return <div key={row.platform}><span><strong>{row.platform}</strong><small>{number(share)}%</small></span><i><b style={{ width: `${share}%` }} /></i><em>{money(row.sales)}</em></div>; })}{!factViews.byPlatform.length ? <div className="empty-state compact-empty">暂无平台数据。</div> : null}</div></section>
       </div>
       {storeOperations ? <StoreOperationsPanel {...storeOperations} /> : null}
     </div>
