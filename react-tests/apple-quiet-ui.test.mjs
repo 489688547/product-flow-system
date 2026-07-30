@@ -106,3 +106,12 @@ test("boss home and product overview lead with actionable summaries", () => {
   assert.match(dashboardSource, />需要处理</);
   assert.match(dashboardSource, />流程中的产品</);
 });
+
+test("data center quick actions collapse after their desktop rule at mobile width", () => {
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const desktopRule = css.indexOf(".data-center-quick-actions { display: grid; grid-template-columns: repeat(3");
+  const mobileRule = css.lastIndexOf(".data-center-quick-actions { grid-template-columns: 1fr; }");
+
+  assert.ok(desktopRule >= 0);
+  assert.ok(mobileRule > desktopRule);
+});
