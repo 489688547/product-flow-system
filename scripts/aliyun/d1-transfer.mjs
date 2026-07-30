@@ -20,14 +20,11 @@ export const DATABASES = Object.freeze([
 
 const IMPORT_MARKER = ".pfs-import-complete.json";
 const MINIFLARE_D1_NAMESPACE = "miniflare-D1DatabaseObject";
-const SQLITE_BACKUP_SCRIPT = [
+const SQLITE_QUICK_CHECK_SCRIPT = [
   "import sqlite3, sys",
-  "source = sqlite3.connect('file:' + sys.argv[1] + '?mode=ro', uri=True)",
-  "target = sqlite3.connect(sys.argv[2])",
-  "source.backup(target)",
-  "result = target.execute('PRAGMA quick_check').fetchone()[0]",
-  "source.close()",
-  "target.close()",
+  "database = sqlite3.connect('file:' + sys.argv[1] + '?mode=ro', uri=True)",
+  "result = database.execute('PRAGMA quick_check').fetchone()[0]",
+  "database.close()",
   "if result != 'ok': raise RuntimeError('SQLite quick_check failed: ' + str(result))"
 ].join("\n");
 
@@ -207,6 +204,7 @@ export async function backupLocalD1({
   ossUri = "",
   run = runCommand,
   ossutilBin = "ossutil",
+  sqliteBin = "sqlite3",
   pythonBin = "python3",
   now = () => new Date().toISOString()
 }) {
@@ -221,7 +219,12 @@ export async function backupLocalD1({
     if (!(await exists(source))) {
       throw new Error(`${database.name} 本地 SQLite 文件不存在：${source}`);
     }
-    await run(pythonBin, ["-c", SQLITE_BACKUP_SCRIPT, source, output]);
+    await run(sqliteBin, [
+      source,
+      ".timeout 30000",
+      `.backup ${JSON.stringify(output)}`
+    ]);
+    await run(pythonBin, ["-c", SQLITE_QUICK_CHECK_SCRIPT, output]);
     const metadata = await stat(output);
     if (metadata.size === 0) throw new Error(`${database.name} SQLite 备份为空。`);
     items.push({
