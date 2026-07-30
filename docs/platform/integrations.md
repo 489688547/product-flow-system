@@ -73,7 +73,9 @@ Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状
 阿里云 ECS 是 Pages Functions 与双 SQLite 的过渡生产运行时，不是第二套业务
 API。容器通过 Wrangler 本地 Pages 运行时执行仓库中的 `functions/`，正式与
 展示 binding 分别持久化到 ECS 数据卷；公网环境不得启用
-`LOCAL_ONLINE_ACCOUNT_MODE`。现有 Nginx Proxy Manager 负责 80/443，应用端口
+`LOCAL_ONLINE_ACCOUNT_MODE`。运行时 Secret 只从只读 `runtime.env` 挂载，
+启动器在受限工作目录以 `.dev.vars` 符号链接交给 Pages Functions，不复制进镜像
+或持久化数据。现有 Nginx Proxy Manager 负责 80/443，应用端口
 默认只绑定宿主机回环地址。正式阿里云入口登记为 `deshan-tiyes.cn`；ICP备案、
 HTTPS 和钉钉回调白名单完成前只允许 Host 头预验收，不切换 DNS。
 

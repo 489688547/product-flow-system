@@ -79,7 +79,7 @@ export function runtimeWorkingDirectory(config) {
   return config.workDir;
 }
 
-function ensureDirectorySymlink(linkPath, targetPath) {
+function ensureSymlink(linkPath, targetPath, type) {
   try {
     const stat = lstatSync(linkPath);
     if (!stat.isSymbolicLink()) {
@@ -90,13 +90,14 @@ function ensureDirectorySymlink(linkPath, targetPath) {
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
   }
-  symlinkSync(targetPath, linkPath, "dir");
+  symlinkSync(targetPath, linkPath, type);
 }
 
 export function prepareRuntimeWorkspace(config) {
   mkdirSync(config.workDir, { recursive: true, mode: 0o700 });
   copyFileSync(config.configPath, join(config.workDir, "wrangler.toml"));
   chmodSync(join(config.workDir, "wrangler.toml"), 0o600);
-  ensureDirectorySymlink(join(config.workDir, "dist"), config.assetsDir);
-  ensureDirectorySymlink(join(config.workDir, "functions"), config.functionsDir);
+  ensureSymlink(join(config.workDir, ".dev.vars"), config.envFile, "file");
+  ensureSymlink(join(config.workDir, "dist"), config.assetsDir, "dir");
+  ensureSymlink(join(config.workDir, "functions"), config.functionsDir, "dir");
 }

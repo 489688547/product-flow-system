@@ -6,6 +6,8 @@
   提供。
 - 两个 D1 binding 都落在 `/opt/product-flow/data` 的本地 SQLite。
 - `runtime.env` 权限必须为 `600`，不得启用 `LOCAL_ONLINE_ACCOUNT_MODE`。
+- 启动脚本只在受限运行目录创建 `.dev.vars` 符号链接，使 Pages Functions
+  能从只读的 `/run/pfs/runtime.env` 读取 binding；不得把 Secret 复制进镜像。
 - OSS 只接收私有对象和 SQLite 一致性快照，不承载在线数据库。
 
 ## 首次预发布

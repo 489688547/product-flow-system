@@ -137,6 +137,7 @@ test("Aliyun runtime prepares a writable Pages workspace without copying applica
   prepareRuntimeWorkspace(config);
 
   assert.equal(await readFile(join(workDir, "wrangler.toml"), "utf8"), 'name = "test"\n');
+  assert.equal(await readlink(join(workDir, ".dev.vars")), config.envFile);
   assert.equal(await readlink(join(workDir, "dist")), assetsDir);
   assert.equal(await readlink(join(workDir, "functions")), functionsDir);
 });

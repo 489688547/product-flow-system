@@ -61,6 +61,8 @@
   - 提交：只记录验收证据，不提交服务器 Secret。
   - 2026-07-30 收尾：ECS 已绑定最小权限 OSS 实例角色；备份改用 SQLite
     Online Backup 一致性快照，并由 systemd timer 每日执行。
+  - 2026-07-30 验收修复：运行时把只读 `runtime.env` 链接为 Pages Functions
+    识别的 `.dev.vars`，钉钉 OAuth bootstrap 从缺少配置的 501 恢复为 200。
 
 - [ ] 域名与正式切流
   - 依赖：域名实名、ICP备案、OSS Bucket 和实例 RAM 角色。
