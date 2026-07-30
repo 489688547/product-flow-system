@@ -84,6 +84,42 @@ const CATALOG = Object.freeze({
     action: "重试无效，多为页面改版所致，需要更新采集适配。",
     retryable: false
   },
+  DOUYIN_EXTRACT_DAYS_MISSING: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "取数结果缺少部分业务日，本批未入库任何数据。",
+    action: "为避免缺的那天被显示成「没有生意」，整批作废，重试即可重新取数。",
+    retryable: true
+  },
+  DOUYIN_EXTRACT_DATE_COLUMN_MISSING: {
+    kind: COLLECTION_FAILURE_KIND.schemaChanged,
+    summary: "取数结果缺少「日期」列，无法定位业务日。",
+    action: "重试无效，多为时间粒度选错或导出结构变化，需要更新采集适配。",
+    retryable: false
+  },
+  DOUYIN_EXTRACT_DATE_NOT_APPLIED: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "统计周期没有进入取数表单，任务未创建。",
+    action: "多为页面响应慢所致，重试一次通常可恢复；连续失败请反馈。",
+    retryable: true
+  },
+  DOUYIN_EXTRACT_TIMEOUT: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "罗盘的取数任务还在排队，本次没有等到结果。",
+    action: "取数队列由抖音全平台共用，繁忙时排队较久；稍后重试即可，不必改配置。",
+    retryable: true
+  },
+  DOUYIN_EXTRACT_TASK_FAILED: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "罗盘的取数任务被平台判为失败。",
+    action: "多为平台侧临时故障，重试一次通常可恢复；连续多次失败请反馈。",
+    retryable: true
+  },
+  DOUYIN_EXTRACT_RANGE_TOO_LONG: {
+    kind: COLLECTION_FAILURE_KIND.schemaChanged,
+    summary: "取数区间超过罗盘单次上限（3 个月），本次没有发起任务。",
+    action: "重试无效，需要按上限拆分区间后再采。",
+    retryable: false
+  },
   KUAIMAI_SALES_CALCULATE_TIMEOUT: {
     kind: COLLECTION_FAILURE_KIND.pageInteraction,
     summary: "销售报表一直没算完，本次没有导出，避免落下半天的数据。",
