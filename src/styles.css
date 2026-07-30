@@ -2322,6 +2322,10 @@ main { min-width: 0; overflow-x: clip; }
 .store-ops-tile { display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; column-gap: 11px; align-items: center; padding: 13px 15px; background: var(--surface-subtle); border: 1px solid var(--border); border-radius: var(--radius-panel); }
 .store-ops-tile-icon { grid-row: 1 / span 2; width: 32px; height: 32px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); border-radius: 9px; }
 .store-ops-tile-label { color: var(--text-tertiary); font-size: 12px; }
+/* 数据不是当天的必须一眼看出来。这两块的采集独立于店铺汇总，失败时会停在最后一次
+   成功的业务日；灰色小字标个日期等于没说，人只会把它当成当天的数。 */
+.store-ops-tile.stale { background: var(--warning-soft); border-color: color-mix(in oklch, var(--warning), white 65%); }
+.store-ops-tile-stale { color: var(--warning); font-weight: 500; }
 .store-ops-tile strong { color: var(--text-primary); font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .store-ops-tile small { grid-column: 2; color: var(--text-tertiary); font-size: 11px; font-variant-numeric: tabular-nums; }
 

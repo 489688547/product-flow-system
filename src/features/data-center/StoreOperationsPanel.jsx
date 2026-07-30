@@ -66,6 +66,29 @@ function PanelShell({ businessDate, children, stores, selectedStore, onSelectSto
   );
 }
 
+// 直播与短视频的采集独立于店铺汇总，失败时这两块会停在最后一次成功的业务日。
+// 面板此前把它们和店铺汇总并排展示，头部写着「业务日 2026-07-29」，卡片里却是 07-23
+// 的数字，只用一行灰色小字标注日期——等于把不同日期的数据当成同一天给人看。
+// 日期不一致必须显式说明「这不是当天的数」，而不是让人自己去核对小字。
+//
+// 「场」「条」也要说清是什么：原先只写「226 场」「1131 条」，没人看得出是直播场次
+// 还是别的东西。
+function StoreContentTile({ icon, label, amount, unitCount, unitLabel, dataDate, panelDate }) {
+  const date = String(dataDate || "");
+  const stale = Boolean(date && panelDate && date !== panelDate);
+  const count = Number(unitCount) || 0;
+  return <div className={`store-ops-tile${stale ? " stale" : ""}`}>
+    <span className="store-ops-tile-icon">{icon}</span>
+    <span className="store-ops-tile-label">{label}</span>
+    <strong>{money(amount)}</strong>
+    {stale
+      ? <small className="store-ops-tile-stale">
+          非当日数据 · {date} 的 {count} {unitLabel}，此后未采集成功
+        </small>
+      : <small>{date || panelDate} · {count} {unitLabel}</small>}
+  </div>;
+}
+
 export function StoreOperationsPanel({
   stores = [],
   selectedStore = "",
@@ -129,18 +152,24 @@ export function StoreOperationsPanel({
         <div className="store-ops-content">
           <div className="store-ops-subhead"><h3>直播 / 短视频</h3></div>
           <div className="store-ops-tiles">
-            <div className="store-ops-tile">
-              <span className="store-ops-tile-icon"><Radio size={16} aria-hidden="true" /></span>
-              <span className="store-ops-tile-label">直播成交</span>
-              <strong>{money(content?.live?.transactionAmount)}</strong>
-              <small>{content?.live?.businessDate || businessDate} · {content?.live?.sessionCount || 0} 场</small>
-            </div>
-            <div className="store-ops-tile">
-              <span className="store-ops-tile-icon"><Video size={16} aria-hidden="true" /></span>
-              <span className="store-ops-tile-label">短视频成交</span>
-              <strong>{money(content?.video?.transactionAmount)}</strong>
-              <small>{content?.video?.businessDate || businessDate} · {content?.video?.videoCount || 0} 条</small>
-            </div>
+            <StoreContentTile
+              icon={<Radio size={16} aria-hidden="true" />}
+              label="直播成交"
+              amount={content?.live?.transactionAmount}
+              unitCount={content?.live?.sessionCount}
+              unitLabel="场直播"
+              dataDate={content?.live?.businessDate}
+              panelDate={businessDate}
+            />
+            <StoreContentTile
+              icon={<Video size={16} aria-hidden="true" />}
+              label="短视频成交"
+              amount={content?.video?.transactionAmount}
+              unitCount={content?.video?.videoCount}
+              unitLabel="条短视频"
+              dataDate={content?.video?.businessDate}
+              panelDate={businessDate}
+            />
           </div>
         </div>
       </div>
