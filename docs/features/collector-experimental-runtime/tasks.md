@@ -10,7 +10,7 @@
 
 ## 任务
 
-- [ ] 领域模板与签名执行包
+- [x] 领域模板与签名执行包
   - 依赖：无。
   - 文件：`src/domain/collectorTemplates.js`、`tests/collector-template-domain.test.mjs`。
   - 输入：PRD 中的模板、步骤、版本、权限和信任等级规则。
@@ -18,6 +18,8 @@
   - 失败测试：`node --test tests/collector-template-domain.test.mjs`，预期因领域模块不存在失败。
   - 实现步骤：锁定 schema；实现规范化和稳定哈希输入；实现版本与执行包验证；实现信任等级。
   - 验证：聚焦测试全部通过，未知步骤、错误角色、过期和哈希不一致均 fail closed。
+  - 实际证据：`node --test tests/collector-template-domain.test.mjs` 7/7；
+    `npx eslint src/domain/collectorTemplates.js tests/collector-template-domain.test.mjs` 通过。
   - 提交：领域文件、测试和任务证据，提交信息 `feat(collector): add versioned template contract`。
 
 - [ ] 本机实验步骤与资源限制
