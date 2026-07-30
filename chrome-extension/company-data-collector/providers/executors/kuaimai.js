@@ -3,6 +3,10 @@ import * as kuaimai from "../kuaimai.js";
 
 const wait = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds));
 const KUAIMAI_ORDER_PAGE_READY_TIMEOUT_MS = 15_000;
+const KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS = 20_000;
+const KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS = 4_000;
+const KUAIMAI_SALES_CALCULATE_TIMEOUT_MS = 180_000;
+const KUAIMAI_SALES_CALCULATE_START_TIMEOUT_MS = 8_000;
 const KUAIMAI_DOWNLOAD_CENTER_TIMEOUT_MS = 180_000;
 const KUAIMAI_DOWNLOAD_CENTER_POLL_MS = 2_500;
 
@@ -34,19 +38,92 @@ async function waitForRequiredTextElement(selector, value, matchesText, code) {
   throw Object.assign(new Error("页面控件不可用。"), { code });
 }
 
-function assertAppliedKuaimaiRange(selectors, context) {
+function appliedKuaimaiRangeMatches(selectors, context) {
   const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_TIME_BASIS_MISSING");
   const startTime = findRequired(selectors.startTime, "KUAIMAI_START_TIME_MISSING");
   const endTime = findRequired(selectors.endTime, "KUAIMAI_END_TIME_MISSING");
-  if (
-    timeBasis.value !== context.expectedTimeBasis
-    || startTime.value !== context.expectedStartTime
-    || endTime.value !== context.expectedEndTime
-  ) {
-    throw Object.assign(new Error("创建时间范围未生效。"), {
-      code: "KUAIMAI_TIME_RANGE_NOT_APPLIED"
-    });
+  return timeBasis.value === context.expectedTimeBasis
+    && startTime.value === context.expectedStartTime
+    && endTime.value === context.expectedEndTime;
+}
+
+function assertAppliedKuaimaiRange(selectors, context) {
+  if (appliedKuaimaiRangeMatches(selectors, context)) return;
+  throw Object.assign(new Error("创建时间范围未生效。"), {
+    code: "KUAIMAI_TIME_RANGE_NOT_APPLIED"
+  });
+}
+
+// 补数任务连着跑时会复用同一个标签页，只换 hash。页面「就绪」的判据是控件存在，
+// 而复用时控件本来就在，只是还带着上一天的值——立刻断言就会读到旧值，
+// 于是每次补历史日期都报 KUAIMAI_TIME_RANGE_NOT_APPLIED，只有当天第一次
+// （新开标签页，控件和值一起出现）才通过。所以必须等值追上来，而不是立刻判定。
+async function waitForAppliedKuaimaiRange(selectors, context, searchHash = "") {
+  const startedAt = Date.now();
+  const deadline = startedAt + KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS;
+  let replayed = false;
+  do {
+    if (appliedKuaimaiRangeMatches(selectors, context)) return;
+    // 光等不一定收敛：任务连着跑时页面偶尔就是不重新应用筛选。此时重放一次
+    // hash 导航——实测这是唯一可靠的施加手段（程序化写输入框不会更新 Vue 模型，
+    // 点查询提交的仍是旧筛选）。改 hash 是页内跳转，不会重载文档、不会中断本脚本。
+    if (!replayed && searchHash && Date.now() - startedAt >= KUAIMAI_TIME_RANGE_REPLAY_AFTER_MS) {
+      replayed = true;
+      window.location.hash = searchHash;
+    }
+    await wait(200);
+  } while (Date.now() < deadline);
+  assertAppliedKuaimaiRange(selectors, context);
+}
+
+// 「导出」按钮在计算过程中始终可点，所以它不能当完成信号：实测点完「计算数据」
+// 第 2 秒时遮罩还在、表格还是 0 行，导出按钮已经可点。原先固定等 3.5 秒就导出，
+// 导出的是算到一半的中间结果——07-26 只落了 176 行 ¥8,498，正常是约 530 行 ¥13 万。
+// 真正的完成信号是遮罩消失且表格出现数据行。
+function kuaimaiSalesMasked() {
+  return Array.from(document.querySelectorAll(".el-loading-mask"))
+    .some(mask => mask.getClientRects().length > 0);
+}
+
+function kuaimaiSalesTableFingerprint() {
+  return Array.from(document.querySelectorAll("tbody tr")).slice(0, 3)
+    .map(row => row.textContent.replace(/\s+/g, "")).join("|");
+}
+
+// 「遮罩消失且表格有行」单独不够：点击「计算数据」后遮罩要过一会儿才挂上，在那之前
+// 页面上还留着上一个任务算好的表格——行数大于 0、又没有遮罩，会被当成本轮已完成，
+// 导出的就是上一天的数据。实测目标 07-27 的导出里 2026-07-26 占 24777 个单元格、
+// 07-27 只有 5498 个，正是上一个任务的结果；而一批任务里的第一个（页面无旧结果）
+// 总是成功。所以必须先确认本轮计算确实启动了。
+async function waitForKuaimaiSalesCalculation(previousFingerprint = "") {
+  const startDeadline = Date.now() + KUAIMAI_SALES_CALCULATE_START_TIMEOUT_MS;
+  let started = false;
+  while (Date.now() < startDeadline) {
+    if (kuaimaiSalesMasked()) {
+      started = true;
+      break;
+    }
+    await wait(100);
   }
+  const deadline = Date.now() + KUAIMAI_SALES_CALCULATE_TIMEOUT_MS;
+  let settled = 0;
+  do {
+    const rows = document.querySelectorAll("tbody tr").length;
+    // 遮罩始终没出现时，只认「表格内容确实换过」，绝不拿旧结果充数。
+    const fresh = started
+      || (previousFingerprint !== "" && kuaimaiSalesTableFingerprint() !== previousFingerprint);
+    if (!kuaimaiSalesMasked() && rows > 0 && fresh) {
+      settled += 1;
+      // 连续两次都稳定才收工，避免正好命中两段计算之间的空档。
+      if (settled >= 2) return;
+    } else {
+      settled = 0;
+    }
+    await wait(500);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("销售报表计算未在预期时间内完成。"), {
+    code: "KUAIMAI_SALES_CALCULATE_TIMEOUT"
+  });
 }
 
 async function openKuaimaiExportDialog({
@@ -279,6 +356,65 @@ function setNativeInputValue(input, value) {
   input.dispatchEvent(new Event("blur", { bubbles: true }));
 }
 
+// 销售报表的日期框是 Element UI 只读日期选择器（readOnly=true），写 value 只改 DOM、
+// 不更新 Vue 模型：实测把两端都写成 2026-07-26 后，输入框显示对了，计算请求带的却
+// 仍是页面原范围 2026-07-22 ~ 2026-07-28。导出因此是七天聚合而不是目标业务日，
+// 落库时被判 WEB_COLLECTION_BUSINESS_DATE_MISMATCH，或落成残缺数据。
+// 唯一可靠的方式是打开日期面板点日期格。
+// 两个日期框的浮层都常驻 DOM，Element UI 只是把它们移出视野，getClientRects() 一直
+// 非空，所以「当前可见的那个面板」和「新出现的那个面板」都无法区分它们——实测按这两
+// 种判据去点，结束日期会被点到开始日期的面板上，表现为开始生效、结束仍是旧值。
+// 可靠的关联是位置：每个浮层就贴在自己输入框的正下方（实测开始框 top=149 对应面板
+// top=187，结束框 top=181 对应面板 top=219）。
+function kuaimaiPickerPanelFor(input) {
+  const box = input.getBoundingClientRect();
+  const panels = Array.from(document.querySelectorAll(".el-picker-panel.el-date-picker"))
+    .filter(panel => panel.getClientRects().length > 0);
+  let best = null;
+  let bestGap = Infinity;
+  for (const panel of panels) {
+    const rect = panel.getBoundingClientRect();
+    const gap = Math.abs(rect.top - box.bottom) + Math.abs(rect.left - box.left);
+    if (gap < bestGap) {
+      bestGap = gap;
+      best = panel;
+    }
+  }
+  return bestGap <= 80 ? best : null;
+}
+
+// 销售报表的日期框是 Element UI 只读日期选择器（readOnly=true），写 value 只改 DOM、
+// 不更新 Vue 模型：实测把两端都写成 2026-07-26 后，输入框显示对了，计算请求带的却
+// 仍是页面原范围 2026-07-22 ~ 2026-07-28。导出因此是七天聚合而不是目标业务日。
+// 唯一可靠的方式是打开日期面板点日期格。
+async function pickKuaimaiDate(input, businessDate) {
+  const day = String(Number(String(businessDate).slice(8, 10)));
+  for (const type of ["mousedown", "mouseup", "click", "focus"]) {
+    input.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true, view: window }));
+  }
+  input.focus();
+  await wait(400);
+  const deadline = Date.now() + 5000;
+  do {
+    const panel = kuaimaiPickerPanelFor(input);
+    const cell = panel && Array.from(panel.querySelectorAll("td")).find(td =>
+      td.getClientRects().length > 0
+      && !/prev-month|next-month|disabled/.test(td.className)
+      && td.textContent.trim() === day
+    );
+    if (cell) {
+      cell.click();
+      await wait(500);
+      if (input.value === businessDate) return;
+      break;
+    }
+    await wait(200);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("销售报表日期未能选中。"), {
+    code: "KUAIMAI_SALES_DATE_PICK_FAILED"
+  });
+}
+
 async function prepareKuaimaiSalesReport(action, selectors, matchesText, context) {
   const legacyButton = exactTextElement(selectors.dialogButton, "暂不，继续使用旧版", matchesText);
   if (legacyButton) {
@@ -305,8 +441,9 @@ async function prepareKuaimaiSalesReport(action, selectors, matchesText, context
   }
   const startDate = findRequired(selectors.startDate, "KUAIMAI_SALES_START_DATE_MISSING");
   const endDate = findRequired(selectors.endDate, "KUAIMAI_SALES_END_DATE_MISSING");
-  if (startDate.value !== action.businessDate) setNativeInputValue(startDate, action.businessDate);
-  if (endDate.value !== action.businessDate) setNativeInputValue(endDate, action.businessDate);
+  // 先收窄结束端：若先把开始日期挪到更早的目标日，区间会短暂跨越更大范围。
+  if (endDate.value !== action.businessDate) await pickKuaimaiDate(endDate, action.businessDate);
+  if (startDate.value !== action.businessDate) await pickKuaimaiDate(startDate, action.businessDate);
   await wait(250);
   const reportTab = findRequiredTextElement(
     selectors.reportTab,
@@ -320,19 +457,25 @@ async function prepareKuaimaiSalesReport(action, selectors, matchesText, context
   context.expectedSalesTimeBasis = action.timeBasis;
 }
 
-function assertAppliedKuaimaiSalesRange(selectors, context) {
+function appliedKuaimaiSalesRangeMatches(selectors, context) {
   const timeBasis = findRequired(selectors.timeBasis, "KUAIMAI_SALES_TIME_BASIS_MISSING");
   const startDate = findRequired(selectors.startDate, "KUAIMAI_SALES_START_DATE_MISSING");
   const endDate = findRequired(selectors.endDate, "KUAIMAI_SALES_END_DATE_MISSING");
-  if (
-    timeBasis.value !== context.expectedSalesTimeBasis
-    || startDate.value !== context.expectedSalesDate
-    || endDate.value !== context.expectedSalesDate
-  ) {
-    throw Object.assign(new Error("销售报表创建时间范围未生效。"), {
-      code: "KUAIMAI_SALES_TIME_RANGE_NOT_APPLIED"
-    });
-  }
+  return timeBasis.value === context.expectedSalesTimeBasis
+    && startDate.value === context.expectedSalesDate
+    && endDate.value === context.expectedSalesDate;
+}
+
+// 与订单页同因：复用标签页时控件先在、值后到，立刻断言会读到上一次的筛选。
+async function assertAppliedKuaimaiSalesRange(selectors, context) {
+  const deadline = Date.now() + KUAIMAI_TIME_RANGE_APPLY_TIMEOUT_MS;
+  do {
+    if (appliedKuaimaiSalesRangeMatches(selectors, context)) return;
+    await wait(200);
+  } while (Date.now() < deadline);
+  throw Object.assign(new Error("销售报表创建时间范围未生效。"), {
+    code: "KUAIMAI_SALES_TIME_RANGE_NOT_APPLIED"
+  });
 }
 
 function readDownloadCenterRows(selectors) {
@@ -372,7 +515,18 @@ async function downloadFromKuaimaiCenter({
       if (!download) {
         throw Object.assign(new Error("快麦下载控件不可用。"), { code: "KUAIMAI_DOWNLOAD_BUTTON_MISSING" });
       }
-      download.click();
+      // 下载链接是 <a href="javascript:void(0)">：点击会让浏览器同时尝试跳转到这个
+      // javascript: URL，被页面 CSP 拦下并记一条扩展错误。文件确实下载得到，功能
+      // 没问题，但每下载一次就攒一条噪音，真正的故障会被淹掉（错误页上几十条全是
+      // 这一条）。挡掉默认跳转即可——preventDefault 只阻止默认行为，页面自己的
+      // 点击处理器照常执行。
+      const suppressNavigation = event => event.preventDefault();
+      download.addEventListener("click", suppressNavigation);
+      try {
+        download.click();
+      } finally {
+        download.removeEventListener("click", suppressNavigation);
+      }
       return;
     }
 
@@ -533,16 +687,17 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       await prepareKuaimaiSalesReport(action, context.salesSelectors, matchesText, context);
       return;
     case "calculate_sales_report": {
-      assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
+      await assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
       const button = findRequiredTextElement(
         context.salesSelectors.calculateButton,
         "计算数据",
         matchesText,
         "KUAIMAI_SALES_CALCULATE_MISSING"
       );
+      const beforeCalculation = kuaimaiSalesTableFingerprint();
       button.click();
-      await wait(3500);
-      assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
+      await waitForKuaimaiSalesCalculation(beforeCalculation);
+      await assertAppliedKuaimaiSalesRange(context.salesSelectors, context);
       return;
     }
     case "export_sales_items": {
@@ -572,12 +727,14 @@ async function runKuaimaiAction(action, selectors, matchesText, context) {
       context.expectedTimeBasis = action.timeBasis;
       context.expectedStartTime = action.startValue;
       context.expectedEndTime = action.endValue;
-      assertAppliedKuaimaiRange(selectors, context);
+      context.searchHash = action.searchHash || "";
+      await waitForAppliedKuaimaiRange(selectors, context, context.searchHash);
       return;
     }
     case "wait_for_results":
       await wait(3000);
-      assertAppliedKuaimaiRange(selectors, context);
+      // 结果加载完仍要复核一次：中途若被别的筛选覆盖，导出的就不是目标业务日。
+      await waitForAppliedKuaimaiRange(selectors, context, context.searchHash || "");
       return;
     case "export_orders": {
       await openKuaimaiExportDialog({

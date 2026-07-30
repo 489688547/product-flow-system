@@ -30,9 +30,64 @@ export const DOUYIN_API_ENDPOINTS = Object.freeze({
 // _lid 是埋点 ID，与取数无关。
 export const SIGNATURE_PARAMS = Object.freeze(["msToken", "a_bogus", "verifyFp", "fp", "_lid"]);
 
-// 页面自身对单日查询使用 date_type=1。日期同时接受 YYYY-MM-DD 与
-// "YYYY/MM/DD HH:mm:ss" 两种格式，实测均可取数，这里统一用前者。
-const DATE_TYPE_DAILY = "1";
+// date_type 决定后端接受什么日期，选错会被静默拒绝或只给最近两天。实测（2026-07-29）：
+//
+// | date_type | 含义       | 取 2026-07-26（三天前） |
+// |-----------|-----------|------------------------|
+// | 20        | 页面「近1天」| st:100008「日期校验失败」 |
+// | 21        | 自定义范围  | 正常返回 10 行           |
+//
+// 页面切到「近1天」时用 20，那是滚动预设，后端只允许最近两天，补历史日必被拒。
+// 自定义范围用 21，这也是罗盘自己的链接里带的值。因此补数一律用 21。
+//
+// 日期格式不敏感：`2026/07/26 00:00:00`、`2026-07-26`、`2026/07/26` 三种写法
+// 在 date_type=21 下返回完全相同的结果（首行支付金额均为 1519911）。
+const DATE_TYPE_DAILY = "21";
+
+// 罗盘自己会告诉你每种 date_type 能查多久，不必猜也不该盲目重试：
+//   GET /compass_api/config_center/data_range_v2?data_type=<页面标识>&path=<页面路径>
+// 返回 data_range_map，按 date_type 给出 min_date/max_date。直播概览页实测：
+//   22→3 天、21→7 天、23→30 天、24→90 天、7→今年至今。
+// 各页面窗口不同，接入执行器时应先查询再选 date_type，并据此判断目标业务日可否采集。
+export const DOUYIN_DATA_RANGE_ENDPOINT = "/compass_api/config_center/data_range_v2";
+
+// 单日数据必须逐日不同，否则说明日期没生效。实测 date_type=21 下
+// 07-26 首行支付金额 1519911、07-27 为 1441483，确认日期真正参与查询。
+// 另外罗盘商品卡只保留到 07-26，更早的日期返回 0 行——这是平台的数据保留期，
+// 不是故障，不应按失败重试。
+export const DOUYIN_PRODUCT_CARD_PARAMS = Object.freeze({
+  activity_id: "",
+  is_activity: "false",
+  category_code: "",
+  product_status: "0",
+  is_asc: "false",
+  channel: "all",
+  product_tab: "0",
+  only_abnormal: "false",
+  page_no: "1",
+  page_size: "50"
+});
+
+// 每个资源除日期外还有自己的必填参数，缺了会被判「参数校验失败」而不是静默降级。
+// 全部取自页面实际发出的请求（2026-07-29 抓包）。
+export const DOUYIN_RESOURCE_PARAMS = Object.freeze({
+  product_daily: DOUYIN_PRODUCT_CARD_PARAMS,
+  // index_selected 决定返回哪些指标，其中 ad_costed_amt 是投放消耗、
+  // stat_cost 是广告花费——广告费用就在这个接口里，不需要另找数据源。
+  live_daily: Object.freeze({
+    page_size: "50",
+    page_no: "1",
+    index_selected: "new_pay_amt,pay_amt,watch_cnt,pay_cnt,net_pay_cnt,ad_costed_amt,stat_cost,use_coupon_pay_amt,coupon_pay_amt_ratio",
+    a_type: "-1",
+    activity_id: ""
+  })
+});
+
+// 直播明细的数据埋在 data.module_data.shop_live_list_room_detail
+// .compass_general_table_value.data 里，不是顶层数组。
+export const DOUYIN_LIVE_TABLE_PATH = Object.freeze([
+  "module_data", "shop_live_list_room_detail", "compass_general_table_value"
+]);
 
 export function buildDouyinApiUrl({ endpoint, businessDate, sourceParams = {} } = {}) {
   const url = new URL(String(endpoint || ""), DOUYIN_API_ORIGIN);

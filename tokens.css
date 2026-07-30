@@ -1,0 +1,32 @@
+:root {
+  --color-canvas: oklch(97.2% 0.006 255);
+  --color-sidebar: oklch(98.4% 0.004 255);
+  --color-surface: oklch(100% 0 0);
+  --color-surface-subtle: oklch(96.8% 0.007 255);
+  --color-surface-hover: oklch(95.4% 0.013 255);
+  --color-border: oklch(89.5% 0.012 258);
+  --color-border-strong: oklch(82.8% 0.021 258);
+  --color-ink: oklch(20.5% 0.028 258);
+  --color-ink-secondary: oklch(40% 0.026 258);
+  --color-ink-tertiary: oklch(53% 0.022 258);
+  --color-ink-disabled: oklch(70% 0.016 258);
+  --color-accent: oklch(54% 0.19 258);
+  --color-accent-hover: oklch(49% 0.2 258);
+  --color-accent-soft: oklch(95.2% 0.032 258);
+  --color-accent-ink: oklch(100% 0 0);
+  --font-body: "SF Pro Text", "PingFang SC", -apple-system, BlinkMacSystemFont, "Microsoft YaHei", sans-serif;
+  --space-unit: 4px;
+  --text-page-title: 26px;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-in: cubic-bezier(.4, 0, 1, 1);
+  --ease-in-out: cubic-bezier(.4, 0, .2, 1);
+  --dur-fast: 120ms;
+  --dur-standard: 180ms;
+  --rule-hairline: 1px;
+  --radius-control-token: 10px;
+  --radius-panel-token: 14px;
+  --radius-modal-token: 18px;
+  --elevation-rest: 0 1px 2px oklch(24% 0.018 258 / .04);
+  --elevation-float: 0 10px 30px oklch(24% 0.018 258 / .12);
+  --elevation-modal: 0 24px 64px oklch(24% 0.018 258 / .16);
+}

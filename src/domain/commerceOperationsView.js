@@ -27,11 +27,19 @@ export function dayOverDay(value, previous, { lowerIsBetter = false } = {}) {
   return { available: true, current, previous: base, delta, changeRatio, direction, favorable };
 }
 
+// 成交订单数、成交人数、客单价已从面板撤下：这三个数是错的，且错得不报错。
+// 2026-07-29 面板显示成交订单数 3,147,743、成交人数 2,575,726、客单价 ¥0，
+// 而当日 GMV 只有 ¥65,761——量级对不上，客单价是被虚高的人数除出来的。
+//
+// 根因是 store_daily 靠页面标签文字找旁边的数字取数（见 executors/douyin.js 的
+// STORE_METRIC_LABELS）。罗盘首页改版后标签与数值串位，抓到的多半是曝光/点击人数。
+// 罗盘首页接口 summary_core_index_v3 返回的 12 个指标里根本没有订单数与人数，
+// 说明这两个数在当前取数路径下无法得到可信来源。
+//
+// 错数比缺数危险：缺数看得见，错数会被当真。恢复条件是改用接口按键名取数，
+// 并确认订单数与人数的真实来源。
 export const STORE_DAILY_METRICS = Object.freeze([
   Object.freeze({ key: "transactionAmount", label: "成交金额(GMV)", format: "money", lowerIsBetter: false }),
-  Object.freeze({ key: "transactionOrderCount", label: "成交订单数", format: "number", lowerIsBetter: false }),
-  Object.freeze({ key: "transactionBuyerCount", label: "成交人数", format: "number", lowerIsBetter: false }),
-  Object.freeze({ key: "derived.averageOrderValue", label: "客单价", format: "money", lowerIsBetter: false }),
   Object.freeze({ key: "derived.exposureClickRate", label: "曝光点击率", format: "percent", lowerIsBetter: false }),
   Object.freeze({ key: "derived.refundRate", label: "退款率", format: "percent", lowerIsBetter: true })
 ]);

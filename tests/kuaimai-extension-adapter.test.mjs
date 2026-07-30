@@ -52,7 +52,10 @@ test("Kuaimai orders use order creation time and yesterday full Shanghai day", a
       action: "verify_time_range",
       timeBasis: "下单时间",
       startValue: "2026-07-21 00:00:00",
-      endValue: "2026-07-21 23:59:59"
+      endValue: "2026-07-21 23:59:59",
+      // 筛选没应用上时执行器要重放这个 hash：订单页只认 hash 参数，
+      // 程序化写输入框不会更新 Vue 模型。它必须与任务地址的 hash 完全一致。
+      searchHash: "#/trade/searchlist/?pageNo=1&timeType=created&startTime=1784563200000&endTime=1784649599000&field=created&_emitFrom=search"
     },
     { action: "wait_for_results" },
     { action: "export_orders" },

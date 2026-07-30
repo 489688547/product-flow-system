@@ -836,14 +836,15 @@ test("settings uses organization-backed navigation and feature permission matric
   assert.doesNotMatch(page, /角色权限/);
 });
 
-test("visual system uses a lighter collaboration-tool shell instead of dark admin styling", () => {
+test("visual system uses the restrained Apple workbench shell", () => {
   const styles = read("src/styles.css");
   const app = read("src/App.jsx");
-  assert.match(styles, /\.app-shell\s*\{[\s\S]*grid-template-columns: 176px minmax\(0, 1fr\);/);
-  assert.match(styles, /\.sidebar\s*\{[\s\S]*background: rgba\(255, 255, 255, \.86\);/);
-  assert.match(styles, /\.sidebar nav button\.active\s*\{[\s\S]*background: var\(--primary-soft\);[\s\S]*color: var\(--primary\);/);
-  assert.match(styles, /\.page\s*\{[\s\S]*padding: 22px 26px;/);
-  assert.match(styles, /\.section-panel, \.table-wrap, \.product-card, \.file-tile\s*\{[\s\S]*box-shadow: var\(--shadow-sm\);/);
+  assert.match(styles, /\.app-shell\s*\{[\s\S]*grid-template-columns: 72px 220px minmax\(0, 1fr\);/);
+  assert.match(styles, /\.workspace-app-rail\s*\{[\s\S]*background: var\(--color-sidebar\);/);
+  assert.match(styles, /\.workspace-context-button\.active\s*\{[\s\S]*background: var\(--primary-soft\);[\s\S]*color: var\(--primary\);/);
+  assert.match(styles, /\.page\s*\{[\s\S]*padding: 28px 32px;/);
+  assert.match(styles, /\.section-panel, \.table-wrap, \.product-card, \.file-tile\s*\{[\s\S]*box-shadow: none;/);
+  assert.match(app, /<WorkspaceNavigation/);
   assert.match(app, /currentUser/);
   assert.match(app, /currentUser\?\.name/);
 });
@@ -934,13 +935,16 @@ test("shared page and table primitives support consistent hierarchy and responsi
   const pageHeader = read("src/ui/PageHeader.jsx");
   const table = read("src/ui/DataTable.jsx");
   const styles = read("src/styles.css");
+  const tokens = read("tokens.css");
   assert.match(pageHeader, /export function PageHeader/);
   assert.match(pageHeader, /className="page-header"/);
   assert.match(table, /minWidth/);
   assert.match(table, /data-label/);
   assert.match(styles, /--space-1: 4px/);
-  assert.match(styles, /--radius-control: 8px/);
-  assert.match(styles, /--radius-panel: 12px/);
+  assert.match(styles, /--radius-control: var\(--radius-control-token\)/);
+  assert.match(styles, /--radius-panel: var\(--radius-panel-token\)/);
+  assert.match(tokens, /--radius-control-token: 10px/);
+  assert.match(tokens, /--radius-panel-token: 14px/);
   assert.match(styles, /font-size: 14px/);
   assert.match(styles, /:focus-visible/);
   assert.match(styles, /prefers-reduced-motion/);

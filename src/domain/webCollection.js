@@ -115,7 +115,11 @@ export function createDailyPlan({
   adapters = [],
   now = new Date(),
   timeZone = "Asia/Shanghai",
-  scheduleHour = 5
+  // 凌晨 5 点排昨日采集会拿到半成品：快麦销售主题报表虽然标称 T+1，但清晨聚合
+  // 尚未完成，导出的数据严重残缺。2026-07-29 的对照极干净——同一业务日、同一套
+  // 代码、同一个采集器，05:07 采到 188 行 ¥8,880，11:55 重采得到 549 行 ¥129,223，
+  // 只差采集时间。因此推迟到上午 10 点，给上游留足聚合时间。
+  scheduleHour = 10
 } = {}) {
   const parts = dateParts(now, timeZone);
   if (Number(parts.hour) < scheduleHour) return [];

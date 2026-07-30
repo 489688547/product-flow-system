@@ -6,7 +6,13 @@ function validDate(value) {
   return new Date(Date.UTC(year, month - 1, day)).toISOString().slice(0, 10) === value;
 }
 
-function latestDailyFacts(rows, limit = 8) {
+// 同步覆盖按 14 天判定，事实却只截最近 8 天，缺的 6 天会被当成「数据缺失」误报——
+// 2026-07-30 页面报 07-16 至 07-21 六天缺失，实际每天都有 520~553 行、13~15 万元。
+// 误报比漏报更糟：它让人反复去补根本不缺的数据，真问题反而被淹没。
+// 这里必须覆盖判定窗口，取值与 COVERAGE_WINDOW_DAYS 对齐。
+const DAILY_FACTS_WINDOW_DAYS = 14;
+
+function latestDailyFacts(rows, limit = DAILY_FACTS_WINDOW_DAYS) {
   const dailyFacts = new Map();
   rows.forEach(row => {
     if (!validDate(String(row?.date || ""))) return;

@@ -45,7 +45,13 @@ export const DOUYIN_DEDICATED_RESOURCES = Object.freeze({
     reportVersion: "douyin-video-v2"
   })
 });
-const REGISTERED_URLS = new Set(Object.values(DOUYIN_DEDICATED_RESOURCES).map(resource => resource.url));
+// 自助取数是独立页面，不属于四个资源各自的落地页，需要单独登记为合法地址。
+export const SELF_SERVICE_URL = "https://compass.jinritemai.com/shop/workshop/appcustom-access?tab=access";
+
+const REGISTERED_URLS = new Set([
+  ...Object.values(DOUYIN_DEDICATED_RESOURCES).map(resource => resource.url),
+  SELF_SERVICE_URL
+]);
 const SELECTOR_VERSION = "2026-07-25";
 
 const INSPECT_SNAPSHOT_EXPRESSION = `(() => {
@@ -205,7 +211,9 @@ export function validateDedicatedDouyinTask(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw douyinError("DOUYIN_TASK_INVALID", "抖店任务格式无效。");
   }
-  if (Object.keys(value).some(field => !TASK_FIELDS.has(field))) {
+  // viaSelfService 决定走自助取数还是逐页导出，属于任务的合法字段。
+  const allowed = new Set([...TASK_FIELDS, "viaSelfService"]);
+  if (Object.keys(value).some(field => !allowed.has(field))) {
     throw douyinError("DOUYIN_TASK_UNSAFE_FIELDS", "抖店任务包含未登记字段。");
   }
   if (
@@ -249,7 +257,7 @@ function validateStoreCapture(capture) {
   };
 }
 
-export function createDouyinDedicatedExecutor({ createController }) {
+export function createDouyinDedicatedExecutor({ createController, createExtractRunner = null }) {
   if (typeof createController !== "function") {
     throw douyinError("DOUYIN_BROWSER_CONTROLLER_REQUIRED", "抖店专用浏览器控制器未配置。");
   }
@@ -300,6 +308,31 @@ export function createDouyinDedicatedExecutor({ createController }) {
         }
         if (String(inspection.storeId || "") !== task.storeId) {
           return terminalResult(task, "failed", "DOUYIN_STORE_MISMATCH", "专用 Chrome 当前登录的店铺与任务不一致。");
+        }
+
+        // 自助取数走独立通道：页面日期控件只认可信事件，扩展发不出，
+        // 而这里是专用浏览器，CDP Input 域可以。它也是唯一能回溯 14 个月的路径。
+        if (task.viaSelfService && createExtractRunner) {
+          await controller.open(SELF_SERVICE_URL);
+          await onCheckpoint("waiting_download");
+          const runner = createExtractRunner({ controller });
+          const { plan } = await runner.run({
+            resourceType: task.resourceType,
+            from: task.businessDate,
+            to: task.businessDate
+          });
+          const downloaded = await controller.awaitDownload?.(plan.taskName);
+          if (!downloaded) {
+            return terminalResult(task, "failed", "DOUYIN_EXTRACT_DOWNLOAD_MISSING", "取数文件未落盘。");
+          }
+          return {
+            kind: "downloaded",
+            jobId: task.jobId,
+            filePath: downloaded.filePath,
+            safeFileName: downloaded.safeFileName,
+            pageType: "shop_compass_self_service",
+            reportVersion: "douyin-self-service-v1"
+          };
         }
 
         await controller.applyBusinessDate(task.businessDate);
@@ -383,7 +416,64 @@ export function createCdpDouyinController({
     }));
   }
 
+  // 罗盘的日期控件只认可信事件：element.click() 与合成 MouseEvent 都只改显示，
+  // 不进表单模型——实测在自助取数里填好日期后提交仍报「请输入时间」，用真实鼠标
+  // 点击同一个格子则校验立刻通过。扩展没有 debugger 权限发不出可信事件，这正是
+  // 专用浏览器模式存在的意义：CDP 的 Input 域发出的就是可信事件。
+  async function trustedClickAt(x, y) {
+    if (!pageSession) throw douyinError("DOUYIN_PAGE_NOT_OPEN", "抖店登记页面尚未打开。");
+    const point = { x: Math.round(Number(x)), y: Math.round(Number(y)) };
+    if (!Number.isFinite(point.x) || !Number.isFinite(point.y) || point.x < 0 || point.y < 0) {
+      throw douyinError("DOUYIN_CLICK_POINT_INVALID", "点击坐标无效。");
+    }
+    const base = { ...point, button: "left", clickCount: 1 };
+    await pageSession.send("Input.dispatchMouseEvent", { type: "mouseMoved", ...point });
+    await pageSession.send("Input.dispatchMouseEvent", { type: "mousePressed", ...base });
+    await pageSession.send("Input.dispatchMouseEvent", { type: "mouseReleased", ...base });
+  }
+
+  // 元素位置由页面自己给出，避免在采集器里硬编码坐标——罗盘一改版坐标就失效，
+  // 而且失效时不会报错，只会点空。
+  async function trustedClickElement(selectorExpression, missingCode, missingMessage) {
+    const box = await evaluate(`(() => {
+      const target = ${selectorExpression};
+      if (!target) return null;
+      const rect = target.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    if (!box) throw douyinError(missingCode, missingMessage);
+    await trustedClickAt(box.x, box.y);
+    return box;
+  }
+
+  // 文本同样要用可信事件写入。今天在快麦与罗盘上反复验证：程序化写 value 只改显示，
+  // 提交时表单模型里还是旧值，而且不报错——这是最难察觉的一类故障。
+  async function trustedTypeText(text) {
+    if (!pageSession) throw douyinError("DOUYIN_PAGE_NOT_OPEN", "抖店登记页面尚未打开。");
+    for (const char of String(text)) {
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyDown", text: char });
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyUp" });
+    }
+  }
+
+  // 清空输入框：全选后输入即覆盖。不用 value = "" ——同样进不了表单模型。
+  async function trustedClearAndType(selectorExpression, text, missingCode, missingMessage) {
+    await trustedClickElement(selectorExpression, missingCode, missingMessage);
+    await pageSession.send("Input.dispatchKeyEvent", {
+      type: "keyDown", modifiers: 4, key: "a", code: "KeyA", windowsVirtualKeyCode: 65
+    });
+    await pageSession.send("Input.dispatchKeyEvent", {
+      type: "keyUp", modifiers: 4, key: "a", code: "KeyA", windowsVirtualKeyCode: 65
+    });
+    await trustedTypeText(text);
+  }
+
   return Object.freeze({
+    trustedClickAt,
+    trustedClickElement,
+    trustedTypeText,
+    trustedClearAndType,
     async open(url) {
       if (!REGISTERED_URLS.has(url)) {
         throw douyinError("DOUYIN_URL_NOT_REGISTERED", "抖店页面未在采集器登记。");
