@@ -28,3 +28,7 @@ export function activeCollapsibleGroup(navigation = [], screen = "") {
     .find(candidate => candidate.items.some(([key]) => key === screen));
   return group?.collapsible ? group.label : "";
 }
+
+export function activeNavigationGroup(groups = [], screen = "") {
+  return groups.find(group => group.items.some(([key]) => key === screen)) || groups[0] || null;
+}

@@ -145,6 +145,13 @@ export function DataCenterAppPage({ section = "overview", dataAccessCategory = "
       <PageHeader title={title} description={description} identity={section === "services" ? "服务端统一调用 · 不展示个人排行 · 内容不入审计" : undefined}>
         {section === "overview" ? <a className={`data-health-link ${dataHealthOkay ? "success" : "warning"}`} href={latestSalesAnomaly.status === "anomaly" ? "#data-sync/kuaimai-sales" : "#data-sync"} aria-label={`${dataHealthLabel}，查看同步记录`}>{dataHealthLabel}</a> : null}
       </PageHeader>
+      {section === "overview" ? (
+        <nav className="data-center-quick-actions" aria-label="数据中心快捷操作">
+          <a className={dataHealthOkay ? "success" : "warning"} href={latestSalesAnomaly.status === "anomaly" ? "#data-sync/kuaimai-sales" : "#data-sync"}><span>数据健康</span><strong>{dataHealthOkay ? "状态正常" : `${Math.max(dataHealthIssueCount, unifiedGapDays, 1)} 项待处理`}</strong></a>
+          <a href="#data-sources"><span>数据接入</span><strong>管理平台与凭证</strong></a>
+          <a href="#data-services"><span>AI 大模型</span><strong>查看 Token 与 Skill</strong></a>
+        </nav>
+      ) : null}
       {section !== "services" && error ? <div className="section-panel" role="status">{error}</div> : null}
       {section !== "services" && loading ? <div className="section-panel empty-state">正在加载数据…</div> : content[section] || <div className="section-panel empty-state">工作区已接入，详细内容正在装配。</div>}
     </section>

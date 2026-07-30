@@ -839,11 +839,12 @@ test("settings uses organization-backed navigation and feature permission matric
 test("visual system uses the restrained Apple workbench shell", () => {
   const styles = read("src/styles.css");
   const app = read("src/App.jsx");
-  assert.match(styles, /\.app-shell\s*\{[\s\S]*grid-template-columns: 208px minmax\(0, 1fr\);/);
-  assert.match(styles, /\.sidebar\s*\{[\s\S]*background: var\(--color-sidebar\);/);
-  assert.match(styles, /\.sidebar nav button\.active\s*\{[\s\S]*background: var\(--primary-soft\);[\s\S]*color: var\(--primary\);/);
+  assert.match(styles, /\.app-shell\s*\{[\s\S]*grid-template-columns: 72px 220px minmax\(0, 1fr\);/);
+  assert.match(styles, /\.workspace-app-rail\s*\{[\s\S]*background: var\(--color-sidebar\);/);
+  assert.match(styles, /\.workspace-context-button\.active\s*\{[\s\S]*background: var\(--primary-soft\);[\s\S]*color: var\(--primary\);/);
   assert.match(styles, /\.page\s*\{[\s\S]*padding: 28px 32px;/);
   assert.match(styles, /\.section-panel, \.table-wrap, \.product-card, \.file-tile\s*\{[\s\S]*box-shadow: none;/);
+  assert.match(app, /<WorkspaceNavigation/);
   assert.match(app, /currentUser/);
   assert.match(app, /currentUser\?\.name/);
 });

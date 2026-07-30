@@ -10,5 +10,18 @@
     "slop_test": "pass",
     "contrast": "WCAG 2.1 token pairs pass; accent ink 5.19:1",
     "responsive": "390px browser pass without horizontal overflow"
+  },
+  {
+    "date": "2026-07-30",
+    "scope": "app",
+    "macrostructure": "Task-first command center",
+    "theme": "custom",
+    "theme_axes": "cool-paper / system-sans / blue-258",
+    "vibe": "Apple quiet with Bubble accents",
+    "enrichment": "none",
+    "nav": "two-level App rail and contextual sidebar",
+    "brief": "Global information architecture, company home, product overview and data center phase 2",
+    "slop_test": "pending",
+    "responsive": "pending Ego verification"
   }
 ]

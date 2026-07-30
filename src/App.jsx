@@ -7,11 +7,12 @@ import { useAuth } from "./state/AuthProvider.jsx";
 import { usePlatform } from "./state/PlatformProvider.jsx";
 import { formatAppHash, parseAppHash } from "./domain/appNavigation.js";
 import { featureFlagEnabled } from "./domain/featureFlags.js";
-import { activeCollapsibleGroup, groupSidebarNavigation } from "./domain/sidebarNavigation.js";
+import { activeNavigationGroup, groupSidebarNavigation } from "./domain/sidebarNavigation.js";
 import { parseTaskTodoDeepLink } from "./domain/taskTodo.js";
 import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
 import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
 import { LocalOnlineEnvironmentBanner } from "./ui/LocalOnlineEnvironmentBanner.jsx";
+import { WorkspaceNavigation } from "./ui/WorkspaceNavigation.jsx";
 
 const lazyNamed = (loader, exportName) => lazy(async () => {
   const module = await loader();
@@ -164,17 +165,6 @@ function resolveScreen(screen) {
   return resolvedDataScreen === "performance-management" ? "performance-overview" : resolvedDataScreen;
 }
 
-const SIDEBAR_EXPANDED_GROUPS_KEY = "sidebar-expanded-groups:v1";
-
-function readStoredExpandedGroups() {
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(SIDEBAR_EXPANDED_GROUPS_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed.filter(item => typeof item === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
 function routeFromHash() {
   const route = parseAppHash(window.location.hash);
   if (route.screen === "data-connections") {
@@ -219,27 +209,15 @@ export default function App() {
   const defaultScreen = visibleNavigation[0]?.[0] || (hasCompanyAccess ? "home" : "dashboard");
   const screenAllowed = visibleScreenKeys.has(screen) || screen === "ai-assistant" || (screen === "packages" && visibleScreenKeys.has("archive"));
   const activeScreen = screenAllowed ? screen : defaultScreen;
-  const [expandedAppGroups, setExpandedAppGroups] = useState(() => {
-    const group = activeCollapsibleGroup(visibleNavigation, activeScreen);
-    return group ? [group] : readStoredExpandedGroups();
-  });
   const sidebarNavigationGroups = useMemo(() => groupSidebarNavigation(visibleNavigation), [visibleNavigation]);
+  const activeNavigation = activeNavigationGroup(sidebarNavigationGroups, activeScreen);
+  const activeNavigationItem = activeNavigation?.items.find(([key]) => key === activeScreen);
   const accountMeta = [currentUser?.department, currentUser?.title].filter(Boolean).join(" / ") || "组织信息待同步";
   const accountName = currentUser?.name || "未登录";
   useEffect(() => {
-    // 手风琴：进入某个业务分组时只保留它展开，避免分组只增不减把侧栏撑得远超一屏。
-    const group = activeCollapsibleGroup(visibleNavigation, activeScreen);
-    if (group) setExpandedAppGroups(current => current.length === 1 && current[0] === group ? current : [group]);
-  }, [activeScreen, visibleNavigation]);
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(SIDEBAR_EXPANDED_GROUPS_KEY, JSON.stringify(expandedAppGroups));
-    } catch { /* 隐私模式等写入失败时仅保留会话内状态 */ }
-  }, [expandedAppGroups]);
-  useEffect(() => {
-    // 深链接或分组展开后激活项可能落在侧栏滚动区外；已可见时 nearest 不会产生位移。
+    // 深链接进入较长 App 时，保证当前功能出现在二级导航可视区。
     const frame = globalThis.requestAnimationFrame?.(() => {
-      document.querySelector(".sidebar nav button.active")?.scrollIntoView({ block: "nearest" });
+      document.querySelector(".workspace-context-button.active")?.scrollIntoView({ block: "nearest" });
     });
     return () => globalThis.cancelAnimationFrame?.(frame);
   }, [activeScreen]);
@@ -327,44 +305,19 @@ export default function App() {
   return (
     <div className="app-shell">
       <a className="skip-link" href="#main-content">跳到主要内容</a>
-      <aside className="sidebar">
-        <div className="brand"><span>{hasCompanyAccess ? "企" : "P"}</span><div><strong>{hasCompanyAccess ? "经营执行平台" : "产品全周期"}</strong><small>{hasCompanyAccess ? "战略与业务协同" : "流程协同系统"}</small></div></div>
-        <nav aria-label="主导航">
-          {sidebarNavigationGroups.map((group, groupIndex) => {
-            const isExpanded = expandedAppGroups.includes(group.label);
-            const groupId = `sidebar-group-${groupIndex}`;
-            return (
-              <div className={`sidebar-app-group${group.collapsible ? " collapsible" : ""}${isExpanded ? " expanded" : ""}`} key={group.label}>
-                {group.collapsible ? (
-                  <button
-                    className="sidebar-group-toggle"
-                    type="button"
-                    aria-expanded={isExpanded}
-                    aria-controls={groupId}
-                    aria-label={`${isExpanded ? "收起" : "展开"}${group.label}`}
-                    onClick={() => setExpandedAppGroups(current => current.includes(group.label) ? current.filter(label => label !== group.label) : [...current, group.label])}
-                  >
-                    <span>{group.label}</span>
-                    <ChevronDown size={15} aria-hidden="true" />
-                  </button>
-                ) : <span className="sidebar-section-label">{group.label}</span>}
-                <div className="sidebar-group-items" id={groupId}>
-                  {group.items.map(([key, label, Icon]) => (
-                    <div className="sidebar-nav-item" key={key}>
-                      <button className={activeScreen === key ? "active" : ""} aria-current={activeScreen === key ? "page" : undefined} onClick={() => navigate(key)}>
-                        <Icon size={18} aria-hidden="true" />
-                        <span>{label}</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </nav>
-      </aside>
+      <WorkspaceNavigation
+        groups={sidebarNavigationGroups}
+        activeScreen={activeScreen}
+        onNavigate={navigate}
+        brandMark={hasCompanyAccess ? "企" : "P"}
+        brandName={hasCompanyAccess ? "经营执行平台" : "产品全周期"}
+      />
       <main id="main-content">
         <header className="topbar">
+          <div className="topbar-context">
+            <small>{activeNavigation?.label || "工作台"}</small>
+            <strong>{activeNavigationItem?.[1] || "首页"}</strong>
+          </div>
           {sharedError || (hasCompanyAccess && platformError) ? <em role="status">{sharedError || platformError}</em> : null}
           {activeScreen !== "ai-assistant" ? <AiAssistantTrigger triggerRef={aiTriggerRef} /> : null}
           <div className="account-menu-wrap" ref={accountMenuRef}>

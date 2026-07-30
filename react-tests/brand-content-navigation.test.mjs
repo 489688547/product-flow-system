@@ -28,12 +28,14 @@ const BRAND_PAGES = [
   "BrandContentSettingsPage"
 ];
 
-test("brand content uses nine left routes and no top subnavigation", () => {
+test("brand content uses nine contextual routes and no top subnavigation", () => {
   const app = read("src/App.jsx");
+  const navigation = read("src/ui/WorkspaceNavigation.jsx");
   assert.match(app, /品牌内容协同/);
   for (const route of BRAND_ROUTES) assert.match(app, new RegExp(route));
   assert.doesNotMatch(app, /role="tablist"|brand-content-tabs|brand-subnav/);
-  assert.match(app, /sidebar-section-label/);
+  assert.match(app, /<WorkspaceNavigation/);
+  assert.match(navigation, /workspace-context-sidebar/);
 });
 
 test("brand and operations employees can see brand routes through permission defaults", () => {
