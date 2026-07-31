@@ -23,6 +23,10 @@ function safeErrorCode(value, fallback = "WEB_COLLECTION_LOCAL_PROCESSING_FAILED
   return /^[A-Z0-9_]{3,80}$/.test(code) ? code : fallback;
 }
 
+// dedicated 模式下改由专用浏览器执行的 provider。其余 provider 仍由扩展执行——
+// 快麦就是靠这条继续跑的。
+const DEDICATED_PROVIDERS = new Set(["douyin-ecommerce"]);
+
 export function createWebCollectorOrchestrator({
   api,
   processors,
@@ -119,22 +123,35 @@ export function createWebCollectorOrchestrator({
       return api.ensurePlan(jobs);
     },
     async nextTask({ storeId = "", executor = "extension" } = {}) {
-      if (executionMode === "dedicated" && executor !== "dedicated" && storeId) return null;
       if (executor === "extension") lastExtensionSeenAt = currentTime();
+      // dedicated 模式下只有抖音改由专用浏览器执行，快麦等仍旧由扩展执行。
+      //
+      // 原先的判据是「扩展请求带了 storeId 就一概不给」，但扩展只要存过抖音的 storeId，
+      // 之后每次轮询都会带着它——于是快麦任务再也发不出去，而表现只是「快麦不采了」，
+      // 看不出跟切换浏览器模式有关。判据应当是「这条任务归谁执行」，与请求里带什么无关。
+      const 归专用浏览器 = job => executionMode === "dedicated"
+        && DEDICATED_PROVIDERS.has(String(job?.providerId || ""));
       const profileStoreId = String(storeId || "");
       if (activeJob) {
         if (processingResult) return null;
         if (activeLeaseExpiresAt && currentTime() >= activeLeaseExpiresAt) clearActiveJob();
       }
       if (activeJob) {
+        if (executor !== "dedicated" && 归专用浏览器(activeJob)) return null;
         if (activeJob.providerId === "douyin-ecommerce" && activeJob.storeId !== profileStoreId) return null;
         return safeTask(activeJob);
       }
-      const claimed = await api.claim(300, profileStoreId ? { storeId: profileStoreId } : {});
+      // 扩展在 dedicated 模式下不按 storeId 过滤：带上抖音的 storeId 会把快麦任务一并挡在外面。
+      const 过滤 = profileStoreId && (executor === "dedicated" || executionMode !== "dedicated")
+        ? { storeId: profileStoreId }
+        : {};
+      const claimed = await api.claim(300, 过滤);
       if (!claimed?.job) return null;
       activeJob = claimed.job;
       rememberLease(activeJob, 300);
       await transition("claimed", "opening");
+      // 抖音的任务留给专用浏览器下一轮来取，不交给扩展。
+      if (executor !== "dedicated" && 归专用浏览器(activeJob)) return null;
       return safeTask(activeJob);
     },
     recordBrowserStatus(status = {}) {
