@@ -241,18 +241,45 @@ GET /compass_api/shop/common/homepage/summary_core_index_v3  收支概况（广�
 （`functions/api/platform/v1/commerce-facts/`），所有读取方一次生效，不必每个页面各自
 记得排除。数据留在库里可审计，重采成功后自然被可信来源顶上。
 
-### 顺带修掉一个现行 bug
+### 更正：重复行原本就没有外泄
 
-事实行的 `id` 里含 `batch_id`，而 batch_id 取自文件内容哈希——**重采不会覆盖旧行，
-只会再插一条**。这既是同一业务日堆积多行的原因，也会一直复现。原先查询按 `f.id`
-排序取第一条，取到哪条全看哈希：07-27 面板上显示的很可能正是那条 GMV 61400、
-成交订单数为空的半成品。
+事实行的 `id` 里含 `batch_id`，而 batch_id 取自文件内容哈希——重采不覆盖旧行，只会再插
+一条，所以同一业务日确实堆积了多行（07-24 两行、07-27 三行、07-28 两行）。
 
-现在查询带上批次完成时间，`store_daily` 按业务日只保留最新批次那条。其余资源一天多行
-是正常的（一个商品 / 一场直播一行），只过滤不可信来源。
+但当初判断「面板上显示的很可能是那条半成品」是**错的**。查询是
+`INNER JOIN commerce_fact_batches b ON ... AND b.status = 'completed'`，而那些重复行的
+批次状态是 `superseded`——系统本来就只取 completed 的那条，07-27 取到的正是正确的
+61447.45 / 2947。supersede 机制是有效的，重复行没有外泄。
+
+按业务日只保留最新批次那条仍然保留，作为第二道保险：它不依赖批次状态被正确维护。
+真正的问题只有一个——07-29、07-30 的数字被拼接。
 
 ### 还没做的：把那 12 行删掉
 
 读取时过滤已经止住错值外泄，但行还在库里。真正删除需要单独授权——那是对生产库的
 批量删除，「把历史处理掉」说的是目标，没有指名表与动作。届时先落盘备份，
 再按 source_version 前缀删。
+
+## 摸接口用 CDP Network 域
+
+页内包一层 `fetch`/`XHR` 有两个死角：页面一刷新注入的代码就没了，首屏那批请求永远抓不到；
+数据已在 SPA 缓存里时页面根本不再发请求。实测「看流量 / 看商品 / 看搜索」就是后者，
+点了半天一条都没捞到。
+
+CDP 的 Network 域在浏览器层面监听，不受这两者影响。启用后一次刷新就拿到了全部入口：
+
+| 页面上的块 | 接口 |
+|---|---|
+| 看流量 | `/compass_api/shop/common/flow/overview` |
+| 看商品 | `/compass_api/shop/common/homepage/product_list` |
+| 看搜索 | `/compass_api/shop/common/homepage/search/source` |
+| 载体分布 | `/compass_api/shop/common/homepage/content_detail_v3` |
+| 数据趋势 | `/compass_api/shop/common/homepage/core_trend_v3` |
+| 实时直播间 | `/compass_api/shop/common/homepage/liveroom/realtime_liveroom_list` |
+
+顺带发现页面用的是 `core_index_v3` 而不是我先前探到的 `core_index`。两者取到的数值一致，
+但跟着页面用同一个版本更稳妥。
+
+**这块能力只用于摸接口，不参与正式采集**：正式采集走的是已经逐字段验证过的首页接口与
+自助取数。它只记录 URL 与方法、不取响应体——摸接口只需要知道「调了什么」，
+拿到路径后再按需单独请求；而且必须显式 `stop()`，否则会一直收所有请求。

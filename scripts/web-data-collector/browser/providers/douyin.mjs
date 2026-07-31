@@ -758,6 +758,35 @@ export function createCdpDouyinController({
         browserSession.close?.();
       }
     },
+    // 在浏览器层面记录网络往来，用来摸清页面到底调了哪些接口。
+    //
+    // 为什么不能在页面里包一层 fetch/XHR：页面一刷新注入的代码就没了，首屏那批请求
+    // 永远抓不到；数据已在 SPA 缓存里时页面根本不再发请求。实测「看流量/看商品/看搜索」
+    // 就是这样一条都没捞到。CDP 的 Network 域在浏览器层面监听，不受这两者影响。
+    //
+    // 这块能力只用于摸接口，不参与正式采集：正式采集走的是已经逐字段验证过的
+    // 首页接口与自助取数。用完必须 stop——它会持续收所有请求，开着既费内存也没必要。
+    //
+    // 只记录 URL 与方法，不取响应体：响应体里可能有与本次排查无关的内容，
+    // 摸接口只需要知道「调了什么」，拿到路径后再单独按需请求即可。
+    async recordNetwork({ urlPattern = "compass_api" } = {}) {
+      if (!pageSession) throw douyinError("DOUYIN_PAGE_NOT_OPEN", "抖店登记页面尚未打开。");
+      const seen = [];
+      const unsubscribe = pageSession.on("Network.requestWillBeSent", event => {
+        const url = String(event?.request?.url || "");
+        if (urlPattern && !url.includes(urlPattern)) return;
+        seen.push({ method: String(event?.request?.method || ""), url });
+      });
+      await pageSession.send("Network.enable");
+      return {
+        entries: seen,
+        async stop() {
+          unsubscribe?.();
+          await pageSession?.send("Network.disable").catch(() => {});
+          return seen;
+        }
+      };
+    },
     async captureStoreDaily() {
       return evaluate(CAPTURE_EXPRESSION);
     },

@@ -45,3 +45,16 @@ test("下载地址按端点放行，不把白名单放宽成模糊匹配", async
   assert.equal(isRegisteredDouyinUrl("https://compass.jinritemai.com/data_factory/download_file?task_id=1&next=evil"), false);
   assert.equal(isRegisteredDouyinUrl("https://evil.example.com/data_factory/download_file?task_id=1"), false);
 });
+
+test("网络记录能力可用且必须能关掉", async () => {
+  // 只用于摸接口，不参与正式采集。它会持续收所有请求，开着既费内存也没必要，
+  // 因此必须给出明确的 stop。
+  const { createCdpDouyinController } = await import("../scripts/web-data-collector/browser/providers/douyin.mjs");
+  const controller = createCdpDouyinController({
+    browser: { endpoint: "http://127.0.0.1:9222" },
+    downloadsDirectory: "/tmp"
+  });
+  assert.equal(typeof controller.recordNetwork, "function");
+  // 没打开页面时应当明确报错，而不是返回一个永远空的记录器。
+  await assert.rejects(controller.recordNetwork(), error => error.code === "DOUYIN_PAGE_NOT_OPEN");
+});
