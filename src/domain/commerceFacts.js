@@ -33,7 +33,14 @@ const RESOURCE_SCHEMAS = Object.freeze({
       "refundOrderCountByPaymentDate",
       "refundOrderCountByRefundDate",
       "productExposureUsers",
-      "productClickUsers"
+      "productClickUsers",
+      // 花出去的钱。原先表里只有收进来的钱，算不了投放费比，也答不了「广告费多少」。
+      "adCostAmount",
+      "expenseAmount",
+      "platformCommission",
+      "influencerCommission",
+      "adContributedAmount",
+      "netTransactionAmount"
     ])
   }),
   product_daily: Object.freeze({
@@ -204,7 +211,13 @@ export function deriveCommerceMetrics(resourceType, row = {}) {
         refundRate: safeRatio(row.refundAmountByPaymentDate, row.transactionAmount),
         averageOrderValue: safeRatio(row.transactionAmount, row.transactionOrderCount),
         exposureClickRate: safeRatio(row.productClickUsers, row.productExposureUsers),
-        clickTransactionRate: safeRatio(row.transactionBuyerCount, row.productClickUsers)
+        clickTransactionRate: safeRatio(row.transactionBuyerCount, row.productClickUsers),
+        // 投放费比 = 投放消耗 / 成交金额。这里按明确定义现算，不落库平台自己的费比：
+        // 它有「剔除退款」「综合费比」等多个变体，存一个说不清是哪种口径的比率，
+        // 比不存更糟。
+        adCostRatio: safeRatio(row.adCostAmount, row.transactionAmount),
+        // 投放贡献成交占比：多少成交是投放带来的。
+        adContributedRatio: safeRatio(row.adContributedAmount, row.transactionAmount)
       };
     case "product_daily":
       return {

@@ -104,9 +104,13 @@ export function createDouyinExtractApi({ controller, evaluate }) {
       const preview = await request(PREVIEW_PATH, { method: "POST", body: payload });
       assertPreviewCovers(parsePreviewColumns(preview), plan.dimension, PREVIEW_REQUIRED_COLUMNS[plan.dimension] || []);
 
+      // 返回 created 让调用方分得清「刚建的」和「本来就在」。
+      // 两者混成一个结果，日志里就都是「提交成功」——实测因此误判过一次：
+      // 以为选定的指标集提交上去了，其实撞上同名旧任务被静默复用，
+      // 后面拿到的是旧内容的文件。
       try {
         await request(SUBMIT_PATH, { method: "POST", body: payload });
-        return plan;
+        return { ...plan, created: true };
       } catch (error) {
         const recoverable = error.code === "DOUYIN_EXTRACT_TASK_EXISTS"
           || error.code === "DOUYIN_EXTRACT_QUOTA_EXHAUSTED";
@@ -118,7 +122,7 @@ export function createDouyinExtractApi({ controller, evaluate }) {
         // 配额用尽也要看：平台先查配额再查重名，采集器崩溃重启后重跑，收到的是「配额用尽」，
         // 而它之前建的那条其实正在队列里排着。直接放弃就白等一天。
         const existing = await this.findTask(plan.taskName);
-        if (existing.state !== "missing") return plan;
+        if (existing.state !== "missing") return { ...plan, created: false, reusedReason: error.code };
         throw error;
       }
     },

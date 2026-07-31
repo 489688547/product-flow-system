@@ -97,3 +97,46 @@ test("商品：一行一个商品，业务日仍取「日期」列", async () =>
   assert.equal(result.facts[0].transactionQuantity, 389);
   assert.equal(result.facts[0].transactionAmount, null, "商品维度没有成交金额");
 });
+
+test("店铺日事实带上花出去的钱：广告费、支出、佣金", async () => {
+  // 原先表里只有收进来的钱，算不了投放费比，也答不了「广告费多少」。
+  // 列名以 preview 为准（2026-07-31 核对）。
+  const header = [
+    "统计日期", "日期", "店铺名称", "成交金额", "用户支付金额", "成交订单数", "成交人数",
+    "投放消耗（店铺被投）", "支出金额（店铺被投）", "平台佣金（财务已结算）", "达人佣金（财务已结算）",
+    "投放贡献成交金额", "净成交金额"
+  ];
+  const file = await csv([
+    header,
+    ["20260730-20260730", "20260730", "TIYES", "65449.76", "60342.64", "3265", "2676",
+      "18320.55", "21044.10", "1962.40", "780.00", "61825.86", "61817.99"]
+  ]);
+  const fact = (await readDouyinSelfServiceReport(file, 参数)).facts[0];
+  assert.equal(fact.adCostAmount, 18320.55);
+  assert.equal(fact.expenseAmount, 21044.10);
+  assert.equal(fact.platformCommission, 1962.40);
+  assert.equal(fact.influencerCommission, 780);
+  assert.equal(fact.adContributedAmount, 61825.86);
+  // 费比不落库：平台自己有「剔除退款」等多个变体，口径不一，
+  // 存一个说不清是哪种口径的比率比不存更糟。由这里的金额按明确定义现算。
+  assert.equal("adCostRatio" in fact, false);
+});
+
+test("店铺日事实带上结算与退款：面板的退款率靠它们算", async () => {
+  const header = [
+    "统计日期", "日期", "店铺名称", "成交金额", "成交订单数", "成交人数",
+    "结算金额", "退款金额（支付时间）", "退款金额（退款时间）",
+    "退款订单数（支付时间）", "退款订单数（退款时间）", "商品曝光人数", "商品点击人数"
+  ];
+  const file = await csv([
+    header,
+    ["20260730-20260730", "20260730", "TIYES", "65449.76", "3265", "2676",
+      "58210.30", "4120.55", "3980.10", "210", "198", "182033", "41255"]
+  ]);
+  const fact = (await readDouyinSelfServiceReport(file, 参数)).facts[0];
+  assert.equal(fact.settlementAmount, 58210.30);
+  assert.equal(fact.refundAmountByPaymentDate, 4120.55);
+  assert.equal(fact.refundOrderCountByRefundDate, 198);
+  assert.equal(fact.productExposureUsers, 182033);
+  assert.equal(fact.productClickUsers, 41255);
+});

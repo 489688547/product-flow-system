@@ -424,7 +424,20 @@ const SELF_SERVICE_FACT_MAP = Object.freeze({
       transactionAmount: "transactionAmount",
       transactionOrderCount: "transactionOrderCount",
       transactionBuyerCount: "transactionBuyerCount",
-      userPaymentAmount: "userPaymentAmount"
+      userPaymentAmount: "userPaymentAmount",
+      settlementAmount: "settlementAmount",
+      refundAmountByPaymentDate: "refundAmountByPaymentDate",
+      refundAmountByRefundDate: "refundAmountByRefundDate",
+      refundOrderCountByPaymentDate: "refundOrderCountByPaymentDate",
+      refundOrderCountByRefundDate: "refundOrderCountByRefundDate",
+      productExposureUsers: "productExposureUsers",
+      productClickUsers: "productClickUsers",
+      adCostAmount: "adCostAmount",
+      expenseAmount: "expenseAmount",
+      platformCommission: "platformCommission",
+      influencerCommission: "influencerCommission",
+      adContributedAmount: "adContributedAmount",
+      netTransactionAmount: "netTransactionAmount"
     })
   }),
   product_daily: Object.freeze({

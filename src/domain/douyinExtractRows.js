@@ -38,7 +38,14 @@ export const COLUMNS_BY_DIMENSION = Object.freeze({
     "退款订单数（支付时间）": "refundOrderCountByPaymentDate",
     "退款订单数（退款时间）": "refundOrderCountByRefundDate",
     商品曝光人数: "productExposureUsers",
-    商品点击人数: "productClickUsers"
+    商品点击人数: "productClickUsers",
+    // 花出去的钱。列名以 preview 为准（2026-07-31 核对）。
+    "投放消耗（店铺被投）": "adCostAmount",
+    "支出金额（店铺被投）": "expenseAmount",
+    "平台佣金（财务已结算）": "platformCommission",
+    "达人佣金（财务已结算）": "influencerCommission",
+    投放贡献成交金额: "adContributedAmount",
+    净成交金额: "netTransactionAmount"
   }),
   // 商品与店铺一样从「日期」列取业务日，但一行是一个商品，不是一天。
   product: Object.freeze({
@@ -93,6 +100,11 @@ export const PREVIEW_REQUIRED_COLUMNS = Object.freeze({
 
 const NUMERIC_FIELDS = new Set([
   "transactionAmount",
+  "adContributedAmount",
+  "influencerCommission",
+  "platformCommission",
+  "expenseAmount",
+  "adCostAmount",
   "refundQuantity",
   "refundOrderCount",
   "refundAmount",
