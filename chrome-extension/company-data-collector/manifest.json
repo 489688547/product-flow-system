@@ -38,7 +38,7 @@
       "matches": ["https://erp.superboss.cc/*", "https://erpb.superboss.cc/*"]
     },
     {
-      "resources": ["providers/registry.js", "providers/douyin.js", "providers/executors/douyin.js"],
+      "resources": ["providers/registry.js", "providers/douyin.js", "providers/douyinApi.js", "providers/executors/douyin.js"],
       "matches": ["https://fxg.jinritemai.com/*", "https://compass.jinritemai.com/*"]
     }
   ]

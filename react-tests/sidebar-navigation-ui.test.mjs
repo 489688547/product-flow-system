@@ -4,26 +4,24 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 
-test("App renders permission-filtered navigation through accessible expandable groups", () => {
+test("App renders permission-filtered navigation through the shared two-level workspace shell", () => {
   const app = read("src/App.jsx");
   assert.match(app, /groupSidebarNavigation\(visibleNavigation\)/);
-  assert.match(app, /activeCollapsibleGroup\(visibleNavigation, activeScreen\)/);
-  assert.match(app, /className="sidebar-group-toggle"/);
-  assert.match(app, /aria-expanded=\{isExpanded\}/);
-  assert.match(app, /aria-controls=\{groupId\}/);
-  assert.match(app, /setExpandedAppGroups\(current => current\.includes\(group\.label\) \? current\.filter/);
-  assert.match(app, /expandedAppGroups\.includes\(group\.label\)/);
-  assert.match(app, /SIDEBAR_EXPANDED_GROUPS_KEY/);
-  assert.doesNotMatch(app, /current === group\.label \? "" : group\.label/);
-  assert.match(app, /group\.items\.map/);
+  assert.match(app, /activeNavigationGroup\(sidebarNavigationGroups, activeScreen\)/);
+  assert.match(app, /<WorkspaceNavigation/);
+  assert.match(app, /groups=\{sidebarNavigationGroups\}/);
+  assert.match(app, /activeScreen=\{activeScreen\}/);
+  assert.doesNotMatch(app, /SIDEBAR_EXPANDED_GROUPS_KEY/);
+  assert.doesNotMatch(app, /expandedAppGroups/);
 });
 
-test("desktop collapses App children while mobile restores the flat authorized navigation", () => {
+test("desktop separates App and page navigation while mobile keeps both as 44px scrollable bands", () => {
   const css = read("src/styles.css");
-  assert.match(css, /\.sidebar-app-group\.collapsible:not\(\.expanded\) \.sidebar-nav-item:not\(:first-child\)\s*\{[^}]*display:\s*none/s);
-  assert.match(css, /\.sidebar-group-toggle:focus-visible/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.sidebar-group-toggle svg/);
-  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.sidebar-app-group\s*,\s*\.sidebar-group-items\s*\{[^}]*display:\s*contents/s);
-  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.sidebar-app-group\.collapsible:not\(\.expanded\) \.sidebar-nav-item:not\(:first-child\)\s*\{[^}]*display:\s*grid/s);
-  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.sidebar\s*\{[^}]*min-height:\s*0/s);
+  assert.match(css, /\.app-shell\s*\{[^}]*grid-template-columns:\s*72px 220px minmax\(0, 1fr\)/s);
+  assert.match(css, /\.workspace-app-rail\s*\{[^}]*height:\s*100dvh/s);
+  assert.match(css, /\.workspace-context-sidebar\s*\{[^}]*height:\s*100dvh/s);
+  assert.match(css, /\.workspace-app-button\.active/);
+  assert.match(css, /\.workspace-context-button\.active/);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.workspace-app-button\s*\{[^}]*min-height:\s*44px/s);
+  assert.match(css, /@media \(max-width: 900px\)[\s\S]*\.workspace-context-button\s*\{[^}]*min-height:\s*44px/s);
 });

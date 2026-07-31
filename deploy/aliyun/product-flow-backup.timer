@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Product Flow SQLite OSS backup every day
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 Asia/Shanghai
+RandomizedDelaySec=15m
+Persistent=true
+Unit=product-flow-backup.service
+
+[Install]
+WantedBy=timers.target

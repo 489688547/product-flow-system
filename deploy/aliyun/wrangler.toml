@@ -1,0 +1,17 @@
+name = "product-flow-system-aliyun"
+pages_build_output_dir = "./dist"
+compatibility_date = "2026-07-18"
+
+[[d1_databases]]
+binding = "PRODUCT_FLOW_DB"
+database_name = "product-flow-system"
+database_id = "64389843-2c2f-4781-862d-48fe27caa012"
+preview_database_id = "PRODUCT_FLOW_DB"
+remote = false
+
+[[d1_databases]]
+binding = "DEMO_FLOW_DB"
+database_name = "product-flow-system-display"
+database_id = "700a0679-eaf2-43ab-a50f-ff952503d338"
+preview_database_id = "DEMO_FLOW_DB"
+remote = false

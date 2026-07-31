@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createServer } from "vite";
@@ -70,4 +71,47 @@ test("data overview exposes its core metrics and analysis areas as named regions
   assert.match(markup, /aria-labelledby="data-platform-title"/);
   assert.match(markup, />净销售额</);
   assert.match(markup, />经营趋势</);
+});
+
+test("workspace navigation exposes a named App rail and current App page navigation", async () => {
+  const { WorkspaceNavigation } = await loadModule("/src/ui/WorkspaceNavigation.jsx");
+  const Icon = () => React.createElement("span", { "aria-hidden": "true" });
+  const markup = renderToStaticMarkup(React.createElement(WorkspaceNavigation, {
+    groups: [
+      { label: "公司经营", items: [["home", "公司首页", Icon]] },
+      { label: "数据中心", items: [["data-overview", "数据总览", Icon], ["data-sync", "数据同步", Icon]] }
+    ],
+    activeScreen: "data-sync",
+    onNavigate: () => {}
+  }));
+
+  assert.match(markup, /aria-label="业务 App"/);
+  assert.match(markup, /aria-label="数据中心功能"/);
+  assert.match(markup, /aria-current="page"[^>]*>[\s\S]*数据同步/);
+  assert.doesNotMatch(markup, />公司首页<\/button>[\s\S]*>数据同步<\/button>/);
+});
+
+test("boss home and product overview lead with actionable summaries", () => {
+  const home = new URL("../src/features/company/CompanyHomePage.jsx", import.meta.url);
+  const dashboard = new URL("../src/features/dashboard/DashboardPage.jsx", import.meta.url);
+  const homeSource = readFileSync(home, "utf8");
+  const dashboardSource = readFileSync(dashboard, "utf8");
+
+  assert.match(homeSource, /className="executive-pulse-grid"/);
+  assert.match(homeSource, />待拍板</);
+  assert.match(homeSource, />经营风险</);
+  assert.match(homeSource, />产品待办</);
+  assert.match(dashboardSource, /className="dashboard-action-grid"/);
+  assert.ok(dashboardSource.indexOf('className="dashboard-action-grid"') < dashboardSource.indexOf('className="flow-summary"'));
+  assert.match(dashboardSource, />需要处理</);
+  assert.match(dashboardSource, />流程中的产品</);
+});
+
+test("data center quick actions collapse after their desktop rule at mobile width", () => {
+  const css = readFileSync(new URL("../src/styles.css", import.meta.url), "utf8");
+  const desktopRule = css.indexOf(".data-center-quick-actions { display: grid; grid-template-columns: repeat(3");
+  const mobileRule = css.lastIndexOf(".data-center-quick-actions { grid-template-columns: 1fr; }");
+
+  assert.ok(desktopRule >= 0);
+  assert.ok(mobileRule > desktopRule);
 });

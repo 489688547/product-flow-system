@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import process from "node:process";
 import test from "node:test";
+
+import {
+  collectorTemplateContentHash,
+  normalizeCollectorTemplate
+} from "../src/domain/collectorTemplates.js";
+import { executeExperimentalRun } from "../scripts/web-data-collector/experimental/executor.mjs";
 
 async function checkpointModule() {
   return import("../scripts/web-data-collector/checkpoints.mjs").catch(() => ({}));
@@ -103,6 +110,129 @@ test("checkpoint store persists only safe processor resume state", async () => {
     stage: "uploading",
     resume: { token: "secret" }
   }), /恢复|字段/);
+});
+
+test("experimental checkpoints bind resume state to one template version and content hash", async () => {
+  const { createCheckpointStore } = await checkpointModule();
+  const rootDir = await mkdtemp(join(tmpdir(), "web-checkpoint-"));
+  const store = createCheckpointStore({
+    rootDir,
+    now: () => new Date("2026-07-30T10:00:00.000Z")
+  });
+  const execution = {
+    templateId: "kuaimai-inventory",
+    templateVersion: 3,
+    contentHash: "a".repeat(64)
+  };
+
+  await store.save("run-1", {
+    stage: "executing",
+    execution: {
+      ...execution,
+      nextStepIndex: 2,
+      variables: { cursor: 12 }
+    }
+  });
+  const loaded = await store.load("run-1", { execution });
+  assert.equal(loaded.execution.nextStepIndex, 2);
+  assert.deepEqual(loaded.execution.variables, { cursor: 12 });
+
+  await assert.rejects(
+    store.load("run-1", {
+      execution: { ...execution, contentHash: "b".repeat(64) }
+    }),
+    error => error?.code === "COLLECTOR_CHECKPOINT_INVALID"
+  );
+  await assert.rejects(
+    store.save("run-sensitive", {
+      stage: "executing",
+      execution: {
+        ...execution,
+        nextStepIndex: 1,
+        variables: { accessToken: "secret" }
+      }
+    }),
+    error => error?.code === "COLLECTOR_RESULT_SENSITIVE"
+  );
+});
+
+test("experimental executor resumes after the last completed step without repeating browser work", async () => {
+  const { createCheckpointStore } = await checkpointModule();
+  const rootDir = await mkdtemp(join(tmpdir(), "web-checkpoint-"));
+  const workspace = await mkdtemp(join(tmpdir(), "web-experimental-"));
+  const checkpointStore = createCheckpointStore({ rootDir });
+  const template = normalizeCollectorTemplate({
+    templateId: "resume-contract",
+    version: 1,
+    mode: "experimental",
+    providerId: "kuaimai",
+    profileId: "kuaimai-main",
+    timeoutSeconds: 10,
+    limits: {
+      maxOutputBytes: 16_384,
+      maxChildProcesses: 2,
+      maxLoopIterations: 10,
+      maxFiles: 10
+    },
+    status: "draft",
+    steps: [
+      {
+        id: "browser",
+        type: "browser.javascript",
+        code: "return 'downloaded';",
+        timeoutSeconds: 2
+      },
+      {
+        id: "command",
+        type: "local.command",
+        command: [
+          process.execPath,
+          "-e",
+          "process.stdout.write(process.argv[1])",
+          "${browser}"
+        ],
+        timeoutSeconds: 2
+      }
+    ]
+  }, { allowedOrigins: ["https://erp.superboss.cc"] });
+  const contentHash = await collectorTemplateContentHash(template);
+  await checkpointStore.save("run-resume-1", {
+    stage: "executing",
+    execution: {
+      templateId: template.templateId,
+      templateVersion: template.version,
+      contentHash,
+      nextStepIndex: 1,
+      variables: { browser: "downloaded" }
+    }
+  });
+
+  const result = await executeExperimentalRun({
+    bundle: {
+      runId: "run-resume-1",
+      runnerId: "runner-company-mac",
+      templateId: template.templateId,
+      version: template.version,
+      contentHash,
+      template
+    },
+    workspace,
+    checkpointStore,
+    browser: {
+      async evaluate() {
+        throw new Error("browser step must not repeat");
+      }
+    }
+  });
+
+  assert.equal(result.outputs.command.stdout, "downloaded");
+  assert.equal((await checkpointStore.load("run-resume-1", {
+    execution: {
+      templateId: template.templateId,
+      templateVersion: template.version,
+      contentHash
+    }
+  })).stage, "completed");
 });
 
 test("local diagnostics are encrypted, page-scoped and deleted after seven days", async () => {

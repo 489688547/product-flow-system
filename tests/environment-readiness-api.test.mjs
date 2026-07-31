@@ -74,7 +74,11 @@ const WEB_COLLECTION_TABLES = [
   "web_collection_jobs",
   "web_collection_runs",
   "web_collection_cursors",
-  "web_collection_notifications"
+  "web_collection_notifications",
+  "collector_templates",
+  "collector_template_versions",
+  "collector_experimental_runs",
+  "collector_experimental_run_events"
 ];
 const COMMERCE_FACT_TABLES = [
   "commerce_fact_batches",
@@ -220,7 +224,9 @@ test("warning capabilities do not block an otherwise ready production environmen
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
       PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
-      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY,
+      COLLECTOR_EXPERIMENTAL_MODE: "0",
+      WEB_COLLECTION_EXPERIMENTAL_MODE: "0"
     },
     data: { session: { name: "员工", role: "product", department: "产品部" } }
   });
@@ -279,7 +285,9 @@ test("a server-only production data token can read readiness without an employee
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
       PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
-      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY,
+      COLLECTOR_EXPERIMENTAL_MODE: "0",
+      WEB_COLLECTION_EXPERIMENTAL_MODE: "0"
     },
     data: {}
   });
@@ -320,4 +328,50 @@ test("readiness checks display tables against DEMO_FLOW_DB instead of the contro
 
   assert.equal(result.ready, false);
   assert.deepEqual(result.capabilities[0].missing, ["DEMO_FLOW_DB:product_sales_daily"]);
+});
+
+test("readiness checks large table catalogs in bounded D1 query batches", async () => {
+  const { inspectEnvironmentReadiness } = await import(
+    resolve("functions/api/platform/_shared/environmentReadiness.js")
+  );
+  const tables = Array.from({ length: 102 }, (_, index) => `table_${index + 1}`);
+  const querySizes = [];
+  const db = {
+    prepare(sql) {
+      const statement = {
+        values: [],
+        bind(...values) {
+          statement.values = values;
+          return statement;
+        },
+        async all() {
+          assert.match(sql, /sqlite_master/i);
+          querySizes.push(statement.values.length);
+          if (statement.values.length > 50) throw new Error("too many SQL variables");
+          return { results: statement.values.map(name => ({ name })) };
+        }
+      };
+      return statement;
+    }
+  };
+  const result = await inspectEnvironmentReadiness({
+    env: { RUNTIME_ENV: "production", PRODUCT_FLOW_DB: db },
+    manifest: {
+      capabilities: [{
+        id: "large-table-catalog",
+        name: "大表目录",
+        description: "D1 参数上限回归",
+        platforms: ["cloudflare-d1"],
+        requiredIn: ["production"],
+        level: "blocking",
+        envVars: [],
+        bindings: ["PRODUCT_FLOW_DB"],
+        tables
+      }]
+    }
+  });
+
+  assert.equal(result.ready, true);
+  assert.equal(querySizes.length, 3);
+  assert.equal(Math.max(...querySizes), 50);
 });
