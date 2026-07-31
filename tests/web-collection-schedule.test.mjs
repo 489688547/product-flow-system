@@ -218,7 +218,7 @@ test("每日排程不得早于上午 10 点", () => {
   assert.ok(上午十点.length > 0, "10 点起应正常排程");
 });
 
-test("抖音日事实标记走自助取数，其它保持原样", () => {
+test("已验证的抖音日事实标记走自助取数，其它保持原样", () => {
   // 逐页导出拿不到成交订单数与成交人数，页面标签又抓错过；
   // 自助取数是这两项目前已知的唯一可信来源。
   const plan = createDailyPlan({
@@ -228,14 +228,14 @@ test("抖音日事实标记走自助取数，其它保持原样", () => {
         id: "douyin-ecommerce",
         storeId: "90862283",
         resources: [
-          { type: "store_daily", rangeKind: "daily_fact" },
+          { type: "live_daily", rangeKind: "daily_fact" },
           { type: "product_list", rangeKind: "current_snapshot" }
         ]
       },
       { id: "kuaimai", storeId: "1", resources: [{ type: "sales_items", rangeKind: "daily_fact" }] }
     ]
   });
-  const 抖音日事实 = plan.find(job => job.providerId === "douyin-ecommerce" && job.resourceType === "store_daily");
+  const 抖音日事实 = plan.find(job => job.providerId === "douyin-ecommerce" && job.resourceType === "live_daily");
   const 抖音快照 = plan.find(job => job.resourceType === "product_list");
   const 快麦 = plan.find(job => job.providerId === "kuaimai");
   assert.equal(抖音日事实.viaSelfService, true);
@@ -246,18 +246,24 @@ test("抖音日事实标记走自助取数，其它保持原样", () => {
 test("自助取数任务超过平台每日配额时，排计划阶段就挡住", () => {
   // 排超了不会在排计划时出问题，而是跑到第 6 条才被平台拒掉：前 5 条已经排进队列，
   // 看起来一切正常，唯独有个资源今天永远采不到，失败信息还只说「每天仅支持创建5条任务」。
-  const 六个资源 = ["store_daily", "product_daily", "live_daily", "video_daily", "a_daily", "b_daily"]
-    .map(type => ({ type, rangeKind: "daily_fact" }));
+  // 三家店各两个自助取数资源就是 6 条。
+  const 资源 = ["live_daily", "video_daily"].map(type => ({ type, rangeKind: "daily_fact" }));
   assert.throws(
     () => createDailyPlan({
       now: new Date("2026-07-31T12:00:00+08:00"),
-      adapters: [{ id: "douyin-ecommerce", storeId: "90862283", resources: 六个资源 }]
+      adapters: [{
+        id: "douyin-ecommerce",
+        stores: [{ id: "1" }, { id: "2" }, { id: "3" }],
+        resources: 资源
+      }]
     }),
     /超过平台配额 5 条/
   );
 });
 
-test("四个资源正好在配额内", () => {
+test("只有验证过的资源走自助取数，其余仍走逐页导出", () => {
+  // store 切过去会让结算/退款/曝光点击变成 null，面板的退款率与曝光点击率就没了；
+  // product 的导出列名还没实测。没验过就不切——切错不报错，只会静默少数据。
   const plan = createDailyPlan({
     now: new Date("2026-07-31T12:00:00+08:00"),
     adapters: [{
@@ -266,5 +272,8 @@ test("四个资源正好在配额内", () => {
       resources: ["store_daily", "product_daily", "live_daily", "video_daily"].map(type => ({ type, rangeKind: "daily_fact" }))
     }]
   });
-  assert.equal(plan.filter(job => job.viaSelfService).length, 4);
+  assert.deepEqual(
+    plan.filter(job => job.viaSelfService).map(job => job.resourceType).sort(),
+    ["live_daily", "video_daily"]
+  );
 });

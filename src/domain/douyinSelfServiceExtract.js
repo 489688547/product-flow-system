@@ -8,6 +8,32 @@
 
 export const SELF_SERVICE_ROUTE = "/shop/workshop/appcustom-access?tab=access";
 
+// 抖音的日事实一律走自助取数。
+//
+// 这是资源的属性，不是某个任务的属性，所以由执行器按资源类型自己判定，不靠字段传输。
+// 之前是在排日计划时打一个 viaSelfService 标记带过去，但 web_collection_jobs 表没有
+// 这一列——标记经服务端一个来回就没了，执行器拿到 undefined，于是悄悄走回逐页导出，
+// 采回另一个口径的数据还不报错。本地测试全绿，是因为测试直接构造带标记的任务，
+// 绕过了那个来回。
+// 只切换已经端到端验证过的资源，其余仍走逐页导出。
+//
+// live / video：自助取数覆盖了逐页导出能给的全部，且多给了可靠的成交订单数与成交人数。
+//
+// store 暂不切：自助取数这边目前只取了成交类 7 项，而逐页采集还提供结算金额、退款金额、
+// 商品曝光/点击人数——面板的退款率与曝光点击率正是由它们算出来的。直接切过去，
+// 那几项会变成 null，两个比率就没了，而且不报错。要切得先把结算/退款/流量三类指标
+// 也取上并验过导出列名。
+//
+// product 暂不切：取数口径已与配置接口核对，但导出文件的列名还没实测，
+// 列名对不上就是一列静默的 null。
+export const SELF_SERVICE_RESOURCES = Object.freeze(["live_daily", "video_daily"]);
+
+// 只看 provider 与资源类型：执行器拿到的任务里没有 rangeKind，
+// 判定条件必须只用它确实有的字段——否则又是一个「本地能过、生产判不出来」。
+export function usesSelfService({ providerId, resourceType } = {}) {
+  return String(providerId) === "douyin-ecommerce" && SELF_SERVICE_RESOURCES.includes(resourceType);
+}
+
 // 主要维度是单选，取值取自页面表单的 radio value。
 export const PRIMARY_DIMENSIONS = Object.freeze({
   store_daily: "shop",

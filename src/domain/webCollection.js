@@ -111,6 +111,8 @@ export function webCollectionJobKey(job) {
   return [providerId, storeId, resourceType, businessDate, scheduleVersion].filter(Boolean).join(":");
 }
 
+import { usesSelfService } from "./douyinSelfServiceExtract.js";
+
 // 与 src/domain/douyinSelfServiceExtract.js 的 DAILY_TASK_QUOTA 同源，
 // 这里单独写一份是为了让规划层不依赖采集器的模块。
 export const DOUYIN_SELF_SERVICE_DAILY_QUOTA = 5;
@@ -155,11 +157,11 @@ export function createDailyPlan({
           range: rangeFor(rangeKind, businessDate, timeZone),
           scheduleVersion: String(resource.scheduleVersion || "v1"),
           // 抖音的日事实统一走自助取数：逐页导出拿不到成交订单数与成交人数，
-          // 页面标签又抓错过（曾显示 314 万单 / 257 万人，实际 GMV 仅 6.5 万），
-          // 而自助取数是这两项目前已知的唯一可信来源，也是唯一能回溯 14 个月的路径。
-          ...(providerId === "douyin-ecommerce" && rangeKind === "daily_fact"
-            ? { viaSelfService: true }
-            : {})
+          // 页面标签又抓错过（曾显示 314 万单 / 257 万人，实际 GMV 仅 6.5 万）。
+          //
+          // 这个标记只在本地用来算当日配额。执行器不读它——它按资源类型自己判定，
+          // 因为 web_collection_jobs 表没有这一列，标记经服务端一个来回就没了。
+          ...(usesSelfService({ providerId, resourceType }) ? { viaSelfService: true } : {})
         };
         plan.push({ ...job, idempotencyKey: webCollectionJobKey(job) });
       }

@@ -48,6 +48,8 @@ export const DOUYIN_DEDICATED_RESOURCES = Object.freeze({
 // 自助取数是独立页面，不属于四个资源各自的落地页，需要单独登记为合法地址。
 export const SELF_SERVICE_URL = "https://compass.jinritemai.com/shop/workshop/appcustom-access?tab=access";
 
+import { usesSelfService } from "../../../../src/domain/douyinSelfServiceExtract.js";
+
 const REGISTERED_URLS = new Set([
   ...Object.values(DOUYIN_DEDICATED_RESOURCES).map(resource => resource.url),
   SELF_SERVICE_URL
@@ -330,7 +332,7 @@ export function createDouyinDedicatedExecutor({
         // 它也是唯一能回溯 14 个月、且能拿到成交订单数与成交人数的路径。
         //
         // 请求在页面上下文里发，登录态由专用浏览器自己带，采集器不接触任何凭据。
-        if (task.viaSelfService) {
+        if (usesSelfService(task)) {
           // 通道没接线时必须明确失败，不能悄悄退回逐页导出：那条路采回来的是另一个
           // 口径的数据，看起来一切正常，错值却已经入库了。
           if (!createExtractRunner || !createExtractApi) {

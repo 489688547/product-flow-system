@@ -41,20 +41,25 @@ test("viaSelfService 的任务走自助取数页面，不走逐页导出", async
   assert.deepEqual(ranWith, { resourceType: "live_daily", from: "2026-07-29", to: "2026-07-29" });
 });
 
-test("未标记 viaSelfService 时保持原有逐页路径", async () => {
-  // 新通道不得悄悄改变现有行为：没标记就还是走 applyBusinessDate。
+test("任务上的 viaSelfService 标记不再影响走向，一切以资源类型为准", async () => {
+  // 标记曾经是路由依据，但它经服务端一个来回就没了（表里没有这一列）。
+  // 现在即使显式写 false，已验证的资源照样走自助取数——路由不能依赖传不过来的字段。
   let applied = false;
   const controller = controllerStub({
     async applyBusinessDate() { applied = true; },
     async downloadOfficialReport() { return { filePath: "/tmp/b.xlsx", safeFileName: "b.xlsx" }; }
   });
-  const executor = createDouyinDedicatedExecutor({ createController: async () => controller });
+  const executor = createDouyinDedicatedExecutor({
+    createController: async () => controller,
+    createExtractApi: () => ({}),
+    createExtractRunner: () => ({ async run() { return { plan: { taskName: "采集-live-20260729-20260729" } }; } })
+  });
   const result = await executor.executeTask({
     task: { ...task, viaSelfService: false },
     browser: { endpoint: "http://127.0.0.1:9222", profileKey: "douyin-ecommerce:90862283", online: true }
   });
-  assert.equal(applied, true);
-  assert.notEqual(result.reportVersion, "douyin-self-service-v1", "未标记时不得走自助取数");
+  assert.equal(applied, false, "已验证的资源不看标记");
+  assert.equal(result.reportVersion, "douyin-self-service-v1");
 });
 
 test("viaSelfService 是合法任务字段", () => {
@@ -83,4 +88,42 @@ test("自助取数通道没接线时明确失败，不悄悄退回逐页导出",
     browser: { endpoint: "http://127.0.0.1:9222", profileKey: "douyin-ecommerce:90862283", online: true }
   });
   assert.equal(result.errorCode, "DOUYIN_EXTRACT_CHANNEL_UNAVAILABLE");
+});
+
+test("走不走自助取数由资源类型判定，不依赖任务上的标记", async () => {
+  // 之前是在排日计划时打 viaSelfService 标记带过去，但 web_collection_jobs 表没有这一列，
+  // 标记经服务端一个来回就没了：执行器拿到 undefined，于是悄悄走回逐页导出，
+  // 采回另一个口径的数据还不报错。本地测试全绿，因为测试直接构造带标记的任务，
+  // 绕过了那个来回。所以这里刻意不带标记。
+  const controller = controllerStub();
+  const executor = createDouyinDedicatedExecutor({
+    createController: async () => controller,
+    createExtractApi: () => ({}),
+    createExtractRunner: () => ({ async run() { return { plan: { taskName: "采集-live-20260729-20260729" } }; } })
+  });
+  const { viaSelfService, ...没有标记的任务 } = task;
+  const result = await executor.executeTask({
+    task: 没有标记的任务,
+    browser: { endpoint: "http://127.0.0.1:9222", profileKey: "douyin-ecommerce:90862283", online: true }
+  });
+  assert.equal(result.reportVersion, "douyin-self-service-v1");
+});
+
+test("未验证的资源仍走逐页导出，不被误切", async () => {
+  // store 切过去会让结算/退款/曝光点击变成 null，面板的退款率与曝光点击率就没了。
+  let applied = false;
+  const controller = controllerStub({
+    async applyBusinessDate() { applied = true; },
+    async downloadOfficialReport() { return { filePath: "/tmp/s.xlsx", safeFileName: "s.xlsx" }; }
+  });
+  const executor = createDouyinDedicatedExecutor({
+    createController: async () => controller,
+    createExtractApi: () => ({}),
+    createExtractRunner: () => ({ async run() { throw new Error("store 不该走自助取数"); } })
+  });
+  await executor.executeTask({
+    task: { ...task, resourceType: "store_daily" },
+    browser: { endpoint: "http://127.0.0.1:9222", profileKey: "douyin-ecommerce:90862283", online: true }
+  });
+  assert.equal(applied, true);
 });
