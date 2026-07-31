@@ -250,10 +250,35 @@ test("dedicated mode keeps Douyin work away from the extension bridge", async ()
     executionMode: "dedicated"
   });
 
-  assert.equal(await orchestrator.nextTask({ storeId: "store-a" }), null);
+  assert.equal(await orchestrator.nextTask({ storeId: "store-a" }), null, "抖音的活不交给扩展");
   const dedicated = await orchestrator.nextTask({ storeId: "store-a", executor: "dedicated" });
   assert.equal(dedicated.storeId, "store-a");
-  assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, { storeId: "store-a" }]);
+  // 扩展在 dedicated 模式下领任务时不按 storeId 过滤：扩展只要存过抖音的 storeId，
+  // 之后每次轮询都会带着它，按它过滤会把别的 provider 的任务一并挡在外面。
+  assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, {}]);
+});
+
+test("dedicated 模式下扩展仍能领到别的 provider 的任务", async () => {
+  // 这是切换浏览器模式时最容易打断的地方：判据若是「扩展请求带了 storeId 就不给」，
+  // 而扩展总是带着抖音的 storeId 轮询，快麦就再也领不到任务——表现只是「快麦不采了」，
+  // 看不出跟切模式有关。判据必须是「这条任务归谁执行」。
+  const kuaimaiJob = {
+    ...job,
+    id: "kuaimai-job-1",
+    providerId: "kuaimai",
+    storeId: "",
+    resourceType: "sales_items"
+  };
+  const api = apiDouble(kuaimaiJob);
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({}),
+    executionMode: "dedicated"
+  });
+
+  const task = await orchestrator.nextTask({ storeId: "store-a" });
+  assert.ok(task, "扩展带着抖音的 storeId 轮询，也必须能领到快麦的任务");
+  assert.equal(task.providerId, "kuaimai");
 });
 
 test("profile registry creates one safe local profile per assigned store", async () => {

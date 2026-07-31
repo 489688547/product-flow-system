@@ -48,6 +48,9 @@ import {
   createDouyinProcessor,
   DEFAULT_DOUYIN_ARCHIVE_ROOT
 } from "./providers/douyin/index.mjs";
+import { createDouyinExtractApi } from "./browser/providers/douyinExtractApi.js";
+import { createDouyinHomepageApi } from "./browser/providers/douyinHomepageApi.js";
+import { createDouyinExtractRunner } from "./browser/providers/douyinExtractRunner.js";
 
 function argument(argv, name, fallback = "") {
   const index = argv.indexOf(name);
@@ -263,7 +266,10 @@ async function serve({
     createController: browser => createCdpDouyinController({
       browser,
       downloadsDirectory
-    })
+    }),
+    createExtractApi: createDouyinExtractApi,
+    createHomepageApi: createDouyinHomepageApi,
+    createExtractRunner: createDouyinExtractRunner
   });
   const dedicatedRuntime = browserMode === "dedicated"
     ? createDedicatedBrowserRuntime({

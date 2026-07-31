@@ -34,58 +34,32 @@ test("dedicated Douyin adapter accepts only registered task fields and resources
   }
 });
 
-test("dedicated Douyin adapter opens only the fixed registered report page", async () => {
-  const { createDouyinDedicatedExecutor } = await moduleUnderTest();
-  assert.equal(typeof createDouyinDedicatedExecutor, "function", "createDouyinDedicatedExecutor must be implemented");
-  const calls = [];
+test("专用浏览器只打开登记过的页面：自助取数走固定的取数页", async () => {
+  // 保留的性质是「只去登记过的地址」，变的只是去哪个页面：四个日事实资源现在都走
+  // 自助取数，落地页因此是固定的取数页，而不是各资源自己的报表页。
+  const { createDouyinDedicatedExecutor, SELF_SERVICE_URL, isRegisteredDouyinUrl } = await moduleUnderTest();
+  const opened = [];
   const executor = createDouyinDedicatedExecutor({
     createController: async () => ({
-      async open(url) {
-        calls.push(["open", url]);
-      },
-      async inspect() {
-        return { state: "ready", storeId: "90862283" };
-      },
-      async applyBusinessDate(value) {
-        calls.push(["date", value]);
-      },
-      async downloadOfficialReport(input) {
-        calls.push(["download", input]);
-        return {
-          filePath: "/managed/downloads/product-report.xlsx",
-          safeFileName: "product-report.xlsx"
-        };
-      }
-    })
+      async open(url) { opened.push(url); },
+      async inspect() { return { state: "ready", storeId: "90862283" }; },
+      async applyBusinessDate() { throw new Error("自助取数不该走逐页日期设置"); },
+      async downloadOfficialReport() { throw new Error("自助取数不该走逐页导出"); },
+      async awaitDownload() { return { filePath: "/managed/downloads/a.xlsx", safeFileName: "a.xlsx" }; }
+    }),
+    createExtractApi: () => ({}),
+    createExtractRunner: () => ({ async run() { return { plan: { taskName: "采集-product-20260729-20260729" } }; } })
   });
 
   const result = await executor.executeTask({
     task,
-    browser: {
-      online: true,
-      profileKey: "douyin-ecommerce:90862283",
-      endpoint: "http://127.0.0.1:43127"
-    },
-    onCheckpoint: async stage => calls.push(["checkpoint", stage])
+    browser: { online: true, profileKey: "douyin-ecommerce:90862283", endpoint: "http://127.0.0.1:43127" }
   });
 
-  assert.deepEqual(calls[0], ["open", "https://compass.jinritemai.com/shop/merchandise-traffic"]);
-  assert.deepEqual(calls[1], ["checkpoint", "opening"]);
-  assert.deepEqual(calls[2], ["date", "2026-07-24"]);
-  assert.deepEqual(calls[3], ["checkpoint", "waiting_download"]);
-  assert.deepEqual(calls[4], ["download", {
-    resourceType: "product_daily",
-    pageType: "shop_compass_product",
-    reportVersion: "douyin-product-v2"
-  }]);
-  assert.deepEqual(result, {
-    kind: "downloaded",
-    jobId: "job-1",
-    filePath: "/managed/downloads/product-report.xlsx",
-    safeFileName: "product-report.xlsx",
-    pageType: "shop_compass_product",
-    reportVersion: "douyin-product-v2"
-  });
+  assert.equal(result.kind, "downloaded");
+  // 先打开资源落地页做登录态与店铺校验，再转到取数页——两个都必须在白名单里。
+  assert.ok(opened.every(isRegisteredDouyinUrl), `打开了未登记的地址：${opened.join("、")}`);
+  assert.ok(opened.includes(SELF_SERVICE_URL), "自助取数任务必须落到取数页");
 });
 
 test("dedicated Douyin adapter stops for login, verification, wrong store and schema changes", async () => {
@@ -174,38 +148,10 @@ test("Douyin page inspection never treats the public site or a pre-login report 
   }), { state: "store_identity_unavailable" });
 });
 
-test("store daily falls back to the fixed metric whitelist when no report is available", async () => {
-  const { createDouyinDedicatedExecutor, STORE_DAILY_FACT_KEYS } = await moduleUnderTest();
-  assert.equal(typeof createDouyinDedicatedExecutor, "function", "createDouyinDedicatedExecutor must be implemented");
-  const facts = Object.fromEntries(STORE_DAILY_FACT_KEYS.map((key, index) => [key, index]));
-  const executor = createDouyinDedicatedExecutor({
-    createController: async () => ({
-      async open() {},
-      async inspect() { return { state: "ready", storeId: "90862283" }; },
-      async applyBusinessDate() {},
-      async downloadOfficialReport() { return null; },
-      async captureStoreDaily() {
-        return {
-          facts,
-          selectorVersion: "2026-07-25"
-        };
-      }
-    })
-  });
-
-  const result = await executor.executeTask({
-    task: { ...task, resourceType: "store_daily" },
-    browser: {
-      online: true,
-      profileKey: "douyin-ecommerce:90862283",
-      endpoint: "http://127.0.0.1:43127"
-    }
-  });
-
-  assert.equal(result.kind, "captured");
-  assert.deepEqual(Object.keys(result.facts), STORE_DAILY_FACT_KEYS);
-  assert.equal(result.pageType, "shop_compass_overview");
-});
+// 原先这里有一个用例断言「没有报表时 store_daily 退回页面指标抓取」。
+// 那条路径正是产生 314 万成交订单数 / 257 万成交人数（同日 GMV 仅 6.5 万）的来源，
+// 现在 store_daily 走自助取数，它在专用浏览器里已不可达，因此删除该用例。
+// 扩展模式仍走页面抓取，其字段白名单由 tests/douyin-extension-adapter.test.mjs 覆盖。
 
 test("CDP controller allows only registered pages and resolves an official download locally", async () => {
   const { createCdpDouyinController } = await moduleUnderTest();

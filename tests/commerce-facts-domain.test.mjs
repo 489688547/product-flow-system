@@ -47,7 +47,10 @@ test("derived rates use atomic facts and return null for missing or zero denomin
     refundRate: null,
     averageOrderValue: null,
     exposureClickRate: 0.2,
-    clickTransactionRate: 2
+    clickTransactionRate: 2,
+    // 没采到投放消耗就是 null，不拿 0 冒充「没花钱」。
+    adCostRatio: null,
+    adContributedRatio: null
   });
   assert.equal(deriveCommerceMetrics("product_daily", {
     transactionAmount: 100,
