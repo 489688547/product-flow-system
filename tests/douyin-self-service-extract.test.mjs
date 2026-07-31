@@ -1,9 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  metricsFor,
   GRANULARITY_BY_DIMENSION,
-  METRICS_BY_DIMENSION,
   MAX_RANGE_DAYS,
   PRIMARY_DIMENSIONS,
   TASK_TIMEOUT_MS,
@@ -106,35 +104,18 @@ test("未超时继续等，不重复创建任务", () => {
   assert.deepEqual(planExtractWait({ startedAt: 0, now: 60_000, state: "pending" }), { action: "wait" });
 });
 
-test("指标按维度登记，直播与短视频不得冒充成交金额", () => {
-  // 同名指标在不同维度下 value 不同；更要紧的是直播与短视频没有「成交金额」，
-  // 只有「用户支付金额」，两者口径不同，混填会造出看起来权威的错值。
-  assert.equal(METRICS_BY_DIMENSION.shop.metrics.transactionOrderCount, "pay_cnt");
-  assert.equal(METRICS_BY_DIMENSION.live.metrics.transactionOrderCount, "live_room_pay_cnt");
-  assert.equal(METRICS_BY_DIMENSION.video.metrics.transactionOrderCount, "video_pay_cnt");
-  assert.equal("transactionAmount" in METRICS_BY_DIMENSION.live.metrics, false);
-  assert.equal("transactionAmount" in METRICS_BY_DIMENSION.video.metrics, false);
-});
 
-test("店铺仍带上成交人数与投放金额：它们是面板撤下指标的唯一可信来源", () => {
-  const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-29", to: "2026-07-29" });
-  assert.ok(plan.metricValues.includes("pay_ucnt"));
-  assert.ok(plan.metricValues.includes("ad_receive_amt"), "投放金额是支出与广告费用的来源");
-  assert.deepEqual(plan.metricCategories, ["1"], "成交分类在店铺口径下编号是 1");
-});
 
-test("只有店铺有「成交金额」，其余三个维度都只有用户支付金额", () => {
-  // 与平台配置接口逐条核对过。混填会造出看起来权威的错值。
-  assert.equal(METRICS_BY_DIMENSION.shop.metrics.transactionAmount, "income_amt");
-  for (const dimension of ["product", "live", "video"]) {
-    assert.equal("transactionAmount" in METRICS_BY_DIMENSION[dimension].metrics, false, dimension);
-    assert.ok(METRICS_BY_DIMENSION[dimension].metrics.userPaymentAmount, dimension);
-  }
-});
 
-test("未登记的维度拒绝取数，不能凭猜测下单", () => {
-  assert.throws(
-    () => metricsFor("未知维度"),
-    error => error.code === "DOUYIN_EXTRACT_METRICS_UNVERIFIED"
-  );
+
+test("计划里不再带指标清单：指标一律全选，由平台配置接口现取", () => {
+  // 维护「我们要哪些指标」的清单本身就是脆弱点：漏选一类，那几列静默变 null
+  // （店铺少选退款与流量，面板的退款率与曝光点击率就没了，且不报错）；
+  // 平台新增指标我们也不会知道。实测店铺 6 类共 76 个指标全选，接口照收。
+  const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-30", to: "2026-07-30" });
+  assert.equal("metricValues" in plan, false);
+  assert.equal("metricCategories" in plan, false);
+  // 仍要登记的只有选错了不会报错的两项：粒度与视频类型。
+  assert.equal(plan.granularityValue, "day");
+  assert.equal(buildExtractPlan({ resourceType: "video_daily", from: "2026-07-30", to: "2026-07-30" }).videoType, "ecom_video");
 });

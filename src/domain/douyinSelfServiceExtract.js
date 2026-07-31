@@ -15,18 +15,17 @@ export const SELF_SERVICE_ROUTE = "/shop/workshop/appcustom-access?tab=access";
 // 这一列——标记经服务端一个来回就没了，执行器拿到 undefined，于是悄悄走回逐页导出，
 // 采回另一个口径的数据还不报错。本地测试全绿，是因为测试直接构造带标记的任务，
 // 绕过了那个来回。
-// 只切换已经端到端验证过的资源，其余仍走逐页导出。
+// 四个日事实资源全部走自助取数。
 //
-// live / video：自助取数覆盖了逐页导出能给的全部，且多给了可靠的成交订单数与成交人数。
-//
-// store 暂不切：自助取数这边目前只取了成交类 7 项，而逐页采集还提供结算金额、退款金额、
-// 商品曝光/点击人数——面板的退款率与曝光点击率正是由它们算出来的。直接切过去，
-// 那几项会变成 null，两个比率就没了，而且不报错。要切得先把结算/退款/流量三类指标
-// 也取上并验过导出列名。
-//
-// product 暂不切：取数口径已与配置接口核对，但导出文件的列名还没实测，
-// 列名对不上就是一列静默的 null。
-export const SELF_SERVICE_RESOURCES = Object.freeze(["live_daily", "video_daily"]);
+// store 与 product 是最后切的：它们除成交外还要结算、退款、商品曝光/点击——
+// 面板的退款率与曝光点击率由这些算出，少取一类就会静默变成 null。
+// 现在四类指标都取上了，列名也用 preview 接口逐列核对过（见 assertPreviewCovers）。
+export const SELF_SERVICE_RESOURCES = Object.freeze([
+  "store_daily",
+  "product_daily",
+  "live_daily",
+  "video_daily"
+]);
 
 // 只看 provider 与资源类型：执行器拿到的任务里没有 rangeKind，
 // 判定条件必须只用它确实有的字段——否则又是一个「本地能过、生产判不出来」。
@@ -42,87 +41,34 @@ export const PRIMARY_DIMENSIONS = Object.freeze({
   video_daily: "video"
 });
 
-// 指标不是四个维度通用的，而且指标面板还有一层分类筛选（2026-07-30 在专用浏览器逐维度实测）。
+// 指标选多少，按维度而异——这条是实测撞出来的，不能一刀切。
 //
-// 两处结构必须同时说清，否则报错会指向错误的方向：
+// 店铺与商品：全选。清单本身就是脆弱点（漏选一类，那几列静默变 null，平台新增指标
+// 我们也不会知道），全选没有代价：落库只取登记过的列，其余留在归档文件里。
+// 实测店铺 6 类共 76 个指标全选，接口照收，身份列仍是「日期」/「商品ID」。
 //
-// 一、指标 value 随维度变，连同名指标都不同名：
-//     店铺「成交订单数」= pay_cnt，直播是 live_room_pay_cnt，短视频是 video_pay_cnt。
-//     更要紧的是直播与短视频**没有「成交金额」**，只有「用户支付金额」——
-//     两者口径不同，不能拿支付金额冒充成交金额填进 transactionAmount。
-//
-// 二、指标按分类筛选显示，未勾选的分类其指标根本不在 DOM 里：
-//     店铺默认停在「成交」，所以最初一眼就看到了 income_amt；
-//     直播与短视频默认停在「基础信息」，商品默认勾的是流量/预售/退款。
-//     不先勾分类就找指标，报的是「指标不可用」，真实原因却是「没勾分类」。
-//
-// 所以取指标前必须先勾中它所属的分类。
-export const METRICS_BY_DIMENSION = Object.freeze({
-  shop: Object.freeze({
-    categories: Object.freeze(["1"]),
-    // 罗盘首页接口不返回成交订单数与成交人数，而这两项正是 store_daily 靠页面标签
-    // 抓错、已从面板撤下的指标（面板曾显示 314 万单、257 万人，实际 GMV 仅 6.5 万）。
-    // 自助取数是目前已知的唯一可信来源：实测 07-25 是 3418 单 / 2810 人 / ¥67159。
-    metrics: Object.freeze({
-      transactionAmount: "income_amt",
-      userPaymentAmount: "pay_amt",
-      transactionOrderCount: "pay_cnt",
-      transactionBuyerCount: "pay_ucnt",
-      netTransactionAmount: "net_income_amt",
-      adContributedAmount: "ad_receive_amt",
-      adContributedRatio: "ad_receive_amt_ratio"
-    })
-  }),
-  product: Object.freeze({
-    categories: Object.freeze(["1"]),
-    // 商品维度同样没有「成交金额」，只有用户支付金额——四个维度里只有店铺有 income_amt。
-    metrics: Object.freeze({
-      userPaymentAmount: "pay_amt",
-      transactionOrderCount: "pay_cnt",
-      transactionBuyerCount: "pay_ucnt",
-      transactionQuantity: "pay_combo_cnt"
-    })
-  }),
+// 直播与短视频：只能选定。全选会把「基础信息」里的达人字段（account_id / nickname 等）
+// 也带上，于是**行的身份从直播间/短视频变成了达人**——preview 实测直播全选后列里
+// 根本没有「直播间ID」，短视频没有「短视频ID」。那不是少一列，是整张表的含义变了。
+export const SELECTED_METRICS = Object.freeze({
   live: Object.freeze({
-    // 要两个分类：成交（2）之外还要基础信息（1），因为必须把 live_start_ts 取回来。
-    //
-    // 直播导出是一行一个直播间、没有按天的「日期」列，统计日期给的是整段区间。
-    // 少了开播时间，就只能靠「我请求的是这几天」去推断业务日——那是推断，不是事实，
-    // 5 天的数据会被当成某一天入库。把开播时间取进来，业务日就在数据里。
+    // 基础信息只取开播时间：业务日靠它归集，取多了会把身份换成达人。
     categories: Object.freeze(["1", "2"]),
-    metrics: Object.freeze({
-      liveStartedAt: "live_start_ts",
-      userPaymentAmount: "live_room_pay_amt",
-      transactionOrderCount: "live_room_pay_cnt",
-      transactionBuyerCount: "live_room_pay_ucnt"
-    })
+    metrics: Object.freeze([
+      "live_start_ts",
+      "live_room_pay_amt",
+      "live_room_pay_cnt",
+      "live_room_pay_ucnt",
+      "live_room_pay_combo_cnt"
+    ])
   }),
   video: Object.freeze({
-    categories: Object.freeze(["1", "2"]),
-    // 短视频不能照搬直播那招：它只有「统计日期累计」，给的是区间合计；
-    // 而发布时间也不能当业务日——5 月发的视频 7 月照样出单。
-    // 所以短视频只能一天一个任务，业务日由文件里的统计日期自证（见 SINGLE_DAY_ONLY_DIMENSIONS）。
-    metrics: Object.freeze({
-      userPaymentAmount: "video_pay_amt",
-      transactionOrderCount: "video_pay_cnt"
-    })
+    categories: Object.freeze(["2"]),
+    metrics: Object.freeze(["video_pay_amt", "video_pay_cnt", "video_gpm"])
   })
 });
 
-// 登记表不是靠点页面摸出来的，而是与平台的配置接口逐条核对过
-// （GET /data_factory/download/config?main_dimension=…&date_type=…&edition=2，
-// 它返回该维度可选的粒度、指标分类与每类下的指标）。提交前还会再核一次，
-// 平台改了什么会被当场指出来，而不是采回一个少列的文件才发现。
-export function metricsFor(dimension) {
-  const entry = METRICS_BY_DIMENSION[dimension];
-  if (!entry) {
-    throw Object.assign(
-      new Error(`维度 ${dimension} 的指标尚未实测登记，不能凭猜测取数。`),
-      { code: "DOUYIN_EXTRACT_METRICS_UNVERIFIED" }
-    );
-  }
-  return entry;
-}
+// 需要登记的另外两件按维度而异、且选错不会报错的事：时间粒度与视频类型。
 
 // 时间粒度选项随主要维度变化，四个维度并不通用（与平台配置接口逐条核对）：
 //
@@ -197,7 +143,27 @@ function daysBetween(from, to) {
 
 // 任务名称要能在任务列表里被唯一认出来：列表只给名称、创建人、状态、创建日期，
 // 没有业务字段，靠名称回找是唯一可行的关联方式。
-export function buildTaskName({ resourceType, from, to, videoType = "" } = {}) {
+// 任务名必须编码「这次到底要什么」，不能只有维度与区间。
+//
+// 平台按名称判重，而我们的名字是确定性的。指标集一变（比如从只取成交类改成全选），
+// 名字却没变，重名逻辑就把它当成「我之前建过的同一个请求」接着等——拿回来的是旧任务
+// 的旧文件。实测就这么中过一次：明明提交了全选，下回来的还是 10 列的窄表，且不报错。
+//
+// 同名 ≠ 同内容。指纹取自实际提交的粒度、视频类型、指标分类与指标。
+export function fingerprintSelection({ granularityValue = "", videoType = "", categories = [], metrics = [] } = {}) {
+  const text = [granularityValue, videoType, [...categories].sort().join(","), [...metrics].sort().join(",")].join("|");
+  // FNV-1a：够稳定、够短，不引入依赖。这里只用来区分不同的取数内容，不做安全用途。
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36).padStart(6, "0").slice(-6);
+}
+
+// 平台的任务名上限是 40 字符（页面上显示 25/40）。视频类型只留首字母，
+// 否则 采集-video-ecom_video-20260730-20260730-xxxxxx 就超了。
+export function buildTaskName({ resourceType, from, to, videoType = "", fingerprint = "" } = {}) {
   const dimension = PRIMARY_DIMENSIONS[resourceType];
   if (!dimension) {
     throw Object.assign(new Error(`资源 ${resourceType} 未登记主要维度。`), {
@@ -208,8 +174,9 @@ export function buildTaskName({ resourceType, from, to, videoType = "" } = {}) {
   const end = assertDate(to, "结束日期");
   // 短视频的挂车与非挂车是两批数据，名字必须区分：平台按名称判重，同名会被拒，
   // 而被拒也照样耗掉一次尝试。
-  const slice = videoType ? `-${videoType}` : "";
-  return `采集-${dimension}${slice}-${start.replace(/-/g, "")}-${end.replace(/-/g, "")}`;
+  const slice = videoType ? `-${videoType.slice(0, 1)}` : "";
+  const suffix = fingerprint ? `-${fingerprint}` : "";
+  return `采集-${dimension}${slice}-${start.replace(/-/g, "")}-${end.replace(/-/g, "")}${suffix}`;
 }
 
 export function buildExtractPlan({ resourceType, from, to } = {}) {
@@ -238,20 +205,15 @@ export function buildExtractPlan({ resourceType, from, to } = {}) {
       code: "DOUYIN_EXTRACT_RANGE_TOO_LONG"
     });
   }
-  const { categories, metrics } = metricsFor(dimension);
   const videoType = dimension === "video" ? DEFAULT_VIDEO_TYPE : "";
   return {
-    taskName: buildTaskName({ resourceType, from: start, to: end, videoType }),
+    // 任务名要等指标选定后才能算指纹，由接口客户端补上（见 douyinExtractApi.js）。
     videoType,
     dimension,
     from: start,
     to: end,
     granularity: GRANULARITY_BY_DIMENSION[dimension].label,
     granularityValue: GRANULARITY_BY_DIMENSION[dimension].value,
-    metricCategories: categories,
-    metricValues: Object.freeze(Object.values(metrics)),
-    // 字段名 → 指标 value 的反查，供解析导出文件时对齐用。
-    metrics
   };
 }
 

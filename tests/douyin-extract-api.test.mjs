@@ -3,8 +3,10 @@ import test from "node:test";
 import {
   TASK_STATUS,
   assertConfigSupportsPlan,
+  assertPreviewCovers,
   configQuery,
   parseExtractConfig,
+  selectMetrics,
   buildSubmitPayload,
   dayEndSeconds,
   dayStartSeconds,
@@ -12,6 +14,7 @@ import {
   selectApiTask
 } from "../src/domain/douyinExtractApi.js";
 import { buildExtractPlan } from "../src/domain/douyinSelfServiceExtract.js";
+import { PREVIEW_REQUIRED_COLUMNS } from "../src/domain/douyinExtractRows.js";
 
 // 抓包实测的一行（2026-07-30）：列表每格都裹三层。
 function cell(field, value) {
@@ -40,9 +43,10 @@ test("时间戳按 Asia/Shanghai 自然日边界，不看运行机器的时区",
 
 test("提交载荷与抓包一致，字段取自各维度的登记表", () => {
   const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-25", to: "2026-07-29" });
-  assert.deepEqual(buildSubmitPayload(plan), {
+  const selection = { categories: ["1", "2", "3", "5"], metrics: ["income_amt", "pay_amt", "pay_cnt", "pay_ucnt", "net_income_amt", "ad_receive_amt", "ad_receive_amt_ratio"] };
+  assert.deepEqual(buildSubmitPayload(plan, selection), {
     main_dimension: "shop",
-    main_metrics: ["1"],
+    main_metrics: ["1", "2", "3", "5"],
     metrics: ["income_amt", "pay_amt", "pay_cnt", "pay_ucnt", "net_income_amt", "ad_receive_amt", "ad_receive_amt_ratio"],
     begin_date: 1784908800,
     end_date: 1785340799,
@@ -52,11 +56,6 @@ test("提交载荷与抓包一致，字段取自各维度的登记表", () => {
   });
 });
 
-test("指标分类编号按维度取，直播与短视频的成交不是 1", () => {
-  // 它们的 1 是「基础信息」，只用 1 会取回一堆达人 ID 而不是成交数据，且不会报错。
-  assert.deepEqual(buildExtractPlan({ resourceType: "store_daily", from: "2026-07-30", to: "2026-07-30" }).metricCategories, ["1"]);
-  assert.deepEqual(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-30", to: "2026-07-30" }).metricCategories, ["1", "2"]);
-});
 
 test("列表解析逐格取值，不猜结构", () => {
   const rows = parseTaskList({ data: [row({ name: "采集-shop-20260725-20260729", status: "0", rank: "3/4" })] });
@@ -115,21 +114,13 @@ test("配置接口按维度与粒度取，参数与抓包一致", () => {
   );
 });
 
+// 指标改成「店铺/商品全选、直播/短视频选定」后，分类编号与指标存在性的把关都移到了
+// selectMetrics，配置核对只剩粒度一项——见下方 selectMetrics 的用例。
 test("平台还给这些就放行", () => {
   const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-30", to: "2026-07-30" });
   assert.equal(assertConfigSupportsPlan(parseExtractConfig(config()), plan), true);
 });
 
-test("指标被平台下掉就当场拒绝，并说清是哪一个", () => {
-  // 少一个指标就是导出文件里少一列，落到事实表里是一个静默的 null。
-  // 宁可不提交，也不要排完二十分钟队才发现。
-  const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-30", to: "2026-07-30" });
-  const 少了成交人数 = config({ groups: { 1: ["income_amt", "pay_amt", "pay_cnt", "net_income_amt", "ad_receive_amt", "ad_receive_amt_ratio"] } });
-  assert.throws(
-    () => assertConfigSupportsPlan(parseExtractConfig(少了成交人数), plan),
-    error => error.code === "DOUYIN_EXTRACT_CONFIG_DRIFTED" && /pay_ucnt/.test(error.message)
-  );
-});
 
 test("粒度被平台下掉也当场拒绝", () => {
   const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-30", to: "2026-07-30" });
@@ -139,14 +130,49 @@ test("粒度被平台下掉也当场拒绝", () => {
   );
 });
 
-test("整个分类没了时只报分类，不刷一屏指标", () => {
-  const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-30", to: "2026-07-30" });
-  try {
-    assertConfigSupportsPlan(parseExtractConfig(config({ groups: { 9: ["x"] } })), plan);
-    assert.fail("应当拒绝");
-  } catch (error) {
-    assert.equal(error.code, "DOUYIN_EXTRACT_CONFIG_DRIFTED");
-    assert.match(error.message, /指标分类 1 已不存在/);
-    assert.equal(/income_amt/.test(error.message), false, "分类没了就别再逐个指标报");
-  }
+
+test("店铺与商品全选指标，直播与短视频只能选定", () => {
+  // 直播/短视频全选会把「基础信息」里的达人字段带上，行的身份就从直播间/短视频
+  // 变成达人——preview 实测全选后列里根本没有「直播间ID」。那不是少一列，
+  // 是整张表的含义变了。
+  const 全 = parseExtractConfig(config({ groups: { 1: ["a", "b"], 2: ["c"] } }));
+  assert.deepEqual(selectMetrics(全, "shop"), { categories: ["1", "2"], metrics: ["a", "b", "c"] });
+
+  const 直播配置 = parseExtractConfig(config({
+    dates: ["live_start_date"],
+    groups: { 1: ["live_start_ts", "author_id", "nickname"], 2: ["live_room_pay_amt", "live_room_pay_cnt", "live_room_pay_ucnt", "live_room_pay_combo_cnt"] }
+  }));
+  const 直播 = selectMetrics(直播配置, "live");
+  assert.equal(直播.metrics.includes("author_id"), false, "达人字段会把行的身份换掉");
+  assert.ok(直播.metrics.includes("live_start_ts"), "开播时间必须要，业务日靠它归集");
+});
+
+test("选定集里的指标被平台下掉时当场拒绝", () => {
+  const 少了开播时间 = parseExtractConfig(config({
+    dates: ["live_start_date"],
+    groups: { 1: ["author_id"], 2: ["live_room_pay_amt", "live_room_pay_cnt", "live_room_pay_ucnt", "live_room_pay_combo_cnt"] }
+  }));
+  assert.throws(
+    () => selectMetrics(少了开播时间, "live"),
+    error => error.code === "DOUYIN_EXTRACT_CONFIG_DRIFTED" && /live_start_ts/.test(error.message)
+  );
+});
+
+test("preview 只核对指标列，身份列另有把关", () => {
+  // preview 报的不是导出文件的完整表头：实测直播导出有「直播间ID」而 preview 没有，
+  // 反过来 preview 有「日期」而文件里没有。让一道检查假装管两件事，
+  // 就会像今天这样：直播明明是好的，却被判成「缺少必需列」。
+  const 直播列 = [
+    { key: "date_range", label: "统计日期" },
+    { key: "live_start_ts", label: "直播开始时间" },
+    { key: "live_room_pay_amt", label: "用户支付金额" },
+    { key: "live_room_pay_cnt", label: "成交订单数" }
+  ];
+  assert.equal(assertPreviewCovers(直播列, "live", PREVIEW_REQUIRED_COLUMNS.live), true);
+  assert.equal(PREVIEW_REQUIRED_COLUMNS.live.includes("直播间ID"), false);
+
+  assert.throws(
+    () => assertPreviewCovers(直播列.slice(0, 2), "live", PREVIEW_REQUIRED_COLUMNS.live),
+    error => error.code === "DOUYIN_EXTRACT_COLUMNS_DRIFTED" && /成交订单数/.test(error.message)
+  );
 });

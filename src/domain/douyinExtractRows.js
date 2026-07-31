@@ -26,13 +26,19 @@ const SHARED_COLUMNS = Object.freeze({
 });
 
 export const COLUMNS_BY_DIMENSION = Object.freeze({
+  // 指标一律全选，所以文件里的列远多于这里登记的。没登记的列直接忽略——
+  // 它们仍留在归档文件里，将来要用不必重采。
   shop: Object.freeze({
     ...SHARED_COLUMNS,
     日期: "businessDateRaw",
     成交金额: "transactionAmount",
-    净成交金额: "netTransactionAmount",
-    投放贡献成交金额: "adContributedAmount",
-    投放贡献成交占比: "adContributedRatio"
+    结算金额: "settlementAmount",
+    "退款金额（支付时间）": "refundAmountByPaymentDate",
+    "退款金额（退款时间）": "refundAmountByRefundDate",
+    "退款订单数（支付时间）": "refundOrderCountByPaymentDate",
+    "退款订单数（退款时间）": "refundOrderCountByRefundDate",
+    商品曝光人数: "productExposureUsers",
+    商品点击人数: "productClickUsers"
   }),
   // 商品与店铺一样从「日期」列取业务日，但一行是一个商品，不是一天。
   product: Object.freeze({
@@ -40,7 +46,15 @@ export const COLUMNS_BY_DIMENSION = Object.freeze({
     日期: "businessDateRaw",
     商品ID: "productId",
     商品名称: "productName",
-    成交件数: "transactionQuantity"
+    成交件数: "transactionQuantity",
+    商品曝光人数: "exposureUsers",
+    商品点击人数: "clickUsers",
+    // 平台自己也不一致：配置接口把 refund_cnt 标成「退款订单数（退款时间）」，
+    // 而 preview 给的列名是「退款订单数（支付时间）」。导出文件用的是后者，
+    // 所以列名一律以 preview 为准，不拿配置接口的文案当列名。
+    "退款订单数（支付时间）": "refundOrderCount",
+    "成交退款金额（退款时间）": "refundAmount",
+    "退款件数（退款时间）": "refundQuantity"
   }),
   live: Object.freeze({
     ...SHARED_COLUMNS,
@@ -61,8 +75,36 @@ export const COLUMNS_BY_DIMENSION = Object.freeze({
   })
 });
 
+// 建任务前用 preview 接口核对的列。
+//
+// 注意 preview 报的是**指标列**，不是导出文件的完整表头：实测直播的导出文件有
+// 「直播间ID / 直播间名称 / 店铺名称」而 preview 里没有，反过来 preview 有「日期」
+// 而文件里没有。店铺与商品两者恰好一致，所以这个差别是在直播上才暴露的。
+//
+// 因此这里只列 preview 确实会报的列。身份列不靠它把关——身份缺失由入库时的必填
+// 校验拦下（live 缺 liveSessionId、video 缺 videoId 会直接抛错），业务日来源缺失
+// 由 parseExtractRows 拦下。两道各管各的，别让一道假装管了两件事。
+export const PREVIEW_REQUIRED_COLUMNS = Object.freeze({
+  shop: Object.freeze(["日期", "成交金额", "成交订单数", "成交人数"]),
+  product: Object.freeze(["日期", "商品ID", "用户支付金额", "成交订单数"]),
+  live: Object.freeze(["直播开始时间", "用户支付金额", "成交订单数"]),
+  video: Object.freeze(["短视频用户支付金额", "成交订单数"])
+});
+
 const NUMERIC_FIELDS = new Set([
   "transactionAmount",
+  "refundQuantity",
+  "refundOrderCount",
+  "refundAmount",
+  "clickUsers",
+  "exposureUsers",
+  "productClickUsers",
+  "productExposureUsers",
+  "refundOrderCountByRefundDate",
+  "refundOrderCountByPaymentDate",
+  "refundAmountByRefundDate",
+  "refundAmountByPaymentDate",
+  "settlementAmount",
   "transactionQuantity",
   "userPaymentAmount",
   "transactionOrderCount",

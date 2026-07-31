@@ -5,16 +5,25 @@
 // 不依赖坐标、不依赖 class 名、不受页面缩放影响。
 
 import {
+  PREVIEW_PATH,
   SUBMIT_PATH,
   TASK_LIST_PATH,
   assertConfigSupportsPlan,
+  assertPreviewCovers,
   buildSubmitPayload,
   configQuery,
   parseExtractConfig,
+  parsePreviewColumns,
   parseTaskList,
+  selectMetrics,
   selectApiTask
 } from "../../../../src/domain/douyinExtractApi.js";
-import { buildExtractPlan } from "../../../../src/domain/douyinSelfServiceExtract.js";
+import { PREVIEW_REQUIRED_COLUMNS } from "../../../../src/domain/douyinExtractRows.js";
+import {
+  buildExtractPlan,
+  buildTaskName,
+  fingerprintSelection
+} from "../../../../src/domain/douyinSelfServiceExtract.js";
 import { SELF_SERVICE_URL } from "./douyin.mjs";
 
 function apiError(code, message) {
@@ -64,11 +73,39 @@ export function createDouyinExtractApi({ controller, evaluate }) {
   return Object.freeze({
     async createTask({ resourceType, from, to }) {
       const plan = buildExtractPlan({ resourceType, from, to });
-      // 先问平台「这些还给不给」。一次 GET 换来的是：平台改了会当场说清改了什么，
-      // 而不是排完二十分钟队、下回一个少列的文件，再由解析器报个离原因很远的错。
-      assertConfigSupportsPlan(parseExtractConfig(await request(configQuery(plan))), plan);
+
+      // 建任务前两道免费的核对。每天只有 5 条配额，被拒的提交也算一条，
+      // 所以宁可多两次请求，也不要白建一条任务。
+      //
+      // 一、配置接口：粒度还在不在（指标全选，不必逐个核对）。
+      const config = parseExtractConfig(await request(configQuery(plan)));
+      assertConfigSupportsPlan(config, plan);
+      const selection = selectMetrics(config, plan.dimension);
+
+      // 名字要等指标选定后才能定：它必须编码这次到底要什么。平台按名称判重，
+      // 名字不变就会把内容不同的旧任务当成同一个接着等——实测中过一次，
+      // 提交的是全选，下回来的却是旧的 10 列窄表，而且不报错。
+      plan.taskName = buildTaskName({
+        resourceType,
+        from: plan.from,
+        to: plan.to,
+        videoType: plan.videoType,
+        fingerprint: fingerprintSelection({
+          granularityValue: plan.granularityValue,
+          videoType: plan.videoType,
+          ...selection
+        })
+      });
+
+      // 二、preview 接口：这次取数会生成哪些列。指标 key 还在不代表列名没变，
+      // 而解析是按中文列名做的——列名一改，解析出来是一列静默的 null。
+      // preview 不建任务、不耗配额。
+      const payload = buildSubmitPayload(plan, selection);
+      const preview = await request(PREVIEW_PATH, { method: "POST", body: payload });
+      assertPreviewCovers(parsePreviewColumns(preview), plan.dimension, PREVIEW_REQUIRED_COLUMNS[plan.dimension] || []);
+
       try {
-        await request(SUBMIT_PATH, { method: "POST", body: buildSubmitPayload(plan) });
+        await request(SUBMIT_PATH, { method: "POST", body: payload });
         return plan;
       } catch (error) {
         const recoverable = error.code === "DOUYIN_EXTRACT_TASK_EXISTS"
