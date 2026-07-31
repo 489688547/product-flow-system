@@ -254,11 +254,27 @@ GET /compass_api/shop/common/homepage/summary_core_index_v3  收支概况（广�
 按业务日只保留最新批次那条仍然保留，作为第二道保险：它不依赖批次状态被正确维护。
 真正的问题只有一个——07-29、07-30 的数字被拼接。
 
-### 还没做的：把那 12 行删掉
+### 已执行：删除（2026-07-31，逐条指名授权）
 
-读取时过滤已经止住错值外泄，但行还在库里。真正删除需要单独授权——那是对生产库的
-批量删除，「把历史处理掉」说的是目标，没有指名表与动作。届时先落盘备份，
-再按 source_version 前缀删。
+- `commerce_store_daily_facts`：删除 `source_version LIKE 'douyin-store-capture-%'` 的 12 行
+- `commerce_fact_batches`：删除 `resource_type='store_daily'` 且同前缀的 13 条
+
+两次删除都由使用者逐条指名表与谓词后执行，删前落盘备份：
+
+```
+~/Documents/product-flow-backups/commerce_store_daily_facts-douyin-store-capture-2026-07-31.json
+~/Documents/product-flow-backups/commerce_fact_batches-store_daily-douyin-store-capture-2026-07-31.json
+```
+
+**备份路径的教训**：第一份备份原本写在仓库的 `artifacts/` 下，事后发现文件不见了
+（多半被某个清理脚本扫掉），而那时数据已经删了。后来才从 `/tmp` 的副本转存出来。
+删生产数据前的备份必须写到不会被构建流程碰的地方，**并且写完立刻回读校验**，
+不能只看写入函数没报错。
+
+删除后库里的状态：`store_daily` 事实与批次均为 0；其余三个资源只剩 07-23 一天，
+来自文件导出路径（`douyin-*-v2`），覆盖率分别是直播 84%、商品 56%、短视频 43%，
+其中短视频置信为 low。它们不属于标签抓取那一类错误（问题是「少」不是「错」），
+未作处理。
 
 ## 摸接口用 CDP Network 域
 
