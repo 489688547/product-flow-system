@@ -329,3 +329,49 @@ test("readiness checks display tables against DEMO_FLOW_DB instead of the contro
   assert.equal(result.ready, false);
   assert.deepEqual(result.capabilities[0].missing, ["DEMO_FLOW_DB:product_sales_daily"]);
 });
+
+test("readiness checks large table catalogs in bounded D1 query batches", async () => {
+  const { inspectEnvironmentReadiness } = await import(
+    resolve("functions/api/platform/_shared/environmentReadiness.js")
+  );
+  const tables = Array.from({ length: 102 }, (_, index) => `table_${index + 1}`);
+  const querySizes = [];
+  const db = {
+    prepare(sql) {
+      const statement = {
+        values: [],
+        bind(...values) {
+          statement.values = values;
+          return statement;
+        },
+        async all() {
+          assert.match(sql, /sqlite_master/i);
+          querySizes.push(statement.values.length);
+          if (statement.values.length > 50) throw new Error("too many SQL variables");
+          return { results: statement.values.map(name => ({ name })) };
+        }
+      };
+      return statement;
+    }
+  };
+  const result = await inspectEnvironmentReadiness({
+    env: { RUNTIME_ENV: "production", PRODUCT_FLOW_DB: db },
+    manifest: {
+      capabilities: [{
+        id: "large-table-catalog",
+        name: "大表目录",
+        description: "D1 参数上限回归",
+        platforms: ["cloudflare-d1"],
+        requiredIn: ["production"],
+        level: "blocking",
+        envVars: [],
+        bindings: ["PRODUCT_FLOW_DB"],
+        tables
+      }]
+    }
+  });
+
+  assert.equal(result.ready, true);
+  assert.equal(querySizes.length, 3);
+  assert.equal(Math.max(...querySizes), 50);
+});

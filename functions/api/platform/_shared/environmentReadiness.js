@@ -39,12 +39,17 @@ function environmentVariableMissing(name, env, vaultEnvVars) {
 
 async function existingTables(db, names) {
   if (!db || !names.length) return new Set();
-  const placeholders = names.map(() => "?").join(", ");
+  const existing = new Set();
   try {
-    const result = await db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${placeholders})`)
-      .bind(...names)
-      .all();
-    return new Set((result?.results || []).map(row => row.name));
+    for (let offset = 0; offset < names.length; offset += 50) {
+      const batch = names.slice(offset, offset + 50);
+      const placeholders = batch.map(() => "?").join(", ");
+      const result = await db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name IN (${placeholders})`)
+        .bind(...batch)
+        .all();
+      for (const row of result?.results || []) existing.add(row.name);
+    }
+    return existing;
   } catch {
     return new Set();
   }
