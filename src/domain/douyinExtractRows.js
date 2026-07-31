@@ -5,6 +5,7 @@
 // | 维度 | 粒度         | 每行是什么 | 业务日来自 |
 // |------|--------------|-----------|-----------|
 // | shop | 自然日累计    | 一天      | 「日期」列（20260725） |
+// | product | 自然日累计 | 一个商品   | 「日期」列，同店铺 |
 // | live | 开播日期累计  | 一个直播间 | 「直播开始时间」（2026/07/29 07:59:36） |
 // | video| 统计日期累计  | 一个视频   | 「统计日期」，且必须是单日区间 |
 //
@@ -33,6 +34,14 @@ export const COLUMNS_BY_DIMENSION = Object.freeze({
     投放贡献成交金额: "adContributedAmount",
     投放贡献成交占比: "adContributedRatio"
   }),
+  // 商品与店铺一样从「日期」列取业务日，但一行是一个商品，不是一天。
+  product: Object.freeze({
+    ...SHARED_COLUMNS,
+    日期: "businessDateRaw",
+    商品ID: "productId",
+    商品名称: "productName",
+    成交件数: "transactionQuantity"
+  }),
   live: Object.freeze({
     ...SHARED_COLUMNS,
     统计日期: "statPeriod",
@@ -54,6 +63,7 @@ export const COLUMNS_BY_DIMENSION = Object.freeze({
 
 const NUMERIC_FIELDS = new Set([
   "transactionAmount",
+  "transactionQuantity",
   "userPaymentAmount",
   "transactionOrderCount",
   "transactionBuyerCount",

@@ -427,6 +427,18 @@ const SELF_SERVICE_FACT_MAP = Object.freeze({
       userPaymentAmount: "userPaymentAmount"
     })
   }),
+  product_daily: Object.freeze({
+    perRow: true,
+    identity: Object.freeze({ productId: "productId" }),
+    // 商品维度同样没有「成交金额」。买家数在商品口径叫 transactionBuyers。
+    numbers: Object.freeze({
+      userPaymentAmount: "userPaymentAmount",
+      transactionOrderCount: "transactionOrderCount",
+      transactionBuyerCount: "transactionBuyers",
+      transactionQuantity: "transactionQuantity"
+    }),
+    strings: Object.freeze({ productName: "productName" })
+  }),
   live_daily: Object.freeze({
     perRow: true,
     identity: Object.freeze({ liveRoomId: "liveSessionId", liveStartedAt: "startedAt" }),
@@ -490,6 +502,9 @@ export async function readDouyinSelfServiceReport(input, { resourceType, busines
       sourceVersion: SELF_SERVICE_REPORT_VERSION
     };
     for (const [from, to] of Object.entries(mapping.identity)) {
+      if (row[from]) mapped[to] = row[from];
+    }
+    for (const [from, to] of Object.entries(mapping.strings || {})) {
       if (row[from]) mapped[to] = row[from];
     }
     for (const [from, to] of Object.entries(mapping.numbers)) {

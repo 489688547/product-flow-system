@@ -59,12 +59,10 @@ test("直播不得凭用户支付金额冒充成交金额", async () => {
   assert.equal(result.facts[0].transactionAmount, null);
 });
 
-test("未登记入库口径的维度直接拒绝，不猜", async () => {
-  // 商品维度的取数口径已登记（与平台配置接口核对过），但导出文件的列名还没实测，
-  // 没见过就不登记入库映射——猜错不报错，只会采回错位的数字。
+test("未登记入库口径的资源直接拒绝，不猜", async () => {
   const file = await csv([SHOP_HEADER, ["20260730-20260730", "20260730", "TIYES", "1", "1", "1", "1"]]);
   await assert.rejects(
-    readDouyinSelfServiceReport(file, { ...参数, resourceType: "product_daily" }),
+    readDouyinSelfServiceReport(file, { ...参数, resourceType: "orders" }),
     error => error.code === "DOUYIN_RESOURCE_NOT_COVERED"
   );
 });
@@ -83,4 +81,19 @@ test("短视频：列名是「短视频用户支付金额」，且绝不填进�
   assert.equal(result.facts[0].userPaymentAmount, 4113.11);
   assert.equal(result.facts[0].transactionOrderCount, 166);
   assert.equal(result.facts[0].transactionAmount, null, "成交金额没采就是没采");
+});
+
+test("商品：一行一个商品，业务日仍取「日期」列", async () => {
+  // 表头与数值取自 2026-07-30 真实下载到的文件。
+  const file = await csv([
+    ["统计日期", "日期", "商品ID", "商品名称", "用户支付金额", "成交订单数", "成交人数", "成交件数"],
+    ["20260730-20260730", "20260730", "3814810793887794009", "提野星仓鼠垫料", "9273.49", "385", "380", "389"]
+  ], "采集-product-20260730-20260730.csv");
+  const result = await readDouyinSelfServiceReport(file, { ...参数, resourceType: "product_daily" });
+  assert.equal(result.facts.length, 1);
+  assert.equal(result.facts[0].productId, "3814810793887794009");
+  assert.equal(result.facts[0].businessDate, "2026-07-30");
+  assert.equal(result.facts[0].transactionBuyers, 380, "买家数在商品口径叫 transactionBuyers");
+  assert.equal(result.facts[0].transactionQuantity, 389);
+  assert.equal(result.facts[0].transactionAmount, null, "商品维度没有成交金额");
 });
