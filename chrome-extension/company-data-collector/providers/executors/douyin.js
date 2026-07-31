@@ -5,8 +5,9 @@ import {
   projectDouyinTask,
   validateDouyinCapture
 } from "../douyin.js";
+import { collectDouyinProductDaily } from "../douyinApi.js";
 
-const SELECTOR_VERSION = "2026-07-24";
+const SELECTOR_VERSION = "2026-07-31";
 const WAIT_AFTER_ACTION_MS = 600;
 const WAIT_AFTER_DATE_MS = 3_000;
 const YESTERDAY_PRESET_LABELS = Object.freeze(["近1天", "昨天", "昨日"]);
@@ -357,6 +358,22 @@ export async function executeDouyinTask(task) {
   }
 
   try {
+    if (projected.resourceType === "product_daily") {
+      const collected = await collectDouyinProductDaily({
+        businessDate: projected.businessDate
+      });
+      return {
+        ...validateDouyinCapture({
+          kind: "captured",
+          resourceType: "product_daily",
+          facts: collected.facts,
+          pageType: resource.pageType,
+          selectorVersion: SELECTOR_VERSION
+        }),
+        status: "captured",
+        stage: "collecting"
+      };
+    }
     if (
       projected.resourceType === "store_daily"
       && projected.businessDate === shanghaiYesterday()
@@ -393,10 +410,11 @@ export async function executeDouyinTask(task) {
       errorCode: "DOUYIN_OFFICIAL_REPORT_BUTTON_MISSING"
     };
   } catch (error) {
+    const waitingHuman = error?.code === "DOUYIN_LOGIN_REQUIRED";
     return {
-      kind: "failed",
-      status: "failed",
-      stage: "exporting",
+      kind: waitingHuman ? "waiting_human" : "failed",
+      status: waitingHuman ? "waiting_human" : "failed",
+      stage: projected.resourceType === "product_daily" ? "collecting" : "exporting",
       errorCode: error?.code || "DOUYIN_ACTION_FAILED"
     };
   }

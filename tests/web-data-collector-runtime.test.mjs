@@ -884,6 +884,59 @@ test("Douyin captured store facts are validated and completed as one immutable b
   assert.equal(uploads[1].complete, true);
 });
 
+test("Douyin captured product facts are normalized and completed as one immutable batch", async () => {
+  const uploads = [];
+  const processor = createDouyinProcessor({
+    uploadFactChunk: async input => {
+      uploads.push(input);
+      return { completedCount: input.expectedCount };
+    }
+  });
+  const captured = {
+    kind: "captured",
+    resourceType: "product_daily",
+    facts: [{
+      productId: "3718502021305860341",
+      skuId: null,
+      productName: "莓果冻干主粮",
+      skuName: null,
+      merchantCode: null,
+      exposureUsers: 48_100,
+      clickUsers: 3_346,
+      transactionBuyers: 575,
+      transactionOrderCount: 593,
+      transactionQuantity: null,
+      transactionAmount: null,
+      userPaymentAmount: 15_199.11,
+      refundOrderCount: null,
+      refundQuantity: null,
+      refundAmount: null
+    }],
+    pageType: "shop_compass_product",
+    selectorVersion: "2026-07-31"
+  };
+
+  const processed = await processor.process({
+    job: {
+      id: "douyin-product-job-1",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "product_daily",
+      businessDate: "2026-07-30"
+    },
+    result: captured
+  });
+
+  assert.equal(processed.rowCount, 1);
+  assert.equal(processed.confidence, "medium");
+  assert.equal(uploads.length, 2);
+  assert.equal(uploads[0].facts[0].productId, "3718502021305860341");
+  assert.equal(uploads[0].facts[0].businessDate, "2026-07-30");
+  assert.equal(uploads[0].facts[0].userPaymentAmount, 15_199.11);
+  assert.equal(uploads[1].complete, true);
+  assert.equal(uploads[1].expectedCount, 1);
+});
+
 test("Douyin processor resumes after an uploaded chunk and checkpoints final submission", async () => {
   const uploads = [];
   const stages = [];

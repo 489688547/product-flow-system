@@ -63,6 +63,11 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 - runner 进程心跳与浏览器执行器状态必须分开表达。MV3 使用 `extension_online/offline`；专用浏览器使用 `dedicated_browser_online/offline`。`queued` 只表示等待领取，页面不得把它显示为“正在采集”；只有 `claimed` 及后续阶段才表示已经开始处理。
 - 永久 LaunchAgent 不得保存临时 `.worktrees/*` 入口。安装器必须通过 Git common directory 把当前工作树中的采集入口映射回主检出仓库的同一相对路径，再原子写入 plist；临时分支被删除后，服务重启仍须能找到入口。
 - 05:00 日计划由本机执行器生成并通过控制面幂等登记；扩展触发官方导出，解析、脱敏、原始文件本机归档和 D1 ingest 仍由本机执行器完成。只有完整 ingest 成功才能推进游标。
+- 抖店 `product_daily` 的昨天增量使用商品卡页面登记的同源接口，固定
+  `begin_date=end_date=businessDate`、`date_type=21` 并分页到官方 `total`。Chrome 扩展只把
+  固定响应投影成商品 ID、商品名称、支付金额、订单、买家、曝光和点击白名单事实；原始响应不上传。
+  SKU/69 码通过商品主数据关联，接口未提供的退款、件数和平台成交金额保持 `null`。空页、缺商品 ID、
+  重复商品、分页变化或不完整一律失败，不写空批次、不推进游标。
 - 控制面只自动恢复已登记的瞬时错误：下载、网络或本机处理失败按 5 分钟、15 分钟退避，同一任务最多领取 3 次；重排必须保持 provider、resource、业务日期、目标环境和幂等键不变。登录、验证码与 `schema_changed` 不自动循环；页面适配器修复通过提升 `scheduleVersion` 创建可审计的新任务，旧失败记录不得覆盖或删除。
 - `claimed`、`opening`、`collecting`、`exporting`、`downloading`、`validating` 或 `ingesting` 阶段的设备租约过期表示本机执行中断；控制面允许其他轮询重新领取同一任务并增加 attempt，最多 3 次。不能只恢复 `claimed`，否则进程在后续阶段退出会让任务永久显示“同步中”。
 - 本机编排器必须同步释放自己内存中的过期活动任务，再向控制面重新领取；只依赖服务端允许重领但继续返回旧的内存任务，会让 attempt 永远不增长并阻塞整个串行队列。结果正在本机校验或入库时不得中途释放，避免并发写入同一批次。

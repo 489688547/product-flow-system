@@ -349,6 +349,11 @@ boolean，`coverage` 必须在 0–1；任意输出、页面正文或扩展字�
 
 The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `web_collection_stores.store_id`. An executive may register multiple Douyin stores from 数据接入 using only `storeId` and `storeName`; `(providerId, storeId)` is unique and submitting the same ID updates its name. The paired extension may also register a Douyin store after reading the fixed shop-management page. The bridge and runner accept exactly `providerId`, stable `storeId` and `storeName`. The server, not the runner, resolves that store directory. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie, token or page body field are rejected.
 
+`captured` 结果仅允许 `store_daily` 的固定原子对象或 `product_daily` 的非空商品数组。商品数组每行必须
+包含唯一稳定 `productId` 以及完整标准字段集合；接口没有提供的字段使用 `null`。Bridge 最大接收 2 MiB，
+本机 processor 按 200 行分块写入标准事实 API，只有最终空结案块声明 `complete=true` 和
+`expectedCount`。任何空数组、重复商品、敏感字段、未知字段或不完整分页都在写入前失败。
+
 Runner actions are:
 
 - `heartbeat`: update version, Chrome status, current job and last-seen time.
@@ -383,6 +388,8 @@ Responses use `{ data, meta }` and `cache-control: no-store`. The list response 
 - `WEB_COLLECTION_TRIGGER_INVALID`: the requested provider, resource or business date is outside the fixed user-trigger contract.
 - `WEB_COLLECTION_JOB_INVALID`: provider, resource, date, range, key or forbidden instruction field is invalid.
 - `WEB_COLLECTION_BUSINESS_DATE_MISMATCH`: the downloaded file's parsed first or last business date differs from the job date; the file is not ingested and the cursor does not advance.
+- `DOUYIN_API_EMPTY_DATA` / `DOUYIN_PRODUCT_ID_MISSING`: 商品接口为空或缺少稳定商品 ID，不写入。
+- `DOUYIN_PRODUCT_DUPLICATE` / `DOUYIN_PRODUCT_PAGE_INCOMPLETE` / `DOUYIN_PRODUCT_PAGE_CHANGED`: 商品分页重复、不完整或采集中总数变化，不写入。
 - `WEB_COLLECTION_JOB_NOT_FOUND` / `WEB_COLLECTION_JOB_OWNER_MISMATCH`: missing or wrong runner job.
 - `WEB_COLLECTION_STATE_CONFLICT` / `WEB_COLLECTION_TRANSITION_INVALID`: stale or illegal state update.
 - `WEB_COLLECTION_RUN_INVALID` / `WEB_COLLECTION_NOTIFICATION_INVALID`: invalid completion or notification metadata.
