@@ -2,7 +2,11 @@ import { createHash } from "node:crypto";
 
 import { normalizeCommerceFact } from "../../../../src/domain/commerceFacts.js";
 import { archiveDouyinReport, DEFAULT_DOUYIN_ARCHIVE_ROOT } from "./archive.mjs";
-import { readDouyinReport } from "./parser.mjs";
+import {
+  readDouyinReport,
+  readDouyinSelfServiceReport,
+  SELF_SERVICE_REPORT_VERSION
+} from "./parser.mjs";
 
 export { DEFAULT_DOUYIN_ARCHIVE_ROOT };
 
@@ -156,7 +160,12 @@ export function createDouyinProcessor({
           }
         });
       }
-      const parsed = await readDouyinReport(filePath, {
+      // 自助取数的文件结构与逐页导出完全不同（「统计日期」是区间、直播没有成交金额列），
+      // 必须走各自的解析口径，不能让它去撞逐页导出那套别名匹配。
+      const readReport = result.reportVersion === SELF_SERVICE_REPORT_VERSION
+        ? readDouyinSelfServiceReport
+        : readDouyinReport;
+      const parsed = await readReport(filePath, {
         resourceType: job.resourceType,
         businessDate: job.businessDate,
         storeId: job.storeId

@@ -1,0 +1,68 @@
+import assert from "node:assert/strict";
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+
+import { readDouyinSelfServiceReport } from "../scripts/web-data-collector/providers/douyin/parser.mjs";
+
+const SHOP_HEADER = ["统计日期", "日期", "店铺名称", "成交金额", "用户支付金额", "成交订单数", "成交人数"];
+const LIVE_HEADER = ["统计日期", "直播间ID", "直播间名称", "店铺名称", "直播开始时间", "用户支付金额", "成交订单数", "成交人数"];
+const 参数 = { resourceType: "store_daily", businessDate: "2026-07-30", storeId: "90862283" };
+
+async function csv(rows, name = "采集-shop-20260730-20260730.csv") {
+  const dir = await mkdtemp(join(tmpdir(), "douyin-self-service-"));
+  const path = join(dir, name);
+  await writeFile(path, rows.map(row => row.join(",")).join("\n"), "utf8");
+  return path;
+}
+
+test("店铺：按「日期」列定业务日，不碰「统计日期」", async () => {
+  // 逐页导出那套别名匹配把「统计日期」也当日期别名，而这里它是区间 20260730-20260730。
+  // 先命中谁用谁的话，业务日会变成一段区间字符串，而且不会报错。
+  // 数值取自 2026-07-30 真实下载到的文件。
+  const file = await csv([SHOP_HEADER, ["20260730-20260730", "20260730", "TIYES", "65449.76", "60342.64", "3265", "2676"]]);
+  const result = await readDouyinSelfServiceReport(file, 参数);
+  assert.equal(result.reportVersion, "douyin-self-service-v1");
+  assert.equal(result.facts.length, 1);
+  assert.equal(result.facts[0].businessDate, "2026-07-30");
+  assert.equal(result.facts[0].transactionOrderCount, 3265);
+  assert.equal(result.facts[0].transactionBuyerCount, 2676);
+});
+
+test("文件里混进别的业务日就整批拒绝", async () => {
+  // 「返回了数据」不等于「返回了这一天的数据」。
+  const file = await csv([SHOP_HEADER, ["20260729-20260730", "20260729", "TIYES", "1", "1", "1", "1"]]);
+  await assert.rejects(readDouyinSelfServiceReport(file, 参数));
+});
+
+test("直播：一行一场，按开播时间归业务日，不合并", async () => {
+  // live_daily 的事实以 liveSessionId 为身份，合并成一条日事实就没有身份了，
+  // 也丢掉了场次粒度。
+  const file = await csv([
+    LIVE_HEADER,
+    ["20260730-20260730", "111", "场次甲", "TIYES", "2026/07/30 08:00:00", "1000.5", "50", "40"],
+    ["20260730-20260730", "222", "场次乙", "TIYES", "2026/07/30 20:00:00", "2000.5", "70", "55"]
+  ], "采集-live-20260730-20260730.csv");
+  const result = await readDouyinSelfServiceReport(file, { ...参数, resourceType: "live_daily" });
+  assert.equal(result.facts.length, 2);
+  assert.deepEqual(result.facts.map(fact => fact.liveSessionId), ["111", "222"]);
+  assert.equal(result.facts[0].userPaymentAmount, 1000.5);
+  assert.equal(result.facts[1].transactionOrderCount, 70);
+  assert.equal(result.facts[1].transactionBuyers, 55, "买家数在直播口径叫 transactionBuyers");
+});
+
+test("直播不得凭用户支付金额冒充成交金额", async () => {
+  // 自助取数的直播维度根本没有「成交金额」，两者口径不同，混填会造出权威的错值。
+  const file = await csv([LIVE_HEADER, ["20260730-20260730", "111", "甲", "TIYES", "2026/07/30 08:00:00", "1000.5", "50", "40"]], "采集-live-20260730-20260730.csv");
+  const result = await readDouyinSelfServiceReport(file, { ...参数, resourceType: "live_daily" });
+  assert.equal(result.facts[0].transactionAmount, null);
+});
+
+test("未登记入库口径的维度直接拒绝，不猜", async () => {
+  const file = await csv([SHOP_HEADER, ["20260730-20260730", "20260730", "TIYES", "1", "1", "1", "1"]]);
+  await assert.rejects(
+    readDouyinSelfServiceReport(file, { ...参数, resourceType: "product_daily" }),
+    error => error.code === "DOUYIN_RESOURCE_NOT_COVERED"
+  );
+});
