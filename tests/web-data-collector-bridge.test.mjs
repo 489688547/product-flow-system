@@ -174,7 +174,7 @@ test("loopback bridge accepts the strict downloaded result and rejects sensitive
   });
 });
 
-test("loopback bridge accepts only fixed store capture facts and bounded human summaries", async () => {
+test("loopback bridge accepts fixed store/product capture facts and bounded human summaries", async () => {
   await withBridge(async ({ baseUrl, submitted }) => {
     const facts = {
       transactionAmount: 100,
@@ -204,19 +204,50 @@ test("loopback bridge accepts only fixed store capture facts and bounded human s
     assert.equal(capture.status, 202);
     assert.equal(submitted.at(-1).facts.transactionAmount, 100);
 
-    const wrongResource = await fetch(`${baseUrl}/v1/tasks/job-1/result`, {
+    const productCapture = await fetch(`${baseUrl}/v1/tasks/job-1/result`, {
       method: "POST",
       headers: { ...headers(), "Content-Type": "application/json" },
       body: JSON.stringify({
         kind: "captured",
         jobId: "job-1",
         resourceType: "product_daily",
-        facts,
+        facts: [{
+          productId: "3718502021305860341",
+          skuId: null,
+          productName: "莓果冻干主粮",
+          skuName: null,
+          merchantCode: null,
+          exposureUsers: 48_100,
+          clickUsers: 3_346,
+          transactionBuyers: 575,
+          transactionOrderCount: 593,
+          transactionQuantity: null,
+          transactionAmount: null,
+          userPaymentAmount: 15_199.11,
+          refundOrderCount: null,
+          refundQuantity: null,
+          refundAmount: null
+        }],
         pageType: "shop_compass_product",
-        selectorVersion: "2026-07-24"
+        selectorVersion: "2026-07-31"
       })
     });
-    assert.equal(wrongResource.status, 400);
+    assert.equal(productCapture.status, 202);
+    assert.equal(submitted.at(-1).facts[0].productId, "3718502021305860341");
+
+    const emptyProduct = await fetch(`${baseUrl}/v1/tasks/job-1/result`, {
+      method: "POST",
+      headers: { ...headers(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "captured",
+        jobId: "job-1",
+        resourceType: "product_daily",
+        facts: [],
+        pageType: "shop_compass_product",
+        selectorVersion: "2026-07-31"
+      })
+    });
+    assert.equal(emptyProduct.status, 400);
 
     const longSummary = await fetch(`${baseUrl}/v1/tasks/job-1/result`, {
       method: "POST",

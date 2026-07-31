@@ -468,7 +468,11 @@ async function runRegisteredBridgeTask(task) {
     return;
   }
   if (result?.kind === "captured") {
-    if (task.providerId !== "douyin-ecommerce" || task.resourceType !== "store_daily") {
+    if (
+      task.providerId !== "douyin-ecommerce"
+      || !["store_daily", "product_daily"].includes(task.resourceType)
+      || result.resourceType !== task.resourceType
+    ) {
       await reportTaskResult(task, {
         kind: "failed",
         errorCode: "EXTENSION_CAPTURE_RESOURCE_INVALID",
@@ -479,7 +483,7 @@ async function runRegisteredBridgeTask(task) {
     }
     await reportTaskResult(task, {
       kind: "captured",
-      resourceType: "store_daily",
+      resourceType: task.resourceType,
       facts: result.facts,
       pageType: result.pageType,
       selectorVersion: result.selectorVersion

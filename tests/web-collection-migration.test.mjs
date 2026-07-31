@@ -14,6 +14,12 @@ const TABLES = [
   "web_collection_cursors",
   "web_collection_notifications"
 ];
+const EXPERIMENTAL_TABLES = [
+  "collector_templates",
+  "collector_template_versions",
+  "collector_experimental_runs",
+  "collector_experimental_run_events"
+];
 
 test("web collection migration creates governed generic control-plane tables", () => {
   for (const table of TABLES) assert.match(migration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`));
@@ -27,9 +33,12 @@ test("web collection migration creates governed generic control-plane tables", (
 test("web collection environment capability names the exact D1 boundary", () => {
   const capability = environment.capabilities.find(item => item.id === "company-web-data-collection");
   assert.ok(capability);
-  assert.deepEqual(capability.tables, TABLES);
+  assert.deepEqual(capability.tables, [...TABLES, ...EXPERIMENTAL_TABLES]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
-  assert.deepEqual(capability.envVars, []);
+  assert.deepEqual(capability.envVars, [
+    "COLLECTOR_EXPERIMENTAL_MODE",
+    "WEB_COLLECTION_EXPERIMENTAL_MODE"
+  ]);
   assert.deepEqual(capability.platforms, [
     "cloudflare-pages",
     "cloudflare-d1",

@@ -138,3 +138,140 @@ export function interpretDouyinApiResponse(payload) {
   }
   return { ok: true, code: "", message: "", data: payload.data };
 }
+
+function douyinApiError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+function textCellValue(row, indexName, fieldName) {
+  const cell = row?.cell_info?.[indexName];
+  const wrapped = cell?.[`${indexName}_${fieldName}_value`]
+    || cell?.[`${fieldName}_value`];
+  const value = wrapped?.value;
+  if (!value || typeof value !== "object") return null;
+  const resolved = value.unit === "string" ? value.value_str : value.value ?? value.value_str;
+  if (resolved === null || resolved === undefined || resolved === "") return null;
+  return String(resolved).replace(/[\u0000-\u001f\u007f]/g, " ").trim() || null;
+}
+
+function metricCellValue(row, aliases, { priceInFen = false } = {}) {
+  for (const indexName of aliases) {
+    const indexValues = row?.cell_info?.[indexName]?.[`${indexName}_index_values`]?.index_values;
+    const raw = indexValues?.value?.value;
+    if (raw === null || raw === undefined || raw === "") continue;
+    const number = Number(raw);
+    if (!Number.isFinite(number) || number < 0) {
+      throw douyinApiError("DOUYIN_PRODUCT_METRIC_INVALID", `抖店商品指标无效：${indexName}`);
+    }
+    return priceInFen ? number / 100 : number;
+  }
+  return null;
+}
+
+function projectProductRow(row) {
+  const productId = textCellValue(row, "product", "id");
+  if (!productId || /\s/.test(productId) || productId.length > 200) {
+    throw douyinApiError("DOUYIN_PRODUCT_ID_MISSING", "抖店商品记录缺少稳定商品 ID。");
+  }
+  return {
+    productId,
+    skuId: null,
+    productName: textCellValue(row, "product", "name"),
+    skuName: null,
+    merchantCode: null,
+    exposureUsers: metricCellValue(row, ["product_show_ucnt", "show_ucnt"]),
+    clickUsers: metricCellValue(row, ["product_show_click_ucnt", "product_click_ucnt", "click_ucnt"]),
+    transactionBuyers: metricCellValue(row, ["pay_ucnt"]),
+    transactionOrderCount: metricCellValue(row, ["pay_cnt"]),
+    transactionQuantity: null,
+    transactionAmount: null,
+    userPaymentAmount: metricCellValue(row, ["pay_amt"], { priceInFen: true }),
+    refundOrderCount: null,
+    refundQuantity: null,
+    refundAmount: null
+  };
+}
+
+export function projectDouyinProductApiPage(payload) {
+  const interpreted = interpretDouyinApiResponse(payload);
+  if (!interpreted.ok) throw douyinApiError(interpreted.code, interpreted.message);
+  if (!Array.isArray(payload.data) || payload.data.length === 0) {
+    throw douyinApiError("DOUYIN_API_EMPTY_DATA", "抖店商品接口没有返回商品记录。");
+  }
+  const total = Number(payload.page_result?.total ?? payload.data.length);
+  if (!Number.isSafeInteger(total) || total < payload.data.length || total > 10_000) {
+    throw douyinApiError("DOUYIN_PRODUCT_PAGE_INVALID", "抖店商品接口分页信息无效。");
+  }
+  return {
+    facts: payload.data.map(projectProductRow),
+    total
+  };
+}
+
+export async function collectDouyinProductDaily({
+  businessDate,
+  pageSize = Number(DOUYIN_PRODUCT_CARD_PARAMS.page_size),
+  fetchImpl = fetch
+} = {}) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(businessDate || ""))) {
+    throw douyinApiError("DOUYIN_DATE_INVALID", "抖店商品业务日期无效。");
+  }
+  if (!Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 100) {
+    throw douyinApiError("DOUYIN_PRODUCT_PAGE_INVALID", "抖店商品分页大小无效。");
+  }
+  if (typeof fetchImpl !== "function") {
+    throw douyinApiError("DOUYIN_API_UNAVAILABLE", "抖店商品接口请求能力不可用。");
+  }
+
+  const facts = [];
+  const productIds = new Set();
+  let expectedTotal = null;
+  for (let pageNo = 1; pageNo <= 200; pageNo += 1) {
+    const url = buildDouyinApiUrl({
+      endpoint: DOUYIN_API_ENDPOINTS.product_daily[0],
+      businessDate,
+      sourceParams: {
+        ...DOUYIN_PRODUCT_CARD_PARAMS,
+        page_no: String(pageNo),
+        page_size: String(pageSize)
+      }
+    });
+    const response = await fetchImpl(url, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      headers: { Accept: "application/json" }
+    });
+    if (!response?.ok) {
+      throw douyinApiError(
+        response?.status === 401 || response?.status === 403
+          ? "DOUYIN_LOGIN_REQUIRED"
+          : "DOUYIN_API_REQUEST_FAILED",
+        "抖店商品接口请求失败。"
+      );
+    }
+    let payload;
+    try {
+      payload = await response.json();
+    } catch {
+      throw douyinApiError("DOUYIN_API_MALFORMED", "抖店商品接口没有返回有效 JSON。");
+    }
+    const page = projectDouyinProductApiPage(payload);
+    if (expectedTotal === null) expectedTotal = page.total;
+    if (page.total !== expectedTotal) {
+      throw douyinApiError("DOUYIN_PRODUCT_PAGE_CHANGED", "抖店商品分页总数在采集过程中发生变化。");
+    }
+    for (const fact of page.facts) {
+      if (productIds.has(fact.productId)) {
+        throw douyinApiError("DOUYIN_PRODUCT_DUPLICATE", "抖店商品分页返回了重复商品。");
+      }
+      productIds.add(fact.productId);
+      facts.push(fact);
+    }
+    if (facts.length === expectedTotal) return { facts, total: expectedTotal };
+    if (facts.length > expectedTotal || page.facts.length < pageSize) {
+      throw douyinApiError("DOUYIN_PRODUCT_PAGE_INCOMPLETE", "抖店商品分页未完整返回全部商品。");
+    }
+  }
+  throw douyinApiError("DOUYIN_PRODUCT_PAGE_INCOMPLETE", "抖店商品分页超过安全上限。");
+}

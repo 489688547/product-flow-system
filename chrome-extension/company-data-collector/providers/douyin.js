@@ -18,6 +18,37 @@ export const STORE_DAILY_FACT_KEYS = Object.freeze([
 ]);
 
 const STORE_FACT_KEY_SET = new Set(STORE_DAILY_FACT_KEYS);
+export const PRODUCT_DAILY_FACT_KEYS = Object.freeze([
+  "productId",
+  "skuId",
+  "productName",
+  "skuName",
+  "merchantCode",
+  "exposureUsers",
+  "clickUsers",
+  "transactionBuyers",
+  "transactionOrderCount",
+  "transactionQuantity",
+  "transactionAmount",
+  "userPaymentAmount",
+  "refundOrderCount",
+  "refundQuantity",
+  "refundAmount"
+]);
+const PRODUCT_FACT_KEY_SET = new Set(PRODUCT_DAILY_FACT_KEYS);
+const PRODUCT_STRING_FIELDS = new Set(["skuId", "productName", "skuName", "merchantCode"]);
+const PRODUCT_NUMBER_FIELDS = new Set([
+  "exposureUsers",
+  "clickUsers",
+  "transactionBuyers",
+  "transactionOrderCount",
+  "transactionQuantity",
+  "transactionAmount",
+  "userPaymentAmount",
+  "refundOrderCount",
+  "refundQuantity",
+  "refundAmount"
+]);
 const TASK_FIELDS = new Set([
   "jobId",
   "providerId",
@@ -185,6 +216,9 @@ export function buildDouyinTaskUrl(baseUrl, task) {
 
 export function buildDouyinActionPlan(task) {
   const projected = projectDouyinTask(task);
+  if (projected.resourceType === "product_daily") {
+    return [{ action: "capture_product_api", businessDate: projected.businessDate }];
+  }
   const actions = [
     { action: "apply_business_date", businessDate: projected.businessDate },
     { action: "download_official_report", resourceType: projected.resourceType }
@@ -203,10 +237,68 @@ export function validateDouyinCapture(capture) {
   if (unknown.length || Object.keys(capture).some(field => UNSAFE_FIELD_PATTERN.test(field))) {
     throw douyinError("DOUYIN_CAPTURE_UNSAFE_FIELDS", "店铺读数包含不允许的字段。");
   }
-  if (capture.kind !== "captured" || capture.resourceType !== "store_daily") {
-    throw douyinError("DOUYIN_CAPTURE_RESOURCE_INVALID", "仅允许店铺总览安全读数。");
+  if (
+    capture.kind !== "captured"
+    || !["store_daily", "product_daily"].includes(capture.resourceType)
+  ) {
+    throw douyinError("DOUYIN_CAPTURE_RESOURCE_INVALID", "仅允许已登记的店铺或商品安全读数。");
   }
-  if (!capture.facts || typeof capture.facts !== "object" || Array.isArray(capture.facts)) {
+  if (!capture.facts || typeof capture.facts !== "object") {
+    throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "店铺读数字段无效。");
+  }
+  if (capture.resourceType === "product_daily") {
+    if (!Array.isArray(capture.facts) || capture.facts.length < 1 || capture.facts.length > 10_000) {
+      throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "商品读数必须包含完整的非空商品列表。");
+    }
+    const productIds = new Set();
+    const facts = capture.facts.map(fact => {
+      if (!fact || typeof fact !== "object" || Array.isArray(fact)) {
+        throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "商品读数结构无效。");
+      }
+      const keys = Object.keys(fact);
+      if (
+        keys.length !== PRODUCT_DAILY_FACT_KEYS.length
+        || keys.some(key => !PRODUCT_FACT_KEY_SET.has(key) || UNSAFE_FIELD_PATTERN.test(key))
+      ) {
+        throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "商品读数字段不完整或未登记。");
+      }
+      const productId = String(fact.productId || "");
+      if (!productId || /\s/.test(productId) || productId.length > 200 || productIds.has(productId)) {
+        throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "商品读数缺少唯一稳定商品 ID。");
+      }
+      productIds.add(productId);
+      for (const field of PRODUCT_STRING_FIELDS) {
+        const value = fact[field];
+        if (
+          value !== null
+          && (typeof value !== "string" || !value.trim() || value.length > 300 || /[\u0000-\u001f\u007f]/.test(value))
+        ) {
+          throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", `商品文本字段无效：${field}`);
+        }
+      }
+      for (const field of PRODUCT_NUMBER_FIELDS) {
+        const value = fact[field];
+        if (value !== null && (!Number.isFinite(value) || value < 0)) {
+          throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", `商品数值字段无效：${field}`);
+        }
+      }
+      return Object.fromEntries(PRODUCT_DAILY_FACT_KEYS.map(key => [key, fact[key]]));
+    });
+    if (!/^[a-z0-9_-]{1,64}$/i.test(String(capture.pageType || ""))) {
+      throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "页面类型无效。");
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(capture.selectorVersion || ""))) {
+      throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "选择器版本无效。");
+    }
+    return {
+      kind: "captured",
+      resourceType: "product_daily",
+      facts,
+      pageType: capture.pageType,
+      selectorVersion: capture.selectorVersion
+    };
+  }
+  if (Array.isArray(capture.facts)) {
     throw douyinError("DOUYIN_CAPTURE_SCHEMA_INVALID", "店铺读数字段无效。");
   }
   const factKeys = Object.keys(capture.facts);
