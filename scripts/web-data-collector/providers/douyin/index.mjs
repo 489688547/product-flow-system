@@ -54,30 +54,46 @@ export function createDouyinProcessor({
         await onStage(stage, structuredClone(state));
       };
       if (result?.kind === "captured") {
-        if (job.resourceType !== "store_daily" || result.resourceType !== "store_daily") {
-          throw processorError("DOUYIN_CAPTURE_RESOURCE_INVALID", "仅店铺总览允许安全页面读数。");
+        if (
+          !["store_daily", "product_daily"].includes(job.resourceType)
+          || result.resourceType !== job.resourceType
+        ) {
+          throw processorError("DOUYIN_CAPTURE_RESOURCE_INVALID", "页面读数资源与抖店任务不匹配。");
         }
-        const sourceVersion = `douyin-store-capture-${result.selectorVersion}`;
-        const fact = normalizeCommerceFact("store_daily", {
+        const sourceVersion = job.resourceType === "store_daily"
+          ? `douyin-store-capture-${result.selectorVersion}`
+          : `douyin-product-api-${result.selectorVersion}`;
+        const capturedFacts = job.resourceType === "store_daily"
+          ? [result.facts]
+          : result.facts;
+        if (!Array.isArray(capturedFacts) || capturedFacts.length === 0) {
+          throw processorError("DOUYIN_CAPTURE_EMPTY", "抖店页面读数为空，未写入事实。");
+        }
+        const facts = capturedFacts.map(captured => normalizeCommerceFact(job.resourceType, {
           providerId: job.providerId,
           storeId: job.storeId,
           businessDate: job.businessDate,
           sourceVersion,
-          ...result.facts
-        });
+          ...captured
+        }));
         const contentHash = createHash("sha256")
-          .update(JSON.stringify(fact))
+          .update(JSON.stringify(facts))
           .digest("hex");
-        const batchId = `douyin-store_daily-${contentHash.slice(0, 24)}`;
-        const populated = Object.values(result.facts).filter(value => value !== null).length;
-        const coverage = populated / Object.keys(result.facts).length;
+        const batchId = `douyin-${job.resourceType}-${contentHash.slice(0, 24)}`;
+        const values = capturedFacts.flatMap(fact => Object.values(fact));
+        const populated = values.filter(value => value !== null).length;
+        const coverage = populated / values.length;
         await onValidated?.({ coverage, confidence: "medium" });
         await checkpoint("validated");
+        const chunks = [];
+        for (let offset = 0; offset < facts.length; offset += 200) {
+          chunks.push(facts.slice(offset, offset + 200));
+        }
         const nextChunkIndex = Number.isInteger(state.nextChunkIndex) ? state.nextChunkIndex : 0;
-        if (nextChunkIndex < 0 || nextChunkIndex > 1) {
+        if (nextChunkIndex < 0 || nextChunkIndex > chunks.length) {
           throw processorError("DOUYIN_CHECKPOINT_INVALID", "抖店本机恢复分块位置无效。");
         }
-        if (nextChunkIndex === 0) {
+        for (let chunkIndex = nextChunkIndex; chunkIndex < chunks.length; chunkIndex += 1) {
           await uploadFactChunk({
             jobId: job.id,
             batchId,
@@ -88,16 +104,16 @@ export function createDouyinProcessor({
             schemaVersion: sourceVersion,
             sourceVersion,
             contentHash,
-            chunkIndex: 0,
+            chunkIndex,
             complete: false,
             expectedCount: null,
             coverage: null,
             confidence: null,
-            facts: [fact]
+            facts: chunks[chunkIndex]
           });
-          await checkpoint("uploading", { nextChunkIndex: 1 });
+          await checkpoint("uploading", { nextChunkIndex: chunkIndex + 1 });
         }
-        await checkpoint("uploading", { nextChunkIndex: 1 });
+        await checkpoint("uploading", { nextChunkIndex: chunks.length });
         const completed = await uploadFactChunk({
           jobId: job.id,
           batchId,
@@ -108,21 +124,21 @@ export function createDouyinProcessor({
           schemaVersion: sourceVersion,
           sourceVersion,
           contentHash,
-          chunkIndex: 1,
+          chunkIndex: chunks.length,
           complete: true,
-          expectedCount: 1,
+          expectedCount: facts.length,
           coverage,
           confidence: "medium",
           facts: []
         });
         const processed = {
           batchId,
-          rowCount: 1,
+          rowCount: facts.length,
           coverage,
           confidence: "medium",
           fileHash: contentHash,
           sourceVersion,
-          completedCount: completed?.completedCount ?? 1
+          completedCount: completed?.completedCount ?? facts.length
         };
         await checkpoint("submitted", { processed });
         return processed;

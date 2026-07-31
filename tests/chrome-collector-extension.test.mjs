@@ -33,6 +33,7 @@ test("extension source never evaluates remote code or accepts remote selectors",
     "providers/registry.js",
     "providers/kuaimai.js",
     "providers/douyin.js",
+    "providers/douyinApi.js",
     "providers/executors/kuaimai.js",
     "providers/executors/douyin.js"
   ];
@@ -126,6 +127,7 @@ test("Douyin content execution supports safe capture and official downloads only
   assert.match(contentScript, /executeDouyinTask/);
   assert.match(executor, /download_official_report|clickOfficialReport/);
   assert.match(executor, /captureStoreOverview/);
+  assert.match(executor, /collectDouyinProductDaily/);
   assert.match(executor, /DOUYIN_HUMAN_VERIFICATION_REQUIRED|classifyDouyinPage/);
   assert.match(executor, /近1天/);
   assert.match(executor, /userName/);
@@ -135,12 +137,17 @@ test("Douyin content execution supports safe capture and official downloads only
   assert.match(adapter, /route:\s*"\/shop\/live-overview"/);
   assert.match(adapter, /route:\s*"\/shop\/video\/overview"/);
   assert.match(serviceWorker, /result\?\.kind === "captured"/);
+  assert.match(serviceWorker, /"product_daily"/);
   assert.match(serviceWorker, /safeFileName/);
   assert.match(serviceWorker, /DOUYIN_PROFILE_STORE_ID_KEY/);
   assert.match(serviceWorker, /URLSearchParams/);
   assert.match(serviceWorker, /storeId/);
   assert.doesNotMatch(executor, /chrome\.(cookies|debugger|webRequest)/);
   assert.doesNotMatch(executor, /task\.(url|selector|script)/);
+  assert.ok(
+    manifest.web_accessible_resources.some(entry => entry.resources.includes("providers/douyinApi.js")),
+    "商品页执行器依赖的固定 API adapter 必须随扩展公开"
+  );
 });
 
 test("Douyin visible-number parsing only applies the unit attached to the primary value", async () => {

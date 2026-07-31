@@ -42,7 +42,8 @@ PR #159 据此回滚（见 #160）。
 
 ## 参数
 
-最小可用集：`begin_date`、`end_date`、`date_type=1`。
+商品日采集最小可用集：`begin_date`、`end_date`、`date_type=21`。`21` 是自定义日期，
+可稳定指定某一个业务日；页面“近 1 天”使用的滚动预设不能用于补历史日期。
 
 日期同时接受 `YYYY-MM-DD` 与 `YYYY/MM/DD HH:mm:ss`，实测均可取数。
 
@@ -60,10 +61,36 @@ PR #159 据此回滚（见 #160）。
 { st: 0, msg: "", data: { module_data: { ... } } }
 ```
 
-成功判据是 `st === 0` **且** `data.module_data` 非空。只看 `st` 会把空数据当成功。
+店铺汇总使用 `data.module_data`；商品列表使用：
+
+```json
+{
+  "st": 0,
+  "data": [
+    {
+      "cell_info": {
+        "product": {
+          "product_id_value": { "value": { "unit": "string", "value_str": "3718502021305860341" } },
+          "product_name_value": { "value": { "unit": "string", "value_str": "商品名称" } }
+        },
+        "pay_amt": {
+          "pay_amt_index_values": { "index_values": { "value": { "unit": "price", "value": 1519911 } } }
+        }
+      }
+    }
+  ],
+  "page_result": { "total": 134 }
+}
+```
+
+商品金额原值为分，标准事实写入前除以 100 转为元。当前商品接口可稳定映射商品 ID、商品名称、
+用户支付金额、成交订单数、成交人数、曝光人数和点击人数；SKU/69 码由商品主数据后续关联，
+退款、成交件数和平台成交金额在该接口没有事实来源，保持 `null`，不得补零或由名称推断。
+
+成功判据是 `st === 0` 且对应数据容器非空。商品列表还必须完整分页到
+`page_result.total`，商品 ID 唯一且非空；空页、重复 ID、分页总数变化或提前结束都失败且不入库。
 
 ## 尚未验证
 
-- 各接口返回字段与现有 `STORE_DAILY_FACT_KEYS` 等标准事实的映射完整性
+- 店铺、直播和短视频接口与标准事实的完整字段映射
 - 接口在扩展 content script 中的长期稳定性（内部接口无契约保证）
-- 分页资源（`channel_product_card_list` 带 `page_no`/`page_size`）的翻页终止条件

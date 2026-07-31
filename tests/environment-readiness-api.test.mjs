@@ -74,7 +74,11 @@ const WEB_COLLECTION_TABLES = [
   "web_collection_jobs",
   "web_collection_runs",
   "web_collection_cursors",
-  "web_collection_notifications"
+  "web_collection_notifications",
+  "collector_templates",
+  "collector_template_versions",
+  "collector_experimental_runs",
+  "collector_experimental_run_events"
 ];
 const COMMERCE_FACT_TABLES = [
   "commerce_fact_batches",
@@ -220,7 +224,9 @@ test("warning capabilities do not block an otherwise ready production environmen
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
       PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
-      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY,
+      COLLECTOR_EXPERIMENTAL_MODE: "0",
+      WEB_COLLECTION_EXPERIMENTAL_MODE: "0"
     },
     data: { session: { name: "员工", role: "product", department: "产品部" } }
   });
@@ -279,7 +285,9 @@ test("a server-only production data token can read readiness without an employee
       DINGTALK_APP_KEY: "configured",
       DINGTALK_APP_SECRET: "configured",
       PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
-      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY
+      DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY,
+      COLLECTOR_EXPERIMENTAL_MODE: "0",
+      WEB_COLLECTION_EXPERIMENTAL_MODE: "0"
     },
     data: {}
   });

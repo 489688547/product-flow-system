@@ -24,6 +24,36 @@ const STORE_DAILY_FACT_KEYS = Object.freeze([
   "productExposureUsers",
   "productClickUsers"
 ]);
+const PRODUCT_DAILY_FACT_KEYS = Object.freeze([
+  "productId",
+  "skuId",
+  "productName",
+  "skuName",
+  "merchantCode",
+  "exposureUsers",
+  "clickUsers",
+  "transactionBuyers",
+  "transactionOrderCount",
+  "transactionQuantity",
+  "transactionAmount",
+  "userPaymentAmount",
+  "refundOrderCount",
+  "refundQuantity",
+  "refundAmount"
+]);
+const PRODUCT_STRING_FIELDS = new Set(["skuId", "productName", "skuName", "merchantCode"]);
+const PRODUCT_NUMBER_FIELDS = new Set([
+  "exposureUsers",
+  "clickUsers",
+  "transactionBuyers",
+  "transactionOrderCount",
+  "transactionQuantity",
+  "transactionAmount",
+  "userPaymentAmount",
+  "refundOrderCount",
+  "refundQuantity",
+  "refundAmount"
+]);
 const RESULT_FIELDS = Object.freeze({
   downloaded: new Set(["kind", "jobId", "downloadId", "safeFileName", "pageType", "reportVersion"]),
   captured: new Set(["kind", "jobId", "resourceType", "facts", "pageType", "selectorVersion"]),
@@ -91,19 +121,61 @@ function validateResult(value) {
     }
   }
   if (value.kind === "captured") {
-    if (value.resourceType !== "store_daily") throw new Error("RESULT_CAPTURE_RESOURCE_INVALID");
+    if (!["store_daily", "product_daily"].includes(value.resourceType)) {
+      throw new Error("RESULT_CAPTURE_RESOURCE_INVALID");
+    }
     if (!SAFE_LABEL.test(String(value.pageType || "")) || !/^\d{4}-\d{2}-\d{2}$/.test(String(value.selectorVersion || ""))) {
       throw new Error("RESULT_CAPTURE_IDENTITY_INVALID");
     }
-    if (!value.facts || typeof value.facts !== "object" || Array.isArray(value.facts)) {
-      throw new Error("RESULT_CAPTURE_FACTS_INVALID");
-    }
-    const keys = Object.keys(value.facts);
-    if (keys.length !== STORE_DAILY_FACT_KEYS.length || keys.some(key => !STORE_DAILY_FACT_KEYS.includes(key))) {
-      throw new Error("RESULT_CAPTURE_FACTS_INVALID");
-    }
-    if (keys.some(key => value.facts[key] !== null && !Number.isFinite(value.facts[key]))) {
-      throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+    if (value.resourceType === "store_daily") {
+      if (!value.facts || typeof value.facts !== "object" || Array.isArray(value.facts)) {
+        throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+      }
+      const keys = Object.keys(value.facts);
+      if (keys.length !== STORE_DAILY_FACT_KEYS.length || keys.some(key => !STORE_DAILY_FACT_KEYS.includes(key))) {
+        throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+      }
+      if (keys.some(key => value.facts[key] !== null && !Number.isFinite(value.facts[key]))) {
+        throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+      }
+    } else {
+      if (!Array.isArray(value.facts) || value.facts.length < 1 || value.facts.length > 10_000) {
+        throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+      }
+      const productIds = new Set();
+      for (const fact of value.facts) {
+        const keys = fact && typeof fact === "object" && !Array.isArray(fact)
+          ? Object.keys(fact)
+          : [];
+        if (
+          keys.length !== PRODUCT_DAILY_FACT_KEYS.length
+          || keys.some(key => !PRODUCT_DAILY_FACT_KEYS.includes(key))
+        ) {
+          throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+        }
+        const productId = String(fact.productId || "");
+        if (!productId || /\s/.test(productId) || productId.length > 200 || productIds.has(productId)) {
+          throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+        }
+        productIds.add(productId);
+        if ([...PRODUCT_STRING_FIELDS].some(field => (
+          fact[field] !== null
+          && (
+            typeof fact[field] !== "string"
+            || !fact[field].trim()
+            || fact[field].length > 300
+            || /[\u0000-\u001f\u007f]/.test(fact[field])
+          )
+        ))) {
+          throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+        }
+        if ([...PRODUCT_NUMBER_FIELDS].some(field => (
+          fact[field] !== null
+          && (!Number.isFinite(fact[field]) || fact[field] < 0)
+        ))) {
+          throw new Error("RESULT_CAPTURE_FACTS_INVALID");
+        }
+      }
     }
   }
   if (["waiting_human", "failed", "schema_changed"].includes(value.kind)) {
@@ -119,7 +191,7 @@ async function readJson(request) {
   let bytes = 0;
   for await (const chunk of request) {
     bytes += chunk.length;
-    if (bytes > 64 * 1024) throw new Error("REQUEST_TOO_LARGE");
+    if (bytes > 2 * 1024 * 1024) throw new Error("REQUEST_TOO_LARGE");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");

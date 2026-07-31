@@ -74,7 +74,7 @@ test("Douyin adapter classifies login and verification as human work without byp
   });
 });
 
-test("Douyin store capture accepts only the fixed atomic fact schema", async () => {
+test("Douyin page capture accepts only fixed store and product fact schemas", async () => {
   const {
     STORE_DAILY_FACT_KEYS,
     validateDouyinCapture
@@ -110,9 +110,40 @@ test("Douyin store capture accepts only the fixed atomic fact schema", async () 
     () => validateDouyinCapture({ ...capture, cookie: "secret" }),
     error => error?.code === "DOUYIN_CAPTURE_UNSAFE_FIELDS"
   );
+  const productCapture = {
+    kind: "captured",
+    resourceType: "product_daily",
+    facts: [{
+      productId: "3718502021305860341",
+      skuId: null,
+      productName: "莓果冻干主粮",
+      skuName: null,
+      merchantCode: null,
+      exposureUsers: 48_100,
+      clickUsers: 3_346,
+      transactionBuyers: 575,
+      transactionOrderCount: 593,
+      transactionQuantity: null,
+      transactionAmount: null,
+      userPaymentAmount: 15_199.11,
+      refundOrderCount: null,
+      refundQuantity: null,
+      refundAmount: null
+    }],
+    pageType: "shop_compass_product",
+    selectorVersion: "2026-07-31"
+  };
+  assert.deepEqual(validateDouyinCapture(productCapture), productCapture);
   assert.throws(
-    () => validateDouyinCapture({ ...capture, resourceType: "product_daily" }),
-    error => error?.code === "DOUYIN_CAPTURE_RESOURCE_INVALID"
+    () => validateDouyinCapture({ ...productCapture, facts: [] }),
+    error => error?.code === "DOUYIN_CAPTURE_SCHEMA_INVALID"
+  );
+  assert.throws(
+    () => validateDouyinCapture({
+      ...productCapture,
+      facts: [{ ...productCapture.facts[0], productId: "", customerMobile: "13800000000" }]
+    }),
+    error => error?.code === "DOUYIN_CAPTURE_SCHEMA_INVALID"
   );
   assert.throws(
     () => validateDouyinCapture({ ...capture, facts: { ...facts, customerMobile: "13800000000" } }),
@@ -143,6 +174,10 @@ test("Douyin tasks use fixed pages and fixed official-report actions", async () 
           { action: "download_official_report", resourceType: "store_daily" },
           { action: "capture_store_fallback", businessDate: "2026-07-23" }
         ]
+      : resourceType === "product_daily"
+        ? [
+            { action: "capture_product_api", businessDate: "2026-07-23" }
+          ]
       : [
           { action: "apply_business_date", businessDate: "2026-07-23" },
           { action: "download_official_report", resourceType }

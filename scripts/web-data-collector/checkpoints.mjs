@@ -3,13 +3,15 @@ import { join } from "node:path";
 
 const CHECKPOINT_STAGES = new Set([
   "opening",
+  "executing",
   "waiting_download",
   "downloaded",
   "archived",
   "parsed",
   "validated",
   "uploading",
-  "submitted"
+  "submitted",
+  "completed"
 ]);
 const RESULT_FIELDS = new Set([
   "kind",
@@ -39,6 +41,13 @@ const PROCESSED_FIELDS = new Set([
   "fileHash",
   "sourceVersion",
   "completedCount"
+]);
+const EXECUTION_FIELDS = new Set([
+  "templateId",
+  "templateVersion",
+  "contentHash",
+  "nextStepIndex",
+  "variables"
 ]);
 
 function assertJobId(value) {
@@ -162,6 +171,82 @@ function validateResume(resume) {
   return normalized;
 }
 
+function checkpointError(code, message) {
+  return Object.assign(new Error(message), { code });
+}
+
+function validateSafeValue(value, depth = 0) {
+  if (depth > 8) {
+    throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点变量嵌套过深。");
+  }
+  if (value === null || ["string", "number", "boolean"].includes(typeof value)) {
+    if (typeof value === "string" && value.length > 200_000) {
+      throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点变量过长。");
+    }
+    return value;
+  }
+  if (Array.isArray(value)) {
+    if (value.length > 10_000) {
+      throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点变量数组过大。");
+    }
+    return value.map(item => validateSafeValue(item, depth + 1));
+  }
+  if (!value || typeof value !== "object") {
+    throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点变量类型无效。");
+  }
+  const entries = Object.entries(value);
+  if (entries.length > 1_000) {
+    throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点变量字段过多。");
+  }
+  if (entries.some(([key]) => SENSITIVE_FIELD.test(key))) {
+    throw checkpointError("COLLECTOR_RESULT_SENSITIVE", "本机检查点变量包含敏感字段。");
+  }
+  return Object.fromEntries(entries.map(([key, nested]) => [
+    key,
+    validateSafeValue(nested, depth + 1)
+  ]));
+}
+
+function validateExecution(value) {
+  assertObjectFields(value, EXECUTION_FIELDS, "实验执行信息");
+  const templateId = String(value.templateId || "");
+  const templateVersion = Number(value.templateVersion);
+  const nextStepIndex = Number(value.nextStepIndex);
+  if (
+    !/^[-_.:a-zA-Z0-9]{1,160}$/.test(templateId)
+    || !Number.isInteger(templateVersion)
+    || templateVersion < 1
+    || !Number.isInteger(nextStepIndex)
+    || nextStepIndex < 0
+    || nextStepIndex > 10_000
+  ) {
+    throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点实验执行信息无效。");
+  }
+  return {
+    templateId,
+    templateVersion,
+    contentHash: validateHash(value.contentHash),
+    nextStepIndex,
+    variables: validateSafeValue(value.variables || {})
+  };
+}
+
+function assertExpectedExecution(saved, expected) {
+  if (!expected) return;
+  const identity = {
+    templateId: String(expected.templateId || ""),
+    templateVersion: Number(expected.templateVersion),
+    contentHash: String(expected.contentHash || "").toLowerCase()
+  };
+  if (
+    saved?.templateId !== identity.templateId
+    || saved?.templateVersion !== identity.templateVersion
+    || saved?.contentHash !== identity.contentHash
+  ) {
+    throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点不属于当前模板版本。");
+  }
+}
+
 export function createCheckpointStore({
   rootDir,
   now = () => new Date(),
@@ -190,6 +275,9 @@ export function createCheckpointStore({
           : {}),
         ...(checkpoint.resume !== undefined
           ? { resume: validateResume(checkpoint.resume) }
+          : {}),
+        ...(checkpoint.execution !== undefined
+          ? { execution: validateExecution(checkpoint.execution) }
           : {})
       };
       await fs.mkdir(rootDir, { recursive: true, mode: 0o700 });
@@ -203,7 +291,7 @@ export function createCheckpointStore({
         updatedAt: saved.updatedAt
       };
     },
-    async load(inputJobId) {
+    async load(inputJobId, options = {}) {
       const jobId = assertJobId(inputJobId);
       try {
         const parsed = JSON.parse(await fs.readFile(join(rootDir, `${jobId}.json`), "utf8"));
@@ -212,6 +300,12 @@ export function createCheckpointStore({
         }
         if (parsed.result !== undefined) parsed.result = validateResult(parsed.result, jobId);
         if (parsed.resume !== undefined) parsed.resume = validateResume(parsed.resume);
+        if (parsed.execution !== undefined) {
+          parsed.execution = validateExecution(parsed.execution);
+          assertExpectedExecution(parsed.execution, options.execution);
+        } else if (options.execution) {
+          throw checkpointError("COLLECTOR_CHECKPOINT_INVALID", "本机检查点缺少模板版本。");
+        }
         return parsed;
       } catch (error) {
         if (error?.code === "ENOENT") return null;

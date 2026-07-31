@@ -4,7 +4,8 @@ import test from "node:test";
 import {
   assertBusinessDateMatchesRange,
   assertCollectionFileMatchesTask,
-  createCommerceFactUploader
+  createCommerceFactUploader,
+  experimentalModeEnabled
 } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 import {
@@ -47,6 +48,13 @@ const job = {
   businessDate: "2026-07-21",
   scheduleVersion: "v1"
 };
+
+test("experimental mode is off by default and requires an explicit runner switch", () => {
+  assert.equal(experimentalModeEnabled(), false);
+  assert.equal(experimentalModeEnabled("0"), false);
+  assert.equal(experimentalModeEnabled("1"), true);
+  assert.equal(experimentalModeEnabled("enabled"), true);
+});
 
 test("orchestrator schedules all extension-implemented Kuaimai resources after 10:00", async () => {
   const api = apiDouble(job);
@@ -344,6 +352,146 @@ test("dedicated runtime fetches assigned stores and completes a short browser ac
     { storeId: "90862283", executor: "dedicated" }
   ]);
   assert.equal(calls.some(([name]) => name === "submitResult"), true);
+});
+
+test("collector runtime executes an assigned experimental bundle through the versioned run API", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  assert.equal(typeof createExperimentalRunCycle, "function", "createExperimentalRunCycle must be implemented");
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        calls.push(["assigned"]);
+        return {
+          runs: [{
+            run: { id: "run-1", version: 1 },
+            executionBundle: {
+              runId: "run-1",
+              runnerId: "runner-1",
+              templateId: "research",
+              version: 1,
+              contentHash: "a".repeat(64),
+              expiresAt: "2026-07-30T10:15:00.000Z",
+              template: { mode: "experimental" }
+            }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input, key) {
+        calls.push(["action", runId, input.action, input.expectedVersion, key]);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3,
+            status: input.action === "start" ? "running" : "completed"
+          }
+        };
+      }
+    },
+    executeRun: async bundle => {
+      calls.push(["execute", bundle.runId]);
+      return {
+        runId: bundle.runId,
+        status: "completed",
+        quality: {
+          requiredFieldsComplete: true,
+          storeMatched: true,
+          businessDateMatched: true,
+          schemaMatched: true,
+          coverage: 1
+        }
+      };
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 1, waitingHuman: 0, failed: 0 });
+  assert.deepEqual(calls.map(call => call.slice(0, 3)), [
+    ["assigned"],
+    ["action", "run-1", "start"],
+    ["execute", "run-1"],
+    ["action", "run-1", "complete"]
+  ]);
+  assert.match(calls[1][4], /^collector-run:run-1:start:1$/);
+  assert.match(calls[3][4], /^collector-run:run-1:complete:2$/);
+});
+
+test("collector runtime reports safe failure without sending local output or paths", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        return {
+          runs: [{
+            run: { id: "run-1", version: 1 },
+            executionBundle: { runId: "run-1" }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input) {
+        calls.push(input);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3
+          }
+        };
+      }
+    },
+    executeRun: async () => {
+      throw Object.assign(new Error("failed at /Users/employee/report.xlsx token=secret"), {
+        code: "COLLECTOR_COMMAND_FAILED"
+      });
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 0, waitingHuman: 0, failed: 1 });
+  assert.equal(calls.at(-1).action, "fail");
+  assert.equal(calls.at(-1).errorCode, "COLLECTOR_COMMAND_FAILED");
+  assert.doesNotMatch(JSON.stringify(calls.at(-1)), /Users|report\.xlsx|token=|secret/i);
+});
+
+test("collector runtime pauses for human verification without recording a failed run", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        return {
+          runs: [{
+            run: { id: "run-human", version: 1 },
+            executionBundle: { runId: "run-human" }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input) {
+        calls.push([runId, input]);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3
+          }
+        };
+      }
+    },
+    executeRun: async () => {
+      throw Object.assign(new Error("验证码页面包含用户手机号"), {
+        code: "COLLECTOR_HUMAN_VERIFICATION_REQUIRED"
+      });
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 0, waitingHuman: 1, failed: 0 });
+  assert.equal(calls.at(-1)[1].action, "wait_human");
+  assert.equal(calls.at(-1)[1].errorCode, "COLLECTOR_HUMAN_VERIFICATION_REQUIRED");
+  assert.equal(calls.at(-1)[1].safeSummary, "请在公司 Mac 完成人工验证后重试。");
+  assert.equal(calls.some(([, input]) => input.action === "fail"), false);
 });
 
 test("dedicated runtime resumes a downloaded checkpoint without repeating browser work", async () => {
@@ -734,6 +882,59 @@ test("Douyin captured store facts are validated and completed as one immutable b
   assert.equal(uploads.length, 2);
   assert.equal(uploads[0].facts[0].storeId, "store-a");
   assert.equal(uploads[1].complete, true);
+});
+
+test("Douyin captured product facts are normalized and completed as one immutable batch", async () => {
+  const uploads = [];
+  const processor = createDouyinProcessor({
+    uploadFactChunk: async input => {
+      uploads.push(input);
+      return { completedCount: input.expectedCount };
+    }
+  });
+  const captured = {
+    kind: "captured",
+    resourceType: "product_daily",
+    facts: [{
+      productId: "3718502021305860341",
+      skuId: null,
+      productName: "莓果冻干主粮",
+      skuName: null,
+      merchantCode: null,
+      exposureUsers: 48_100,
+      clickUsers: 3_346,
+      transactionBuyers: 575,
+      transactionOrderCount: 593,
+      transactionQuantity: null,
+      transactionAmount: null,
+      userPaymentAmount: 15_199.11,
+      refundOrderCount: null,
+      refundQuantity: null,
+      refundAmount: null
+    }],
+    pageType: "shop_compass_product",
+    selectorVersion: "2026-07-31"
+  };
+
+  const processed = await processor.process({
+    job: {
+      id: "douyin-product-job-1",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "product_daily",
+      businessDate: "2026-07-30"
+    },
+    result: captured
+  });
+
+  assert.equal(processed.rowCount, 1);
+  assert.equal(processed.confidence, "medium");
+  assert.equal(uploads.length, 2);
+  assert.equal(uploads[0].facts[0].productId, "3718502021305860341");
+  assert.equal(uploads[0].facts[0].businessDate, "2026-07-30");
+  assert.equal(uploads[0].facts[0].userPaymentAmount, 15_199.11);
+  assert.equal(uploads[1].complete, true);
+  assert.equal(uploads[1].expectedCount, 1);
 });
 
 test("Douyin processor resumes after an uploaded chunk and checkpoints final submission", async () => {
