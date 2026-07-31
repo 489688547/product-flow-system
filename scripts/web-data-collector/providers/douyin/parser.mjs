@@ -435,6 +435,15 @@ const SELF_SERVICE_FACT_MAP = Object.freeze({
       transactionOrderCount: "transactionOrderCount",
       transactionBuyerCount: "transactionBuyers"
     })
+  }),
+  video_daily: Object.freeze({
+    perRow: true,
+    identity: Object.freeze({ videoId: "videoId" }),
+    // 短视频给的是「短视频用户支付金额」，与成交金额是两个口径，绝不能填进 transactionAmount。
+    numbers: Object.freeze({
+      userPaymentAmount: "userPaymentAmount",
+      transactionOrderCount: "transactionOrderCount"
+    })
   })
 });
 

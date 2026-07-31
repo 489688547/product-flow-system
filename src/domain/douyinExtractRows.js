@@ -40,10 +40,15 @@ export const COLUMNS_BY_DIMENSION = Object.freeze({
     直播间名称: "liveRoomName",
     直播开始时间: "liveStartedAt"
   }),
+  // 短视频的列名又是另一套：支付金额叫「短视频用户支付金额」，不是「用户支付金额」。
+  // 三个维度三套列名，这也是必须按维度登记而不是共用一张表的原因。
   video: Object.freeze({
-    ...SHARED_COLUMNS,
     统计日期: "statPeriod",
-    视频标题: "videoTitle"
+    店铺名称: "storeName",
+    短视频ID: "videoId",
+    视频类型: "videoType",
+    成交订单数: "transactionOrderCount",
+    短视频用户支付金额: "userPaymentAmount"
   })
 });
 

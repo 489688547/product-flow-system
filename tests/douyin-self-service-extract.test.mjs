@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  DIMENSIONS_PENDING_METRICS,
+  metricsFor,
   GRANULARITY_BY_DIMENSION,
   METRICS_BY_DIMENSION,
   MAX_RANGE_DAYS,
@@ -28,11 +28,11 @@ test("粒度登记 value 而不只是文案：回读 checked 才能确认真选�
 
 test("时间粒度随维度取值，不能一律用自然日累计", () => {
   // 四个维度的粒度选项并不通用（2026-07-30 在专用浏览器逐个实测）：
-  // 店铺/商品有自然日累计，直播只有开播日期累计与分钟级，短视频只有挂车/非挂车/统计日期累计。
-  // 原先写死自然日累计，直播与短视频根本没有该选项，报的却是 GRANULARITY_MISSING，
-  // 与真正原因隔了好几步。
+  // 店铺/商品有 统计日期/自然日/自然周/自然月，直播只有 开播日期累计/分钟级，
+  // 短视频只有 统计日期累计（平台配置接口逐条核对过）。原先写死自然日累计，
+  // 直播与短视频根本没有该选项，报的却是 GRANULARITY_MISSING，与真正原因隔了好几步。
   assert.equal(buildExtractPlan({ resourceType: "store_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "自然日累计");
-  assert.equal(GRANULARITY_BY_DIMENSION.product.label, "自然日累计"); // 商品的指标尚未实测，只断言粒度登记
+  assert.equal(buildExtractPlan({ resourceType: "product_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "自然日累计");
   assert.equal(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "开播日期累计");
   assert.equal(buildExtractPlan({ resourceType: "video_daily", from: "2026-07-29", to: "2026-07-29" }).granularity, "统计日期累计");
 });
@@ -120,15 +120,21 @@ test("店铺仍带上成交人数与投放金额：它们是面板撤下指标�
   const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-29", to: "2026-07-29" });
   assert.ok(plan.metricValues.includes("pay_ucnt"));
   assert.ok(plan.metricValues.includes("ad_receive_amt"), "投放金额是支出与广告费用的来源");
-  assert.equal(plan.metricCategory, "成交");
+  assert.deepEqual(plan.metricCategories, ["1"], "成交分类在店铺口径下编号是 1");
 });
 
-test("未实测的维度必须拒绝取数，不能凭猜测下单", () => {
-  // 商品维度的成交分类当时点不动（点击落在 label 空白处），指标没取到。
-  // 猜一组 value 不会报错，只会采回错位的数字。
-  assert.ok(DIMENSIONS_PENDING_METRICS.includes("product"));
+test("只有店铺有「成交金额」，其余三个维度都只有用户支付金额", () => {
+  // 与平台配置接口逐条核对过。混填会造出看起来权威的错值。
+  assert.equal(METRICS_BY_DIMENSION.shop.metrics.transactionAmount, "income_amt");
+  for (const dimension of ["product", "live", "video"]) {
+    assert.equal("transactionAmount" in METRICS_BY_DIMENSION[dimension].metrics, false, dimension);
+    assert.ok(METRICS_BY_DIMENSION[dimension].metrics.userPaymentAmount, dimension);
+  }
+});
+
+test("未登记的维度拒绝取数，不能凭猜测下单", () => {
   assert.throws(
-    () => buildExtractPlan({ resourceType: "product_daily", from: "2026-07-29", to: "2026-07-29" }),
+    () => metricsFor("未知维度"),
     error => error.code === "DOUYIN_EXTRACT_METRICS_UNVERIFIED"
   );
 });

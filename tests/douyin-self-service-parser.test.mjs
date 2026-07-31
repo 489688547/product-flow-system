@@ -60,9 +60,27 @@ test("直播不得凭用户支付金额冒充成交金额", async () => {
 });
 
 test("未登记入库口径的维度直接拒绝，不猜", async () => {
+  // 商品维度的取数口径已登记（与平台配置接口核对过），但导出文件的列名还没实测，
+  // 没见过就不登记入库映射——猜错不报错，只会采回错位的数字。
   const file = await csv([SHOP_HEADER, ["20260730-20260730", "20260730", "TIYES", "1", "1", "1", "1"]]);
   await assert.rejects(
     readDouyinSelfServiceReport(file, { ...参数, resourceType: "product_daily" }),
     error => error.code === "DOUYIN_RESOURCE_NOT_COVERED"
   );
+});
+
+test("短视频：列名是「短视频用户支付金额」，且绝不填进成交金额", async () => {
+  // 三个维度三套列名。短视频给的是用户支付金额，与成交金额是两个口径——
+  // 表里原先没有对应列，只能丢数或冒充成交金额，后者会造出看起来权威的错值。
+  // 数值取自 2026-07-30 真实下载到的文件。
+  const file = await csv([
+    ["统计日期", "成交订单数", "短视频ID", "店铺名称", "视频类型", "短视频用户支付金额"],
+    ["20260730-20260730", "166", "7656752002734728307", "TIYES", "挂车", "4113.11"]
+  ], "采集-video-ecom_video-20260730-20260730.csv");
+  const result = await readDouyinSelfServiceReport(file, { ...参数, resourceType: "video_daily" });
+  assert.equal(result.facts.length, 1);
+  assert.equal(result.facts[0].videoId, "7656752002734728307");
+  assert.equal(result.facts[0].userPaymentAmount, 4113.11);
+  assert.equal(result.facts[0].transactionOrderCount, 166);
+  assert.equal(result.facts[0].transactionAmount, null, "成交金额没采就是没采");
 });

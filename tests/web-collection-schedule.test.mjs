@@ -242,3 +242,29 @@ test("抖音日事实标记走自助取数，其它保持原样", () => {
   assert.equal("viaSelfService" in 抖音快照, false, "快照类不走自助取数");
   assert.equal("viaSelfService" in 快麦, false, "别的平台不受影响");
 });
+
+test("自助取数任务超过平台每日配额时，排计划阶段就挡住", () => {
+  // 排超了不会在排计划时出问题，而是跑到第 6 条才被平台拒掉：前 5 条已经排进队列，
+  // 看起来一切正常，唯独有个资源今天永远采不到，失败信息还只说「每天仅支持创建5条任务」。
+  const 六个资源 = ["store_daily", "product_daily", "live_daily", "video_daily", "a_daily", "b_daily"]
+    .map(type => ({ type, rangeKind: "daily_fact" }));
+  assert.throws(
+    () => createDailyPlan({
+      now: new Date("2026-07-31T12:00:00+08:00"),
+      adapters: [{ id: "douyin-ecommerce", storeId: "90862283", resources: 六个资源 }]
+    }),
+    /超过平台配额 5 条/
+  );
+});
+
+test("四个资源正好在配额内", () => {
+  const plan = createDailyPlan({
+    now: new Date("2026-07-31T12:00:00+08:00"),
+    adapters: [{
+      id: "douyin-ecommerce",
+      storeId: "90862283",
+      resources: ["store_daily", "product_daily", "live_daily", "video_daily"].map(type => ({ type, rangeKind: "daily_fact" }))
+    }]
+  });
+  assert.equal(plan.filter(job => job.viaSelfService).length, 4);
+});

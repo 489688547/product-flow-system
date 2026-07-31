@@ -88,6 +88,9 @@ const RESOURCE_SCHEMAS = Object.freeze({
       "transactionOrderCount",
       "transactionQuantity",
       "transactionAmount",
+      // 自助取数给的是「短视频用户支付金额」，与成交金额是两个口径。
+      // 没有这一列就只能丢数或冒充成交金额，后者会造出看起来权威的错值。
+      "userPaymentAmount",
       "refundOrderCount",
       "refundAmount"
     ])

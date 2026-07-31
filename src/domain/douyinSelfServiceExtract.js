@@ -47,6 +47,16 @@ export const METRICS_BY_DIMENSION = Object.freeze({
       adContributedRatio: "ad_receive_amt_ratio"
     })
   }),
+  product: Object.freeze({
+    categories: Object.freeze(["1"]),
+    // 商品维度同样没有「成交金额」，只有用户支付金额——四个维度里只有店铺有 income_amt。
+    metrics: Object.freeze({
+      userPaymentAmount: "pay_amt",
+      transactionOrderCount: "pay_cnt",
+      transactionBuyerCount: "pay_ucnt",
+      transactionQuantity: "pay_combo_cnt"
+    })
+  }),
   live: Object.freeze({
     // 要两个分类：成交（2）之外还要基础信息（1），因为必须把 live_start_ts 取回来。
     //
@@ -73,11 +83,10 @@ export const METRICS_BY_DIMENSION = Object.freeze({
   })
 });
 
-// 商品维度的成交分类尚未取到：勾选分类的点击落在 label 中心而不在复选框上，
-// 点了不生效（回读 checked 仍为 false）。驱动改成点复选框自身后需重新实测，
-// 在实测前不登记猜测值——猜错了不会报错，只会采回一堆错位的数字。
-export const DIMENSIONS_PENDING_METRICS = Object.freeze(["product"]);
-
+// 登记表不是靠点页面摸出来的，而是与平台的配置接口逐条核对过
+// （GET /data_factory/download/config?main_dimension=…&date_type=…&edition=2，
+// 它返回该维度可选的粒度、指标分类与每类下的指标）。提交前还会再核一次，
+// 平台改了什么会被当场指出来，而不是采回一个少列的文件才发现。
 export function metricsFor(dimension) {
   const entry = METRICS_BY_DIMENSION[dimension];
   if (!entry) {
@@ -89,17 +98,20 @@ export function metricsFor(dimension) {
   return entry;
 }
 
-// 时间粒度选项随主要维度变化，四个维度并不通用（2026-07-30 在专用浏览器里逐个实测）：
+// 时间粒度选项随主要维度变化，四个维度并不通用（与平台配置接口逐条核对）：
 //
-// | 维度   | 可选粒度 |
-// |--------|----------|
-// | shop   | 统计日期累计 / 自然日累计 / 自然周累计 / 自然月累计 |
-// | product| 同上 |
-// | live   | 开播日期累计 / 分钟级 |
-// | video  | 挂车 / 非挂车 / 统计日期累计 |
+// | 维度    | 可选粒度 |
+// |---------|----------|
+// | shop    | 统计日期累计 / 自然日累计 / 自然周累计 / 自然月累计 |
+// | product | 同上 |
+// | live    | 开播日期累计 / 分钟级 |
+// | video   | 只有统计日期累计 |
 //
 // 原先写死「自然日累计」，直播与短视频根本没有这个选项，找不到控件后报的却是
 // GRANULARITY_MISSING，与真正原因隔了好几步。
+//
+// 顺带纠正一处早期在 DOM 上的误读：短视频那组「挂车 / 非挂车」不是粒度，
+// 是另一个字段 video_type。
 //
 // 选取原则是「能还原到业务日」：店铺与商品用自然日累计；直播用开播日期累计——
 // 直播的天然单位是场次，按开播日归集才对得上业务日；短视频只有统计日期累计，
@@ -118,6 +130,23 @@ export const SINGLE_DAY_ONLY_DIMENSIONS = Object.freeze(["video"]);
 
 // 单次统计周期最长 3 个月，超出会被表单拒绝。补历史时必须按此切段。
 export const MAX_RANGE_DAYS = 92;
+
+// 每天只能建 5 条任务（2026-07-31 实测，第 6 条直接被拒：「每天仅支持创建5条任务」）。
+//
+// 这条硬约束直接改变规划方式：
+// - 每天四个资源各一条正好 4 条，只剩 1 条余量，失败重试就要烧配额；
+// - 因此提交前的配置核对不是可有可无的——一次白建的任务吃掉当日 20% 的配额；
+// - 补历史要靠长区间：店铺/商品/直播一条能覆盖 92 天，短视频只能单日，
+//   也就是说短视频每天最多补 5 天，14 个月的历史用自助取数补不动。
+export const DAILY_TASK_QUOTA = 5;
+
+// 短视频必须指定视频类型，传空串会被拒（「请选择视频类型(挂车/非挂车)」）。
+//
+// 只采挂车：挂车视频才挂着商品，成交金额是归到它头上的。非挂车是否也有成交尚未验证
+// ——当天配额已用尽，没能建成对照任务。要采的话得另占一条配额，而且任务名必须带上
+// 视频类型，否则两批数据会撞名（平台按名称判重）。
+export const VIDEO_TYPES = Object.freeze({ ecom: "ecom_video", unecom: "unecom_video" });
+export const DEFAULT_VIDEO_TYPE = VIDEO_TYPES.ecom;
 
 // 页面提示「取数完成等待时间一般至少为 10-20 分钟」，且队列全平台共用。
 // 超时留足余量：宁可等，也不要把还在排队的任务判成失败后重复创建，
@@ -142,7 +171,7 @@ function daysBetween(from, to) {
 
 // 任务名称要能在任务列表里被唯一认出来：列表只给名称、创建人、状态、创建日期，
 // 没有业务字段，靠名称回找是唯一可行的关联方式。
-export function buildTaskName({ resourceType, from, to } = {}) {
+export function buildTaskName({ resourceType, from, to, videoType = "" } = {}) {
   const dimension = PRIMARY_DIMENSIONS[resourceType];
   if (!dimension) {
     throw Object.assign(new Error(`资源 ${resourceType} 未登记主要维度。`), {
@@ -151,7 +180,10 @@ export function buildTaskName({ resourceType, from, to } = {}) {
   }
   const start = assertDate(from, "开始日期");
   const end = assertDate(to, "结束日期");
-  return `采集-${dimension}-${start.replace(/-/g, "")}-${end.replace(/-/g, "")}`;
+  // 短视频的挂车与非挂车是两批数据，名字必须区分：平台按名称判重，同名会被拒，
+  // 而被拒也照样耗掉一次尝试。
+  const slice = videoType ? `-${videoType}` : "";
+  return `采集-${dimension}${slice}-${start.replace(/-/g, "")}-${end.replace(/-/g, "")}`;
 }
 
 export function buildExtractPlan({ resourceType, from, to } = {}) {
@@ -181,8 +213,10 @@ export function buildExtractPlan({ resourceType, from, to } = {}) {
     });
   }
   const { categories, metrics } = metricsFor(dimension);
+  const videoType = dimension === "video" ? DEFAULT_VIDEO_TYPE : "";
   return {
-    taskName: buildTaskName({ resourceType, from: start, to: end }),
+    taskName: buildTaskName({ resourceType, from: start, to: end, videoType }),
+    videoType,
     dimension,
     from: start,
     to: end,
