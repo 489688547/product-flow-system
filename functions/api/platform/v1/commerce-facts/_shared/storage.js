@@ -2,7 +2,9 @@ import {
   COMMERCE_FACT_RESOURCES,
   commerceFactIdentity,
   commerceFactsInternals,
-  deriveCommerceMetrics
+  deriveCommerceMetrics,
+  isDistrustedSource,
+  selectTrustedDailyFacts
 } from "../../../../../../src/domain/commerceFacts.js";
 import { routeError } from "./http.js";
 
@@ -250,11 +252,13 @@ export async function queryCommerceFacts(db, input) {
     params.push(filters[key]);
   }
   const [factsResult, batchesResult] = await Promise.all([
-    db.prepare(`SELECT f.* FROM ${table} f
+    // 带上批次的完成时间：同一业务日可能有多行（事实行的 id 里含批次，重采不覆盖旧行
+    // 而是再插一条），要靠它挑出最新的那条。原先按 f.id 排序取第一条，取到哪条全看哈希。
+    db.prepare(`SELECT f.*, b.completed_at AS batch_completed_at FROM ${table} f
       INNER JOIN commerce_fact_batches b ON b.id = f.batch_id AND b.status = 'completed'
       WHERE f.provider_id = ? AND f.store_id = ? AND f.business_date >= ? AND f.business_date <= ?
       ${dimensionSql}
-      ORDER BY f.business_date, f.id`).bind(...params).all(),
+      ORDER BY f.business_date, b.completed_at`).bind(...params).all(),
     db.prepare(`SELECT business_date, completed_at, coverage, confidence, source_version
       FROM commerce_fact_batches
       WHERE status = 'completed' AND provider_id = ? AND store_id = ? AND resource_type = ?
@@ -268,7 +272,16 @@ export async function queryCommerceFacts(db, input) {
   const completedAt = batches.map(row => row.completed_at).filter(Boolean).sort();
   const coverageValues = batches.map(row => row.coverage).filter(value => value !== null && value !== undefined).map(Number);
   return {
-    facts: (factsResult?.results || []).map(row => mapFact(row, filters.resourceType)),
+    // store_daily 一天一行，去重后展示；其余资源一天多行是正常的（一个商品/一场直播一行），
+    // 只过滤不可信来源。
+    facts: filters.resourceType === "store_daily"
+      ? selectTrustedDailyFacts((factsResult?.results || []).map(row => ({
+        ...mapFact(row, filters.resourceType),
+        batchCompletedAt: row.batch_completed_at
+      })))
+      : (factsResult?.results || [])
+        .map(row => mapFact(row, filters.resourceType))
+        .filter(fact => !isDistrustedSource(fact.sourceVersion)),
     quality: {
       source: filters.providerId,
       latestDate: dates.at(-1) || null,
