@@ -43,6 +43,7 @@ import {
   DEFAULT_DOUYIN_ARCHIVE_ROOT
 } from "./providers/douyin/index.mjs";
 import { createDouyinExtractApi } from "./browser/providers/douyinExtractApi.js";
+import { createDouyinHomepageApi } from "./browser/providers/douyinHomepageApi.js";
 import { createDouyinExtractRunner } from "./browser/providers/douyinExtractRunner.js";
 
 function argument(argv, name, fallback = "") {
@@ -250,6 +251,7 @@ async function serve({
       downloadsDirectory
     }),
     createExtractApi: createDouyinExtractApi,
+    createHomepageApi: createDouyinHomepageApi,
     createExtractRunner: createDouyinExtractRunner
   });
   const dedicatedRuntime = browserMode === "dedicated"

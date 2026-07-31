@@ -49,6 +49,12 @@ export const DOUYIN_DEDICATED_RESOURCES = Object.freeze({
 export const SELF_SERVICE_URL = "https://compass.jinritemai.com/shop/workshop/appcustom-access?tab=access";
 
 import { usesSelfService } from "../../../../src/domain/douyinSelfServiceExtract.js";
+import { withinHomepageWindow } from "../../../../src/domain/douyinHomepageApi.js";
+
+// 业务日一律按 Asia/Shanghai 判定，不看运行机器的时区。
+function shanghaiToday() {
+  return new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
 
 const REGISTERED_URLS = new Set([
   ...Object.values(DOUYIN_DEDICATED_RESOURCES).map(resource => resource.url),
@@ -272,6 +278,7 @@ export function createDouyinDedicatedExecutor({
   createController,
   createExtractRunner = null,
   createExtractApi = null,
+  createHomepageApi = null,
   // 轮询的等待也由外部注入，测试才能把 45 分钟的等待压缩成瞬间。
   wait: waitImpl = ms => new Promise(resolve => setTimeout(resolve, ms))
 }) {
@@ -332,6 +339,28 @@ export function createDouyinDedicatedExecutor({
         // 它也是唯一能回溯 14 个月、且能拿到成交订单数与成交人数的路径。
         //
         // 请求在页面上下文里发，登录态由专用浏览器自己带，采集器不接触任何凭据。
+        // 首页接口是即时通道：秒级返回、不占自助取数的每日 5 条配额，并且直接带广告费。
+        // 只覆盖店铺整体，且近1天口径只回溯约两天——超出窗口就退回自助取数。
+        //
+        // 走接口而不是读页面：首页每张指标卡里挨着本店值、较上期、同行顶尖三个数，
+        // 按标签就近找数字必然抓错，store_daily 曾因此显示 314 万成交订单数。
+        if (createHomepageApi && task.resourceType === "store_daily"
+          && withinHomepageWindow(task.businessDate, shanghaiToday())) {
+          const homepage = createHomepageApi({ controller, evaluate: controller.evaluate });
+          const facts = await homepage.readStoreDaily({
+            businessDate: task.businessDate,
+            storeId: task.storeId
+          });
+          return {
+            kind: "captured",
+            jobId: task.jobId,
+            resourceType: "store_daily",
+            facts,
+            pageType: "shop_compass_homepage",
+            selectorVersion: "douyin-homepage-v1"
+          };
+        }
+
         if (usesSelfService(task)) {
           // 通道没接线时必须明确失败，不能悄悄退回逐页导出：那条路采回来的是另一个
           // 口径的数据，看起来一切正常，错值却已经入库了。
