@@ -52,6 +52,15 @@ const REGISTERED_URLS = new Set([
   ...Object.values(DOUYIN_DEDICATED_RESOURCES).map(resource => resource.url),
   SELF_SERVICE_URL
 ]);
+
+// 取数文件的地址带变动的 task_id，没法逐个登记。但也不能因此把白名单放宽成模糊匹配
+// ——白名单的意义就是「只去该去的地方」。这里只放行这一个端点，且 task_id 必须是纯数字。
+const DOWNLOAD_FILE_PATTERN = /^https:\/\/compass\.jinritemai\.com\/data_factory\/download_file\?task_id=\d+$/;
+
+export function isRegisteredDouyinUrl(url) {
+  const text = String(url || "");
+  return REGISTERED_URLS.has(text) || DOWNLOAD_FILE_PATTERN.test(text);
+}
 const SELECTOR_VERSION = "2026-07-25";
 
 const INSPECT_SNAPSHOT_EXPRESSION = `(() => {
@@ -257,7 +266,13 @@ function validateStoreCapture(capture) {
   };
 }
 
-export function createDouyinDedicatedExecutor({ createController, createExtractRunner = null }) {
+export function createDouyinDedicatedExecutor({
+  createController,
+  createExtractRunner = null,
+  createExtractApi = null,
+  // 轮询的等待也由外部注入，测试才能把 45 分钟的等待压缩成瞬间。
+  wait: waitImpl = ms => new Promise(resolve => setTimeout(resolve, ms))
+}) {
   if (typeof createController !== "function") {
     throw douyinError("DOUYIN_BROWSER_CONTROLLER_REQUIRED", "抖店专用浏览器控制器未配置。");
   }
@@ -310,12 +325,21 @@ export function createDouyinDedicatedExecutor({ createController, createExtractR
           return terminalResult(task, "failed", "DOUYIN_STORE_MISMATCH", "专用 Chrome 当前登录的店铺与任务不一致。");
         }
 
-        // 自助取数走独立通道：页面日期控件只认可信事件，扩展发不出，
-        // 而这里是专用浏览器，CDP Input 域可以。它也是唯一能回溯 14 个月的路径。
-        if (task.viaSelfService && createExtractRunner) {
+        // 自助取数走独立通道：它直接调罗盘的取数接口（建任务/查任务/取文件），
+        // 不驱动页面表单——表单只能靠视口坐标点，元素动一下就点空且不报错。
+        // 它也是唯一能回溯 14 个月、且能拿到成交订单数与成交人数的路径。
+        //
+        // 请求在页面上下文里发，登录态由专用浏览器自己带，采集器不接触任何凭据。
+        if (task.viaSelfService) {
+          // 通道没接线时必须明确失败，不能悄悄退回逐页导出：那条路采回来的是另一个
+          // 口径的数据，看起来一切正常，错值却已经入库了。
+          if (!createExtractRunner || !createExtractApi) {
+            return terminalResult(task, "failed", "DOUYIN_EXTRACT_CHANNEL_UNAVAILABLE", "自助取数通道未接线。");
+          }
           await controller.open(SELF_SERVICE_URL);
           await onCheckpoint("waiting_download");
-          const runner = createExtractRunner({ controller });
+          const api = createExtractApi({ controller, evaluate: controller.evaluate });
+          const runner = createExtractRunner({ api, wait: waitImpl });
           const { plan } = await runner.run({
             resourceType: task.resourceType,
             from: task.businessDate,
@@ -434,17 +458,68 @@ export function createCdpDouyinController({
 
   // 元素位置由页面自己给出，避免在采集器里硬编码坐标——罗盘一改版坐标就失效，
   // 而且失效时不会报错，只会点空。
-  async function trustedClickElement(selectorExpression, missingCode, missingMessage) {
-    const box = await evaluate(`(() => {
+  //
+  // 但「量一次就点」不够：元素在测量与点击之间只要动一下，坐标就落到别处，
+  // 而坐标仍在页面内，所以不会报错。这一条今天连着造成三次故障——
+  // 粒度选项没选中、日期面板打不开、点 25 号点成了正上方的 18 号（差整整一行），
+  // 全因为展开动画或重绘还没停。
+  //
+  // 所以要等位置稳定：连续两次量到同一个位置才算停了，再点。
+  // 还要保证点击坐标真的落在视口里。CDP 的鼠标事件按视口坐标派发，坐标在视口外
+  // 就什么都点不到，而且不会报错。实测日期面板展开在页面底部：视口高 1092，
+  // 面板占 925~1218，25 号格子在 y=1109，整行都在屏幕外，
+  // elementFromPoint 返回 null——点了等于没点。
+  async function measureElement(selectorExpression) {
+    return evaluate(`(() => {
       const target = ${selectorExpression};
       if (!target) return null;
-      const rect = target.getBoundingClientRect();
+      let rect = target.getBoundingClientRect();
       if (!rect.width || !rect.height) return null;
-      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+      const outside = r => {
+        const x = r.left + r.width / 2;
+        const y = r.top + r.height / 2;
+        return x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight;
+      };
+      if (outside(rect)) {
+        target.scrollIntoView({ block: "center", inline: "center" });
+        rect = target.getBoundingClientRect();
+      }
+      return {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+        offscreen: outside(rect)
+      };
     })()`);
-    if (!box) throw douyinError(missingCode, missingMessage);
-    await trustedClickAt(box.x, box.y);
-    return box;
+  }
+
+  async function trustedClickElement(selectorExpression, missingCode, missingMessage) {
+    let previous = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const box = await measureElement(selectorExpression);
+      if (!box) throw douyinError(missingCode, missingMessage);
+      if (box.offscreen) {
+        // 滚过之后仍在视口外：继续点只会点到空白处，还会顺手关掉弹层。
+        if (attempt >= 6) {
+          throw douyinError(
+            "DOUYIN_ELEMENT_OFFSCREEN",
+            `${missingMessage}（元素在视口外 x=${Math.round(box.x)} y=${Math.round(box.y)}，滚动后仍无法点击）`
+          );
+        }
+        previous = null;
+        await new Promise(resolve => setTimeout(resolve, 250));
+        continue;
+      }
+      if (previous && Math.abs(previous.x - box.x) < 1 && Math.abs(previous.y - box.y) < 1) {
+        await trustedClickAt(box.x, box.y);
+        return box;
+      }
+      previous = box;
+      await new Promise(resolve => setTimeout(resolve, 180));
+    }
+    throw douyinError(
+      "DOUYIN_ELEMENT_NOT_SETTLED",
+      `${missingMessage}（元素位置持续变动，无法安全点击）`
+    );
   }
 
   // 文本同样要用可信事件写入。今天在快麦与罗盘上反复验证：程序化写 value 只改显示，
@@ -457,25 +532,49 @@ export function createCdpDouyinController({
     }
   }
 
-  // 清空输入框：全选后输入即覆盖。不用 value = "" ——同样进不了表单模型。
+  // 清空输入框。实测 CDP 的全选组合键（Ctrl 与 Meta 都试过）在罗盘的输入框上不生效：
+  // 新文本被插在光标处而不是覆盖，任务名称先超出 40 字上限，表单卡在
+  // 「任务名称已达字符上限」不再往下渲染，后续所有控件都找不到。表现却是
+  // GRANULARITY_MISSING，与真正原因隔了好几步——这类连锁误导只有真跑才看得见。
+  //
+  // 因此改用最笨也最可靠的方式：先把光标移到末尾，再按住退格逐字符删空。
   async function trustedClearAndType(selectorExpression, text, missingCode, missingMessage) {
     await trustedClickElement(selectorExpression, missingCode, missingMessage);
-    await pageSession.send("Input.dispatchKeyEvent", {
-      type: "keyDown", modifiers: 4, key: "a", code: "KeyA", windowsVirtualKeyCode: 65
-    });
-    await pageSession.send("Input.dispatchKeyEvent", {
-      type: "keyUp", modifiers: 4, key: "a", code: "KeyA", windowsVirtualKeyCode: 65
-    });
+    const current = await evaluate(`(() => {
+      const el = document.activeElement;
+      return el && typeof el.value === "string" ? el.value.length : 0;
+    })()`);
+    const length = Number(current) || 0;
+    for (const key of ["End", "ArrowRight"]) {
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyDown", key, code: key, windowsVirtualKeyCode: key === "End" ? 35 : 39 });
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyUp", key, code: key, windowsVirtualKeyCode: key === "End" ? 35 : 39 });
+    }
+    // 多删几次留余量：光标位置无法完全确定，多按的退格作用在空串上无副作用。
+    for (let index = 0; index < length + 8; index += 1) {
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+      await pageSession.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
+    }
     await trustedTypeText(text);
+    // 写完必须核对：写歪了会连锁触发别处的报错，在那里才发现就晚了。
+    const written = await evaluate(`(() => {
+      const el = document.activeElement;
+      return el && typeof el.value === "string" ? el.value : "";
+    })()`);
+    if (String(written) !== String(text)) {
+      throw douyinError("DOUYIN_EXTRACT_TEXT_NOT_APPLIED", `输入框内容为「${written}」，与预期「${text}」不符。`);
+    }
   }
 
   return Object.freeze({
+    // 表单驱动需要读页面状态（日历月份、表单校验结果），因此对外暴露。
+    // 此前只在控制器内部可见，接线时才发现缺口——又一处 stub 测试抓不到的问题。
+    evaluate,
     trustedClickAt,
     trustedClickElement,
     trustedTypeText,
     trustedClearAndType,
     async open(url) {
-      if (!REGISTERED_URLS.has(url)) {
+      if (!isRegisteredDouyinUrl(url)) {
         throw douyinError("DOUYIN_URL_NOT_REGISTERED", "抖店页面未在采集器登记。");
       }
       const response = await fetchImpl(`${endpoint}/json`);

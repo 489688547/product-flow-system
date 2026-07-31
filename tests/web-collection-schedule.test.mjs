@@ -217,3 +217,28 @@ test("每日排程不得早于上午 10 点", () => {
   const 上午十点 = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-26T10:00:00+08:00" });
   assert.ok(上午十点.length > 0, "10 点起应正常排程");
 });
+
+test("抖音日事实标记走自助取数，其它保持原样", () => {
+  // 逐页导出拿不到成交订单数与成交人数，页面标签又抓错过；
+  // 自助取数是这两项目前已知的唯一可信来源。
+  const plan = createDailyPlan({
+    now: new Date("2026-07-30T12:00:00+08:00"),
+    adapters: [
+      {
+        id: "douyin-ecommerce",
+        storeId: "90862283",
+        resources: [
+          { type: "store_daily", rangeKind: "daily_fact" },
+          { type: "product_list", rangeKind: "current_snapshot" }
+        ]
+      },
+      { id: "kuaimai", storeId: "1", resources: [{ type: "sales_items", rangeKind: "daily_fact" }] }
+    ]
+  });
+  const 抖音日事实 = plan.find(job => job.providerId === "douyin-ecommerce" && job.resourceType === "store_daily");
+  const 抖音快照 = plan.find(job => job.resourceType === "product_list");
+  const 快麦 = plan.find(job => job.providerId === "kuaimai");
+  assert.equal(抖音日事实.viaSelfService, true);
+  assert.equal("viaSelfService" in 抖音快照, false, "快照类不走自助取数");
+  assert.equal("viaSelfService" in 快麦, false, "别的平台不受影响");
+});

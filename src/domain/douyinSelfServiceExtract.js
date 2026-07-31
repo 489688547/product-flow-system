@@ -16,24 +16,105 @@ export const PRIMARY_DIMENSIONS = Object.freeze({
   video_daily: "video"
 });
 
-// 指标复选框带语义化 value（2026-07-30 在页面上抓取），按 value 选比按标签文字选
-// 稳得多——文案随时可能改，value 是接口字段名。
+// 指标不是四个维度通用的，而且指标面板还有一层分类筛选（2026-07-30 在专用浏览器逐维度实测）。
 //
-// 特别注意 pay_cnt 与 pay_ucnt：成交订单数与成交人数正是 store_daily 靠页面标签
-// 抓错、已从面板撤下的两个指标（面板曾显示 314 万单、257 万人，实际 GMV 仅 6.5 万）。
-// 罗盘首页接口不返回它们，自助取数是目前已知的唯一可信来源。
-export const EXTRACT_METRICS = Object.freeze({
-  transactionAmount: "income_amt",
-  userPaymentAmount: "pay_amt",
-  transactionOrderCount: "pay_cnt",
-  transactionBuyerCount: "pay_ucnt",
-  netTransactionAmount: "net_income_amt",
-  adContributedAmount: "ad_receive_amt",
-  adContributedRatio: "ad_receive_amt_ratio"
+// 两处结构必须同时说清，否则报错会指向错误的方向：
+//
+// 一、指标 value 随维度变，连同名指标都不同名：
+//     店铺「成交订单数」= pay_cnt，直播是 live_room_pay_cnt，短视频是 video_pay_cnt。
+//     更要紧的是直播与短视频**没有「成交金额」**，只有「用户支付金额」——
+//     两者口径不同，不能拿支付金额冒充成交金额填进 transactionAmount。
+//
+// 二、指标按分类筛选显示，未勾选的分类其指标根本不在 DOM 里：
+//     店铺默认停在「成交」，所以最初一眼就看到了 income_amt；
+//     直播与短视频默认停在「基础信息」，商品默认勾的是流量/预售/退款。
+//     不先勾分类就找指标，报的是「指标不可用」，真实原因却是「没勾分类」。
+//
+// 所以取指标前必须先勾中它所属的分类。
+export const METRICS_BY_DIMENSION = Object.freeze({
+  shop: Object.freeze({
+    categories: Object.freeze(["1"]),
+    // 罗盘首页接口不返回成交订单数与成交人数，而这两项正是 store_daily 靠页面标签
+    // 抓错、已从面板撤下的指标（面板曾显示 314 万单、257 万人，实际 GMV 仅 6.5 万）。
+    // 自助取数是目前已知的唯一可信来源：实测 07-25 是 3418 单 / 2810 人 / ¥67159。
+    metrics: Object.freeze({
+      transactionAmount: "income_amt",
+      userPaymentAmount: "pay_amt",
+      transactionOrderCount: "pay_cnt",
+      transactionBuyerCount: "pay_ucnt",
+      netTransactionAmount: "net_income_amt",
+      adContributedAmount: "ad_receive_amt",
+      adContributedRatio: "ad_receive_amt_ratio"
+    })
+  }),
+  live: Object.freeze({
+    // 要两个分类：成交（2）之外还要基础信息（1），因为必须把 live_start_ts 取回来。
+    //
+    // 直播导出是一行一个直播间、没有按天的「日期」列，统计日期给的是整段区间。
+    // 少了开播时间，就只能靠「我请求的是这几天」去推断业务日——那是推断，不是事实，
+    // 5 天的数据会被当成某一天入库。把开播时间取进来，业务日就在数据里。
+    categories: Object.freeze(["1", "2"]),
+    metrics: Object.freeze({
+      liveStartedAt: "live_start_ts",
+      userPaymentAmount: "live_room_pay_amt",
+      transactionOrderCount: "live_room_pay_cnt",
+      transactionBuyerCount: "live_room_pay_ucnt"
+    })
+  }),
+  video: Object.freeze({
+    categories: Object.freeze(["1", "2"]),
+    // 短视频不能照搬直播那招：它只有「统计日期累计」，给的是区间合计；
+    // 而发布时间也不能当业务日——5 月发的视频 7 月照样出单。
+    // 所以短视频只能一天一个任务，业务日由文件里的统计日期自证（见 SINGLE_DAY_ONLY_DIMENSIONS）。
+    metrics: Object.freeze({
+      userPaymentAmount: "video_pay_amt",
+      transactionOrderCount: "video_pay_cnt"
+    })
+  })
 });
 
-// 默认取这几项：既覆盖成交口径，也带上投放金额（支出与广告费用的来源）。
-export const DEFAULT_METRIC_VALUES = Object.freeze(Object.values(EXTRACT_METRICS));
+// 商品维度的成交分类尚未取到：勾选分类的点击落在 label 中心而不在复选框上，
+// 点了不生效（回读 checked 仍为 false）。驱动改成点复选框自身后需重新实测，
+// 在实测前不登记猜测值——猜错了不会报错，只会采回一堆错位的数字。
+export const DIMENSIONS_PENDING_METRICS = Object.freeze(["product"]);
+
+export function metricsFor(dimension) {
+  const entry = METRICS_BY_DIMENSION[dimension];
+  if (!entry) {
+    throw Object.assign(
+      new Error(`维度 ${dimension} 的指标尚未实测登记，不能凭猜测取数。`),
+      { code: "DOUYIN_EXTRACT_METRICS_UNVERIFIED" }
+    );
+  }
+  return entry;
+}
+
+// 时间粒度选项随主要维度变化，四个维度并不通用（2026-07-30 在专用浏览器里逐个实测）：
+//
+// | 维度   | 可选粒度 |
+// |--------|----------|
+// | shop   | 统计日期累计 / 自然日累计 / 自然周累计 / 自然月累计 |
+// | product| 同上 |
+// | live   | 开播日期累计 / 分钟级 |
+// | video  | 挂车 / 非挂车 / 统计日期累计 |
+//
+// 原先写死「自然日累计」，直播与短视频根本没有这个选项，找不到控件后报的却是
+// GRANULARITY_MISSING，与真正原因隔了好几步。
+//
+// 选取原则是「能还原到业务日」：店铺与商品用自然日累计；直播用开播日期累计——
+// 直播的天然单位是场次，按开播日归集才对得上业务日；短视频只有统计日期累计，
+// 它给的是区间合计，因此短视频必须按单日建任务，一天一个任务。
+// 登记 value 而不只是文案：文案随时可能改，value 是提交给接口的字段值；
+// 更重要的是按 value 选完可以回读 checked 确认，靠文案只能确认「点到了那几个字」。
+export const GRANULARITY_BY_DIMENSION = Object.freeze({
+  shop: Object.freeze({ value: "day", label: "自然日累计" }),
+  product: Object.freeze({ value: "day", label: "自然日累计" }),
+  live: Object.freeze({ value: "live_start_date", label: "开播日期累计" }),
+  video: Object.freeze({ value: "all", label: "统计日期累计" })
+});
+
+// 短视频只有区间合计粒度，跨多天会把几天混成一行，无法还原业务日。
+export const SINGLE_DAY_ONLY_DIMENSIONS = Object.freeze(["video"]);
 
 // 单次统计周期最长 3 个月，超出会被表单拒绝。补历史时必须按此切段。
 export const MAX_RANGE_DAYS = 92;
@@ -88,18 +169,29 @@ export function buildExtractPlan({ resourceType, from, to } = {}) {
     });
   }
   const span = daysBetween(start, end);
+  if (SINGLE_DAY_ONLY_DIMENSIONS.includes(dimension) && span > 1) {
+    throw Object.assign(
+      new Error(`${dimension} 维度只有区间合计粒度，跨 ${span} 天会混成一行，必须按单日建任务。`),
+      { code: "DOUYIN_EXTRACT_SINGLE_DAY_REQUIRED" }
+    );
+  }
   if (span > MAX_RANGE_DAYS) {
     throw Object.assign(new Error(`统计周期 ${span} 天超过单次上限 ${MAX_RANGE_DAYS} 天，需拆分。`), {
       code: "DOUYIN_EXTRACT_RANGE_TOO_LONG"
     });
   }
+  const { categories, metrics } = metricsFor(dimension);
   return {
     taskName: buildTaskName({ resourceType, from: start, to: end }),
     dimension,
     from: start,
     to: end,
-    // 自然日累计才会一行一天；统计日期累计给的是区间合计，无法还原到业务日。
-    granularity: "自然日累计"
+    granularity: GRANULARITY_BY_DIMENSION[dimension].label,
+    granularityValue: GRANULARITY_BY_DIMENSION[dimension].value,
+    metricCategories: categories,
+    metricValues: Object.freeze(Object.values(metrics)),
+    // 字段名 → 指标 value 的反查，供解析导出文件时对齐用。
+    metrics
   };
 }
 

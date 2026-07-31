@@ -29,6 +29,7 @@ test("viaSelfService 的任务走自助取数页面，不走逐页导出", async
   let ranWith = null;
   const executor = createDouyinDedicatedExecutor({
     createController: async () => controller,
+    createExtractApi: () => ({}),
     createExtractRunner: () => ({
       async run(input) { ranWith = input; return { plan: { taskName: "采集-live-20260729-20260729" } }; }
     })
@@ -64,8 +65,22 @@ test("文件未落盘时明确失败，不谎报成功", async () => {
   const controller = controllerStub({ async awaitDownload() { return null; } });
   const executor = createDouyinDedicatedExecutor({
     createController: async () => controller,
+    createExtractApi: () => ({}),
     createExtractRunner: () => ({ async run() { return { plan: { taskName: "x" } }; } })
   });
   const result = await executor.executeTask({ task, browser: { endpoint: "http://127.0.0.1:9222", profileKey: "douyin-ecommerce:90862283", online: true } });
   assert.equal(result.errorCode, "DOUYIN_EXTRACT_DOWNLOAD_MISSING");
+});
+
+test("自助取数通道没接线时明确失败，不悄悄退回逐页导出", async () => {
+  // 逐页导出采回的是另一个口径的数据，退回去不会报错，错值却已经入库了。
+  const controller = controllerStub({
+    async applyBusinessDate() { throw new Error("不该走到这里"); }
+  });
+  const executor = createDouyinDedicatedExecutor({ createController: async () => controller });
+  const result = await executor.executeTask({
+    task,
+    browser: { endpoint: "http://127.0.0.1:9222", profileKey: "douyin-ecommerce:90862283", online: true }
+  });
+  assert.equal(result.errorCode, "DOUYIN_EXTRACT_CHANNEL_UNAVAILABLE");
 });

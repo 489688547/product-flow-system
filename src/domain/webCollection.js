@@ -149,7 +149,13 @@ export function createDailyPlan({
           businessDate,
           rangeKind,
           range: rangeFor(rangeKind, businessDate, timeZone),
-          scheduleVersion: String(resource.scheduleVersion || "v1")
+          scheduleVersion: String(resource.scheduleVersion || "v1"),
+          // 抖音的日事实统一走自助取数：逐页导出拿不到成交订单数与成交人数，
+          // 页面标签又抓错过（曾显示 314 万单 / 257 万人，实际 GMV 仅 6.5 万），
+          // 而自助取数是这两项目前已知的唯一可信来源，也是唯一能回溯 14 个月的路径。
+          ...(providerId === "douyin-ecommerce" && rangeKind === "daily_fact"
+            ? { viaSelfService: true }
+            : {})
         };
         plan.push({ ...job, idempotencyKey: webCollectionJobKey(job) });
       }

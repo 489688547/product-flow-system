@@ -18,7 +18,7 @@ test("真实控制器提供执行器调用的每个方法", () => {
   });
   for (const name of [
     "open", "inspect", "applyBusinessDate", "downloadOfficialReport",
-    "captureStoreDaily", "awaitDownload",
+    "captureStoreDaily", "awaitDownload", "evaluate",
     "trustedClickAt", "trustedClickElement", "trustedTypeText", "trustedClearAndType"
   ]) {
     assert.equal(typeof controller[name], "function", `控制器缺少 ${name}`);
@@ -35,4 +35,13 @@ test("采集主路径不得用可选链调用控制器方法", () => {
   for (const match of code.matchAll(/controller\.(\w+)\?\.\(/g)) {
     assert.ok(兜底方法.has(match[1]), `采集主路径不得可选链调用 controller.${match[1]}`);
   }
+});
+
+test("下载地址按端点放行，不把白名单放宽成模糊匹配", async () => {
+  const { isRegisteredDouyinUrl } = await import("../scripts/web-data-collector/browser/providers/douyin.mjs");
+  assert.equal(isRegisteredDouyinUrl("https://compass.jinritemai.com/data_factory/download_file?task_id=7668269421552205839"), true);
+  // 白名单的意义就是「只去该去的地方」，这几种都必须挡住。
+  assert.equal(isRegisteredDouyinUrl("https://compass.jinritemai.com/data_factory/download_file?task_id=abc"), false);
+  assert.equal(isRegisteredDouyinUrl("https://compass.jinritemai.com/data_factory/download_file?task_id=1&next=evil"), false);
+  assert.equal(isRegisteredDouyinUrl("https://evil.example.com/data_factory/download_file?task_id=1"), false);
 });

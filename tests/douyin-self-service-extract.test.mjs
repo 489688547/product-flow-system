@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  DEFAULT_METRIC_VALUES,
-  EXTRACT_METRICS,
+  DIMENSIONS_PENDING_METRICS,
+  GRANULARITY_BY_DIMENSION,
+  METRICS_BY_DIMENSION,
   MAX_RANGE_DAYS,
   PRIMARY_DIMENSIONS,
   TASK_TIMEOUT_MS,
@@ -19,9 +20,30 @@ test("四个资源都登记了主要维度", () => {
   });
 });
 
-test("时间粒度必须是自然日累计", () => {
-  // 统计日期累计给的是区间合计，无法还原到业务日；一行一天才能入库。
-  assert.equal(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "自然日累计");
+test("粒度登记 value 而不只是文案：回读 checked 才能确认真选中了", () => {
+  assert.equal(GRANULARITY_BY_DIMENSION.shop.value, "day");
+  assert.equal(GRANULARITY_BY_DIMENSION.live.value, "live_start_date");
+  assert.equal(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-29", to: "2026-07-29" }).granularityValue, "live_start_date");
+});
+
+test("时间粒度随维度取值，不能一律用自然日累计", () => {
+  // 四个维度的粒度选项并不通用（2026-07-30 在专用浏览器逐个实测）：
+  // 店铺/商品有自然日累计，直播只有开播日期累计与分钟级，短视频只有挂车/非挂车/统计日期累计。
+  // 原先写死自然日累计，直播与短视频根本没有该选项，报的却是 GRANULARITY_MISSING，
+  // 与真正原因隔了好几步。
+  assert.equal(buildExtractPlan({ resourceType: "store_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "自然日累计");
+  assert.equal(GRANULARITY_BY_DIMENSION.product.label, "自然日累计"); // 商品的指标尚未实测，只断言粒度登记
+  assert.equal(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "开播日期累计");
+  assert.equal(buildExtractPlan({ resourceType: "video_daily", from: "2026-07-29", to: "2026-07-29" }).granularity, "统计日期累计");
+});
+
+test("短视频跨天必须拒绝：它只有区间合计粒度", () => {
+  // 跨多天会把几天混成一行，无法还原到业务日——落库后就是一天的数字冒充多天。
+  assert.throws(
+    () => buildExtractPlan({ resourceType: "video_daily", from: "2026-07-25", to: "2026-07-29" }),
+    error => error.code === "DOUYIN_EXTRACT_SINGLE_DAY_REQUIRED"
+  );
+  assert.doesNotThrow(() => buildExtractPlan({ resourceType: "video_daily", from: "2026-07-29", to: "2026-07-29" }));
 });
 
 test("任务名称可回找，且区分资源与区间", () => {
@@ -84,17 +106,29 @@ test("未超时继续等，不重复创建任务", () => {
   assert.deepEqual(planExtractWait({ startedAt: 0, now: 60_000, state: "pending" }), { action: "wait" });
 });
 
-test("指标按语义化 value 选择，不按标签文字", () => {
-  // 文案随时可能改，value 是接口字段名，稳定得多。
-  assert.equal(EXTRACT_METRICS.transactionOrderCount, "pay_cnt");
-  assert.equal(EXTRACT_METRICS.transactionBuyerCount, "pay_ucnt");
-  assert.ok(DEFAULT_METRIC_VALUES.includes("ad_receive_amt"), "默认应带上投放金额，它是支出与广告费用的来源");
+test("指标按维度登记，直播与短视频不得冒充成交金额", () => {
+  // 同名指标在不同维度下 value 不同；更要紧的是直播与短视频没有「成交金额」，
+  // 只有「用户支付金额」，两者口径不同，混填会造出看起来权威的错值。
+  assert.equal(METRICS_BY_DIMENSION.shop.metrics.transactionOrderCount, "pay_cnt");
+  assert.equal(METRICS_BY_DIMENSION.live.metrics.transactionOrderCount, "live_room_pay_cnt");
+  assert.equal(METRICS_BY_DIMENSION.video.metrics.transactionOrderCount, "video_pay_cnt");
+  assert.equal("transactionAmount" in METRICS_BY_DIMENSION.live.metrics, false);
+  assert.equal("transactionAmount" in METRICS_BY_DIMENSION.video.metrics, false);
 });
 
-test("默认指标覆盖已撤下的订单数与人数", () => {
-  // 这两个指标因 store_daily 抓错已从面板撤下（曾显示 314 万单、257 万人，
-  // 实际 GMV 仅 6.5 万）。罗盘首页接口不返回它们，自助取数是已知唯一可信来源，
-  // 因此必须默认取到，否则面板永远补不回这两列。
-  assert.ok(DEFAULT_METRIC_VALUES.includes("pay_cnt"));
-  assert.ok(DEFAULT_METRIC_VALUES.includes("pay_ucnt"));
+test("店铺仍带上成交人数与投放金额：它们是面板撤下指标的唯一可信来源", () => {
+  const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-29", to: "2026-07-29" });
+  assert.ok(plan.metricValues.includes("pay_ucnt"));
+  assert.ok(plan.metricValues.includes("ad_receive_amt"), "投放金额是支出与广告费用的来源");
+  assert.equal(plan.metricCategory, "成交");
+});
+
+test("未实测的维度必须拒绝取数，不能凭猜测下单", () => {
+  // 商品维度的成交分类当时点不动（点击落在 label 空白处），指标没取到。
+  // 猜一组 value 不会报错，只会采回错位的数字。
+  assert.ok(DIMENSIONS_PENDING_METRICS.includes("product"));
+  assert.throws(
+    () => buildExtractPlan({ resourceType: "product_daily", from: "2026-07-29", to: "2026-07-29" }),
+    error => error.code === "DOUYIN_EXTRACT_METRICS_UNVERIFIED"
+  );
 });
