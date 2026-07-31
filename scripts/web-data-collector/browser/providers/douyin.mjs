@@ -357,7 +357,10 @@ export function createDouyinDedicatedExecutor({
             resourceType: "store_daily",
             facts,
             pageType: "shop_compass_homepage",
-            selectorVersion: "douyin-homepage-v1"
+            selectorVersion: "douyin-homepage-v1",
+            // 必须显式给出来源：否则处理器会按老规矩加上 douyin-store-capture- 前缀，
+            // 而那个前缀会被读取层当作页面抓取整批过滤掉。
+            sourceVersion: "douyin-homepage-v1"
           };
         }
 

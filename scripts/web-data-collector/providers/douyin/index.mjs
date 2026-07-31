@@ -64,9 +64,13 @@ export function createDouyinProcessor({
         ) {
           throw processorError("DOUYIN_CAPTURE_RESOURCE_INVALID", "页面读数资源与抖店任务不匹配。");
         }
-        const sourceVersion = job.resourceType === "store_daily"
+        // 执行器给了来源就用它的。首页接口也走 captured 这条路，但它绝不能被叫成
+        // douyin-store-capture-*——那个前缀是页面标签抓取的标记，会被读取层当作不可信
+        // 整批过滤掉（见 src/domain/commerceFacts.js 的 isDistrustedSource）。
+        // 即：采回来的好数据会被自己的过滤器扔掉，而且不报错。
+        const sourceVersion = result.sourceVersion || (job.resourceType === "store_daily"
           ? `douyin-store-capture-${result.selectorVersion}`
-          : `douyin-product-api-${result.selectorVersion}`;
+          : `douyin-product-api-${result.selectorVersion}`);
         const capturedFacts = job.resourceType === "store_daily"
           ? [result.facts]
           : result.facts;

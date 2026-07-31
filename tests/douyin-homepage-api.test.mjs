@@ -90,3 +90,18 @@ test("回溯窗口约两天，超出的日期不该走这条路", () => {
   assert.equal(withinHomepageWindow("2026-07-29", "2026-07-31"), true);
   assert.equal(withinHomepageWindow("2026-07-28", "2026-07-31"), false);
 });
+
+test("首页来源不得被叫成 douyin-store-capture-*", async () => {
+  // 首页接口也走 captured 这条路，处理器按老规矩会加 douyin-store-capture- 前缀，
+  // 而那个前缀被读取层当作页面标签抓取整批过滤掉——采回来的好数据会被自己的过滤器
+  // 扔掉，而且不报错。
+  const { isDistrustedSource } = await import("../src/domain/commerceFacts.js");
+  const { buildHomepageFacts } = await import("../src/domain/douyinHomepageApi.js");
+  const fact = buildHomepageFacts(
+    { income_amt: 65449.76, pay_cnt: 3265 },
+    { businessDate: "2026-07-30", storeId: "90862283" }
+  );
+  assert.equal(fact.sourceVersion, "douyin-homepage-v1");
+  assert.equal(isDistrustedSource(fact.sourceVersion), false);
+  assert.equal(isDistrustedSource(`douyin-store-capture-${fact.sourceVersion}`), true, "加上前缀就会被过滤，所以不能加");
+});
