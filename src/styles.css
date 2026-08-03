@@ -2757,6 +2757,13 @@ main { min-width: 0; overflow-x: clip; background: var(--canvas); }
 .ai-provider-error { padding: var(--space-4); display: flex; align-items: center; gap: var(--space-3); color: var(--danger); }
 .ai-provider-error span { flex: 1; }
 .ai-provider-settings :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* 登录面板的操作列：两个按钮之间必须留白。
+   不留白会渲染成「打开登录页重新采集」，读起来像一个词——实测在 dev 站上就是这样。 */
+.platform-login-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.platform-login-actions .platform-login-note { flex-basis: 100%; margin: 0; }
+/* 判据时间与操作说明都是次要文字，沿用页面里既有的次要文字规格。 */
+.platform-login-note { color: var(--text-tertiary); font-size: 11px; }
+
 .data-settings-workspace { border: 1px solid var(--border); border-radius: var(--radius-panel); background: var(--surface); }
 .data-settings-toolbar { padding: var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); border-bottom: 1px solid var(--border); }
 .data-settings-workspace fieldset { margin: 0; padding: var(--space-4); border: 0; display: grid; grid-template-columns: repeat(4, minmax(150px, 1fr)); gap: var(--space-3); }

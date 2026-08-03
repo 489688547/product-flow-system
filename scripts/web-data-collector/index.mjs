@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createHash, randomBytes } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import os from "node:os";
 import { mkdir, readdir, stat } from "node:fs/promises";
 import path, { dirname, resolve } from "node:path";
@@ -181,6 +182,27 @@ async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
 // 改完扩展代码必须重载 Chrome 扩展才生效，否则一直跑旧代码。这一点极难察觉：
 // 表现为「改完没效果」，只能靠失败耗时之类的间接线索才判断得出来。把扩展源码的
 // 最新修改时间当指纹随任务轮询带给扩展，扩展空闲时自行重载。
+// 采集器自身的代码指纹：取几个关键文件的内容哈希，与 git 提交无关——
+// 即使有人在工作区改了文件没提交，这个值也会变。
+async function sourceFingerprint() {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const files = [
+    "orchestrator.mjs",
+    "browser/providers/douyin.mjs",
+    "browser/providers/douyinExtractApi.js",
+    "browser/providers/douyinHomepageApi.js"
+  ];
+  const hash = createHash("sha256");
+  for (const name of files) {
+    try {
+      hash.update(await readFile(resolve(here, name)));
+    } catch {
+      hash.update(`missing:${name}`);
+    }
+  }
+  return hash.digest("hex").slice(0, 12);
+}
+
 const EXTENSION_SOURCE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../chrome-extension/company-data-collector");
 let cachedSourceStamp = { at: 0, value: "" };
 
@@ -352,6 +374,10 @@ async function serve({
   process.once("SIGTERM", () => void stop().then(() => process.exit(0)));
   return {
     status: "serving",
+    // 启动时把代码指纹打出来。出过一次说不清的事：代码验证过是对的、进程也是新的，
+    // 但线上行为像是旧代码——当时无法判断跑的到底是哪份代码。
+    // 有了这个，下次一眼就能对上（与 git rev-parse HEAD 比对即可）。
+    codeVersion: await sourceFingerprint(),
     host: "127.0.0.1",
     port: bridge.port,
     extensionId: EXTENSION_ID,
