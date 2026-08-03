@@ -176,6 +176,12 @@ function countLatestSyncAttention(syncRuns = []) {
   return [...latestBySource.values()].filter(run => !["success", "healthy"].includes(String(run.status || ""))).length;
 }
 
+// 同步覆盖按这个天数逐日判定缺数，喂给它的事实必须至少覆盖同样长度。
+// 曾经服务端 SQL 写 LIMIT 8、前端又各自写 limit = 8，而判定按 14 天，
+// 结果最早的 6 天被判成「数据缺失」误报——实际每天都有 520~553 行、13~15 万元。
+// 两处各写一遍就会漂，因此收敛成一个常量。
+export const DAILY_FACTS_WINDOW_DAYS = 14;
+
 export function defaultDataCenterRange(today = new Date()) {
   const to = previousDay(shanghaiDate(today));
   return { from: `${to.slice(0, 7)}-01`, to };
