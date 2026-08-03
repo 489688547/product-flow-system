@@ -27,6 +27,12 @@ function safeErrorCode(value, fallback = "WEB_COLLECTION_LOCAL_PROCESSING_FAILED
 // 快麦就是靠这条继续跑的。
 const DEDICATED_PROVIDERS = new Set(["douyin-ecommerce"]);
 
+// 任务分发只在这一处发生，出问题时必须能从日志看出「谁领走了什么」。
+// 不打日志的话，只能从失败记录反推，而失败记录不记录是哪个执行器跑的。
+function logRouting(message) {
+  process.stdout.write(`[routing] ${new Date().toISOString()} ${message}\n`);
+}
+
 export function createWebCollectorOrchestrator({
   api,
   processors,
@@ -158,8 +164,19 @@ export function createWebCollectorOrchestrator({
       await transition("claimed", "opening");
       // 抖音的任务留给专用浏览器下一轮来取，不交给扩展；
       // 别的平台的任务留给扩展下一轮来取，不交给专用浏览器。
-      if (executor !== "dedicated" && 归专用浏览器(activeJob)) return null;
-      if (executor === "dedicated" && 不该给专用浏览器(activeJob)) return null;
+      //
+      // 这里打日志是因为出过一次说不清的事：代码与执行器都验证过会扣下抖音任务，
+      // 但生产上抖音任务仍被扩展执行了。静态分析解释不了，只能让下一次运行自己说话——
+      // 日志里没有「扣下」而抖音又被扩展跑了，就说明跑的根本不是这份代码。
+      if (executor !== "dedicated" && 归专用浏览器(activeJob)) {
+        logRouting(`扣下 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate}：归专用浏览器，不交给扩展`);
+        return null;
+      }
+      if (executor === "dedicated" && 不该给专用浏览器(activeJob)) {
+        logRouting(`扣下 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate}：不归专用浏览器，留给扩展`);
+        return null;
+      }
+      logRouting(`派发 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate} → ${executor}`);
       return safeTask(activeJob);
     },
     recordBrowserStatus(status = {}) {
