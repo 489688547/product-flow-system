@@ -230,20 +230,31 @@ const UNIFIED_CALIBER_RESOURCES = Object.freeze(["sales_items", "order_items"]);
       setResultMessage("该平台当前没有待重采的任务。");
       return;
     }
+    // 点之前先说清会排多少条。实测一次排了 34 条，而抖音自助取数每天只有 5 条配额，
+    // 超出的部分注定当天失败——不先说清，人会以为「重采」就等于「今天能补齐」。
+    const 提示 = providerId === "douyin-ecommerce"
+      ? `将重新排队 ${targets.length} 条任务。抖音自助取数每天限 5 条，超出的会等明天。继续？`
+      : `将重新排队 ${targets.length} 条任务。继续？`;
+    if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(提示)) return;
+
     setRecollecting(providerId);
     setResultMessage("");
     setResultError("");
     try {
-      for (const job of targets) {
-        await triggerWebCollection({
-          providerId: job.providerId,
-          storeId: job.storeId || "",
-          resourceType: job.resourceType,
-          businessDate: job.businessDate,
-          force: true
-        });
+      // 并发触发。逐条 await 的话 34 条要走 34 个来回，按钮会静止在「正在排队…」
+      // 四十秒——看不出还要多久，也看不出有没有卡死。
+      const results = await Promise.allSettled(targets.map(job => triggerWebCollection({
+        providerId: job.providerId,
+        storeId: job.storeId || "",
+        resourceType: job.resourceType,
+        businessDate: job.businessDate,
+        force: true
+      })));
+      const 失败 = results.filter(item => item.status === "rejected").length;
+      if (失败) {
+        setResultError(`${providerId} 有 ${失败} 条重新排队失败，其余 ${targets.length - 失败} 条已排队。`);
       }
-      setResultMessage(`${providerId} 的 ${targets.length} 条任务已重新排队。`);
+      setResultMessage(`${providerId} 的 ${targets.length - 失败} 条任务已重新排队。`);
       await refreshWebCollection();
     } catch (error) {
       setResultError(error.message || "重新采集触发失败。");

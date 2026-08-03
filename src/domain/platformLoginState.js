@@ -72,6 +72,16 @@ export function buildPlatformLoginStates(jobs = [], { platforms = PLATFORM_LOGIN
   });
 }
 
+// 待重采的任务数。按钮上要标出来——实测点一下排了 34 条，而点之前完全看不出会排多少。
+// 抖音自助取数每天只有 5 条配额，一次排几十条的话超出的部分注定当天失败。
+export const PENDING_STATUSES = Object.freeze(["failed", "waiting_human", "schema_changed"]);
+
+export function countPendingJobs(jobs = [], providerId) {
+  return (Array.isArray(jobs) ? jobs : [])
+    .filter(job => job?.providerId === providerId && PENDING_STATUSES.includes(String(job?.status || "")))
+    .length;
+}
+
 export const LOGIN_STATE_LABELS = Object.freeze({
   login_required: "需要登录",
   signed_in: "上次采集时已登录",
