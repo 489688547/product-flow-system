@@ -151,6 +151,11 @@ export function createWebCollectorOrchestrator({
         if (executor !== "dedicated" && 归专用浏览器(activeJob)) return null;
         if (executor === "dedicated" && 不该给专用浏览器(activeJob)) return null;
         if (activeJob.providerId === "douyin-ecommerce" && activeJob.storeId !== profileStoreId) return null;
+        // 这条分支原先没打日志，而它恰恰是任务真正被交出去的那一次：
+        // 领取发生在上一轮（另一个执行器轮询时），这一轮只是把已领的任务交给来取的人。
+        // 结果是实测时日志全程沉默，看不出抖音任务最后交给了谁——加日志是为了回答
+        // 「谁领走了什么」，漏掉交付这一步，它就在最需要的时候是哑的。
+        logRouting(`交付 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate} → ${executor}（上一轮已领取）`);
         return safeTask(activeJob);
       }
       // 扩展在 dedicated 模式下不按 storeId 过滤：带上抖音的 storeId 会把快麦任务一并挡在外面。
