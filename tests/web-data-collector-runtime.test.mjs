@@ -1089,3 +1089,25 @@ test("dedicated 模式下专用浏览器不得领到别的 provider 的任务", 
   // 同一条任务，扩展来领就应当拿得到。
   assert.equal((await orchestrator.nextTask({ storeId: "store-a" }))?.providerId, "kuaimai");
 });
+
+test("已领取的任务交给谁，日志必须记下来", async () => {
+  // 加日志是为了回答「谁领走了什么」。领取与交付是两轮：领取发生在一个执行器轮询时，
+  // 交付发生在另一个执行器来取时。原先只记了领取那一步，实测时日志全程沉默——
+  // 在最需要它的时候是哑的。
+  const douyinJob = { ...job, id: "douyin-job-log", providerId: "douyin-ecommerce", storeId: "store-a", resourceType: "store_daily" };
+  const api = apiDouble(douyinJob);
+  const orchestrator = createWebCollectorOrchestrator({ api, processDownload: async () => ({}), executionMode: "dedicated" });
+
+  const lines = [];
+  const write = process.stdout.write.bind(process.stdout);
+  process.stdout.write = chunk => { lines.push(String(chunk)); return true; };
+  try {
+    await orchestrator.nextTask({ storeId: "store-a" });                          // 扩展轮询：领取并扣下
+    await orchestrator.nextTask({ storeId: "store-a", executor: "dedicated" });   // 专用浏览器来取：交付
+  } finally {
+    process.stdout.write = write;
+  }
+  const 全部 = lines.join("");
+  assert.match(全部, /扣下 douyin-ecommerce\/store_daily/, "扣下要记");
+  assert.match(全部, /交付 douyin-ecommerce\/store_daily .* → dedicated/, "交付给谁也要记");
+});
