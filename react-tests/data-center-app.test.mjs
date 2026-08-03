@@ -112,7 +112,7 @@ test("governance workspaces merge quality into sync and use the focused AI model
   assert.match(workspaces, /triggerKuaimaiSalesCollection/);
   assert.match(workspaces, /triggerWebCollection/);
   assert.match(workspaces, /TablePagination/);
-  assert.match(workspaces, /COVERAGE_WINDOW_DAYS = 14/);
+  assert.match(workspaces, /COVERAGE_WINDOW_DAYS = DAILY_FACTS_WINDOW_DAYS/);
   assert.match(workspaces, /refresh/);
   assert.match(page, /AiModelWorkspace/);
   assert.match(page, /DataCenterSettingsWorkspace/);
