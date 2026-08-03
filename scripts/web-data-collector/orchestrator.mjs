@@ -131,6 +131,11 @@ export function createWebCollectorOrchestrator({
       // 看不出跟切换浏览器模式有关。判据应当是「这条任务归谁执行」，与请求里带什么无关。
       const 归专用浏览器 = job => executionMode === "dedicated"
         && DEDICATED_PROVIDERS.has(String(job?.providerId || ""));
+      // 反方向同样要堵：专用浏览器执行器只认抖音任务，拿到别的平台会直接判 DOUYIN_TASK_INVALID。
+      // 实测 08-02 的 kuaimai inventory 与 orders 就是这么被判失败的——领错了活，
+      // 而且失败得像是快麦自己出了问题。
+      const 不该给专用浏览器 = job => executionMode === "dedicated"
+        && !DEDICATED_PROVIDERS.has(String(job?.providerId || ""));
       const profileStoreId = String(storeId || "");
       if (activeJob) {
         if (processingResult) return null;
@@ -138,6 +143,7 @@ export function createWebCollectorOrchestrator({
       }
       if (activeJob) {
         if (executor !== "dedicated" && 归专用浏览器(activeJob)) return null;
+        if (executor === "dedicated" && 不该给专用浏览器(activeJob)) return null;
         if (activeJob.providerId === "douyin-ecommerce" && activeJob.storeId !== profileStoreId) return null;
         return safeTask(activeJob);
       }
@@ -150,8 +156,10 @@ export function createWebCollectorOrchestrator({
       activeJob = claimed.job;
       rememberLease(activeJob, 300);
       await transition("claimed", "opening");
-      // 抖音的任务留给专用浏览器下一轮来取，不交给扩展。
+      // 抖音的任务留给专用浏览器下一轮来取，不交给扩展；
+      // 别的平台的任务留给扩展下一轮来取，不交给专用浏览器。
       if (executor !== "dedicated" && 归专用浏览器(activeJob)) return null;
+      if (executor === "dedicated" && 不该给专用浏览器(activeJob)) return null;
       return safeTask(activeJob);
     },
     recordBrowserStatus(status = {}) {
