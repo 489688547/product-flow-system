@@ -15,7 +15,7 @@ import {
   buildSyncCoverage
 } from "../../domain/dataSyncCoverage.js";
 import { DOUYIN_COLLECTION_RESOURCES } from "../../domain/dataCenterConnectors.js";
-import { defaultDataCenterRange } from "../../domain/dataCenter.js";
+import { DAILY_FACTS_WINDOW_DAYS, defaultDataCenterRange } from "../../domain/dataCenter.js";
 import { buildDataSyncRunRows } from "../../domain/dataSyncRunRows.js";
 import { TablePagination } from "../../ui/TablePagination.jsx";
 import { LocalArchivePanel } from "./LocalArchivePanel.jsx";
@@ -24,7 +24,8 @@ import { SyncCoveragePanel } from "./SyncCoveragePanel.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
 
 // 覆盖窗口独立于总览日期范围：联动会让半年区间拉出上千行。
-const COVERAGE_WINDOW_DAYS = 14;
+// 与 DAILY_FACTS_WINDOW_DAYS 必须一致：事实窗口短于判定窗口时，缺的天会被误报为数据缺失。
+const COVERAGE_WINDOW_DAYS = DAILY_FACTS_WINDOW_DAYS;
 const RUN_PAGE_SIZE = 20;
 
 const STATUS_LABELS = { healthy: "正常", success: "成功", queued: "等待 Chrome 领取", claimed: "已被 Chrome 领取", opening: "正在打开页面", exporting: "正在生成报表", downloading: "正在下载报表", validating: "正在校验", ingesting: "正在入库", pending_validation: "待验证", waiting_verification: "等待人工验证", waiting_human: "等待人工处理", collecting: "页面读数中", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", unavailable: "尚未完成真实采集", superseded: "已被新批次取代", disabled: "未启用" };
