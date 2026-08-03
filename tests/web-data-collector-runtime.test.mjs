@@ -1066,3 +1066,26 @@ test("processor failure records a failed transition and never completes the job"
     "本机文件处理或入库失败。"
   );
 });
+
+test("dedicated 模式下专用浏览器不得领到别的 provider 的任务", async () => {
+  // 专用浏览器执行器只认抖音任务，拿到别的平台会直接判 DOUYIN_TASK_INVALID。
+  // 实测 08-02 的 kuaimai inventory 与 orders 就是这么被判失败的——领错了活，
+  // 而且失败得像是快麦自己出了问题。先前只堵了「抖音的活不给扩展」，漏了反方向。
+  const kuaimaiJob = {
+    ...job,
+    id: "kuaimai-job-2",
+    providerId: "kuaimai",
+    storeId: "",
+    resourceType: "inventory"
+  };
+  const api = apiDouble(kuaimaiJob);
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({}),
+    executionMode: "dedicated"
+  });
+
+  assert.equal(await orchestrator.nextTask({ storeId: "store-a", executor: "dedicated" }), null);
+  // 同一条任务，扩展来领就应当拿得到。
+  assert.equal((await orchestrator.nextTask({ storeId: "store-a" }))?.providerId, "kuaimai");
+});
