@@ -1,6 +1,6 @@
 import React from "react";
 import { Button } from "../../ui/Button.jsx";
-import { LOGIN_STATE_LABELS, buildPlatformLoginStates } from "../../domain/platformLoginState.js";
+import { LOGIN_STATE_LABELS, buildPlatformLoginStates, countPendingJobs } from "../../domain/platformLoginState.js";
 
 // 登录失效是采集失败最常见的原因，但它原先只体现为某几条任务的错误码，
 // 要人自己在一堆失败里认出「这是登录掉了」。这里把它汇总到平台一级，
@@ -36,7 +36,7 @@ export function PlatformLoginPanel({ jobs = [], onRecollect, recollecting = "", 
           <td><span className={`status-badge ${STATE_BADGE[item.state] || "neutral"}`}>{LOGIN_STATE_LABELS[item.state]}</span></td>
           <td>
             <div>{item.reason}</div>
-            {item.since ? <div className="data-note">{判据时间(item.since)}</div> : null}
+            {item.since ? <div className="platform-login-note">{判据时间(item.since)}</div> : null}
           </td>
           <td className="platform-login-actions">
             {/* 快麦跑在当前浏览器的扩展里，链接正好落在对的地方。
@@ -45,14 +45,18 @@ export function PlatformLoginPanel({ jobs = [], onRecollect, recollecting = "", 
             {item.openIn === "current_browser"
               ? <a className="button" href={item.loginUrl} target="_blank" rel="noreferrer">打开登录页</a>
               : null}
+            {/* 按钮上标出会排多少条。实测点一下排了 34 条，而点之前完全看不出——
+                抖音自助取数每天只有 5 条配额，一次排几十条的话超出的部分注定当天失败。 */}
             <Button
               type="button"
-              disabled={!canTrigger || Boolean(recollecting)}
+              disabled={!canTrigger || Boolean(recollecting) || !countPendingJobs(jobs, item.providerId)}
               onClick={() => onRecollect?.(item.providerId)}
             >
-              {recollecting === item.providerId ? "正在排队…" : "重新采集"}
+              {recollecting === item.providerId
+                ? "正在排队…"
+                : `重新采集${countPendingJobs(jobs, item.providerId) ? ` (${countPendingJobs(jobs, item.providerId)})` : ""}`}
             </Button>
-            <div className="data-note">{item.hint}</div>
+            <div className="platform-login-note">{item.hint}</div>
           </td>
         </tr>)}
       </tbody>
