@@ -36,7 +36,7 @@ export function PlatformLoginPanel({ jobs = [], onRecollect, recollecting = "", 
           <td><span className={`status-badge ${STATE_BADGE[item.state] || "neutral"}`}>{LOGIN_STATE_LABELS[item.state]}</span></td>
           <td>
             <div>{item.reason}</div>
-            {item.since ? <div className="data-note">{判据时间(item.since)}</div> : null}
+            {item.since ? <div className="platform-login-note">{判据时间(item.since)}</div> : null}
           </td>
           <td className="platform-login-actions">
             {/* 快麦跑在当前浏览器的扩展里，链接正好落在对的地方。
@@ -52,7 +52,7 @@ export function PlatformLoginPanel({ jobs = [], onRecollect, recollecting = "", 
             >
               {recollecting === item.providerId ? "正在排队…" : "重新采集"}
             </Button>
-            <div className="data-note">{item.hint}</div>
+            <div className="platform-login-note">{item.hint}</div>
           </td>
         </tr>)}
       </tbody>
