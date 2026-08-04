@@ -87,6 +87,39 @@ test("Ego runner returns one registered safe result", async () => {
   );
 });
 
+test("Ego runner accepts the one safe cliLog result emitted on stderr", async () => {
+  const result = {
+    kind: "waiting_human",
+    jobId: "job-ego-1",
+    errorCode: "DOUYIN_LOGIN_REQUIRED",
+    safeSummary: "请在 Ego 登录抖店后重试。",
+    stage: "opening"
+  };
+  const runner = createEgoCliRunner({
+    executable: "/Users/company/.local/bin/ego-browser",
+    moduleRoot: "/repo",
+    spawn: fakeEgoProcess({ stderr: `${JSON.stringify(result)}\n` })
+  });
+
+  assert.deepEqual(
+    await runner.run({ moduleUrl: "file:///repo/douyinEgoTask.mjs", input: safeTask }),
+    result
+  );
+});
+
+test("Ego runner rejects results split across stdout and stderr", async () => {
+  const runner = createEgoCliRunner({
+    executable: "/Users/company/.local/bin/ego-browser",
+    moduleRoot: "/repo",
+    spawn: fakeEgoProcess({ stdout: "{}\n", stderr: "{}\n" })
+  });
+
+  await assert.rejects(
+    runner.run({ moduleUrl: "file:///repo/douyinEgoTask.mjs", input: safeTask }),
+    error => error.code === "EGO_PROTOCOL_INVALID"
+  );
+});
+
 test("Ego runner rejects sensitive task fields before spawning", async () => {
   let spawned = false;
   const runner = createEgoCliRunner({
@@ -149,15 +182,16 @@ test("Ego runner reports a non-zero Ego exit without exposing stderr", async () 
   );
 });
 
-test("Ego runner bootstrap executes one fixed local task module through stdin", async () => {
+test("Ego runner bootstrap carries validated input through stdin when Ego strips custom environment variables", async () => {
   const moduleRoot = await mkdtemp(join(tmpdir(), "ego-cli-runtime-"));
   const executable = join(moduleRoot, "ego-browser");
   const taskModule = join(moduleRoot, "task.mjs");
   await writeFile(executable, `#!/usr/bin/env node
 let source = "";
 for await (const chunk of process.stdin) source += chunk;
-for (const name of ["listTaskSpaces", "useOrCreateTaskSpace", "claimTaskSpace", "handOffTaskSpace", "listTabs", "switchTab", "openOrReuseTab", "gotoAndWait", "pageInfo", "js", "cdp", "wait", "completeTaskSpace"]) globalThis[name] = async () => null;
+for (const name of ["listTaskSpaces", "useOrCreateTaskSpace", "claimTaskSpace", "takeOverTaskSpace", "handOffTaskSpace", "listTabs", "switchTab", "openOrReuseTab", "gotoAndWait", "pageInfo", "js", "cdp", "wait", "completeTaskSpace"]) globalThis[name] = async () => null;
 globalThis.cliLog = value => process.stdout.write(String(value) + "\\n");
+delete process.env.EC_EGO_TASK_B64;
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 await new AsyncFunction(source)();
 `, { mode: 0o700 });

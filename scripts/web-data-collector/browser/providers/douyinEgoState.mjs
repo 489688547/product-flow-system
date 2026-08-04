@@ -105,6 +105,28 @@ export function parseDouyinStoreIdentityText(value) {
   };
 }
 
+export function parseDouyinStoreIdentitySnapshot(value) {
+  if (typeof value === "string") return parseDouyinStoreIdentityText(value);
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  if (Object.keys(value).some(field => !["visibleText", "labelledStoreIds"].includes(field))) return null;
+  const visibleText = String(value.visibleText || "");
+  if (
+    visibleText.length > 50_000
+    || /[\u0000\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(visibleText)
+    || !Array.isArray(value.labelledStoreIds)
+    || value.labelledStoreIds.length > 8
+  ) return null;
+  const storeIds = [...new Set(value.labelledStoreIds.map(cleanLine))];
+  if (storeIds.length !== 1 || !STABLE_ID.test(storeIds[0])) return null;
+  const visibleIdentity = parseDouyinStoreIdentityText(visibleText);
+  if (visibleIdentity && visibleIdentity.storeId !== storeIds[0]) return null;
+  return {
+    providerId: "douyin-ecommerce",
+    storeId: storeIds[0],
+    ...(visibleIdentity?.storeName ? { storeName: visibleIdentity.storeName } : {})
+  };
+}
+
 function result(state, errorCode, extra = {}) {
   return { state, errorCode, ...extra };
 }

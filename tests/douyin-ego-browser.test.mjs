@@ -47,7 +47,7 @@ const stablePage = Object.freeze({
   origin: "https://compass.jinritemai.com",
   path: "/shop/video/overview",
   title: "短视频分析-抖音电商罗盘",
-  body: "短视频明细 日期 下载报表",
+  body: "短视频明细 下载明细",
   readyState: "complete",
   networkIdle: true,
   hasPassword: false,
@@ -158,9 +158,17 @@ test("Ego Douyin state classification separates every terminal cause", () => {
   }
 });
 
-function egoHelpers({ ownership = "agent", identityStoreId = "90862283" } = {}) {
+function egoHelpers({
+  ownership = "agent",
+  identityStoreId = "90862283",
+  identitySnapshot = null,
+  identitySnapshots = null,
+  identityTabUrl = "https://fxg.jinritemai.com/ffa/mshop/homepage/index",
+  resourceSnapshot = null
+} = {}) {
   const calls = [];
   let currentUrl = "";
+  let identityRead = 0;
   const name = "EC 抖音 90862283";
   return {
     calls,
@@ -176,35 +184,47 @@ function egoHelpers({ ownership = "agent", identityStoreId = "90862283" } = {}) 
       calls.push(["claimTaskSpace", id]);
       return { id, name, ownership: "agent" };
     },
+    async takeOverTaskSpace(id) {
+      calls.push(["takeOverTaskSpace", id]);
+      return { id, name, ownership: "agent" };
+    },
     async handOffTaskSpace(id) {
       calls.push(["handOffTaskSpace", id]);
       return { done: true };
     },
     async listTabs() {
       calls.push(["listTabs"]);
-      return [{ targetId: "tab-identity", url: "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools" }];
+      return [{ targetId: "tab-identity", url: identityTabUrl }];
     },
     async switchTab(targetId) {
       calls.push(["switchTab", targetId]);
+      if (targetId === "tab-identity") currentUrl = identityTabUrl;
     },
     async openOrReuseTab(url) {
       currentUrl = url;
       calls.push(["openOrReuseTab", url]);
-      return { targetId: url.includes("qualification") ? "tab-identity" : "tab-resource", url };
+      return { targetId: url.includes("/ffa/mshop/homepage/index") ? "tab-identity" : "tab-resource", url };
     },
     async pageInfo() {
       const parsed = new URL(currentUrl);
       return { url: currentUrl, title: parsed.hostname };
     },
     async js() {
-      if (currentUrl.includes("qualification")) {
+      if (currentUrl.includes("/ffa/mshop/homepage/index")) {
+        if (Array.isArray(identitySnapshots)) {
+          const snapshot = identitySnapshots[Math.min(identityRead, identitySnapshots.length - 1)];
+          identityRead += 1;
+          return snapshot;
+        }
+        if (identitySnapshot) return identitySnapshot;
         return `店铺名称：TIYES提野星宠物用品旗舰店\n店铺 ID：${identityStoreId}`;
       }
+      if (resourceSnapshot) return resourceSnapshot;
       return {
         origin: "https://compass.jinritemai.com",
         path: "/shop/video/overview",
         title: "短视频分析-抖音电商罗盘",
-        body: "短视频明细 日期 下载报表",
+        body: "短视频明细 下载明细",
         readyState: "complete",
         networkIdle: true,
         hasPassword: false,
@@ -217,6 +237,122 @@ function egoHelpers({ ownership = "agent", identityStoreId = "90862283" } = {}) 
     async cdp() {}
   };
 }
+
+test("hidden homepage shop information verifies one labelled store ID", async () => {
+  const helpers = egoHelpers({
+    identitySnapshot: {
+      visibleText: "TIYES提野星宠物用品旗舰店 店铺管理 商家体验分",
+      labelledStoreIds: ["90862283"]
+    }
+  });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: false }
+  }, helpers, {
+    collect: async input => ({
+      kind: "download_capability_check",
+      jobId: input.task.jobId,
+      safeSummary: "identity-ok"
+    })
+  });
+
+  assert.equal(result.kind, "download_capability_check");
+  assert.equal(helpers.calls.some(([name, targetId]) => name === "switchTab" && targetId === "tab-identity"), true);
+  assert.equal(
+    helpers.calls.some(([name, url]) => name === "openOrReuseTab" && String(url).startsWith("https://fxg.jinritemai.com")),
+    false
+  );
+});
+
+test("delayed homepage shop information is awaited before identity is rejected", async () => {
+  const helpers = egoHelpers({
+    identitySnapshots: [
+      { visibleText: "首页加载中", labelledStoreIds: [] },
+      {
+        visibleText: "TIYES提野星宠物用品旗舰店 店铺管理 商家体验分",
+        labelledStoreIds: ["90862283"]
+      }
+    ]
+  });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: false }
+  }, helpers, {
+    collect: async input => ({
+      kind: "download_capability_check",
+      jobId: input.task.jobId,
+      safeSummary: "identity-ready"
+    })
+  });
+
+  assert.equal(result.kind, "download_capability_check");
+});
+
+test("missing homepage identity remains a technical failure without handing control to the user", async () => {
+  const helpers = egoHelpers({
+    identitySnapshots: [{ visibleText: "首页 店铺管理 商家体验分", labelledStoreIds: [] }]
+  });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: false }
+  }, helpers);
+
+  assert.equal(result.kind, "failed");
+  assert.equal(result.errorCode, "DOUYIN_STORE_IDENTITY_UNAVAILABLE");
+  assert.equal(helpers.calls.some(([name]) => name === "handOffTaskSpace"), false);
+});
+
+test("query-bearing existing homepage is reused instead of opening a duplicate identity tab", async () => {
+  const helpers = egoHelpers({
+    identityTabUrl: "https://fxg.jinritemai.com/ffa/mshop/homepage/index?btm_show_id=existing",
+    identitySnapshot: {
+      visibleText: "TIYES提野星宠物用品旗舰店 店铺管理 商家体验分",
+      labelledStoreIds: ["90862283"]
+    }
+  });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: false }
+  }, helpers, {
+    collect: async input => ({
+      kind: "download_capability_check",
+      jobId: input.task.jobId,
+      safeSummary: "identity-tab-reused"
+    })
+  });
+
+  assert.equal(result.kind, "download_capability_check");
+  assert.deepEqual(
+    helpers.calls.filter(([name, url]) => name === "openOrReuseTab" && String(url).startsWith("https://fxg.jinritemai.com")),
+    []
+  );
+});
+
+test("current video overview is ready without the removed date label", async () => {
+  const helpers = egoHelpers({
+    resourceSnapshot: {
+      origin: "https://compass.jinritemai.com",
+      path: "/shop/video/overview",
+      title: "视频概览",
+      body: "短视频 本店数据 视频概览 视频销量榜 下载明细 短视频明细",
+      readyState: "complete",
+      networkIdle: true,
+      hasPassword: false
+    }
+  });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: false }
+  }, helpers, {
+    collect: async input => ({
+      kind: "download_capability_check",
+      jobId: input.task.jobId,
+      safeSummary: "current-video-overview-ready"
+    })
+  });
+
+  assert.equal(result.kind, "download_capability_check");
+});
 
 test("Ego task space binding is deterministic for one registered store", () => {
   assert.equal(egoTaskSpaceName({
@@ -238,7 +374,7 @@ test("automatic polling never claims a user-controlled Ego task space", async ()
   assert.equal(helpers.calls.some(([name]) => name === "openOrReuseTab"), false);
 });
 
-test("manual same-job retry claims the store space and selects its exact tab", async () => {
+test("manual same-job retry takes over the store space and selects its exact tab", async () => {
   const helpers = egoHelpers({ ownership: "user" });
   const result = await executeDouyinEgoTask({
     task,
@@ -254,7 +390,7 @@ test("manual same-job retry claims the store space and selects its exact tab", a
   assert.equal(result.kind, "download_capability_check");
   assert.deepEqual(helpers.calls.slice(0, 4), [
     ["listTaskSpaces"],
-    ["claimTaskSpace", 41],
+    ["takeOverTaskSpace", 41],
     ["listTabs"],
     ["switchTab", "tab-identity"]
   ]);
@@ -272,8 +408,9 @@ test("wrong stable store identity hands off without opening a resource page", as
   assert.equal(result.errorCode, "DOUYIN_STORE_MISMATCH");
   assert.deepEqual(
     helpers.calls.filter(([name]) => name === "openOrReuseTab").map(([, url]) => url),
-    ["https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools"]
+    []
   );
+  assert.equal(helpers.calls.some(([name, targetId]) => name === "switchTab" && targetId === "tab-identity"), true);
   assert.equal(helpers.calls.some(([name]) => name === "handOffTaskSpace"), true);
 });
 
@@ -290,6 +427,23 @@ test("Ego controlled download configures the task workspace before export", asyn
     downloadPath: workspace,
     eventsEnabled: true
   }]]);
+});
+
+test("Ego controlled download falls back to the page domain on older Chromium", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "ego-download-"));
+  const calls = [];
+  await configureEgoDownload({
+    workspace,
+    cdp: async (method, params) => {
+      calls.push([method, params]);
+      if (method === "Browser.setDownloadBehavior") throw new Error("method not found");
+    }
+  });
+
+  assert.deepEqual(calls.map(([method]) => method), [
+    "Browser.setDownloadBehavior",
+    "Page.setDownloadBehavior"
+  ]);
 });
 
 test("Ego download success requires a new stable file inside the task workspace", async () => {

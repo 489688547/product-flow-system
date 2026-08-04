@@ -95,20 +95,20 @@ function encodeInput(input) {
   return Buffer.from(json).toString("base64url");
 }
 
-function childEnvironment(source, encodedInput) {
+function childEnvironment(source) {
   const environment = {};
   for (const field of SAFE_ENV_FIELDS) {
     if (source[field] !== undefined) environment[field] = source[field];
   }
-  environment.EC_EGO_TASK_B64 = encodedInput;
   return environment;
 }
 
-export function buildEgoBootstrap(moduleUrl) {
+export function buildEgoBootstrap(moduleUrl, encodedInput) {
   const encodedModuleUrl = JSON.stringify(String(moduleUrl || ""));
-  return `const input = JSON.parse(Buffer.from(process.env.EC_EGO_TASK_B64, "base64url").toString("utf8"));\n`
+  const encodedTaskInput = JSON.stringify(String(encodedInput || ""));
+  return `const input = JSON.parse(Buffer.from(${encodedTaskInput}, "base64url").toString("utf8"));\n`
     + `const taskModule = await import(${encodedModuleUrl});\n`
-    + "const helpers = Object.freeze({ listTaskSpaces, useOrCreateTaskSpace, claimTaskSpace, handOffTaskSpace, listTabs, switchTab, openOrReuseTab, gotoAndWait, pageInfo, js, cdp, wait, completeTaskSpace });\n"
+    + "const helpers = Object.freeze({ listTaskSpaces, useOrCreateTaskSpace, claimTaskSpace, takeOverTaskSpace, handOffTaskSpace, listTabs, switchTab, openOrReuseTab, gotoAndWait, pageInfo, js, cdp, wait, completeTaskSpace });\n"
     + "const result = await taskModule.executeEgoCliTask(input, helpers);\n"
     + "cliLog(JSON.stringify(result));\n";
 }
@@ -172,7 +172,7 @@ export function createEgoCliRunner({
       return new Promise((resolveRun, rejectRun) => {
         let child;
         let stdout = Buffer.alloc(0);
-        let stderrBytes = 0;
+        let stderr = Buffer.alloc(0);
         let settled = false;
         let timer;
 
@@ -182,12 +182,12 @@ export function createEgoCliRunner({
           clearTimeout(timer);
           callback(value);
         };
-        const overflow = chunk => stdout.length + stderrBytes + Buffer.byteLength(chunk) > safeOutputLimit;
+        const overflow = chunk => stdout.length + stderr.length + Buffer.byteLength(chunk) > safeOutputLimit;
         try {
           child = spawn(binary, ["nodejs"], {
             detached: true,
             stdio: ["pipe", "pipe", "pipe"],
-            env: childEnvironment(environment, encodedInput)
+            env: childEnvironment(environment)
           });
         } catch {
           throw egoError("EGO_PROCESS_FAILED", "Ego 进程无法启动。");
@@ -206,7 +206,7 @@ export function createEgoCliRunner({
             finish(rejectRun, egoError("EGO_OUTPUT_LIMIT_EXCEEDED", "Ego 输出超过安全上限。"));
             return;
           }
-          stderrBytes += Buffer.byteLength(chunk);
+          stderr = Buffer.concat([stderr, Buffer.from(chunk)]);
         });
         child.once("error", () => {
           finish(rejectRun, egoError("EGO_PROCESS_FAILED", "Ego 进程无法启动。"));
@@ -218,7 +218,13 @@ export function createEgoCliRunner({
             return;
           }
           try {
-            finish(resolveRun, parseSingleResult(stdout.toString("utf8")));
+            const stdoutText = stdout.toString("utf8");
+            const stderrText = stderr.toString("utf8");
+            const populated = [stdoutText, stderrText].filter(value => value.trim() !== "");
+            if (populated.length !== 1) {
+              throw egoError("EGO_PROTOCOL_INVALID", "Ego 输出必须来自唯一结果流。");
+            }
+            finish(resolveRun, parseSingleResult(populated[0]));
           } catch (error) {
             finish(rejectRun, error);
           }
@@ -227,7 +233,7 @@ export function createEgoCliRunner({
           stopChild(child);
           finish(rejectRun, egoError("EGO_TIMEOUT", "Ego 进程执行超时。"));
         }, safeTimeoutMs);
-        child.stdin.end(buildEgoBootstrap(safeModuleUrl));
+        child.stdin.end(buildEgoBootstrap(safeModuleUrl, encodedInput));
       });
     }
   });

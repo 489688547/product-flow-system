@@ -3,14 +3,14 @@ import { basename, extname, isAbsolute, join, resolve } from "node:path";
 
 import {
   classifyDouyinEgoSnapshot,
-  parseDouyinStoreIdentityText,
+  parseDouyinStoreIdentitySnapshot,
   validateDouyinEgoTask
 } from "./douyinEgoState.mjs";
 import { createDouyinExtractApi } from "./douyinExtractApi.js";
 import { createDouyinExtractRunner } from "./douyinExtractRunner.js";
 import { SELF_SERVICE_REPORT_VERSION } from "../../providers/douyin/parser.mjs";
 
-export const DOUYIN_EGO_STORE_IDENTITY_URL = "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools";
+export const DOUYIN_EGO_STORE_IDENTITY_URL = "https://fxg.jinritemai.com/ffa/mshop/homepage/index";
 export const DOUYIN_EGO_RESOURCE_URLS = Object.freeze({
   store_daily: "https://compass.jinritemai.com/shop",
   product_daily: "https://compass.jinritemai.com/shop/merchandise-traffic",
@@ -34,9 +34,36 @@ const RESOURCE_SENTINELS = Object.freeze({
   store_daily: ["店铺", "日期"],
   product_daily: ["商品", "日期"],
   live_daily: ["直播", "日期"],
-  video_daily: ["短视频", "日期"]
+  video_daily: ["短视频", "下载明细"]
 });
-const IDENTITY_TEXT_EXPRESSION = String.raw`(() => String(document.body?.innerText || "").slice(0, 50000))()`;
+const IDENTITY_SNAPSHOT_EXPRESSION = String.raw`(() => {
+  const normalize = value => String(value || "").replace(/\s+/g, " ").trim();
+  const ownText = element => normalize(
+    [...element.childNodes]
+      .filter(node => node.nodeType === Node.TEXT_NODE)
+      .map(node => node.textContent)
+      .join(" ")
+  );
+  const stableId = /^[-_a-zA-Z0-9]{1,128}$/;
+  const label = /^(?:店铺\s*ID|店铺编号|商家编号)$/i;
+  const labelledStoreIds = [];
+  const elements = [...document.querySelectorAll("body *")].slice(0, 5000);
+  for (const element of elements) {
+    if (!label.test(ownText(element))) continue;
+    const roots = [element.parentElement, element.nextElementSibling, element.parentElement?.nextElementSibling]
+      .filter(Boolean);
+    for (const root of roots) {
+      for (const candidate of [root, ...root.querySelectorAll("*")].slice(0, 100)) {
+        const value = ownText(candidate);
+        if (stableId.test(value)) labelledStoreIds.push(value);
+      }
+    }
+  }
+  return {
+    visibleText: String(document.body?.innerText || "").slice(0, 50000),
+    labelledStoreIds: [...new Set(labelledStoreIds)].slice(0, 8)
+  };
+})()`;
 const DOWNLOAD_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
 
 function taskError(code, message) {
@@ -53,14 +80,19 @@ export async function configureEgoDownload({ cdp, workspace } = {}) {
   if (!details?.isDirectory()) {
     throw taskError("EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE", "Ego 受控下载目录不可用。");
   }
+  const parameters = {
+    behavior: "allow",
+    downloadPath: directory,
+    eventsEnabled: true
+  };
   try {
-    await cdp("Browser.setDownloadBehavior", {
-      behavior: "allow",
-      downloadPath: directory,
-      eventsEnabled: true
-    });
+    await cdp("Browser.setDownloadBehavior", parameters);
   } catch {
-    throw taskError("EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE", "当前 Ego 版本无法提供受控下载目录，采集已停止。");
+    try {
+      await cdp("Page.setDownloadBehavior", parameters);
+    } catch {
+      throw taskError("EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE", "当前 Ego 版本无法提供受控下载目录，采集已停止。");
+    }
   }
 }
 
@@ -187,7 +219,7 @@ function requireHelpers(helpers) {
   const required = [
     "listTaskSpaces",
     "useOrCreateTaskSpace",
-    "claimTaskSpace",
+    "takeOverTaskSpace",
     "handOffTaskSpace",
     "listTabs",
     "switchTab",
@@ -210,7 +242,7 @@ async function selectTaskSpace(task, control, helpers) {
   }
   let selected;
   if (existing?.ownership === "user") {
-    selected = await helpers.claimTaskSpace(existing.id);
+    selected = await helpers.takeOverTaskSpace(existing.id);
     const tabs = await helpers.listTabs();
     const exact = Array.isArray(tabs) ? tabs.find(tab => (
       tab?.url === DOUYIN_EGO_STORE_IDENTITY_URL
@@ -243,21 +275,49 @@ function identityPageState(info, body) {
   return "identity";
 }
 
+function isRegisteredIdentityTab(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.origin === "https://fxg.jinritemai.com"
+      && url.pathname === "/ffa/mshop/homepage/index";
+  } catch {
+    return false;
+  }
+}
+
+async function openIdentityPage(helpers) {
+  const tabs = await helpers.listTabs();
+  const existing = Array.isArray(tabs)
+    ? tabs.find(tab => tab?.targetId && isRegisteredIdentityTab(tab?.url))
+    : null;
+  if (existing) {
+    await helpers.switchTab(existing.targetId);
+    return existing;
+  }
+  return helpers.openOrReuseTab(DOUYIN_EGO_STORE_IDENTITY_URL, { wait: true, timeout: 20 });
+}
+
 function resourceSnapshotExpression(resourceType) {
-  const sentinels = JSON.stringify(RESOURCE_SENTINELS[resourceType]);
   return `(() => {
     const body = String(document.body?.innerText || "").replace(/\\s+/g, " ").trim().slice(0, 20000);
-    const sentinels = ${sentinels};
     return {
       origin: location.origin,
       path: location.pathname,
       title: String(document.title || "").trim(),
       body,
       readyState: document.readyState,
-      hasPassword: Boolean(document.querySelector("input[type='password']")),
-      hasRegisteredResourceSentinels: sentinels.every(term => body.includes(term))
+      hasPassword: Boolean(document.querySelector("input[type='password']"))
     };
   })()`;
+}
+
+function withResourceSentinels(snapshot, resourceType) {
+  const value = snapshot && typeof snapshot === "object" ? snapshot : {};
+  const body = String(value.body || "");
+  return {
+    ...value,
+    hasRegisteredResourceSentinels: RESOURCE_SENTINELS[resourceType].every(term => body.includes(term))
+  };
 }
 
 async function handoff(helpers, taskSpaceId) {
@@ -280,32 +340,39 @@ export async function executeDouyinEgoTask(input, helpers, {
     );
   }
 
-  await helpers.openOrReuseTab(DOUYIN_EGO_STORE_IDENTITY_URL, { wait: true, timeout: 20 });
+  await openIdentityPage(helpers);
   const identityInfo = await helpers.pageInfo();
-  const identityText = await helpers.js(IDENTITY_TEXT_EXPRESSION);
-  const identityState = identityPageState(identityInfo, identityText);
-  if (identityState === "login" || identityState === "human") {
-    await handoff(helpers, taskSpace.id);
-    return terminal(
-      task,
-      "waiting_human",
-      identityState === "login" ? "DOUYIN_LOGIN_REQUIRED" : "DOUYIN_HUMAN_VERIFICATION_REQUIRED",
-      identityState === "login"
-        ? "请在 Ego 完成抖店登录后，到公司平台确认重试。"
-        : "请在 Ego 完成验证码、扫码、滑块或设备确认后，到公司平台确认重试。"
-    );
+  let identity = null;
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    const identitySnapshot = await helpers.js(IDENTITY_SNAPSHOT_EXPRESSION);
+    const identityText = typeof identitySnapshot === "string"
+      ? identitySnapshot
+      : String(identitySnapshot?.visibleText || "");
+    const identityState = identityPageState(identityInfo, identityText);
+    if (identityState === "login" || identityState === "human") {
+      await handoff(helpers, taskSpace.id);
+      return terminal(
+        task,
+        "waiting_human",
+        identityState === "login" ? "DOUYIN_LOGIN_REQUIRED" : "DOUYIN_HUMAN_VERIFICATION_REQUIRED",
+        identityState === "login"
+          ? "请在 Ego 完成抖店登录后，到公司平台确认重试。"
+          : "请在 Ego 完成验证码、扫码、滑块或设备确认后，到公司平台确认重试。"
+      );
+    }
+    if (identityState !== "identity") {
+      return terminal(task, "failed", "DOUYIN_NAVIGATION_UNEXPECTED", "Ego 打开了未登记的店铺身份页面。");
+    }
+    identity = parseDouyinStoreIdentitySnapshot(identitySnapshot);
+    if (identity) break;
+    if (attempt < 14) await helpers.wait(1);
   }
-  if (identityState !== "identity") {
-    return terminal(task, "failed", "DOUYIN_NAVIGATION_UNEXPECTED", "Ego 打开了未登记的店铺身份页面。");
-  }
-  const identity = parseDouyinStoreIdentityText(identityText);
   if (!identity) {
-    await handoff(helpers, taskSpace.id);
     return terminal(
       task,
-      "waiting_human",
+      "failed",
       "DOUYIN_STORE_IDENTITY_UNAVAILABLE",
-      "Ego 无法从抖店登记页确认稳定店铺 ID，请人工检查。"
+      "抖店首页未能提供唯一店铺 ID，采集器将按技术失败处理。"
     );
   }
   if (identity.storeId !== task.storeId) {
@@ -322,9 +389,9 @@ export async function executeDouyinEgoTask(input, helpers, {
   const startedAt = Date.now();
   const expression = resourceSnapshotExpression(task.resourceType);
   while (true) {
-    const first = await helpers.js(expression);
+    const first = withResourceSentinels(await helpers.js(expression), task.resourceType);
     await helpers.wait(1);
-    const second = await helpers.js(expression);
+    const second = withResourceSentinels(await helpers.js(expression), task.resourceType);
     const stable = String(first?.body || "") === String(second?.body || "")
       && String(first?.path || "") === String(second?.path || "");
     const classification = classifyDouyinEgoSnapshot({ ...second, networkIdle: stable }, {
