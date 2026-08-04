@@ -286,30 +286,31 @@ const integrationRegistry = {
       "id": "douyin-ecommerce",
       "name": "抖音电商罗盘",
       "status": "integrating",
-      "summary": "账号密码登录与旧 browser-agent 任务保持退役；公司 Mac 默认通过 MV3 扩展复用日常已登录 Chrome，以官方报表下载为主采集抖店与电商罗盘经营数据，本机服务承担耗时处理与受控入库。数据接入维护多店铺名称与稳定店铺 ID，任务按当前 Chrome 已核对的店铺 ID 领取；专用 Profile 仅作显式回退。",
+      "summary": "账号密码登录与旧 browser-agent 任务保持退役；抖店正式采集只使用公司 Mac 的 Ego Task Space 复用人工维护的登录态，按稳定店铺 ID 隔离多店铺任务并下载官方报表。本机完成受控下载、归档、解析和检查点；只有阿里云 ECS API 的 SQLite 事务确认后才成功，Cloudflare D1 不接收 Ego 采集写入。",
       "capabilities": [
         "多店铺名称与店铺 ID 目录",
-        "公司日常 Chrome 登录态复用",
-        "专用 Profile 显式回退",
-        "已登录 Chrome 官方报表采集",
+        "确定性 Ego Task Space 隔离",
+        "Ego Task Space 官方报表采集",
+        "人工登录与验证接管",
         "账号密码登录保持退役",
         "店铺每日",
         "商品每日",
         "直播每日",
         "短视频每日",
         "本地原始文件归档",
+        "本地待上传检查点",
         "文件导入兜底",
         "通用任务租约与游标",
-        "标准经营事实"
+        "阿里云 SQLite 标准经营事实"
       ],
       "businessQuestions": [
         "如何登记和识别多个抖音店铺",
-        "公司日常 Chrome 已登录时如何直接复用",
-        "不同 Chrome 登录账号如何避免串店",
+        "不同 Ego 店铺空间如何避免串店",
         "抖店昨天四类经营数据是否就绪",
-        "公司 Chrome 未登录或要求人工验证",
+        "Ego 未登录或要求人工验证",
         "官方报表下载或字段发生变化",
-        "标准经营事实是否完整入库",
+        "本地待上传结果何时进入阿里云",
+        "SQLite 事务是否确认完整入库",
         "原始文件如何留在公司 Mac",
         "巨量千川为何不在本集成"
       ],
@@ -318,8 +319,11 @@ const integrationRegistry = {
         "抖店",
         "电商罗盘",
         "Douyin",
-        "Chrome 采集",
+        "Ego",
+        "Task Space",
         "官方报表",
+        "阿里云",
+        "SQLite",
         "文件导入"
       ],
       "codePaths": [
@@ -331,7 +335,6 @@ const integrationRegistry = {
         "src/features/data-center/DataGovernanceWorkspaces.jsx",
         "functions/api/platform/v1/web-collection/**",
         "functions/api/platform/v1/commerce-facts/**",
-        "chrome-extension/company-data-collector/**",
         "scripts/web-data-collector/**",
         "migrations/0013_douyin_commerce_facts.sql"
       ],
@@ -348,22 +351,27 @@ const integrationRegistry = {
       ],
       "publicDocs": [],
       "evidence": [
-        "docs/decisions/2026-07-24-douyin-preauthenticated-chrome-collection.md",
-        "docs/decisions/2026-07-25-existing-chrome-extension-first.md",
+        "docs/features/douyin-ego-collector/design.md",
+        "docs/features/douyin-ego-collector/plan.md",
         "docs/features/douyin-compass-collection/prd.md",
         "docs/features/douyin-compass-collection/design.md",
         "docs/platform/apis/commerce-facts-v1.md"
       ],
       "relations": [
         {
+          "platformId": "aliyun",
+          "type": "formal-facts-target",
+          "description": "阿里云 ECS API 承载正式任务控制与经营事实写入，SQLite 事务返回批次、行数和校验摘要后任务才能成功。"
+        },
+        {
           "platformId": "cloudflare-d1",
-          "type": "stores-standard-facts",
-          "description": "控制库保存设备、任务、运行和游标，服务端选择的业务库保存完成批次与标准经营事实；原始文件不进入 D1。"
+          "type": "rollback-only",
+          "description": "Cloudflare D1 只保留切流前控制数据和切流后只读回滚边界，不接收本事项产生的 Ego 采集写入，也不与 SQLite 双写。"
         },
         {
           "platformId": "cloudflare-pages",
-          "type": "hosts-collection-control-and-facts-api",
-          "description": "Pages Functions 承载受控任务、标准事实写入和只读查询接口。"
+          "type": "rollback-control-boundary",
+          "description": "Cloudflare Pages 在阿里云切流验收前保持旧生产控制面，正式 Ego 模式对该目标 fail closed。"
         },
         {
           "platformId": "erp-file-import",
@@ -373,7 +381,7 @@ const integrationRegistry = {
         {
           "platformId": "kuaimai",
           "type": "shares-web-collection-runtime",
-          "description": "默认复用公司日常 Chrome 的 MV3 扩展、本机桥接、任务租约、游标与通知；专用 Profile 仅作显式回退，provider 页面规则和事实 writer 保持隔离。"
+          "description": "共用本机 bridge、任务租约、检查点、游标与通知；快麦继续走 Chrome MV3，抖店只走 Ego，provider 页面规则和事实 writer 保持隔离。"
         },
         {
           "platformId": "oceanengine-qianchuan",

@@ -12,6 +12,7 @@ import { uploadErpCollection } from "../kuaimai-erp-collector/api.mjs";
 import { readCollectorToken as readErpCollectorToken } from "../kuaimai-erp-collector/automation.mjs";
 import { nodeRequest } from "../kuaimai-erp-collector/http.mjs";
 import { ensureManagedChrome } from "../browser-runtime/managed-chrome.mjs";
+import { createEgoCliRunner } from "../browser-runtime/ego-cli.mjs";
 import { createWebCollectionApi } from "./api.mjs";
 import {
   EXTENSION_ID,
@@ -28,12 +29,14 @@ import {
   createDedicatedBrowserRuntime,
   createExperimentalRunCycle
 } from "./browser/runtime.mjs";
+import { createEgoBrowserRuntime } from "./browser/ego-runtime.mjs";
 import {
   DOUYIN_DEDICATED_RESOURCES,
   createCdpDouyinController,
   createDouyinDedicatedExecutor
 } from "./browser/providers/douyin.mjs";
 import { createCheckpointStore } from "./checkpoints.mjs";
+import { runEgoProbe } from "./ego-probe.mjs";
 import { createLocalDiagnosticStore } from "./diagnostics.mjs";
 import { createExperimentalCdpBrowser } from "./experimental/browser.mjs";
 import { executeExperimentalRun } from "./experimental/executor.mjs";
@@ -52,6 +55,7 @@ import {
 import { createDouyinExtractApi } from "./browser/providers/douyinExtractApi.js";
 import { createDouyinHomepageApi } from "./browser/providers/douyinHomepageApi.js";
 import { createDouyinExtractRunner } from "./browser/providers/douyinExtractRunner.js";
+import { validateDouyinEgoTask } from "./browser/providers/douyinEgoState.mjs";
 
 function argument(argv, name, fallback = "") {
   const index = argv.indexOf(name);
@@ -70,8 +74,89 @@ export const DEFAULT_MANAGED_PROFILE_ROOT = path.join(
   "Profiles"
 );
 
+export function buildEgoProbeTask(argv, { homeDirectory = os.homedir() } = {}) {
+  const storeId = argument(argv, "--store-id");
+  const resourceType = argument(argv, "--resource");
+  const businessDate = argument(argv, "--business-date");
+  const jobId = `ego-probe-${storeId}-${resourceType}-${businessDate}`;
+  return validateDouyinEgoTask({
+    jobId,
+    providerId: "douyin-ecommerce",
+    storeId,
+    storeName: argument(argv, "--store-name", `店铺 ${storeId}`),
+    resourceType,
+    businessDate,
+    status: "opening",
+    attempt: 1,
+    scheduleVersion: "ego-probe-v1",
+    workspace: path.join(
+      homeDirectory,
+      "Library",
+      "Application Support",
+      "Product Flow Collector",
+      "Ego Probes",
+      jobId
+    )
+  });
+}
+
+async function runEgoProbeCommand(argv) {
+  const task = buildEgoProbeTask(argv);
+  await mkdir(task.workspace, { recursive: true, mode: 0o700 });
+  const modulePath = resolve(dirname(fileURLToPath(import.meta.url)), "browser/providers/douyinEgoTask.mjs");
+  const runner = createEgoCliRunner({
+    executable: argument(argv, "--ego-cli"),
+    moduleRoot: dirname(modulePath),
+    timeoutMs: 50 * 60 * 1_000
+  });
+  const checkpointStore = createCheckpointStore({
+    rootDir: path.join(dirname(task.workspace), "Checkpoints")
+  });
+  return runEgoProbe({
+    task,
+    executeTask: input => runner.run({
+      moduleUrl: pathToFileURL(modulePath).href,
+      input
+    }),
+    checkpointStore,
+    archiveRoot: DEFAULT_DOUYIN_ARCHIVE_ROOT
+  });
+}
+
 export function experimentalModeEnabled(value = "") {
   return ["1", "true", "enabled"].includes(String(value || "").trim().toLowerCase());
+}
+
+export function normalizeBrowserMode(value) {
+  const mode = String(value || "").trim();
+  if (["extension", "dedicated", "ego"].includes(mode)) return mode;
+  throw Object.assign(new Error("浏览器模式无效。"), { code: "WEB_COLLECTION_BROWSER_MODE_INVALID" });
+}
+
+export function browserModeUsesManagedChrome(browserMode, { experimentalMode = false } = {}) {
+  return browserMode === "dedicated" || experimentalMode === true;
+}
+
+export function assertAliyunCollectorTarget({ baseUrl, browserMode, allowLocalProbe = false } = {}) {
+  if (browserMode !== "ego") return;
+  let target;
+  try {
+    target = new URL(String(baseUrl || ""));
+  } catch {
+    target = null;
+  }
+  const isApprovedAliyun = target?.origin === "https://deshan-tiyes.cn"
+    && target.pathname === "/"
+    && !target.search
+    && !target.hash;
+  const isLoopbackProbe = allowLocalProbe === true
+    && target?.protocol === "http:"
+    && ["127.0.0.1", "localhost", "::1"].includes(target.hostname);
+  if (!isApprovedAliyun && !isLoopbackProbe) {
+    throw Object.assign(new Error("正式 Ego 采集只允许写入已登记的阿里云 ECS 入口。"), {
+      code: "EGO_FORMAL_TARGET_NOT_ALIYUN"
+    });
+  }
 }
 
 async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
@@ -188,7 +273,10 @@ async function sourceFingerprint() {
   const here = dirname(fileURLToPath(import.meta.url));
   const files = [
     "orchestrator.mjs",
+    "browser/ego-runtime.mjs",
     "browser/providers/douyin.mjs",
+    "browser/providers/douyinEgoTask.mjs",
+    "browser/providers/douyinEgoState.mjs",
     "browser/providers/douyinExtractApi.js",
     "browser/providers/douyinHomepageApi.js"
   ];
@@ -242,6 +330,7 @@ async function serve({
   baseUrl,
   downloadsDirectory,
   browserMode = "extension",
+  egoCli = "",
   profileRoot = DEFAULT_MANAGED_PROFILE_ROOT,
   experimentalMode = false
 }) {
@@ -269,7 +358,9 @@ async function serve({
     notify: notifyCollectionIssue,
     executionMode: browserMode
   });
-  const profileRegistry = createBrowserProfileRegistry({ rootDir: profileRoot });
+  const profileRegistry = browserModeUsesManagedChrome(browserMode, { experimentalMode })
+    ? createBrowserProfileRegistry({ rootDir: profileRoot })
+    : null;
   const runtimeStateRoot = path.dirname(profileRoot);
   const checkpointStore = createCheckpointStore({
     rootDir: path.join(runtimeStateRoot, "Checkpoints")
@@ -303,6 +394,27 @@ async function serve({
       checkpointStore,
       diagnosticStore,
       diagnosticPageType: task => DOUYIN_DEDICATED_RESOURCES[task.resourceType]?.pageType || ""
+    })
+    : null;
+  const egoModulePath = resolve(dirname(fileURLToPath(import.meta.url)), "browser/providers/douyinEgoTask.mjs");
+  const egoRunner = browserMode === "ego"
+    ? createEgoCliRunner({
+      executable: egoCli,
+      moduleRoot: dirname(egoModulePath),
+      timeoutMs: 50 * 60 * 1_000
+    })
+    : null;
+  const egoWorkspaceRoot = path.join(runtimeStateRoot, "Ego Tasks");
+  const egoRuntime = browserMode === "ego"
+    ? createEgoBrowserRuntime({
+      api,
+      orchestrator,
+      executeTask: input => egoRunner.run({
+        moduleUrl: pathToFileURL(egoModulePath).href,
+        input
+      }),
+      checkpointStore,
+      workspaceForTask: task => path.join(egoWorkspaceRoot, task.jobId)
     })
     : null;
   const experimentalCycle = experimentalMode ? createExperimentalRunCycle({
@@ -358,6 +470,7 @@ async function serve({
       await orchestrator.prepare();
       await diagnosticStore.cleanup();
       await dedicatedRuntime?.runOnce();
+      await egoRuntime?.runOnce();
       await experimentalCycle?.runOnce();
     } finally {
       cycleRunning = false;
@@ -391,14 +504,17 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
   const root = resolve(argument(argv, "--root", DEFAULT_ARCHIVE_ROOT));
   const baseUrl = normalizeBaseUrl(argument(argv, "--base-url", process.env.WEB_COLLECTION_BASE_URL || "http://127.0.0.1:8132"));
   const downloadsDirectory = resolve(argument(argv, "--downloads", path.join(os.homedir(), "Downloads")));
-  const browserMode = argument(argv, "--browser-mode", "extension") === "dedicated"
-    ? "dedicated"
-    : "extension";
+  const browserMode = normalizeBrowserMode(argument(argv, "--browser-mode", "extension"));
   const experimentalMode = experimentalModeEnabled(
     argument(argv, "--experimental-mode", process.env.WEB_COLLECTION_EXPERIMENTAL_MODE || "")
   );
   const profileRoot = resolve(argument(argv, "--profile-root", DEFAULT_MANAGED_PROFILE_ROOT));
+  const egoCli = argument(argv, "--ego-cli");
   const extensionPath = EXTENSION_SOURCE_ROOT;
+  if (["serve", "install"].includes(command)) {
+    assertAliyunCollectorTarget({ baseUrl, browserMode });
+  }
+  if (command === "probe-ego") return runEgoProbeCommand(argv);
   if (command === "register") return registerRunner(baseUrl);
   if (command === "install") {
     await Promise.all([readRunnerToken(), readPairingKey()]);
@@ -406,7 +522,8 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
       collectorPath: fileURLToPath(import.meta.url),
       root,
       baseUrl,
-      browserMode
+      browserMode,
+      egoCli
     });
     return { ...launchAgent, extensionId: EXTENSION_ID, extensionPath };
   }
@@ -431,6 +548,7 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
     baseUrl,
     downloadsDirectory,
     browserMode,
+    egoCli,
     profileRoot,
     experimentalMode
   });

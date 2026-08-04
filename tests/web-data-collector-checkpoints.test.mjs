@@ -112,6 +112,55 @@ test("checkpoint store persists only safe processor resume state", async () => {
   }), /恢复|字段/);
 });
 
+test("checkpoint store retains only a safe same-job human handoff marker", async () => {
+  const { createCheckpointStore } = await checkpointModule();
+  const rootDir = await mkdtemp(join(tmpdir(), "web-checkpoint-"));
+  const store = createCheckpointStore({ rootDir });
+  const humanWait = {
+    errorCode: "DOUYIN_LOGIN_REQUIRED",
+    taskSpaceName: "EC 抖音 90862283"
+  };
+
+  await store.save("job-ego-1", {
+    stage: "waiting_human",
+    resume: { humanWait }
+  });
+
+  assert.deepEqual((await store.load("job-ego-1")).resume, { humanWait });
+  await assert.rejects(store.save("job-ego-2", {
+    stage: "waiting_human",
+    resume: {
+      humanWait: {
+        errorCode: "DOUYIN_LOGIN_REQUIRED",
+        taskSpaceName: "EC 抖音 90862283",
+        taskSpaceId: 41
+      }
+    }
+  }), /恢复|字段/);
+});
+
+test("checkpoint store persists a parsed probe while upload is pending", async () => {
+  const { createCheckpointStore } = await checkpointModule();
+  const rootDir = await mkdtemp(join(tmpdir(), "web-checkpoint-"));
+  const store = createCheckpointStore({ rootDir });
+  const resume = {
+    archive: {
+      relativeArchiveKey: "douyin-ecommerce/90862283/video_daily/2026/08/report.xlsx",
+      fileHash: "a".repeat(64)
+    },
+    parsed: {
+      reportVersion: "douyin-self-service-v1",
+      rowCount: 1,
+      coverage: 1,
+      confidence: "high"
+    }
+  };
+
+  await store.save("job-ego-1", { stage: "pending_upload", resume });
+
+  assert.deepEqual((await store.load("job-ego-1")).resume, resume);
+});
+
 test("experimental checkpoints bind resume state to one template version and content hash", async () => {
   const { createCheckpointStore } = await checkpointModule();
   const rootDir = await mkdtemp(join(tmpdir(), "web-checkpoint-"));

@@ -3,9 +3,13 @@ import test from "node:test";
 
 import {
   assertBusinessDateMatchesRange,
+  assertAliyunCollectorTarget,
   assertCollectionFileMatchesTask,
+  browserModeUsesManagedChrome,
   createCommerceFactUploader,
-  experimentalModeEnabled
+  experimentalModeEnabled,
+  normalizeBrowserMode,
+  runWebCollector
 } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 import {
@@ -21,6 +25,10 @@ async function dedicatedRuntimeModules() {
     import("../scripts/web-data-collector/browser/runtime.mjs").catch(() => ({}))
   ]);
   return { ...profileRegistry, ...runtime };
+}
+
+async function egoRuntimeModule() {
+  return import("../scripts/web-data-collector/browser/ego-runtime.mjs").catch(() => ({}));
 }
 
 function apiDouble(job) {
@@ -54,6 +62,58 @@ test("experimental mode is off by default and requires an explicit runner switch
   assert.equal(experimentalModeEnabled("0"), false);
   assert.equal(experimentalModeEnabled("1"), true);
   assert.equal(experimentalModeEnabled("enabled"), true);
+});
+
+test("browser mode accepts Ego explicitly and rejects silent fallback", () => {
+  assert.equal(normalizeBrowserMode("ego"), "ego");
+  assert.equal(normalizeBrowserMode("extension"), "extension");
+  assert.throws(
+    () => normalizeBrowserMode("unknown"),
+    error => error?.code === "WEB_COLLECTION_BROWSER_MODE_INVALID"
+  );
+});
+
+test("Ego mode creates no managed Chrome registry", () => {
+  assert.equal(browserModeUsesManagedChrome("ego"), false);
+  assert.equal(browserModeUsesManagedChrome("extension"), false);
+  assert.equal(browserModeUsesManagedChrome("dedicated"), true);
+  assert.equal(browserModeUsesManagedChrome("ego", { experimentalMode: true }), true);
+});
+
+test("formal Ego service refuses non-Aliyun targets while a loopback probe is allowed", () => {
+  assert.doesNotThrow(() => assertAliyunCollectorTarget({
+    baseUrl: "https://deshan-tiyes.cn",
+    browserMode: "ego"
+  }));
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes-system.pages.dev", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://203.0.113.9", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes.cn:8443", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.doesNotThrow(() => assertAliyunCollectorTarget({
+    baseUrl: "http://127.0.0.1:8132",
+    browserMode: "ego",
+    allowLocalProbe: true
+  }));
+});
+
+test("serve rejects a Cloudflare Ego target before reading local service secrets", async () => {
+  await assert.rejects(
+    runWebCollector([
+      "serve",
+      "--browser-mode", "ego",
+      "--base-url", "https://deshan-tiyes-system.pages.dev",
+      "--ego-cli", "/Users/company/.local/bin/ego-browser"
+    ]),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
 });
 
 test("orchestrator schedules all extension-implemented Kuaimai resources after 10:00", async () => {
@@ -279,6 +339,230 @@ test("dedicated 模式下扩展仍能领到别的 provider 的任务", async () 
   const task = await orchestrator.nextTask({ storeId: "store-a" });
   assert.ok(task, "扩展带着抖音的 storeId 轮询，也必须能领到快麦的任务");
   assert.equal(task.providerId, "kuaimai");
+});
+
+test("ego mode reserves Douyin while the extension still receives Kuaimai", async () => {
+  const douyinApi = apiDouble({
+    ...job,
+    id: "douyin-job-1",
+    providerId: "douyin-ecommerce",
+    storeId: "store-a",
+    resourceType: "video_daily"
+  });
+  const douyinOrchestrator = createWebCollectorOrchestrator({
+    api: douyinApi,
+    processDownload: async () => ({}),
+    executionMode: "ego"
+  });
+  assert.equal(await douyinOrchestrator.nextTask({ storeId: "store-a", executor: "extension" }), null);
+  assert.equal((await douyinOrchestrator.nextTask({ storeId: "store-a", executor: "ego" })).providerId, "douyin-ecommerce");
+
+  const kuaimaiApi = apiDouble({ ...job, providerId: "kuaimai", storeId: "", resourceType: "orders" });
+  const kuaimaiOrchestrator = createWebCollectorOrchestrator({
+    api: kuaimaiApi,
+    processDownload: async () => ({}),
+    executionMode: "ego"
+  });
+  assert.equal((await kuaimaiOrchestrator.nextTask({ storeId: "store-a", executor: "extension" })).providerId, "kuaimai");
+  assert.equal(await kuaimaiOrchestrator.nextTask({ storeId: "store-a", executor: "ego" }), null);
+});
+
+test("Ego runtime executes an assigned Douyin store without any Chrome dependency", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  assert.equal(typeof createEgoBrowserRuntime, "function", "createEgoBrowserRuntime must be implemented");
+  const calls = [];
+  const runtime = createEgoBrowserRuntime({
+    api: {
+      async assignedStores() {
+        return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] };
+      }
+    },
+    orchestrator: {
+      async nextTask(input) {
+        calls.push(["nextTask", input]);
+        return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" };
+      },
+      async submitResult(result) { calls.push(["submitResult", result.kind]); }
+    },
+    executeTask: async ({ task, control }) => {
+      assert.equal(task.storeName, "TIYES旗舰店");
+      assert.equal(task.workspace, "/local/ego/job-ego-1");
+      assert.equal(control.explicitHumanRetry, false);
+      return { kind: "downloaded", jobId: task.jobId, filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+    },
+    checkpointStore: { async load() { return null; }, async save() {}, async clear() {} },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 1, failed: 0 });
+  assert.deepEqual(calls[0], ["nextTask", { storeId: "90862283", executor: "ego" }]);
+  assert.deepEqual(calls.at(-1), ["submitResult", "downloaded"]);
+});
+
+test("Ego runtime retains a result-free checkpoint when control is handed to a human", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const saved = [];
+  let clears = 0;
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult() {}
+    },
+    executeTask: async () => ({ kind: "waiting_human", jobId: "job-ego-1", errorCode: "DOUYIN_LOGIN_REQUIRED", safeSummary: "请登录", stage: "opening" }),
+    checkpointStore: {
+      async load() { return null; },
+      async save(jobId, checkpoint) { saved.push([jobId, checkpoint]); },
+      async clear() { clears += 1; }
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  await runtime.runOnce();
+
+  assert.deepEqual(saved.at(-1), ["job-ego-1", {
+    stage: "waiting_human",
+    resume: {
+      humanWait: {
+        errorCode: "DOUYIN_LOGIN_REQUIRED",
+        taskSpaceName: "EC 抖音 90862283"
+      }
+    }
+  }]);
+  assert.equal(clears, 0);
+});
+
+test("Ego runtime turns a same-job human checkpoint into one explicit retry", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const saved = [];
+  let explicitHumanRetry = null;
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult() {}
+    },
+    executeTask: async ({ task, control }) => {
+      explicitHumanRetry = control.explicitHumanRetry;
+      return { kind: "downloaded", jobId: task.jobId, filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+    },
+    checkpointStore: {
+      async load() { return { stage: "waiting_human", resume: { humanWait: { errorCode: "DOUYIN_LOGIN_REQUIRED", taskSpaceName: "EC 抖音 90862283" } } }; },
+      async save(jobId, checkpoint) { saved.push([jobId, checkpoint]); },
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  await runtime.runOnce();
+
+  assert.equal(explicitHumanRetry, true);
+  assert.deepEqual(saved[0], ["job-ego-1", { stage: "opening" }]);
+});
+
+test("Ego runtime rejects a human checkpoint owned by another Task Space", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  let explicitHumanRetry = null;
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult() {}
+    },
+    executeTask: async ({ task, control }) => {
+      explicitHumanRetry = control.explicitHumanRetry;
+      return { kind: "downloaded", jobId: task.jobId, filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+    },
+    checkpointStore: {
+      async load() { return { stage: "waiting_human", resume: { humanWait: { errorCode: "DOUYIN_LOGIN_REQUIRED", taskSpaceName: "EC 抖音 another-store" } } }; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  await runtime.runOnce();
+
+  assert.equal(explicitHumanRetry, false);
+});
+
+test("Ego runtime submits a safe terminal failure when its task-space process crashes", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const submitted = [];
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult(result) { submitted.push(result); }
+    },
+    executeTask: async () => {
+      throw Object.assign(new Error("private child details"), { code: "EGO_PROCESS_FAILED" });
+    },
+    checkpointStore: {
+      async load() { return null; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 0, failed: 1 });
+  assert.deepEqual(submitted, [{
+    kind: "failed",
+    jobId: "job-ego-1",
+    errorCode: "EGO_PROCESS_FAILED",
+    safeSummary: "Ego 任务进程执行失败，请检查 Ego 是否可用后重试。",
+    stage: "opening"
+  }]);
+  assert.doesNotMatch(JSON.stringify(submitted), /private child details/);
+});
+
+test("Ego runtime resumes a downloaded checkpoint without repeating browser work", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const checkpointResult = { kind: "downloaded", jobId: "job-ego-1", filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+  let browserCalls = 0;
+  const submitted = [];
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult(result) { submitted.push(result); }
+    },
+    executeTask: async () => { browserCalls += 1; },
+    checkpointStore: {
+      async load() { return { stage: "downloaded", result: checkpointResult }; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 1, failed: 0 });
+  assert.equal(browserCalls, 0);
+  assert.deepEqual(submitted, [checkpointResult]);
+});
+
+test("Ego runtime submits schema changes as terminal results without browser retry", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const submitted = [];
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult(result) { submitted.push(result); }
+    },
+    executeTask: async ({ task }) => ({ kind: "schema_changed", jobId: task.jobId, errorCode: "DOUYIN_SCHEMA_CHANGED", safeSummary: "页面结构已变化", stage: "opening" }),
+    checkpointStore: {
+      async load() { return null; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 1, failed: 0 });
+  assert.equal(submitted.length, 1);
+  assert.equal(submitted[0].kind, "schema_changed");
 });
 
 test("profile registry creates one safe local profile per assigned store", async () => {
