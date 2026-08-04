@@ -114,7 +114,15 @@ test("package exposes the repository lint gate", () => {
 test("pull requests run required repository quality gates", () => {
   const pkg = JSON.parse(read("package.json"));
   const workflow = read(".github/workflows/quality.yml");
-  assert.equal(pkg.scripts["audit:dependencies"], "npm audit --audit-level=low");
+  // 锁的是性质，不是字面量：生产依赖必须有 low 级的硬门槛。
+  //
+  // 原先写死成一条命令，结果 2026-08-04 新公告一来，wrangler 那条开发链把所有 PR 都
+  // 堵死了——而它唯一的「修复」是把 wrangler 倒退 77 个版本。审计因此分成两档：
+  // 生产依赖 low 硬拦，开发依赖高危只打印。放松的只有开发依赖，
+  // 门槛本身没有降（见 docs/decisions/2026-08-04-dependency-audit-scope.md）。
+  const audit = pkg.scripts["audit:dependencies"];
+  assert.match(audit, /npm audit --omit=dev --audit-level=low/, "生产依赖必须 low 级硬拦");
+  assert.equal(/--omit=dev[^&|]*\|\|\s*true/.test(audit), false, "生产依赖那一档不得被 || true 放过");
   assert.equal(pkg.scripts["check:branch-base"], "node scripts/check-branch-base.mjs");
   assert.equal(existsSync(resolve(root, "scripts/check-branch-base.mjs")), true);
   assert.match(workflow, /pull_request:/);
