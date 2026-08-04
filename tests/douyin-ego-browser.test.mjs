@@ -6,6 +6,10 @@ import {
   parseDouyinStoreIdentityText,
   validateDouyinEgoTask
 } from "../scripts/web-data-collector/browser/providers/douyinEgoState.mjs";
+import {
+  egoTaskSpaceName,
+  executeDouyinEgoTask
+} from "../scripts/web-data-collector/browser/providers/douyinEgoTask.mjs";
 
 const task = Object.freeze({
   jobId: "job-ego-1",
@@ -144,4 +148,117 @@ test("Ego Douyin state classification separates every terminal cause", () => {
   for (const [snapshot, classificationContext, expected] of cases) {
     assert.deepEqual(classifyDouyinEgoSnapshot(snapshot, classificationContext), expected);
   }
+});
+
+function egoHelpers({ ownership = "agent", identityStoreId = "90862283" } = {}) {
+  const calls = [];
+  let currentUrl = "";
+  const name = "EC 抖音 90862283";
+  return {
+    calls,
+    async listTaskSpaces() {
+      calls.push(["listTaskSpaces"]);
+      return [{ id: 41, name, ownership }];
+    },
+    async useOrCreateTaskSpace(value) {
+      calls.push(["useOrCreateTaskSpace", value]);
+      return { id: 41, name, ownership: "agent" };
+    },
+    async claimTaskSpace(id) {
+      calls.push(["claimTaskSpace", id]);
+      return { id, name, ownership: "agent" };
+    },
+    async handOffTaskSpace(id) {
+      calls.push(["handOffTaskSpace", id]);
+      return { done: true };
+    },
+    async listTabs() {
+      calls.push(["listTabs"]);
+      return [{ targetId: "tab-identity", url: "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools" }];
+    },
+    async switchTab(targetId) {
+      calls.push(["switchTab", targetId]);
+    },
+    async openOrReuseTab(url) {
+      currentUrl = url;
+      calls.push(["openOrReuseTab", url]);
+      return { targetId: url.includes("qualification") ? "tab-identity" : "tab-resource", url };
+    },
+    async pageInfo() {
+      const parsed = new URL(currentUrl);
+      return { url: currentUrl, title: parsed.hostname };
+    },
+    async js() {
+      if (currentUrl.includes("qualification")) {
+        return `店铺名称：TIYES提野星宠物用品旗舰店\n店铺 ID：${identityStoreId}`;
+      }
+      return {
+        origin: "https://compass.jinritemai.com",
+        path: "/shop/video/overview",
+        title: "短视频分析-抖音电商罗盘",
+        body: "短视频明细 日期 下载报表",
+        readyState: "complete",
+        networkIdle: true,
+        hasPassword: false,
+        hasRegisteredResourceSentinels: true
+      };
+    },
+    async wait() {},
+    async completeTaskSpace() {},
+    async gotoAndWait() {},
+    async cdp() {}
+  };
+}
+
+test("Ego task space binding is deterministic for one registered store", () => {
+  assert.equal(egoTaskSpaceName({
+    providerId: "douyin-ecommerce",
+    storeId: "90862283"
+  }), "EC 抖音 90862283");
+});
+
+test("automatic polling never claims a user-controlled Ego task space", async () => {
+  const helpers = egoHelpers({ ownership: "user" });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: false }
+  }, helpers);
+
+  assert.equal(result.kind, "waiting_human");
+  assert.equal(result.errorCode, "EGO_TASK_SPACE_USER_CONTROLLED");
+  assert.equal(helpers.calls.some(([name]) => name === "claimTaskSpace"), false);
+  assert.equal(helpers.calls.some(([name]) => name === "openOrReuseTab"), false);
+});
+
+test("manual same-job retry claims the store space and selects its exact tab", async () => {
+  const helpers = egoHelpers({ ownership: "user" });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: true }
+  }, helpers);
+
+  assert.equal(result.kind, "download_capability_check");
+  assert.deepEqual(helpers.calls.slice(0, 4), [
+    ["listTaskSpaces"],
+    ["claimTaskSpace", 41],
+    ["listTabs"],
+    ["switchTab", "tab-identity"]
+  ]);
+  assert.equal(helpers.calls.some(([name]) => name === "handOffTaskSpace"), false);
+});
+
+test("wrong stable store identity hands off without opening a resource page", async () => {
+  const helpers = egoHelpers({ identityStoreId: "99887766" });
+  const result = await executeDouyinEgoTask({
+    task,
+    control: { explicitHumanRetry: false }
+  }, helpers);
+
+  assert.equal(result.kind, "waiting_human");
+  assert.equal(result.errorCode, "DOUYIN_STORE_MISMATCH");
+  assert.deepEqual(
+    helpers.calls.filter(([name]) => name === "openOrReuseTab").map(([, url]) => url),
+    ["https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools"]
+  );
+  assert.equal(helpers.calls.some(([name]) => name === "handOffTaskSpace"), true);
 });

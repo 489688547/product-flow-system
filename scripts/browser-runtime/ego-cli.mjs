@@ -108,7 +108,7 @@ export function buildEgoBootstrap(moduleUrl) {
   const encodedModuleUrl = JSON.stringify(String(moduleUrl || ""));
   return `const input = JSON.parse(Buffer.from(process.env.EC_EGO_TASK_B64, "base64url").toString("utf8"));\n`
     + `const taskModule = await import(${encodedModuleUrl});\n`
-    + "const helpers = Object.freeze({ listTaskSpaces, useOrCreateTaskSpace, claimTaskSpace, handOffTaskSpace, openOrReuseTab, gotoAndWait, pageInfo, js, cdp, wait, completeTaskSpace });\n"
+    + "const helpers = Object.freeze({ listTaskSpaces, useOrCreateTaskSpace, claimTaskSpace, handOffTaskSpace, listTabs, switchTab, openOrReuseTab, gotoAndWait, pageInfo, js, cdp, wait, completeTaskSpace });\n"
     + "const result = await taskModule.executeEgoCliTask(input, helpers);\n"
     + "cliLog(JSON.stringify(result));\n";
 }

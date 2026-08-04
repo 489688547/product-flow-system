@@ -4,6 +4,7 @@ import { join } from "node:path";
 const CHECKPOINT_STAGES = new Set([
   "opening",
   "executing",
+  "waiting_human",
   "waiting_download",
   "downloaded",
   "archived",
@@ -28,7 +29,8 @@ const RESULT_FIELDS = new Set([
   "stage"
 ]);
 const SENSITIVE_FIELD = /cookie|token|password|credential|authorization|html|pageText/i;
-const RESUME_FIELDS = new Set(["archive", "parsed", "nextChunkIndex", "processed"]);
+const RESUME_FIELDS = new Set(["archive", "parsed", "nextChunkIndex", "processed", "humanWait"]);
+const HUMAN_WAIT_FIELDS = new Set(["errorCode", "taskSpaceName"]);
 const ARCHIVE_FIELDS = new Set(["relativeArchiveKey", "fileHash"]);
 const PARSED_FIELDS = new Set(["reportVersion", "rowCount", "coverage", "confidence"]);
 const PROCESSED_FIELDS = new Set([
@@ -128,6 +130,20 @@ function validateResume(resume) {
   if (resume === undefined) return undefined;
   assertObjectFields(resume, RESUME_FIELDS, "恢复信息");
   const normalized = {};
+  if (resume.humanWait !== undefined) {
+    assertObjectFields(resume.humanWait, HUMAN_WAIT_FIELDS, "恢复人工接管信息");
+    const errorCode = String(resume.humanWait.errorCode || "");
+    const taskSpaceName = String(resume.humanWait.taskSpaceName || "").trim();
+    if (
+      !/^[A-Z0-9_]{3,80}$/.test(errorCode)
+      || !taskSpaceName
+      || taskSpaceName.length > 120
+      || /[\u0000-\u001f\u007f]/.test(taskSpaceName)
+    ) {
+      throw new Error("本机检查点恢复人工接管信息无效。");
+    }
+    normalized.humanWait = { errorCode, taskSpaceName };
+  }
   if (resume.archive !== undefined) {
     assertObjectFields(resume.archive, ARCHIVE_FIELDS, "恢复归档信息");
     normalized.archive = {

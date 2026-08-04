@@ -156,7 +156,7 @@ test("Ego runner bootstrap executes one fixed local task module through stdin", 
   await writeFile(executable, `#!/usr/bin/env node
 let source = "";
 for await (const chunk of process.stdin) source += chunk;
-for (const name of ["listTaskSpaces", "useOrCreateTaskSpace", "claimTaskSpace", "handOffTaskSpace", "openOrReuseTab", "gotoAndWait", "pageInfo", "js", "cdp", "wait", "completeTaskSpace"]) globalThis[name] = async () => null;
+for (const name of ["listTaskSpaces", "useOrCreateTaskSpace", "claimTaskSpace", "handOffTaskSpace", "listTabs", "switchTab", "openOrReuseTab", "gotoAndWait", "pageInfo", "js", "cdp", "wait", "completeTaskSpace"]) globalThis[name] = async () => null;
 globalThis.cliLog = value => process.stdout.write(String(value) + "\\n");
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 await new AsyncFunction(source)();
@@ -166,7 +166,7 @@ await new AsyncFunction(source)();
     kind: "failed",
     jobId: input.jobId,
     errorCode: "EGO_SMOKE_FAILED",
-    safeSummary: helpers.openOrReuseTab ? "bootstrap-ok" : "bootstrap-missing-helper",
+    safeSummary: helpers.openOrReuseTab && helpers.listTabs && helpers.switchTab ? "bootstrap-ok" : "bootstrap-missing-helper",
     stage: "opening"
   };
 }
