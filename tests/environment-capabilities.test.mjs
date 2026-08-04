@@ -73,10 +73,14 @@ test("platform credential vault declares its root secret migration and affected 
   assert.deepEqual(chromeCollection.platforms, [
     "cloudflare-pages",
     "cloudflare-d1",
+    "aliyun",
     "kuaimai",
     "douyin-ecommerce",
     "erp-file-import"
   ]);
+  assert.match(chromeCollection.description, /快麦.*MV3/);
+  assert.match(chromeCollection.description, /抖店.*Ego/);
+  assert.match(chromeCollection.description, /阿里云.*SQLite/);
   assert.match(chromeCollection.description, /异常.*幂等排队/);
 
   const registry = JSON.parse(readFileSync(resolve(root, "docs/platform/integration-registry.json"), "utf8"));
@@ -185,7 +189,7 @@ test("environment capability validation rejects secret values and unknown platfo
   assert.equal(errors.some(error => error.includes("变量名")), true);
 });
 
-test("Douyin Compass collection declares control and business D1 boundaries without a new secret", () => {
+test("Douyin Compass collection declares Ego and Aliyun SQLite without a new secret", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "douyin-compass-collection");
 
@@ -193,10 +197,11 @@ test("Douyin Compass collection declares control and business D1 boundaries with
   assert.deepEqual(capability.platforms, [
     "douyin-ecommerce",
     "erp-file-import",
+    "aliyun",
     "cloudflare-pages",
     "cloudflare-d1"
   ]);
-  assert.deepEqual(capability.requiredIn, ["preview", "production"]);
+  assert.deepEqual(capability.requiredIn, []);
   assert.deepEqual(capability.envVars, []);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"]);
   assert.deepEqual(capability.bindingTables.PRODUCT_FLOW_DB, [
@@ -220,5 +225,7 @@ test("Douyin Compass collection declares control and business D1 boundaries with
     "commerce_video_daily_facts"
   ]);
   assert.match(capability.description, /账号密码登录保持退役/);
-  assert.match(capability.description, /已登录 Chrome/);
+  assert.match(capability.description, /Ego Task Space/);
+  assert.match(capability.description, /阿里云.*SQLite/);
+  assert.match(capability.description, /Cloudflare D1.*不接收 Ego/);
 });

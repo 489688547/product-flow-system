@@ -25,15 +25,18 @@ test("integration registry routes every AI consumer through Lingsuan", () => {
   assert.equal(JSON.stringify(lingsuan).includes("api.openai.com"), false);
 });
 
-test("Douyin restores only pre-authenticated Chrome official-report collection", () => {
+test("Douyin uses Ego only and writes formal facts through Aliyun", () => {
   const registry = JSON.parse(readFileSync(registryPath, "utf8"));
   const douyin = registry.platforms.find(entry => entry.id === "douyin-ecommerce");
 
   assert.ok(douyin, "Douyin ecommerce must be registered");
   assert.equal(douyin.status, "integrating");
-  assert.match(douyin.summary, /已登录 Chrome/);
+  assert.match(douyin.summary, /Ego/);
+  assert.match(douyin.summary, /阿里云.*SQLite/);
+  assert.doesNotMatch(douyin.summary, /Chrome.*默认|默认.*Chrome/);
   assert.match(douyin.summary, /账号密码登录.*退役/);
-  assert.equal(douyin.capabilities.includes("已登录 Chrome 官方报表采集"), true);
+  assert.equal(douyin.capabilities.includes("Ego Task Space 官方报表采集"), true);
+  assert.equal(douyin.capabilities.includes("已登录 Chrome 官方报表采集"), false);
   assert.equal(douyin.capabilities.includes("账号密码登录保持退役"), true);
   for (const resource of ["店铺每日", "商品每日", "直播每日", "短视频每日"]) {
     assert.equal(douyin.capabilities.includes(resource), true, resource);
@@ -42,7 +45,13 @@ test("Douyin restores only pre-authenticated Chrome official-report collection",
   assert.equal(douyin.domains.includes("compass.jinritemai.com"), true);
   assert.equal(douyin.apiRoutes.includes("/api/platform/v1/commerce-facts"), true);
   assert.equal(douyin.apiRoutes.includes("/api/platform/v1/commerce-facts/ingest"), true);
-  assert.equal(douyin.evidence.includes("docs/decisions/2026-07-24-douyin-preauthenticated-chrome-collection.md"), true);
+  assert.equal(douyin.evidence.includes("docs/features/douyin-ego-collector/design.md"), true);
+  const aliyun = douyin.relations.find(relation => relation.platformId === "aliyun");
+  assert.equal(aliyun?.type, "formal-facts-target");
+  assert.match(aliyun.description, /ECS.*SQLite/);
+  const d1 = douyin.relations.find(relation => relation.platformId === "cloudflare-d1");
+  assert.equal(d1?.type, "rollback-only");
+  assert.match(d1.description, /不接收.*Ego/);
 });
 
 test("ADR directory is not a provider code path", () => {
