@@ -5,6 +5,7 @@ export const COLLECTION_FAILURE_KIND = Object.freeze({
   schemaChanged: "schema_changed",
   needsHuman: "needs_human",
   extension: "extension",
+  browserRuntime: "browser_runtime",
   ingest: "ingest",
   lifecycle: "lifecycle",
   unknown: "unknown"
@@ -33,7 +34,7 @@ const CATALOG = Object.freeze({
   DOUYIN_DATE_CONTROL_MISSING: {
     kind: COLLECTION_FAILURE_KIND.pageInteraction,
     summary: "在抖店页面上找不到日期选择控件。",
-    action: "确认公司 Chrome 已打开对应店铺后重试；若持续找不到，多半是页面改版，需要更新采集适配。",
+    action: "确认公司 Mac 的 Ego 已打开对应店铺空间后重试；若持续找不到，多半是页面改版，需要更新采集适配。",
     retryable: true
   },
   KUAIMAI_TIME_RANGE_NOT_APPLIED: {
@@ -171,13 +172,55 @@ const CATALOG = Object.freeze({
   DOUYIN_LOGIN_REQUIRED: {
     kind: COLLECTION_FAILURE_KIND.needsHuman,
     summary: "抖店登录状态已失效。",
-    action: "请在公司 Mac 的同一 Chrome Profile 登录抖店，然后重新触发。",
+    action: "请在公司 Mac 的同一店铺 Ego 空间登录抖店，然后在公司平台确认重试。",
     retryable: false
   },
   DOUYIN_HUMAN_VERIFICATION_REQUIRED: {
     kind: COLLECTION_FAILURE_KIND.needsHuman,
     summary: "抖店页面正在等待人工验证。",
-    action: "请在公司 Mac 上完成验证码、扫码、滑块或设备验证，然后重新触发。",
+    action: "请在公司 Mac 的同一店铺 Ego 空间完成验证码、扫码、滑块或设备验证，然后在公司平台确认重试。",
+    retryable: false
+  },
+  EGO_TASK_SPACE_USER_CONTROLLED: {
+    kind: COLLECTION_FAILURE_KIND.needsHuman,
+    summary: "该店铺的 Ego 空间当前由人工控制，采集器没有抢占页面。",
+    action: "请在公司 Mac 的同一店铺 Ego 空间完成操作并交还控制，然后在公司平台确认重试。",
+    retryable: false
+  },
+  DOUYIN_STORE_IDENTITY_UNAVAILABLE: {
+    kind: COLLECTION_FAILURE_KIND.needsHuman,
+    summary: "Ego 无法确认当前抖店的稳定店铺 ID。",
+    action: "请在同一店铺 Ego 空间打开抖店资质页并确认店铺身份，然后在公司平台确认重试。",
+    retryable: false
+  },
+  DOUYIN_STORE_MISMATCH: {
+    kind: COLLECTION_FAILURE_KIND.needsHuman,
+    summary: "Ego 当前登录的抖店与采集任务店铺不一致。",
+    action: "请在该任务的 Ego 空间切换到正确店铺，再在公司平台确认重试。",
+    retryable: false
+  },
+  EGO_UNAVAILABLE: {
+    kind: COLLECTION_FAILURE_KIND.browserRuntime,
+    summary: "公司 Mac 上的 Ego 采集运行时当前不可用。",
+    action: "请打开或重新启动 Ego，确认该店铺空间可用后重试。",
+    retryable: true
+  },
+  EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE: {
+    kind: COLLECTION_FAILURE_KIND.browserRuntime,
+    summary: "当前 Ego 无法把官方报表下载到受控任务目录。",
+    action: "请更新或修复 Ego 后再采集；不能只凭页面提示判定下载成功。",
+    retryable: false
+  },
+  DOUYIN_PAGE_LOAD_TIMEOUT: {
+    kind: COLLECTION_FAILURE_KIND.pageInteraction,
+    summary: "抖店页面在限定时间内没有稳定加载完成。",
+    action: "请先确认 Ego 网络与抖店页面可正常打开，再重试一次；连续超时请反馈。",
+    retryable: true
+  },
+  EGO_FORMAL_TARGET_NOT_ALIYUN: {
+    kind: COLLECTION_FAILURE_KIND.lifecycle,
+    summary: "正式 Ego 采集尚未连接到登记的阿里云数据入口。",
+    action: "请等待阿里云入口、ICP备案和 HTTPS 就绪后再启用正式采集；当前只保留本地待上传证据。",
     retryable: false
   },
   EXTENSION_DOWNLOAD_TIMEOUT: {

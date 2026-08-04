@@ -30,7 +30,7 @@ test("web collection migration creates governed generic control-plane tables", (
   assert.match(migration, /FOREIGN KEY\s*\(job_id\)\s*REFERENCES web_collection_jobs\(id\)/i);
   assert.doesNotMatch(migration, /password|cookie|access_token|refresh_token|verification_code|raw_html|absolute_path/i);
 });
-test("web collection environment capability names the exact D1 boundary", () => {
+test("web collection environment capability names the shared MV3 and Ego boundaries", () => {
   const capability = environment.capabilities.find(item => item.id === "company-web-data-collection");
   assert.ok(capability);
   assert.deepEqual(capability.tables, [...TABLES, ...EXPERIMENTAL_TABLES]);
@@ -42,6 +42,7 @@ test("web collection environment capability names the exact D1 boundary", () => 
   assert.deepEqual(capability.platforms, [
     "cloudflare-pages",
     "cloudflare-d1",
+    "aliyun",
     "kuaimai",
     "douyin-ecommerce",
     "erp-file-import"

@@ -347,7 +347,7 @@ boolean，`coverage` 必须在 0–1；任意输出、页面正文或扩展字�
 
 ## Provider and task contract
 
-The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `web_collection_stores.store_id`. An executive may register multiple Douyin stores from 数据接入 using only `storeId` and `storeName`; `(providerId, storeId)` is unique and submitting the same ID updates its name. The paired extension may also register a Douyin store after reading the fixed shop-management page. The bridge and runner accept exactly `providerId`, stable `storeId` and `storeName`. The server, not the runner, resolves that store directory. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie, token or page body field are rejected.
+The server accepts only code-registered provider and resource IDs. Kuaimai schedules `orders`, `order_items` and `sales_items`; Douyin schedules `store_daily`, `product_daily`, `live_daily` and `video_daily` once per connected `web_collection_stores.store_id`. An executive may register multiple Douyin stores from 数据接入 using only `storeId` and `storeName`; `(providerId, storeId)` is unique and submitting the same ID updates its name. The bridge and runner accept exactly `providerId`, stable `storeId` and `storeName`. The server, not the runner, resolves that store directory. Formal Douyin execution maps the stable ID to deterministic Ego Task Space `EC 抖音 <storeId>` and confirms the same ID on the fixed qualification page before opening a resource. Kuaimai remains on the paired MV3 extension; the bridge withholds every Douyin job in `ego` mode. A plan item contains `providerId`, stable `storeId`, `resourceType`, `businessDate`, `rangeKind`, an optional fixed Shanghai-time range, `scheduleVersion`, `selectorVersion` and the derived `idempotencyKey`. Requests containing a URL, origin, selector, script, credentials, cookie, token, Task Space ID or page body field are rejected.
 
 `captured` 结果仅允许 `store_daily` 的固定原子对象或 `product_daily` 的非空商品数组。商品数组每行必须
 包含唯一稳定 `productId` 以及完整标准字段集合；接口没有提供的字段使用 `null`。Bridge 最大接收 2 MiB，
@@ -356,10 +356,10 @@ The server accepts only code-registered provider and resource IDs. Kuaimai sched
 
 Runner actions are:
 
-- `heartbeat`: update version, Chrome status, current job and last-seen time.
+- `heartbeat`: update runner version, safe local executor status, current job and last-seen time.
 - `ensure_registered_plan`: after 05:00 Asia/Shanghai, generate yesterday's fixed Kuaimai tasks and four Douyin tasks for every connected store. The request accepts no store, URL, resource or database target.
 - `ensure_plan`: idempotently create 1–100 deterministic jobs.
-- `claim`: lease one queued or expired-lease job for 60–900 seconds. Kuaimai work may be claimed without a store identity; Douyin work is returned only when `storeId` matches the current Chrome Profile identity.
+- `claim`: lease one queued or expired-lease job for 60–900 seconds. Kuaimai work may be claimed without a store identity; Douyin work is returned only to the `ego` executor whose assigned stable `storeId` matches the job.
 - `transition`: perform one legal state transition with safe stage and error summary.
 - `complete`: atomically append the success run, mark the job successful and upsert its resource cursor.
 - `record_notification`: persist one deduplicated macOS notification result.
@@ -373,23 +373,38 @@ User action is:
 
 States are `queued`, `claimed`, `opening`, `collecting`, `waiting_human`, `exporting`, `downloading`, `validating`, `ingesting`, `success`, `failed` and `schema_changed`. `collecting` is used only for a fixed safe page read; official files use `exporting` and `downloading`. Only the owning runner can change a claimed job. A lease expires after at most 15 minutes; the next runner cycle may reclaim it. Job idempotency includes `providerId:storeId:resourceType:businessDate:scheduleVersion` plus the server-owned target environment and version. Only `complete` from `ingesting` advances `(providerId, storeId, resourceType)` cursor. Provider facts are projected to the persisted target business database; a stale display version is rejected.
 
+Ego keeps local `0600` checkpoints for opening, download, archive, parse, upload and completion. A `waiting_human`
+server result retains only the same-job error code and deterministic Task Space name locally; it never stores Cookie,
+page body or Task Space ID. A forced requeue of that exact job may consume the marker once and claim the handed-off
+space. A downloaded checkpoint resumes parsing/upload without repeating browser work. Before Aliyun cutover, the
+local-only `probe-ego` command may stop at `pending_upload`; it does not claim, transition or complete a production job.
+
+Formal `serve/install --browser-mode ego` accepts only `https://deshan-tiyes.cn`. The Ego path uploads facts only
+through the Aliyun ECS API, and success requires the SQLite transaction response with batch ID, accepted row count
+and validation summary. Cloudflare Pages/D1 is rollback-only for this path: no dual write and no fallback write.
+
 ## Responses
 
 Responses use `{ data, meta }` and `cache-control: no-store`. The list response contains safe runner, job, cursor and notification fields. It excludes runner-token hashes, absolute paths, URLs, selectors, page bodies and file contents.
 
 ## Errors
 
-- `WEB_COLLECTION_STORAGE_UNAVAILABLE`: D1 binding or table unavailable, retryable.
+- `WEB_COLLECTION_STORAGE_UNAVAILABLE`: the selected control storage or table is unavailable, retryable.
 - `WEB_COLLECTION_RUNNER_TOKEN_REQUIRED` / `WEB_COLLECTION_RUNNER_TOKEN_INVALID`: missing or invalid Keychain token.
 - `WEB_COLLECTION_RUNNER_REQUIRED`: a user tried to add a store before the company collector was registered.
 - `WEB_COLLECTION_RUNNER_REGISTER_DENIED` / `WEB_COLLECTION_VIEW_DENIED`: authorization failure.
-- `WEB_COLLECTION_STORE_INVALID`: store identity or Chrome Profile store scope is invalid.
+- `WEB_COLLECTION_STORE_INVALID`: stable store identity or assigned executor scope is invalid.
 - `WEB_COLLECTION_TRIGGER_DENIED`: the company session cannot enqueue or retry collection.
 - `WEB_COLLECTION_TRIGGER_INVALID`: the requested provider, resource or business date is outside the fixed user-trigger contract.
 - `WEB_COLLECTION_JOB_INVALID`: provider, resource, date, range, key or forbidden instruction field is invalid.
 - `WEB_COLLECTION_BUSINESS_DATE_MISMATCH`: the downloaded file's parsed first or last business date differs from the job date; the file is not ingested and the cursor does not advance.
 - `DOUYIN_API_EMPTY_DATA` / `DOUYIN_PRODUCT_ID_MISSING`: 商品接口为空或缺少稳定商品 ID，不写入。
 - `DOUYIN_PRODUCT_DUPLICATE` / `DOUYIN_PRODUCT_PAGE_INCOMPLETE` / `DOUYIN_PRODUCT_PAGE_CHANGED`: 商品分页重复、不完整或采集中总数变化，不写入。
+- `EGO_UNAVAILABLE`: Ego runtime or required helper is unavailable; retry only after Ego is restored.
+- `EGO_TASK_SPACE_USER_CONTROLLED`: the deterministic store space is controlled by a human; wait for explicit same-job confirmation.
+- `EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE`: Ego cannot guarantee the controlled download directory; fail closed without Chrome fallback.
+- `DOUYIN_PAGE_LOAD_TIMEOUT`: the registered Douyin page did not become stable before the bounded timeout.
+- `EGO_FORMAL_TARGET_NOT_ALIYUN`: formal Ego service points anywhere except the registered Aliyun HTTPS origin.
 - `WEB_COLLECTION_JOB_NOT_FOUND` / `WEB_COLLECTION_JOB_OWNER_MISMATCH`: missing or wrong runner job.
 - `WEB_COLLECTION_STATE_CONFLICT` / `WEB_COLLECTION_TRANSITION_INVALID`: stale or illegal state update.
 - `WEB_COLLECTION_RUN_INVALID` / `WEB_COLLECTION_NOTIFICATION_INVALID`: invalid completion or notification metadata.
@@ -406,7 +421,7 @@ Responses use `{ data, meta }` and `cache-control: no-store`. The list response 
 
 ## Compatibility, capacity and rollback
 
-This is an additive v1 API. New providers add code adapters and registered resource IDs without changing the shared task schema. D1 stores small operational metadata and completed standard facts only; binary exports remain in the local archive. Rollback disables the provider adapter and registered daily plan while retaining jobs, runs, cursors, notifications and last trusted facts for audit; the existing Kuaimai file scanner remains available.
+This is an additive v1 API. New providers add code adapters and registered resource IDs without changing the shared task schema. Kuaimai keeps its MV3/D1 compatibility path. Douyin uses Ego only and treats the Aliyun ECS/SQLite runtime as its sole formal destination; Cloudflare remains a rollback boundary and receives no Ego facts. Binary exports remain in the local archive. Before cutover, rollback means leaving the existing production collector unchanged. After cutover, rollback stops ECS writes and restores the prior read-only boundary; SQLite and D1 increments are never auto-merged. Disabling a provider retains jobs, runs, cursors, notifications and last trusted facts for audit; the existing Kuaimai file scanner remains available.
 
 ## Observability and contract tests
 
