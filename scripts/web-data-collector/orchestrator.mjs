@@ -26,6 +26,7 @@ function safeErrorCode(value, fallback = "WEB_COLLECTION_LOCAL_PROCESSING_FAILED
 // dedicated 模式下改由专用浏览器执行的 provider。其余 provider 仍由扩展执行——
 // 快麦就是靠这条继续跑的。
 const DEDICATED_PROVIDERS = new Set(["douyin-ecommerce"]);
+const BROWSER_EXECUTION_MODES = new Set(["dedicated", "ego"]);
 
 // 任务分发只在这一处发生，出问题时必须能从日志看出「谁领走了什么」。
 // 不打日志的话，只能从失败记录反推，而失败记录不记录是哪个执行器跑的。
@@ -130,26 +131,28 @@ export function createWebCollectorOrchestrator({
     },
     async nextTask({ storeId = "", executor = "extension" } = {}) {
       if (executor === "extension") lastExtensionSeenAt = currentTime();
-      // dedicated 模式下只有抖音改由专用浏览器执行，快麦等仍旧由扩展执行。
+      // dedicated/ego 模式下只有抖音改由当前浏览器执行器处理，快麦等仍旧由扩展执行。
       //
       // 原先的判据是「扩展请求带了 storeId 就一概不给」，但扩展只要存过抖音的 storeId，
       // 之后每次轮询都会带着它——于是快麦任务再也发不出去，而表现只是「快麦不采了」，
       // 看不出跟切换浏览器模式有关。判据应当是「这条任务归谁执行」，与请求里带什么无关。
-      const 归专用浏览器 = job => executionMode === "dedicated"
+      const 归浏览器执行器 = job => BROWSER_EXECUTION_MODES.has(executionMode)
         && DEDICATED_PROVIDERS.has(String(job?.providerId || ""));
-      // 反方向同样要堵：专用浏览器执行器只认抖音任务，拿到别的平台会直接判 DOUYIN_TASK_INVALID。
+      // 反方向同样要堵：浏览器执行器只认抖音任务，拿到别的平台会直接判任务无效。
       // 实测 08-02 的 kuaimai inventory 与 orders 就是这么被判失败的——领错了活，
       // 而且失败得像是快麦自己出了问题。
-      const 不该给专用浏览器 = job => executionMode === "dedicated"
+      const 不该给浏览器执行器 = job => BROWSER_EXECUTION_MODES.has(executionMode)
         && !DEDICATED_PROVIDERS.has(String(job?.providerId || ""));
+      const 是当前浏览器执行器 = executor === executionMode && BROWSER_EXECUTION_MODES.has(executionMode);
       const profileStoreId = String(storeId || "");
       if (activeJob) {
         if (processingResult) return null;
         if (activeLeaseExpiresAt && currentTime() >= activeLeaseExpiresAt) clearActiveJob();
       }
       if (activeJob) {
-        if (executor !== "dedicated" && 归专用浏览器(activeJob)) return null;
-        if (executor === "dedicated" && 不该给专用浏览器(activeJob)) return null;
+        if (executor === "extension" && 归浏览器执行器(activeJob)) return null;
+        if (是当前浏览器执行器 && 不该给浏览器执行器(activeJob)) return null;
+        if (executor !== "extension" && !是当前浏览器执行器) return null;
         if (activeJob.providerId === "douyin-ecommerce" && activeJob.storeId !== profileStoreId) return null;
         // 这条分支原先没打日志，而它恰恰是任务真正被交出去的那一次：
         // 领取发生在上一轮（另一个执行器轮询时），这一轮只是把已领的任务交给来取的人。
@@ -159,7 +162,7 @@ export function createWebCollectorOrchestrator({
         return safeTask(activeJob);
       }
       // 扩展在 dedicated 模式下不按 storeId 过滤：带上抖音的 storeId 会把快麦任务一并挡在外面。
-      const 过滤 = profileStoreId && (executor === "dedicated" || executionMode !== "dedicated")
+      const 过滤 = profileStoreId && (是当前浏览器执行器 || !BROWSER_EXECUTION_MODES.has(executionMode))
         ? { storeId: profileStoreId }
         : {};
       const claimed = await api.claim(300, 过滤);
@@ -167,18 +170,18 @@ export function createWebCollectorOrchestrator({
       activeJob = claimed.job;
       rememberLease(activeJob, 300);
       await transition("claimed", "opening");
-      // 抖音的任务留给专用浏览器下一轮来取，不交给扩展；
-      // 别的平台的任务留给扩展下一轮来取，不交给专用浏览器。
+      // 抖音的任务留给当前浏览器执行器下一轮来取，不交给扩展；
+      // 别的平台的任务留给扩展下一轮来取，不交给浏览器执行器。
       //
       // 这里打日志是因为出过一次说不清的事：代码与执行器都验证过会扣下抖音任务，
       // 但生产上抖音任务仍被扩展执行了。静态分析解释不了，只能让下一次运行自己说话——
       // 日志里没有「扣下」而抖音又被扩展跑了，就说明跑的根本不是这份代码。
-      if (executor !== "dedicated" && 归专用浏览器(activeJob)) {
-        logRouting(`扣下 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate}：归专用浏览器，不交给扩展`);
+      if (executor === "extension" && 归浏览器执行器(activeJob)) {
+        logRouting(`扣下 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate}：归 ${executionMode}，不交给扩展`);
         return null;
       }
-      if (executor === "dedicated" && 不该给专用浏览器(activeJob)) {
-        logRouting(`扣下 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate}：不归专用浏览器，留给扩展`);
+      if (是当前浏览器执行器 && 不该给浏览器执行器(activeJob)) {
+        logRouting(`扣下 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate}：不归 ${executionMode}，留给扩展`);
         return null;
       }
       logRouting(`派发 ${activeJob.providerId}/${activeJob.resourceType} ${activeJob.businessDate} → ${executor}`);
