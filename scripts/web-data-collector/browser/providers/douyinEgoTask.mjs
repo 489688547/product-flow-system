@@ -1,8 +1,14 @@
+import { mkdir, readdir, stat } from "node:fs/promises";
+import { basename, extname, isAbsolute, join, resolve } from "node:path";
+
 import {
   classifyDouyinEgoSnapshot,
   parseDouyinStoreIdentityText,
   validateDouyinEgoTask
 } from "./douyinEgoState.mjs";
+import { createDouyinExtractApi } from "./douyinExtractApi.js";
+import { createDouyinExtractRunner } from "./douyinExtractRunner.js";
+import { SELF_SERVICE_REPORT_VERSION } from "../../providers/douyin/parser.mjs";
 
 export const DOUYIN_EGO_STORE_IDENTITY_URL = "https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools";
 export const DOUYIN_EGO_RESOURCE_URLS = Object.freeze({
@@ -11,6 +17,8 @@ export const DOUYIN_EGO_RESOURCE_URLS = Object.freeze({
   live_daily: "https://compass.jinritemai.com/shop/live-overview",
   video_daily: "https://compass.jinritemai.com/shop/video/overview"
 });
+export const DOUYIN_EGO_SELF_SERVICE_URL = "https://compass.jinritemai.com/shop/workshop/appcustom-access?tab=access";
+const DOUYIN_DOWNLOAD_URL = /^https:\/\/compass\.jinritemai\.com\/data_factory\/download_file\?task_id=\d+$/;
 
 const HUMAN_TERMS = Object.freeze([
   "验证码",
@@ -29,9 +37,125 @@ const RESOURCE_SENTINELS = Object.freeze({
   video_daily: ["短视频", "日期"]
 });
 const IDENTITY_TEXT_EXPRESSION = String.raw`(() => String(document.body?.innerText || "").slice(0, 50000))()`;
+const DOWNLOAD_EXTENSIONS = new Set([".xlsx", ".xls", ".csv"]);
 
 function taskError(code, message) {
   return Object.assign(new Error(message), { code });
+}
+
+export async function configureEgoDownload({ cdp, workspace } = {}) {
+  const directory = String(workspace || "");
+  if (typeof cdp !== "function" || !isAbsolute(directory)) {
+    throw taskError("EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE", "Ego 受控下载目录配置无效。");
+  }
+  await mkdir(directory, { recursive: true, mode: 0o700 });
+  const details = await stat(directory).catch(() => null);
+  if (!details?.isDirectory()) {
+    throw taskError("EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE", "Ego 受控下载目录不可用。");
+  }
+  try {
+    await cdp("Browser.setDownloadBehavior", {
+      behavior: "allow",
+      downloadPath: directory,
+      eventsEnabled: true
+    });
+  } catch {
+    throw taskError("EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE", "当前 Ego 版本无法提供受控下载目录，采集已停止。");
+  }
+}
+
+function waitMilliseconds(milliseconds) {
+  return new Promise(resolveWait => setTimeout(resolveWait, Math.max(0, milliseconds)));
+}
+
+export async function waitForStableEgoDownload({
+  workspace,
+  startedAt,
+  timeoutMs = 90_000,
+  pollIntervalMs = 500,
+  stabilityDelayMs = 750,
+  now = () => Date.now()
+} = {}) {
+  const root = resolve(String(workspace || ""));
+  if (!isAbsolute(String(workspace || "")) || !Number.isFinite(Number(startedAt))) {
+    throw taskError("EGO_DOWNLOAD_WORKSPACE_INVALID", "Ego 下载任务目录无效。");
+  }
+  const deadline = now() + Math.max(1, Number(timeoutMs) || 90_000);
+  while (now() <= deadline) {
+    const entries = await readdir(root, { withFileTypes: true }).catch(error => {
+      if (error?.code === "ENOENT") return [];
+      throw error;
+    });
+    const candidates = [];
+    for (const entry of entries) {
+      if (!entry.isFile() || basename(entry.name) !== entry.name) continue;
+      if (!DOWNLOAD_EXTENSIONS.has(extname(entry.name).toLowerCase())) continue;
+      const filePath = join(root, entry.name);
+      const first = await stat(filePath).catch(() => null);
+      if (!first?.isFile() || first.size <= 0 || first.mtimeMs + 1 < Number(startedAt)) continue;
+      candidates.push({ filePath, safeFileName: entry.name, first });
+    }
+    candidates.sort((left, right) => left.first.mtimeMs - right.first.mtimeMs || left.safeFileName.localeCompare(right.safeFileName));
+    for (const candidate of candidates) {
+      await waitMilliseconds(stabilityDelayMs);
+      const second = await stat(candidate.filePath).catch(() => null);
+      if (
+        second?.isFile()
+        && second.size > 0
+        && second.size === candidate.first.size
+        && second.mtimeMs === candidate.first.mtimeMs
+      ) {
+        return { filePath: candidate.filePath, safeFileName: candidate.safeFileName };
+      }
+    }
+    if (now() <= deadline) await waitMilliseconds(pollIntervalMs);
+  }
+  throw taskError("EGO_DOWNLOAD_TIMEOUT", "Ego 下载文件未在限定时间内稳定落盘。");
+}
+
+export async function collectDouyinResourceWithEgo({
+  task,
+  helpers,
+  createApi = createDouyinExtractApi,
+  createRunner = createDouyinExtractRunner,
+  downloadOptions = {}
+} = {}) {
+  await configureEgoDownload({ cdp: helpers?.cdp, workspace: task?.workspace });
+  const open = async url => {
+    const target = String(url || "");
+    if (target !== DOUYIN_EGO_SELF_SERVICE_URL && !DOUYIN_DOWNLOAD_URL.test(target)) {
+      throw taskError("DOUYIN_NAVIGATION_UNEXPECTED", "Ego 自助取数尝试打开未登记地址。");
+    }
+    return helpers.openOrReuseTab(target, { wait: true, timeout: 20 });
+  };
+  await open(DOUYIN_EGO_SELF_SERVICE_URL);
+  const api = createApi({
+    controller: { open },
+    evaluate: code => helpers.js(code)
+  });
+  const runner = createRunner({
+    api,
+    wait: milliseconds => helpers.wait(Math.max(0, Number(milliseconds) || 0) / 1_000)
+  });
+  const startedAt = Date.now();
+  await runner.run({
+    resourceType: task.resourceType,
+    from: task.businessDate,
+    to: task.businessDate
+  });
+  const downloaded = await waitForStableEgoDownload({
+    workspace: task.workspace,
+    startedAt,
+    ...downloadOptions
+  });
+  return {
+    kind: "downloaded",
+    jobId: task.jobId,
+    filePath: downloaded.filePath,
+    safeFileName: downloaded.safeFileName,
+    pageType: "shop_compass_self_service",
+    reportVersion: SELF_SERVICE_REPORT_VERSION
+  };
 }
 
 function stableId(value) {
@@ -140,7 +264,9 @@ async function handoff(helpers, taskSpaceId) {
   await helpers.handOffTaskSpace(taskSpaceId);
 }
 
-export async function executeDouyinEgoTask(input, helpers) {
+export async function executeDouyinEgoTask(input, helpers, {
+  collect = collectDouyinResourceWithEgo
+} = {}) {
   requireHelpers(helpers);
   const task = validateDouyinEgoTask(input?.task);
   const control = validateControl(input?.control);
@@ -210,11 +336,20 @@ export async function executeDouyinEgoTask(input, helpers) {
     });
     if (classification.state === "loading") continue;
     if (classification.state === "ready") {
-      return {
-        kind: "download_capability_check",
-        jobId: task.jobId,
-        safeSummary: "Ego 店铺身份和资源页面已确认。"
-      };
+      try {
+        return await collect({ task, helpers, taskSpace });
+      } catch (error) {
+        const candidate = String(error?.code || "EGO_COLLECTION_FAILED").toUpperCase();
+        const errorCode = /^[A-Z0-9_]{3,80}$/.test(candidate) ? candidate : "EGO_COLLECTION_FAILED";
+        return terminal(
+          task,
+          "failed",
+          errorCode,
+          errorCode === "EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE"
+            ? "当前 Ego 版本无法提供受控下载目录，采集已停止。"
+            : "Ego 自助取数或下载未完成，未进入解析和上传。"
+        );
+      }
     }
     if (["login_required", "human_verification", "store_mismatch"].includes(classification.state)) {
       await handoff(helpers, taskSpace.id);

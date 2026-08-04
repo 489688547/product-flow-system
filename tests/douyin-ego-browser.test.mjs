@@ -1,4 +1,7 @@
 import assert from "node:assert/strict";
+import { mkdtemp, utimes, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -7,9 +10,14 @@ import {
   validateDouyinEgoTask
 } from "../scripts/web-data-collector/browser/providers/douyinEgoState.mjs";
 import {
+  collectDouyinResourceWithEgo,
+  configureEgoDownload,
   egoTaskSpaceName,
-  executeDouyinEgoTask
+  executeDouyinEgoTask,
+  waitForStableEgoDownload
 } from "../scripts/web-data-collector/browser/providers/douyinEgoTask.mjs";
+import { runEgoProbe } from "../scripts/web-data-collector/ego-probe.mjs";
+import { buildEgoProbeTask } from "../scripts/web-data-collector/index.mjs";
 
 const task = Object.freeze({
   jobId: "job-ego-1",
@@ -235,7 +243,13 @@ test("manual same-job retry claims the store space and selects its exact tab", a
   const result = await executeDouyinEgoTask({
     task,
     control: { explicitHumanRetry: true }
-  }, helpers);
+  }, helpers, {
+    collect: async input => ({
+      kind: "download_capability_check",
+      jobId: input.task.jobId,
+      safeSummary: "ready-only"
+    })
+  });
 
   assert.equal(result.kind, "download_capability_check");
   assert.deepEqual(helpers.calls.slice(0, 4), [
@@ -261,4 +275,147 @@ test("wrong stable store identity hands off without opening a resource page", as
     ["https://fxg.jinritemai.com/ffa/grs-new/qualification/common-tools"]
   );
   assert.equal(helpers.calls.some(([name]) => name === "handOffTaskSpace"), true);
+});
+
+test("Ego controlled download configures the task workspace before export", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "ego-download-"));
+  const calls = [];
+  await configureEgoDownload({
+    workspace,
+    cdp: async (method, params) => calls.push([method, params])
+  });
+
+  assert.deepEqual(calls, [["Browser.setDownloadBehavior", {
+    behavior: "allow",
+    downloadPath: workspace,
+    eventsEnabled: true
+  }]]);
+});
+
+test("Ego download success requires a new stable file inside the task workspace", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "ego-download-"));
+  const startedAt = Date.now();
+  const filePath = join(workspace, "采集-video-20260803-20260803.xlsx");
+  await writeFile(filePath, "real-export");
+
+  assert.deepEqual(await waitForStableEgoDownload({
+    workspace,
+    startedAt,
+    timeoutMs: 100,
+    pollIntervalMs: 1,
+    stabilityDelayMs: 1
+  }), {
+    filePath,
+    safeFileName: "采集-video-20260803-20260803.xlsx"
+  });
+});
+
+test("Ego download discovery rejects pre-existing and partial files", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "ego-download-"));
+  const oldFile = join(workspace, "old.xlsx");
+  await writeFile(oldFile, "old-export");
+  await utimes(oldFile, new Date(0), new Date(0));
+  await writeFile(join(workspace, "new.xlsx.crdownload"), "partial");
+
+  await assert.rejects(waitForStableEgoDownload({
+    workspace,
+    startedAt: Date.now(),
+    timeoutMs: 5,
+    pollIntervalMs: 1,
+    stabilityDelayMs: 1
+  }), error => error.code === "EGO_DOWNLOAD_TIMEOUT");
+});
+
+test("Ego collection configures download before reusing the mature extract runner", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "ego-download-"));
+  const calls = [];
+  const helpers = {
+    async cdp(method) { calls.push(method); },
+    async openOrReuseTab(url) { calls.push(`open:${url}`); },
+    async js() { return null; },
+    async wait() {}
+  };
+  const result = await collectDouyinResourceWithEgo({
+    task: { ...task, workspace },
+    helpers,
+    createApi: () => ({ kind: "api" }),
+    createRunner: () => ({
+      async run() {
+        calls.push("extract:run");
+        await writeFile(join(workspace, "采集-video-20260803-20260803.xlsx"), "real-export");
+        return { downloaded: true };
+      }
+    }),
+    downloadOptions: { timeoutMs: 100, pollIntervalMs: 1, stabilityDelayMs: 1 }
+  });
+
+  assert.equal(calls[0], "Browser.setDownloadBehavior");
+  assert.equal(calls.includes("extract:run"), true);
+  assert.equal(result.kind, "downloaded");
+  assert.equal(result.safeFileName, "采集-video-20260803-20260803.xlsx");
+});
+
+test("local Ego probe archives and parses one file but stops at pending upload", async () => {
+  const workspace = await mkdtemp(join(tmpdir(), "ego-probe-"));
+  const filePath = join(workspace, "video.xlsx");
+  await writeFile(filePath, "fixture");
+  const checkpoints = [];
+  let remoteCalls = 0;
+  const result = await runEgoProbe({
+    task: { ...task, workspace },
+    executeTask: async () => ({
+      kind: "downloaded",
+      jobId: task.jobId,
+      filePath,
+      safeFileName: "video.xlsx",
+      pageType: "shop_compass_self_service",
+      reportVersion: "douyin-self-service-v1"
+    }),
+    checkpointStore: {
+      async save(jobId, checkpoint) { checkpoints.push([jobId, checkpoint]); }
+    },
+    archiveReport: async () => ({
+      sha256: "a".repeat(64),
+      relativeArchiveKey: "douyin-ecommerce/90862283/video_daily/2026/08/2026-08-03/a.xlsx"
+    }),
+    parseReport: async () => ({
+      reportVersion: "douyin-self-service-v1",
+      facts: [{ videoId: "video-1" }],
+      coverage: 1,
+      confidence: "high"
+    }),
+    completeRemote: async () => { remoteCalls += 1; }
+  });
+
+  assert.equal(result.kind, "pending_upload");
+  assert.equal(result.fileHash, "a".repeat(64));
+  assert.equal(result.rowCount, 1);
+  assert.deepEqual(checkpoints.map(([, checkpoint]) => checkpoint.stage), [
+    "downloaded",
+    "archived",
+    "parsed",
+    "pending_upload"
+  ]);
+  assert.equal(remoteCalls, 0);
+});
+
+test("probe-ego CLI builds one local-only registered task", () => {
+  assert.deepEqual(buildEgoProbeTask([
+    "probe-ego",
+    "--store-id", "90862283",
+    "--store-name", "TIYES提野星宠物用品旗舰店",
+    "--resource", "video_daily",
+    "--business-date", "2026-08-03"
+  ], { homeDirectory: "/Users/company" }), {
+    jobId: "ego-probe-90862283-video_daily-2026-08-03",
+    providerId: "douyin-ecommerce",
+    storeId: "90862283",
+    storeName: "TIYES提野星宠物用品旗舰店",
+    resourceType: "video_daily",
+    businessDate: "2026-08-03",
+    status: "opening",
+    attempt: 1,
+    scheduleVersion: "ego-probe-v1",
+    workspace: "/Users/company/Library/Application Support/Product Flow Collector/Ego Probes/ego-probe-90862283-video_daily-2026-08-03"
+  });
 });

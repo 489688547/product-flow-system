@@ -10,6 +10,7 @@ const CHECKPOINT_STAGES = new Set([
   "archived",
   "parsed",
   "validated",
+  "pending_upload",
   "uploading",
   "submitted",
   "completed"
