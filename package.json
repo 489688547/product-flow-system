@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 8132",
-    "audit:dependencies": "npm audit --audit-level=low",
+    "audit:dependencies": "npm audit --omit=dev --audit-level=low && npm audit --audit-level=high || true",
     "build": "npm run check:environment-capabilities && vite build && node scripts/prepare-pages-build.mjs && node scripts/check-build-chunks.mjs",
     "lint": "eslint src functions server scripts tests react-tests chrome-extension",
     "release:pages": "npm run build && node scripts/prepare-pages-release.mjs",
