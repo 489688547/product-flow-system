@@ -3,11 +3,13 @@ import test from "node:test";
 
 import {
   assertBusinessDateMatchesRange,
+  assertAliyunCollectorTarget,
   assertCollectionFileMatchesTask,
   browserModeUsesManagedChrome,
   createCommerceFactUploader,
   experimentalModeEnabled,
-  normalizeBrowserMode
+  normalizeBrowserMode,
+  runWebCollector
 } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 import {
@@ -76,6 +78,42 @@ test("Ego mode creates no managed Chrome registry", () => {
   assert.equal(browserModeUsesManagedChrome("extension"), false);
   assert.equal(browserModeUsesManagedChrome("dedicated"), true);
   assert.equal(browserModeUsesManagedChrome("ego", { experimentalMode: true }), true);
+});
+
+test("formal Ego service refuses non-Aliyun targets while a loopback probe is allowed", () => {
+  assert.doesNotThrow(() => assertAliyunCollectorTarget({
+    baseUrl: "https://deshan-tiyes.cn",
+    browserMode: "ego"
+  }));
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes-system.pages.dev", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://203.0.113.9", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes.cn:8443", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.doesNotThrow(() => assertAliyunCollectorTarget({
+    baseUrl: "http://127.0.0.1:8132",
+    browserMode: "ego",
+    allowLocalProbe: true
+  }));
+});
+
+test("serve rejects a Cloudflare Ego target before reading local service secrets", async () => {
+  await assert.rejects(
+    runWebCollector([
+      "serve",
+      "--browser-mode", "ego",
+      "--base-url", "https://deshan-tiyes-system.pages.dev",
+      "--ego-cli", "/Users/company/.local/bin/ego-browser"
+    ]),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
 });
 
 test("orchestrator schedules all extension-implemented Kuaimai resources after 10:00", async () => {

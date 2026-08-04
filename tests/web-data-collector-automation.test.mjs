@@ -75,3 +75,34 @@ test("LaunchAgent installer preserves the requested dedicated fallback mode", as
     await rm(home, { recursive: true, force: true });
   }
 });
+
+test("LaunchAgent pins formal Ego mode and its absolute CLI without secrets", () => {
+  const plist = collectorLaunchAgentPlist({
+    nodePath: "/usr/local/bin/node",
+    collectorPath: "/repo/scripts/web-data-collector/index.mjs",
+    root: "/Users/company/Desktop/company-data-archive",
+    baseUrl: "https://deshan-tiyes.cn",
+    browserMode: "ego",
+    egoCli: "/Applications/ego lite.app/Contents/MacOS/ego lite"
+  });
+
+  assert.match(plist, /<string>--browser-mode<\/string>\s*<string>ego<\/string>/);
+  assert.match(plist, /<string>--ego-cli<\/string>\s*<string>\/Applications\/ego lite\.app\/Contents\/MacOS\/ego lite<\/string>/);
+  assert.doesNotMatch(plist, /wdc_|wcp_|Cookie|Task Space/i);
+});
+
+test("Ego switch script gates Aliyun before changing the LaunchAgent", async () => {
+  const script = await readFile(new URL("../scripts/switch-collector-to-ego.sh", import.meta.url), "utf8");
+  const targetGate = script.indexOf('[ "$BASE_URL" = "https://deshan-tiyes.cn" ]');
+  const reachabilityGate = script.indexOf("curl -fsS --max-time 10");
+  const installStep = script.indexOf("index.mjs\" install");
+
+  assert.ok(targetGate >= 0 && reachabilityGate > targetGate);
+  assert.ok(installStep > reachabilityGate, "Aliyun checks must finish before installing the LaunchAgent");
+  assert.match(script, /\/Users\/roger\/Desktop\/EC-management-system/);
+  assert.match(script, /--browser-mode ego/);
+  assert.match(script, /--ego-cli/);
+  assert.match(script, /17653/);
+  assert.match(script, /codeVersion/);
+  assert.match(script, /probe-ego/);
+});

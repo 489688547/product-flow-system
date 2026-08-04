@@ -137,6 +137,28 @@ export function browserModeUsesManagedChrome(browserMode, { experimentalMode = f
   return browserMode === "dedicated" || experimentalMode === true;
 }
 
+export function assertAliyunCollectorTarget({ baseUrl, browserMode, allowLocalProbe = false } = {}) {
+  if (browserMode !== "ego") return;
+  let target;
+  try {
+    target = new URL(String(baseUrl || ""));
+  } catch {
+    target = null;
+  }
+  const isApprovedAliyun = target?.origin === "https://deshan-tiyes.cn"
+    && target.pathname === "/"
+    && !target.search
+    && !target.hash;
+  const isLoopbackProbe = allowLocalProbe === true
+    && target?.protocol === "http:"
+    && ["127.0.0.1", "localhost", "::1"].includes(target.hostname);
+  if (!isApprovedAliyun && !isLoopbackProbe) {
+    throw Object.assign(new Error("正式 Ego 采集只允许写入已登记的阿里云 ECS 入口。"), {
+      code: "EGO_FORMAL_TARGET_NOT_ALIYUN"
+    });
+  }
+}
+
 async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
   const personalToken = String(process.env.PRODUCTION_DATA_ACCESS_TOKEN || "").trim();
   const response = await fetchImpl(`${normalizeBaseUrl(baseUrl)}/api/platform/v1/web-collection/runners`, {
@@ -489,6 +511,9 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
   const profileRoot = resolve(argument(argv, "--profile-root", DEFAULT_MANAGED_PROFILE_ROOT));
   const egoCli = argument(argv, "--ego-cli");
   const extensionPath = EXTENSION_SOURCE_ROOT;
+  if (["serve", "install"].includes(command)) {
+    assertAliyunCollectorTarget({ baseUrl, browserMode });
+  }
   if (command === "probe-ego") return runEgoProbeCommand(argv);
   if (command === "register") return registerRunner(baseUrl);
   if (command === "install") {
@@ -497,7 +522,8 @@ export async function runWebCollector(argv = process.argv.slice(2)) {
       collectorPath: fileURLToPath(import.meta.url),
       root,
       baseUrl,
-      browserMode
+      browserMode,
+      egoCli
     });
     return { ...launchAgent, extensionId: EXTENSION_ID, extensionPath };
   }
