@@ -4,11 +4,11 @@
 
 数据中心通过统一 provider registry、连接保险箱、文件导入、受控任务和结果 writer 获取外部系统数据。业务 App 只读取标准事实表或平台 API，不能直接登录抖音、ERP、广告平台或 NAS。
 
-旧的“保存账号密码并由通用 agent 代登录”路径已经退役。抖店经营采集默认复用公司日常 Chrome
-的已登录状态：MV3 扩展只执行代码登记的页面短动作、官方报表下载和固定白名单指标读取，本机采集
-服务承担等待、归档、解析、校验、检查点、重试和受控 API 入库。专用持久 Chrome Profile 仅作为
-多账号隔离或扩展故障时的显式回退。该能力在完成真实连续验收前保持 `integrating`，不能据此推断
-其他店铺或广告平台已接通。
+旧的“保存账号密码并由通用 agent 代登录”路径已经退役。快麦继续复用公司日常 Chrome 的 MV3
+扩展；抖店正式采集只使用 Ego，并以 `EC 抖音 <storeId>` 的确定性 Task Space 隔离多店铺登录态。
+本机采集服务承担受控下载、归档、解析、校验、检查点和重试。抖店结果只有在阿里云 ECS API 的
+SQLite 事务返回批次、行数和校验摘要后才算成功；备案或 HTTPS 未就绪时只保留本地
+`pending_upload`，不回写 Cloudflare D1。该能力在完成真实连续验收前保持 `integrating`。
 
 ## 分层
 
@@ -52,24 +52,17 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
   本机路径、完整输出、Cookie、Token、客户数据和原始页面正文不进入 D1 或展示数据库。
 
 - 已验证的 ERP 网页导出使用仓库内 MV3 插件复用公司日常 Chrome 登录态；首期通过“加载已解压的扩展程序”安装，不依赖 Chrome 应用商店。插件只申请 alarms、storage、tabs、downloads、scripting 和登记平台 host 权限；scripting 仅注入代码包内按 provider 固定登记的 content script，不申请 Cookie、History、WebRequest、Debugger 或 Native Messaging。
-- 抖店默认使用公司日常 Chrome 的 MV3 扩展；扩展按最近核对的稳定 `storeId` 领取任务。需要账号隔离
-  时可显式启用专用 Chrome 进程，每个已登记店铺对应一个非默认 `user-data-dir`；DevTools 只绑定
-  `127.0.0.1` 的随机端口。外网调试地址、远端 URL/脚本/选择器和未登记店铺一律拒绝。
-- 默认扩展模式与专用回退模式共用 `web_collection_jobs` 的 claim/lease，不建立第二套队列。
-  专用模式启用时，MV3 bridge 不向扩展返回 Douyin 任务，但继续服务 Kuaimai；不能让两个执行器并发
-  领取同一店铺任务。LaunchAgent、安装器和 CLI 未显式指定时都使用 `--browser-mode extension`。
-- runner 通过 `assigned_stores` 只读取分配给本设备的已启用店铺，响应仅包含 `providerId/storeId/storeName`。本机 Profile 目录、DevTools 端口、Cookie、Token、凭据、页面正文和截图不得返回服务器。
-- 官方下载和固定页面读数完成后，本机把可恢复结果原子写入权限为 `0600` 的检查点；服务重启并重新取得同一任务租约后优先恢复检查点，不重复执行页面动作。失败截图只允许来自登记页面，使用本机 AES-256-GCM 加密保存，服务器只接收稳定错误码与诊断编号；诊断文件保留七天后清理。
+- 抖店只使用已安装的 `ego-browser` CLI；运行器输入仅含任务、店铺、资源、业务日期、固定工作目录和一次性人工重试标记，不接收远端 URL、脚本、选择器或凭据。Ego 不可用、页面不匹配或受控下载能力缺失时 fail closed，不回退 Chrome。
+- 每个已登记抖店 `storeId` 固定映射到一个 Ego Task Space。任务执行前必须从抖店资质页确认稳定店铺 ID；登录、扫码、验证码、滑块、设备验证、店铺不一致或人工正在控制该空间时进入 `waiting_human` 并交还页面。只有同一 job 被授权人员显式重排时才能认领该空间一次。
+- Ego 与 MV3 bridge 共用 `web_collection_jobs` 的 claim/lease，不建立第二套队列。`--browser-mode ego` 时 bridge 永不返回 Douyin 任务但继续服务 Kuaimai；Ego runtime 也拒绝快麦任务。该模式不创建托管 Chrome registry，也不调用 `ensureManagedChrome`。
+- runner 通过 `assigned_stores` 只读取分配给本设备的已启用店铺，响应仅包含 `providerId/storeId/storeName`。本机 Task Space ID、工作目录、Cookie、Token、凭据、页面正文和截图不得返回服务器。
+- 官方文件真实落盘后，本机按下载、归档、解析、待上传、上传和完成分别保存权限为 `0600` 的检查点。服务重启并重新取得同一任务租约后优先恢复同 job 结果，不重复页面动作；人工断点只保存错误码与确定性 Task Space 名，不保存终态结果。
 - 本机执行器只监听 `127.0.0.1`，请求带 `Origin` 时必须匹配固定扩展 ID；Chrome MV3 Service Worker 未发送 `Origin` 时仍必须通过随机配对密钥，缺少或错误密钥一律拒绝。runner token 和配对密钥分别存在 macOS Keychain。插件只接收 provider/resource/businessDate/jobId，不接收远程 URL、选择器、脚本或凭据。
 - ERP 采集器令牌由 `/erp-collection/runners` 登记并保存在 macOS Keychain；`/erp-collection/archives`、`/erp-collection/ingest` 和 `/erp-collection/sales-facts` 都属于 handler 自认证路由，API 中间件必须放行 Bearer token 交由各 handler 校验，不能先按员工会话拦截。销售事实路由遗漏放行会表现为文件已归档但 D1 上传 HTTP 401。
-- runner 进程心跳与浏览器执行器状态必须分开表达。MV3 使用 `extension_online/offline`；专用浏览器使用 `dedicated_browser_online/offline`。`queued` 只表示等待领取，页面不得把它显示为“正在采集”；只有 `claimed` 及后续阶段才表示已经开始处理。
+- runner 进程心跳与浏览器执行器状态必须分开表达。MV3 使用 `extension_online/offline`；Ego 的可执行文件、任务进程和人工接管错误使用独立稳定错误码。`queued` 只表示等待领取，页面不得把它显示为“正在采集”；只有 `claimed` 及后续阶段才表示已经开始处理。
 - 永久 LaunchAgent 不得保存临时 `.worktrees/*` 入口。安装器必须通过 Git common directory 把当前工作树中的采集入口映射回主检出仓库的同一相对路径，再原子写入 plist；临时分支被删除后，服务重启仍须能找到入口。
-- 05:00 日计划由本机执行器生成并通过控制面幂等登记；扩展触发官方导出，解析、脱敏、原始文件本机归档和 D1 ingest 仍由本机执行器完成。只有完整 ingest 成功才能推进游标。
-- 抖店 `product_daily` 的昨天增量使用商品卡页面登记的同源接口，固定
-  `begin_date=end_date=businessDate`、`date_type=21` 并分页到官方 `total`。Chrome 扩展只把
-  固定响应投影成商品 ID、商品名称、支付金额、订单、买家、曝光和点击白名单事实；原始响应不上传。
-  SKU/69 码通过商品主数据关联，接口未提供的退款、件数和平台成交金额保持 `null`。空页、缺商品 ID、
-  重复商品、分页变化或不完整一律失败，不写空批次、不推进游标。
+- 日计划由本机执行器生成并通过控制面幂等登记。快麦由扩展触发官方导出并按现有 D1 链路处理；抖店四类日事实由 Ego 使用固定自助取数页、固定资源映射和成熟解析器。文件哈希、归档、解析行数、阿里云批次与 SQLite 校验全部确认后才推进抖店游标。
+- 正式 Ego `serve/install` 只接受精确 origin `https://deshan-tiyes.cn`。Cloudflare Pages、任意公网 IP、其他端口或路径全部返回 `EGO_FORMAL_TARGET_NOT_ALIYUN`；ICP备案或 HTTPS 未完成时仅允许本地 `probe-ego` 停在 `pending_upload`，禁止双写或静默沿用 D1。
 - 控制面只自动恢复已登记的瞬时错误：下载、网络或本机处理失败按 5 分钟、15 分钟退避，同一任务最多领取 3 次；重排必须保持 provider、resource、业务日期、目标环境和幂等键不变。登录、验证码与 `schema_changed` 不自动循环；页面适配器修复通过提升 `scheduleVersion` 创建可审计的新任务，旧失败记录不得覆盖或删除。
 - `claimed`、`opening`、`collecting`、`exporting`、`downloading`、`validating` 或 `ingesting` 阶段的设备租约过期表示本机执行中断；控制面允许其他轮询重新领取同一任务并增加 attempt，最多 3 次。不能只恢复 `claimed`，否则进程在后续阶段退出会让任务永久显示“同步中”。
 - 本机编排器必须同步释放自己内存中的过期活动任务，再向控制面重新领取；只依赖服务端允许重领但继续返回旧的内存任务，会让 attempt 永远不增长并阻塞整个串行队列。结果正在本机校验或入库时不得中途释放，避免并发写入同一批次。
@@ -94,7 +87,7 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 - 高行数 `sales_items` 在公司 Mac 完成脱敏、校验和 `日期 × 69码 × 平台` 聚合后，通过一次标准事实请求写入 D1；完整明细文件留在本机/NAS 原始归档，D1 记录文件哈希、原始行数、事实行数、日期范围和安全异常，不按 500 行分块复制销售明细。
 - 采集任务开始前必须主动探测 provider 标签页的 content script；探测失败时强制刷新，仍失败则只能通过 `scripting.executeScript` 注入代码包内按 provider 固定登记的脚本，不能接收远端脚本名或代码。主动注入仍失败时必须区分 `EXTENSION_SITE_ACCESS_DENIED`（员工需恢复登记域名的网站访问权限）与 `EXTENSION_CONTENT_SCRIPT_UNAVAILABLE`（扩展包或运行时异常），不能笼统显示“采集中”。仅凭 URL、加载状态或同源 SPA 的 hash 变化，不能判定扩展升级或重载后的脚本已经注入。
 
-- 旧的凭据登录 browser agent 已停用，不再创建或领取店铺登录任务。专用 Chrome 不读取数据中心保存的账号密码，也不代替员工提交验证码或破解风控。
+- 旧的凭据登录 browser agent 已停用，不再创建或领取店铺登录任务。Ego 运行器不读取数据中心保存的账号密码，也不代替员工提交验证码或破解风控。
 - 浏览器 provider 必须按页面条件等待可操作状态；平台专属的登录方式切换、字段选择器和人工验证文案留在 adapter 内。对有动态风控的平台，adapter 只预填凭证，不代替用户点击登录、接受协议或提交验证码；再次验证优先复用同一登录页，同一固定浏览器 Profile 在人工登录后复用会话。普通手机登录方式中的“发送验证码”等说明不得直接当成已出现人工挑战，邮箱验证码、滑块、扫码和设备确认则必须保持人工等待状态。
 - 公司 Mac 离线：任务留在队列，不丢失连接。
 - 五分钟 claim 到期：其他同 scope agent 可重新领取。
@@ -105,7 +98,7 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 ## 当前范围
 
-抖店公司 Chrome 扩展采集已完成本地实现，店铺每日已通过 2026-07-24 真实登录态与 D1 完成批次
-验收；商品、直播、短视频仍需完成最新业务日主链路生产复核，因此状态保持 `integrating`。其他店铺
-平台仍以文件样例和各自生产证据为准。快麦继续使用现有 MV3 官方导出与本机处理链路；广告、钉钉
-和 NAS 是否可用仍以集成注册表与生产证据为准。
+抖店 Ego runtime、Task Space 隔离、受控下载、本地归档解析和阿里云 fail-closed 闸门已完成本地
+实现；因 `deshan-tiyes.cn` 的 ICP/HTTPS 尚未完成，正式 ECS/SQLite 回传与最新业务日单任务仍未
+验收，状态保持 `integrating`。当前生产采集器仍为旧 `dedicated`/Cloudflare 配置，不能据此宣称新
+链路已上线。快麦继续使用现有 MV3 官方导出与本机处理链路；其他平台以各自生产证据为准。
