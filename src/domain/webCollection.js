@@ -111,6 +111,12 @@ export function webCollectionJobKey(job) {
   return [providerId, storeId, resourceType, businessDate, scheduleVersion].filter(Boolean).join(":");
 }
 
+import { usesSelfService } from "./douyinSelfServiceExtract.js";
+
+// 与 src/domain/douyinSelfServiceExtract.js 的 DAILY_TASK_QUOTA 同源，
+// 这里单独写一份是为了让规划层不依赖采集器的模块。
+export const DOUYIN_SELF_SERVICE_DAILY_QUOTA = 5;
+
 export function createDailyPlan({
   adapters = [],
   now = new Date(),
@@ -149,13 +155,36 @@ export function createDailyPlan({
           businessDate,
           rangeKind,
           range: rangeFor(rangeKind, businessDate, timeZone),
-          scheduleVersion: String(resource.scheduleVersion || "v1")
+          scheduleVersion: String(resource.scheduleVersion || "v1"),
+          // 抖音的日事实统一走自助取数：逐页导出拿不到成交订单数与成交人数，
+          // 页面标签又抓错过（曾显示 314 万单 / 257 万人，实际 GMV 仅 6.5 万）。
+          //
+          // 这个标记只在本地用来算当日配额。执行器不读它——它按资源类型自己判定，
+          // 因为 web_collection_jobs 表没有这一列，标记经服务端一个来回就没了。
+          ...(usesSelfService({ providerId, resourceType }) ? { viaSelfService: true } : {})
         };
         plan.push({ ...job, idempotencyKey: webCollectionJobKey(job) });
       }
     }
   }
+  assertSelfServiceQuota(plan);
   return plan;
+}
+
+// 罗盘自助取数每天只能建 5 条任务（2026-07-31 实测，第 6 条直接被拒）。
+//
+// 排超了不会在排计划时出问题，而是在跑到第 6 条时被平台拒掉——那时前 5 条已经排进
+// 队列，看起来一切正常，唯独有个资源今天永远采不到，且失败信息只说「每天仅支持创建
+// 5 条任务」，看不出是计划排多了。所以在排计划时就挡住。
+export function assertSelfServiceQuota(plan = []) {
+  const count = plan.filter(job => job.viaSelfService).length;
+  if (count > DOUYIN_SELF_SERVICE_DAILY_QUOTA) {
+    throw new Error(
+      `当日自助取数任务 ${count} 条，超过平台配额 ${DOUYIN_SELF_SERVICE_DAILY_QUOTA} 条；`
+      + "超出的部分会被平台拒绝，需要先减少资源或改用长区间补采。"
+    );
+  }
+  return true;
 }
 
 export function assertWebCollectionTransition(from, to) {

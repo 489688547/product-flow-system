@@ -3,6 +3,7 @@ import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateEgoExecutable } from "../browser-runtime/ego-cli.mjs";
 import {
   readCollectorGitLayout,
   resolveStableCollectorPath as resolveStableEntrypoint
@@ -59,8 +60,13 @@ export const readRunnerToken = (options = {}) => readSecret({ service: RUNNER_KE
 export const storePairingKey = (value, options = {}) => storeSecret(value, { service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 export const readPairingKey = (options = {}) => readSecret({ service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 
-export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl, browserMode = "extension" }) {
-  const safeBrowserMode = browserMode === "extension" ? "extension" : "dedicated";
+export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl, browserMode = "extension", egoCli = "" }) {
+  if (!["extension", "dedicated", "ego"].includes(browserMode)) {
+    throw Object.assign(new Error("浏览器模式无效。"), { code: "WEB_COLLECTION_BROWSER_MODE_INVALID" });
+  }
+  const egoArguments = browserMode === "ego"
+    ? ["--ego-cli", validateEgoExecutable(egoCli)]
+    : [];
   const argumentsList = [
     nodePath,
     collectorPath,
@@ -70,7 +76,8 @@ export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseU
     "--base-url",
     baseUrl,
     "--browser-mode",
-    safeBrowserMode
+    browserMode,
+    ...egoArguments
   ]
     .map(value => `      <string>${xml(value)}</string>`).join("\n");
   // 没有日志时，常驻任务失败只在 launchctl 留下一个退出码，无法定位原因。
@@ -115,6 +122,7 @@ export async function installLaunchAgent({
   root,
   baseUrl,
   browserMode = "extension",
+  egoCli = "",
   home = os.homedir(),
   command = systemCommand
 }) {
@@ -131,7 +139,8 @@ export async function installLaunchAgent({
       collectorPath: stableCollectorPath,
       root,
       baseUrl,
-      browserMode
+      browserMode,
+      egoCli
     }),
     { mode: 0o600 }
   );

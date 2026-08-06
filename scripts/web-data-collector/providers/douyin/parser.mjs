@@ -6,6 +6,11 @@ import { readFile } from "node:fs/promises";
 
 import { normalizeCommerceFact } from "../../../../src/domain/commerceFacts.js";
 import { streamSpreadsheetRows } from "../../../../src/domain/xlsxLite.js";
+import { PRIMARY_DIMENSIONS } from "../../../../src/domain/douyinSelfServiceExtract.js";
+import {
+  assertExtractComplete,
+  parseExtractRows
+} from "../../../../src/domain/douyinExtractRows.js";
 
 const DATE_ALIASES = ["日期", "数据日期", "统计日期"];
 
@@ -394,3 +399,137 @@ export const douyinReportInternals = Object.freeze({
   numberValue,
   timestampValue
 });
+
+// 自助取数的文件走独立解析，不能套用上面那套别名匹配。
+//
+// 两个原因，都会静默出错：
+// 一是 DATE_ALIASES 把「统计日期」也当日期别名，而自助取数的文件里「统计日期」是
+//    区间（20260725-20260729）、「日期」才是业务日，两列同时存在，先命中谁用谁；
+// 二是直播维度这边没有「成交金额」列（只有用户支付金额），required 直接判缺字段。
+//
+// 列名映射与业务日的取法都在 src/domain/douyinExtractRows.js 里按维度登记，
+// 那里也是唯一知道「直播要用开播时间定业务日」的地方。
+export const SELF_SERVICE_REPORT_VERSION = "douyin-self-service-v1";
+
+// 导出文件的字段 → 入库事实的字段。两边名字并不总是一样：买家数在店铺口径叫
+// transactionBuyerCount，在直播口径叫 transactionBuyers，照抄一边会被事实校验挡下。
+//
+// 直播是一行一场，不能合并成一条日事实——live_daily 的事实以 liveSessionId 为身份，
+// 合并后没有身份，也丢掉了场次粒度。
+const SELF_SERVICE_FACT_MAP = Object.freeze({
+  store_daily: Object.freeze({
+    perRow: false,
+    identity: Object.freeze({}),
+    numbers: Object.freeze({
+      transactionAmount: "transactionAmount",
+      transactionOrderCount: "transactionOrderCount",
+      transactionBuyerCount: "transactionBuyerCount",
+      userPaymentAmount: "userPaymentAmount",
+      settlementAmount: "settlementAmount",
+      refundAmountByPaymentDate: "refundAmountByPaymentDate",
+      refundAmountByRefundDate: "refundAmountByRefundDate",
+      refundOrderCountByPaymentDate: "refundOrderCountByPaymentDate",
+      refundOrderCountByRefundDate: "refundOrderCountByRefundDate",
+      productExposureUsers: "productExposureUsers",
+      productClickUsers: "productClickUsers",
+      adCostAmount: "adCostAmount",
+      expenseAmount: "expenseAmount",
+      platformCommission: "platformCommission",
+      influencerCommission: "influencerCommission",
+      adContributedAmount: "adContributedAmount",
+      netTransactionAmount: "netTransactionAmount"
+    })
+  }),
+  product_daily: Object.freeze({
+    perRow: true,
+    identity: Object.freeze({ productId: "productId" }),
+    // 商品维度同样没有「成交金额」。买家数在商品口径叫 transactionBuyers。
+    numbers: Object.freeze({
+      userPaymentAmount: "userPaymentAmount",
+      transactionOrderCount: "transactionOrderCount",
+      transactionBuyerCount: "transactionBuyers",
+      transactionQuantity: "transactionQuantity"
+    }),
+    strings: Object.freeze({ productName: "productName" })
+  }),
+  live_daily: Object.freeze({
+    perRow: true,
+    identity: Object.freeze({ liveRoomId: "liveSessionId", liveStartedAt: "startedAt" }),
+    numbers: Object.freeze({
+      userPaymentAmount: "userPaymentAmount",
+      transactionOrderCount: "transactionOrderCount",
+      transactionBuyerCount: "transactionBuyers"
+    })
+  }),
+  video_daily: Object.freeze({
+    perRow: true,
+    identity: Object.freeze({ videoId: "videoId" }),
+    // 短视频给的是「短视频用户支付金额」，与成交金额是两个口径，绝不能填进 transactionAmount。
+    numbers: Object.freeze({
+      userPaymentAmount: "userPaymentAmount",
+      transactionOrderCount: "transactionOrderCount"
+    })
+  })
+});
+
+export async function readDouyinSelfServiceReport(input, { resourceType, businessDate, storeId } = {}) {
+  const dimension = PRIMARY_DIMENSIONS[resourceType];
+  const mapping = SELF_SERVICE_FACT_MAP[resourceType];
+  if (!dimension || !mapping) {
+    throw reportError("DOUYIN_RESOURCE_NOT_COVERED", `自助取数尚未登记 ${resourceType} 的入库口径。`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(businessDate || ""))) {
+    throw reportError(DATE_ERROR_CODES[resourceType], "抖店报表任务日期无效。");
+  }
+  if (!/^[-_a-zA-Z0-9]{1,160}$/.test(String(storeId || ""))) {
+    throw reportError("DOUYIN_STORE_IDENTITY_MISMATCH", "抖店任务缺少稳定店铺标识。");
+  }
+
+  const file = await sourceFile(input);
+  const rows = [];
+  await streamSpreadsheetRows(file, row => {
+    if (row.some(value => valueText(value))) rows.push(row);
+  });
+  if (!rows.length) throw reportError("DOUYIN_REPORT_SCHEMA_CHANGED", "自助取数文件为空或无法读取。");
+
+  const parsed = assertExtractComplete(
+    parseExtractRows(rows[0], rows.slice(1), { dimension, businessDates: [businessDate] }),
+    [businessDate]
+  );
+
+  // 任务是按天建的，文件里出现别的业务日就说明取回来的不是这一天——整批拒绝。
+  // 「返回了数据」不等于「返回了这一天的数据」，这个错今天在快麦上犯过一次。
+  const foreign = parsed.rows.filter(row => row.businessDate !== businessDate);
+  if (foreign.length) {
+    throw reportError(
+      DATE_ERROR_CODES[resourceType],
+      `自助取数文件含 ${foreign.length} 行非 ${businessDate} 的数据。`
+    );
+  }
+
+  const facts = parsed.rows.map(row => {
+    const mapped = {
+      providerId: "douyin-ecommerce",
+      storeId,
+      businessDate,
+      sourceVersion: SELF_SERVICE_REPORT_VERSION
+    };
+    for (const [from, to] of Object.entries(mapping.identity)) {
+      if (row[from]) mapped[to] = row[from];
+    }
+    for (const [from, to] of Object.entries(mapping.strings || {})) {
+      if (row[from]) mapped[to] = row[from];
+    }
+    for (const [from, to] of Object.entries(mapping.numbers)) {
+      if (typeof row[from] === "number") mapped[to] = row[from];
+    }
+    return normalizeCommerceFact(resourceType, mapped);
+  });
+
+  return {
+    reportVersion: SELF_SERVICE_REPORT_VERSION,
+    facts,
+    coverage: { sourceRowCount: parsed.rows.length, factCount: facts.length },
+    confidence: "high"
+  };
+}

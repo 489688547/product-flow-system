@@ -3,8 +3,13 @@ import test from "node:test";
 
 import {
   assertBusinessDateMatchesRange,
+  assertAliyunCollectorTarget,
   assertCollectionFileMatchesTask,
-  createCommerceFactUploader
+  browserModeUsesManagedChrome,
+  createCommerceFactUploader,
+  experimentalModeEnabled,
+  normalizeBrowserMode,
+  runWebCollector
 } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 import {
@@ -20,6 +25,10 @@ async function dedicatedRuntimeModules() {
     import("../scripts/web-data-collector/browser/runtime.mjs").catch(() => ({}))
   ]);
   return { ...profileRegistry, ...runtime };
+}
+
+async function egoRuntimeModule() {
+  return import("../scripts/web-data-collector/browser/ego-runtime.mjs").catch(() => ({}));
 }
 
 function apiDouble(job) {
@@ -47,6 +56,65 @@ const job = {
   businessDate: "2026-07-21",
   scheduleVersion: "v1"
 };
+
+test("experimental mode is off by default and requires an explicit runner switch", () => {
+  assert.equal(experimentalModeEnabled(), false);
+  assert.equal(experimentalModeEnabled("0"), false);
+  assert.equal(experimentalModeEnabled("1"), true);
+  assert.equal(experimentalModeEnabled("enabled"), true);
+});
+
+test("browser mode accepts Ego explicitly and rejects silent fallback", () => {
+  assert.equal(normalizeBrowserMode("ego"), "ego");
+  assert.equal(normalizeBrowserMode("extension"), "extension");
+  assert.throws(
+    () => normalizeBrowserMode("unknown"),
+    error => error?.code === "WEB_COLLECTION_BROWSER_MODE_INVALID"
+  );
+});
+
+test("Ego mode creates no managed Chrome registry", () => {
+  assert.equal(browserModeUsesManagedChrome("ego"), false);
+  assert.equal(browserModeUsesManagedChrome("extension"), false);
+  assert.equal(browserModeUsesManagedChrome("dedicated"), true);
+  assert.equal(browserModeUsesManagedChrome("ego", { experimentalMode: true }), true);
+});
+
+test("formal Ego service refuses non-Aliyun targets while a loopback probe is allowed", () => {
+  assert.doesNotThrow(() => assertAliyunCollectorTarget({
+    baseUrl: "https://deshan-tiyes.cn",
+    browserMode: "ego"
+  }));
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes-system.pages.dev", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://203.0.113.9", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.throws(
+    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes.cn:8443", browserMode: "ego" }),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+  assert.doesNotThrow(() => assertAliyunCollectorTarget({
+    baseUrl: "http://127.0.0.1:8132",
+    browserMode: "ego",
+    allowLocalProbe: true
+  }));
+});
+
+test("serve rejects a Cloudflare Ego target before reading local service secrets", async () => {
+  await assert.rejects(
+    runWebCollector([
+      "serve",
+      "--browser-mode", "ego",
+      "--base-url", "https://deshan-tiyes-system.pages.dev",
+      "--ego-cli", "/Users/company/.local/bin/ego-browser"
+    ]),
+    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+  );
+});
 
 test("orchestrator schedules all extension-implemented Kuaimai resources after 10:00", async () => {
   const api = apiDouble(job);
@@ -242,10 +310,259 @@ test("dedicated mode keeps Douyin work away from the extension bridge", async ()
     executionMode: "dedicated"
   });
 
-  assert.equal(await orchestrator.nextTask({ storeId: "store-a" }), null);
+  assert.equal(await orchestrator.nextTask({ storeId: "store-a" }), null, "抖音的活不交给扩展");
   const dedicated = await orchestrator.nextTask({ storeId: "store-a", executor: "dedicated" });
   assert.equal(dedicated.storeId, "store-a");
-  assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, { storeId: "store-a" }]);
+  // 扩展在 dedicated 模式下领任务时不按 storeId 过滤：扩展只要存过抖音的 storeId，
+  // 之后每次轮询都会带着它，按它过滤会把别的 provider 的任务一并挡在外面。
+  assert.deepEqual(api.calls.find(([name]) => name === "claim"), ["claim", 300, {}]);
+});
+
+test("dedicated 模式下扩展仍能领到别的 provider 的任务", async () => {
+  // 这是切换浏览器模式时最容易打断的地方：判据若是「扩展请求带了 storeId 就不给」，
+  // 而扩展总是带着抖音的 storeId 轮询，快麦就再也领不到任务——表现只是「快麦不采了」，
+  // 看不出跟切模式有关。判据必须是「这条任务归谁执行」。
+  const kuaimaiJob = {
+    ...job,
+    id: "kuaimai-job-1",
+    providerId: "kuaimai",
+    storeId: "",
+    resourceType: "sales_items"
+  };
+  const api = apiDouble(kuaimaiJob);
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({}),
+    executionMode: "dedicated"
+  });
+
+  const task = await orchestrator.nextTask({ storeId: "store-a" });
+  assert.ok(task, "扩展带着抖音的 storeId 轮询，也必须能领到快麦的任务");
+  assert.equal(task.providerId, "kuaimai");
+});
+
+test("ego mode reserves Douyin while the extension still receives Kuaimai", async () => {
+  const douyinApi = apiDouble({
+    ...job,
+    id: "douyin-job-1",
+    providerId: "douyin-ecommerce",
+    storeId: "store-a",
+    resourceType: "video_daily"
+  });
+  const douyinOrchestrator = createWebCollectorOrchestrator({
+    api: douyinApi,
+    processDownload: async () => ({}),
+    executionMode: "ego"
+  });
+  assert.equal(await douyinOrchestrator.nextTask({ storeId: "store-a", executor: "extension" }), null);
+  assert.equal((await douyinOrchestrator.nextTask({ storeId: "store-a", executor: "ego" })).providerId, "douyin-ecommerce");
+
+  const kuaimaiApi = apiDouble({ ...job, providerId: "kuaimai", storeId: "", resourceType: "orders" });
+  const kuaimaiOrchestrator = createWebCollectorOrchestrator({
+    api: kuaimaiApi,
+    processDownload: async () => ({}),
+    executionMode: "ego"
+  });
+  assert.equal((await kuaimaiOrchestrator.nextTask({ storeId: "store-a", executor: "extension" })).providerId, "kuaimai");
+  assert.equal(await kuaimaiOrchestrator.nextTask({ storeId: "store-a", executor: "ego" }), null);
+});
+
+test("Ego runtime executes an assigned Douyin store without any Chrome dependency", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  assert.equal(typeof createEgoBrowserRuntime, "function", "createEgoBrowserRuntime must be implemented");
+  const calls = [];
+  const runtime = createEgoBrowserRuntime({
+    api: {
+      async assignedStores() {
+        return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] };
+      }
+    },
+    orchestrator: {
+      async nextTask(input) {
+        calls.push(["nextTask", input]);
+        return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" };
+      },
+      async submitResult(result) { calls.push(["submitResult", result.kind]); }
+    },
+    executeTask: async ({ task, control }) => {
+      assert.equal(task.storeName, "TIYES旗舰店");
+      assert.equal(task.workspace, "/local/ego/job-ego-1");
+      assert.equal(control.explicitHumanRetry, false);
+      return { kind: "downloaded", jobId: task.jobId, filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+    },
+    checkpointStore: { async load() { return null; }, async save() {}, async clear() {} },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 1, failed: 0 });
+  assert.deepEqual(calls[0], ["nextTask", { storeId: "90862283", executor: "ego" }]);
+  assert.deepEqual(calls.at(-1), ["submitResult", "downloaded"]);
+});
+
+test("Ego runtime retains a result-free checkpoint when control is handed to a human", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const saved = [];
+  let clears = 0;
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult() {}
+    },
+    executeTask: async () => ({ kind: "waiting_human", jobId: "job-ego-1", errorCode: "DOUYIN_LOGIN_REQUIRED", safeSummary: "请登录", stage: "opening" }),
+    checkpointStore: {
+      async load() { return null; },
+      async save(jobId, checkpoint) { saved.push([jobId, checkpoint]); },
+      async clear() { clears += 1; }
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  await runtime.runOnce();
+
+  assert.deepEqual(saved.at(-1), ["job-ego-1", {
+    stage: "waiting_human",
+    resume: {
+      humanWait: {
+        errorCode: "DOUYIN_LOGIN_REQUIRED",
+        taskSpaceName: "EC 抖音 90862283"
+      }
+    }
+  }]);
+  assert.equal(clears, 0);
+});
+
+test("Ego runtime turns a same-job human checkpoint into one explicit retry", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const saved = [];
+  let explicitHumanRetry = null;
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult() {}
+    },
+    executeTask: async ({ task, control }) => {
+      explicitHumanRetry = control.explicitHumanRetry;
+      return { kind: "downloaded", jobId: task.jobId, filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+    },
+    checkpointStore: {
+      async load() { return { stage: "waiting_human", resume: { humanWait: { errorCode: "DOUYIN_LOGIN_REQUIRED", taskSpaceName: "EC 抖音 90862283" } } }; },
+      async save(jobId, checkpoint) { saved.push([jobId, checkpoint]); },
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  await runtime.runOnce();
+
+  assert.equal(explicitHumanRetry, true);
+  assert.deepEqual(saved[0], ["job-ego-1", { stage: "opening" }]);
+});
+
+test("Ego runtime rejects a human checkpoint owned by another Task Space", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  let explicitHumanRetry = null;
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult() {}
+    },
+    executeTask: async ({ task, control }) => {
+      explicitHumanRetry = control.explicitHumanRetry;
+      return { kind: "downloaded", jobId: task.jobId, filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+    },
+    checkpointStore: {
+      async load() { return { stage: "waiting_human", resume: { humanWait: { errorCode: "DOUYIN_LOGIN_REQUIRED", taskSpaceName: "EC 抖音 another-store" } } }; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  await runtime.runOnce();
+
+  assert.equal(explicitHumanRetry, false);
+});
+
+test("Ego runtime submits a safe terminal failure when its task-space process crashes", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const submitted = [];
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult(result) { submitted.push(result); }
+    },
+    executeTask: async () => {
+      throw Object.assign(new Error("private child details"), { code: "EGO_PROCESS_FAILED" });
+    },
+    checkpointStore: {
+      async load() { return null; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 0, failed: 1 });
+  assert.deepEqual(submitted, [{
+    kind: "failed",
+    jobId: "job-ego-1",
+    errorCode: "EGO_PROCESS_FAILED",
+    safeSummary: "Ego 任务进程执行失败，请检查 Ego 是否可用后重试。",
+    stage: "opening"
+  }]);
+  assert.doesNotMatch(JSON.stringify(submitted), /private child details/);
+});
+
+test("Ego runtime resumes a downloaded checkpoint without repeating browser work", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const checkpointResult = { kind: "downloaded", jobId: "job-ego-1", filePath: "/local/ego/job-ego-1/video.xlsx", safeFileName: "video.xlsx", pageType: "shop_compass_self_service", reportVersion: "douyin-self-service-v1" };
+  let browserCalls = 0;
+  const submitted = [];
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult(result) { submitted.push(result); }
+    },
+    executeTask: async () => { browserCalls += 1; },
+    checkpointStore: {
+      async load() { return { stage: "downloaded", result: checkpointResult }; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 1, failed: 0 });
+  assert.equal(browserCalls, 0);
+  assert.deepEqual(submitted, [checkpointResult]);
+});
+
+test("Ego runtime submits schema changes as terminal results without browser retry", async () => {
+  const { createEgoBrowserRuntime } = await egoRuntimeModule();
+  const submitted = [];
+  const runtime = createEgoBrowserRuntime({
+    api: { async assignedStores() { return { stores: [{ providerId: "douyin-ecommerce", storeId: "90862283", storeName: "TIYES旗舰店" }] }; } },
+    orchestrator: {
+      async nextTask() { return { jobId: "job-ego-1", providerId: "douyin-ecommerce", storeId: "90862283", resourceType: "video_daily", businessDate: "2026-08-03" }; },
+      async submitResult(result) { submitted.push(result); }
+    },
+    executeTask: async ({ task }) => ({ kind: "schema_changed", jobId: task.jobId, errorCode: "DOUYIN_SCHEMA_CHANGED", safeSummary: "页面结构已变化", stage: "opening" }),
+    checkpointStore: {
+      async load() { return null; },
+      async save() {},
+      async clear() {}
+    },
+    workspaceForTask: task => `/local/ego/${task.jobId}`
+  });
+
+  assert.deepEqual(await runtime.runOnce(), { assigned: 1, processed: 1, failed: 0 });
+  assert.equal(submitted.length, 1);
+  assert.equal(submitted[0].kind, "schema_changed");
 });
 
 test("profile registry creates one safe local profile per assigned store", async () => {
@@ -344,6 +661,146 @@ test("dedicated runtime fetches assigned stores and completes a short browser ac
     { storeId: "90862283", executor: "dedicated" }
   ]);
   assert.equal(calls.some(([name]) => name === "submitResult"), true);
+});
+
+test("collector runtime executes an assigned experimental bundle through the versioned run API", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  assert.equal(typeof createExperimentalRunCycle, "function", "createExperimentalRunCycle must be implemented");
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        calls.push(["assigned"]);
+        return {
+          runs: [{
+            run: { id: "run-1", version: 1 },
+            executionBundle: {
+              runId: "run-1",
+              runnerId: "runner-1",
+              templateId: "research",
+              version: 1,
+              contentHash: "a".repeat(64),
+              expiresAt: "2026-07-30T10:15:00.000Z",
+              template: { mode: "experimental" }
+            }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input, key) {
+        calls.push(["action", runId, input.action, input.expectedVersion, key]);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3,
+            status: input.action === "start" ? "running" : "completed"
+          }
+        };
+      }
+    },
+    executeRun: async bundle => {
+      calls.push(["execute", bundle.runId]);
+      return {
+        runId: bundle.runId,
+        status: "completed",
+        quality: {
+          requiredFieldsComplete: true,
+          storeMatched: true,
+          businessDateMatched: true,
+          schemaMatched: true,
+          coverage: 1
+        }
+      };
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 1, waitingHuman: 0, failed: 0 });
+  assert.deepEqual(calls.map(call => call.slice(0, 3)), [
+    ["assigned"],
+    ["action", "run-1", "start"],
+    ["execute", "run-1"],
+    ["action", "run-1", "complete"]
+  ]);
+  assert.match(calls[1][4], /^collector-run:run-1:start:1$/);
+  assert.match(calls[3][4], /^collector-run:run-1:complete:2$/);
+});
+
+test("collector runtime reports safe failure without sending local output or paths", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        return {
+          runs: [{
+            run: { id: "run-1", version: 1 },
+            executionBundle: { runId: "run-1" }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input) {
+        calls.push(input);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3
+          }
+        };
+      }
+    },
+    executeRun: async () => {
+      throw Object.assign(new Error("failed at /Users/employee/report.xlsx token=secret"), {
+        code: "COLLECTOR_COMMAND_FAILED"
+      });
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 0, waitingHuman: 0, failed: 1 });
+  assert.equal(calls.at(-1).action, "fail");
+  assert.equal(calls.at(-1).errorCode, "COLLECTOR_COMMAND_FAILED");
+  assert.doesNotMatch(JSON.stringify(calls.at(-1)), /Users|report\.xlsx|token=|secret/i);
+});
+
+test("collector runtime pauses for human verification without recording a failed run", async () => {
+  const { createExperimentalRunCycle } = await dedicatedRuntimeModules();
+  const calls = [];
+  const cycle = createExperimentalRunCycle({
+    api: {
+      async assignedExperimentalRuns() {
+        return {
+          runs: [{
+            run: { id: "run-human", version: 1 },
+            executionBundle: { runId: "run-human" }
+          }]
+        };
+      },
+      async experimentalRunAction(runId, input) {
+        calls.push([runId, input]);
+        return {
+          run: {
+            id: runId,
+            version: input.action === "start" ? 2 : 3
+          }
+        };
+      }
+    },
+    executeRun: async () => {
+      throw Object.assign(new Error("验证码页面包含用户手机号"), {
+        code: "COLLECTOR_HUMAN_VERIFICATION_REQUIRED"
+      });
+    }
+  });
+
+  const result = await cycle.runOnce();
+
+  assert.deepEqual(result, { assigned: 1, processed: 0, waitingHuman: 1, failed: 0 });
+  assert.equal(calls.at(-1)[1].action, "wait_human");
+  assert.equal(calls.at(-1)[1].errorCode, "COLLECTOR_HUMAN_VERIFICATION_REQUIRED");
+  assert.equal(calls.at(-1)[1].safeSummary, "请在公司 Mac 完成人工验证后重试。");
+  assert.equal(calls.some(([, input]) => input.action === "fail"), false);
 });
 
 test("dedicated runtime resumes a downloaded checkpoint without repeating browser work", async () => {
@@ -736,6 +1193,59 @@ test("Douyin captured store facts are validated and completed as one immutable b
   assert.equal(uploads[1].complete, true);
 });
 
+test("Douyin captured product facts are normalized and completed as one immutable batch", async () => {
+  const uploads = [];
+  const processor = createDouyinProcessor({
+    uploadFactChunk: async input => {
+      uploads.push(input);
+      return { completedCount: input.expectedCount };
+    }
+  });
+  const captured = {
+    kind: "captured",
+    resourceType: "product_daily",
+    facts: [{
+      productId: "3718502021305860341",
+      skuId: null,
+      productName: "莓果冻干主粮",
+      skuName: null,
+      merchantCode: null,
+      exposureUsers: 48_100,
+      clickUsers: 3_346,
+      transactionBuyers: 575,
+      transactionOrderCount: 593,
+      transactionQuantity: null,
+      transactionAmount: null,
+      userPaymentAmount: 15_199.11,
+      refundOrderCount: null,
+      refundQuantity: null,
+      refundAmount: null
+    }],
+    pageType: "shop_compass_product",
+    selectorVersion: "2026-07-31"
+  };
+
+  const processed = await processor.process({
+    job: {
+      id: "douyin-product-job-1",
+      providerId: "douyin-ecommerce",
+      storeId: "store-a",
+      resourceType: "product_daily",
+      businessDate: "2026-07-30"
+    },
+    result: captured
+  });
+
+  assert.equal(processed.rowCount, 1);
+  assert.equal(processed.confidence, "medium");
+  assert.equal(uploads.length, 2);
+  assert.equal(uploads[0].facts[0].productId, "3718502021305860341");
+  assert.equal(uploads[0].facts[0].businessDate, "2026-07-30");
+  assert.equal(uploads[0].facts[0].userPaymentAmount, 15_199.11);
+  assert.equal(uploads[1].complete, true);
+  assert.equal(uploads[1].expectedCount, 1);
+});
+
 test("Douyin processor resumes after an uploaded chunk and checkpoints final submission", async () => {
   const uploads = [];
   const stages = [];
@@ -839,4 +1349,49 @@ test("processor failure records a failed transition and never completes the job"
     api.calls.filter(([name]) => name === "transition").at(-1)[1].errorSummary,
     "本机文件处理或入库失败。"
   );
+});
+
+test("dedicated 模式下专用浏览器不得领到别的 provider 的任务", async () => {
+  // 专用浏览器执行器只认抖音任务，拿到别的平台会直接判 DOUYIN_TASK_INVALID。
+  // 实测 08-02 的 kuaimai inventory 与 orders 就是这么被判失败的——领错了活，
+  // 而且失败得像是快麦自己出了问题。先前只堵了「抖音的活不给扩展」，漏了反方向。
+  const kuaimaiJob = {
+    ...job,
+    id: "kuaimai-job-2",
+    providerId: "kuaimai",
+    storeId: "",
+    resourceType: "inventory"
+  };
+  const api = apiDouble(kuaimaiJob);
+  const orchestrator = createWebCollectorOrchestrator({
+    api,
+    processDownload: async () => ({}),
+    executionMode: "dedicated"
+  });
+
+  assert.equal(await orchestrator.nextTask({ storeId: "store-a", executor: "dedicated" }), null);
+  // 同一条任务，扩展来领就应当拿得到。
+  assert.equal((await orchestrator.nextTask({ storeId: "store-a" }))?.providerId, "kuaimai");
+});
+
+test("已领取的任务交给谁，日志必须记下来", async () => {
+  // 加日志是为了回答「谁领走了什么」。领取与交付是两轮：领取发生在一个执行器轮询时，
+  // 交付发生在另一个执行器来取时。原先只记了领取那一步，实测时日志全程沉默——
+  // 在最需要它的时候是哑的。
+  const douyinJob = { ...job, id: "douyin-job-log", providerId: "douyin-ecommerce", storeId: "store-a", resourceType: "store_daily" };
+  const api = apiDouble(douyinJob);
+  const orchestrator = createWebCollectorOrchestrator({ api, processDownload: async () => ({}), executionMode: "dedicated" });
+
+  const lines = [];
+  const write = process.stdout.write.bind(process.stdout);
+  process.stdout.write = chunk => { lines.push(String(chunk)); return true; };
+  try {
+    await orchestrator.nextTask({ storeId: "store-a" });                          // 扩展轮询：领取并扣下
+    await orchestrator.nextTask({ storeId: "store-a", executor: "dedicated" });   // 专用浏览器来取：交付
+  } finally {
+    process.stdout.write = write;
+  }
+  const 全部 = lines.join("");
+  assert.match(全部, /扣下 douyin-ecommerce\/store_daily/, "扣下要记");
+  assert.match(全部, /交付 douyin-ecommerce\/store_daily .* → dedicated/, "交付给谁也要记");
 });

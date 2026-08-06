@@ -1,4 +1,5 @@
 import { jsonResponse, optionsResponse } from "../dingtalk/_shared/dingtalk.js";
+import { DAILY_FACTS_WINDOW_DAYS } from "../../../src/domain/dataCenter.js";
 import { ensureSalesTables, salesDatabase } from "../sales.js";
 import { normalizeDataCenterStorageError } from "./_shared/errors.js";
 
@@ -62,7 +63,7 @@ async function latestDailyFacts(db) {
     WHERE TRIM(COALESCE(platform, '')) NOT IN ('', '其它', '其他', '未知', '未知平台')
     GROUP BY date
     ORDER BY date DESC
-    LIMIT 8`).all();
+    LIMIT ${DAILY_FACTS_WINDOW_DAYS}`).all();
   return (result?.results || []).map(row => ({
     date: String(row.date || ""),
     sales: Number(row.sales) || 0,

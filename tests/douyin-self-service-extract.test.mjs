@@ -1,8 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  DEFAULT_METRIC_VALUES,
-  EXTRACT_METRICS,
+  GRANULARITY_BY_DIMENSION,
   MAX_RANGE_DAYS,
   PRIMARY_DIMENSIONS,
   TASK_TIMEOUT_MS,
@@ -19,9 +18,30 @@ test("四个资源都登记了主要维度", () => {
   });
 });
 
-test("时间粒度必须是自然日累计", () => {
-  // 统计日期累计给的是区间合计，无法还原到业务日；一行一天才能入库。
-  assert.equal(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "自然日累计");
+test("粒度登记 value 而不只是文案：回读 checked 才能确认真选中了", () => {
+  assert.equal(GRANULARITY_BY_DIMENSION.shop.value, "day");
+  assert.equal(GRANULARITY_BY_DIMENSION.live.value, "live_start_date");
+  assert.equal(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-29", to: "2026-07-29" }).granularityValue, "live_start_date");
+});
+
+test("时间粒度随维度取值，不能一律用自然日累计", () => {
+  // 四个维度的粒度选项并不通用（2026-07-30 在专用浏览器逐个实测）：
+  // 店铺/商品有 统计日期/自然日/自然周/自然月，直播只有 开播日期累计/分钟级，
+  // 短视频只有 统计日期累计（平台配置接口逐条核对过）。原先写死自然日累计，
+  // 直播与短视频根本没有该选项，报的却是 GRANULARITY_MISSING，与真正原因隔了好几步。
+  assert.equal(buildExtractPlan({ resourceType: "store_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "自然日累计");
+  assert.equal(buildExtractPlan({ resourceType: "product_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "自然日累计");
+  assert.equal(buildExtractPlan({ resourceType: "live_daily", from: "2026-07-25", to: "2026-07-29" }).granularity, "开播日期累计");
+  assert.equal(buildExtractPlan({ resourceType: "video_daily", from: "2026-07-29", to: "2026-07-29" }).granularity, "统计日期累计");
+});
+
+test("短视频跨天必须拒绝：它只有区间合计粒度", () => {
+  // 跨多天会把几天混成一行，无法还原到业务日——落库后就是一天的数字冒充多天。
+  assert.throws(
+    () => buildExtractPlan({ resourceType: "video_daily", from: "2026-07-25", to: "2026-07-29" }),
+    error => error.code === "DOUYIN_EXTRACT_SINGLE_DAY_REQUIRED"
+  );
+  assert.doesNotThrow(() => buildExtractPlan({ resourceType: "video_daily", from: "2026-07-29", to: "2026-07-29" }));
 });
 
 test("任务名称可回找，且区分资源与区间", () => {
@@ -84,17 +104,18 @@ test("未超时继续等，不重复创建任务", () => {
   assert.deepEqual(planExtractWait({ startedAt: 0, now: 60_000, state: "pending" }), { action: "wait" });
 });
 
-test("指标按语义化 value 选择，不按标签文字", () => {
-  // 文案随时可能改，value 是接口字段名，稳定得多。
-  assert.equal(EXTRACT_METRICS.transactionOrderCount, "pay_cnt");
-  assert.equal(EXTRACT_METRICS.transactionBuyerCount, "pay_ucnt");
-  assert.ok(DEFAULT_METRIC_VALUES.includes("ad_receive_amt"), "默认应带上投放金额，它是支出与广告费用的来源");
-});
 
-test("默认指标覆盖已撤下的订单数与人数", () => {
-  // 这两个指标因 store_daily 抓错已从面板撤下（曾显示 314 万单、257 万人，
-  // 实际 GMV 仅 6.5 万）。罗盘首页接口不返回它们，自助取数是已知唯一可信来源，
-  // 因此必须默认取到，否则面板永远补不回这两列。
-  assert.ok(DEFAULT_METRIC_VALUES.includes("pay_cnt"));
-  assert.ok(DEFAULT_METRIC_VALUES.includes("pay_ucnt"));
+
+
+
+test("计划里不再带指标清单：指标一律全选，由平台配置接口现取", () => {
+  // 维护「我们要哪些指标」的清单本身就是脆弱点：漏选一类，那几列静默变 null
+  // （店铺少选退款与流量，面板的退款率与曝光点击率就没了，且不报错）；
+  // 平台新增指标我们也不会知道。实测店铺 6 类共 76 个指标全选，接口照收。
+  const plan = buildExtractPlan({ resourceType: "store_daily", from: "2026-07-30", to: "2026-07-30" });
+  assert.equal("metricValues" in plan, false);
+  assert.equal("metricCategories" in plan, false);
+  // 仍要登记的只有选错了不会报错的两项：粒度与视频类型。
+  assert.equal(plan.granularityValue, "day");
+  assert.equal(buildExtractPlan({ resourceType: "video_daily", from: "2026-07-30", to: "2026-07-30" }).videoType, "ecom_video");
 });

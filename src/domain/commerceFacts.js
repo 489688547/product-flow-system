@@ -33,7 +33,14 @@ const RESOURCE_SCHEMAS = Object.freeze({
       "refundOrderCountByPaymentDate",
       "refundOrderCountByRefundDate",
       "productExposureUsers",
-      "productClickUsers"
+      "productClickUsers",
+      // 花出去的钱。原先表里只有收进来的钱，算不了投放费比，也答不了「广告费多少」。
+      "adCostAmount",
+      "expenseAmount",
+      "platformCommission",
+      "influencerCommission",
+      "adContributedAmount",
+      "netTransactionAmount"
     ])
   }),
   product_daily: Object.freeze({
@@ -88,6 +95,9 @@ const RESOURCE_SCHEMAS = Object.freeze({
       "transactionOrderCount",
       "transactionQuantity",
       "transactionAmount",
+      // 自助取数给的是「短视频用户支付金额」，与成交金额是两个口径。
+      // 没有这一列就只能丢数或冒充成交金额，后者会造出看起来权威的错值。
+      "userPaymentAmount",
       "refundOrderCount",
       "refundAmount"
     ])
@@ -201,7 +211,13 @@ export function deriveCommerceMetrics(resourceType, row = {}) {
         refundRate: safeRatio(row.refundAmountByPaymentDate, row.transactionAmount),
         averageOrderValue: safeRatio(row.transactionAmount, row.transactionOrderCount),
         exposureClickRate: safeRatio(row.productClickUsers, row.productExposureUsers),
-        clickTransactionRate: safeRatio(row.transactionBuyerCount, row.productClickUsers)
+        clickTransactionRate: safeRatio(row.transactionBuyerCount, row.productClickUsers),
+        // 投放费比 = 投放消耗 / 成交金额。这里按明确定义现算，不落库平台自己的费比：
+        // 它有「剔除退款」「综合费比」等多个变体，存一个说不清是哪种口径的比率，
+        // 比不存更糟。
+        adCostRatio: safeRatio(row.adCostAmount, row.transactionAmount),
+        // 投放贡献成交占比：多少成交是投放带来的。
+        adContributedRatio: safeRatio(row.adContributedAmount, row.transactionAmount)
       };
     case "product_daily":
       return {
@@ -361,3 +377,38 @@ export const commerceFactsInternals = Object.freeze({
   RESOURCE_SCHEMAS,
   safeRatio
 });
+
+// 不可信来源：罗盘首页的页面抓取。
+//
+// 首页每张指标卡里挨着本店值、较上期、同行顶尖三个数，按标签就近取值会跨越两个数字。
+// 实测这批行里 07-30 的成交订单数存成 3265840（真值 3265，"3265" 接了相邻的 "840"）、
+// 07-29 存成 3147743（真值 3147）、07-30 的成交金额存成 65449.761（真值 65449.76）。
+//
+// 有几天看着是对的，但它们是同一套代码抓的，只是那天没撞上拼接。没有任何规则能把
+// 「看着对的」和「被拼接的」分开——凭「看着合理」留下一行，等于把没验证过的数字当真。
+// 因此整个来源都不信：宁可页面上缺这几天，也不要显示一个错的。缺数看得见，错数会被当真。
+//
+// 数据本身不删，留着可审计；只是读取时不再当作真值。重采成功后自然被可信来源顶上。
+export const DISTRUSTED_SOURCE_PREFIXES = Object.freeze(["douyin-store-capture-"]);
+
+export function isDistrustedSource(sourceVersion) {
+  const text = String(sourceVersion || "");
+  return DISTRUSTED_SOURCE_PREFIXES.some(prefix => text.startsWith(prefix));
+}
+
+// 同一业务日可能有多行：事实行的 id 里含批次，重采不覆盖旧行而是再插一条。
+// 07-24 有 2 行、07-27 有 3 行（其中两行是采早了的半成品，成交订单数为空）。
+// 原先按 id 排序取第一条，取到哪条全看哈希——那等于随机挑一个版本显示。
+// 规则：丢掉不可信来源，同一天保留批次完成时间最新的那条。
+export function selectTrustedDailyFacts(rows = []) {
+  const latest = new Map();
+  for (const row of rows) {
+    if (isDistrustedSource(row?.sourceVersion || row?.batchSourceVersion)) continue;
+    const date = String(row?.businessDate || "");
+    if (!date) continue;
+    const current = latest.get(date);
+    const stamp = String(row?.batchCompletedAt || "");
+    if (!current || stamp >= String(current.batchCompletedAt || "")) latest.set(date, row);
+  }
+  return [...latest.values()].sort((left, right) => String(left.businessDate).localeCompare(String(right.businessDate)));
+}

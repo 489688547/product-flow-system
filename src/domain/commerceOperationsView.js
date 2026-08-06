@@ -41,7 +41,11 @@ export function dayOverDay(value, previous, { lowerIsBetter = false } = {}) {
 export const STORE_DAILY_METRICS = Object.freeze([
   Object.freeze({ key: "transactionAmount", label: "成交金额(GMV)", format: "money", lowerIsBetter: false }),
   Object.freeze({ key: "derived.exposureClickRate", label: "曝光点击率", format: "percent", lowerIsBetter: false }),
-  Object.freeze({ key: "derived.refundRate", label: "退款率", format: "percent", lowerIsBetter: true })
+  Object.freeze({ key: "derived.refundRate", label: "退款率", format: "percent", lowerIsBetter: true }),
+  // 花出去的钱。数据来自罗盘自助取数的「支出」类，随店铺日事实一起采回。
+  // 投放费比按 投放消耗 / 成交金额 现算，不用平台那几个口径不一的费比变体。
+  Object.freeze({ key: "adCostAmount", label: "广告费(投放消耗)", format: "money", lowerIsBetter: true }),
+  Object.freeze({ key: "derived.adCostRatio", label: "投放费比", format: "percent", lowerIsBetter: true })
 ]);
 
 function sortedDates(facts) {

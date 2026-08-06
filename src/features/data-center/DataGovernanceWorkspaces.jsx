@@ -15,16 +15,18 @@ import {
   buildSyncCoverage
 } from "../../domain/dataSyncCoverage.js";
 import { DOUYIN_COLLECTION_RESOURCES } from "../../domain/dataCenterConnectors.js";
-import { defaultDataCenterRange } from "../../domain/dataCenter.js";
+import { DAILY_FACTS_WINDOW_DAYS, defaultDataCenterRange } from "../../domain/dataCenter.js";
 import { buildDataSyncRunRows } from "../../domain/dataSyncRunRows.js";
 import { TablePagination } from "../../ui/TablePagination.jsx";
 import { LocalArchivePanel } from "./LocalArchivePanel.jsx";
+import { PlatformLoginPanel } from "./PlatformLoginPanel.jsx";
 import { SyncConclusionBar } from "./SyncConclusionBar.jsx";
 import { SyncCoveragePanel } from "./SyncCoveragePanel.jsx";
 import { DataConnectionsWorkspace } from "./connections/DataConnectionsWorkspace.jsx";
 
 // 覆盖窗口独立于总览日期范围：联动会让半年区间拉出上千行。
-const COVERAGE_WINDOW_DAYS = 14;
+// 与 DAILY_FACTS_WINDOW_DAYS 必须一致：事实窗口短于判定窗口时，缺的天会被误报为数据缺失。
+const COVERAGE_WINDOW_DAYS = DAILY_FACTS_WINDOW_DAYS;
 const RUN_PAGE_SIZE = 20;
 
 const STATUS_LABELS = { healthy: "正常", success: "成功", queued: "等待 Chrome 领取", claimed: "已被 Chrome 领取", opening: "正在打开页面", exporting: "正在生成报表", downloading: "正在下载报表", validating: "正在校验", ingesting: "正在入库", pending_validation: "待验证", waiting_verification: "等待人工验证", waiting_human: "等待人工处理", collecting: "页面读数中", running: "同步中", stale: "已过期", login_required: "需要登录", schema_changed: "页面结构变化", failed: "失败", manual_required: "需要人工处理", unavailable: "尚未完成真实采集", superseded: "已被新批次取代", disabled: "未启用" };
@@ -217,6 +219,50 @@ const UNIFIED_CALIBER_RESOURCES = Object.freeze(["sales_items", "order_items"]);
     }
   };
   // 执行记录里的失败必须能就地重试，不用用户自己到上面的覆盖表里找对应行。
+  // 按平台重采：登录修好之后，把该平台所有未完成的任务重新排队。
+  // 复用逐条重试用的同一个入口，不新造机制——它已经带 force，能越过重试次数已用尽的终态。
+  const [recollecting, setRecollecting] = useState("");
+  const recollectPlatform = async providerId => {
+    if (!canTrigger || recollecting) return;
+    const targets = (webCollection.jobs || []).filter(job => job?.providerId === providerId
+      && ["failed", "waiting_human", "schema_changed"].includes(String(job?.status || "")));
+    if (!targets.length) {
+      setResultMessage("该平台当前没有待重采的任务。");
+      return;
+    }
+    // 点之前先说清会排多少条。实测一次排了 34 条，而抖音自助取数每天只有 5 条配额，
+    // 超出的部分注定当天失败——不先说清，人会以为「重采」就等于「今天能补齐」。
+    const 提示 = providerId === "douyin-ecommerce"
+      ? `将重新排队 ${targets.length} 条任务。抖音自助取数每天限 5 条，超出的会等明天。继续？`
+      : `将重新排队 ${targets.length} 条任务。继续？`;
+    if (typeof window !== "undefined" && typeof window.confirm === "function" && !window.confirm(提示)) return;
+
+    setRecollecting(providerId);
+    setResultMessage("");
+    setResultError("");
+    try {
+      // 并发触发。逐条 await 的话 34 条要走 34 个来回，按钮会静止在「正在排队…」
+      // 四十秒——看不出还要多久，也看不出有没有卡死。
+      const results = await Promise.allSettled(targets.map(job => triggerWebCollection({
+        providerId: job.providerId,
+        storeId: job.storeId || "",
+        resourceType: job.resourceType,
+        businessDate: job.businessDate,
+        force: true
+      })));
+      const 失败 = results.filter(item => item.status === "rejected").length;
+      if (失败) {
+        setResultError(`${providerId} 有 ${失败} 条重新排队失败，其余 ${targets.length - 失败} 条已排队。`);
+      }
+      setResultMessage(`${providerId} 的 ${targets.length - 失败} 条任务已重新排队。`);
+      await refreshWebCollection();
+    } catch (error) {
+      setResultError(error.message || "重新采集触发失败。");
+    } finally {
+      setRecollecting("");
+    }
+  };
+
   const retryRun = async row => {
     if (!canTrigger || !row.retryTarget || retryingRun) return;
     setRetryingRun(row.id);
@@ -240,6 +286,12 @@ const UNIFIED_CALIBER_RESOURCES = Object.freeze(["sales_items", "order_items"]);
       error={webCollectionError}
       onRecheck={refreshStatus}
       rechecking={webCollectionLoading}
+    />
+    <PlatformLoginPanel
+      jobs={webCollection.jobs}
+      onRecollect={recollectPlatform}
+      recollecting={recollecting}
+      canTrigger={canTrigger}
     />
     <div ref={coverageRef}>
       <SyncCoveragePanel

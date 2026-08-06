@@ -48,6 +48,42 @@ test("扩展环境类失败指向 Chrome 而不是快麦或抖店页面", () => 
   assert.match(explained.action, /Chrome/);
 });
 
+test("Ego 不可用只指向 Ego，不建议用 Chrome 重试", () => {
+  const explained = explainCollectionFailure("EGO_UNAVAILABLE", { stage: "opening" });
+  assert.match(explained.action, /打开 Ego|启动 Ego/);
+  assert.doesNotMatch(explained.action, /Chrome/);
+  assert.equal(explained.retryable, true);
+});
+
+test("抖店人工处理明确在同店铺 Ego 空间完成", () => {
+  for (const code of [
+    "DOUYIN_LOGIN_REQUIRED",
+    "DOUYIN_HUMAN_VERIFICATION_REQUIRED",
+    "EGO_TASK_SPACE_USER_CONTROLLED"
+  ]) {
+    const explained = explainCollectionFailure(code, { stage: "opening" });
+    assert.equal(explained.kind, COLLECTION_FAILURE_KIND.needsHuman);
+    assert.match(explained.action, /Ego/);
+    assert.doesNotMatch(explained.action, /Chrome/);
+    assert.equal(explained.retryable, false);
+  }
+});
+
+test("Ego 下载、页面超时和阿里云闸门错误都有稳定处置", () => {
+  const download = explainCollectionFailure("EGO_DOWNLOAD_CAPABILITY_UNAVAILABLE", { stage: "downloading" });
+  assert.match(download.action, /Ego/);
+  assert.equal(download.retryable, false);
+
+  const pageLoad = explainCollectionFailure("DOUYIN_PAGE_LOAD_TIMEOUT", { stage: "opening" });
+  assert.match(pageLoad.action, /重试/);
+  assert.equal(pageLoad.retryable, true);
+
+  const target = explainCollectionFailure("EGO_FORMAL_TARGET_NOT_ALIYUN", { stage: "ingesting" });
+  assert.match(target.action, /阿里云|备案|HTTPS/);
+  assert.doesNotMatch(target.action, /D1|Cloudflare/);
+  assert.equal(target.retryable, false);
+});
+
 test("未登记的错误码保留原码但仍给出可读结构，不假装认识", () => {
   const explained = explainCollectionFailure("SOME_BRAND_NEW_CODE", { stage: "exporting" });
   assert.equal(explained.kind, COLLECTION_FAILURE_KIND.unknown);

@@ -217,3 +217,64 @@ test("每日排程不得早于上午 10 点", () => {
   const 上午十点 = createDailyPlan({ adapters: WEB_COLLECTION_ADAPTERS, now: "2026-07-26T10:00:00+08:00" });
   assert.ok(上午十点.length > 0, "10 点起应正常排程");
 });
+
+test("已验证的抖音日事实标记走自助取数，其它保持原样", () => {
+  // 逐页导出拿不到成交订单数与成交人数，页面标签又抓错过；
+  // 自助取数是这两项目前已知的唯一可信来源。
+  const plan = createDailyPlan({
+    now: new Date("2026-07-30T12:00:00+08:00"),
+    adapters: [
+      {
+        id: "douyin-ecommerce",
+        storeId: "90862283",
+        resources: [
+          { type: "live_daily", rangeKind: "daily_fact" },
+          { type: "product_list", rangeKind: "current_snapshot" }
+        ]
+      },
+      { id: "kuaimai", storeId: "1", resources: [{ type: "sales_items", rangeKind: "daily_fact" }] }
+    ]
+  });
+  const 抖音日事实 = plan.find(job => job.providerId === "douyin-ecommerce" && job.resourceType === "live_daily");
+  const 抖音快照 = plan.find(job => job.resourceType === "product_list");
+  const 快麦 = plan.find(job => job.providerId === "kuaimai");
+  assert.equal(抖音日事实.viaSelfService, true);
+  assert.equal("viaSelfService" in 抖音快照, false, "快照类不走自助取数");
+  assert.equal("viaSelfService" in 快麦, false, "别的平台不受影响");
+});
+
+test("自助取数任务超过平台每日配额时，排计划阶段就挡住", () => {
+  // 排超了不会在排计划时出问题，而是跑到第 6 条才被平台拒掉：前 5 条已经排进队列，
+  // 看起来一切正常，唯独有个资源今天永远采不到，失败信息还只说「每天仅支持创建5条任务」。
+  // 三家店各两个自助取数资源就是 6 条。
+  const 资源 = ["store_daily", "live_daily", "video_daily"].map(type => ({ type, rangeKind: "daily_fact" }));
+  assert.throws(
+    () => createDailyPlan({
+      now: new Date("2026-07-31T12:00:00+08:00"),
+      adapters: [{
+        id: "douyin-ecommerce",
+          stores: [{ id: "1" }, { id: "2" }],
+        resources: 资源
+      }]
+    }),
+    /超过平台配额 5 条/
+  );
+});
+
+test("四个日事实资源全部走自助取数", () => {
+  // store 与 product 是最后切的：它们除成交外还要结算、退款、商品曝光/点击，
+  // 少取一类那几项就静默变 null，面板的退款率与曝光点击率会消失。
+  // 现在指标一律全选，列名也用 preview 逐列核对，前置条件已满足。
+  const plan = createDailyPlan({
+    now: new Date("2026-07-31T12:00:00+08:00"),
+    adapters: [{
+      id: "douyin-ecommerce",
+      storeId: "90862283",
+      resources: ["store_daily", "product_daily", "live_daily", "video_daily"].map(type => ({ type, rangeKind: "daily_fact" }))
+    }]
+  });
+  assert.deepEqual(
+    plan.filter(job => job.viaSelfService).map(job => job.resourceType).sort(),
+    ["live_daily", "product_daily", "store_daily", "video_daily"]
+  );
+});
