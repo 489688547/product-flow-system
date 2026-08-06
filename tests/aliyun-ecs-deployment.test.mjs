@@ -80,9 +80,16 @@ test("Aliyun production, test API, static test frontend, and OSS backup are decl
   assert.match(aliyunWrangler, /compatibility_date = "2026-07-18"/);
   assert.match(proxyHost, /server_name deshan-tiyes\.cn www\.deshan-tiyes\.cn;/);
   assert.match(proxyHost, /set \$server "product-flow-app";/);
+  assert.match(proxyHost, /listen 443 ssl;/);
+  assert.match(proxyHost, /proxy_set_header X-Forwarded-Proto https;/);
+  assert.match(proxyHost, /proxy_set_header X-Forwarded-Host \$host;/);
+  assert.match(proxyHost, /proxy_hide_header X-Server-Env;/);
+  assert.match(
+    proxyHost,
+    /proxy_redirect .*redirect_uri=http%3A%2F%2Fdeshan-tiyes.*redirect_uri=https%3A%2F%2Fdeshan-tiyes\.cn/
+  );
   assert.match(testProxyHost, /server_name api-test\.deshan-tiyes\.cn;/);
   assert.match(testProxyHost, /set \$server "product-flow-test-api";/);
-  assert.doesNotMatch(proxyHost, /listen 443/);
 });
 
 test("Aliyun runtime rejects local executive bypass and unsafe paths", async () => {
