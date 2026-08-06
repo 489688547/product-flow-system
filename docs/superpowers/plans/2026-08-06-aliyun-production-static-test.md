@@ -520,7 +520,7 @@ git diff --name-only origin/dev...HEAD
 
 Expected: only migration files plus the preserved CA fix; no unrelated collector edits beyond the dev merge.
 
-- [ ] **Step 2: Run the complete definition of done**
+- [x] **Step 2: Run the complete definition of done**
 
 ~~~bash
 npm run lint
@@ -534,7 +534,7 @@ npm run check:pr -- --base origin/dev
 
 Expected: every command exits zero.
 
-- [ ] **Step 3: Run container verification**
+- [x] **Step 3: Run container verification**
 
 ~~~bash
 docker compose -f deploy/aliyun/docker-compose.yml config
@@ -544,14 +544,18 @@ docker build --build-arg PFS_BUILD_COMMIT="$(git rev-parse HEAD)" -f Dockerfile.
 
 Expected: PASS; image reports the full current commit.
 
-- [ ] **Step 4: Record and commit evidence**
+ACR build `28156f94-187b-416d-8cab-79a95c835cc7` and the ECS production/test
+Compose configurations supplied the container verification lane because Docker Desktop was
+not available locally.
+
+- [x] **Step 4: Record and commit evidence**
 
 ~~~bash
 git add docs/features/aliyun-ecs-deployment/tasks.md
 git commit -m "docs(deploy): record aliyun migration verification"
 ~~~
 
-- [ ] **Step 5: Push and open PR to dev**
+- [x] **Step 5: Push and open PR to dev**
 
 ~~~bash
 git push origin codex/aliyun-deployment
@@ -559,6 +563,8 @@ gh pr create --base dev --head codex/aliyun-deployment --title "feat(deploy): mo
 ~~~
 
 Expected: PR base dev and current CI payload.
+
+PR #221 passed quality and merged to `dev` as `cd0750571d5618c7e465a21e2e1b5dd3efb9281d`.
 
 ### Task 10: Deploy and Accept the Test Environment
 
@@ -570,29 +576,34 @@ Expected: PR base dev and current CI payload.
 - Consumes: merged dev commit and immutable ACR image.
 - Produces: https://test.deshan-tiyes.cn plus https://api-test.deshan-tiyes.cn with the same dev commit and isolated test data.
 
-- [ ] **Step 1: Configure DNS without touching production**
+- [x] **Step 1: Configure DNS without touching production**
 
 In the existing Ego task space, set api-test A to ECS and test CNAME to Pages. Read both records back and verify public DNS.
 
-- [ ] **Step 2: Configure static-only Pages**
+- [x] **Step 2: Configure static-only Pages**
 
 Disable the old Git deployment that bundles functions. Add the custom test domain. Confirm no Functions invocation, D1 binding or business Secret.
 
-- [ ] **Step 3: Deploy isolated test API**
+- [x] **Step 3: Deploy isolated test API**
 
 Create mode-600 test runtime env and owned test data directory on ECS, pull the dev ACR image, install test Nginx host and start only the test Compose profile. Never display env contents.
 
-- [ ] **Step 4: Prove database isolation**
+- [x] **Step 4: Prove database isolation**
 
 Record canonical paths, sizes, schema versions and non-sensitive row counts. Perform and remove a reversible test-only write through the app/API and prove production did not change.
 
-- [ ] **Step 5: Verify test DingTalk OAuth in Ego**
+- [x] **Step 5: Verify test DingTalk OAuth in Ego**
 
 Use a fresh session, complete login, verify return to test frontend, authenticated business read from test API and direct network requests to api-test.
 
-- [ ] **Step 6: Exercise on-demand behavior**
+- [x] **Step 6: Exercise on-demand behavior**
 
 Run commit, HTTPS, CORS, cold/warm and 20-concurrency checks. Stop test API and prove production remains 200; restart and prove test recovery.
+
+Accepted on 2026-08-06 at `cd0750571d56`: public DNS and TLS resolved, Cloudflare
+project configuration contained no Variables, Secrets or D1 bindings in either environment,
+real DingTalk OAuth returned to the test frontend, the reversible test write never appeared in
+production, and the post-restart fixed-site smoke passed.
 
 ### Task 11: Release and Accept Production
 
