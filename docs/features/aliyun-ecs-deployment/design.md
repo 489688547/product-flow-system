@@ -23,13 +23,15 @@
 2. OAuth start 使用当前 HTTPS Origin 生成同源 callback。
 3. callback 在 ECS 本地正式库创建会话 Cookie。
 4. 已登录用户按原有权限读取正式或展示业务库。
-5. 发生故障时运维恢复 Cloudflare 固定入口，用户无需导入本地缓存。
+5. 发生故障时运维回滚 ECS 上一个镜像和 SQLite 快照，用户无需导入本地缓存。
+6. 测试用户访问 Cloudflare Pages 静态站，浏览器只调用 ECS 隔离测试 API。
 
 ## 组件复用
 
 - 复用现有登录页、会话中间件、环境就绪 API 和所有业务页面。
 - 复用 Nginx Proxy Manager 管理 80/443 和证书，不在应用容器内再运行 Nginx。
 - 复用 Pages Functions 目录和 Wrangler 本地 D1 兼容接口，避免复制 API。
+- Cloudflare Pages 只复用静态文件托管；不复用 Functions、Workers 或 D1。
 
 ## 新增组件
 
@@ -49,6 +51,7 @@
 - 无权限：沿用服务端会话与角色校验。
 - 禁用：域名/OSS 未就绪只影响对应上线或备份步骤，不伪装成功。
 - 成功：readiness、数据库校验和公网请求均提供独立证据。
+- 环境隔离：生产和测试页面显示各自环境；测试 API 不得读取生产 SQLite。
 
 ## 响应式与钉钉 WebView
 
@@ -69,4 +72,4 @@
 
 - `deshan-tiyes.cn` 登录页：1440×900、1280×800、390×844。
 - 钉钉 PC 与移动 WebView：登录、回调、首页和一个数据页。
-- Cloudflare 回滚入口：同一用户在全新会话中仍可登录。
+- Cloudflare 测试静态站：只请求 ECS 测试 API，不存在 Cloudflare API 请求。

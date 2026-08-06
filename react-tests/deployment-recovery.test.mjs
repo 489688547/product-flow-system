@@ -56,7 +56,7 @@ test("旧版本动态分包失效时只自动刷新一次", async () => {
   assert.equal(listeners.has("vite:preloadError"), false);
 });
 
-test("应用启动前安装恢复监听，Pages 发布包含顶层 404 页面", () => {
+test("应用启动前安装恢复监听，运行时构建保留公共 404 页面", () => {
   const mainSource = readFileSync(new URL("../src/main.jsx", import.meta.url), "utf8");
   const installAt = mainSource.indexOf("installDeploymentRecovery()");
   const renderAt = mainSource.indexOf("createRoot(");
@@ -64,27 +64,26 @@ test("应用启动前安装恢复监听，Pages 发布包含顶层 404 页面", 
   assert.ok(installAt >= 0, "应用入口应安装分包恢复监听");
   assert.ok(installAt < renderAt, "恢复监听必须先于 React 渲染安装");
 
-  const releaseSource = readFileSync(new URL("../scripts/prepare-pages-release.mjs", import.meta.url), "utf8");
-  assert.match(releaseSource, /404\.html/);
   assert.equal(
-    existsSync(new URL("../404.html", import.meta.url)),
+    existsSync(new URL("../public/404.html", import.meta.url)),
     true,
-    "顶层 404.html 可阻止 Pages 把缺失 JS 伪装成首页 HTML",
+    "公共 404.html 可阻止静态主机把缺失 JS 伪装成首页 HTML",
   );
 });
 
-test("自动 Pages 构建包含兼容入口和缓存重写契约", () => {
+test("运行时构建只包含根入口和静态缓存重写契约", () => {
   const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
   assert.match(
     packageJson.scripts.build,
-    /prepare-pages-build\.mjs/,
-    "Cloudflare Git 自动构建必须补齐完整 Pages 发布产物",
+    /prepare-runtime-build\.mjs/,
+    "生产和测试构建必须使用同一静态产物准备脚本",
   );
 
-  const buildPreparationPath = new URL("../scripts/prepare-pages-build.mjs", import.meta.url);
+  const buildPreparationPath = new URL("../scripts/prepare-runtime-build.mjs", import.meta.url);
   assert.equal(existsSync(buildPreparationPath), true, "应提供 dist 发布后处理脚本");
   const buildPreparationSource = readFileSync(buildPreparationPath, "utf8");
-  assert.match(buildPreparationSource, /cloudflare-entry\.html/);
+  assert.doesNotMatch(buildPreparationSource, /cloudflare-entry\.html/);
+  assert.doesNotMatch(buildPreparationSource, /_routes\.json/);
   assert.match(buildPreparationSource, /_headers/);
   assert.match(buildPreparationSource, /_redirects/);
 });

@@ -17,6 +17,7 @@ services:
       - "${PFS_RUNTIME_ENV_FILE:-/opt/product-flow/config/runtime.env}"
     environment:
       LOCAL_ONLINE_ACCOUNT_MODE: "0"
+      PFS_RUNTIME_NAME: "production"
       PFS_RUNTIME_HOST: "0.0.0.0"
       PFS_RUNTIME_PORT: "8080"
       PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler"
@@ -32,6 +33,49 @@ services:
         - node
         - -e
         - "fetch('http://127.0.0.1:8080/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+    networks:
+      - proxy
+
+  product-flow-test-api:
+    profiles: ["test"]
+    image: "${PFS_TEST_IMAGE:-product-flow-system:aliyun-test}"
+    build:
+      context: ../..
+      dockerfile: Dockerfile.aliyun
+      args:
+        PFS_BUILD_COMMIT: "${PFS_BUILD_COMMIT:-}"
+    container_name: product-flow-test-api
+    restart: unless-stopped
+    stop_grace_period: 30s
+    cpus: 0.5
+    mem_limit: 512m
+    ports:
+      - "127.0.0.1:8081:8081"
+    env_file:
+      - "${PFS_TEST_RUNTIME_ENV_FILE:-/opt/product-flow-test/config/runtime.env}"
+    environment:
+      LOCAL_ONLINE_ACCOUNT_MODE: "0"
+      PFS_RUNTIME_NAME: "test"
+      PFS_RUNTIME_HOST: "0.0.0.0"
+      PFS_RUNTIME_PORT: "8081"
+      PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow-test/wrangler"
+      PFS_RUNTIME_WORK_DIR: "/var/lib/product-flow-test/runtime"
+      PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env"
+    volumes:
+      - "${PFS_TEST_DATA_DIR:-/opt/product-flow-test/data}:/var/lib/product-flow-test"
+      - "${PFS_TEST_RUNTIME_ENV_FILE:-/opt/product-flow-test/config/runtime.env}:/run/pfs/runtime.env:ro"
+    tmpfs:
+      - /tmp:size=96m,mode=1777
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:8081/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
       interval: 20s
       timeout: 5s
       retries: 5

@@ -1,0 +1,55 @@
+name: deploy-test-static
+
+on:
+  workflow_run:
+    workflows: [quality]
+    branches: [dev]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-test-static
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_PFS_API_ORIGIN: https://api-test.deshan-tiyes.cn
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Prepare isolated static directory
+        id: static
+        shell: bash
+        run: |
+          STATIC_DIR="$RUNNER_TEMP/product-flow-static"
+          rm -rf "$STATIC_DIR"
+          mkdir -p "$STATIC_DIR"
+          cp -R dist/. "$STATIC_DIR/"
+          for forbidden in functions _routes.json .dev.vars wrangler.toml; do
+            test ! -e "$STATIC_DIR/$forbidden"
+          done
+          echo "directory=$STATIC_DIR" >> "$GITHUB_OUTPUT"
+      - name: Deploy dev static frontend only
+        working-directory: ${{ steps.static.outputs.directory }}
+        run: >-
+          "$GITHUB_WORKSPACE/node_modules/.bin/wrangler" pages deploy .
+          --project-name deshan-tiyes-system-dev
+          --branch dev
+          --commit-hash "${{ github.event.workflow_run.head_sha || github.sha }}"

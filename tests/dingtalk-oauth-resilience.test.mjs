@@ -1,74 +1,26 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import test from "node:test";
 
 const root = resolve(import.meta.dirname, "..");
 
-test("OAuth public entrypoints are static Pages routes outside the monolithic Function", async () => {
-  const routes = JSON.parse(await readFile(resolve(root, "public/_routes.json"), "utf8"));
+test("DingTalk OAuth is served by ECS API routes without Pages static shims", () => {
+  assert.equal(existsSync(resolve(root, "functions/api/auth/dingtalk/start.js")), true);
+  assert.equal(existsSync(resolve(root, "functions/api/auth/dingtalk/callback.js")), true);
+  assert.equal(existsSync(resolve(root, "public/_routes.json")), false);
+  assert.equal(existsSync(resolve(root, "public/auth/dingtalk-start.html")), false);
+  assert.equal(existsSync(resolve(root, "public/auth/dingtalk-callback.html")), false);
+  assert.equal(existsSync(resolve(root, "public/auth/dingtalk-oauth.js")), false);
 
-  assert.deepEqual(routes, {
-    version: 1,
-    include: ["/*"],
-    exclude: [
-      "/api/auth/dingtalk/start",
-      "/api/auth/dingtalk/start/*",
-      "/api/auth/dingtalk/callback",
-      "/api/auth/dingtalk/callback/*",
-      "/auth/dingtalk-start*",
-      "/auth/dingtalk-callback*",
-      "/auth/dingtalk-oauth.js"
-    ]
-  });
-
-  const start = await readFile(resolve(root, "public/auth/dingtalk-start.html"), "utf8");
-  const callback = await readFile(resolve(root, "public/auth/dingtalk-callback.html"), "utf8");
-  assert.match(start, /runDingTalkOAuthStart/);
-  assert.match(callback, /runDingTalkOAuthCallback/);
-
-  const redirects = await readFile(resolve(root, "_redirects"), "utf8");
-  assert.match(redirects, /^\/api\/auth\/dingtalk\/start \/auth\/dingtalk-start\.html 200$/m);
-  assert.match(redirects, /^\/api\/auth\/dingtalk\/callback \/auth\/dingtalk-callback\.html 200$/m);
+  const redirects = readFileSync(resolve(root, "_redirects"), "utf8").trim();
+  assert.equal(redirects, "/* /index.html 200");
+  assert.doesNotMatch(redirects, /\/api\//);
 });
 
-test("OAuth bootstrap retries transient Worker resource failures before succeeding", async () => {
-  const { fetchJsonWithRetry } = await import("../public/auth/dingtalk-oauth.js");
-  let calls = 0;
-  const payload = await fetchJsonWithRetry("/api/auth/dingtalk/bootstrap", {}, {
-    delays: [0, 0, 0],
-    fetchImpl: async () => {
-      calls += 1;
-      if (calls < 3) {
-        return new Response("Worker exceeded resource limits", { status: 500 });
-      }
-      return Response.json({ ready: true, authorizeUrl: "https://login.dingtalk.com/oauth2/auth" });
-    },
-    waitImpl: async () => {}
-  });
-
-  assert.equal(calls, 3);
-  assert.equal(payload.authorizeUrl, "https://login.dingtalk.com/oauth2/auth");
-});
-
-test("OAuth bootstrap does not retry permanent validation failures", async () => {
-  const { fetchJsonWithRetry } = await import("../public/auth/dingtalk-oauth.js");
-  let calls = 0;
-  await assert.rejects(
-    fetchJsonWithRetry("/api/auth/dingtalk/bootstrap", {}, {
-      delays: [0, 0, 0],
-      fetchImpl: async () => {
-        calls += 1;
-        return Response.json({ message: "登录校验已失效" }, { status: 400 });
-      },
-      waitImpl: async () => {}
-    }),
-    /登录校验已失效/
-  );
-  assert.equal(calls, 1);
-});
-
-test("Pages build preparation keeps the OAuth static routing contract", async () => {
-  const source = await readFile(resolve(root, "scripts/prepare-pages-build.mjs"), "utf8");
-  assert.match(source, /_routes\.json/);
+test("runtime build preparation never creates Pages function routing artifacts", () => {
+  const source = readFileSync(resolve(root, "scripts/prepare-runtime-build.mjs"), "utf8");
+  assert.doesNotMatch(source, /cloudflare-entry\.html/);
+  assert.doesNotMatch(source, /_routes\.json/);
+  assert.match(source, /dist.*index\.html/s);
 });

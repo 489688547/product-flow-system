@@ -11,7 +11,7 @@ test("my groups load from the authenticated group collection route", async () =>
     return Response.json({ groups: [{ id: "g1", name: "产品群", myRole: "OWNER" }] });
   });
   assert.equal(requested.url, "/api/dingtalk/groups");
-  assert.equal(requested.options.credentials, "same-origin");
+  assert.equal(requested.options.credentials, "include");
   assert.equal(result.groups[0].name, "产品群");
 });
 
@@ -22,7 +22,7 @@ test("group search encodes the query and keeps the session cookie", async () => 
     return Response.json({ groups: [{ id: "g1", name: "产品群" }], nextCursor: "" });
   });
   assert.match(requested.url, /q=%E4%BA%A7%E5%93%81/);
-  assert.equal(requested.options.credentials, "same-origin");
+  assert.equal(requested.options.credentials, "include");
   assert.equal(result.groups[0].id, "g1");
 });
 

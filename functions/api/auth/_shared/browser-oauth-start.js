@@ -1,22 +1,3 @@
-const PRODUCTION_ORIGIN = "https://deshan-tiyes-system.pages.dev";
-const DEVELOPMENT_ORIGIN = "https://deshan-tiyes-system-dev.pages.dev";
-
-function fixedPagesOrigin(requestUrl) {
-  if (
-    requestUrl.hostname.endsWith(".deshan-tiyes-system-dev.pages.dev")
-    && requestUrl.origin !== DEVELOPMENT_ORIGIN
-  ) {
-    return DEVELOPMENT_ORIGIN;
-  }
-  if (
-    requestUrl.hostname.endsWith(".deshan-tiyes-system.pages.dev")
-    && requestUrl.origin !== PRODUCTION_ORIGIN
-  ) {
-    return PRODUCTION_ORIGIN;
-  }
-  return "";
-}
-
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -67,22 +48,6 @@ export function createBrowserOauthStartResponse({ request, env, mode = "redirect
   if (request.method !== "GET") return jsonResponse({ message: "Method not allowed" }, 405);
   const requestUrl = new URL(request.url);
   const returnTo = safeReturnTo(requestUrl.searchParams.get("returnTo"));
-  const fixedOrigin = fixedPagesOrigin(requestUrl);
-  if (fixedOrigin) {
-    const productionStart = new URL("/api/auth/dingtalk/start", fixedOrigin);
-    if (returnTo) productionStart.searchParams.set("returnTo", returnTo);
-    if (mode === "json") {
-      return jsonResponse({ ready: true, authorizeUrl: productionStart.toString() });
-    }
-    return new Response(null, {
-      status: 302,
-      headers: {
-        location: productionStart.toString(),
-        "cache-control": "no-store"
-      }
-    });
-  }
-
   const { appKey, missing } = credentials(env);
   if (missing.length) return jsonResponse({ message: `缺少钉钉应用配置：${missing.join("、")}` }, 501);
 

@@ -22,7 +22,7 @@ test("data connection tables stay aligned with the environment capability", () =
   assert.deepEqual(capability.tables, DATA_CONNECTION_TABLES);
   assert.deepEqual(capability.envVars, ["PLATFORM_CREDENTIAL_MASTER_KEY"]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
-  assert.deepEqual(capability.platforms, ["douyin-ecommerce", "cloudflare-pages", "cloudflare-d1"]);
+  assert.deepEqual(capability.platforms, ["douyin-ecommerce", "aliyun"]);
   for (const table of DATA_CONNECTION_TABLES) {
     assert.match(migration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}\\b`));
   }

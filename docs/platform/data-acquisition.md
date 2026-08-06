@@ -98,7 +98,7 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 ## 当前范围
 
-抖店 Ego runtime、Task Space 隔离、受控下载、本地归档解析和阿里云 fail-closed 闸门已完成本地
-实现；因 `deshan-tiyes.cn` 的 ICP/HTTPS 尚未完成，正式 ECS/SQLite 回传与最新业务日单任务仍未
-验收，状态保持 `integrating`。当前生产采集器仍为旧 `dedicated`/Cloudflare 配置，不能据此宣称新
-链路已上线。快麦继续使用现有 MV3 官方导出与本机处理链路；其他平台以各自生产证据为准。
+抖店 Ego runtime、Task Space 隔离、受控下载、本地归档解析和阿里云 fail-closed 闸门已完成实现。
+采集器只允许指向 `https://deshan-tiyes.cn` 或登记的 ECS 测试 API；旧 Cloudflare API 目标已退休。
+最新业务日单任务仍需按采集器的创建、完成、下载、解析、映射和落库阶段逐项验收。快麦继续使用
+现有 MV3 官方导出与本机处理链路；其他平台以各自生产证据为准。

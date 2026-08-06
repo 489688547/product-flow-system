@@ -1,146 +1,122 @@
 import assert from "node:assert/strict";
-import test from "node:test";
 import { resolve } from "node:path";
+import test from "node:test";
 
 const scriptPath = resolve("scripts/check-deployed-smoke.mjs");
-const baseUrl = "https://deshan-tiyes-system.pages.dev";
 const expectedCommit = "abcdef1234567890";
+const productionUrl = "https://deshan-tiyes.cn";
+const testUrl = "https://test.deshan-tiyes.cn";
+const testApiUrl = "https://api-test.deshan-tiyes.cn";
 
-function responseMap(overrides = {}) {
-  const responses = {
-    "/cloudflare-entry.html": new Response(
-      `<!doctype html><meta name="pfs-release-commit" content="${expectedCommit}"><main>ready</main>`,
-      { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
-    ),
-    "/api/auth/dingtalk/start": new Response(
-      "<!doctype html><main data-oauth-status>正在安全连接钉钉</main>",
-      { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
-    ),
-    "/api/auth/dingtalk/bootstrap": Response.json({
-      ready: true,
-      authorizeUrl: `https://login.dingtalk.com/oauth2/auth?redirect_uri=${encodeURIComponent(`${baseUrl}/api/auth/dingtalk/callback`)}`
-    }),
-    "/api/auth/session": Response.json({ authenticated: false }),
-    "/api/platform/v1/environment-readiness": Response.json({
-      ready: true,
-      checkedAt: "2026-07-28T00:00:00.000Z",
-      capabilities: []
-    }),
-    ...overrides
-  };
-  return async input => {
+function responseMap({ baseUrl, apiUrl = baseUrl, environment, corsOrigin = "", entryHeaders = {} } = {}) {
+  return async (input, init = {}) => {
     const url = new URL(String(input));
-    const response = responses[url.pathname];
-    if (!response) throw new Error(`Unexpected URL: ${url.pathname}`);
-    return response.clone();
+    if (url.origin === new URL(baseUrl).origin && url.pathname === "/") {
+      return new Response(`<!doctype html><meta name="pfs-release-commit" content="${expectedCommit}">`, {
+        status: 200,
+        headers: { "content-type": "text/html", ...entryHeaders }
+      });
+    }
+    if (url.origin !== new URL(apiUrl).origin) throw new Error(`Unexpected origin: ${url.origin}`);
+    if (url.pathname === "/api/auth/session" && init.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: {
+          "access-control-allow-origin": corsOrigin,
+          "access-control-allow-credentials": "true"
+        }
+      });
+    }
+    if (url.pathname === "/api/auth/session") {
+      return Response.json({ authenticated: false, user: null }, { status: 401 });
+    }
+    if (url.pathname === "/api/platform/v1/environment-readiness") {
+      return Response.json({ environment, ready: true, capabilities: [] });
+    }
+    if (url.pathname === "/api/auth/dingtalk/bootstrap") {
+      return Response.json({
+        ready: true,
+        authorizeUrl: `https://login.dingtalk.com/oauth2/auth?redirect_uri=${encodeURIComponent(`${apiUrl}/api/auth/dingtalk/callback`)}`
+      });
+    }
+    throw new Error(`Unexpected URL: ${url.href}`);
   };
 }
 
-test("fixed-site smoke proves commit, static OAuth, callback origin, session safety and readiness", async () => {
+test("production smoke proves root commit, Aliyun readiness and DingTalk callback", async () => {
   const { checkDeployedSmoke } = await import(scriptPath);
   const result = await checkDeployedSmoke({
-    baseUrl,
+    baseUrl: productionUrl,
     expectedCommit,
     accessToken: "safe-test-token",
-    fetchImpl: responseMap()
+    requiredPlatforms: ["aliyun", "dingtalk"],
+    expectedEnvironment: "production",
+    forbidServerEnvDev: true,
+    oauthConcurrency: 2,
+    fetchImpl: responseMap({ baseUrl: productionUrl, environment: "production" })
   });
-  assert.equal(result.baseUrl, baseUrl);
-  assert.equal(result.commit, expectedCommit);
-  assert.equal(result.oauth.entryStatus, 200);
-  assert.equal(result.sessionAuthenticated, false);
-  assert.equal(result.readiness.ready, true);
+  assert.equal(result.baseUrl, productionUrl);
+  assert.equal(result.apiBaseUrl, productionUrl);
+  assert.equal(result.readiness.oauth.callbackOrigin, productionUrl);
 });
 
-test("fixed-site smoke follows only the fixed same-origin OAuth entry redirect", async () => {
+test("split test smoke proves static commit, preview API and credentialed CORS", async () => {
   const { checkDeployedSmoke } = await import(scriptPath);
   const result = await checkDeployedSmoke({
-    baseUrl,
+    baseUrl: testUrl,
+    apiBaseUrl: testApiUrl,
     expectedCommit,
     accessToken: "safe-test-token",
+    requiredPlatforms: ["aliyun", "dingtalk"],
+    expectedEnvironment: "preview",
+    allowedBrowserOrigin: testUrl,
+    oauthConcurrency: 2,
     fetchImpl: responseMap({
-      "/api/auth/dingtalk/start": new Response(null, {
-        status: 308,
-        headers: { location: "/auth/dingtalk-start" }
-      }),
-      "/auth/dingtalk-start": new Response(
-        "<!doctype html><main data-oauth-status>正在安全连接钉钉</main>",
-        { status: 200, headers: { "content-type": "text/html; charset=utf-8" } }
-      )
+      baseUrl: testUrl,
+      apiUrl: testApiUrl,
+      environment: "preview",
+      corsOrigin: testUrl
     })
   });
-
-  assert.equal(result.oauth.entryStatus, 308);
-  assert.equal(result.oauth.staticStatus, 200);
+  assert.equal(result.apiBaseUrl, testApiUrl);
+  assert.equal(result.cors.origin, testUrl);
+  assert.equal(result.readiness.oauth.callbackOrigin, testApiUrl);
 });
 
-test("fixed-site smoke accepts the explicit unauthenticated session response", async () => {
-  const { checkDeployedSmoke } = await import(scriptPath);
-  const result = await checkDeployedSmoke({
-    baseUrl,
-    expectedCommit,
-    accessToken: "safe-test-token",
-    fetchImpl: responseMap({
-      "/api/auth/session": Response.json(
-        { authenticated: false, user: null },
-        { status: 401 }
-      )
-    })
-  });
-
-  assert.equal(result.sessionAuthenticated, false);
-});
-
-test("fixed-site smoke rejects an OAuth entry redirect to another origin", async () => {
+test("production smoke rejects dev server headers and commit drift", async () => {
   const { checkDeployedSmoke } = await import(scriptPath);
   await assert.rejects(checkDeployedSmoke({
-    baseUrl,
+    baseUrl: productionUrl,
     expectedCommit,
     accessToken: "safe-test-token",
+    forbidServerEnvDev: true,
     fetchImpl: responseMap({
-      "/api/auth/dingtalk/start": new Response(null, {
-        status: 308,
-        headers: { location: "https://attacker.example/auth/dingtalk-start" }
-      })
+      baseUrl: productionUrl,
+      environment: "production",
+      entryHeaders: { "x-server-env": "dev" }
     })
-  }), /OAuth|同源|redirect/i);
-});
-
-test("fixed-site smoke rejects a deployed commit mismatch", async () => {
-  const { checkDeployedSmoke } = await import(scriptPath);
+  }), /x-server-env/);
   await assert.rejects(checkDeployedSmoke({
-    baseUrl,
+    baseUrl: productionUrl,
     expectedCommit: "different-commit",
     accessToken: "safe-test-token",
-    fetchImpl: responseMap()
-  }), /commit/i);
+    fetchImpl: responseMap({ baseUrl: productionUrl, environment: "production" })
+  }), /commit/);
 });
 
-test("fixed-site smoke rejects an OAuth callback on another origin", async () => {
+test("split test smoke rejects wildcard CORS", async () => {
   const { checkDeployedSmoke } = await import(scriptPath);
   await assert.rejects(checkDeployedSmoke({
-    baseUrl,
+    baseUrl: testUrl,
+    apiBaseUrl: testApiUrl,
     expectedCommit,
     accessToken: "safe-test-token",
+    allowedBrowserOrigin: testUrl,
     fetchImpl: responseMap({
-      "/api/auth/dingtalk/bootstrap": Response.json({
-        ready: true,
-        authorizeUrl: `https://login.dingtalk.com/oauth2/auth?redirect_uri=${encodeURIComponent("https://old.example.com/api/auth/dingtalk/callback")}`
-      })
+      baseUrl: testUrl,
+      apiUrl: testApiUrl,
+      environment: "preview",
+      corsOrigin: "*"
     })
-  }), /callback|Origin/i);
-});
-
-test("fixed-site smoke rejects a blocked readiness response", async () => {
-  const { checkDeployedSmoke } = await import(scriptPath);
-  await assert.rejects(checkDeployedSmoke({
-    baseUrl,
-    expectedCommit,
-    accessToken: "safe-test-token",
-    fetchImpl: responseMap({
-      "/api/platform/v1/environment-readiness": Response.json({
-        ready: false,
-        capabilities: [{ id: "cloudflare-d1", status: "blocked", missing: ["PRODUCT_FLOW_DB"] }]
-      })
-    })
-  }), /PRODUCT_FLOW_DB|未就绪/);
+  }), /CORS/);
 });

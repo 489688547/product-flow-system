@@ -167,14 +167,14 @@ test("task todo payload requires a due date and keeps a stable system source id"
 
 test("todo card deep link focuses the exact product task without a custom completion action", () => {
   assert.deepEqual(parseTaskTodoDeepLink(
-    "https://flow.example.com/cloudflare-entry?productId=p1&taskId=t1&todoAction=complete#progress"
+    "https://flow.example.com/?productId=p1&taskId=t1&todoAction=complete#progress"
   ), {
     productId: "p1",
     taskId: "t1",
     action: "view"
   });
   assert.deepEqual(parseTaskTodoDeepLink(
-    "https://flow.example.com/cloudflare-entry?productId=p1&taskId=t1&todoAction=unknown#progress"
+    "https://flow.example.com/?productId=p1&taskId=t1&todoAction=unknown#progress"
   ), {
     productId: "p1",
     taskId: "t1",

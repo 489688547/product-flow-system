@@ -393,7 +393,7 @@ git commit -m "feat(collector): route Douyin exclusively through Ego"
 ```js
 test("formal Ego service refuses Cloudflare while local probe may remain pending", () => {
   assert.throws(
-    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes-system.pages.dev", browserMode: "ego" }),
+    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes.cn", browserMode: "ego" }),
     error => error.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
   );
 });

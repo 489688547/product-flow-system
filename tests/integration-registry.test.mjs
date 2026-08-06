@@ -49,9 +49,26 @@ test("Douyin uses Ego only and writes formal facts through Aliyun", () => {
   const aliyun = douyin.relations.find(relation => relation.platformId === "aliyun");
   assert.equal(aliyun?.type, "formal-facts-target");
   assert.match(aliyun.description, /ECS.*SQLite/);
-  const d1 = douyin.relations.find(relation => relation.platformId === "cloudflare-d1");
-  assert.equal(d1?.type, "rollback-only");
-  assert.match(d1.description, /不接收.*Ego/);
+  assert.equal(douyin.relations.some(relation => relation.platformId === "cloudflare-d1"), false);
+});
+
+test("Cloudflare is static-test-only while Aliyun owns backend and data", () => {
+  const registry = JSON.parse(readFileSync(registryPath, "utf8"));
+  const pages = registry.platforms.find(entry => entry.id === "cloudflare-pages");
+  const d1 = registry.platforms.find(entry => entry.id === "cloudflare-d1");
+  const aliyun = registry.platforms.find(entry => entry.id === "aliyun");
+
+  assert.equal(pages.status, "connected");
+  assert.deepEqual(pages.capabilities, ["测试静态前端"]);
+  assert.deepEqual(pages.apiRoutes, []);
+  assert.deepEqual(pages.envVars, []);
+  assert.equal(d1.status, "retired");
+  assert.deepEqual(d1.apiRoutes, []);
+  assert.deepEqual(d1.envVars, []);
+  assert.equal(aliyun.status, "connected");
+  assert.equal(aliyun.capabilities.includes("生产前端与 API"), true);
+  assert.equal(aliyun.capabilities.includes("测试 API"), true);
+  assert.equal(aliyun.domains.includes("api-test.deshan-tiyes.cn"), true);
 });
 
 test("ADR directory is not a provider code path", () => {

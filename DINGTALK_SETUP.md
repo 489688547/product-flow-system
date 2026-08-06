@@ -5,7 +5,7 @@
 1. 前端在钉钉容器中调用 `requestAuthCode` 获取一次性免登码。
 2. 服务端用 `DINGTALK_APP_KEY` / `DINGTALK_APP_SECRET` 获取应用 `access_token`。
 3. 服务端用免登码换取当前钉钉用户，并尽量读取用户详情、角色、岗位信息。
-4. 前端按钉钉岗位信息自动映射到系统角色权限，并在本地缓存 7 天。
+4. 服务端按钉钉组织身份解析系统角色权限，并建立 HttpOnly 会话。
 
 ## 本地启动
 
@@ -29,7 +29,7 @@ DINGTALK_PORT=8127
 npm start
 ```
 
-本地访问：
+先执行 `npm run seed:sandbox` 初始化本地 SQLite。`npm start` 不访问生产数据库；本地访问：
 
 ```text
 http://127.0.0.1:8127/
@@ -38,8 +38,10 @@ http://127.0.0.1:8127/
 ## 钉钉后台需要配置
 
 - 应用类型：企业内部应用 / H5 微应用。
-- 首页地址示例：`https://你的正式域名/?corpId=$CORPID$`
-- 推荐用 Cloudflare Pages 发布，设置见 `CLOUDFLARE_PAGES.md`。
+- 正式首页：`https://deshan-tiyes.cn/?corpId=$CORPID$`
+- 正式 OAuth 回调：`https://deshan-tiyes.cn/api/auth/dingtalk/callback`
+- 测试首页：`https://test.deshan-tiyes.cn/?corpId=$CORPID$`，其 API 固定为 `https://api-test.deshan-tiyes.cn`。
+- 生产前端、API 和 SQLite 均运行在阿里云 ECS；Cloudflare 只托管测试站静态文件。
 - 本地调试可用内网穿透或局域网地址替代 `127.0.0.1`，并同样带上 `corpId=$CORPID$`。
 - 权限：
   - 免登。

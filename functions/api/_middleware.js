@@ -1,25 +1,23 @@
 import { readSession } from "./auth/_shared/session.js";
-import { authorizeProductionToken, productionAccessError } from "./platform/_shared/productionDataAccess.js";
 import {
   assertEnvironmentWriteVersion,
   dataEnvironmentErrorResponse,
   resolveDataEnvironment,
   withDataEnvironmentHeaders
 } from "./platform/_shared/dataEnvironment.js";
+import {
+  browserOriginErrorResponse,
+  browserOriginPolicy,
+  browserPreflightResponse,
+  withBrowserCors
+} from "./platform/_shared/browserOriginPolicy.js";
 
 const JSON_HEADERS = {
-  "content-type": "application/json; charset=utf-8",
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
-  "access-control-allow-headers": "content-type"
+  "content-type": "application/json; charset=utf-8"
 };
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
-}
-
-function optionsResponse() {
-  return new Response(null, { status: 204, headers: JSON_HEADERS });
 }
 
 const PUBLIC_PATHS = new Set([
@@ -70,51 +68,6 @@ function usesHandlerBearerAuth(path) {
     || path.startsWith("/api/platform/v1/browser-agent/");
 }
 
-function isLoopbackRequest(request) {
-  const hostname = new URL(request.url).hostname;
-  return ["localhost", "127.0.0.1", "::1"].includes(hostname);
-}
-
-function hasLocalOnlineTransportSecret(request, env = {}) {
-  const expected = String(env.LOCAL_ONLINE_REQUEST_SECRET || "");
-  const actual = String(request.headers.get("x-pfs-local-online-session") || "");
-  return Boolean(expected) && actual === expected;
-}
-
-function localOnlineError(error) {
-  return jsonResponse({
-    authenticated: false,
-    message: error?.message || "本地线上账号验证失败。",
-    error: {
-      code: error?.code || "LOCAL_ONLINE_AUTH_FAILED",
-      retryable: Boolean(error?.retryable)
-    }
-  }, error?.status || 500);
-}
-
-async function localOnlineAccountSession(request, env = {}) {
-  const trustedTransport = isLoopbackRequest(request) || hasLocalOnlineTransportSecret(request, env);
-  if (env.LOCAL_ONLINE_ACCOUNT_MODE !== "1" || !trustedTransport) return null;
-  if (!env.PRODUCTION_DATA_ACCESS_TOKEN) {
-    throw productionAccessError("本地线上账号缺少个人令牌。", 401, "LOCAL_ONLINE_TOKEN_REQUIRED");
-  }
-  if (!env.PRODUCT_FLOW_DB) {
-    throw productionAccessError("本地线上账号缺少生产 D1 绑定。", 503, "LOCAL_ONLINE_DATABASE_REQUIRED");
-  }
-  const capability = ["GET", "HEAD"].includes(request.method) ? "read" : "write";
-  const access = await authorizeProductionToken(env.PRODUCTION_DATA_ACCESS_TOKEN, env.PRODUCT_FLOW_DB, { capability });
-  return {
-    corpId: access.corpId,
-    userId: access.userId,
-    unionId: access.unionId,
-    name: access.name,
-    role: access.role,
-    department: access.department,
-    title: access.title,
-    loginMode: "local-online-account"
-  };
-}
-
 const SELF_AUTHENTICATING_PATH_PREFIXES = [
   "/api/platform/v1/data-standards"
 ];
@@ -124,19 +77,13 @@ function usesRouteAuthentication(path) {
 }
 
 export async function onRequest(context) {
-  if (context.request.method === "OPTIONS") return optionsResponse();
+  const originPolicy = browserOriginPolicy(context.request, context.env);
+  if (!originPolicy.allowed) return browserOriginErrorResponse(originPolicy);
+  if (context.request.method === "OPTIONS") return browserPreflightResponse(originPolicy);
+  const finish = response => withBrowserCors(response, originPolicy);
   const path = new URL(context.request.url).pathname.replace(/\/$/, "") || "/";
   let authenticated = false;
-  try {
-    const localSession = await localOnlineAccountSession(context.request, context.env);
-    if (localSession) {
-      context.data.session = localSession;
-      authenticated = true;
-    }
-  } catch (error) {
-    return localOnlineError(error);
-  }
-  if (PUBLIC_PATHS.has(path)) return context.next();
+  if (PUBLIC_PATHS.has(path)) return finish(await context.next());
 
   if (!authenticated) {
     const session = await readSession(context.request, context.env);
@@ -146,22 +93,24 @@ export async function onRequest(context) {
     }
   }
   if (authenticated) {
-    if (usesControlDatabaseOnly(path)) return context.next();
+    if (usesControlDatabaseOnly(path)) return finish(await context.next());
     try {
       const resolved = await resolveDataEnvironment(context);
       context.data.controlDb = context.env.PRODUCT_FLOW_DB;
       context.data.dataEnvironment = resolved;
       context.data.businessDb = resolved.businessDb;
       assertEnvironmentWriteVersion(context.request, resolved);
-      return withDataEnvironmentHeaders(await context.next(), resolved);
+      return finish(withDataEnvironmentHeaders(await context.next(), resolved));
     } catch (error) {
-      return dataEnvironmentErrorResponse(error);
+      return finish(dataEnvironmentErrorResponse(error));
     }
   }
-  if (ALTERNATE_AUTH_PATHS.has(path) || usesRouteAuthentication(path) || usesHandlerBearerAuth(path)) return context.next();
+  if (ALTERNATE_AUTH_PATHS.has(path) || usesRouteAuthentication(path) || usesHandlerBearerAuth(path)) {
+    return finish(await context.next());
+  }
 
-  return jsonResponse({
+  return finish(jsonResponse({
     authenticated: false,
     message: "请先使用钉钉登录。"
-  }, 401);
+  }, 401));
 }

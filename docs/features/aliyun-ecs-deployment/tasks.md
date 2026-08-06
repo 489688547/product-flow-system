@@ -24,7 +24,8 @@
   - 文件：`docs/platform/environment-capabilities.json`、
     `docs/platform/integration-registry.json`、生成模块和契约测试。
   - 输入：ECS 本地 D1、钉钉、OSS 所需变量名。
-  - 输出：`aliyun-ecs-runtime`、`aliyun-oss-backup` 能力。
+  - 输出：`aliyun-ecs-production`、`aliyun-ecs-test-api`、
+    `cloudflare-pages-static-test`、`aliyun-oss-backup` 能力。
   - 失败测试：`node --test tests/aliyun-ecs-deployment.test.mjs` 应因能力缺失失败。
   - 实现步骤：先补 manifest 测试，再更新 JSON 并重新生成模块。
   - 验证：`npm run check:environment-capabilities && npm run check:integrations`。
@@ -63,15 +64,31 @@
     Online Backup 一致性快照，并由 systemd timer 每日执行。
   - 2026-07-30 验收修复：运行时把只读 `runtime.env` 链接为 Pages Functions
     识别的 `.dev.vars`，钉钉 OAuth bootstrap 从缺少配置的 501 恢复为 200。
+  - 2026-07-31 验收修复：运行时安装系统 CA，并显式向 workerd 提供证书路径，
+    避免钉钉 OAuth 换取用户令牌时因缺少本地签发链返回 500。
 
-- [ ] 域名与正式切流
+- [x] 域名与正式切流
   - 依赖：域名实名、ICP备案、OSS Bucket 和实例 RAM 角色。
   - 文件：钉钉控制台、DNS、Nginx Proxy Manager 外部配置。
   - 输入：`deshan-tiyes.cn`、停写窗口。
   - 输出：HTTPS、真实钉钉登录和 ECS 正式事实源。
-  - 失败测试：证书、回调、readiness 或数据库校验失败时保持 Cloudflare。
+  - 失败测试：证书、回调、readiness 或数据库校验失败时停止发布。
   - 实现步骤：最终导出/导入、代理、DNS、回调、验收。
-  - 验证：新会话、冷暖、20 并发、业务读写和 Cloudflare 回滚请求。
+  - 验证：新会话、冷暖、20 并发和业务读写。
   - 提交：将真实验收证据回写 DEV-000014。
-  - 当前状态：企业实名认证、私有 OSS Bucket、实例 RAM 角色和备份任务已就绪；
-    HTTP Host 代理可预配置，ICP备案完成前保持 DNS 和钉钉回调不变。
+  - 2026-08-06：ICP备案、HTTPS、DNS 和真实钉钉 OAuth 已完成，生产入口为
+    `https://deshan-tiyes.cn`。
+
+- [x] 隔离测试环境并退役 Cloudflare 业务运行时
+  - 依赖：生产 ECS 入口已验收。
+  - 输出：Cloudflare 静态测试前端、ECS 测试 API/SQLite、无 D1/Workers 运行依赖。
+  - 验证：测试/生产 commit 与数据隔离、CORS、OAuth、readiness 和完整门禁。
+  - 2026-08-06：代码与契约已完成；固定域名部署和真实环境验收作为发布任务继续执行。
+
+- [ ] 发布并验收固定测试环境
+  - 输出：`https://test.deshan-tiyes.cn` 与 `https://api-test.deshan-tiyes.cn` 报告同一 `dev` commit。
+  - 验证：静态产物边界、CORS、OAuth、readiness、数据隔离与钉钉 WebView。
+
+- [ ] 通过 `dev -> main` 发布并验收生产
+  - 输出：`https://deshan-tiyes.cn` 报告目标 `main` commit。
+  - 验证：OAuth、readiness、业务读写、容器健康恢复与 SQLite/OSS 备份。
