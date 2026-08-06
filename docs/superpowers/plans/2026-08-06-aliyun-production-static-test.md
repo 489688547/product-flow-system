@@ -405,11 +405,11 @@ git commit -m "fix(deploy): restart unhealthy ecs runtime safely"
 - Consumes: CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID only for static test upload; PRODUCTION_DATA_ACCESS_TOKEN for readiness.
 - Produces: static dev deployment from an isolated directory and fixed Aliyun production/test smoke checks.
 
-- [ ] **Step 1: Write release-flow tests**
+- [x] **Step 1: Write release-flow tests**
 
 Assert the fixed production, test and test API URLs; the static Pages project name; VITE_PFS_API_ORIGIN; an isolated deploy directory; no old production pages.dev URL; no cloudflare-d1 readiness requirement.
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 ~~~bash
 node --test tests/deployed-readiness.test.mjs tests/pr-branch-flow.test.mjs tests/static-test-build.test.mjs
@@ -417,15 +417,15 @@ node --test tests/deployed-readiness.test.mjs tests/pr-branch-flow.test.mjs test
 
 Expected: FAIL because deployed-smoke still targets old Pages backends.
 
-- [ ] **Step 3: Implement static-only dev deployment**
+- [x] **Step 3: Implement static-only dev deployment**
 
 After quality, build with the fixed test API origin, copy only dist into RUNNER_TEMP, enter that directory and run the repository Wrangler CLI. Fail before upload if functions, _routes.json or .dev.vars exists there.
 
-- [ ] **Step 4: Implement split smoke lanes**
+- [x] **Step 4: Implement split smoke lanes**
 
 For dev verify static commit, test API readiness and credentialed CORS preflight. For main verify production commit, aliyun and dingtalk readiness, OAuth bootstrap concurrency and absence of x-server-env dev.
 
-- [ ] **Step 5: Run focused gates**
+- [x] **Step 5: Run focused gates**
 
 ~~~bash
 node --test tests/deployed-readiness.test.mjs tests/pr-branch-flow.test.mjs tests/static-test-build.test.mjs
@@ -435,7 +435,7 @@ npm run check:integrations
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ~~~bash
 git status --short

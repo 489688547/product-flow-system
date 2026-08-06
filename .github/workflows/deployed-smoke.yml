@@ -22,16 +22,27 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Wait for fixed Pages deployment
+      - name: Wait for fixed Aliyun and static-test deployment
         env:
           PRODUCTION_DATA_ACCESS_TOKEN: ${{ secrets.PRODUCTION_DATA_ACCESS_TOKEN }}
-          TARGET_URL: ${{ github.ref_name == 'main' && 'https://deshan-tiyes-system.pages.dev' || 'https://deshan-tiyes-system-dev.pages.dev' }}
+          TARGET_URL: ${{ github.ref_name == 'main' && 'https://deshan-tiyes.cn' || 'https://test.deshan-tiyes.cn' }}
+          API_URL: ${{ github.ref_name == 'main' && 'https://deshan-tiyes.cn' || 'https://api-test.deshan-tiyes.cn' }}
+          EXPECT_ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
+          ALLOWED_BROWSER_ORIGIN: ${{ github.ref_name == 'main' && '' || 'https://test.deshan-tiyes.cn' }}
         run: |
+          EXTRA_ARGS=()
+          if [ "$GITHUB_REF_NAME" = "main" ]; then
+            EXTRA_ARGS+=(--forbid-server-env-dev)
+          fi
           for attempt in $(seq 1 30); do
             if node scripts/check-deployed-smoke.mjs \
               --url "$TARGET_URL" \
+              --api-url "$API_URL" \
               --commit "$GITHUB_SHA" \
-              --require-platform "cloudflare-pages,cloudflare-d1,dingtalk"; then
+              --expect-environment "$EXPECT_ENVIRONMENT" \
+              --allowed-browser-origin "$ALLOWED_BROWSER_ORIGIN" \
+              --require-platform "aliyun,dingtalk" \
+              "${EXTRA_ARGS[@]}"; then
               exit 0
             fi
             sleep 10

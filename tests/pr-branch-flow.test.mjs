@@ -1,5 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { validatePullRequestBranchFlow } from "../scripts/check-pr-branch-flow.mjs";
 
@@ -58,4 +60,23 @@ test("功能分支前缀不限定来源工具", () => {
   }
   // 功能分支仍然只能进 dev，不能直接进 main。
   assert.throws(() => validatePullRequestBranchFlow(pullRequest("main", "claude/x")), /功能分支必须提交到 dev/);
+});
+
+test("release workflows deploy only the static test frontend and verify Aliyun APIs", () => {
+  const staticWorkflowPath = resolve(".github/workflows/deploy-test-static.yml");
+  assert.equal(existsSync(staticWorkflowPath), true);
+  const staticWorkflow = readFileSync(staticWorkflowPath, "utf8");
+  const smokeWorkflow = readFileSync(resolve(".github/workflows/deployed-smoke.yml"), "utf8");
+
+  assert.match(staticWorkflow, /deshan-tiyes-system-dev/);
+  assert.match(staticWorkflow, /VITE_PFS_API_ORIGIN:\s*https:\/\/api-test\.deshan-tiyes\.cn/);
+  assert.match(staticWorkflow, /RUNNER_TEMP/);
+  assert.match(staticWorkflow, /functions|_routes\.json/);
+  assert.doesNotMatch(staticWorkflow, /PRODUCT_FLOW_DB|DEMO_FLOW_DB|DINGTALK_APP_SECRET/);
+
+  assert.match(smokeWorkflow, /https:\/\/deshan-tiyes\.cn/);
+  assert.match(smokeWorkflow, /https:\/\/test\.deshan-tiyes\.cn/);
+  assert.match(smokeWorkflow, /https:\/\/api-test\.deshan-tiyes\.cn/);
+  assert.match(smokeWorkflow, /aliyun,dingtalk/);
+  assert.doesNotMatch(smokeWorkflow, /deshan-tiyes-system\.pages\.dev|cloudflare-d1/);
 });
