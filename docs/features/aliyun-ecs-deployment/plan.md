@@ -99,4 +99,5 @@ docker inspect --format '{{.State.Health.Status}}' product-flow-app
 5. 本地完整门禁、ECS 私有预发布和服务器内验收。
 6. 部署 ECS 隔离测试 API 和 Cloudflare 测试静态前端。
 7. 通过 `dev → main` 发布 ECS 生产镜像并完成钉钉验收。
-8. 删除 Cloudflare Functions、Workers、D1 运行配置和遗留代码。
+8. 删除 Cloudflare Workers、D1 binding、业务 Secret、Git 构建入口和无用后端配置；
+   保留由 ECS Wrangler 兼容运行时加载的 `functions/` 业务源代码。
