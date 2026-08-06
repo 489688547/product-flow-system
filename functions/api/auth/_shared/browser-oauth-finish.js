@@ -17,11 +17,31 @@ function safeReturnTo(value = "") {
   return path.startsWith("/") && !path.startsWith("//") ? path : "";
 }
 
-function errorResponse(message, status) {
-  const response = jsonResponse({ message }, status);
+function errorResponse(message, status, code = "") {
+  const response = jsonResponse({
+    message,
+    ...(code ? { error: { code, retryable: status >= 500 } } : {})
+  }, status);
   response.headers.set("cache-control", "no-store");
   response.headers.append("set-cookie", CLEAR_OAUTH_COOKIE);
   return response;
+}
+
+function publicAppOrigin(env, fallbackOrigin) {
+  const raw = String(env.PFS_PUBLIC_APP_ORIGIN || "").trim();
+  if (!raw) return fallbackOrigin;
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    url = null;
+  }
+  if (!url || url.protocol !== "https:" || url.pathname !== "/" || url.search || url.hash) {
+    const error = new Error("PFS_PUBLIC_APP_ORIGIN must be an HTTPS origin");
+    error.code = "BROWSER_ORIGIN_INVALID";
+    throw error;
+  }
+  return url.origin;
 }
 
 export async function finishBrowserOauth({ request, env, mode = "redirect" }) {
@@ -35,11 +55,18 @@ export async function finishBrowserOauth({ request, env, mode = "redirect" }) {
     return errorResponse("登录校验已失效，请重新发起钉钉扫码登录。", 400);
   }
 
+  let redirectOrigin;
+  try {
+    redirectOrigin = publicAppOrigin(env, url.origin);
+  } catch (error) {
+    return errorResponse(error.message, 503, error.code);
+  }
+
   try {
     const { identity, userToken } = await getDingBrowserLogin(code, env);
     const created = await createSession(identity, "browser", env);
     await saveDingUserToken(controlDatabase(env), created.sessionIdHash, userToken, env);
-    const redirectTo = returnTo ? `${url.origin}${returnTo}` : `${url.origin}/?login=success`;
+    const redirectTo = returnTo ? `${redirectOrigin}${returnTo}` : `${redirectOrigin}/?login=success`;
     const response = mode === "json"
       ? jsonResponse({ authenticated: true, redirectTo })
       : new Response(null, {

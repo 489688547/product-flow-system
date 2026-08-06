@@ -6,20 +6,19 @@ import {
   resolveDataEnvironment,
   withDataEnvironmentHeaders
 } from "./platform/_shared/dataEnvironment.js";
+import {
+  browserOriginErrorResponse,
+  browserOriginPolicy,
+  browserPreflightResponse,
+  withBrowserCors
+} from "./platform/_shared/browserOriginPolicy.js";
 
 const JSON_HEADERS = {
-  "content-type": "application/json; charset=utf-8",
-  "access-control-allow-origin": "*",
-  "access-control-allow-methods": "GET,POST,PUT,OPTIONS",
-  "access-control-allow-headers": "content-type"
+  "content-type": "application/json; charset=utf-8"
 };
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
-}
-
-function optionsResponse() {
-  return new Response(null, { status: 204, headers: JSON_HEADERS });
 }
 
 const PUBLIC_PATHS = new Set([
@@ -124,7 +123,10 @@ function usesRouteAuthentication(path) {
 }
 
 export async function onRequest(context) {
-  if (context.request.method === "OPTIONS") return optionsResponse();
+  const originPolicy = browserOriginPolicy(context.request, context.env);
+  if (!originPolicy.allowed) return browserOriginErrorResponse(originPolicy);
+  if (context.request.method === "OPTIONS") return browserPreflightResponse(originPolicy);
+  const finish = response => withBrowserCors(response, originPolicy);
   const path = new URL(context.request.url).pathname.replace(/\/$/, "") || "/";
   let authenticated = false;
   try {
@@ -134,9 +136,9 @@ export async function onRequest(context) {
       authenticated = true;
     }
   } catch (error) {
-    return localOnlineError(error);
+    return finish(localOnlineError(error));
   }
-  if (PUBLIC_PATHS.has(path)) return context.next();
+  if (PUBLIC_PATHS.has(path)) return finish(await context.next());
 
   if (!authenticated) {
     const session = await readSession(context.request, context.env);
@@ -146,22 +148,24 @@ export async function onRequest(context) {
     }
   }
   if (authenticated) {
-    if (usesControlDatabaseOnly(path)) return context.next();
+    if (usesControlDatabaseOnly(path)) return finish(await context.next());
     try {
       const resolved = await resolveDataEnvironment(context);
       context.data.controlDb = context.env.PRODUCT_FLOW_DB;
       context.data.dataEnvironment = resolved;
       context.data.businessDb = resolved.businessDb;
       assertEnvironmentWriteVersion(context.request, resolved);
-      return withDataEnvironmentHeaders(await context.next(), resolved);
+      return finish(withDataEnvironmentHeaders(await context.next(), resolved));
     } catch (error) {
-      return dataEnvironmentErrorResponse(error);
+      return finish(dataEnvironmentErrorResponse(error));
     }
   }
-  if (ALTERNATE_AUTH_PATHS.has(path) || usesRouteAuthentication(path) || usesHandlerBearerAuth(path)) return context.next();
+  if (ALTERNATE_AUTH_PATHS.has(path) || usesRouteAuthentication(path) || usesHandlerBearerAuth(path)) {
+    return finish(await context.next());
+  }
 
-  return jsonResponse({
+  return finish(jsonResponse({
     authenticated: false,
     message: "请先使用钉钉登录。"
-  }, 401);
+  }, 401));
 }

@@ -179,7 +179,7 @@ git commit -m "feat(runtime): route static test frontend to ecs api"
 - Consumes: PFS_ALLOWED_BROWSER_ORIGIN and PFS_PUBLIC_APP_ORIGIN.
 - Produces: browserOriginPolicy(request, env) and withBrowserCors(response, policy).
 
-- [ ] **Step 1: Write CORS and OAuth tests**
+- [x] **Step 1: Write CORS and OAuth tests**
 
 ~~~js
 assert.equal(preflight("https://test.deshan-tiyes.cn").status, 204);
@@ -193,7 +193,7 @@ assert.equal(callback.headers.get("location"), "https://test.deshan-tiyes.cn/?lo
 
 Also assert invalid or non-HTTPS configured origins fail with BROWSER_ORIGIN_INVALID and OAuth state mismatch still returns 400.
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 ~~~bash
 node --test tests/browser-origin-policy.test.mjs tests/dingtalk-oauth-resilience.test.mjs tests/dingtalk-web-auth.test.mjs
@@ -201,19 +201,19 @@ node --test tests/browser-origin-policy.test.mjs tests/dingtalk-oauth-resilience
 
 Expected: FAIL because wildcard CORS and same-origin callback return remain.
 
-- [ ] **Step 3: Implement the origin policy**
+- [x] **Step 3: Implement the origin policy**
 
 Allow requests without Origin as same-origin/server traffic. For cross-origin browser traffic, compare against the single configured HTTPS origin. Reject mismatch before auth, answer allowed OPTIONS with the exact origin, and overwrite route-level wildcard headers on the final response.
 
-- [ ] **Step 4: Implement OAuth public-app return**
+- [x] **Step 4: Implement OAuth public-app return**
 
 Keep DingTalk callback generation based on the ECS API request origin. After session creation, build the final browser redirect only from server-owned PFS_PUBLIC_APP_ORIGIN plus a validated relative return path.
 
-- [ ] **Step 5: Re-run the Step 2 tests**
+- [x] **Step 5: Re-run the Step 2 tests**
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ~~~bash
 git add functions/api/platform/_shared/browserOriginPolicy.js functions/api/_middleware.js functions/api/auth/_shared/browser-oauth-start.js functions/api/auth/_shared/browser-oauth-finish.js tests/browser-origin-policy.test.mjs tests/dingtalk-oauth-resilience.test.mjs tests/dingtalk-web-auth.test.mjs

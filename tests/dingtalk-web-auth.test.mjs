@@ -75,15 +75,19 @@ test("logout revokes a server session without exposing the raw token", async () 
 
 test("browser login start redirects to DingTalk with a protected callback state", async () => {
   const response = await startBrowserLogin({
-    request: new Request("https://flow.example.com/api/auth/dingtalk/start"),
-    env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/start"),
+    env: {
+      DINGTALK_APP_KEY: "app-key",
+      DINGTALK_APP_SECRET: "app-secret",
+      PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn"
+    }
   });
 
   assert.equal(response.status, 302);
   const location = new URL(response.headers.get("location"));
   assert.equal(location.origin, "https://login.dingtalk.com");
   assert.equal(location.searchParams.get("client_id"), "app-key");
-  assert.equal(location.searchParams.get("redirect_uri"), "https://flow.example.com/api/auth/dingtalk/callback");
+  assert.equal(location.searchParams.get("redirect_uri"), "https://api-test.deshan-tiyes.cn/api/auth/dingtalk/callback");
   assert.ok(location.searchParams.get("state"));
   assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
   assert.match(response.headers.get("set-cookie"), /HttpOnly/);
@@ -147,46 +151,6 @@ test("retired Pages previews no longer redirect to a deleted fixed project", asy
   assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
 });
 
-test("the fixed production and development sites keep DingTalk callbacks on their own origin", async () => {
-  for (const origin of [
-    "https://deshan-tiyes-system.pages.dev",
-    "https://deshan-tiyes-system-dev.pages.dev"
-  ]) {
-    const response = await bootstrapBrowserLogin({
-      request: new Request(`${origin}/api/auth/dingtalk/bootstrap`),
-      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
-    });
-    const payload = await response.json();
-    assert.equal(response.status, 200);
-    assert.equal(
-      new URL(payload.authorizeUrl).searchParams.get("redirect_uri"),
-      `${origin}/api/auth/dingtalk/callback`
-    );
-  }
-});
-
-test("branch preview deployments redirect to the matching fixed Pages project", async () => {
-  const cases = [
-    [
-      "https://abc123.deshan-tiyes-system.pages.dev/api/auth/dingtalk/start",
-      "https://deshan-tiyes-system.pages.dev/api/auth/dingtalk/start"
-    ],
-    [
-      "https://abc123.deshan-tiyes-system-dev.pages.dev/api/auth/dingtalk/start",
-      "https://deshan-tiyes-system-dev.pages.dev/api/auth/dingtalk/start"
-    ]
-  ];
-  for (const [requestUrl, expectedLocation] of cases) {
-    const response = await startBrowserLogin({
-      request: new Request(requestUrl),
-      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
-    });
-    assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), expectedLocation);
-    assert.equal(response.headers.get("set-cookie"), null);
-  }
-});
-
 test("group authorization remembers only a safe same-origin return path", async () => {
   const response = await startBrowserLogin({
     request: new Request("https://flow.example.com/api/auth/dingtalk/start?returnTo=%2F%3FproductId%3Dp1%23progress"),
@@ -217,6 +181,20 @@ test("browser OAuth callback rejects a mismatched state", async () => {
 
   assert.equal(response.status, 400);
   assert.match(body.message, /登录校验已失效/);
+});
+
+test("browser OAuth callback rejects an invalid configured public app origin", async () => {
+  const response = await finishBrowserLogin({
+    request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/callback?code=auth-code&state=expected", {
+      headers: { cookie: "pfs_oauth_state=expected" }
+    }),
+    env: {
+      PRODUCT_FLOW_DB: createAuthD1Mock(),
+      PFS_PUBLIC_APP_ORIGIN: "http://test.deshan-tiyes.cn"
+    }
+  });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "BROWSER_ORIGIN_INVALID");
 });
 
 test("browser OAuth callback creates a server session for an enterprise employee", async () => {
@@ -258,19 +236,20 @@ test("browser OAuth callback creates a server session for an enterprise employee
 
   try {
     const response = await finishBrowserLogin({
-      request: new Request("https://flow.example.com/api/auth/dingtalk/callback?code=auth-code&state=expected", {
+      request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/callback?code=auth-code&state=expected", {
         headers: { cookie: "pfs_oauth_state=expected" }
       }),
       env: {
         PRODUCT_FLOW_DB: db,
         DINGTALK_APP_KEY: "app-key",
         DINGTALK_APP_SECRET: "app-secret",
-        DINGTALK_CORP_ID: "ding-company"
+        DINGTALK_CORP_ID: "ding-company",
+        PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn"
       }
     });
 
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "https://flow.example.com/?login=success");
+    assert.equal(response.headers.get("location"), "https://test.deshan-tiyes.cn/?login=success");
     assert.match(response.headers.get("set-cookie"), /pfs_session=/);
     const sessionResponse = await getCurrentSession({
       request: requestWithCookie(response.headers.get("set-cookie")),
@@ -285,7 +264,7 @@ test("browser OAuth callback creates a server session for an enterprise employee
   }
 });
 
-test("browser OAuth completion returns a same-origin destination and creates the server session", async () => {
+test("browser OAuth completion returns the configured public app destination", async () => {
   const db = createAuthD1Mock();
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async url => {
@@ -324,7 +303,7 @@ test("browser OAuth completion returns a same-origin destination and creates the
 
   try {
     const response = await completeBrowserLogin({
-      request: new Request("https://flow.example.com/api/auth/dingtalk/complete?code=auth-code&state=expected", {
+      request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/complete?code=auth-code&state=expected", {
         headers: {
           cookie: "pfs_oauth_state=expected; pfs_oauth_return=%2F%23dashboard"
         }
@@ -333,14 +312,15 @@ test("browser OAuth completion returns a same-origin destination and creates the
         PRODUCT_FLOW_DB: db,
         DINGTALK_APP_KEY: "app-key",
         DINGTALK_APP_SECRET: "app-secret",
-        DINGTALK_CORP_ID: "ding-company"
+        DINGTALK_CORP_ID: "ding-company",
+        PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn"
       }
     });
     const body = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(body.authenticated, true);
-    assert.equal(body.redirectTo, "https://flow.example.com/#dashboard");
+    assert.equal(body.redirectTo, "https://test.deshan-tiyes.cn/#dashboard");
     assert.match(response.headers.get("set-cookie"), /pfs_session=/);
     assert.equal(response.headers.get("cache-control"), "no-store");
   } finally {
