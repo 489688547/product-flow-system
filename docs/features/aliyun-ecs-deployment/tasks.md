@@ -85,9 +85,16 @@
   - 验证：测试/生产 commit 与数据隔离、CORS、OAuth、readiness 和完整门禁。
   - 2026-08-06：代码与契约已完成；固定域名部署和真实环境验收作为发布任务继续执行。
 
-- [ ] 发布并验收固定测试环境
+- [x] 发布并验收固定测试环境
   - 输出：`https://test.deshan-tiyes.cn` 与 `https://api-test.deshan-tiyes.cn` 报告同一 `dev` commit。
   - 验证：静态产物边界、CORS、OAuth、readiness、数据隔离与钉钉 WebView。
+  - 2026-08-06：ACR 构建 `28156f94-187b-416d-8cab-79a95c835cc7` 成功，
+    固定前端与隔离测试 API 均报告 `cd0750571d56`；完整冒烟、精确 CORS、
+    20 路 OAuth bootstrap、真实钉钉登录和 executive 业务读取通过。
+  - 2026-08-06：测试库写入 `ECS-ISOLATION-CHECK-20260806-2212` 时生产库
+    计数保持为 0，测试记录随后已清理；停止/重启测试容器期间生产站保持可用。
+  - 2026-08-06：Cloudflare Pages Git 构建已断开，production/preview 的
+    Variables、Secrets 和 D1 bindings 均已清空，只保留固定测试静态产物与域名。
 
 - [ ] 通过 `dev -> main` 发布并验收生产
   - 输出：`https://deshan-tiyes.cn` 报告目标 `main` commit。
