@@ -63,6 +63,9 @@ Cloudflare Pages 只承载 `dev` 分支构建出的 React 静态文件。构建�
 启动器在受限工作目录以 `.dev.vars` 符号链接交给 Pages Functions，不复制进镜像
 或持久化数据。现有 Nginx Proxy Manager 负责 80/443，应用端口
 默认只绑定宿主机回环地址。正式入口为 `https://deshan-tiyes.cn`，测试 API 为 `https://api-test.deshan-tiyes.cn`。
+生产 HTTPS 代理必须向应用传入 `X-Forwarded-Proto: https` 和原始 Host，隐藏仅供
+服务器诊断的 `X-Server-Env`；钉钉 OAuth bootstrap 的 `redirect_uri` 必须保持为
+登记的 HTTPS 同源回调，禁止把浏览器重定向降级为 HTTP。
 
 Cloudflare D1 到 ECS SQLite 的一次性停写迁移已经完成。历史 SQL、清单和 SHA-256 只作为迁移证据保存；在线数据不得再双写、回切或自动合并 Cloudflare 增量。
 

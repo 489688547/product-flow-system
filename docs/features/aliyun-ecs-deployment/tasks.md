@@ -99,6 +99,16 @@
     出现资源抖动；重启后生产 30 秒内恢复 200，测试以最终镜像恢复健康。后续发布
     必须串行停止按需测试容器后再拉取生产镜像，或先升级到至少 4 GiB 内存。
 
-- [ ] 通过 `dev -> main` 发布并验收生产
+- [x] 通过 `dev -> main` 发布并验收生产
   - 输出：`https://deshan-tiyes.cn` 报告目标 `main` commit。
   - 验证：OAuth、readiness、业务读写、容器健康恢复与 SQLite/OSS 备份。
+  - 2026-08-06：`dev -> main` 已发布 `f551714ce43d`，ACR 构建
+    `d4b96be8-f25b-47f1-a2eb-f8c636c855eb` 成功，生产容器恢复健康。
+  - 2026-08-06：切流前生成双 SQLite 一致性快照并上传
+    `oss://deshan-tiyes-product-flow-backup-cn-hangzhou/product-flow/backups/20260806T145734Z/`；
+    服务器清单与文件 SHA-256 回读一致。
+  - 2026-08-06：HTTPS 钉钉回调返回同源
+    `https://deshan-tiyes.cn/api/auth/dingtalk/callback`；真实钉钉登录后会话为
+    `executive`，总览成功读取 26 项业务待办。
+  - 2026-08-06：生产冒烟通过 `f551714ce43d`；测试前端和隔离测试 API
+    恢复后冒烟通过 `7c9352ba4ae5`。
