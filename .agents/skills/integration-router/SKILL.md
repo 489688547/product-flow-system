@@ -7,6 +7,8 @@ description: Use before coding, debugging, reviewing, or documenting work that m
 
 Use `docs/platform/integration-registry.json` as the only public source of platform status, capability, code boundary, relationship, and official documentation.
 
+Cloudflare is a test-static-frontend integration only. Backend/API/database work routes to Aliyun; `cloudflare-d1` is retired and cannot be selected without a new ADR.
+
 ## Preflight
 
 1. Route the task text and any known paths:

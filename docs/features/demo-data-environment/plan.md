@@ -34,7 +34,7 @@
 - 修改：`wrangler.toml`
 - 修改：`docs/platform/environment-capabilities.json`
 - 修改：`scripts/generate-environment-capabilities.mjs`
-- 修改：`scripts/check-pages-environment-parity.mjs`
+- 修改：`scripts/check-deployed-smoke.mjs`
 - 修改：`tests/environment-capabilities.test.mjs`
 - 修改：`tests/pages-environment-parity.test.mjs`
 - 修改：`tests/environment-readiness-api.test.mjs`
@@ -1265,7 +1265,7 @@ npm start
 2. 对正式 `PRODUCT_FLOW_DB` 应用 `0011` 控制面迁移。
 3. 对 `DEMO_FLOW_DB` 应用现有全部业务迁移；控制面表即使因共享迁移存在，也不得由展示路由使用，后续可通过拆分迁移清单排除。
 4. 运行双 binding readiness。
-5. 部署前执行 `npm run release:pages`，不得直接部署仓库根目录。
+5. 部署前执行 `npm run build`，测试静态站只允许上传 `dist/`。
 6. 验证 Git deployment 与当前 Wrangler CLI 均能构建 Functions。
 7. 部署保存的确切提交。
 8. 首次刷新展示库并记录校验摘要。

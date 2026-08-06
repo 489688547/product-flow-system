@@ -4,91 +4,29 @@ import { readFileSync } from "node:fs";
 
 const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 const seedSource = readFileSync(new URL("../scripts/seed-local-sandbox.mjs", import.meta.url), "utf8");
-const startSource = readFileSync(new URL("../scripts/start-local-online.mjs", import.meta.url), "utf8");
+const startSource = readFileSync(new URL("../scripts/start-local-sandbox.mjs", import.meta.url), "utf8");
 
-test("sandbox entry points exist in package.json scripts", () => {
-  assert.equal(pkg.scripts["start:sandbox"], "node scripts/start-local-online.mjs --local-d1");
+test("sandbox entry points use the same local-only launcher", () => {
+  assert.equal(pkg.scripts.start, "node scripts/start-local-sandbox.mjs");
+  assert.equal(pkg.scripts["start:sandbox"], "node scripts/start-local-sandbox.mjs");
   assert.equal(pkg.scripts["seed:sandbox"], "node scripts/seed-local-sandbox.mjs");
 });
 
-test("sandbox start uses an isolated temporary Pages project and restores legacy config swaps", () => {
-  assert.match(startSource, /--local-d1/);
-  assert.match(startSource, /LOCAL_D1_SANDBOX/);
-  assert.match(startSource, /wrangler\.local\.toml/);
-  assert.match(startSource, /restoreConfigIfSwapped/);
-  assert.match(startSource, /symlinkSync\([^)]*["']functions["']/);
-  assert.match(startSource, /copyFileSync\(WRANGLER_SANDBOX_CONFIG/);
-  assert.match(startSource, /devVarsPath/);
+test("sandbox runtime is isolated and strips production credentials", () => {
+  assert.match(startSource, /mkdtempSync/);
+  assert.match(startSource, /symlinkSync\([^)]*"functions"/);
+  assert.match(startSource, /symlinkSync\([^)]*"dist"/);
+  assert.match(startSource, /"--persist-to"/);
+  assert.match(startSource, /PRODUCTION_DATA_ACCESS_TOKEN/);
+  assert.match(startSource, /CLOUDFLARE_API_TOKEN/);
+  assert.match(startSource, /LOCAL_ONLINE_ACCOUNT_MODE", "0"/);
+  assert.doesNotMatch(startSource, /--remote|authorizeProductionToken/);
 });
 
-test("sandbox uses the same per-start server session without exposing the personal token", () => {
-  const launchSection = startSource.slice(
-    startSource.indexOf('console.log(useLocalD1 ? "正在启动'),
-    startSource.indexOf("await waitForPort(PAGES_PORT)")
-  );
-  const localBlock = launchSection.match(/if \(useLocalD1\) \{([\s\S]*?)\n  \} else \{/i)?.[1] || "";
-  assert.ok(launchSection.indexOf("prepareRemoteRuntime({") < launchSection.indexOf("if (useLocalD1) {"));
-  assert.match(launchSection, /requestSecret\s*=\s*runtime\.requestSecret/);
-  assert.match(
-    launchSection,
-    /prepareRemoteRuntime\(\{\s*PRODUCTION_DATA_ACCESS_TOKEN:\s*sharedEnv\.values\.PRODUCTION_DATA_ACCESS_TOKEN\s*\}\)/
-  );
-  assert.match(localBlock, /"--cwd", runtimeTempDir/);
-  assert.match(localBlock, /"--persist-to", resolve\(ROOT, "\.wrangler", "state"\)/);
-  assert.doesNotMatch(localBlock, /"--env-file"/);
-  assert.doesNotMatch(localBlock, /swapToSandboxConfig/);
-  assert.match(startSource, /await waitForAuthenticatedApi\(requestSecret\)/);
-  assert.match(startSource, /writeFileSync\(envPath,[\s\S]*mode:\s*0o600/);
-  assert.doesNotMatch(startSource, /console\.log\([^)]*PRODUCTION_DATA_ACCESS_TOKEN/);
-  assert.match(startSource, /VITE_LOCAL_D1_SANDBOX:\s*useLocalD1\s*\?\s*"1"\s*:\s*"0"/);
-});
-
-test("seed script never reads plaintext tokens or .env files", () => {
-  const codeOnly = seedSource.split("\n").filter(line => !line.trimStart().startsWith("//")).join("\n");
-  assert.doesNotMatch(codeOnly, /PRODUCTION_DATA_ACCESS_TOKEN/);
-  assert.doesNotMatch(codeOnly, /\.env/);
-  assert.match(seedSource, /token_hash/);
-});
-
-test("seed script remote reads stay on the documented whitelist", () => {
-  const allowedTables = new Set([
-    "production_data_access_tokens",
-    "product_flow_org_members",
-    "product_flow_state",
-    "product_flow_state_parts"
-  ]);
-  const forbiddenTables = [
-    "platform_credentials",
-    "platform_credential_audit",
-    "credential_vault_entries",
-    "internal_vault_items",
-    "data_connector_instances"
-  ];
-  const remoteReads = [...seedSource.matchAll(/d1RemoteJson\(\s*["`]?\s*SELECT[\s\S]*?FROM\s+(\w+)/g)].map(match => match[1]);
-  assert.ok(remoteReads.length >= 2, "expected identity/state remote reads in the seed script");
-  for (const table of remoteReads) {
-    assert.ok(allowedTables.has(table), `remote read touches non-whitelisted table: ${table}`);
-  }
-  for (const table of forbiddenTables) {
-    assert.ok(!remoteReads.includes(table), `seed script must never copy ${table}`);
-  }
-});
-
-test("with-state copy is opt-in and only touches shared state tables", () => {
+test("seed script applies migrations locally and refuses production state copy", () => {
   assert.match(seedSource, /--with-state/);
-  const withStateIndex = seedSource.indexOf('--with-state")');
-  assert.ok(withStateIndex > 0);
-  const withStateBlock = seedSource.slice(withStateIndex);
-  assert.match(withStateBlock, /FROM product_flow_state\b/);
-  assert.match(withStateBlock, /FROM product_flow_state_parts/);
-  assert.match(withStateBlock, /--file/, "large state payloads must be written via a temp SQL file, not inline --command");
-  assert.match(withStateBlock, /shardPayload/, "oversized payloads must be sharded across part_index rows, matching deserializeStateParts");
-  assert.match(withStateBlock, /DELETE FROM product_flow_state_parts/, "re-seeding must clear stale shard rows before insert");
-  assert.doesNotMatch(withStateBlock, /platform_credentials|credential_vault/);
-});
-
-test("seed script is re-runnable and skips migrations on an already migrated database", () => {
+  assert.match(seedSource, /已取消从生产库复制状态/);
+  assert.match(seedSource, /"--local"/);
   assert.match(seedSource, /sqlite_master/);
-  assert.match(seedSource, /alreadyMigrated/);
-  assert.match(seedSource, /新增迁移时需先清空 \.wrangler\/state/);
+  assert.doesNotMatch(seedSource, /--remote|PRODUCTION_DATA_ACCESS_TOKEN|platform_credentials/);
 });

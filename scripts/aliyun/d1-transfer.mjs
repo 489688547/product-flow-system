@@ -86,44 +86,6 @@ export function runCommand(command, args, options = {}) {
   });
 }
 
-export async function exportCloudflareD1({
-  exportDir,
-  run = runCommand,
-  wranglerBin = "npx",
-  now = () => new Date().toISOString()
-}) {
-  const directory = requiredAbsolutePath(exportDir, "exportDir");
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  const items = [];
-  for (const database of DATABASES) {
-    const output = join(directory, database.file);
-    await run(wranglerBin, [
-      ...(wranglerBin === "npx" ? ["wrangler"] : []),
-      "d1",
-      "export",
-      database.name,
-      "--remote",
-      "--output",
-      output
-    ]);
-    const metadata = await stat(output);
-    if (metadata.size === 0) throw new Error(`${database.name} 导出文件为空。`);
-    items.push({
-      ...database,
-      bytes: metadata.size,
-      sha256: await sha256(output)
-    });
-  }
-  const manifest = {
-    schemaVersion: 1,
-    createdAt: now(),
-    source: "cloudflare-d1-remote",
-    databases: items
-  };
-  await atomicJson(join(directory, "manifest.json"), manifest);
-  return manifest;
-}
-
 async function verifiedManifest(exportDir) {
   const manifestPath = join(exportDir, "manifest.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8"));

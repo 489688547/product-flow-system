@@ -19,12 +19,7 @@
 
 承担员工身份、组织通讯录、待办、日历、文档和会议纪要。身份优先使用 user ID 和 union ID；组织名称用于展示和历史兼容。钉钉授权、企业归属和接口权限必须在服务端验证。
 
-浏览器 OAuth 的登记回调固定由生产域名承载。Cloudflare 预览域名和部署唯一域名不得直接生成钉钉回调地址；预览页面发起登录时统一跳转到生产域名完成认证，并在生产环境继续访问，避免为短生命周期域名扩张开放平台白名单。
-
-浏览器 OAuth 的开始页和回调页必须保持为 Pages 静态韧性入口，不得再次直接暴露共享 Functions Worker。
-静态页只调用同源 bootstrap/complete 路由；OAuth state、returnTo 和服务器会话仍由服务端 HttpOnly
-Cookie 管理。只允许对网络错误、502/503/504 与明确的 Cloudflare 1102 做有限重试，业务校验和 Provider
-错误不得自动重放。要求钉钉能力的生产就绪检查必须验证静态入口、冷启动恢复和并发 bootstrap。
+浏览器 OAuth 的正式登记回调固定为 `https://deshan-tiyes.cn/api/auth/dingtalk/callback`。测试前端通过 `https://api-test.deshan-tiyes.cn` 发起登录，服务端回调完成后只重定向到登记的 `https://test.deshan-tiyes.cn`。OAuth state、returnTo 和服务器会话始终由 ECS API 的 HttpOnly Cookie 管理；Cloudflare 静态站不得承载认证逻辑或服务端 Secret。要求钉钉能力的生产就绪检查必须验证 API 回调、冷启动恢复和并发 bootstrap。
 
 钉钉组织同步负责刷新在职状态、姓名、部门和平台推断角色，但部分组织快照不能覆盖或停用系统内已经明确授予的 `executive` 最高权限。撤销最高权限必须先直接核验身份，或由平台管理员显式执行，不能以一次同步未返回该人员作为依据。
 
@@ -40,7 +35,7 @@ Cookie 管理。只允许对网络错误、502/503/504 与明确的 Cloudflare 1
 
 ## 平台连接保险箱
 
-钉钉和快麦的公司级凭据由数据中心统一维护。浏览器只提交本次修改值并读取脱敏状态；服务端使用 Cloudflare Secret `PLATFORM_CREDENTIAL_MASTER_KEY` 加密后写入 D1，审计只记录平台、动作、字段名、操作者和结果，不记录凭据值或外部平台原始响应。
+钉钉和快麦的公司级凭据由数据中心统一维护。浏览器只提交本次修改值并读取脱敏状态；ECS 服务端使用只读 `runtime.env` 中的 `PLATFORM_CREDENTIAL_MASTER_KEY` 加密后写入控制 SQLite，审计只记录平台、动作、字段名、操作者和结果，不记录凭据值或外部平台原始响应。
 
 候选配置必须先完成只读连接验证，成功后才以版本锁切换为当前连接；验证或保存失败时继续使用原连接。所有外部适配器通过共享解析器读取有效版本，旧环境变量仅用于兼容回退，停用保险箱版本后恢复回退。阿里云等尚未完成真实适配的平台只显示接入中，不提供虚假字段。
 
@@ -56,32 +51,20 @@ ERP 或 Excel 导入作为销售数据回补和商品主数据 Chrome 采集的�
 
 抖音店铺浏览器登录 adapter 已退役，不再保存店铺账号密码、访问固定登录域名或创建公司 Mac 登录任务。抖音、快手、淘系、拼多多、小红书和京东/京麦改为平台原始文件方向；取得真实样例前保持“等待文件样例”。ERP 和广告平台仍按各自已验证的 API、文件或受控连接契约接入，不得复制旧店铺登录链路，也不得把所有记录塞进一个无口径的通用 JSON 表。
 
-## Cloudflare Pages 与 D1
+## Cloudflare 静态测试前端
 
-Pages 承载 React 静态资源，Functions 承载 `/api/*`，D1 保存共享状态、公司平台实体、会话、组织缓存和销售聚合。绑定、迁移和部署属于生产基础设施验证，不能用本地预览结果替代。
+Cloudflare Pages 只承载 `dev` 分支构建出的 React 静态文件。构建时注入 `VITE_PFS_API_ORIGIN=https://api-test.deshan-tiyes.cn`；上传目录必须拒绝 Functions、D1 配置、`.dev.vars`、Wrangler 配置和服务端 Secret。Cloudflare D1 已退休，禁止新增绑定、远程执行，也不得作为后端故障恢复目标。
 
-`docs/platform/environment-capabilities.json` 是环境必需配置的公开事实源，只记录名称和检查方式。生产就绪 API 不返回变量值。发布后必须运行 `npm run verify:production`；缺少阻断配置时不能宣告上线完成。
-
-生产交付统一走 GitHub GitOps：开发改动在功能分支完成，PR 通过必需检查后合并到 `main`，再由 Cloudflare Git 集成自动创建生产部署。直接使用 Wrangler 或 Pages 上传只允许用于明确授权的故障恢复或临时验证，不能替代 `main`；只有同一源码已进入 `main`、Git 触发的部署成功且生产验证通过，才算完成上线。
-
-完整本地开发通过 `npm start` 把 Pages Functions 构建为远程开发 Worker，在 Cloudflare 网络原生访问生产 D1 和正式提供商适配器。个人访问令牌只保存在 `.env`，D1 只保存哈希；启动器生成的一次性传输密钥只在 Vite 服务端代理和远程开发 Worker 之间流转，中间件据此还原令牌对应的真实 active executive 会话。该会话可以按线上同账号权限读写数据、创建钉钉待办与日历或触发快麦同步，但仍必须经过各路由的角色、目标范围、幂等和提供商权限，数据库访问本身不会绕过外部平台授权。
-
-生产数据网关继续用于运维修复；其跨环境写入仍需要 15 分钟解锁、版本检查、写前快照和审计。部署后的生产验证、钉钉 WebView 验证和外部平台真实动作验证保持独立，不用本地成功互相替代。
+测试交付仍走 GitHub GitOps：功能分支合并到 `dev` 后才发布固定测试站 `https://test.deshan-tiyes.cn`，并与 ECS 测试 API 的同一 commit 一起验收。任意 Pages Preview URL 不算共享验收结果。
 
 ## 阿里云 ECS 与 OSS
 
-阿里云 ECS 是 Pages Functions 与双 SQLite 的过渡生产运行时，不是第二套业务
-API。容器通过 Wrangler 本地 Pages 运行时执行仓库中的 `functions/`，正式与
-展示 binding 分别持久化到 ECS 数据卷；公网环境不得启用
-`LOCAL_ONLINE_ACCOUNT_MODE`。运行时 Secret 只从只读 `runtime.env` 挂载，
+阿里云 ECS 是唯一业务 API 和在线数据库运行时。生产与测试容器通过 Wrangler 本地 Pages-compatible 运行时执行仓库中的 `functions/`；两套环境分别使用独立的正式/展示 SQLite、端口、环境文件和数据卷，公网环境不得启用 `LOCAL_ONLINE_ACCOUNT_MODE`。运行时 Secret 只从只读 `runtime.env` 挂载，
 启动器在受限工作目录以 `.dev.vars` 符号链接交给 Pages Functions，不复制进镜像
 或持久化数据。现有 Nginx Proxy Manager 负责 80/443，应用端口
-默认只绑定宿主机回环地址。正式阿里云入口登记为 `deshan-tiyes.cn`；ICP备案、
-HTTPS 和钉钉回调白名单完成前只允许 Host 头预验收，不切换 DNS。
+默认只绑定宿主机回环地址。正式入口为 `https://deshan-tiyes.cn`，测试 API 为 `https://api-test.deshan-tiyes.cn`。
 
-D1 迁移使用停写窗口：先停止公司采集器和业务写入，再分别导出正式与展示 D1，
-导入两个空白 SQLite 并核对表数、关键表行数和 SHA-256。Cloudflare 在切流前
-保持生产服务，切流后保留为只读回滚点；禁止长期双写或自动合并两端增量。
+Cloudflare D1 到 ECS SQLite 的一次性停写迁移已经完成。历史 SQL、清单和 SHA-256 只作为迁移证据保存；在线数据不得再双写、回切或自动合并 Cloudflare 增量。
 
 OSS 存储图片、附件和数据库 SQLite 一致性快照，不承载在线数据库。Bucket 必须私有并阻止
 公共访问；服务器优先使用最小权限 ECS 实例 RAM 角色，仓库、命令参数、日志和
@@ -92,17 +75,17 @@ OSS 存储图片、附件和数据库 SQLite 一致性快照，不承载在线�
 
 公司级 AI 能力统一经过 `/api/platform/v1/ai/*` 服务端网关。业务 App 不直接调用模型供应商，也不把浏览器中的业务状态作为可信上下文；服务端根据钉钉会话、数据域权限和外发策略读取、脱敏并限额公司数据。灵算首期使用固定 `https://lingsuan.top/responses`、`gpt-5.6-sol` 和 `store: false`，设置页不得覆盖域名、路径或任意 Header；灵算凭据直接复用平台连接保险箱保存和验证，不建立独立凭据存储。
 
-`AI_ASSISTANT_ENABLED` 默认关闭。公司级凭据优先由平台连接保险箱解析，迁移期允许 `LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 作为 Pages 服务端 Secret 回退；环境回退值不可回显。最高权限管理员通过专用 POST reveal 路由查看当前启用的保险箱版本时，必须满足 15 分钟内会话、用途、精确确认语、15 分钟最多 5 次、`private, no-store` 和无秘密审计，浏览器只在内存保留 5 分钟并在离开设置时清除。连接测试仅使用固定合成输入；Function Calling 另用 `lookup_status({})` 做无公司数据能力测试。业务查询只能从服务端按当前会话权限下发的只读 Skill 中选择，每次调用重新校验固定 Schema、数据域和外发策略，并限制为两轮、六次。调用审计只保存 Skill、App、参数名、数量、耗时和结果码，不保存参数值、业务结果或对话内容。
+`AI_ASSISTANT_ENABLED` 默认关闭。公司级凭据优先由平台连接保险箱解析，迁移期允许 `LINGSUAN_API_KEY` 和可选的 `LINGSUAN_ACTOR_AUTHORIZATION` 作为 ECS 服务端环境回退；环境回退值不可回显。最高权限管理员通过专用 POST reveal 路由查看当前启用的保险箱版本时，必须满足 15 分钟内会话、用途、精确确认语、15 分钟最多 5 次、`private, no-store` 和无秘密审计，浏览器只在内存保留 5 分钟并在离开设置时清除。连接测试仅使用固定合成输入；Function Calling 另用 `lookup_status({})` 做无公司数据能力测试。业务查询只能从服务端按当前会话权限下发的只读 Skill 中选择，每次调用重新校验固定 Schema、数据域和外发策略，并限制为两轮、六次。调用审计只保存 Skill、App、参数名、数量、耗时和结果码，不保存参数值、业务结果或对话内容。
 
 模型使用审计只记录身份、数据域、记录数、数据时间、token、耗时和结果码，不保存问题、回答、上下文或 Provider 原始响应。财务数据即使用户内部有权查看，也在当前 Provider 下统一阻止外发；只有获得可审计的不留存承诺并完成新的安全决策后才能调整。
 
 公司总助对话与电商运营方案点评都通过统一 AI 能力调用。每个功能必须在服务端注册稳定 `appId/featureId` 并复用 `invokeAiFeature` 或流式聊天编排；业务路由不得导入 Provider 配置、Responses 适配器或自行发起模型请求。治理 CI 会扫描直接模型地址、Secret 和低层适配器导入，唯一例外是平台连接测试器使用合成内容验证候选凭据。
 
-研发待办草稿同样通过统一 AI 能力调用，登记为 `company-platform/development-backlog-draft`。它只整理当前需求描述并返回未落库结构化草稿；总经办确认后才通过标准研发待办 API 写入控制 D1。AI 未配置时页面进入数据中心 AI 大模型设置，临时超时或限流留在当前页面重试。
+研发待办草稿同样通过统一 AI 能力调用，登记为 `company-platform/development-backlog-draft`。它只整理当前需求描述并返回未落库结构化草稿；总经办确认后才通过标准研发待办 API 写入控制 SQLite。AI 未配置时页面进入数据中心 AI 大模型设置，临时超时或限流留在当前页面重试。
 
 ## 内部平台资料
 
-任意已登录员工可读取内部平台资料，仅总经办平台管理员可维护。D1 表 `integration_private_profiles` 保存字段白名单内的非敏感资料；`integration_profile_audit` 只记录变更字段名，不保存字段值。资料超过 180 天未验证时，说明书显示复核提醒。内部 API 失败时公开平台地图继续可用。
+任意已登录员工可读取内部平台资料，仅总经办平台管理员可维护。SQLite 表 `integration_private_profiles` 保存字段白名单内的非敏感资料；`integration_profile_audit` 只记录变更字段名，不保存字段值。资料超过 180 天未验证时，说明书显示复核提醒。内部 API 失败时公开平台地图继续可用。
 
 禁止在内部资料中保存密钥、访问令牌、刷新令牌、Cookie、密码、私钥、带凭据的 URL 或完整外部接口响应。
 
@@ -114,7 +97,7 @@ OSS 存储图片、附件和数据库 SQLite 一致性快照，不承载在线�
 
 目录组合不改变底层职责。公司级连接负责运行时 App 凭据、只读验证和版本切换；连接器同步实例负责主体、数据集、计划和采集状态。连接凭据与同步实例可以在同一平台详情中组合展示，但不可在客户端混存、复制或互相代替，仍分别使用各自的权限、API、持久化记录和审计链路。
 
-连接器实例可引用 D1 中的加密凭证。密码、API Secret、Token、Cookie 和可复用会话使用 Cloudflare Secret 与 AES-256-GCM 加密；OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果不持久化。普通 API 不返回明文，本地采集器通过任务绑定的短时授权取用，所有敏感动作追加审计且不记录值。
+连接器实例可引用控制 SQLite 中的加密凭证。密码、API Secret、Token、Cookie 和可复用会话使用 ECS 只读运行时主密钥与 AES-256-GCM 加密；OTP、短信验证码、二维码内容、滑块答案和当次人工验证结果不持久化。普通 API 不返回明文，本地采集器通过任务绑定的短时授权取用，所有敏感动作追加审计且不记录值。
 
 店铺连接器不再运行网页自动登录，统一等待平台原始文件样例。其他网页型能力只有在注册表明确登记、生产真实验证且无法使用稳定 API/文件时，才可运行在固定公司 Mac 的专用 Profile；不得沿用已退役的店铺账号、任务或会话。API 型连接器仍由服务端 provider adapter 调用，前端功能不能直接访问外部平台。
 

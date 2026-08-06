@@ -20,8 +20,8 @@ test("integration registry is valid and contains the approved initial lifecycle"
   assert.equal(statusById.dingtalk, "connected");
   assert.equal(statusById.kuaimai, "integrating");
   assert.equal(statusById["cloudflare-pages"], "connected");
-  assert.equal(statusById["cloudflare-d1"], "connected");
-  assert.equal(statusById.aliyun, "integrating");
+  assert.equal(statusById["cloudflare-d1"], "retired");
+  assert.equal(statusById.aliyun, "connected");
   assert.equal(statusById["erp-file-import"], "integrating");
   assert.equal(statusById["taobao-open-platform"], "planned");
   assert.equal(statusById["pinduoduo-open-platform"], "planned");
@@ -49,7 +49,7 @@ test("registry validation rejects duplicate ids, invalid relations, and public s
 test("registry validation requires evidence for integrating platforms", () => {
   const registry = loadIntegrationRegistry(rootDir);
   const invalid = structuredClone(registry);
-  invalid.platforms.find(platform => platform.id === "aliyun").evidence = [];
+  invalid.platforms.find(platform => platform.id === "kuaimai").evidence = [];
 
   assert.ok(validateIntegrationRegistry(invalid).some(error => error.includes("integrating") && error.includes("evidence")));
 });
@@ -62,7 +62,7 @@ test("router matches prompt keywords and expands one-hop related platforms", () 
   });
 
   assert.deepEqual(result.direct.map(match => match.id), ["kuaimai"]);
-  assert.ok(result.related.some(match => match.id === "cloudflare-d1"));
+  assert.ok(result.related.some(match => match.id === "aliyun"));
   assert.ok(result.direct[0].evidence.some(item => item.type === "keyword"));
 });
 
@@ -135,13 +135,13 @@ test("impact check accepts complete declarations and rejects missing path covera
   const paths = ["functions/api/auth/dingtalk/callback.js"];
   const accepted = checkIntegrationImpact(registry, {
     paths,
-    body: "Integration-Impact: dingtalk, cloudflare-pages, cloudflare-d1\nIntegration-Impact-Reason: 调整登录回调"
+    body: "Integration-Impact: dingtalk, aliyun\nIntegration-Impact-Reason: 调整 ECS 登录回调"
   });
   assert.deepEqual(accepted.errors, []);
 
   const rejected = checkIntegrationImpact(registry, {
     paths,
-    body: "Integration-Impact: cloudflare-pages, cloudflare-d1\nIntegration-Impact-Reason: 调整登录回调"
+    body: "Integration-Impact: aliyun\nIntegration-Impact-Reason: 调整 ECS 登录回调"
   });
   assert.ok(rejected.errors.some(error => error.includes("dingtalk")));
 });

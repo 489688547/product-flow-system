@@ -79,7 +79,16 @@
   - 2026-08-06：ICP备案、HTTPS、DNS 和真实钉钉 OAuth 已完成，生产入口为
     `https://deshan-tiyes.cn`。
 
-- [ ] 隔离测试环境并退役 Cloudflare 业务运行时
+- [x] 隔离测试环境并退役 Cloudflare 业务运行时
   - 依赖：生产 ECS 入口已验收。
   - 输出：Cloudflare 静态测试前端、ECS 测试 API/SQLite、无 D1/Workers 运行依赖。
   - 验证：测试/生产 commit 与数据隔离、CORS、OAuth、readiness 和完整门禁。
+  - 2026-08-06：代码与契约已完成；固定域名部署和真实环境验收作为发布任务继续执行。
+
+- [ ] 发布并验收固定测试环境
+  - 输出：`https://test.deshan-tiyes.cn` 与 `https://api-test.deshan-tiyes.cn` 报告同一 `dev` commit。
+  - 验证：静态产物边界、CORS、OAuth、readiness、数据隔离与钉钉 WebView。
+
+- [ ] 通过 `dev -> main` 发布并验收生产
+  - 输出：`https://deshan-tiyes.cn` 报告目标 `main` commit。
+  - 验证：OAuth、readiness、业务读写、容器健康恢复与 SQLite/OSS 备份。

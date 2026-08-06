@@ -97,8 +97,7 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 
 - 任一历史 D1 导出或 SQLite 导入校验缺少证据：停止发布并从迁移快照重新验证。
 - 测试 SQLite 初始化失败：测试 API 保持不可用，不得回退生产数据库。
-- ECS 内存不足或容器被 OOM：保持 Cloudflare DNS，不切流；运行时设置内存上限
-  并记录容器重启。
+- ECS 内存不足或容器被 OOM：Nginx 进入维护状态，停止写入并回滚上一个 ECS 镜像与匹配快照；运行时设置内存上限并记录容器重启。
 - OSS 未创建或实例角色未授权：本地备份仍生成，但上线状态标记“OSS 备份受阻”。
 - 域名、证书或回调配置失效：生产进入维护并从最近 ECS/OSS 快照恢复，不回写 D1。
 

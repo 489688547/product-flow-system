@@ -408,7 +408,7 @@ Expected: 当前 HEAD 包含最新 `origin/main`；只暂存本功能文件，�
 
 - [ ] **Step 3: 经执行时授权后迁移并部署**
 
-按 `environment-parity` 的 Cloudflare 清单和 `npm run release:pages` 执行；先预检/备份，再应用 `0009_web_collection.sql`，部署 Pages，最后分别验证生产 API 的未认证拒绝、公司会话只读状态和 D1 表/索引。
+按 `environment-parity` 的 ECS 清单执行；先预检/备份，再应用 `0009_web_collection.sql`，部署测试 API，最后分别验证未认证拒绝、公司会话只读状态和 SQLite 表/索引。
 
 - [ ] **Step 4: 登记并安装公司 Mac 采集器**
 

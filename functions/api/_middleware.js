@@ -1,5 +1,4 @@
 import { readSession } from "./auth/_shared/session.js";
-import { authorizeProductionToken, productionAccessError } from "./platform/_shared/productionDataAccess.js";
 import {
   assertEnvironmentWriteVersion,
   dataEnvironmentErrorResponse,
@@ -69,51 +68,6 @@ function usesHandlerBearerAuth(path) {
     || path.startsWith("/api/platform/v1/browser-agent/");
 }
 
-function isLoopbackRequest(request) {
-  const hostname = new URL(request.url).hostname;
-  return ["localhost", "127.0.0.1", "::1"].includes(hostname);
-}
-
-function hasLocalOnlineTransportSecret(request, env = {}) {
-  const expected = String(env.LOCAL_ONLINE_REQUEST_SECRET || "");
-  const actual = String(request.headers.get("x-pfs-local-online-session") || "");
-  return Boolean(expected) && actual === expected;
-}
-
-function localOnlineError(error) {
-  return jsonResponse({
-    authenticated: false,
-    message: error?.message || "本地线上账号验证失败。",
-    error: {
-      code: error?.code || "LOCAL_ONLINE_AUTH_FAILED",
-      retryable: Boolean(error?.retryable)
-    }
-  }, error?.status || 500);
-}
-
-async function localOnlineAccountSession(request, env = {}) {
-  const trustedTransport = isLoopbackRequest(request) || hasLocalOnlineTransportSecret(request, env);
-  if (env.LOCAL_ONLINE_ACCOUNT_MODE !== "1" || !trustedTransport) return null;
-  if (!env.PRODUCTION_DATA_ACCESS_TOKEN) {
-    throw productionAccessError("本地线上账号缺少个人令牌。", 401, "LOCAL_ONLINE_TOKEN_REQUIRED");
-  }
-  if (!env.PRODUCT_FLOW_DB) {
-    throw productionAccessError("本地线上账号缺少生产 D1 绑定。", 503, "LOCAL_ONLINE_DATABASE_REQUIRED");
-  }
-  const capability = ["GET", "HEAD"].includes(request.method) ? "read" : "write";
-  const access = await authorizeProductionToken(env.PRODUCTION_DATA_ACCESS_TOKEN, env.PRODUCT_FLOW_DB, { capability });
-  return {
-    corpId: access.corpId,
-    userId: access.userId,
-    unionId: access.unionId,
-    name: access.name,
-    role: access.role,
-    department: access.department,
-    title: access.title,
-    loginMode: "local-online-account"
-  };
-}
-
 const SELF_AUTHENTICATING_PATH_PREFIXES = [
   "/api/platform/v1/data-standards"
 ];
@@ -129,15 +83,6 @@ export async function onRequest(context) {
   const finish = response => withBrowserCors(response, originPolicy);
   const path = new URL(context.request.url).pathname.replace(/\/$/, "") || "/";
   let authenticated = false;
-  try {
-    const localSession = await localOnlineAccountSession(context.request, context.env);
-    if (localSession) {
-      context.data.session = localSession;
-      authenticated = true;
-    }
-  } catch (error) {
-    return finish(localOnlineError(error));
-  }
   if (PUBLIC_PATHS.has(path)) return finish(await context.next());
 
   if (!authenticated) {

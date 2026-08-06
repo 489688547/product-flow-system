@@ -29,8 +29,8 @@
     "test:store-connection-cleanup": "node --test tests/store-connection-cleanup-api.test.mjs",
     "test:product-catalog-sales-mapping": "node --test tests/product-catalog-sales-api.test.mjs tests/product-catalog-sales-mapping-migration.test.mjs tests/product-catalog-sales-mappings-api.test.mjs",
     "test": "node --test tests/sales-api.test.mjs && npm run test:react && npm run test:api && npm run test:development-backlog && npm run test:product-catalog-sales-mapping && npm run test:store-connection-cleanup && npm run test:goods-flow-projections && npm run test:web-collector && npm run test:release-flow",
-    "start": "node scripts/start-local-online.mjs",
-    "start:sandbox": "node scripts/start-local-online.mjs --local-d1",
+    "start": "node scripts/start-local-sandbox.mjs",
+    "start:sandbox": "node scripts/start-local-sandbox.mjs",
     "seed:sandbox": "node scripts/seed-local-sandbox.mjs",
     "test:release-flow": "node --test tests/pr-branch-flow.test.mjs tests/sync-main-to-dev-workflow.test.mjs"
   },

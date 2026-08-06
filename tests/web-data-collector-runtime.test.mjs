@@ -86,7 +86,7 @@ test("formal Ego service refuses non-Aliyun targets while a loopback probe is al
     browserMode: "ego"
   }));
   assert.throws(
-    () => assertAliyunCollectorTarget({ baseUrl: "https://deshan-tiyes-system.pages.dev", browserMode: "ego" }),
+    () => assertAliyunCollectorTarget({ baseUrl: "https://retired-backend.pages.dev", browserMode: "ego" }),
     error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
   );
   assert.throws(
@@ -109,7 +109,7 @@ test("serve rejects a Cloudflare Ego target before reading local service secrets
     runWebCollector([
       "serve",
       "--browser-mode", "ego",
-      "--base-url", "https://deshan-tiyes-system.pages.dev",
+      "--base-url", "https://retired-backend.pages.dev",
       "--ego-cli", "/Users/company/.local/bin/ego-browser"
     ]),
     error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"

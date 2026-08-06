@@ -224,7 +224,7 @@ npm test
 npm run build
 ```
 
-5. 检查 `git status --short`，只提交本功能文件。没有新的明确部署授权时停在可部署状态，不执行 `release:pages` 或 D1 远程迁移。
+5. 检查 `git status --short`，只提交本功能文件。没有新的明确部署授权时停在可部署状态，不执行 ECS 部署或数据库迁移。
 
 ## 完成标准
 

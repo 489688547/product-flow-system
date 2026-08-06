@@ -1,48 +1,20 @@
-name = "product-flow-system"
+name = "product-flow-system-local-sandbox"
 pages_build_output_dir = "./dist"
 compatibility_date = "2026-07-18"
 
+# Local sandbox only. Cloudflare account, remote D1 IDs and remote execution are forbidden.
 [vars]
-LOCAL_ONLINE_ACCOUNT_MODE = "1"
+LOCAL_ONLINE_ACCOUNT_MODE = "0"
+RUNTIME_ENV = "development"
 
 [[d1_databases]]
 binding = "PRODUCT_FLOW_DB"
-database_name = "product-flow-system"
-database_id = "64389843-2c2f-4781-862d-48fe27caa012"
-remote = true
+database_name = "product-flow-system-local"
+database_id = "PRODUCT_FLOW_DB"
+remote = false
 
 [[d1_databases]]
 binding = "DEMO_FLOW_DB"
-database_name = "product-flow-system-display"
-database_id = "700a0679-eaf2-43ab-a50f-ff952503d338"
-remote = true
-
-[env.preview.vars]
-LOCAL_ONLINE_ACCOUNT_MODE = "1"
-
-[[env.preview.d1_databases]]
-binding = "PRODUCT_FLOW_DB"
-database_name = "product-flow-system"
-database_id = "64389843-2c2f-4781-862d-48fe27caa012"
-remote = true
-
-[[env.preview.d1_databases]]
-binding = "DEMO_FLOW_DB"
-database_name = "product-flow-system-display"
-database_id = "700a0679-eaf2-43ab-a50f-ff952503d338"
-remote = true
-
-[env.production.vars]
-LOCAL_ONLINE_ACCOUNT_MODE = "1"
-
-[[env.production.d1_databases]]
-binding = "PRODUCT_FLOW_DB"
-database_name = "product-flow-system"
-database_id = "64389843-2c2f-4781-862d-48fe27caa012"
-remote = true
-
-[[env.production.d1_databases]]
-binding = "DEMO_FLOW_DB"
-database_name = "product-flow-system-display"
-database_id = "700a0679-eaf2-43ab-a50f-ff952503d338"
-remote = true
+database_name = "product-flow-system-display-local"
+database_id = "DEMO_FLOW_DB"
+remote = false

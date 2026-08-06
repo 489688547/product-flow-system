@@ -399,7 +399,6 @@ const integrationRegistry = {
       "envVars": [],
       "domains": [
         "test.deshan-tiyes.cn",
-        "deshan-tiyes-system-dev.pages.dev",
         "pages.dev",
         "api.cloudflare.com",
         "dash.cloudflare.com"

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readdir, readlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -11,6 +12,27 @@ const execFileAsync = promisify(execFile);
 
 async function json(path) {
   return JSON.parse(await readFile(resolve(root, path), "utf8"));
+}
+
+async function writeHistoricalMigrationExport(exportDir) {
+  const { DATABASES } = await import("../scripts/aliyun/d1-transfer.mjs");
+  await mkdir(exportDir, { recursive: true });
+  const databases = [];
+  for (const database of DATABASES) {
+    const content = `-- archived migration export for ${database.name}\nSELECT 1;\n`;
+    await writeFile(join(exportDir, database.file), content, "utf8");
+    databases.push({
+      ...database,
+      bytes: Buffer.byteLength(content),
+      sha256: createHash("sha256").update(content).digest("hex")
+    });
+  }
+  await writeFile(join(exportDir, "manifest.json"), JSON.stringify({
+    schemaVersion: 1,
+    createdAt: "2026-07-29T08:00:00.000Z",
+    source: "archived-cloudflare-migration",
+    databases
+  }), "utf8");
 }
 
 test("Aliyun production, test API, static test frontend, and OSS backup are declared safely", async () => {
@@ -200,34 +222,15 @@ test("DingTalk OAuth on the Aliyun HTTPS origin keeps its callback same-origin",
   );
 });
 
-test("D1 transfer exports both databases with hashes and refuses an overwrite", async () => {
-  const { exportCloudflareD1, importLocalD1 } = await import("../scripts/aliyun/d1-transfer.mjs");
+test("archived migration exports import with hashes and refuse an overwrite", async () => {
+  const { importLocalD1 } = await import("../scripts/aliyun/d1-transfer.mjs");
   const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-transfer-"));
   const exportDir = join(tempRoot, "export");
   const persistDir = join(tempRoot, "persist");
   const calls = [];
-  const run = async (_command, args) => {
-    calls.push(args);
-    const outputIndex = args.indexOf("--output");
-    if (outputIndex >= 0) {
-      await mkdir(exportDir, { recursive: true });
-      await writeFile(args[outputIndex + 1], `-- ${args[2]}\nSELECT 1;\n`, "utf8");
-    }
-  };
+  const run = async (_command, args) => calls.push(args);
+  await writeHistoricalMigrationExport(exportDir);
 
-  const manifest = await exportCloudflareD1({
-    exportDir,
-    run,
-    now: () => "2026-07-29T08:00:00.000Z"
-  });
-  assert.deepEqual(manifest.databases.map(item => item.name), [
-    "product-flow-system",
-    "product-flow-system-display"
-  ]);
-  assert.ok(manifest.databases.every(item => /^[a-f0-9]{64}$/.test(item.sha256)));
-  assert.equal(calls.filter(args => args.includes("--remote")).length, 2);
-
-  calls.length = 0;
   await importLocalD1({ exportDir, persistDir, run });
   assert.equal(calls.filter(args => args.includes("--local")).length, 2);
   await assert.rejects(
@@ -237,19 +240,13 @@ test("D1 transfer exports both databases with hashes and refuses an overwrite", 
 });
 
 test("D1 transfer rejects a changed SQL export and unsafe OSS destination", async () => {
-  const { backupLocalD1, exportCloudflareD1, importLocalD1 } = await import(
+  const { backupLocalD1, importLocalD1 } = await import(
     "../scripts/aliyun/d1-transfer.mjs"
   );
   const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-integrity-"));
   const exportDir = join(tempRoot, "export");
-  const run = async (_command, args) => {
-    const outputIndex = args.indexOf("--output");
-    if (outputIndex >= 0) {
-      await mkdir(exportDir, { recursive: true });
-      await writeFile(args[outputIndex + 1], "SELECT 1;\n", "utf8");
-    }
-  };
-  await exportCloudflareD1({ exportDir, run });
+  const run = async () => {};
+  await writeHistoricalMigrationExport(exportDir);
   const manifest = JSON.parse(await readFile(join(exportDir, "manifest.json"), "utf8"));
   await writeFile(join(exportDir, manifest.databases[0].file), "SELECT 2;\n", "utf8");
 
@@ -440,10 +437,9 @@ test("local D1 check requires both databases to contain tables", async () => {
   const queried = [];
   const checks = await checkLocalD1({
     persistDir: "/var/lib/product-flow/wrangler",
-    configPath: "/app/deploy/aliyun/wrangler.toml",
     runQuery: async (_command, args) => {
       queried.push(args);
-      return JSON.stringify([{ success: true, results: [{ table_count: 119 }] }]);
+      return "ok\n119\n";
     }
   });
 
@@ -455,8 +451,7 @@ test("local D1 check requires both databases to contain tables", async () => {
   await assert.rejects(
     () => checkLocalD1({
       persistDir: "/var/lib/product-flow/wrangler",
-      configPath: "/app/deploy/aliyun/wrangler.toml",
-      runQuery: async () => JSON.stringify([{ success: true, results: [{ table_count: 0 }] }])
+      runQuery: async () => "ok\n0\n"
     }),
     /校验失败/
   );

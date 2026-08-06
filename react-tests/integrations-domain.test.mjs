@@ -26,7 +26,7 @@ test("integration search covers names, capabilities, questions, and keywords", (
   const platforms = mergeIntegrationProfiles(registry, []);
   assert.deepEqual(filterIntegrations(platforms, { query: "免登" }).map(item => item.id), ["dingtalk"]);
   assert.ok(filterIntegrations(platforms, { query: "商品数据" }).some(item => item.id === "taobao-open-platform"));
-  assert.ok(filterIntegrations(platforms, { query: "数据只在本地可见" }).some(item => item.id === "cloudflare-d1"));
+  assert.ok(filterIntegrations(platforms, { query: "历史迁移" }).some(item => item.id === "cloudflare-d1"));
 });
 
 test("integration filters and counts use lifecycle status", () => {
@@ -37,7 +37,7 @@ test("integration filters and counts use lifecycle status", () => {
   assert.equal(planned.length, 7);
   assert.ok(platforms.some(item => item.id === "browser-market-collector" && item.status === "connected"));
   assert.ok(platforms.some(item => item.id === "douyin-ecommerce" && item.status === "integrating"));
-  assert.deepEqual(counts, { all: 16, connected: 5, integrating: 4, planned: 7, retired: 0 });
+  assert.deepEqual(counts, { all: 16, connected: 5, integrating: 3, planned: 7, retired: 1 });
 });
 
 test("relations resolve to public platform records", () => {
@@ -45,7 +45,7 @@ test("relations resolve to public platform records", () => {
   const kuaimai = platforms.find(platform => platform.id === "kuaimai");
   const relations = resolveIntegrationRelations(platforms, kuaimai);
 
-  assert.ok(relations.some(relation => relation.platform.id === "cloudflare-d1"));
+  assert.ok(relations.some(relation => relation.platform.id === "aliyun"));
   assert.ok(relations.every(relation => relation.description));
 });
 

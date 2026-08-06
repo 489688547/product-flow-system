@@ -1,6 +1,6 @@
 # 平台总体架构
 
-系统采用模块化单体前端与 Pages Functions 接口。当前 Cloudflare Pages/D1 是已上线生产边界；阿里云 ECS 通过 Wrangler 本地 Pages 运行时和双 SQLite 建设过渡生产边界，在完成域名、认证、迁移和公网验收前仅作私有预发布。两条运行时复用同一 Functions 源码，避免产生第二套业务 API。
+系统采用模块化单体前端与同仓库 Functions 接口。生产前端、API 和双 SQLite 均运行在阿里云 ECS；测试前端由 Cloudflare Pages 仅托管静态产物，跨域调用 ECS 上隔离的测试 API 与测试 SQLite。两套 ECS 运行时复用同一 Functions 源码，但使用不同端口、环境文件和持久化目录。
 
 ## 前端边界
 
@@ -16,7 +16,6 @@
 
 - `functions/api/_middleware.js`：公共路由识别、OPTIONS 和公司会话认证。
 - `functions/api/auth/`：钉钉登录、Cookie 会话和退出。
-- `public/api/auth/dingtalk/`：钉钉 OAuth 的静态开始/回调韧性入口；敏感状态和会话仍只由服务端 API 管理。
 - `functions/api/dingtalk/`：组织、待办、日历、文档和会议纪要适配。
 - `functions/api/kuaimai/`：订单拉取、聚合、刷新和同步状态。
 - `functions/api/state.js`：产品全周期共享状态持久化。
@@ -38,23 +37,22 @@
 
 采集控制记录始终写正式控制库，并固化服务端解析出的目标环境和版本；ERP 文件、网页采集和销售修复只把业务投影写入目标业务库。展示环境的外部写请求经过同一业务校验后由共享模拟器返回兼容结果，不解析真实写入凭据。AI Provider、租约、Token 和 Skill 次数记录在控制库，Context builders 与业务 Skills 读取 `businessDb`，审计用独立 `data_environment` 字段标记来源而不改变 `model|rule_fallback` 语义。
 
-完整本地开发通过 `npm start` 同时运行 Vite 与 Wrangler Remote Dev。浏览器只访问 Vite `127.0.0.1:8127`，页面保留热更新，所有 `/api` 请求代理到内部 Wrangler `127.0.0.1:8132`。启动器把 Pages Functions 构建为临时 Worker bundle，并在 Cloudflare 网络执行，使 API 原生访问生产 D1，不经过 Pages Dev/Miniflare 远程绑定。启动器从被忽略的 `.env` 读取个人令牌，每次生成仅供 Vite 服务端代理和远程 Worker 使用的一次性传输密钥；API 中间件校验传输通道、令牌哈希、能力与 active executive 组织身份后注入真实线上会话。之后数据与钉钉、快麦等外部动作进入同一套正式路由、权限和适配器。任何密钥不得进入浏览器；硬编码本地身份和第二套本地业务 API 都不是支持的完整运行时。
+完整本地开发通过 `npm start` 同时运行 Vite 与本地 Pages-compatible Functions。浏览器只访问 Vite `127.0.0.1:8127`，所有 `/api` 请求代理到 `127.0.0.1:8132`，数据只写入 `.wrangler/state` 下的本地 SQLite。启动器过滤生产令牌、Cloudflare 凭据和本地线上账号密钥；本地需要真实身份时走正常钉钉登录，但不得访问生产数据或生产 Provider 凭据。共享数据与真实外部动作只在固定测试站或生产站验收。
 
-生产数据网关继续作为运维修复旁路：它的跨环境写入仍需要 15 分钟解锁、版本检查、写前快照和审计。本地线上账号模式是正式应用在本机执行，不绕过业务 API 自己的版本、幂等、审计或提供商权限。
+生产数据网关继续作为运维修复旁路：跨环境写入仍需要 15 分钟解锁、版本检查、写前快照和审计，且只能指向 ECS HTTPS 入口。
 
 ## 运行环境
 
-- 本地完整运行时使用 Vite 热更新与 `/api` 到 Pages Functions 的反向代理；仅运行 Vite 不具备业务 API 能力。
-- Cloudflare Pages/Functions 是生产静态资源和 API 边界。
-- D1 保存公司共享状态、平台实体、会话、组织缓存和销售聚合。
-- 阿里云过渡运行时在 Docker 内使用 Wrangler 本地 Pages Functions，`PRODUCT_FLOW_DB` 与 `DEMO_FLOW_DB` 映射到 ECS 持久化数据卷内两个独立 SQLite；公网环境禁止启用本地线上账号模式。
-- ECS 应用端口只绑定宿主机回环地址并加入 Nginx Proxy Manager 内部网络；域名未实名、备案和配置 HTTPS 前不得宣称公网生产上线。
+- 本地完整运行时使用 Vite 热更新与 `/api` 到本地 Functions 的反向代理，只连接本地 SQLite。
+- Cloudflare Pages 只部署 `dev` 的测试静态前端；不得上传 Functions、D1 配置或服务端 Secret。
+- 阿里云 ECS 是生产与测试 API 边界。`PRODUCT_FLOW_DB` 与 `DEMO_FLOW_DB` 在每个环境分别映射到持久化数据卷内两个独立 SQLite；生产与测试禁止启用本地线上账号模式。
+- ECS 应用端口只绑定宿主机回环地址并加入 Nginx Proxy Manager 内部网络；Nginx 只暴露 HTTPS 域名。
 - OSS 只保存私有对象与两个数据库的一致性导出备份，不承载在线 SQLite。备份优先使用 ECS 实例 RAM 角色，仓库、命令行和日志不得出现 AccessKey。
-- Cloudflare 与 ECS 不长期双写。最终迁移必须停止采集和业务写入，全量导出、导入并校验后切换；回滚先停止 ECS 写入再恢复固定 Cloudflare 入口。
-- `PRODUCT_FLOW_DB` 是正式控制库与正式业务库，`DEMO_FLOW_DB` 只保存展示业务数据；两者必须是不同的物理 D1。
-- 整状态共享数据以 D1 为事实源；默认状态、旧标签页和旧分支只有在先读取当前基线后才能写，同一基线通过原子比较只能被接受一次，所有成功写入都可通过快照和审计回滚。
+- Cloudflare D1 已退休，禁止双写或回切；历史导出只作为已完成迁移证据，在线事实源是 ECS SQLite。
+- `PRODUCT_FLOW_DB` 是控制库与业务库的兼容 binding 名，`DEMO_FLOW_DB` 只保存展示业务数据；每个环境的两者必须映射不同物理 SQLite 文件。
+- 整状态共享数据以当前 ECS 环境的 SQLite 为事实源；默认状态、旧标签页和旧分支只有在先读取当前基线后才能写，同一基线通过原子比较只能被接受一次，所有成功写入都可通过快照和审计回滚。
 - 钉钉 WebView 是独立的嵌入环境，需要单独验证登录、视口和权限。
-- `docs/platform/environment-capabilities.json` 定义各环境必需的变量名、绑定名和表结构；生成模块供 Pages Functions 使用，CI 检查漂移。
+- `docs/platform/environment-capabilities.json` 定义各环境必需的变量名、binding 名和表结构；生成模块供 ECS Functions 使用，CI 检查漂移。
 
 ### 前端发布恢复
 
@@ -64,7 +62,7 @@
 - 应用根节点使用不依赖业务 Provider 的错误边界。未预见的 React 渲染或生命周期异常必须显示安全恢复页；恢复页不得展示原始错误或业务数据，只能刷新，或在用户确认后按白名单清理本机业务缓存再刷新。
 - `_headers` 保持入口 HTML 不缓存；`npm run build` 只在 `dist` 内保留根
   `index.html`、`_headers`、`_redirects` 和 Vite 资源。Cloudflare 仅部署该测试
-  静态产物，不生成 `cloudflare-entry.html`、Pages Functions 路由或根目录发布包。
+  静态产物，不生成旧版兼容入口、Pages Functions 路由或根目录发布包。
 
 ## 未来平台化
 

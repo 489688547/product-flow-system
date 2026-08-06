@@ -168,7 +168,7 @@
 - [ ] 本地线上验证正式/展示切换和真实采集
 - [x] 对两个 D1 应用正确迁移
 - [ ] 运行双 binding readiness
-- [x] 使用 `npm run release:pages` 生成发布包
+- [x] 使用 `npm run build` 生成 `dist/` 静态发布包
 - [ ] 验证 Git deployment 与当前 Wrangler CLI
 - [ ] 完成 Preview、Production 和钉钉 WebView 验收
 - [ ] 首次刷新展示数据库并记录校验摘要

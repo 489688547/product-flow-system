@@ -74,7 +74,7 @@
       "keywords": ["Cloudflare", "Pages", "测试前端", "静态托管"],
       "codePaths": [".github/workflows/deploy-test-static.yml", "scripts/prepare-runtime-build.mjs", "_headers", "_redirects"],
       "envVars": [],
-      "domains": ["test.deshan-tiyes.cn", "deshan-tiyes-system-dev.pages.dev", "pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
+      "domains": ["test.deshan-tiyes.cn", "pages.dev", "api.cloudflare.com", "dash.cloudflare.com"],
       "apiRoutes": [],
       "publicDocs": [
         { "label": "Cloudflare Pages 文档", "url": "https://developers.cloudflare.com/pages/" }

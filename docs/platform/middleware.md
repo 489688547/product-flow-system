@@ -6,7 +6,7 @@
 
 `functions/api/_middleware.js` 处理 OPTIONS、公共认证路径和公司会话读取。受保护接口没有有效会话时返回 401，并把有效会话放入 `context.data.session`。
 
-本地线上账号认证顺序固定为：回环主机，或请求携带与服务端 `LOCAL_ONLINE_REQUEST_SECRET` 匹配的远程开发内部 Header → `LOCAL_ONLINE_ACCOUNT_MODE=1` → 服务端个人令牌存在 → 生产 D1 可用 → 令牌哈希有效 → 按 HTTP 方法具备 `read` 或 `write` → `userId/unionId` 匹配 active executive → 注入完整组织会话。成功会话标记 `loginMode=local-online-account`，随后进入与生产相同的业务路由。一次性传输密钥由启动器生成，不能由浏览器提供，也不配置到 Preview/Production。任一校验失败都返回稳定错误，不回退硬编码身份。
+本地运行时不注入线上账号，不接受个人生产令牌或内部身份 Header。它与线上一样只接受正常钉钉会话，但数据库固定为本地 SQLite 沙箱。固定测试站和生产站各自在 ECS 上完成正常会话认证，前端不得选择数据库 binding 或伪造运行环境。
 
 业务权限判断以明确的 `executive` 角色优先于部门展示字符串。一个人在钉钉中属于多个部门时，组织缓存可能以“部门 A / 部门 B”保存；最高权限账号不能因为该展示字段不是单一“总经办”而被供应链、数据中心或店铺运营 API 拒绝。
 
