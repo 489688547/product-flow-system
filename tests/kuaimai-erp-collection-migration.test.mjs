@@ -30,7 +30,7 @@ test("Kuaimai ERP collection tables stay aligned with the environment capability
   assert.deepEqual(capability.tables, KUAIMAI_ERP_COLLECTION_TABLES);
   assert.deepEqual(capability.envVars, []);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
-  assert.deepEqual(capability.platforms, ["kuaimai", "erp-file-import", "cloudflare-pages", "cloudflare-d1"]);
+  assert.deepEqual(capability.platforms, ["kuaimai", "erp-file-import", "aliyun"]);
   assert.deepEqual(capability.requiredIn, ["preview", "production"]);
   assert.equal(capability.level, "blocking");
   for (const table of KUAIMAI_ERP_COLLECTION_TABLES) {

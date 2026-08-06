@@ -473,6 +473,7 @@ const integrationRegistry = {
         "测试 API",
         "ECS 容器运行时",
         "双 SQLite 持久化",
+        "版本化数据口径与计算结果",
         "D1 导入迁移",
         "OSS 私有备份",
         "对象存储",
@@ -503,6 +504,11 @@ const integrationRegistry = {
       ],
       "codePaths": [
         "functions/**",
+        "functions/api/hr-management/**",
+        "functions/api/platform/_shared/dataStandards.js",
+        "functions/api/platform/v1/data-standards/**",
+        "migrations/0002_hr_management_core.sql",
+        "migrations/0004_data_standards.sql",
         "server.mjs",
         "Dockerfile.aliyun",
         "deploy/aliyun/**",
@@ -529,7 +535,8 @@ const integrationRegistry = {
         "help.aliyun.com"
       ],
       "apiRoutes": [
-        "/api/"
+        "/api/",
+        "/api/platform/v1/data-standards"
       ],
       "publicDocs": [
         {
@@ -544,6 +551,8 @@ const integrationRegistry = {
       "evidence": [
         "docs/features/aliyun-ecs-deployment/prd.md",
         "docs/features/aliyun-ecs-deployment/plan.md",
+        "functions/api/platform/_shared/dataStandards.js",
+        "migrations/0004_data_standards.sql",
         "docs/decisions/2026-07-29-aliyun-ecs-sqlite-transition.md",
         "docs/platform/integrations.md"
       ],

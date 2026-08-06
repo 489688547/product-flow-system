@@ -7,14 +7,14 @@ import { demoTablePolicy } from "../functions/api/platform/_shared/demoDataCatal
 const migrationPath = resolve("migrations/0014_development_backlog.sql");
 const manifestPath = resolve("docs/platform/environment-capabilities.json");
 
-test("development backlog declares control-plane D1 tables skipped from display data", () => {
+test("development backlog declares control-plane SQLite tables skipped from display data", () => {
   assert.equal(existsSync(migrationPath), true, "development backlog migration must exist");
   const sql = readFileSync(migrationPath, "utf8");
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "development-backlog");
 
   assert.ok(capability, "development-backlog capability must exist");
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "lingsuan-ai-gateway"]);
+  assert.deepEqual(capability.platforms, ["aliyun", "lingsuan-ai-gateway"]);
   assert.deepEqual(capability.requiredIn, ["preview", "production"]);
   assert.deepEqual(capability.envVars, []);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);

@@ -464,11 +464,11 @@ git commit -m "ci(deploy): verify aliyun backend and static test frontend"
 - Consumes: verified ECS databases and archived migration hashes.
 - Produces: Cloudflare static-test-only repository rule; local sandbox backend; no remote Worker or D1 execution path.
 
-- [ ] **Step 1: Write the retirement audit**
+- [x] **Step 1: Write the retirement audit**
 
 Reject active old pages.dev backend URLs, remote D1 database IDs, wrangler dev --remote, Cloudflare production rollback, cloudflare-entry, and backend capabilities containing cloudflare-pages or cloudflare-d1. Allow only static test and historical ADR references.
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 ~~~bash
 node --test tests/retired-cloudflare-backend.test.mjs
@@ -476,15 +476,15 @@ node --test tests/retired-cloudflare-backend.test.mjs
 
 Expected: FAIL and list current retired paths.
 
-- [ ] **Step 3: Archive migration evidence and remove proven-retired paths**
+- [x] **Step 3: Archive migration evidence and remove proven-retired paths**
 
 Record final D1 migration hashes and database verification in the feature task and ADR before deleting the export tool. Keep functions/api. Keep Wrangler only with local/ECS configuration containing no remote IDs, account routes or --remote commands.
 
-- [ ] **Step 4: Replace local online workflow**
+- [x] **Step 4: Replace local online workflow**
 
 Make local sandbox the only locally executed backend. Direct shared acceptance to the fixed test URL and production checks to ECS scripts. Remove remote Cloudflare token transport.
 
-- [ ] **Step 5: Run the audit and search**
+- [x] **Step 5: Run the audit and search**
 
 ~~~bash
 node --test tests/retired-cloudflare-backend.test.mjs
@@ -493,7 +493,7 @@ rg -n "deshan-tiyes-system[.]pages[.]dev|cloudflare-entry|wrangler dev --remote|
 
 Expected: audit PASS and no active backend path; only allowlisted static-test references remain.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ~~~bash
 git status --short
@@ -510,7 +510,7 @@ git commit -m "chore(platform): retire cloudflare backend and d1"
 - Consumes: Tasks 1 through 8.
 - Produces: PR codex/aliyun-deployment to dev with required integration and rule writeback declarations.
 
-- [ ] **Step 1: Inspect scope**
+- [x] **Step 1: Inspect scope**
 
 ~~~bash
 git status --short
