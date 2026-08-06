@@ -79,6 +79,32 @@ test("request boundary adds the selected version to writes and invalidates old r
   await assert.rejects(pending, error => error?.code === "DATA_ENVIRONMENT_CHANGED");
 });
 
+test("request boundary routes API traffic to the configured origin and preserves Request bodies", async () => {
+  const { createDataEnvironmentRequestBoundary } = await import(clientPath);
+  const calls = [];
+  const boundary = createDataEnvironmentRequestBoundary({
+    apiOrigin: "https://api-test.deshan-tiyes.cn",
+    pageOrigin: "https://test.deshan-tiyes.cn",
+    fetchImpl: async (input, init = {}) => {
+      calls.push({ input, init });
+      return new Response("{}", { status: 200 });
+    }
+  });
+
+  boundary.activate({ id: "display", version: 9, versionRequired: true });
+  const request = new Request("https://test.deshan-tiyes.cn/api/state", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ready: true })
+  });
+  await boundary.fetch(request);
+
+  assert.equal(calls[0].input.url, "https://api-test.deshan-tiyes.cn/api/state");
+  assert.equal(await calls[0].input.clone().text(), JSON.stringify({ ready: true }));
+  assert.equal(calls[0].init.credentials, "include");
+  assert.equal(new Headers(calls[0].init.headers).get("x-data-environment-version"), "9");
+});
+
 test("business browser caches are isolated and legacy values migrate only to production", async () => {
   const { environmentStorageKey, migrateLegacyProductionCache } = await import(clientPath);
   const values = new Map([["productFlowState", "{\"legacy\":true}"]]);

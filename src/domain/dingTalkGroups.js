@@ -1,12 +1,14 @@
+import { runtimeApiUrl } from "../state/runtimeApiOrigin.js";
+
 export function groupAuthorizationUrl(returnTo = "") {
   const current = returnTo || (typeof window !== "undefined"
     ? `${window.location.pathname}${window.location.search}${window.location.hash}`
     : "/#progress");
-  return `/api/auth/dingtalk/start?returnTo=${encodeURIComponent(current)}`;
+  return runtimeApiUrl(`/api/auth/dingtalk/start?returnTo=${encodeURIComponent(current)}`);
 }
 
 async function jsonRequest(url, fetchImpl = fetch) {
-  const response = await fetchImpl(url, { credentials: "same-origin", headers: { accept: "application/json" } });
+  const response = await fetchImpl(url, { credentials: "include", headers: { accept: "application/json" } });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(body.message || "钉钉群数据读取失败，请稍后重试。");

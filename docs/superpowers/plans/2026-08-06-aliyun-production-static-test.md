@@ -120,7 +120,7 @@ git commit -m "docs(platform): make aliyun the backend source of truth"
 - Consumes: public build value VITE_PFS_API_ORIGIN.
 - Produces: resolveRuntimeApiUrl(input, options) and runtimeApiUrl(path); only same-page paths beginning /api/ are rewritten.
 
-- [ ] **Step 1: Write resolver and fetch-boundary tests**
+- [x] **Step 1: Write resolver and fetch-boundary tests**
 
 ~~~js
 assert.equal(resolveRuntimeApiUrl("/api/auth/session", {
@@ -137,7 +137,7 @@ assert.throws(() => resolveRuntimeApiUrl("/api/x", {
 
 Also assert that the existing boundary rewrites API URLs, sets credentials to include, preserves Request bodies and adds x-data-environment-version to writes.
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 ~~~bash
 node --test react-tests/runtime-api-origin.test.mjs react-tests/data-environment-client.test.mjs react-tests/auth-gate.test.mjs
@@ -145,19 +145,19 @@ node --test react-tests/runtime-api-origin.test.mjs react-tests/data-environment
 
 Expected: FAIL because the resolver does not exist.
 
-- [ ] **Step 3: Implement the pure resolver**
+- [x] **Step 3: Implement the pure resolver**
 
 Accept string, URL and Request inputs. Reject non-HTTPS remote origins, normalize trailing slashes, rewrite only same-page /api/ paths, and leave production same-origin requests untouched.
 
-- [ ] **Step 4: Integrate with the existing global fetch boundary**
+- [x] **Step 4: Integrate with the existing global fetch boundary**
 
 Use credentials include for resolved API requests. Preserve the data-environment abort/version behavior. Use runtimeApiUrl for top-level DingTalk login and group reauthorization navigation. Do not mass-edit all API consumers.
 
-- [ ] **Step 5: Run the Step 2 tests**
+- [x] **Step 5: Run the Step 2 tests**
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ~~~bash
 git add src/state/runtimeApiOrigin.js src/state/dataEnvironmentClient.js src/features/auth/LoginPage.jsx src/domain/dingTalkGroups.js react-tests/runtime-api-origin.test.mjs react-tests/data-environment-client.test.mjs react-tests/auth-gate.test.mjs
