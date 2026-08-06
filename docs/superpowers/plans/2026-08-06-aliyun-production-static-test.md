@@ -353,11 +353,11 @@ git commit -m "feat(deploy): isolate production and test ecs runtimes"
 - Consumes: allowlisted container name, Docker health status and state under /opt/product-flow/health-recovery.
 - Produces: bounded restart and JSON audit fields checkedAt, container, commit, priorHealth, action and result without Secret output.
 
-- [ ] **Step 1: Write policy tests**
+- [x] **Step 1: Write policy tests**
 
 Cover healthy no-op, two consecutive unhealthy checks, one restart per 15 minutes, three failed cycles in one hour fail-closed, and unknown container rejection.
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 ~~~bash
 node --test tests/aliyun-health-recovery.test.mjs
@@ -365,15 +365,15 @@ node --test tests/aliyun-health-recovery.test.mjs
 
 Expected: FAIL because the module does not exist.
 
-- [ ] **Step 3: Implement the pure policy and CLI**
+- [x] **Step 3: Implement the pure policy and CLI**
 
 Call only formatted Docker health inspect, restart of an allowlisted container and a second health check. Never log full inspect output, env or Secret files.
 
-- [ ] **Step 4: Add systemd units**
+- [x] **Step 4: Add systemd units**
 
 Run each minute with NoNewPrivileges, ProtectSystem strict, one writable state directory and 45-second timeout. Check test only when its container exists.
 
-- [ ] **Step 5: Verify**
+- [x] **Step 5: Verify**
 
 ~~~bash
 node --test tests/aliyun-health-recovery.test.mjs
@@ -381,7 +381,7 @@ node --test tests/aliyun-health-recovery.test.mjs
 
 On ECS also run systemd-analyze verify against both unit files. Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ~~~bash
 git add scripts/aliyun/recover-unhealthy-container.mjs deploy/aliyun/product-flow-health-recovery.service deploy/aliyun/product-flow-health-recovery.timer deploy/aliyun/README.md tests/aliyun-health-recovery.test.mjs

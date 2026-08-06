@@ -67,6 +67,22 @@ curl -fsS http://127.0.0.1:8081/api/auth/session >/dev/null || test "$?" = 22
 docker inspect --format '{{.State.Health.Status}}' product-flow-test-api
 ```
 
+## 容器健康恢复
+
+Docker 的 `unless-stopped` 不会因为 healthcheck 变成 `unhealthy` 自动重启。安装
+受限恢复定时器：连续两次异常才重启，15 分钟内最多一次，一小时三次失败后停止
+自动恢复并保留 JSON 审计。
+
+```bash
+install -d -m 700 /opt/product-flow/health-recovery
+install -m 0644 deploy/aliyun/product-flow-health-recovery.service /etc/systemd/system/
+install -m 0644 deploy/aliyun/product-flow-health-recovery.timer /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now product-flow-health-recovery.timer
+systemctl start product-flow-health-recovery.service
+journalctl -u product-flow-health-recovery.service -n 20 --no-pager
+```
+
 ## 域名代理预配置
 
 `deshan-tiyes.cn` 已完成 ICP、HTTPS 和钉钉真实登录验收。测试 API 另用
