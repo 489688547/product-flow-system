@@ -50,7 +50,7 @@
 - `npm run check:environment-capabilities`
 - `npm test`
 - `npm run build`
-- `npm run release:pages`
+- `npm run build`
 - `npm run verify:production -- --require-platform cloudflare-d1 --require-platform cloudflare-pages`
 
 ## 任务顺序

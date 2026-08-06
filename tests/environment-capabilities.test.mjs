@@ -22,11 +22,11 @@ test("environment capability manifest validates platform references and generate
   assert.equal(registryModule, renderGeneratedModule("integrationRegistry", registry));
 });
 
-test("collaboration execution declares its production D1 schema", () => {
+test("collaboration execution declares its Aliyun production schema", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "collaboration-execution");
   assert.ok(capability, "collaboration execution capability must be declared");
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "dingtalk"]);
+  assert.deepEqual(capability.platforms, ["aliyun", "dingtalk"]);
   assert.equal(capability.bindings.includes("PRODUCT_FLOW_DB"), true);
   assert.deepEqual(capability.tables, [
     "collaboration_items",
@@ -36,11 +36,11 @@ test("collaboration execution declares its production D1 schema", () => {
   assert.equal(existsSync(resolve(root, "migrations/0002_collaboration_execution.sql")), true);
 });
 
-test("development backlog declares its control D1 and governed AI boundary", () => {
+test("development backlog declares its Aliyun control database and governed AI boundary", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "development-backlog");
   assert.ok(capability, "development backlog capability must be declared");
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "lingsuan-ai-gateway"]);
+  assert.deepEqual(capability.platforms, ["aliyun", "lingsuan-ai-gateway"]);
   assert.deepEqual(capability.requiredIn, ["preview", "production"]);
   assert.deepEqual(capability.envVars, []);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
@@ -52,7 +52,7 @@ test("platform credential vault declares its root secret migration and affected 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "platform-credential-vault");
   assert.ok(capability, "platform credential vault capability must be declared");
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "dingtalk", "kuaimai", "lingsuan-ai-gateway"]);
+  assert.deepEqual(capability.platforms, ["aliyun", "dingtalk", "kuaimai", "lingsuan-ai-gateway"]);
   assert.deepEqual(capability.requiredIn, ["preview", "production"]);
   assert.deepEqual(capability.envVars, ["PLATFORM_CREDENTIAL_MASTER_KEY"]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
@@ -71,8 +71,6 @@ test("platform credential vault declares its root secret migration and affected 
   const chromeCollection = manifest.capabilities.find(entry => entry.id === "company-web-data-collection");
   assert.deepEqual(chromeCollection.requiredIn, ["preview", "production"]);
   assert.deepEqual(chromeCollection.platforms, [
-    "cloudflare-pages",
-    "cloudflare-d1",
     "aliyun",
     "kuaimai",
     "douyin-ecommerce",
@@ -89,13 +87,22 @@ test("platform credential vault declares its root secret migration and affected 
   assert.equal(kuaimaiRegistry.codePaths.includes("functions/api/platform/v1/data-services/sales-repair.js"), true);
 });
 
-test("Pages declares explicit local Preview and Production D1 environment parity", () => {
-  const wrangler = readFileSync(resolve(root, "wrangler.toml"), "utf8");
-  assert.match(wrangler, /\[\[d1_databases\]\]/);
-  assert.match(wrangler, /\[\[env\.preview\.d1_databases\]\]/);
-  assert.match(wrangler, /\[\[env\.production\.d1_databases\]\]/);
-  assert.doesNotMatch(wrangler, /\[.*secrets\]/, "Pages rejects Wrangler secret sections");
-  assert.equal(existsSync(resolve(root, "scripts/check-pages-environment-parity.mjs")), true);
+test("Aliyun declares production, test API, and static test frontend separately", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const production = manifest.capabilities.find(entry => entry.id === "aliyun-ecs-production");
+  const testApi = manifest.capabilities.find(entry => entry.id === "aliyun-ecs-test-api");
+  const staticTest = manifest.capabilities.find(entry => entry.id === "cloudflare-pages-static-test");
+
+  assert.deepEqual(production.requiredIn, ["production"]);
+  assert.deepEqual(production.platforms, ["aliyun", "dingtalk"]);
+  assert.deepEqual(testApi.requiredIn, ["preview"]);
+  assert.deepEqual(testApi.platforms, ["aliyun", "dingtalk"]);
+  assert.equal(testApi.envVars.includes("PFS_PUBLIC_APP_ORIGIN"), true);
+  assert.equal(testApi.envVars.includes("PFS_ALLOWED_BROWSER_ORIGIN"), true);
+  assert.deepEqual(staticTest.requiredIn, ["preview"]);
+  assert.deepEqual(staticTest.platforms, ["cloudflare-pages"]);
+  assert.deepEqual(staticTest.bindings, []);
+  assert.deepEqual(staticTest.tables, []);
 });
 
 test("display data environment declares separate control and business D1 requirements", () => {
@@ -122,7 +129,7 @@ test("company AI declares one governed capability without the retired OpenAI rev
   const capability = manifest.capabilities.find(entry => entry.id === "company-ai-assistant");
   assert.ok(capability, "company AI capability must be declared");
   assert.equal(capability.name, "公司统一 AI");
-  assert.deepEqual(capability.platforms, ["lingsuan-ai-gateway", "cloudflare-pages", "cloudflare-d1"]);
+  assert.deepEqual(capability.platforms, ["lingsuan-ai-gateway", "aliyun"]);
   assert.deepEqual(capability.envVars, ["AI_ASSISTANT_ENABLED", "LINGSUAN_API_KEY", "LINGSUAN_ACTOR_AUTHORIZATION"]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
   assert.deepEqual(capability.tables, [
@@ -140,11 +147,11 @@ test("company AI declares one governed capability without the retired OpenAI rev
   assert.equal(JSON.stringify(manifest).includes("OPENAI_MODEL"), false);
 });
 
-test("goods flow declares its production D1 schema without claiming Kuaimai inventory", () => {
+test("goods flow declares its Aliyun production schema without claiming Kuaimai inventory", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "goods-flow-core");
   assert.ok(capability, "goods flow capability must be declared");
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1", "dingtalk", "kuaimai", "erp-file-import"]);
+  assert.deepEqual(capability.platforms, ["aliyun", "dingtalk", "kuaimai", "erp-file-import"]);
   assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
   assert.deepEqual(capability.tables, [
     "goods_flow_events",
@@ -170,7 +177,7 @@ test("goods flow declares its production D1 schema without claiming Kuaimai inve
 test("environment capability validation rejects secret values and unknown platforms", async () => {
   assert.equal(existsSync(generatorPath), true, "platform manifest generator must exist");
   const { validateEnvironmentCapabilities } = await import(generatorPath);
-  const registry = { platforms: [{ id: "cloudflare-pages" }] };
+  const registry = { platforms: [{ id: "aliyun" }] };
   const invalid = {
     schemaVersion: 1,
     updatedAt: "2026-07-18",
@@ -197,9 +204,7 @@ test("Douyin Compass collection declares Ego and Aliyun SQLite without a new sec
   assert.deepEqual(capability.platforms, [
     "douyin-ecommerce",
     "erp-file-import",
-    "aliyun",
-    "cloudflare-pages",
-    "cloudflare-d1"
+    "aliyun"
   ]);
   assert.deepEqual(capability.requiredIn, []);
   assert.deepEqual(capability.envVars, []);
@@ -227,5 +232,5 @@ test("Douyin Compass collection declares Ego and Aliyun SQLite without a new sec
   assert.match(capability.description, /账号密码登录保持退役/);
   assert.match(capability.description, /Ego Task Space/);
   assert.match(capability.description, /阿里云.*SQLite/);
-  assert.match(capability.description, /Cloudflare D1.*不接收 Ego/);
+  assert.doesNotMatch(capability.description, /Cloudflare D1/);
 });

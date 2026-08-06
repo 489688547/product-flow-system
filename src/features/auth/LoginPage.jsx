@@ -1,8 +1,9 @@
 import { ArrowRight, Building2, RefreshCw } from "lucide-react";
+import { runtimeApiUrl } from "../../state/runtimeApiOrigin.js";
 
 export function LoginPage({ error = "", onRetry }) {
   function startDingTalkLogin() {
-    window.location.assign("/api/auth/dingtalk/start");
+    window.location.assign(runtimeApiUrl("/api/auth/dingtalk/start"));
   }
 
   return (

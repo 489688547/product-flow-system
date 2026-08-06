@@ -40,8 +40,6 @@ test("web collection environment capability names the shared MV3 and Ego boundar
     "WEB_COLLECTION_EXPERIMENTAL_MODE"
   ]);
   assert.deepEqual(capability.platforms, [
-    "cloudflare-pages",
-    "cloudflare-d1",
     "aliyun",
     "kuaimai",
     "douyin-ecommerce",

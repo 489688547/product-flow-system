@@ -24,7 +24,7 @@ test("user insight tables stay aligned with the environment capability", () => {
   const capability = environment.capabilities.find(item => item.id === "user-insights-browser-collection");
   assert.ok(capability, "user-insights-browser-collection capability must exist");
   assert.deepEqual(capability.tables, USER_INSIGHT_TABLES);
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1"]);
+  assert.deepEqual(capability.platforms, ["aliyun"]);
   assert.deepEqual(capability.requiredIn, ["preview", "production"]);
   assert.equal(capability.level, "blocking");
   for (const table of USER_INSIGHT_TABLES) {

@@ -6,14 +6,12 @@ const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 export function detectRuntimeEnvironment(env = {}, requestUrl = "") {
   if (["development", "preview", "production"].includes(env.RUNTIME_ENV)) return env.RUNTIME_ENV;
-  if (env.CF_PAGES_BRANCH) return env.CF_PAGES_BRANCH === "main" ? "production" : "preview";
   try {
     const hostname = new URL(requestUrl).hostname;
     if (LOCAL_HOSTS.has(hostname)) return "development";
-    if (hostname === "deshan-tiyes-system.pages.dev") return "production";
-    if (hostname === "deshan-tiyes-system-dev.pages.dev") return "preview";
-    if (hostname.endsWith(".deshan-tiyes-system.pages.dev")) return "preview";
-    if (hostname.endsWith(".deshan-tiyes-system-dev.pages.dev")) return "preview";
+    if (hostname === "api-test.deshan-tiyes.cn") return "preview";
+    if (hostname === "test.deshan-tiyes.cn") return "preview";
+    if (hostname === "deshan-tiyes.cn" || hostname === "www.deshan-tiyes.cn") return "production";
   } catch {
     // Invalid or absent request URL falls back to production-safe checks.
   }

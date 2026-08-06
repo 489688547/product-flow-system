@@ -107,27 +107,27 @@ async function loadRoute() {
 }
 
 function request() {
-  return new Request("https://product-flow-system.pages.dev/api/platform/v1/environment-readiness");
+  return new Request("https://deshan-tiyes.cn/api/platform/v1/environment-readiness");
 }
 
-test("fixed Pages hosts resolve to their governed runtime environments", async () => {
+test("fixed Aliyun hosts resolve to their governed runtime environments", async () => {
   const { detectRuntimeEnvironment } = await import(
     resolve("functions/api/platform/_shared/environmentReadiness.js")
   );
   assert.equal(
-    detectRuntimeEnvironment({}, "https://deshan-tiyes-system.pages.dev/api/platform/v1/environment-readiness"),
+    detectRuntimeEnvironment({}, "https://deshan-tiyes.cn/api/platform/v1/environment-readiness"),
     "production"
   );
   assert.equal(
-    detectRuntimeEnvironment({}, "https://deshan-tiyes-system-dev.pages.dev/api/platform/v1/environment-readiness"),
+    detectRuntimeEnvironment({}, "https://api-test.deshan-tiyes.cn/api/platform/v1/environment-readiness"),
     "preview"
   );
   assert.equal(
-    detectRuntimeEnvironment({}, "https://abc123.deshan-tiyes-system.pages.dev/api/platform/v1/environment-readiness"),
+    detectRuntimeEnvironment({}, "https://test.deshan-tiyes.cn/api/platform/v1/environment-readiness"),
     "preview"
   );
   assert.equal(
-    detectRuntimeEnvironment({}, "https://retired.product-flow-system.pages.dev/api/platform/v1/environment-readiness"),
+    detectRuntimeEnvironment({}, "https://unknown.example.com/api/platform/v1/environment-readiness"),
     "production"
   );
 });

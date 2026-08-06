@@ -37,7 +37,8 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 - 网页采集同时支持 `formal` 与 `experimental`。未带模板 ID 的现有快麦/抖店任务继续走代码登记的
   正式 Provider 适配器；实验模式必须由服务端 `COLLECTOR_EXPERIMENTAL_MODE=1` 和公司 Mac
-  `WEB_COLLECTION_EXPERIMENTAL_MODE=1` 双重显式开启，任一关闭都不得领取实验运行。
+  `WEB_COLLECTION_EXPERIMENTAL_MODE=1` 双重显式开启，任一关闭都不得领取实验运行。阿里云生产与
+  测试运行时示例必须把两项都显式设为 `0`，启用实验采集需作为独立变更评审和发布。
 - Pages 的 Preview 与 Production 必须显式配置这两个变量，初始值固定为 `0`；变量或控制表首次
   配置后必须通过对应 Git 分支重新构建固定站点，并以 readiness 复核变量存在、迁移完成且模式仍关闭。
 - 实验模板允许页面 JavaScript、本机 Python、系统命令、条件、循环、变量、下载和解析，但仅限
@@ -98,7 +99,7 @@ ERP adapter 可以选择服务端 API、浏览器页面、文件导出或 NAS �
 
 ## 当前范围
 
-抖店 Ego runtime、Task Space 隔离、受控下载、本地归档解析和阿里云 fail-closed 闸门已完成本地
-实现；因 `deshan-tiyes.cn` 的 ICP/HTTPS 尚未完成，正式 ECS/SQLite 回传与最新业务日单任务仍未
-验收，状态保持 `integrating`。当前生产采集器仍为旧 `dedicated`/Cloudflare 配置，不能据此宣称新
-链路已上线。快麦继续使用现有 MV3 官方导出与本机处理链路；其他平台以各自生产证据为准。
+抖店 Ego runtime、Task Space 隔离、受控下载、本地归档解析和阿里云 fail-closed 闸门已完成实现。
+采集器只允许指向 `https://deshan-tiyes.cn` 或登记的 ECS 测试 API；旧 Cloudflare API 目标已退休。
+最新业务日单任务仍需按采集器的创建、完成、下载、解析、映射和落库阶段逐项验收。快麦继续使用
+现有 MV3 官方导出与本机处理链路；其他平台以各自生产证据为准。

@@ -400,14 +400,11 @@ test("environment and integration manifests declare versioned data-standard pers
   ]) {
     assert.ok(capability.tables.includes(table), `${table} must be required by business-data-apps`);
   }
-  const d1 = registry.platforms.find(item => item.id === "cloudflare-d1");
-  const pages = registry.platforms.find(item => item.id === "cloudflare-pages");
-  assert.ok(d1.capabilities.includes("版本化数据口径与计算结果"));
-  for (const platform of [d1, pages]) {
-    assert.ok(platform.apiRoutes.includes("/api/platform/v1/data-standards"));
-    assert.ok(platform.codePaths.some(path => path.includes("dataStandards") || path.includes("data-standards")));
-    assert.ok(platform.evidence.some(path => path.includes("dataStandards") || path.includes("0004_data_standards")));
-  }
+  const aliyun = registry.platforms.find(item => item.id === "aliyun");
+  assert.ok(aliyun.capabilities.includes("版本化数据口径与计算结果"));
+  assert.ok(aliyun.apiRoutes.includes("/api/platform/v1/data-standards"));
+  assert.ok(aliyun.codePaths.some(path => path.includes("dataStandards") || path.includes("data-standards")));
+  assert.ok(aliyun.evidence.some(path => path.includes("dataStandards") || path.includes("0004_data_standards")));
 });
 
 test("the default API test command includes data-standard storage and route regressions", () => {

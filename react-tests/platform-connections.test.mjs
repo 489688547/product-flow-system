@@ -130,7 +130,7 @@ test("environment blockers link to the matching data access category", () => {
 
 test("durable platform sources register the shared API and provider boundaries", () => {
   const registry = JSON.parse(read("docs/platform/integration-registry.json"));
-  for (const platformId of ["dingtalk", "kuaimai", "cloudflare-pages", "cloudflare-d1"]) {
+  for (const platformId of ["dingtalk", "kuaimai"]) {
     const platform = registry.platforms.find(item => item.id === platformId);
     assert.ok(platform, `${platformId} must stay registered`);
     assert.equal(platform.apiRoutes.includes("/api/platform/v1/platform-connections"), true);

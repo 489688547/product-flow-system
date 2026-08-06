@@ -11,7 +11,6 @@ import { activeNavigationGroup, groupSidebarNavigation } from "./domain/sidebarN
 import { parseTaskTodoDeepLink } from "./domain/taskTodo.js";
 import { AiAssistantTrigger } from "./features/ai-assistant/AiAssistantTrigger.jsx";
 import { AiAssistantPanel } from "./features/ai-assistant/AiAssistantPanel.jsx";
-import { LocalOnlineEnvironmentBanner } from "./ui/LocalOnlineEnvironmentBanner.jsx";
 import { WorkspaceNavigation } from "./ui/WorkspaceNavigation.jsx";
 
 const lazyNamed = (loader, exportName) => lazy(async () => {
@@ -333,7 +332,6 @@ export default function App() {
             ) : null}
           </div>
         </header>
-        <LocalOnlineEnvironmentBanner sessionUser={sessionUser} />
         <Suspense fallback={<section className="page"><div className="section-panel empty-state">正在加载页面…</div></section>}>
           {supplySection ? <SupplyChainAppPage section={supplySection} /> : dataSection ? <DataCenterAppPage section={dataSection} dataAccessCategory={dataSection === "sources" ? routeDetail : ""} syncFocus={dataSection === "sync" ? routeDetail : ""} /> : operationsSection ? <EcommerceOperationsAppPage section={operationsSection} /> : performanceSection ? <PerformanceManagementAppPage section={performanceSection} /> : pages[activeScreen]}
         </Suspense>

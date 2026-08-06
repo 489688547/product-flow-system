@@ -207,4 +207,4 @@ Content-Type: application/json
 - `migrations/0014_development_backlog.sql` 只新增两张控制表和索引。
 - 列表分页，详情单独读取事件；索引覆盖状态/优先级、模块/状态、负责人/状态和事项事件时间。
 - 回滚页面和 API 时保留表和事件，不自动删除公司内部路线图。
-- 生产通过 GitHub `main` 的 Cloudflare GitOps 部署；Preview 和 Production 分别验证。
+- 生产通过 GitHub `main` 的 ECS GitOps 部署；固定测试站和 ECS Production 分别验证。

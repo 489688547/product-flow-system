@@ -19,11 +19,7 @@ function oauthFailureMessage(text, status) {
 }
 
 function transientOauthFailure(response, text) {
-  return [502, 503, 504].includes(response.status)
-    || (
-      response.status === 500
-      && /Worker exceeded resource limits|Error code:\s*1102/i.test(text)
-    );
+  return [502, 503, 504].includes(response.status) || /temporarily unavailable/i.test(text);
 }
 
 async function readOauthBootstrap(url, fetchImpl) {
@@ -39,7 +35,12 @@ async function readOauthBootstrap(url, fetchImpl) {
   }
   const payload = JSON.parse(text);
   const authorize = new URL(payload.authorizeUrl || "");
-  if (payload.ready !== true || authorize.origin !== "https://login.dingtalk.com") {
+  const callback = new URL(authorize.searchParams.get("redirect_uri") || "https://invalid.local");
+  if (
+    payload.ready !== true
+    || authorize.origin !== "https://login.dingtalk.com"
+    || callback.origin !== new URL(url).origin
+  ) {
     throw new Error("钉钉 OAuth bootstrap 未返回有效授权地址。");
   }
   return payload;
@@ -65,19 +66,6 @@ async function checkDingTalkOauth({
   concurrency = 20,
   retryDelays = [0, 250, 750, 1500]
 }) {
-  const entry = await fetchImpl(`${url}/api/auth/dingtalk/start`, {
-    headers: { accept: "text/html" },
-    cache: "no-store"
-  });
-  const entryText = await entry.text();
-  if (
-    !entry.ok
-    || !String(entry.headers.get("content-type") || "").includes("text/html")
-    || /Worker exceeded resource limits|Error code:\s*1102/i.test(entryText)
-  ) {
-    throw new Error(`钉钉 OAuth 静态入口未就绪（HTTP ${entry.status}）。`);
-  }
-
   await readOauthBootstrapWithRetry(url, fetchImpl, retryDelays);
 
   const count = Math.max(1, Math.min(50, Number(concurrency) || 20));
@@ -87,7 +75,7 @@ async function checkDingTalkOauth({
       () => readOauthBootstrapWithRetry(url, fetchImpl, retryDelays)
     )
   );
-  return { entryStatus: entry.status, bootstrapConcurrency: count };
+  return { bootstrapConcurrency: count, callbackOrigin: new URL(url).origin };
 }
 
 export async function checkDeployedReadiness({
@@ -95,21 +83,25 @@ export async function checkDeployedReadiness({
   accessToken,
   requiredPlatforms = [],
   fetchImpl = fetch,
-  oauthConcurrency = 20
+  oauthConcurrency = 20,
+  expectedEnvironment = ""
 } = {}) {
   const url = normalizeUrl(baseUrl);
   const token = String(accessToken || "").trim();
-  if (!url) throw new Error("缺少生产部署 URL。");
-  if (!token) throw new Error("缺少 PRODUCTION_DATA_ACCESS_TOKEN，无法执行受控生产检查。");
+  if (!url) throw new Error("缺少部署 API URL。");
+  if (!token) throw new Error("缺少 PRODUCTION_DATA_ACCESS_TOKEN，无法执行受控部署检查。");
   const response = await fetchImpl(`${url}/api/platform/v1/environment-readiness`, {
     headers: { authorization: `Bearer ${token}` }
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(payload.message || `生产环境检查失败（HTTP ${response.status}）。`);
+  if (!response.ok) throw new Error(payload.message || `部署环境检查失败（HTTP ${response.status}）。`);
+  if (expectedEnvironment && payload.environment !== expectedEnvironment) {
+    throw new Error(`部署环境不一致：预期 ${expectedEnvironment}，实际 ${payload.environment || "missing"}。`);
+  }
   const blocking = (payload.capabilities || []).filter(capability => capability.status === "blocked");
   if (!payload.ready || blocking.length) {
     const missing = [...new Set(blocking.flatMap(capability => capability.missing || []))];
-    throw new Error(`生产环境未就绪：${missing.join("、") || "存在未说明的阻断项"}`);
+    throw new Error(`部署环境未就绪：${missing.join("、") || "存在未说明的阻断项"}`);
   }
   const required = new Set(requiredPlatforms.map(value => String(value || "").trim().toLowerCase()).filter(Boolean));
   const affectedWarnings = (payload.capabilities || []).filter(capability =>
@@ -149,11 +141,12 @@ function argumentsList(name) {
 
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   checkDeployedReadiness({
-    baseUrl: argument("--url") || "https://deshan-tiyes-system.pages.dev",
+    baseUrl: argument("--url") || "https://deshan-tiyes.cn",
     accessToken: process.env.PRODUCTION_DATA_ACCESS_TOKEN,
-    requiredPlatforms: argumentsList("--require-platform")
+    requiredPlatforms: argumentsList("--require-platform"),
+    expectedEnvironment: argument("--expect-environment")
   }).then(payload => {
-    process.stdout.write(`生产环境就绪：${payload.checkedAt || new Date().toISOString()}\n`);
+    process.stdout.write(`部署环境就绪：${payload.checkedAt || new Date().toISOString()}\n`);
   }).catch(error => {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

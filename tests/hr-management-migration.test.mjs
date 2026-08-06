@@ -27,7 +27,7 @@ test("HR core tables stay aligned across migration and environment manifest", ()
 
   assert.ok(capability, "hr-management-core environment capability must exist");
   assert.deepEqual(capability.tables, HR_TABLES);
-  assert.deepEqual(capability.platforms, ["cloudflare-pages", "cloudflare-d1"]);
+  assert.deepEqual(capability.platforms, ["aliyun"]);
   assert.deepEqual(capability.requiredIn, ["preview", "production"]);
   assert.equal(capability.level, "blocking");
 
@@ -38,11 +38,11 @@ test("HR core tables stay aligned across migration and environment manifest", ()
 
 test("integration registry routes HR storage without claiming DingTalk attendance", () => {
   const registry = JSON.parse(readFileSync(registryPath, "utf8"));
-  const d1 = registry.platforms.find(item => item.id === "cloudflare-d1");
+  const aliyun = registry.platforms.find(item => item.id === "aliyun");
   const dingtalk = registry.platforms.find(item => item.id === "dingtalk");
 
-  assert.ok(d1.codePaths.includes("functions/api/hr-management/**"));
-  assert.ok(d1.codePaths.includes("migrations/0002_hr_management_core.sql"));
+  assert.ok(aliyun.codePaths.includes("functions/api/hr-management/**"));
+  assert.ok(aliyun.codePaths.includes("migrations/0002_hr_management_core.sql"));
   assert.doesNotMatch(dingtalk.capabilities.join(" "), /考勤|请假|加班/);
   assert.match(dingtalk.capabilities.join(" "), /采购与付款审批同步/);
 });

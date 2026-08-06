@@ -22,19 +22,45 @@ async function readJson(response) {
   return response.json().catch(() => ({}));
 }
 
+async function checkCredentialedCors({ apiUrl, browserOrigin, fetchImpl }) {
+  if (!browserOrigin) return null;
+  const response = await fetchImpl(`${apiUrl}/api/auth/session`, {
+    method: "OPTIONS",
+    headers: {
+      origin: browserOrigin,
+      "access-control-request-method": "GET",
+      "access-control-request-headers": "content-type"
+    }
+  });
+  if (
+    response.status !== 204
+    || response.headers.get("access-control-allow-origin") !== browserOrigin
+    || response.headers.get("access-control-allow-credentials") !== "true"
+  ) {
+    throw new Error(`测试 API CORS 未就绪（HTTP ${response.status}）。`);
+  }
+  return { origin: browserOrigin, status: response.status };
+}
+
 export async function checkDeployedSmoke({
   baseUrl,
+  apiBaseUrl = baseUrl,
   expectedCommit,
   accessToken,
   requiredPlatforms = [],
+  expectedEnvironment = "",
+  allowedBrowserOrigin = "",
+  forbidServerEnvDev = false,
+  oauthConcurrency = 20,
   fetchImpl = fetch
 } = {}) {
   const url = normalizeUrl(baseUrl);
+  const apiUrl = normalizeUrl(apiBaseUrl);
   const commit = String(expectedCommit || "").trim().toLowerCase();
-  if (!url) throw new Error("缺少固定站点 URL。");
+  if (!url || !apiUrl) throw new Error("缺少固定站点或 API URL。");
   if (!/^[0-9a-f]{7,40}$/i.test(commit)) throw new Error("缺少有效的预期 commit。");
 
-  const entry = await fetchImpl(`${url}/cloudflare-entry.html`, {
+  const entry = await fetchImpl(`${url}/`, {
     headers: { accept: "text/html" },
     cache: "no-store"
   });
@@ -43,52 +69,17 @@ export async function checkDeployedSmoke({
   if (!entry.ok || !deployedCommit || !sameCommit(deployedCommit, commit)) {
     throw new Error(`固定站点 commit 不一致：预期 ${commit.slice(0, 12)}，实际 ${deployedCommit.slice(0, 12) || "missing"}。`);
   }
+  if (forbidServerEnvDev && String(entry.headers.get("x-server-env") || "").toLowerCase() === "dev") {
+    throw new Error("生产入口仍报告 x-server-env: dev。");
+  }
 
-  const oauthEntry = await fetchImpl(`${url}/api/auth/dingtalk/start`, {
-    headers: { accept: "text/html" },
-    cache: "no-store",
-    redirect: "manual"
+  const cors = await checkCredentialedCors({
+    apiUrl,
+    browserOrigin: normalizeUrl(allowedBrowserOrigin),
+    fetchImpl
   });
-  const oauthEntryStatus = oauthEntry.status;
-  let oauthStatic = oauthEntry;
-  if ([301, 302, 307, 308].includes(oauthEntryStatus)) {
-    const redirectUrl = new URL(oauthEntry.headers.get("location") || "", `${url}/`);
-    if (redirectUrl.origin !== new URL(url).origin || redirectUrl.pathname !== "/auth/dingtalk-start") {
-      throw new Error("钉钉 OAuth 入口没有跳转到固定站点的同源静态页面。");
-    }
-    oauthStatic = await fetchImpl(redirectUrl.href, {
-      headers: { accept: "text/html" },
-      cache: "no-store",
-      redirect: "manual"
-    });
-  }
-  const oauthHtml = await oauthStatic.text();
-  if (
-    !oauthStatic.ok
-    || !String(oauthStatic.headers.get("content-type") || "").includes("text/html")
-    || !/data-oauth-status|runDingTalkOAuthStart/.test(oauthHtml)
-  ) {
-    throw new Error(`钉钉 OAuth 静态入口未就绪（HTTP ${oauthStatic.status}）。`);
-  }
-
-  const bootstrap = await fetchImpl(`${url}/api/auth/dingtalk/bootstrap`, {
-    headers: { accept: "application/json" },
-    cache: "no-store"
-  });
-  const bootstrapBody = await readJson(bootstrap);
-  const authorize = new URL(bootstrapBody.authorizeUrl || "https://invalid.local");
-  const callback = new URL(authorize.searchParams.get("redirect_uri") || "https://invalid.local");
-  if (
-    !bootstrap.ok
-    || bootstrapBody.ready !== true
-    || authorize.origin !== "https://login.dingtalk.com"
-    || callback.origin !== new URL(url).origin
-  ) {
-    throw new Error("钉钉 OAuth callback Origin 与固定站点不一致。");
-  }
-
-  const session = await fetchImpl(`${url}/api/auth/session`, {
-    headers: { accept: "application/json" },
+  const session = await fetchImpl(`${apiUrl}/api/auth/session`, {
+    headers: { accept: "application/json", ...(allowedBrowserOrigin ? { origin: allowedBrowserOrigin } : {}) },
     cache: "no-store"
   });
   const sessionBody = await readJson(session);
@@ -100,21 +91,20 @@ export async function checkDeployedSmoke({
   }
 
   const readiness = await checkDeployedReadiness({
-    baseUrl: url,
+    baseUrl: apiUrl,
     accessToken,
     requiredPlatforms,
+    expectedEnvironment,
+    oauthConcurrency,
     fetchImpl
   });
   return {
     baseUrl: url,
+    apiBaseUrl: apiUrl,
     commit: deployedCommit,
     checkedAt: new Date().toISOString(),
-    oauth: {
-      entryStatus: oauthEntryStatus,
-      staticStatus: oauthStatic.status,
-      callbackOrigin: callback.origin
-    },
     sessionAuthenticated: sessionBody.authenticated,
+    cors,
     readiness
   };
 }
@@ -131,11 +121,15 @@ function listArgument(name) {
 if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.meta.url) {
   checkDeployedSmoke({
     baseUrl: argument("--url"),
+    apiBaseUrl: argument("--api-url") || argument("--url"),
     expectedCommit: argument("--commit") || process.env.GITHUB_SHA || process.env.CF_PAGES_COMMIT_SHA,
     accessToken: process.env.PRODUCTION_DATA_ACCESS_TOKEN,
-    requiredPlatforms: listArgument("--require-platform")
+    requiredPlatforms: listArgument("--require-platform"),
+    expectedEnvironment: argument("--expect-environment"),
+    allowedBrowserOrigin: argument("--allowed-browser-origin"),
+    forbidServerEnvDev: process.argv.includes("--forbid-server-env-dev")
   }).then(result => {
-    process.stdout.write(`固定站点冒烟通过：${result.baseUrl} @ ${result.commit.slice(0, 12)}\n`);
+    process.stdout.write(`固定站点冒烟通过：${result.baseUrl} -> ${result.apiBaseUrl} @ ${result.commit.slice(0, 12)}\n`);
   }).catch(error => {
     process.stderr.write(`${error.message}\n`);
     process.exitCode = 1;

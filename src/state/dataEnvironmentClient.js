@@ -1,3 +1,5 @@
+import { resolveRuntimeApiUrl } from "./runtimeApiOrigin.js";
+
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const DEFAULT_ENVIRONMENT = Object.freeze({
   id: "production",
@@ -32,7 +34,7 @@ function requestHeaders(input, init) {
   return headers;
 }
 
-export function createDataEnvironmentRequestBoundary({ fetchImpl }) {
+export function createDataEnvironmentRequestBoundary({ fetchImpl, apiOrigin, pageOrigin }) {
   if (typeof fetchImpl !== "function") throw new TypeError("fetchImpl is required");
   let selection = DEFAULT_ENVIRONMENT;
   let generation = 0;
@@ -62,11 +64,17 @@ export function createDataEnvironmentRequestBoundary({ fetchImpl }) {
       headers.set("x-data-environment-version", String(selection.version));
     }
 
+    const resolvedUrl = resolveRuntimeApiUrl(input, { apiOrigin, pageOrigin });
+    const resolvedInput = typeof Request !== "undefined" && input instanceof Request && resolvedUrl !== input.url
+      ? new Request(resolvedUrl, input)
+      : resolvedUrl === (input instanceof URL ? input.href : String(input)) ? input : resolvedUrl;
+
     try {
-      const response = await fetchImpl(input, {
+      const response = await fetchImpl(resolvedInput, {
         ...init,
         method,
         headers,
+        credentials: "include",
         signal: controller.signal
       });
       if (requestGeneration !== generation) throw changedError();

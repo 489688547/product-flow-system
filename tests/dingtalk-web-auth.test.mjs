@@ -19,7 +19,6 @@ import { onRequest as embeddedLogin } from "../functions/api/auth/dingtalk/embed
 import { onRequest as legacyEmbeddedLogin } from "../functions/api/dingtalk/login.js";
 import { onRequest as getCurrentSession } from "../functions/api/auth/session.js";
 import { onRequest as logout } from "../functions/api/auth/logout.js";
-import { hashSecret } from "../functions/api/platform/_shared/productionDataAccess.js";
 
 const identity = {
   corpId: "ding-company",
@@ -75,15 +74,19 @@ test("logout revokes a server session without exposing the raw token", async () 
 
 test("browser login start redirects to DingTalk with a protected callback state", async () => {
   const response = await startBrowserLogin({
-    request: new Request("https://flow.example.com/api/auth/dingtalk/start"),
-    env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
+    request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/start"),
+    env: {
+      DINGTALK_APP_KEY: "app-key",
+      DINGTALK_APP_SECRET: "app-secret",
+      PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn"
+    }
   });
 
   assert.equal(response.status, 302);
   const location = new URL(response.headers.get("location"));
   assert.equal(location.origin, "https://login.dingtalk.com");
   assert.equal(location.searchParams.get("client_id"), "app-key");
-  assert.equal(location.searchParams.get("redirect_uri"), "https://flow.example.com/api/auth/dingtalk/callback");
+  assert.equal(location.searchParams.get("redirect_uri"), "https://api-test.deshan-tiyes.cn/api/auth/dingtalk/callback");
   assert.ok(location.searchParams.get("state"));
   assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
   assert.match(response.headers.get("set-cookie"), /HttpOnly/);
@@ -147,46 +150,6 @@ test("retired Pages previews no longer redirect to a deleted fixed project", asy
   assert.match(response.headers.get("set-cookie"), /pfs_oauth_state=/);
 });
 
-test("the fixed production and development sites keep DingTalk callbacks on their own origin", async () => {
-  for (const origin of [
-    "https://deshan-tiyes-system.pages.dev",
-    "https://deshan-tiyes-system-dev.pages.dev"
-  ]) {
-    const response = await bootstrapBrowserLogin({
-      request: new Request(`${origin}/api/auth/dingtalk/bootstrap`),
-      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
-    });
-    const payload = await response.json();
-    assert.equal(response.status, 200);
-    assert.equal(
-      new URL(payload.authorizeUrl).searchParams.get("redirect_uri"),
-      `${origin}/api/auth/dingtalk/callback`
-    );
-  }
-});
-
-test("branch preview deployments redirect to the matching fixed Pages project", async () => {
-  const cases = [
-    [
-      "https://abc123.deshan-tiyes-system.pages.dev/api/auth/dingtalk/start",
-      "https://deshan-tiyes-system.pages.dev/api/auth/dingtalk/start"
-    ],
-    [
-      "https://abc123.deshan-tiyes-system-dev.pages.dev/api/auth/dingtalk/start",
-      "https://deshan-tiyes-system-dev.pages.dev/api/auth/dingtalk/start"
-    ]
-  ];
-  for (const [requestUrl, expectedLocation] of cases) {
-    const response = await startBrowserLogin({
-      request: new Request(requestUrl),
-      env: { DINGTALK_APP_KEY: "app-key", DINGTALK_APP_SECRET: "app-secret" }
-    });
-    assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), expectedLocation);
-    assert.equal(response.headers.get("set-cookie"), null);
-  }
-});
-
 test("group authorization remembers only a safe same-origin return path", async () => {
   const response = await startBrowserLogin({
     request: new Request("https://flow.example.com/api/auth/dingtalk/start?returnTo=%2F%3FproductId%3Dp1%23progress"),
@@ -217,6 +180,20 @@ test("browser OAuth callback rejects a mismatched state", async () => {
 
   assert.equal(response.status, 400);
   assert.match(body.message, /登录校验已失效/);
+});
+
+test("browser OAuth callback rejects an invalid configured public app origin", async () => {
+  const response = await finishBrowserLogin({
+    request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/callback?code=auth-code&state=expected", {
+      headers: { cookie: "pfs_oauth_state=expected" }
+    }),
+    env: {
+      PRODUCT_FLOW_DB: createAuthD1Mock(),
+      PFS_PUBLIC_APP_ORIGIN: "http://test.deshan-tiyes.cn"
+    }
+  });
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).error.code, "BROWSER_ORIGIN_INVALID");
 });
 
 test("browser OAuth callback creates a server session for an enterprise employee", async () => {
@@ -258,19 +235,20 @@ test("browser OAuth callback creates a server session for an enterprise employee
 
   try {
     const response = await finishBrowserLogin({
-      request: new Request("https://flow.example.com/api/auth/dingtalk/callback?code=auth-code&state=expected", {
+      request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/callback?code=auth-code&state=expected", {
         headers: { cookie: "pfs_oauth_state=expected" }
       }),
       env: {
         PRODUCT_FLOW_DB: db,
         DINGTALK_APP_KEY: "app-key",
         DINGTALK_APP_SECRET: "app-secret",
-        DINGTALK_CORP_ID: "ding-company"
+        DINGTALK_CORP_ID: "ding-company",
+        PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn"
       }
     });
 
     assert.equal(response.status, 302);
-    assert.equal(response.headers.get("location"), "https://flow.example.com/?login=success");
+    assert.equal(response.headers.get("location"), "https://test.deshan-tiyes.cn/?login=success");
     assert.match(response.headers.get("set-cookie"), /pfs_session=/);
     const sessionResponse = await getCurrentSession({
       request: requestWithCookie(response.headers.get("set-cookie")),
@@ -285,7 +263,7 @@ test("browser OAuth callback creates a server session for an enterprise employee
   }
 });
 
-test("browser OAuth completion returns a same-origin destination and creates the server session", async () => {
+test("browser OAuth completion returns the configured public app destination", async () => {
   const db = createAuthD1Mock();
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async url => {
@@ -324,7 +302,7 @@ test("browser OAuth completion returns a same-origin destination and creates the
 
   try {
     const response = await completeBrowserLogin({
-      request: new Request("https://flow.example.com/api/auth/dingtalk/complete?code=auth-code&state=expected", {
+      request: new Request("https://api-test.deshan-tiyes.cn/api/auth/dingtalk/complete?code=auth-code&state=expected", {
         headers: {
           cookie: "pfs_oauth_state=expected; pfs_oauth_return=%2F%23dashboard"
         }
@@ -333,14 +311,15 @@ test("browser OAuth completion returns a same-origin destination and creates the
         PRODUCT_FLOW_DB: db,
         DINGTALK_APP_KEY: "app-key",
         DINGTALK_APP_SECRET: "app-secret",
-        DINGTALK_CORP_ID: "ding-company"
+        DINGTALK_CORP_ID: "ding-company",
+        PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn"
       }
     });
     const body = await response.json();
 
     assert.equal(response.status, 200);
     assert.equal(body.authenticated, true);
-    assert.equal(body.redirectTo, "https://flow.example.com/#dashboard");
+    assert.equal(body.redirectTo, "https://test.deshan-tiyes.cn/#dashboard");
     assert.match(response.headers.get("set-cookie"), /pfs_session=/);
     assert.equal(response.headers.get("cache-control"), "no-store");
   } finally {
@@ -703,142 +682,6 @@ test("API middleware lets commerce fact ingest validate the web collection runne
 
   assert.equal(response.status, 200);
   assert.equal(continued, true);
-});
-
-async function localOnlineEnv({ capabilities = ["read", "write"] } = {}) {
-  const db = createAuthD1Mock();
-  await upsertOrgMembers(db, {
-    corpId: identity.corpId,
-    users: [{ ...identity, departmentNames: [identity.department] }]
-  });
-  db.seedProductionAccess({
-    token_hash: await hashSecret("personal-token"),
-    user_id: identity.userId,
-    union_id: identity.unionId,
-    name: "令牌签发时姓名",
-    capabilities: JSON.stringify(capabilities),
-    expires_at: "2099-01-01T00:00:00.000Z",
-    revoked_at: null
-  });
-  return {
-    LOCAL_ONLINE_ACCOUNT_MODE: "1",
-    PRODUCTION_DATA_ACCESS_TOKEN: "personal-token",
-    PRODUCT_FLOW_DB: db
-  };
-}
-
-test("localhost online mode attaches the real production identity for reads", async () => {
-  const context = {
-    request: new Request("http://127.0.0.1:8141/api/state"),
-    env: await localOnlineEnv(),
-    data: {},
-    next: async () => Response.json({ ok: true })
-  };
-
-  const response = await apiMiddleware(context);
-  assert.equal(response.status, 200);
-  assert.equal(context.data.session.corpId, "ding-company");
-  assert.equal(context.data.session.userId, "user-1");
-  assert.equal(context.data.session.unionId, "union-1");
-  assert.equal(context.data.session.name, "周荣庆");
-  assert.equal(context.data.session.department, "总经办");
-  assert.equal(context.data.session.title, "总经理");
-  assert.equal(context.data.session.loginMode, "local-online-account");
-});
-
-test("localhost online mode allows writes for the authorized account", async () => {
-  let continued = false;
-  const response = await apiMiddleware({
-    request: new Request("http://localhost:8141/api/state", { method: "POST" }),
-    env: await localOnlineEnv(),
-    data: {},
-    next: async () => {
-      continued = true;
-      return Response.json({ ok: true });
-    }
-  });
-  assert.equal(response.status, 200);
-  assert.equal(continued, true);
-});
-
-test("localhost online mode rejects mutations when the token is read-only", async () => {
-  let continued = false;
-  const response = await apiMiddleware({
-    request: new Request("http://localhost:8141/api/dingtalk/todo/create", { method: "POST" }),
-    env: await localOnlineEnv({ capabilities: ["read"] }),
-    data: {},
-    next: async () => {
-      continued = true;
-      return Response.json({ ok: true });
-    }
-  });
-  const body = await response.json();
-
-  assert.equal(response.status, 403);
-  assert.equal(continued, false);
-  assert.equal(body.error.code, "PRODUCTION_CAPABILITY_REQUIRED");
-});
-
-test("localhost online mode requires a server-only personal token", async () => {
-  const response = await apiMiddleware({
-    request: new Request("http://localhost:8141/api/state"),
-    env: { LOCAL_ONLINE_ACCOUNT_MODE: "1", PRODUCT_FLOW_DB: createAuthD1Mock() },
-    data: {},
-    next: async () => Response.json({ ok: true })
-  });
-
-  assert.equal(response.status, 401);
-  assert.equal((await response.json()).error.code, "LOCAL_ONLINE_TOKEN_REQUIRED");
-});
-
-test("local online mode never bypasses authentication on non-local hosts", async () => {
-  const response = await apiMiddleware({
-    request: new Request("https://flow.example.com/api/state"),
-    env: await localOnlineEnv(),
-    data: {},
-    next: async () => Response.json({ ok: true })
-  });
-
-  assert.equal(response.status, 401);
-});
-
-test("remote local-online runtime accepts only its server-generated transport secret", async () => {
-  const env = {
-    ...await localOnlineEnv(),
-    LOCAL_ONLINE_REQUEST_SECRET: "one-start-only-secret"
-  };
-  const context = {
-    request: new Request("https://remote-preview.example/api/state", {
-      headers: { "x-pfs-local-online-session": "one-start-only-secret" }
-    }),
-    env,
-    data: {},
-    next: async () => Response.json({ ok: true })
-  };
-
-  const response = await apiMiddleware(context);
-
-  assert.equal(response.status, 200);
-  assert.equal(context.data.session.loginMode, "local-online-account");
-  assert.equal(context.data.session.userId, "user-1");
-});
-
-test("remote local-online runtime rejects missing or mismatched transport secrets", async () => {
-  const env = {
-    ...await localOnlineEnv(),
-    LOCAL_ONLINE_REQUEST_SECRET: "one-start-only-secret"
-  };
-  for (const header of [null, "wrong-secret"]) {
-    const headers = header ? { "x-pfs-local-online-session": header } : {};
-    const response = await apiMiddleware({
-      request: new Request("https://remote-preview.example/api/state", { headers }),
-      env,
-      data: {},
-      next: async () => Response.json({ ok: true })
-    });
-
-    assert.equal(response.status, 401);
-  }
 });
 
 test("session bootstrap exposes the middleware preview identity", async () => {

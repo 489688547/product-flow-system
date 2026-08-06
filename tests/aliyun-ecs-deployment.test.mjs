@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, readdir, readlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -13,7 +14,28 @@ async function json(path) {
   return JSON.parse(await readFile(resolve(root, path), "utf8"));
 }
 
-test("Aliyun ECS runtime and OSS backup are declared without access-key material", async () => {
+async function writeHistoricalMigrationExport(exportDir) {
+  const { DATABASES } = await import("../scripts/aliyun/d1-transfer.mjs");
+  await mkdir(exportDir, { recursive: true });
+  const databases = [];
+  for (const database of DATABASES) {
+    const content = `-- archived migration export for ${database.name}\nSELECT 1;\n`;
+    await writeFile(join(exportDir, database.file), content, "utf8");
+    databases.push({
+      ...database,
+      bytes: Buffer.byteLength(content),
+      sha256: createHash("sha256").update(content).digest("hex")
+    });
+  }
+  await writeFile(join(exportDir, "manifest.json"), JSON.stringify({
+    schemaVersion: 1,
+    createdAt: "2026-07-29T08:00:00.000Z",
+    source: "archived-cloudflare-migration",
+    databases
+  }), "utf8");
+}
+
+test("Aliyun production, test API, static test frontend, and OSS backup are declared safely", async () => {
   const environment = await json("docs/platform/environment-capabilities.json");
   const registry = await json("docs/platform/integration-registry.json");
   const cloudflareWrangler = await readFile(resolve(root, "wrangler.toml"), "utf8");
@@ -22,7 +44,13 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
     resolve(root, "deploy/aliyun/nginx-proxy-manager/deshan-tiyes.cn.conf"),
     "utf8"
   );
-  const runtime = environment.capabilities.find(entry => entry.id === "aliyun-ecs-runtime");
+  const testProxyHost = await readFile(
+    resolve(root, "deploy/aliyun/nginx-proxy-manager/api-test.deshan-tiyes.cn.conf"),
+    "utf8"
+  );
+  const runtime = environment.capabilities.find(entry => entry.id === "aliyun-ecs-production");
+  const testApi = environment.capabilities.find(entry => entry.id === "aliyun-ecs-test-api");
+  const staticTest = environment.capabilities.find(entry => entry.id === "cloudflare-pages-static-test");
   const backup = environment.capabilities.find(entry => entry.id === "aliyun-oss-backup");
   const aliyun = registry.platforms.find(entry => entry.id === "aliyun");
 
@@ -34,6 +62,12 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
     "PLATFORM_CREDENTIAL_MASTER_KEY",
     "DEMO_DATA_MASKING_KEY"
   ]);
+  assert.deepEqual(runtime.platforms, ["aliyun", "dingtalk"]);
+  assert.deepEqual(runtime.requiredIn, ["production"]);
+  assert.deepEqual(testApi.platforms, ["aliyun", "dingtalk"]);
+  assert.deepEqual(testApi.requiredIn, ["preview"]);
+  assert.deepEqual(staticTest.platforms, ["cloudflare-pages"]);
+  assert.deepEqual(staticTest.requiredIn, ["preview"]);
   assert.ok(backup, "Aliyun OSS backup capability must be declared");
   assert.deepEqual(backup.envVars, ["OSS_BACKUP_URI", "OSS_REGION", "OSS_ENDPOINT"]);
   assert.equal(JSON.stringify(backup).includes("ACCESS_KEY"), false);
@@ -46,6 +80,8 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
   assert.match(aliyunWrangler, /compatibility_date = "2026-07-18"/);
   assert.match(proxyHost, /server_name deshan-tiyes\.cn www\.deshan-tiyes\.cn;/);
   assert.match(proxyHost, /set \$server "product-flow-app";/);
+  assert.match(testProxyHost, /server_name api-test\.deshan-tiyes\.cn;/);
+  assert.match(testProxyHost, /set \$server "product-flow-test-api";/);
   assert.doesNotMatch(proxyHost, /listen 443/);
 });
 
@@ -76,6 +112,30 @@ test("Aliyun runtime rejects local executive bypass and unsafe paths", async () 
   );
   assert.equal(validateRuntimeEnvironment(valid).host, "127.0.0.1");
   assert.equal(validateRuntimeEnvironment(valid).port, 8080);
+  assert.equal(validateRuntimeEnvironment(valid).runtimeName, "production");
+  assert.throws(
+    () => validateRuntimeEnvironment({ ...valid, PFS_RUNTIME_NAME: "test" }),
+    /PFS_PUBLIC_APP_ORIGIN/
+  );
+  const testRuntime = validateRuntimeEnvironment({
+    ...valid,
+    PFS_RUNTIME_NAME: "test",
+    PFS_RUNTIME_PORT: "8081",
+    PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn",
+    PFS_ALLOWED_BROWSER_ORIGIN: "https://test.deshan-tiyes.cn"
+  });
+  assert.equal(testRuntime.runtimeName, "test");
+  assert.equal(testRuntime.publicAppOrigin, "https://test.deshan-tiyes.cn");
+  assert.equal(testRuntime.allowedBrowserOrigin, "https://test.deshan-tiyes.cn");
+  assert.throws(
+    () => validateRuntimeEnvironment({
+      ...valid,
+      PFS_RUNTIME_NAME: "test",
+      PFS_PUBLIC_APP_ORIGIN: "http://test.deshan-tiyes.cn",
+      PFS_ALLOWED_BROWSER_ORIGIN: "https://test.deshan-tiyes.cn"
+    }),
+    /HTTPS/
+  );
 });
 
 test("Aliyun runtime builds a non-interactive local Pages command without secret values", async () => {
@@ -162,34 +222,15 @@ test("DingTalk OAuth on the Aliyun HTTPS origin keeps its callback same-origin",
   );
 });
 
-test("D1 transfer exports both databases with hashes and refuses an overwrite", async () => {
-  const { exportCloudflareD1, importLocalD1 } = await import("../scripts/aliyun/d1-transfer.mjs");
+test("archived migration exports import with hashes and refuse an overwrite", async () => {
+  const { importLocalD1 } = await import("../scripts/aliyun/d1-transfer.mjs");
   const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-transfer-"));
   const exportDir = join(tempRoot, "export");
   const persistDir = join(tempRoot, "persist");
   const calls = [];
-  const run = async (_command, args) => {
-    calls.push(args);
-    const outputIndex = args.indexOf("--output");
-    if (outputIndex >= 0) {
-      await mkdir(exportDir, { recursive: true });
-      await writeFile(args[outputIndex + 1], `-- ${args[2]}\nSELECT 1;\n`, "utf8");
-    }
-  };
+  const run = async (_command, args) => calls.push(args);
+  await writeHistoricalMigrationExport(exportDir);
 
-  const manifest = await exportCloudflareD1({
-    exportDir,
-    run,
-    now: () => "2026-07-29T08:00:00.000Z"
-  });
-  assert.deepEqual(manifest.databases.map(item => item.name), [
-    "product-flow-system",
-    "product-flow-system-display"
-  ]);
-  assert.ok(manifest.databases.every(item => /^[a-f0-9]{64}$/.test(item.sha256)));
-  assert.equal(calls.filter(args => args.includes("--remote")).length, 2);
-
-  calls.length = 0;
   await importLocalD1({ exportDir, persistDir, run });
   assert.equal(calls.filter(args => args.includes("--local")).length, 2);
   await assert.rejects(
@@ -199,19 +240,13 @@ test("D1 transfer exports both databases with hashes and refuses an overwrite", 
 });
 
 test("D1 transfer rejects a changed SQL export and unsafe OSS destination", async () => {
-  const { backupLocalD1, exportCloudflareD1, importLocalD1 } = await import(
+  const { backupLocalD1, importLocalD1 } = await import(
     "../scripts/aliyun/d1-transfer.mjs"
   );
   const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-integrity-"));
   const exportDir = join(tempRoot, "export");
-  const run = async (_command, args) => {
-    const outputIndex = args.indexOf("--output");
-    if (outputIndex >= 0) {
-      await mkdir(exportDir, { recursive: true });
-      await writeFile(args[outputIndex + 1], "SELECT 1;\n", "utf8");
-    }
-  };
-  await exportCloudflareD1({ exportDir, run });
+  const run = async () => {};
+  await writeHistoricalMigrationExport(exportDir);
   const manifest = JSON.parse(await readFile(join(exportDir, "manifest.json"), "utf8"));
   await writeFile(join(exportDir, manifest.databases[0].file), "SELECT 2;\n", "utf8");
 
@@ -315,6 +350,7 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   const runbook = await readFile(resolve(root, "deploy/aliyun/README.md"), "utf8");
   const compose = load(composeText);
   const service = compose.services["product-flow-app"];
+  const testService = compose.services["product-flow-test-api"];
 
   assert.equal(service.build.context, "../..");
   assert.equal(service.build.dockerfile, "Dockerfile.aliyun");
@@ -322,10 +358,27 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.match(dockerfile, /FROM node:22-bookworm-slim AS build/);
   assert.match(dockerfile, /ARG PFS_BUILD_COMMIT/);
   assert.match(dockerfile, /apt-get install -y --no-install-recommends git/);
+  assert.match(dockerfile, /apt-get install -y --no-install-recommends ca-certificates/);
+  assert.match(dockerfile, /SSL_CERT_FILE=\/etc\/ssl\/certs\/ca-certificates\.crt/);
   assert.match(dockerfile, /npm run build && rm -rf \.git/);
   assert.doesNotMatch(dockerignore, /^\.git$/m);
   assert.match(dockerfile, /CMD \["node", "scripts\/aliyun\/start-runtime\.mjs"\]/);
   assert.deepEqual(service.ports, ["127.0.0.1:8080:8080"]);
+  assert.deepEqual(testService.profiles, ["test"]);
+  assert.equal(testService.container_name, "product-flow-test-api");
+  assert.deepEqual(testService.ports, ["127.0.0.1:8081:8081"]);
+  assert.deepEqual(testService.env_file, ["${PFS_TEST_RUNTIME_ENV_FILE:-/opt/product-flow-test/config/runtime.env}"]);
+  assert.equal(testService.environment.PFS_RUNTIME_NAME, "test");
+  assert.equal(testService.environment.PFS_RUNTIME_PORT, "8081");
+  assert.equal(testService.environment.PFS_WRANGLER_PERSIST_DIR, "/var/lib/product-flow-test/wrangler");
+  assert.equal(testService.environment.LOCAL_ONLINE_ACCOUNT_MODE, "0");
+  assert.equal(testService.mem_limit, "512m");
+  assert.deepEqual(testService.volumes, [
+    "${PFS_TEST_DATA_DIR:-/opt/product-flow-test/data}:/var/lib/product-flow-test",
+    "${PFS_TEST_RUNTIME_ENV_FILE:-/opt/product-flow-test/config/runtime.env}:/run/pfs/runtime.env:ro"
+  ]);
+  assert.notDeepEqual(testService.volumes, service.volumes);
+  assert.equal(service.mem_limit, "768m");
   assert.deepEqual(service.networks, ["proxy"]);
   assert.equal(compose.networks.proxy.external, true);
   assert.match(compose.networks.proxy.name, /nginx-proxy-manage_default/);
@@ -384,10 +437,9 @@ test("local D1 check requires both databases to contain tables", async () => {
   const queried = [];
   const checks = await checkLocalD1({
     persistDir: "/var/lib/product-flow/wrangler",
-    configPath: "/app/deploy/aliyun/wrangler.toml",
     runQuery: async (_command, args) => {
       queried.push(args);
-      return JSON.stringify([{ success: true, results: [{ table_count: 119 }] }]);
+      return "ok\n119\n";
     }
   });
 
@@ -399,8 +451,7 @@ test("local D1 check requires both databases to contain tables", async () => {
   await assert.rejects(
     () => checkLocalD1({
       persistDir: "/var/lib/product-flow/wrangler",
-      configPath: "/app/deploy/aliyun/wrangler.toml",
-      runQuery: async () => JSON.stringify([{ success: true, results: [{ table_count: 0 }] }])
+      runQuery: async () => "ok\n0\n"
     }),
     /校验失败/
   );
