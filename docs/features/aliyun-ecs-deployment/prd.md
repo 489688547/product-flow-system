@@ -5,7 +5,7 @@
 - 状态：开发中
 - 负责人：周荣庆
 - 研发待办：DEV-000014
-- 最近更新：2026-07-29
+- 最近更新：2026-08-06
 
 ## 背景与问题
 
@@ -17,8 +17,8 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 
 公司已购买杭州 ECS（2 vCPU、2 GiB 内存、40 GiB 系统盘、3 Mbps 公网带宽）、
 40 GB 中国大陆 OSS 标准存储包和域名 `deshan-tiyes.cn`。域名已完成企业
-实名认证，但 ICP 备案尚未开始，因此正式 HTTPS、DNS 和钉钉回调切换暂不能
-完成。
+实名认证和 ICP 备案，`deshan-tiyes.cn` 已配置 HTTPS 并完成真实钉钉登录。
+当前剩余目标是把测试前端与测试 API 隔离，并彻底退役 Cloudflare 业务运行时。
 
 ## 目标
 
@@ -26,15 +26,17 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
    Cloudflare Worker。
 2. 把正式与展示 D1 通过受控导出、校验和导入迁移到 ECS 持久化 SQLite。
 3. 保持现有钉钉登录、权限、数据环境、快麦采集和平台凭证边界不变。
-4. 生成可校验的本地数据库备份，并在 OSS Bucket 与实例角色就绪后上传 OSS。
-5. Cloudflare 正式站保持可用，直到阿里云域名、认证和数据完成切流验收。
+4. 生成可校验的本地数据库备份并上传私有 OSS。
+5. 生产前端和全部 API 固定由 ECS 承载；Cloudflare 仅托管测试静态前端。
+6. 测试静态前端调用 ECS 上独立容器和 SQLite，不读取或写入生产数据。
 
 ## 非目标
 
 - 本次不购买或迁移到 RDS；只定义可执行的 RDS 迁移触发条件。
 - 不同时向 D1 与 SQLite 双写。
 - 不把 OSS 当作在线数据库，也不在本次引入 CDN。
-- 不删除 Cloudflare Pages、D1 或现有固定生产域名。
+- 不删除用于测试静态前端的 Cloudflare Pages 项目；删除 Pages Functions、
+  Workers 和 D1 运行依赖。
 - 不重构 219 个 Pages Functions 为第二套 Node API。
 
 ## 用户与权限
@@ -48,24 +50,25 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 
 ## 当前流程
 
-1. 浏览器访问 Cloudflare Pages。
-2. Pages Functions 执行业务 API 并访问远程 D1。
-3. 钉钉回调、会话、控制数据和业务数据全部位于 Cloudflare 运行边界。
-4. CPU 时间超过 Worker 套餐限制时请求失败。
+1. 生产浏览器访问 `https://deshan-tiyes.cn`，由 ECS 返回前端和 API。
+2. 测试浏览器暂由 Cloudflare Pages 返回静态前端。
+3. 测试前端尚未拥有独立 ECS API/SQLite，生产和测试边界仍需固化。
 
 ## 目标流程
 
 1. 浏览器通过 `deshan-tiyes.cn` 访问 Nginx Proxy Manager。
 2. Nginx Proxy Manager 把请求代理到同 Docker 网络的应用容器。
-3. 容器使用 Wrangler/Miniflare/workerd 兼容层运行现有 Pages Functions。
-4. `PRODUCT_FLOW_DB` 与 `DEMO_FLOW_DB` 指向 ECS 数据卷中的两个独立本地 D1
-   SQLite 实例。
-5. 定时任务导出两个本地数据库、生成 SHA-256 清单并上传私有 OSS Bucket。
+3. 生产容器使用 Wrangler/workerd 兼容层运行现有 Functions，并使用生产 SQLite。
+4. `api-test.deshan-tiyes.cn` 指向独立测试容器和测试 SQLite；只允许
+   `https://test.deshan-tiyes.cn` 跨域访问。
+5. Cloudflare Pages 仅输出 `dev` 分支静态文件，构建时注入测试 API Origin；
+   不部署 Functions、Workers、D1 binding 或业务 Secret。
+6. 定时任务生成生产数据库 SHA-256 清单并上传私有 OSS Bucket。
 
 ## 业务规则
 
-- ECS SQLite 是正式业务事实源后，Cloudflare D1 只作切流回滚点，不允许继续
-  接受业务写入。
+- ECS SQLite 是唯一在线业务事实源；Cloudflare D1 已退役，不允许运行时读取、
+  写入或作为回滚数据库。
 - 切流必须有短暂停写窗口；停止公司采集器并通知用户不进行业务写入后，才能
   执行最终 D1 导出。
 - 正式库与展示库必须继续物理隔离；不得把两份 SQL 导入同一绑定。
@@ -74,6 +77,10 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
   并加入代理内部网络。
 - OSS Bucket 必须为私有、阻止公共访问；图片对外访问后续通过签名 URL 或 CDN
   方案单独设计。
+- 生产前端只使用同源 `/api`；测试前端只使用构建时固定的
+  `https://api-test.deshan-tiyes.cn`，不能由浏览器动态选择后端。
+- 测试 API 必须返回精确 CORS Origin，不允许 `*`，并使用独立 Cookie、数据库、
+  容器名、端口和数据卷。
 
 ## 数据定义
 
@@ -88,14 +95,12 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 
 ## 异常与边界
 
-- 任一 D1 导出失败：不停止 Cloudflare，不执行切流。
-- 任一 SQLite 导入或关键表校验失败：删除本次空白目标数据卷后重试，Cloudflare
-  继续服务。
+- 任一历史 D1 导出或 SQLite 导入校验缺少证据：停止发布并从迁移快照重新验证。
+- 测试 SQLite 初始化失败：测试 API 保持不可用，不得回退生产数据库。
 - ECS 内存不足或容器被 OOM：保持 Cloudflare DNS，不切流；运行时设置内存上限
   并记录容器重启。
 - OSS 未创建或实例角色未授权：本地备份仍生成，但上线状态标记“OSS 备份受阻”。
-- 域名未实名或未备案：只允许回环/服务器内技术验收，不宣称公网生产上线。
-- D1 最终导出后出现新写入：取消切流，恢复采集器，重新安排停写窗口。
+- 域名、证书或回调配置失效：生产进入维护并从最近 ECS/OSS 快照恢复，不回写 D1。
 
 ## 验收标准
 
@@ -105,18 +110,17 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 4. 正式与展示数据库的表数、关键表行数和导出 SHA-256 有独立校验记录。
 5. 备份任务同时导出两个库并生成清单；OSS 未配置时明确受阻，配置后可上传私有
    Bucket。
-6. 切流前 Cloudflare 生产站仍通过 readiness；阿里云入口通过冷启动、暖请求和
-   并发请求验收后才修改正式入口。
+6. 生产和测试 readiness 均报告预期 commit、运行环境和数据路径，且数据库物理隔离。
+7. Cloudflare 测试部署产物不包含 Functions bundle、D1 binding 或业务 Secret；
+   网络请求只发送到 `api-test.deshan-tiyes.cn`。
+8. 真实钉钉 PC/WebView 在生产域名完成 OAuth、会话和业务页面验收。
 
 ## 上线与回滚
 
-- 第一阶段只部署 ECS 私有预发布：应用端口绑定 `127.0.0.1`，通过服务器内
-  `curl` 验收。
-- 第二阶段完成域名实名、ICP备案、DNS、证书和钉钉回调白名单后，配置代理但
-  暂不关闭 Cloudflare。
-- 最终切流使用停写窗口执行最后一次导出、导入和校验，再修改公司入口。
-- 回滚时停止阿里云写入，把公司入口恢复到
-  `https://deshan-tiyes-system.pages.dev`；不得把两边产生的数据自动合并。
+- 候选代码先部署到 ECS 测试容器和 Cloudflare 测试静态站，完成隔离验证。
+- `dev` 验收后通过唯一的 `dev → main` 发布流程构建生产 ECS 镜像。
+- 回滚使用 ECS 上一个已验收镜像和发布前 SQLite/OSS 快照；不恢复 Cloudflare
+  Functions 或 D1。
 
 ## RDS 迁移触发条件
 

@@ -13,7 +13,7 @@ async function json(path) {
   return JSON.parse(await readFile(resolve(root, path), "utf8"));
 }
 
-test("Aliyun ECS runtime and OSS backup are declared without access-key material", async () => {
+test("Aliyun production, test API, static test frontend, and OSS backup are declared safely", async () => {
   const environment = await json("docs/platform/environment-capabilities.json");
   const registry = await json("docs/platform/integration-registry.json");
   const cloudflareWrangler = await readFile(resolve(root, "wrangler.toml"), "utf8");
@@ -22,7 +22,9 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
     resolve(root, "deploy/aliyun/nginx-proxy-manager/deshan-tiyes.cn.conf"),
     "utf8"
   );
-  const runtime = environment.capabilities.find(entry => entry.id === "aliyun-ecs-runtime");
+  const runtime = environment.capabilities.find(entry => entry.id === "aliyun-ecs-production");
+  const testApi = environment.capabilities.find(entry => entry.id === "aliyun-ecs-test-api");
+  const staticTest = environment.capabilities.find(entry => entry.id === "cloudflare-pages-static-test");
   const backup = environment.capabilities.find(entry => entry.id === "aliyun-oss-backup");
   const aliyun = registry.platforms.find(entry => entry.id === "aliyun");
 
@@ -34,6 +36,12 @@ test("Aliyun ECS runtime and OSS backup are declared without access-key material
     "PLATFORM_CREDENTIAL_MASTER_KEY",
     "DEMO_DATA_MASKING_KEY"
   ]);
+  assert.deepEqual(runtime.platforms, ["aliyun", "dingtalk"]);
+  assert.deepEqual(runtime.requiredIn, ["production"]);
+  assert.deepEqual(testApi.platforms, ["aliyun", "dingtalk"]);
+  assert.deepEqual(testApi.requiredIn, ["preview"]);
+  assert.deepEqual(staticTest.platforms, ["cloudflare-pages"]);
+  assert.deepEqual(staticTest.requiredIn, ["preview"]);
   assert.ok(backup, "Aliyun OSS backup capability must be declared");
   assert.deepEqual(backup.envVars, ["OSS_BACKUP_URI", "OSS_REGION", "OSS_ENDPOINT"]);
   assert.equal(JSON.stringify(backup).includes("ACCESS_KEY"), false);
@@ -322,6 +330,8 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.match(dockerfile, /FROM node:22-bookworm-slim AS build/);
   assert.match(dockerfile, /ARG PFS_BUILD_COMMIT/);
   assert.match(dockerfile, /apt-get install -y --no-install-recommends git/);
+  assert.match(dockerfile, /apt-get install -y --no-install-recommends ca-certificates/);
+  assert.match(dockerfile, /SSL_CERT_FILE=\/etc\/ssl\/certs\/ca-certificates\.crt/);
   assert.match(dockerfile, /npm run build && rm -rf \.git/);
   assert.doesNotMatch(dockerignore, /^\.git$/m);
   assert.match(dockerfile, /CMD \["node", "scripts\/aliyun\/start-runtime\.mjs"\]/);

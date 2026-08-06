@@ -58,7 +58,7 @@
 - Consumes: approved migration spec.
 - Produces: capability IDs aliyun-ecs-production, aliyun-ecs-test-api and cloudflare-pages-static-test; env names PFS_PUBLIC_APP_ORIGIN, PFS_ALLOWED_BROWSER_ORIGIN and VITE_PFS_API_ORIGIN.
 
-- [ ] **Step 1: Write the failing contract assertions**
+- [x] **Step 1: Write the failing contract assertions**
 
 ~~~js
 assert.deepEqual(platform("cloudflare-pages").capabilities, ["测试静态前端"]);
@@ -70,7 +70,7 @@ assert.ok(capability("aliyun-ecs-test-api").envVars.includes("PFS_PUBLIC_APP_ORI
 assert.ok(capability("aliyun-ecs-test-api").envVars.includes("PFS_ALLOWED_BROWSER_ORIGIN"));
 ~~~
 
-- [ ] **Step 2: Prove the old contract fails**
+- [x] **Step 2: Prove the old contract fails**
 
 ~~~bash
 node --test tests/aliyun-ecs-deployment.test.mjs tests/environment-capabilities.test.mjs tests/integration-registry.test.mjs
@@ -78,11 +78,11 @@ node --test tests/aliyun-ecs-deployment.test.mjs tests/environment-capabilities.
 
 Expected: FAIL because Cloudflare remains a backend and D1 platform and the new capabilities do not exist.
 
-- [ ] **Step 3: Update durable feature and decision documents**
+- [x] **Step 3: Update durable feature and decision documents**
 
 Copy the approved boundaries exactly. Remove the old Cloudflare production fallback, D1 write source and non-goal that prohibited Cloudflare removal.
 
-- [ ] **Step 4: Update registries and regenerate modules**
+- [x] **Step 4: Update registries and regenerate modules**
 
 Set cloudflare-pages to limited with static-test-only capability, set cloudflare-d1 to retired, and remove both from backend and data capabilities.
 
@@ -94,11 +94,11 @@ npm run check:integrations
 
 Expected: PASS.
 
-- [ ] **Step 5: Re-run the Step 2 tests**
+- [x] **Step 5: Re-run the Step 2 tests**
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit only this contract**
+- [x] **Step 6: Commit only this contract**
 
 ~~~bash
 git add docs/features/aliyun-ecs-deployment docs/decisions/2026-07-29-aliyun-ecs-sqlite-transition.md docs/platform/environment-capabilities.json docs/platform/integration-registry.json functions/api/platform/_generated tests/aliyun-ecs-deployment.test.mjs tests/environment-capabilities.test.mjs tests/integration-registry.test.mjs

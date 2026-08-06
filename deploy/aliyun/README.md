@@ -8,6 +8,8 @@
 - `runtime.env` 权限必须为 `600`，不得启用 `LOCAL_ONLINE_ACCOUNT_MODE`。
 - 启动脚本只在受限运行目录创建 `.dev.vars` 符号链接，使 Pages Functions
   能从只读的 `/run/pfs/runtime.env` 读取 binding；不得把 Secret 复制进镜像。
+- 镜像安装系统 CA，并通过 `SSL_CERT_FILE` 提供给 workerd，保证钉钉等 HTTPS
+  Provider 的证书链可以在 ECS 容器内校验。
 - OSS 只接收私有对象和 SQLite 一致性快照，不承载在线数据库。
 
 ## 首次预发布
