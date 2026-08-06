@@ -600,7 +600,7 @@ Use a fresh session, complete login, verify return to test frontend, authenticat
 
 Run commit, HTTPS, CORS, cold/warm and 20-concurrency checks. Stop test API and prove production remains 200; restart and prove test recovery.
 
-Accepted on 2026-08-06 at `cd0750571d56`: public DNS and TLS resolved, Cloudflare
+Accepted on 2026-08-06 at `4e8eb09467a8`: public DNS and TLS resolved, Cloudflare
 project configuration contained no Variables, Secrets or D1 bindings in either environment,
 real DingTalk OAuth returned to the test frontend, the reversible test write never appeared in
 production, and the post-restart fixed-site smoke passed.

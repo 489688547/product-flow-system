@@ -88,13 +88,16 @@
 - [x] 发布并验收固定测试环境
   - 输出：`https://test.deshan-tiyes.cn` 与 `https://api-test.deshan-tiyes.cn` 报告同一 `dev` commit。
   - 验证：静态产物边界、CORS、OAuth、readiness、数据隔离与钉钉 WebView。
-  - 2026-08-06：ACR 构建 `28156f94-187b-416d-8cab-79a95c835cc7` 成功，
-    固定前端与隔离测试 API 均报告 `cd0750571d56`；完整冒烟、精确 CORS、
+  - 2026-08-06：最终 ACR 构建 `83af46c9-d11e-4a21-9ed0-f457f009d744` 成功，
+    固定前端与隔离测试 API 均报告 `4e8eb09467a8`；完整冒烟、精确 CORS、
     20 路 OAuth bootstrap、真实钉钉登录和 executive 业务读取通过。
   - 2026-08-06：测试库写入 `ECS-ISOLATION-CHECK-20260806-2212` 时生产库
     计数保持为 0，测试记录随后已清理；停止/重启测试容器期间生产站保持可用。
   - 2026-08-06：Cloudflare Pages Git 构建已断开，production/preview 的
     Variables、Secrets 和 D1 bindings 均已清空，只保留固定测试静态产物与域名。
+  - 2026-08-06：2 GiB ECS 同时运行生产、测试和 Harbor 时，解压 645 MB 镜像
+    出现资源抖动；重启后生产 30 秒内恢复 200，测试以最终镜像恢复健康。后续发布
+    必须串行停止按需测试容器后再拉取生产镜像，或先升级到至少 4 GiB 内存。
 
 - [ ] 通过 `dev -> main` 发布并验收生产
   - 输出：`https://deshan-tiyes.cn` 报告目标 `main` commit。
