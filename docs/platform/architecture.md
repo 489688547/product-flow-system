@@ -62,7 +62,9 @@
 - 应用入口在 React 渲染前接管 Vite 的 `vite:preloadError`。旧标签页加载已被新部署替换的动态分包时，自动刷新获取当前版本。
 - 自动刷新使用会话级冷却时间防止循环；受限 WebView 无法使用会话存储时，仍允许执行一次浏览器刷新。
 - 应用根节点使用不依赖业务 Provider 的错误边界。未预见的 React 渲染或生命周期异常必须显示安全恢复页；恢复页不得展示原始错误或业务数据，只能刷新，或在用户确认后按白名单清理本机业务缓存再刷新。
-- `_headers` 保持入口 HTML 不缓存；`npm run build` 必须在 `dist` 内生成 `cloudflare-entry.html`、`_headers` 和 `_redirects`，确保 Cloudflare Git 自动部署与手动根目录部署同构。`scripts/prepare-pages-release.mjs` 只能从完整 `dist` 同步根目录发布包，避免两条发布路径遗漏不同文件。
+- `_headers` 保持入口 HTML 不缓存；`npm run build` 只在 `dist` 内保留根
+  `index.html`、`_headers`、`_redirects` 和 Vite 资源。Cloudflare 仅部署该测试
+  静态产物，不生成 `cloudflare-entry.html`、Pages Functions 路由或根目录发布包。
 
 ## 未来平台化
 

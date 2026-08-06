@@ -65,7 +65,7 @@ install -m 0644 \
 docker exec nginx-app nginx -t
 docker exec nginx-app s6-svc -h /var/run/s6/services/nginx
 curl -fsS -H 'Host: deshan-tiyes.cn' \
-  http://127.0.0.1/cloudflare-entry >/dev/null
+  http://127.0.0.1/ >/dev/null
 ```
 
 该 Nginx Proxy Manager 镜像由 s6 管理 Nginx，未写入
