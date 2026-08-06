@@ -294,11 +294,11 @@ git commit -m "refactor(build): remove cloudflare production entry artifacts"
 - Consumes: production paths under /opt/product-flow and test paths under /opt/product-flow-test.
 - Produces: product-flow-app on 8080 and Compose profile test service product-flow-test-api on 8081.
 
-- [ ] **Step 1: Extend isolation tests**
+- [x] **Step 1: Extend isolation tests**
 
 Assert different container names, loopback ports, env paths and host data mounts; profile test; LOCAL_ONLINE_ACCOUNT_MODE zero; production memory 768 MiB; test memory no more than 512 MiB.
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 ~~~bash
 node --test tests/aliyun-ecs-deployment.test.mjs
@@ -306,11 +306,11 @@ node --test tests/aliyun-ecs-deployment.test.mjs
 
 Expected: FAIL because the test profile does not exist.
 
-- [ ] **Step 3: Implement runtime identity and validation**
+- [x] **Step 3: Implement runtime identity and validation**
 
 Add runtimeName production or test, port, absolute persistDir, absolute envFile, HTTPS publicAppOrigin and HTTPS allowedBrowserOrigin. Preserve the current CA certificate fix for DingTalk TLS.
 
-- [ ] **Step 4: Add test profile and Nginx host**
+- [x] **Step 4: Add test profile and Nginx host**
 
 Start test only with:
 
@@ -320,7 +320,10 @@ docker compose -f deploy/aliyun/docker-compose.yml --profile test up -d product-
 
 The test proxy targets only the test container. Production root serves index.html without a cloudflare-entry redirect.
 
-- [ ] **Step 5: Validate configurations**
+- [x] **Step 5: Validate configurations**
+
+Local Docker CLI was unavailable; the js-yaml compose contract suite passed. The same
+`docker compose config` commands remain mandatory on ECS before starting either service.
 
 ~~~bash
 node --test tests/aliyun-ecs-deployment.test.mjs
@@ -330,7 +333,7 @@ docker compose -f deploy/aliyun/docker-compose.yml --profile test config
 
 Expected: PASS and no Secret values printed.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ~~~bash
 git add Dockerfile.aliyun deploy/aliyun scripts/aliyun/runtime-config.mjs scripts/aliyun/start-runtime.mjs tests/aliyun-ecs-deployment.test.mjs

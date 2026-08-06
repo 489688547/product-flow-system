@@ -33,5 +33,5 @@ RUN mkdir -p /var/lib/product-flow/wrangler /run/pfs \
     && chown -R node:node /var/lib/product-flow /run/pfs
 
 USER node
-EXPOSE 8080
+EXPOSE 8080 8081
 CMD ["node", "scripts/aliyun/start-runtime.mjs"]

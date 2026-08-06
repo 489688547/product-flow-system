@@ -22,6 +22,10 @@ test("Aliyun production, test API, static test frontend, and OSS backup are decl
     resolve(root, "deploy/aliyun/nginx-proxy-manager/deshan-tiyes.cn.conf"),
     "utf8"
   );
+  const testProxyHost = await readFile(
+    resolve(root, "deploy/aliyun/nginx-proxy-manager/api-test.deshan-tiyes.cn.conf"),
+    "utf8"
+  );
   const runtime = environment.capabilities.find(entry => entry.id === "aliyun-ecs-production");
   const testApi = environment.capabilities.find(entry => entry.id === "aliyun-ecs-test-api");
   const staticTest = environment.capabilities.find(entry => entry.id === "cloudflare-pages-static-test");
@@ -54,6 +58,8 @@ test("Aliyun production, test API, static test frontend, and OSS backup are decl
   assert.match(aliyunWrangler, /compatibility_date = "2026-07-18"/);
   assert.match(proxyHost, /server_name deshan-tiyes\.cn www\.deshan-tiyes\.cn;/);
   assert.match(proxyHost, /set \$server "product-flow-app";/);
+  assert.match(testProxyHost, /server_name api-test\.deshan-tiyes\.cn;/);
+  assert.match(testProxyHost, /set \$server "product-flow-test-api";/);
   assert.doesNotMatch(proxyHost, /listen 443/);
 });
 
@@ -84,6 +90,30 @@ test("Aliyun runtime rejects local executive bypass and unsafe paths", async () 
   );
   assert.equal(validateRuntimeEnvironment(valid).host, "127.0.0.1");
   assert.equal(validateRuntimeEnvironment(valid).port, 8080);
+  assert.equal(validateRuntimeEnvironment(valid).runtimeName, "production");
+  assert.throws(
+    () => validateRuntimeEnvironment({ ...valid, PFS_RUNTIME_NAME: "test" }),
+    /PFS_PUBLIC_APP_ORIGIN/
+  );
+  const testRuntime = validateRuntimeEnvironment({
+    ...valid,
+    PFS_RUNTIME_NAME: "test",
+    PFS_RUNTIME_PORT: "8081",
+    PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn",
+    PFS_ALLOWED_BROWSER_ORIGIN: "https://test.deshan-tiyes.cn"
+  });
+  assert.equal(testRuntime.runtimeName, "test");
+  assert.equal(testRuntime.publicAppOrigin, "https://test.deshan-tiyes.cn");
+  assert.equal(testRuntime.allowedBrowserOrigin, "https://test.deshan-tiyes.cn");
+  assert.throws(
+    () => validateRuntimeEnvironment({
+      ...valid,
+      PFS_RUNTIME_NAME: "test",
+      PFS_PUBLIC_APP_ORIGIN: "http://test.deshan-tiyes.cn",
+      PFS_ALLOWED_BROWSER_ORIGIN: "https://test.deshan-tiyes.cn"
+    }),
+    /HTTPS/
+  );
 });
 
 test("Aliyun runtime builds a non-interactive local Pages command without secret values", async () => {
@@ -323,6 +353,7 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   const runbook = await readFile(resolve(root, "deploy/aliyun/README.md"), "utf8");
   const compose = load(composeText);
   const service = compose.services["product-flow-app"];
+  const testService = compose.services["product-flow-test-api"];
 
   assert.equal(service.build.context, "../..");
   assert.equal(service.build.dockerfile, "Dockerfile.aliyun");
@@ -336,6 +367,21 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.doesNotMatch(dockerignore, /^\.git$/m);
   assert.match(dockerfile, /CMD \["node", "scripts\/aliyun\/start-runtime\.mjs"\]/);
   assert.deepEqual(service.ports, ["127.0.0.1:8080:8080"]);
+  assert.deepEqual(testService.profiles, ["test"]);
+  assert.equal(testService.container_name, "product-flow-test-api");
+  assert.deepEqual(testService.ports, ["127.0.0.1:8081:8081"]);
+  assert.deepEqual(testService.env_file, ["${PFS_TEST_RUNTIME_ENV_FILE:-/opt/product-flow-test/config/runtime.env}"]);
+  assert.equal(testService.environment.PFS_RUNTIME_NAME, "test");
+  assert.equal(testService.environment.PFS_RUNTIME_PORT, "8081");
+  assert.equal(testService.environment.PFS_WRANGLER_PERSIST_DIR, "/var/lib/product-flow-test/wrangler");
+  assert.equal(testService.environment.LOCAL_ONLINE_ACCOUNT_MODE, "0");
+  assert.equal(testService.mem_limit, "512m");
+  assert.deepEqual(testService.volumes, [
+    "${PFS_TEST_DATA_DIR:-/opt/product-flow-test/data}:/var/lib/product-flow-test",
+    "${PFS_TEST_RUNTIME_ENV_FILE:-/opt/product-flow-test/config/runtime.env}:/run/pfs/runtime.env:ro"
+  ]);
+  assert.notDeepEqual(testService.volumes, service.volumes);
+  assert.equal(service.mem_limit, "768m");
   assert.deepEqual(service.networks, ["proxy"]);
   assert.equal(compose.networks.proxy.external, true);
   assert.match(compose.networks.proxy.name, /nginx-proxy-manage_default/);
