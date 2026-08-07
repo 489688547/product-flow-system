@@ -496,11 +496,14 @@ test("Ego collection configures download before reusing the mature extract runne
     createRunner: () => ({
       async run() {
         calls.push("extract:run");
-        await writeFile(join(workspace, "采集-video-20260803-20260803.xlsx"), "real-export");
+        const filePath = join(workspace, "采集-video-20260803-20260803.xlsx");
+        await writeFile(filePath, "real-export");
+        const completedAt = new Date(Date.now() + 60_000);
+        await utimes(filePath, completedAt, completedAt);
         return { downloaded: true };
       }
     }),
-    downloadOptions: { timeoutMs: 1_000, pollIntervalMs: 1, stabilityDelayMs: 1 }
+    downloadOptions: { timeoutMs: 5_000, pollIntervalMs: 1, stabilityDelayMs: 1 }
   });
 
   assert.equal(calls[0], "Browser.setDownloadBehavior");
