@@ -7,7 +7,7 @@ const seedSource = readFileSync(new URL("../scripts/seed-local-sandbox.mjs", imp
 const startSource = readFileSync(new URL("../scripts/start-local-sandbox.mjs", import.meta.url), "utf8");
 
 test("sandbox entry points use the same local-only launcher", () => {
-  assert.equal(pkg.scripts.start, "node scripts/start-local-sandbox.mjs");
+  assert.equal(pkg.scripts.start, "node scripts/start-local.mjs");
   assert.equal(pkg.scripts["start:sandbox"], "node scripts/start-local-sandbox.mjs");
   assert.equal(pkg.scripts["seed:sandbox"], "node scripts/seed-local-sandbox.mjs");
 });

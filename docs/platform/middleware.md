@@ -6,7 +6,10 @@
 
 `functions/api/_middleware.js` 处理 OPTIONS、公共认证路径和公司会话读取。受保护接口没有有效会话时返回 401，并把有效会话放入 `context.data.session`。
 
-本地运行时不注入线上账号，不接受个人生产令牌或内部身份 Header。它与线上一样只接受正常钉钉会话，但数据库固定为本地 SQLite 沙箱。固定测试站和生产站各自在 ECS 上完成正常会话认证，前端不得选择数据库 binding 或伪造运行环境。
+本地沙箱不注入线上账号，也不接受个人生产令牌。核心开发模式是独立入口：本机 Vite
+Node 代理只向已部署 ECS API 注入个人 `x-pfs-core-developer-token`，浏览器看不到该值；
+代理固定绑定 `127.0.0.1:8127`，写请求必须来自同 Origin。前端不得选择数据库 binding
+或直接连接 SQLite。
 
 业务权限判断以明确的 `executive` 角色优先于部门展示字符串。一个人在钉钉中属于多个部门时，组织缓存可能以“部门 A / 部门 B”保存；最高权限账号不能因为该展示字段不是单一“总经办”而被供应链、数据中心或店铺运营 API 拒绝。
 
@@ -32,9 +35,13 @@
 - `functions/api/kuaimai/_shared/kuaimai.js`：快麦签名、订单与商品分页、组合详情和日聚合。商品列表最多 200 条/页，组合详情每批最多 30 条并返回游标；任一列表页失败时不返回完整标记，平台目录不得提交半批。订单库存单位编码只校验非空和长度，不按 69 码格式过滤内部唯一码。
 - `functions/api/platform/v1/product-catalog/_shared/http.js`：商品目录会话、维护权限、成本字段裁剪和统一错误响应。执行顺序为公司会话 → 维护权限（写请求）→ D1 能力 → 输入/提供商读取 → 幂等写入；只记录安全错误码，不记录文件原行或快麦原始响应。
 - `functions/api/platform/_shared/environmentReadiness.js`：环境识别、变量/绑定/表存在性检查和脱敏响应；无外部副作用，不重试。
-- `functions/api/platform/_shared/productionDataAccess.js`：共享个人令牌哈希、能力与组织身份校验，并为运维修复网关提供短时解锁、快照和审计；写入前置于业务状态写入，失败时业务写入不得继续。
+- `functions/api/platform/_shared/productionDataAccess.js`：共享个人令牌哈希、能力与组织身份校验，并为运维修复网关提供短时解锁、快照和审计；显式 `core_developer` 能力还可建立本地前端使用的正式 API 会话。写入前置于业务状态写入，失败时业务写入不得继续。
 
-生产数据访问顺序固定为：D1 可用 → 个人令牌哈希有效 → 钉钉 `userId/unionId` 仍为 active executive → 能力存在 → 写入解锁有效 → 基线版本一致 → 快照与 pending 审计成功 → 业务写入 → 审计完成。令牌校验不自动重试；相同基线版本冲突返回 409，由用户刷新后重新操作。
+普通生产修复访问顺序固定为：控制 SQLite 可用 → 个人令牌哈希有效 → 钉钉
+`userId/unionId` 仍为 active executive → 能力存在。核心开发访问额外要求
+`core_developer`，允许 active 稳定成员获得 effective executive 数据会话，但保留实际
+组织角色；GET/HEAD 要求 read，其余方法要求 write。后续业务路由、数据环境、版本、
+快照、审计和 Provider 授权顺序不变。令牌校验不自动重试。
 
 ## 新中间件要求
 

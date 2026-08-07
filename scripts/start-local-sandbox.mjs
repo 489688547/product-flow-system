@@ -114,7 +114,7 @@ async function main() {
   if (!existsSync(resolve(ROOT, "dist", "index.html"))) {
     throw new Error("缺少 dist/index.html；请先运行 npm run build。");
   }
-  const sharedEnv = loadSharedEnv(ROOT, { envPath: resolveSharedEnvPath(ROOT) });
+  const sharedEnv = loadSharedEnv(ROOT, { envPath: resolveSharedEnvPath(ROOT), optional: true });
   prepareSandboxRuntime(sharedEnv.values);
   console.log("正在启动本地代码 · 本地 SQLite 沙箱；不会连接 Cloudflare 或生产数据库...");
   startChild("Wrangler local", executable("wrangler"), [

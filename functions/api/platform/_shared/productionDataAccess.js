@@ -85,13 +85,14 @@ export async function authorizeProductionToken(rawToken, db, { capability = "rea
   }
   const identity = await db.prepare(`SELECT corp_id, user_id, union_id, name, department, title, role, active
     FROM product_flow_org_members WHERE user_id = ?`).bind(row.user_id).first();
-  if (!identity || !identity.active || identity.union_id !== row.union_id || identity.role !== "executive") {
+  const isCoreDeveloper = capabilities.includes("core_developer");
+  if (!identity || !identity.active || identity.union_id !== row.union_id || (identity.role !== "executive" && !isCoreDeveloper)) {
     throw productionAccessError("当前钉钉身份不再具备生产数据最高权限。", 403, "PRODUCTION_ROLE_REQUIRED");
   }
   await db.prepare("UPDATE production_data_access_tokens SET last_used_at = ? WHERE token_hash = ?")
     .bind(now.toISOString(), tokenHash)
     .run();
-  return {
+  const access = {
     tokenHash,
     capabilities,
     corpId: identity.corp_id || "",
@@ -100,12 +101,37 @@ export async function authorizeProductionToken(rawToken, db, { capability = "rea
     name: identity.name || row.name || row.user_id,
     department: identity.department || "",
     title: identity.title || "",
-    role: identity.role
+    role: isCoreDeveloper ? "executive" : identity.role
   };
+  if (isCoreDeveloper) {
+    access.organizationRole = identity.role;
+    access.loginMode = "local-online-account";
+  }
+  return access;
 }
 
 export async function authorizeProductionAccess(request, db, options = {}) {
   return authorizeProductionToken(bearerToken(request), db, options);
+}
+
+export function coreDeveloperCapabilityForMethod(method = "GET") {
+  return ["GET", "HEAD"].includes(String(method).toUpperCase()) ? "read" : "write";
+}
+
+export async function authorizeCoreDeveloperRequest(request, db, options = {}) {
+  const rawToken = String(request.headers.get("x-pfs-core-developer-token") || "").trim();
+  const access = await authorizeProductionToken(rawToken, db, {
+    ...options,
+    capability: options.capability || coreDeveloperCapabilityForMethod(request.method)
+  });
+  if (!access.capabilities.includes("core_developer")) {
+    throw productionAccessError(
+      "当前个人令牌不是核心开发者令牌。",
+      403,
+      "CORE_DEVELOPER_CAPABILITY_REQUIRED"
+    );
+  }
+  return access;
 }
 
 export function validateUnlockInput(input = {}) {

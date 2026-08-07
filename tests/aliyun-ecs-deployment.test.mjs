@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readdir, readlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -60,12 +60,15 @@ test("Aliyun production, test API, static test frontend, and OSS backup are decl
     "DINGTALK_APP_KEY",
     "DINGTALK_APP_SECRET",
     "PLATFORM_CREDENTIAL_MASTER_KEY",
-    "DEMO_DATA_MASKING_KEY"
+    "DEMO_DATA_MASKING_KEY",
+    "PFS_PUBLIC_API_ORIGIN",
+    "PFS_PUBLIC_APP_ORIGIN"
   ]);
   assert.deepEqual(runtime.platforms, ["aliyun", "dingtalk"]);
   assert.deepEqual(runtime.requiredIn, ["production"]);
   assert.deepEqual(testApi.platforms, ["aliyun", "dingtalk"]);
   assert.deepEqual(testApi.requiredIn, ["preview"]);
+  assert.equal(testApi.envVars.includes("PFS_PUBLIC_API_ORIGIN"), true);
   assert.deepEqual(staticTest.platforms, ["cloudflare-pages"]);
   assert.deepEqual(staticTest.requiredIn, ["preview"]);
   assert.ok(backup, "Aliyun OSS backup capability must be declared");
@@ -74,6 +77,7 @@ test("Aliyun production, test API, static test frontend, and OSS backup are decl
   assert.ok(aliyun.codePaths.includes("deploy/aliyun/**"));
   assert.ok(aliyun.codePaths.includes("scripts/aliyun/**"));
   assert.ok(aliyun.capabilities.includes("ECS 容器运行时"));
+  assert.ok(aliyun.capabilities.includes("Node/Hono 正式运行时"));
   assert.ok(aliyun.capabilities.includes("OSS 私有备份"));
   assert.ok(aliyun.domains.includes("deshan-tiyes.cn"));
   assert.match(cloudflareWrangler, /compatibility_date = "2026-07-18"/);
@@ -98,11 +102,9 @@ test("Aliyun runtime rejects local executive bypass and unsafe paths", async () 
     PFS_RUNTIME_PORT: "8080",
     PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler",
     PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env",
-    PFS_WRANGLER_CONFIG: "/app/deploy/aliyun/wrangler.toml",
-    PFS_RUNTIME_WORK_DIR: "/var/lib/product-flow/runtime",
     PFS_ASSETS_DIR: "/app/dist",
-    PFS_FUNCTIONS_DIR: "/app/functions",
-    PFS_WRANGLER_BIN: "/app/node_modules/.bin/wrangler"
+    PFS_FUNCTIONS_BUNDLE: "/app/dist-server/index.js",
+    PFS_PUBLIC_API_ORIGIN: "https://deshan-tiyes.cn"
   };
 
   assert.throws(
@@ -128,6 +130,7 @@ test("Aliyun runtime rejects local executive bypass and unsafe paths", async () 
     ...valid,
     PFS_RUNTIME_NAME: "test",
     PFS_RUNTIME_PORT: "8081",
+    PFS_PUBLIC_API_ORIGIN: "https://api-test.deshan-tiyes.cn",
     PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn",
     PFS_ALLOWED_BROWSER_ORIGIN: "https://test.deshan-tiyes.cn"
   });
@@ -143,70 +146,6 @@ test("Aliyun runtime rejects local executive bypass and unsafe paths", async () 
     }),
     /HTTPS/
   );
-});
-
-test("Aliyun runtime builds a non-interactive local Pages command without secret values", async () => {
-  const {
-    buildPagesDevArgs,
-    runtimeWorkingDirectory,
-    validateRuntimeEnvironment
-  } = await import("../scripts/aliyun/runtime-config.mjs");
-  const config = validateRuntimeEnvironment({
-    PFS_RUNTIME_PORT: "8080",
-    PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler",
-    PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env",
-    PFS_WRANGLER_CONFIG: "/app/deploy/aliyun/wrangler.toml",
-    PFS_RUNTIME_WORK_DIR: "/var/lib/product-flow/runtime",
-    PFS_ASSETS_DIR: "/app/dist",
-    PFS_FUNCTIONS_DIR: "/app/functions",
-    PFS_WRANGLER_BIN: "/app/node_modules/.bin/wrangler",
-    DINGTALK_APP_SECRET: "must-not-appear"
-  });
-  const args = buildPagesDevArgs(config);
-
-  assert.deepEqual(args, [
-    "pages", "dev", "/var/lib/product-flow/runtime/dist",
-    "--ip", "127.0.0.1",
-    "--port", "8080",
-    "--persist-to", "/var/lib/product-flow/wrangler",
-    "--env-file", "/run/pfs/runtime.env",
-    "--show-interactive-dev-session=false",
-    "--log-level", "info"
-  ]);
-  assert.equal(runtimeWorkingDirectory(config), "/var/lib/product-flow/runtime");
-  assert.equal(args.includes("--config"), false);
-  assert.equal(JSON.stringify(args).includes("must-not-appear"), false);
-});
-
-test("Aliyun runtime prepares a writable Pages workspace without copying application data", async () => {
-  const { prepareRuntimeWorkspace, validateRuntimeEnvironment } = await import(
-    "../scripts/aliyun/runtime-config.mjs"
-  );
-  const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-workspace-"));
-  const assetsDir = join(tempRoot, "app", "dist");
-  const functionsDir = join(tempRoot, "app", "functions");
-  const configPath = join(tempRoot, "app", "deploy", "wrangler.toml");
-  const workDir = join(tempRoot, "data", "runtime");
-  await mkdir(assetsDir, { recursive: true });
-  await mkdir(functionsDir, { recursive: true });
-  await mkdir(resolve(configPath, ".."), { recursive: true });
-  await writeFile(configPath, 'name = "test"\n', "utf8");
-  const config = validateRuntimeEnvironment({
-    PFS_RUNTIME_ENV_FILE: join(tempRoot, "runtime.env"),
-    PFS_WRANGLER_CONFIG: configPath,
-    PFS_RUNTIME_WORK_DIR: workDir,
-    PFS_ASSETS_DIR: assetsDir,
-    PFS_FUNCTIONS_DIR: functionsDir,
-    PFS_WRANGLER_PERSIST_DIR: join(tempRoot, "data", "wrangler"),
-    PFS_WRANGLER_BIN: join(tempRoot, "wrangler")
-  });
-
-  prepareRuntimeWorkspace(config);
-
-  assert.equal(await readFile(join(workDir, "wrangler.toml"), "utf8"), 'name = "test"\n');
-  assert.equal(await readlink(join(workDir, ".dev.vars")), config.envFile);
-  assert.equal(await readlink(join(workDir, "dist")), assetsDir);
-  assert.equal(await readlink(join(workDir, "functions")), functionsDir);
 });
 
 test("DingTalk OAuth on the Aliyun HTTPS origin keeps its callback same-origin", async () => {
@@ -362,12 +301,14 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.equal(service.build.context, "../..");
   assert.equal(service.build.dockerfile, "Dockerfile.aliyun");
   assert.equal(service.build.args.PFS_BUILD_COMMIT, "${PFS_BUILD_COMMIT:-}");
-  assert.match(dockerfile, /FROM node:22-bookworm-slim AS build/);
+  assert.match(dockerfile, /FROM node:24-bookworm-slim AS build/);
   assert.match(dockerfile, /ARG PFS_BUILD_COMMIT/);
   assert.match(dockerfile, /apt-get install -y --no-install-recommends git/);
   assert.match(dockerfile, /apt-get install -y --no-install-recommends ca-certificates/);
   assert.match(dockerfile, /SSL_CERT_FILE=\/etc\/ssl\/certs\/ca-certificates\.crt/);
-  assert.match(dockerfile, /npm run build && rm -rf \.git/);
+  assert.match(dockerfile, /npm run build:aliyun-runtime/);
+  assert.match(dockerfile, /npm prune --omit=dev/);
+  assert.doesNotMatch(dockerfile, /PFS_WRANGLER_BIN/);
   assert.doesNotMatch(dockerignore, /^\.git$/m);
   assert.match(dockerfile, /CMD \["node", "scripts\/aliyun\/start-runtime\.mjs"\]/);
   assert.deepEqual(service.ports, ["127.0.0.1:8080:8080"]);
@@ -378,6 +319,7 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.equal(testService.environment.PFS_RUNTIME_NAME, "test");
   assert.equal(testService.environment.PFS_RUNTIME_PORT, "8081");
   assert.equal(testService.environment.PFS_WRANGLER_PERSIST_DIR, "/var/lib/product-flow-test/wrangler");
+  assert.equal(testService.environment.PFS_PUBLIC_API_ORIGIN, "https://api-test.deshan-tiyes.cn");
   assert.equal(testService.environment.LOCAL_ONLINE_ACCOUNT_MODE, "0");
   assert.equal(testService.mem_limit, "512m");
   assert.deepEqual(testService.volumes, [
@@ -391,6 +333,8 @@ test("Aliyun compose binds only to loopback and joins the existing proxy network
   assert.match(compose.networks.proxy.name, /nginx-proxy-manage_default/);
   assert.equal(service.restart, "unless-stopped");
   assert.equal(service.environment.PFS_RUNTIME_HOST, "0.0.0.0");
+  assert.equal(service.environment.PFS_PUBLIC_API_ORIGIN, "https://deshan-tiyes.cn");
+  assert.match(JSON.stringify(service.healthcheck), /healthz/);
   assert.ok(service.healthcheck);
   assert.equal(JSON.stringify(compose).includes("DINGTALK_APP_SECRET:"), false);
   assert.match(runbook, /chown -R 1000:1000 \/opt\/product-flow\/data/);
@@ -404,7 +348,9 @@ test("Aliyun native systemd service is loopback-only and resource bounded", asyn
 
   assert.match(unit, /^User=pfs$/m);
   assert.match(unit, /^Environment=PFS_RUNTIME_HOST=127\.0\.0\.1$/m);
-  assert.match(unit, /^Environment=PFS_RUNTIME_WORK_DIR=\/opt\/product-flow\/data\/runtime$/m);
+  assert.match(unit, /^Environment=PFS_FUNCTIONS_BUNDLE=\/opt\/product-flow\/app\/dist-server\/index\.js$/m);
+  assert.match(unit, /^ExecStart=\/opt\/node-v24\.18\.0\/bin\/node /m);
+  assert.doesNotMatch(unit, /PFS_WRANGLER_BIN/);
   assert.match(unit, /^MemoryMax=768M$/m);
   assert.match(unit, /^NoNewPrivileges=true$/m);
   assert.match(unit, /^ReadWritePaths=\/opt\/product-flow\/data$/m);

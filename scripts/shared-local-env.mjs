@@ -41,6 +41,9 @@ export function parseLocalEnv(source) {
 
 export function loadSharedEnv(root, options = {}) {
   const envPath = options.envPath || resolveSharedEnvPath(root, options);
-  if (!existsSync(envPath)) throw new Error("缺少共享 .env，请先在主项目目录配置个人令牌和平台连接。");
+  if (!existsSync(envPath)) {
+    if (options.optional) return { envPath, values: {} };
+    throw new Error("缺少共享 .env，请先在主项目目录配置个人令牌和平台连接。");
+  }
   return { envPath, values: parseLocalEnv(readFileSync(envPath, "utf8")) };
 }

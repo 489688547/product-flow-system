@@ -112,3 +112,25 @@
     `executive`，总览成功读取 26 项业务待办。
   - 2026-08-06：生产冒烟通过 `f551714ce43d`；测试前端和隔离测试 API
     恢复后冒烟通过 `7c9352ba4ae5`。
+
+- [x] 用 Node.js 24 + Hono 正式运行时替换 Wrangler Pages Dev
+  - 根因：页面冷启动并发使 Wrangler/esbuild 开发运行时以 exit 1 退出；两个容器
+    均无 cgroup OOM、无 `memory.failcnt`，2 GiB 主机内存不是已证实根因。
+  - 设计：构建期编译 Functions bundle，运行时使用 Hono、SQLite Worker Thread
+    和现有双库文件；生产/测试继续物理隔离。
+  - 验证：失败测试、Node bundle 兼容、事务回滚、容器并发、进程树、钉钉登录、
+    readiness、SQLite/OSS 快照和完整门禁。
+  - 2026-08-07：代码阶段已完成 Hono 入口、构建期 Functions bundle、双 SQLite
+    Worker Thread 与 D1 兼容层；本机真实 bundle 的匿名会话、React 静态回退、
+    事务回滚和优雅关闭测试通过。因本机没有 Docker，Node 24 镜像构建、ECS
+    并发、进程树、钉钉登录和备份验收仍待 ACR/ECS 发布阶段完成。
+  - 2026-08-07：生产 502 复核确认旧正式容器已重启 37 次、测试容器重启 4 次，
+    进程树仍包含 Wrangler、esbuild 和 workerd，主机负载约 9.6；不是 cgroup OOM。
+  - 2026-08-07：停止旧容器后分别生成正式和测试双 SQLite 一致性快照
+    `pre-hono-20260807T073424Z`。ACR 构建
+    `c323bdf0-8d31-4d16-bffa-a437b5db1e65` 在 72 秒内成功，ECS 从杭州内网拉取
+    `aliyun-latest` 并保留旧 Wrangler 镜像回滚标签。
+  - 2026-08-07：正式与测试 Node/Hono 容器均为 `healthy`、重启次数 0，运行时
+    `/healthz` 返回 `node-hono`，进程树不再包含 Wrangler、workerd 或 esbuild。
+    正式站、正式 healthz 与测试 healthz 均为 200；正式/测试容器分别约 190 MiB
+    与 46 MiB，空闲 CPU 接近 0%，主机负载回落到约 1.0。

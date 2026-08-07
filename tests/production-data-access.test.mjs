@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import test from "node:test";
 
 const accessModulePath = resolve("functions/api/platform/_shared/productionDataAccess.js");
+const middlewareModulePath = resolve("functions/api/_middleware.js");
 const unlockRoutePath = resolve("functions/api/platform/v1/production-write-session.js");
 const stateRoutePath = resolve("functions/api/platform/v1/production-data/state.js");
 
@@ -204,6 +205,7 @@ async function loadRoutes() {
   assert.equal(existsSync(stateRoutePath), true, "production state gateway must exist");
   return {
     access: await import(accessModulePath),
+    middleware: await import(middlewareModulePath),
     unlock: await import(unlockRoutePath),
     state: await import(stateRoutePath)
   };
@@ -260,6 +262,84 @@ test("raw personal token enforces the requested capability", async () => {
     () => access.authorizeProductionToken(raw, db, { capability: "write" }),
     error => error.code === "PRODUCTION_CAPABILITY_REQUIRED"
   );
+});
+
+test("core developer tokens resolve an effective executive local session while retaining the organization role", async () => {
+  const { access } = await loadRoutes();
+  const db = createProductionDb();
+  const raw = await seedAccess(db, {
+    capabilities: ["read", "write", "core_developer"],
+    role: "product"
+  });
+
+  const authorized = await access.authorizeProductionToken(raw, db, {
+    capability: "read",
+    now: new Date("2026-07-20T03:00:00.000Z")
+  });
+
+  assert.equal(authorized.role, "executive");
+  assert.equal(authorized.organizationRole, "product");
+  assert.equal(authorized.loginMode, "local-online-account");
+});
+
+test("core developer request authentication maps reads and mutations to distinct capabilities", async () => {
+  const { access } = await loadRoutes();
+  const db = createProductionDb();
+  const raw = await seedAccess(db, {
+    capabilities: ["read", "core_developer"],
+    role: "product"
+  });
+
+  const read = await access.authorizeCoreDeveloperRequest(new Request("https://flow.example.com/api/state", {
+    headers: { "x-pfs-core-developer-token": raw }
+  }), db);
+  assert.equal(read.loginMode, "local-online-account");
+
+  await assert.rejects(
+    () => access.authorizeCoreDeveloperRequest(new Request("https://flow.example.com/api/state", {
+      method: "POST",
+      headers: { "x-pfs-core-developer-token": raw }
+    }), db),
+    error => error.code === "PRODUCTION_CAPABILITY_REQUIRED"
+  );
+});
+
+test("ordinary production tokens cannot authenticate as core developers", async () => {
+  const { access } = await loadRoutes();
+  const db = createProductionDb();
+  const raw = await seedAccess(db, { capabilities: ["read", "write"] });
+
+  await assert.rejects(
+    () => access.authorizeCoreDeveloperRequest(new Request("https://flow.example.com/api/state", {
+      headers: { "x-pfs-core-developer-token": raw }
+    }), db),
+    error => error.code === "CORE_DEVELOPER_CAPABILITY_REQUIRED"
+  );
+});
+
+test("API middleware authenticates the public session endpoint from the private core developer header", async () => {
+  const { middleware } = await loadRoutes();
+  const db = createProductionDb();
+  const raw = await seedAccess(db, {
+    capabilities: ["read", "write", "core_developer"],
+    role: "product"
+  });
+  const context = {
+    request: new Request("https://deshan-tiyes.cn/api/auth/session", {
+      headers: { "x-pfs-core-developer-token": raw }
+    }),
+    env: { PRODUCT_FLOW_DB: db },
+    data: {},
+    next: async () => Response.json({ session: context.data.session })
+  };
+
+  const response = await middleware.onRequest(context);
+  const payload = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.equal(payload.session.name, "周荣庆");
+  assert.equal(payload.session.role, "executive");
+  assert.equal(payload.session.organizationRole, "product");
 });
 
 test("production writes require the exact confirmation, reason, and active unlock", async () => {
