@@ -78,5 +78,9 @@ test("release workflows deploy only the static test frontend and verify Aliyun A
   assert.match(smokeWorkflow, /https:\/\/test\.deshan-tiyes\.cn/);
   assert.match(smokeWorkflow, /https:\/\/api-test\.deshan-tiyes\.cn/);
   assert.match(smokeWorkflow, /aliyun,dingtalk/);
+  assert.match(
+    smokeWorkflow,
+    /if \[ "\$GITHUB_REF_NAME" = "main" \]; then[\s\S]*ALLOWED_BROWSER_ORIGIN=""/
+  );
   assert.doesNotMatch(smokeWorkflow, /deshan-tiyes-system\.pages\.dev|cloudflare-d1/);
 });
