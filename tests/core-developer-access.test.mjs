@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import test from "node:test";
 import {
   DeveloperAccessError,
@@ -33,6 +33,29 @@ const validSource = [
   "PRODUCTION_DATA_ACCESS_TOKEN=test-only-personal-token",
   ""
 ].join("\n");
+
+test("README gives a complete fork-to-running core developer path", async () => {
+  const readme = await readFile(resolve("README.md"), "utf8");
+  const packageJson = JSON.parse(await readFile(resolve("package.json"), "utf8"));
+  const envExample = await readFile(resolve(".env.example"), "utf8");
+
+  assert.match(readme, /git clone https:\/\/github\.com\/<你的 GitHub 用户名>\/EC-management-system\.git/);
+  assert.match(readme, /git remote add upstream https:\/\/github\.com\/489688547\/EC-management-system\.git/);
+  assert.match(readme, /git fetch upstream dev/);
+  assert.match(readme, /git switch -c codex\/<功能名> upstream\/dev/);
+  assert.match(readme, /mkdir -p ~\/\.config\/product-flow-system/);
+  assert.match(readme, /mv ~\/Downloads\/developer\.env ~\/\.config\/product-flow-system\/developer\.env/);
+  assert.match(readme, /chmod 600 ~\/\.config\/product-flow-system\/developer\.env/);
+  assert.match(readme, /npm ci[\s\S]*npm start/);
+  assert.match(readme, /核心开发模式[\s\S]*ECS 正式 API/);
+  assert.match(readme, /npm run start:sandbox[\s\S]*本地 SQLite/);
+  assert.match(readme, /npm run build[\s\S]*npm run seed:sandbox[\s\S]*npm run start:sandbox/);
+  assert.doesNotMatch(readme, /pfs_dev_[A-Za-z0-9_-]{20,}/);
+  assert.match(packageJson.scripts["test:api"], /tests\/core-developer-access\.test\.mjs/);
+  assert.match(packageJson.scripts["test:api"], /tests\/local-online-start\.test\.mjs/);
+  assert.match(envExample, /默认本地 SQLite 沙箱无需复制本文件/);
+  assert.match(envExample, /developer\.env[\s\S]*禁止复制到仓库根目录的 \.env/);
+});
 
 test("personal developer access loads only from the fixed 0600 file", async () => {
   const homeDir = await mkdtemp(join(tmpdir(), "pfs-core-access-"));
