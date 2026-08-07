@@ -30,12 +30,13 @@ test("runtime build injects commit metadata without producing Pages Functions ro
     encoding: "utf8",
     env: {
       ...process.env,
-      GITHUB_SHA: "abcdef1234567890",
+      GITHUB_SHA: "1111111111111111",
+      PFS_BUILD_COMMIT: "abcdef1234567890",
       VITE_PFS_API_ORIGIN: "https://api-test.deshan-tiyes.cn"
     }
   });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(readFileSync(resolve(fixture, "dist/index.html"), "utf8"), /pfs-release-commit/);
+  assert.match(readFileSync(resolve(fixture, "dist/index.html"), "utf8"), /pfs-release-commit" content="abcdef1234567890"/);
   assert.equal(existsSync(resolve(fixture, "dist/_headers")), true);
   assert.equal(existsSync(resolve(fixture, "dist/_redirects")), true);
   assert.equal(existsSync(resolve(fixture, "dist/cloudflare-entry.html")), false);
