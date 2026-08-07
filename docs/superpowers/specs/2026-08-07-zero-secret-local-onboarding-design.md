@@ -16,6 +16,8 @@
 
 1. 根目录新增 `README.md`，第一屏给出零 Secret 快速启动：安装依赖、构建、初始化
    本地 SQLite、启动和访问地址。
+   开发成员可以在自己的 fork/分支直接修改前端、后端、迁移、测试和文档，运行本地
+   验证后通过 Pull Request 提交；这一完整代码开发流程不需要生产 Token。
 2. `npm start` 在没有 `.env` 时使用空的本地环境继续启动；存在 `.env` 时仍只读取
    允许的本地值，并继续剔除生产数据 Token、Cloudflare Token 和本地线上模式变量。
 3. `.env.example` 按用途分组并明确标注：默认本地沙箱无需复制此文件；钉钉、快麦、
@@ -40,6 +42,7 @@
 
 1. 在没有根目录 `.env` 的干净 fork 中，`npm run seed:sandbox` 后 `npm start` 不再
    报“缺少共享 .env”或要求个人 Token。
+   成员修改代码后可以重新构建、运行测试并在本地页面验证改动。
 2. `http://127.0.0.1:8127/` 可打开；本地 API 使用仓库 `.wrangler/state` 下的双
    SQLite，且不读取生产库。
 3. README 第一条路径无需任何 Secret；Token 表格明确写出用途、是否必需和获取
