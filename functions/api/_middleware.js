@@ -1,4 +1,5 @@
 import { readSession } from "./auth/_shared/session.js";
+import { authorizeCoreDeveloperRequest, productionAccessError } from "./platform/_shared/productionDataAccess.js";
 import {
   assertEnvironmentWriteVersion,
   dataEnvironmentErrorResponse,
@@ -18,6 +19,24 @@ const JSON_HEADERS = {
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
+}
+
+function coreDeveloperErrorResponse(error) {
+  const resolved = error?.code
+    ? error
+    : productionAccessError("核心开发者认证暂不可用。", 503, "CORE_DEVELOPER_AUTH_UNAVAILABLE", true);
+  const message = resolved.message;
+  const requestId = crypto.randomUUID?.() || `req_${Date.now().toString(36)}`;
+  return jsonResponse({
+    authenticated: false,
+    message,
+    error: {
+      code: resolved.code,
+      message,
+      requestId,
+      retryable: Boolean(resolved.retryable)
+    }
+  }, resolved.status || 500);
 }
 
 const PUBLIC_PATHS = new Set([
@@ -83,6 +102,23 @@ export async function onRequest(context) {
   const finish = response => withBrowserCors(response, originPolicy);
   const path = new URL(context.request.url).pathname.replace(/\/$/, "") || "/";
   let authenticated = false;
+  const coreDeveloperToken = String(context.request.headers.get("x-pfs-core-developer-token") || "").trim();
+  if (coreDeveloperToken) {
+    if (!context.env.PRODUCT_FLOW_DB) {
+      return finish(coreDeveloperErrorResponse(productionAccessError(
+        "核心开发者认证数据库暂不可用。",
+        503,
+        "CORE_DEVELOPER_STORAGE_UNAVAILABLE",
+        true
+      )));
+    }
+    try {
+      context.data.session = await authorizeCoreDeveloperRequest(context.request, context.env.PRODUCT_FLOW_DB);
+      authenticated = true;
+    } catch (error) {
+      return finish(coreDeveloperErrorResponse(error));
+    }
+  }
   if (PUBLIC_PATHS.has(path)) return finish(await context.next());
 
   if (!authenticated) {

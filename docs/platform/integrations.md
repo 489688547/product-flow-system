@@ -59,7 +59,7 @@ Cloudflare Pages 只承载 `dev` 分支构建出的 React 静态文件。构建�
 
 ## 阿里云 ECS 与 OSS
 
-阿里云 ECS 是唯一业务 API 和在线数据库运行时。生产与测试容器通过 Wrangler 本地 Pages-compatible 运行时执行仓库中的 `functions/`；两套环境分别使用独立的正式/展示 SQLite、端口、环境文件和数据卷，公网环境不得启用 `LOCAL_ONLINE_ACCOUNT_MODE`。运行时 Secret 只从只读 `runtime.env` 挂载，
+阿里云 ECS 是唯一业务 API 和在线数据库运行时。生产与测试容器通过 Node.js 24 与 Hono 正式运行时加载构建期 Functions bundle；请求路径不启动 Wrangler、workerd 或 esbuild。两套环境分别使用独立的正式/展示 SQLite Worker、端口、环境文件和数据卷，公网环境不得启用 `LOCAL_ONLINE_ACCOUNT_MODE`。`PFS_PUBLIC_API_ORIGIN` 固定服务端 API 与钉钉 callback Origin，不能由浏览器或 forwarded host 选择。运行时 Secret 只从只读 `runtime.env` 挂载，
 启动器在受限工作目录以 `.dev.vars` 符号链接交给 Pages Functions，不复制进镜像
 或持久化数据。现有 Nginx Proxy Manager 负责 80/443，应用端口
 默认只绑定宿主机回环地址。正式入口为 `https://deshan-tiyes.cn`，测试 API 为 `https://api-test.deshan-tiyes.cn`。

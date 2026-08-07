@@ -3,6 +3,7 @@
 node_modules/
 .local-data/
 dist/
+dist-server/
 .wrangler/
 .superpowers/
 .worktrees/

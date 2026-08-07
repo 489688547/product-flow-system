@@ -225,6 +225,8 @@ test("warning capabilities do not block an otherwise ready production environmen
       DINGTALK_APP_SECRET: "configured",
       PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
       DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY,
+      PFS_PUBLIC_API_ORIGIN: "https://deshan-tiyes.cn",
+      PFS_PUBLIC_APP_ORIGIN: "https://deshan-tiyes.cn",
       COLLECTOR_EXPERIMENTAL_MODE: "0",
       WEB_COLLECTION_EXPERIMENTAL_MODE: "0"
     },
@@ -286,6 +288,8 @@ test("a server-only production data token can read readiness without an employee
       DINGTALK_APP_SECRET: "configured",
       PLATFORM_CREDENTIAL_MASTER_KEY: TEST_PLATFORM_MASTER_KEY,
       DEMO_DATA_MASKING_KEY: TEST_DEMO_MASKING_KEY,
+      PFS_PUBLIC_API_ORIGIN: "https://deshan-tiyes.cn",
+      PFS_PUBLIC_APP_ORIGIN: "https://deshan-tiyes.cn",
       COLLECTOR_EXPERIMENTAL_MODE: "0",
       WEB_COLLECTION_EXPERIMENTAL_MODE: "0"
     },

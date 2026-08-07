@@ -472,6 +472,7 @@ const integrationRegistry = {
         "生产前端与 API",
         "测试 API",
         "ECS 容器运行时",
+        "Node/Hono 正式运行时",
         "双 SQLite 持久化",
         "版本化数据口径与计算结果",
         "D1 导入迁移",
@@ -510,6 +511,7 @@ const integrationRegistry = {
         "migrations/0002_hr_management_core.sql",
         "migrations/0004_data_standards.sql",
         "server.mjs",
+        "server/aliyun/**",
         "Dockerfile.aliyun",
         "deploy/aliyun/**",
         "scripts/aliyun/**",
@@ -519,6 +521,7 @@ const integrationRegistry = {
         "docs/platform/integrations.md"
       ],
       "envVars": [
+        "PFS_PUBLIC_API_ORIGIN",
         "PFS_PUBLIC_APP_ORIGIN",
         "PFS_ALLOWED_BROWSER_ORIGIN",
         "OSS_BACKUP_URI",
@@ -554,6 +557,7 @@ const integrationRegistry = {
         "functions/api/platform/_shared/dataStandards.js",
         "migrations/0004_data_standards.sql",
         "docs/decisions/2026-07-29-aliyun-ecs-sqlite-transition.md",
+        "docs/decisions/2026-08-07-aliyun-node-hono-runtime.md",
         "docs/platform/integrations.md"
       ],
       "relations": [

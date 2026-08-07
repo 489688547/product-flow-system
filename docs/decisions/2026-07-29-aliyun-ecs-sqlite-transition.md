@@ -2,7 +2,7 @@
 
 - 状态：已采纳
 - 日期：2026-07-29
-- 修订：2026-08-06
+- 修订：2026-08-07
 - 关联事项：DEV-000014
 
 ## 背景
@@ -12,6 +12,10 @@ OSS 存储包和域名。现有服务端由 Pages Functions 与 D1 API 构成，
 Node/RDS 会扩大迁移范围并延长故障窗口。
 
 ## 决策
+
+> 2026-08-07 修订：下列第 1、2 项中的 Wrangler 运行时已被
+> `2026-08-07-aliyun-node-hono-runtime.md` 取代；SQLite、OSS、网络、隔离与 RDS
+> 触发条件继续有效。
 
 1. ECS 通过 Wrangler 本地 Pages 运行时执行现有 Functions，两个 D1 binding
    映射为数据卷内的独立本地 SQLite。
