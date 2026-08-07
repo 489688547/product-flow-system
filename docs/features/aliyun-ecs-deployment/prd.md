@@ -5,7 +5,7 @@
 - 状态：开发中
 - 负责人：周荣庆
 - 研发待办：DEV-000014
-- 最近更新：2026-08-06
+- 最近更新：2026-08-07
 
 ## 背景与问题
 
@@ -22,8 +22,8 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 
 ## 目标
 
-1. 在 ECS 上运行现有 React 静态资源与 Pages Functions，业务请求不再执行
-   Cloudflare Worker。
+1. 在 ECS 上运行现有 React 静态资源与正式 Node.js API 服务，业务请求不再执行
+   Cloudflare Worker，也不再通过 `wrangler pages dev`、workerd 或运行时 esbuild。
 2. 把正式与展示 D1 通过受控导出、校验和导入迁移到 ECS 持久化 SQLite。
 3. 保持现有钉钉登录、权限、数据环境、快麦采集和平台凭证边界不变。
 4. 生成可校验的本地数据库备份并上传私有 OSS。
@@ -37,7 +37,8 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 - 不把 OSS 当作在线数据库，也不在本次引入 CDN。
 - 不删除用于测试静态前端的 Cloudflare Pages 项目；删除 Pages Functions、
   Workers 和 D1 运行依赖。
-- 不重构 219 个 Pages Functions 为第二套 Node API。
+- 不在首次切换中逐个重写 229 个 Pages Functions；先在镜像构建阶段编译为单一
+  Fetch bundle，由 Node/Hono 生产入口加载，再按模块逐步迁移为原生 Hono 路由。
 
 ## 用户与权限
 
@@ -58,12 +59,24 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 
 1. 浏览器通过 `deshan-tiyes.cn` 访问 Nginx Proxy Manager。
 2. Nginx Proxy Manager 把请求代理到同 Docker 网络的应用容器。
-3. 生产容器使用 Wrangler/workerd 兼容层运行现有 Functions，并使用生产 SQLite。
+3. 生产容器使用 Node.js 24 LTS 与 Hono 运行预构建 Functions bundle；运行时不
+   包含 Wrangler 监督进程、workerd 开发服务或 esbuild service。
 4. `api-test.deshan-tiyes.cn` 指向独立测试容器和测试 SQLite；只允许
    `https://test.deshan-tiyes.cn` 跨域访问。
 5. Cloudflare Pages 仅输出 `dev` 分支静态文件，构建时注入测试 API Origin；
    不部署 Functions、Workers、D1 binding 或业务 Secret。
 6. 定时任务生成生产数据库 SHA-256 清单并上传私有 OSS Bucket。
+
+## 运行时稳定性规则
+
+- Pages Functions 只允许在镜像构建阶段通过 Wrangler 编译；容器启动和请求路径
+  不得调用 Wrangler、Miniflare、workerd 或 esbuild。
+- Node 入口以 `PFS_PUBLIC_API_ORIGIN` 重建服务端 Request URL；生产值为
+  `https://deshan-tiyes.cn`，测试值为 `https://api-test.deshan-tiyes.cn`。
+- SQLite 通过业务中立的 D1 兼容适配器提供 `prepare`、`batch`、`first`、`all`
+  和 `run`；数据库工作在 Worker Thread 执行，慢查询不得阻塞 HTTP 事件循环。
+- 每个数据库开启 WAL、外键和 busy timeout；`batch` 必须保持全有或全无事务。
+- 生产与测试继续各运行单实例；SQLite 阶段不允许多实例共享同一写数据卷。
 
 ## 业务规则
 
@@ -113,6 +126,8 @@ Cloudflare Pages Functions 已出现 `Worker exceeded CPU time limit`。2026-07-
 7. Cloudflare 测试部署产物不包含 Functions bundle、D1 binding 或业务 Secret；
    网络请求只发送到 `api-test.deshan-tiyes.cn`。
 8. 真实钉钉 PC/WebView 在生产域名完成 OAuth、会话和业务页面验收。
+9. 容器进程树不包含 Wrangler、workerd 或 esbuild；页面冷启动并发不得导致
+   Node 进程退出，匿名会话、静态资源和至少两个数据库重查询可同时完成。
 
 ## 上线与回滚
 

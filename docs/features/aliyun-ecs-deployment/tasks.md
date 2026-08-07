@@ -112,3 +112,11 @@
     `executive`，总览成功读取 26 项业务待办。
   - 2026-08-06：生产冒烟通过 `f551714ce43d`；测试前端和隔离测试 API
     恢复后冒烟通过 `7c9352ba4ae5`。
+
+- [ ] 用 Node.js 24 + Hono 正式运行时替换 Wrangler Pages Dev
+  - 根因：页面冷启动并发使 Wrangler/esbuild 开发运行时以 exit 1 退出；两个容器
+    均无 cgroup OOM、无 `memory.failcnt`，2 GiB 主机内存不是已证实根因。
+  - 设计：构建期编译 Functions bundle，运行时使用 Hono、SQLite Worker Thread
+    和现有双库文件；生产/测试继续物理隔离。
+  - 验证：失败测试、Node bundle 兼容、事务回滚、容器并发、进程树、钉钉登录、
+    readiness、SQLite/OSS 快照和完整门禁。
