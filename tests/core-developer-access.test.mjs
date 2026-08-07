@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { chmod, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -13,6 +13,11 @@ import {
   applyCoreDeveloperProxyHeaders,
   coreDeveloperProxyDecision
 } from "../scripts/core-developer-proxy.mjs";
+import {
+  CoreDeveloperIssuanceError,
+  issueCoreDeveloperAccess
+} from "../scripts/issue-core-developer-access.mjs";
+import { createD1Database } from "../server/aliyun/sqlite-d1.mjs";
 
 async function accessFixture(source, mode = 0o600) {
   const homeDir = await mkdtemp(join(tmpdir(), "pfs-core-access-"));
@@ -104,4 +109,91 @@ test("local core proxy injects the private token upstream and removes browser or
   assert.equal(headers.get("x-pfs-core-developer-token"), "server-only-test-token");
   assert.equal(headers.has("origin"), false);
   assert.equal(headers.has("referer"), false);
+});
+
+async function issuanceFixture({ active = 1, unionId = "union-dev-1" } = {}) {
+  const directory = await mkdtemp(join(tmpdir(), "pfs-core-issue-"));
+  const db = createD1Database({ file: join(directory, "control.sqlite") });
+  await db.exec(`CREATE TABLE product_flow_org_members (
+    corp_id TEXT NOT NULL, user_id TEXT NOT NULL, union_id TEXT, name TEXT NOT NULL,
+    department TEXT, title TEXT, role TEXT NOT NULL, active INTEGER NOT NULL, synced_at TEXT NOT NULL,
+    PRIMARY KEY (corp_id, user_id)
+  )`);
+  await db.prepare(`INSERT INTO product_flow_org_members
+    (corp_id, user_id, union_id, name, department, title, role, active, synced_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+    "corp-main", "developer-1", unionId, "测试开发者", "产品部", "产品经理", "product", active,
+    "2026-08-07T08:00:00.000Z"
+  ).run();
+  return { directory, db, outputPath: join(directory, "delivery", "developer.env") };
+}
+
+test("controlled issuance stores only a hash and writes one private developer file", async () => {
+  const fixture = await issuanceFixture();
+  try {
+    const result = await issueCoreDeveloperAccess({
+      db: fixture.db,
+      userId: "developer-1",
+      outputPath: fixture.outputPath,
+      apiUrl: "https://deshan-tiyes.cn",
+      now: new Date("2026-08-07T08:30:00.000Z"),
+      randomBytes: () => Buffer.alloc(32, 7),
+      repositoryRoots: []
+    });
+    const tokenRow = await fixture.db.prepare("SELECT * FROM production_data_access_tokens WHERE user_id = ?")
+      .bind("developer-1").first();
+    const source = await readFile(fixture.outputPath, "utf8");
+
+    assert.deepEqual(JSON.parse(tokenRow.capabilities), ["read", "write", "core_developer"]);
+    assert.match(tokenRow.token_hash, /^[a-f0-9]{64}$/);
+    assert.equal((await stat(fixture.outputPath)).mode & 0o777, 0o600);
+    assert.match(source, /^PRODUCTION_DATA_API_URL=https:\/\/deshan-tiyes\.cn$/m);
+    assert.match(source, /^PRODUCTION_DATA_ACCESS_TOKEN=pfs_dev_/m);
+    assert.equal(JSON.stringify(result).includes("pfs_dev_"), false);
+    assert.deepEqual(Object.keys(result).sort(), ["expiresAt", "fingerprint", "path"]);
+  } finally {
+    await fixture.db.close();
+  }
+});
+
+test("controlled issuance rejects inactive, incomplete, duplicate, and repository-contained targets", async () => {
+  for (const identity of [{ active: 0 }, { unionId: "" }]) {
+    const fixture = await issuanceFixture(identity);
+    try {
+      await assert.rejects(() => issueCoreDeveloperAccess({
+        db: fixture.db,
+        userId: "developer-1",
+        outputPath: fixture.outputPath,
+        apiUrl: "https://deshan-tiyes.cn",
+        repositoryRoots: []
+      }), error => error instanceof CoreDeveloperIssuanceError);
+    } finally {
+      await fixture.db.close();
+    }
+  }
+
+  const fixture = await issuanceFixture();
+  try {
+    const options = {
+      db: fixture.db,
+      userId: "developer-1",
+      outputPath: fixture.outputPath,
+      apiUrl: "https://deshan-tiyes.cn",
+      repositoryRoots: []
+    };
+    await issueCoreDeveloperAccess(options);
+    await assert.rejects(() => issueCoreDeveloperAccess({
+      ...options,
+      outputPath: join(fixture.directory, "delivery", "duplicate.env")
+    }), error =>
+      error instanceof CoreDeveloperIssuanceError && error.code === "CORE_DEVELOPER_TOKEN_EXISTS"
+    );
+    await assert.rejects(() => issueCoreDeveloperAccess({
+      ...options,
+      outputPath: join(fixture.directory, "inside-repo.env"),
+      repositoryRoots: [fixture.directory]
+    }), error => error instanceof CoreDeveloperIssuanceError && error.code === "CORE_DEVELOPER_OUTPUT_FORBIDDEN");
+  } finally {
+    await fixture.db.close();
+  }
 });

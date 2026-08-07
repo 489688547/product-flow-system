@@ -36,6 +36,7 @@ COPY --from=build --chown=node:node /app/dist /app/dist
 COPY --from=build --chown=node:node /app/dist-server /app/dist-server
 COPY --from=build --chown=node:node /app/server/aliyun /app/server/aliyun
 COPY --from=build --chown=node:node /app/scripts/aliyun /app/scripts/aliyun
+COPY --from=build --chown=node:node /app/scripts/issue-core-developer-access.mjs /app/scripts/issue-core-developer-access.mjs
 RUN mkdir -p /var/lib/product-flow/wrangler /run/pfs \
     && chown -R node:node /var/lib/product-flow /run/pfs
 

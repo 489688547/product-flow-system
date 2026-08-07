@@ -105,6 +105,18 @@ test("Aliyun declares production, test API, and static test frontend separately"
   assert.deepEqual(staticTest.tables, []);
 });
 
+test("core developer access declares a server-only personal token and control tables", () => {
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const capability = manifest.capabilities.find(entry => entry.id === "local-core-developer-access");
+
+  assert.deepEqual(capability.requiredIn, []);
+  assert.deepEqual(capability.platforms, ["aliyun", "dingtalk"]);
+  assert.deepEqual(capability.envVars, ["PFS_CORE_DEVELOPER_TOKEN"]);
+  assert.deepEqual(capability.bindings, ["PRODUCT_FLOW_DB"]);
+  assert.equal(capability.tables.includes("production_data_access_tokens"), true);
+  assert.match(capability.description, /浏览器不接触 Token/);
+});
+
 test("display data environment declares separate control and business D1 requirements", () => {
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const capability = manifest.capabilities.find(entry => entry.id === "display-data-environment");

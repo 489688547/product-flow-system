@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-08-06",
+  "updatedAt": "2026-08-07",
   "capabilities": [
     {
       "id": "shared-production-data",
@@ -114,6 +114,17 @@
       "envVars": [],
       "bindings": ["PRODUCT_FLOW_DB", "DEMO_FLOW_DB"],
       "tables": []
+    },
+    {
+      "id": "local-core-developer-access",
+      "name": "核心开发者本地正式数据访问",
+      "description": "个人 0600 文件由本机 Node 代理读取并向已部署阿里云 ECS API 注入 Token；浏览器不接触 Token，不直接连接 SQLite，未部署后端仍使用本地沙箱或固定测试 API。",
+      "platforms": ["aliyun", "dingtalk"],
+      "requiredIn": [],
+      "level": "warning",
+      "envVars": ["PFS_CORE_DEVELOPER_TOKEN"],
+      "bindings": ["PRODUCT_FLOW_DB"],
+      "tables": ["production_data_access_tokens", "production_data_audit", "product_flow_org_members"]
     },
     {
       "id": "platform-credential-vault",
