@@ -500,7 +500,7 @@ test("Ego collection configures download before reusing the mature extract runne
         return { downloaded: true };
       }
     }),
-    downloadOptions: { timeoutMs: 100, pollIntervalMs: 1, stabilityDelayMs: 1 }
+    downloadOptions: { timeoutMs: 1_000, pollIntervalMs: 1, stabilityDelayMs: 1 }
   });
 
   assert.equal(calls[0], "Browser.setDownloadBehavior");

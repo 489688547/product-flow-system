@@ -70,6 +70,7 @@ test("release workflows deploy only the static test frontend and verify Aliyun A
 
   assert.match(staticWorkflow, /deshan-tiyes-system-dev/);
   assert.match(staticWorkflow, /VITE_PFS_API_ORIGIN:\s*https:\/\/api-test\.deshan-tiyes\.cn/);
+  assert.match(staticWorkflow, /github\.event\.workflow_run\.head_branch == 'dev'/);
   assert.match(staticWorkflow, /RUNNER_TEMP/);
   assert.match(staticWorkflow, /functions|_routes\.json/);
   assert.doesNotMatch(staticWorkflow, /PRODUCT_FLOW_DB|DEMO_FLOW_DB|DINGTALK_APP_SECRET/);
@@ -78,5 +79,9 @@ test("release workflows deploy only the static test frontend and verify Aliyun A
   assert.match(smokeWorkflow, /https:\/\/test\.deshan-tiyes\.cn/);
   assert.match(smokeWorkflow, /https:\/\/api-test\.deshan-tiyes\.cn/);
   assert.match(smokeWorkflow, /aliyun,dingtalk/);
+  assert.match(
+    smokeWorkflow,
+    /if \[ "\$GITHUB_REF_NAME" = "main" \]; then[\s\S]*ALLOWED_BROWSER_ORIGIN=""/
+  );
   assert.doesNotMatch(smokeWorkflow, /deshan-tiyes-system\.pages\.dev|cloudflare-d1/);
 });

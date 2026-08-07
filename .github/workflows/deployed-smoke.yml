@@ -28,11 +28,12 @@ jobs:
           TARGET_URL: ${{ github.ref_name == 'main' && 'https://deshan-tiyes.cn' || 'https://test.deshan-tiyes.cn' }}
           API_URL: ${{ github.ref_name == 'main' && 'https://deshan-tiyes.cn' || 'https://api-test.deshan-tiyes.cn' }}
           EXPECT_ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
-          ALLOWED_BROWSER_ORIGIN: ${{ github.ref_name == 'main' && '' || 'https://test.deshan-tiyes.cn' }}
+          ALLOWED_BROWSER_ORIGIN: https://test.deshan-tiyes.cn
         run: |
           EXTRA_ARGS=()
           if [ "$GITHUB_REF_NAME" = "main" ]; then
             EXTRA_ARGS+=(--forbid-server-env-dev)
+            ALLOWED_BROWSER_ORIGIN=""
           fi
           for attempt in $(seq 1 30); do
             if node scripts/check-deployed-smoke.mjs \
