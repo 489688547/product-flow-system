@@ -1,6 +1,6 @@
 # Fork 后零 Secret 本地启动设计
 
-- 状态：待实现
+- 状态：由 `docs/features/core-developer-access/` 扩展并取代
 - 日期：2026-08-07
 - 分支：`codex/aliyun-deployment`
 - 关联事项：`DEV-000014`
