@@ -11,6 +11,8 @@ test("the standard local launcher selects personal access or local SQLite sandbo
   const packageJson = JSON.parse(source("package.json"));
   const standardLauncher = source("scripts/start-local.mjs");
   const launcher = source("scripts/start-local-sandbox.mjs");
+  const coreLauncher = source("scripts/start-core-developer.mjs");
+  const coreProxy = source("scripts/core-developer-proxy.mjs");
   const sharedEnv = source("scripts/shared-local-env.mjs");
   const viteConfig = source("vite.config.js");
   const finderLauncher = source("启动服务.command");
@@ -32,6 +34,12 @@ test("the standard local launcher selects personal access or local SQLite sandbo
   assert.match(sharedEnv, /resolve\(root, "\.env"\)/);
   assert.match(viteConfig, /VITE_API_TARGET/);
   assert.doesNotMatch(viteConfig, /LOCAL_ONLINE_REQUEST_SECRET|x-pfs-local-online-session/);
+  assert.match(coreLauncher, /loadDeveloperAccess/);
+  assert.match(coreLauncher, /api\/auth\/session/);
+  assert.match(coreLauncher, /PFS_CORE_DEVELOPER_TOKEN/);
+  assert.match(coreProxy, /CORE_DEVELOPER_PROXY_ORIGIN_FORBIDDEN/);
+  assert.match(viteConfig, /coreDeveloperProxy/);
+  assert.doesNotMatch(viteConfig, /VITE_CORE_DEVELOPER_TOKEN/);
   assert.match(finderLauncher, /npm start/);
 });
 

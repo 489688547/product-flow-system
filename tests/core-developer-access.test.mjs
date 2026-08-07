@@ -9,6 +9,10 @@ import {
   loadDeveloperAccess,
   selectLocalRuntime
 } from "../scripts/core-developer-access.mjs";
+import {
+  applyCoreDeveloperProxyHeaders,
+  coreDeveloperProxyDecision
+} from "../scripts/core-developer-proxy.mjs";
 
 async function accessFixture(source, mode = 0o600) {
   const homeDir = await mkdtemp(join(tmpdir(), "pfs-core-access-"));
@@ -65,3 +69,39 @@ test("developer access rejects unsafe files and values", async () => {
   }
 });
 
+test("local core proxy allows the fixed localhost origin and rejects external mutation origins", () => {
+  assert.deepEqual(coreDeveloperProxyDecision({
+    method: "POST",
+    host: "127.0.0.1:8127",
+    origin: "http://127.0.0.1:8127"
+  }), { allowed: true, status: 200, code: "" });
+
+  assert.deepEqual(coreDeveloperProxyDecision({
+    method: "POST",
+    host: "127.0.0.1:8127",
+    origin: "https://evil.example"
+  }), { allowed: false, status: 403, code: "CORE_DEVELOPER_PROXY_ORIGIN_FORBIDDEN" });
+
+  assert.deepEqual(coreDeveloperProxyDecision({
+    method: "POST",
+    host: "127.0.0.1:8127",
+    origin: ""
+  }), { allowed: false, status: 403, code: "CORE_DEVELOPER_PROXY_ORIGIN_REQUIRED" });
+});
+
+test("local core proxy injects the private token upstream and removes browser origin metadata", () => {
+  const headers = new Map([
+    ["origin", "http://127.0.0.1:8127"],
+    ["referer", "http://127.0.0.1:8127/#dashboard"]
+  ]);
+  const proxyRequest = {
+    setHeader(name, value) { headers.set(name.toLowerCase(), value); },
+    removeHeader(name) { headers.delete(name.toLowerCase()); }
+  };
+
+  applyCoreDeveloperProxyHeaders(proxyRequest, "server-only-test-token");
+
+  assert.equal(headers.get("x-pfs-core-developer-token"), "server-only-test-token");
+  assert.equal(headers.has("origin"), false);
+  assert.equal(headers.has("referer"), false);
+});

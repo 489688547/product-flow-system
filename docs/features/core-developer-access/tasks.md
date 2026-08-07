@@ -21,7 +21,7 @@
   - 2026-08-07：固定路径、0600/所有者/HTTPS Origin/空 Token 校验、缺文件沙箱
     回退和 `npm start` 分流测试共 8 项通过；`npm run start:sandbox` 保持强制本地。
 
-- [ ] 核心开发认证与本地代理
+- [x] 核心开发认证与本地代理
   - 依赖：个人文件合同。
   - 文件：`vite.config.js`、`functions/api/_middleware.js`、认证路由、平台测试。
   - 输入：服务端个人 Token 和请求方法。
@@ -30,6 +30,9 @@
   - 实现步骤：先扩展授权器，再接 middleware、session 和 Vite 代理。
   - 验证：read/write 映射、身份、Origin 和错误合同测试通过。
   - 提交：`feat(auth): authorize core developers`
+  - 2026-08-07：复用生产个人令牌并增加 `core_developer` 能力；服务端按请求方法映射
+    read/write，本地 Vite 仅在 Node 代理注入 Token，拒绝外部 Origin。认证、CORS、
+    代理与沙箱相关测试共 59 项通过，相关 ESLint 通过。
 
 - [ ] 受控签发与仓库外文件
   - 依赖：核心开发认证。
