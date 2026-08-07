@@ -9,7 +9,7 @@
 
 ## 任务
 
-- [ ] 个人文件与启动分流
+- [x] 个人文件与启动分流
   - 依赖：已确认固定路径与两名唯一钉钉成员。
   - 文件：`scripts/core-developer-access.mjs`、`scripts/start-local.mjs`、`package.json`、测试。
   - 输入：用户主目录和个人文件。
@@ -18,6 +18,8 @@
   - 实现步骤：测试先行，实现解析、权限检查和入口分流。
   - 验证：核心文件存在选择 production；不存在选择 sandbox。
   - 提交：`feat(dev): load personal developer access`
+  - 2026-08-07：固定路径、0600/所有者/HTTPS Origin/空 Token 校验、缺文件沙箱
+    回退和 `npm start` 分流测试共 8 项通过；`npm run start:sandbox` 保持强制本地。
 
 - [ ] 核心开发认证与本地代理
   - 依赖：个人文件合同。
