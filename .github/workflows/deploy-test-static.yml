@@ -37,6 +37,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        env:
+          PFS_BUILD_COMMIT: ${{ github.event.workflow_run.head_sha || github.sha }}
       - name: Prepare isolated static directory
         id: static
         shell: bash

@@ -6,7 +6,8 @@ const root = process.cwd();
 const dist = path.join(root, "dist");
 const source = await readFile(path.join(dist, "index.html"), "utf8");
 const releaseCommit = String(
-  process.env.GITHUB_SHA
+  process.env.PFS_BUILD_COMMIT
+  || process.env.GITHUB_SHA
   || process.env.CF_PAGES_COMMIT_SHA
   || execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" })
 ).trim().toLowerCase();

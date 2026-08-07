@@ -71,6 +71,7 @@ test("release workflows deploy only the static test frontend and verify Aliyun A
   assert.match(staticWorkflow, /deshan-tiyes-system-dev/);
   assert.match(staticWorkflow, /VITE_PFS_API_ORIGIN:\s*https:\/\/api-test\.deshan-tiyes\.cn/);
   assert.match(staticWorkflow, /github\.event\.workflow_run\.head_branch == 'dev'/);
+  assert.match(staticWorkflow, /PFS_BUILD_COMMIT:\s*\$\{\{ github\.event\.workflow_run\.head_sha \|\| github\.sha \}\}/);
   assert.match(staticWorkflow, /RUNNER_TEMP/);
   assert.match(staticWorkflow, /functions|_routes\.json/);
   assert.doesNotMatch(staticWorkflow, /PRODUCT_FLOW_DB|DEMO_FLOW_DB|DINGTALK_APP_SECRET/);
