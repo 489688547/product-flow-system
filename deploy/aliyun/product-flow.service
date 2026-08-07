@@ -13,12 +13,9 @@ Environment=PFS_RUNTIME_HOST=127.0.0.1
 Environment=PFS_RUNTIME_PORT=8080
 Environment=PFS_WRANGLER_PERSIST_DIR=/opt/product-flow/data/wrangler
 Environment=PFS_RUNTIME_ENV_FILE=/opt/product-flow/config/runtime.env
-Environment=PFS_WRANGLER_CONFIG=/opt/product-flow/app/deploy/aliyun/wrangler.toml
-Environment=PFS_RUNTIME_WORK_DIR=/opt/product-flow/data/runtime
 Environment=PFS_ASSETS_DIR=/opt/product-flow/app/dist
-Environment=PFS_FUNCTIONS_DIR=/opt/product-flow/app/functions
-Environment=PFS_WRANGLER_BIN=/opt/product-flow/app/node_modules/.bin/wrangler
-ExecStart=/opt/node-v22.22.3/bin/node /opt/product-flow/app/scripts/aliyun/start-runtime.mjs
+Environment=PFS_FUNCTIONS_BUNDLE=/opt/product-flow/app/dist-server/index.js
+ExecStart=/opt/node-v24.18.0/bin/node /opt/product-flow/app/scripts/aliyun/start-runtime.mjs
 Restart=always
 RestartSec=5
 TimeoutStopSec=30

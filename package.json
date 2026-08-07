@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1 --port 8132",
     "audit:dependencies": "npm audit --omit=dev --audit-level=low && npm audit --audit-level=high || true",
     "build": "npm run check:environment-capabilities && vite build && node scripts/prepare-runtime-build.mjs && node scripts/check-build-chunks.mjs",
+    "build:aliyun-runtime": "node scripts/aliyun/build-functions.mjs",
     "lint": "eslint src functions server scripts tests react-tests chrome-extension",
     "preview": "vite preview --host 127.0.0.1 --port 8133",
     "check:governance": "node scripts/check-project-governance.mjs && node scripts/check-data-environment-routing.mjs && node --test tests/ai-provider-boundary.test.mjs",
@@ -35,9 +36,12 @@
     "test:release-flow": "node --test tests/pr-branch-flow.test.mjs tests/sync-main-to-dev-workflow.test.mjs"
   },
   "dependencies": {
+    "@hono/node-server": "^2.1.0",
     "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "better-sqlite3": "^12.10.0",
     "github-slugger": "^2.0.0",
+    "hono": "^4.13.0",
     "lucide-react": "^0.468.0",
     "quill": "2.0.2",
     "react": "^19.0.0",

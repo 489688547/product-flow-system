@@ -1,6 +1,7 @@
 .worktrees
 node_modules
 dist
+dist-server
 coverage
 playwright-report
 test-results

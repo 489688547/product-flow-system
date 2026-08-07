@@ -104,7 +104,7 @@ const environmentCapabilities = {
     {
       "id": "aliyun-ecs-production",
       "name": "阿里云 ECS 正式运行时",
-      "description": "ECS 容器通过本地 Wrangler/workerd 兼容执行器复用现有 Functions，并把正式与展示 binding 持久化为数据卷内两个独立 SQLite；生产前端、API 和数据均由阿里云承载。",
+      "description": "ECS 容器通过 Node.js 24 与 Hono 正式运行时加载构建期 Functions bundle，并把正式与展示 binding 持久化为数据卷内两个独立 SQLite Worker；生产前端、API 和数据均由阿里云承载。",
       "platforms": [
         "aliyun",
         "dingtalk"
@@ -117,7 +117,9 @@ const environmentCapabilities = {
         "DINGTALK_APP_KEY",
         "DINGTALK_APP_SECRET",
         "PLATFORM_CREDENTIAL_MASTER_KEY",
-        "DEMO_DATA_MASKING_KEY"
+        "DEMO_DATA_MASKING_KEY",
+        "PFS_PUBLIC_API_ORIGIN",
+        "PFS_PUBLIC_APP_ORIGIN"
       ],
       "bindings": [
         "PRODUCT_FLOW_DB",
@@ -128,7 +130,7 @@ const environmentCapabilities = {
     {
       "id": "aliyun-ecs-test-api",
       "name": "阿里云 ECS 测试 API",
-      "description": "按需启动的 ECS 测试容器为 Cloudflare 静态测试前端提供独立 API、会话和 SQLite；不得读取或回退正式数据卷。",
+      "description": "按需启动的 Node.js 24 与 Hono ECS 测试容器为 Cloudflare 静态测试前端提供独立 API、会话和 SQLite Worker；不得读取或回退正式数据卷。",
       "platforms": [
         "aliyun",
         "dingtalk"
@@ -142,6 +144,7 @@ const environmentCapabilities = {
         "DINGTALK_APP_SECRET",
         "PLATFORM_CREDENTIAL_MASTER_KEY",
         "DEMO_DATA_MASKING_KEY",
+        "PFS_PUBLIC_API_ORIGIN",
         "PFS_PUBLIC_APP_ORIGIN",
         "PFS_ALLOWED_BROWSER_ORIGIN"
       ],

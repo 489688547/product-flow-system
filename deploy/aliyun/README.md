@@ -7,10 +7,11 @@
 - 生产和测试的兼容 binding 分别落在 `/opt/product-flow/data` 与
   `/opt/product-flow-test/data` 的独立本地 SQLite，禁止交叉挂载。
 - `runtime.env` 权限必须为 `600`，不得启用 `LOCAL_ONLINE_ACCOUNT_MODE`。
-- 启动脚本只在受限运行目录创建 `.dev.vars` 符号链接，使 Pages Functions
-  能从只读的 `/run/pfs/runtime.env` 读取 binding；不得把 Secret 复制进镜像。
-- 镜像安装系统 CA，并通过 `SSL_CERT_FILE` 提供给 workerd，保证钉钉等 HTTPS
-  Provider 的证书链可以在 ECS 容器内校验。
+- 镜像构建阶段把 Pages Functions 编译为单一 bundle；容器请求路径只运行
+  Node.js 24、Hono 和 SQLite Worker Thread，不启动 Wrangler、workerd 或 esbuild。
+- 运行时从只读 `/run/pfs/runtime.env` 接收 Secret；不得把 Secret 复制进镜像。
+- 镜像安装系统 CA，并通过 `SSL_CERT_FILE` 保证钉钉等 HTTPS Provider 的证书链
+  可以在 ECS 容器内校验。
 - OSS 只接收私有对象和 SQLite 一致性快照，不承载在线数据库。
 
 ## 首次预发布
@@ -55,7 +56,7 @@ systemctl enable --now product-flow
 ```bash
 node scripts/aliyun/import-local-d1.mjs /opt/product-flow/import /opt/product-flow/data/wrangler
 docker compose -f deploy/aliyun/docker-compose.yml up -d
-curl -fsS http://127.0.0.1:8080/ >/dev/null
+curl -fsS http://127.0.0.1:8080/healthz >/dev/null
 docker inspect --format '{{.State.Health.Status}}' product-flow-app
 ```
 
@@ -63,7 +64,7 @@ docker inspect --format '{{.State.Health.Status}}' product-flow-app
 
 ```bash
 docker compose -f deploy/aliyun/docker-compose.yml --profile test up -d product-flow-test-api
-curl -fsS http://127.0.0.1:8081/api/auth/session >/dev/null || test "$?" = 22
+curl -fsS http://127.0.0.1:8081/healthz >/dev/null
 docker inspect --format '{{.State.Health.Status}}' product-flow-test-api
 ```
 
@@ -130,8 +131,8 @@ node scripts/aliyun/backup-local-d1.mjs \
   /opt/product-flow/data/wrangler
 ```
 
-备份脚本直接使用 SQLite Online Backup API 生成可恢复的 `.sqlite` 快照，不调用
-宿主机不兼容的 Wrangler/workerd。确认首次上传和恢复校验成功后启用每日任务：
+备份脚本直接使用 SQLite Online Backup API 生成可恢复的 `.sqlite` 快照，不依赖
+应用容器运行时。确认首次上传和恢复校验成功后启用每日任务：
 
 ```bash
 install -m 0644 deploy/aliyun/product-flow-backup.service /etc/systemd/system/

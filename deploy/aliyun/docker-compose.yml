@@ -22,6 +22,8 @@ services:
       PFS_RUNTIME_PORT: "8080"
       PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow/wrangler"
       PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env"
+      PFS_PUBLIC_API_ORIGIN: "https://deshan-tiyes.cn"
+      PFS_PUBLIC_APP_ORIGIN: "https://deshan-tiyes.cn"
     volumes:
       - "${PFS_DATA_DIR:-/opt/product-flow/data}:/var/lib/product-flow"
       - "${PFS_RUNTIME_ENV_FILE:-/opt/product-flow/config/runtime.env}:/run/pfs/runtime.env:ro"
@@ -32,7 +34,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:8080/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        - "fetch('http://127.0.0.1:8080/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
       interval: 20s
       timeout: 5s
       retries: 5
@@ -63,8 +65,10 @@ services:
       PFS_RUNTIME_HOST: "0.0.0.0"
       PFS_RUNTIME_PORT: "8081"
       PFS_WRANGLER_PERSIST_DIR: "/var/lib/product-flow-test/wrangler"
-      PFS_RUNTIME_WORK_DIR: "/var/lib/product-flow-test/runtime"
       PFS_RUNTIME_ENV_FILE: "/run/pfs/runtime.env"
+      PFS_PUBLIC_API_ORIGIN: "https://api-test.deshan-tiyes.cn"
+      PFS_PUBLIC_APP_ORIGIN: "https://test.deshan-tiyes.cn"
+      PFS_ALLOWED_BROWSER_ORIGIN: "https://test.deshan-tiyes.cn"
     volumes:
       - "${PFS_TEST_DATA_DIR:-/opt/product-flow-test/data}:/var/lib/product-flow-test"
       - "${PFS_TEST_RUNTIME_ENV_FILE:-/opt/product-flow-test/config/runtime.env}:/run/pfs/runtime.env:ro"
@@ -75,7 +79,7 @@ services:
         - CMD
         - node
         - -e
-        - "fetch('http://127.0.0.1:8081/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+        - "fetch('http://127.0.0.1:8081/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
       interval: 20s
       timeout: 5s
       retries: 5

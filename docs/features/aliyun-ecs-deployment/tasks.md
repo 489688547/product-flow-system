@@ -120,3 +120,7 @@
     和现有双库文件；生产/测试继续物理隔离。
   - 验证：失败测试、Node bundle 兼容、事务回滚、容器并发、进程树、钉钉登录、
     readiness、SQLite/OSS 快照和完整门禁。
+  - 2026-08-07：代码阶段已完成 Hono 入口、构建期 Functions bundle、双 SQLite
+    Worker Thread 与 D1 兼容层；本机真实 bundle 的匿名会话、React 静态回退、
+    事务回滚和优雅关闭测试通过。因本机没有 Docker，Node 24 镜像构建、ECS
+    并发、进程树、钉钉登录和备份验收仍待 ACR/ECS 发布阶段完成。
