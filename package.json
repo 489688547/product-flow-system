@@ -33,7 +33,7 @@
     "start": "node scripts/start-local.mjs",
     "start:sandbox": "node scripts/start-local-sandbox.mjs",
     "seed:sandbox": "node scripts/seed-local-sandbox.mjs",
-    "test:release-flow": "node --test tests/pr-branch-flow.test.mjs tests/sync-main-to-dev-workflow.test.mjs"
+    "test:release-flow": "node --test tests/pr-branch-flow.test.mjs tests/branch-base.test.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.0",
