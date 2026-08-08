@@ -1,0 +1,10 @@
+{
+  "repository": "https://github.com/EveryInc/compound-engineering-plugin.git",
+  "tag": "compound-engineering-v3.21.4",
+  "commit": "0a2957852e2034d04eb01120fd7da6ed5307dc56",
+  "license": "MIT",
+  "skills": [
+    "ce-compound",
+    "ce-compound-refresh"
+  ]
+}
