@@ -6,7 +6,7 @@ import { mkdir, readdir, stat } from "node:fs/promises";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { archiveExistingFile } from "../kuaimai-erp-collector/scanner.mjs";
+import { archiveExistingFile, scanWaitingDirectory } from "../kuaimai-erp-collector/scanner.mjs";
 import { DEFAULT_ARCHIVE_ROOT } from "../kuaimai-erp-collector/archive.mjs";
 import { uploadErpCollection } from "../kuaimai-erp-collector/api.mjs";
 import { readCollectorToken as readErpCollectorToken } from "../kuaimai-erp-collector/automation.mjs";
@@ -14,6 +14,7 @@ import { nodeRequest } from "../kuaimai-erp-collector/http.mjs";
 import { ensureManagedChrome } from "../browser-runtime/managed-chrome.mjs";
 import { createEgoCliRunner } from "../browser-runtime/ego-cli.mjs";
 import { createWebCollectionApi } from "./api.mjs";
+import { createLocalArchiveCoordinator, startIndependentCollectorCycles } from "./local-inbox.mjs";
 import {
   EXTENSION_ID,
   EXTENSION_ORIGIN,
@@ -24,6 +25,7 @@ import {
   storeRunnerToken
 } from "./automation.mjs";
 import { createCollectorBridge } from "./bridge.mjs";
+import { assertFormalCollectorTarget } from "./formal-target.mjs";
 import { createBrowserProfileRegistry } from "./browser/profile-registry.mjs";
 import {
   createDedicatedBrowserRuntime,
@@ -138,25 +140,7 @@ export function browserModeUsesManagedChrome(browserMode, { experimentalMode = f
 }
 
 export function assertAliyunCollectorTarget({ baseUrl, browserMode, allowLocalProbe = false } = {}) {
-  if (browserMode !== "ego") return;
-  let target;
-  try {
-    target = new URL(String(baseUrl || ""));
-  } catch {
-    target = null;
-  }
-  const isApprovedAliyun = target?.origin === "https://deshan-tiyes.cn"
-    && target.pathname === "/"
-    && !target.search
-    && !target.hash;
-  const isLoopbackProbe = allowLocalProbe === true
-    && target?.protocol === "http:"
-    && ["127.0.0.1", "localhost", "::1"].includes(target.hostname);
-  if (!isApprovedAliyun && !isLoopbackProbe) {
-    throw Object.assign(new Error("正式 Ego 采集只允许写入已登记的阿里云 ECS 入口。"), {
-      code: "EGO_FORMAL_TARGET_NOT_ALIYUN"
-    });
-  }
+  return assertFormalCollectorTarget({ baseUrl, browserMode, allowLocalProbe });
 }
 
 async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
@@ -236,25 +220,36 @@ export function createCommerceFactUploader({
   };
 }
 
-async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
-  const erpToken = await readErpCollectorToken();
+export function createDownloadProcessor({
+  root,
+  downloadsDirectory,
+  baseUrl,
+  readErpToken = readErpCollectorToken,
+  archiveCoordinator,
+  resolveDownloadFile = resolveSafeDownload,
+  archiveFile = archiveExistingFile,
+  uploadCollection = uploadErpCollection
+}) {
   return async ({ jobId, fileName, resourceType, businessDate, onValidated }) => {
-    const filePath = await resolveSafeDownload({ directory: downloadsDirectory, fileName });
-    const archived = await archiveExistingFile(filePath, {
+    const filePath = await resolveDownloadFile({ directory: downloadsDirectory, fileName });
+    const archived = await archiveCoordinator.runBrowserArchive(() => archiveFile(filePath, {
       root,
       resourceType,
       onValidated: async validation => {
         assertCollectionFileMatchesTask({ resourceType, businessDate, ...validation });
         await onValidated?.(validation);
       },
-      upload: collection => uploadErpCollection(collection, {
-        baseUrl,
-        headers: {
-          authorization: `Bearer ${erpToken}`,
-          "x-web-collection-job-id": jobId
-        }
-      })
-    });
+      upload: async collection => {
+        const erpToken = await readErpToken();
+        return uploadCollection(collection, {
+          baseUrl,
+          headers: {
+            authorization: `Bearer ${erpToken}`,
+            "x-web-collection-job-id": jobId
+          }
+        });
+      }
+    }));
     return {
       batchId: archived.batchId || null,
       archiveId: archived.contentHash,
@@ -269,10 +264,15 @@ async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
 // 最新修改时间当指纹随任务轮询带给扩展，扩展空闲时自行重载。
 // 采集器自身的代码指纹：取几个关键文件的内容哈希，与 git 提交无关——
 // 即使有人在工作区改了文件没提交，这个值也会变。
-async function sourceFingerprint() {
+export async function sourceFingerprint({ readSource = readFile } = {}) {
   const here = dirname(fileURLToPath(import.meta.url));
   const files = [
+    "index.mjs",
+    "formal-target.mjs",
+    "local-inbox.mjs",
     "orchestrator.mjs",
+    "../kuaimai-erp-collector/lock.mjs",
+    "../kuaimai-erp-collector/scanner.mjs",
     "browser/ego-runtime.mjs",
     "browser/providers/douyin.mjs",
     "browser/providers/douyinEgoTask.mjs",
@@ -283,7 +283,7 @@ async function sourceFingerprint() {
   const hash = createHash("sha256");
   for (const name of files) {
     try {
-      hash.update(await readFile(resolve(here, name)));
+      hash.update(await readSource(resolve(here, name)));
     } catch {
       hash.update(`missing:${name}`);
     }
@@ -334,11 +334,18 @@ async function serve({
   profileRoot = DEFAULT_MANAGED_PROFILE_ROOT,
   experimentalMode = false
 }) {
-  const [runnerToken, pairingKey, processDownload] = await Promise.all([
+  const [runnerToken, pairingKey] = await Promise.all([
     readRunnerToken(),
-    readPairingKey(),
-    createDownloadProcessor({ root, downloadsDirectory, baseUrl })
+    readPairingKey()
   ]);
+  const archiveCoordinator = createLocalArchiveCoordinator({ root });
+  const processDownload = createDownloadProcessor({
+    root,
+    downloadsDirectory,
+    baseUrl,
+    readErpToken: readErpCollectorToken,
+    archiveCoordinator
+  });
   const api = createWebCollectionApi({ baseUrl, token: runnerToken });
   const uploadFactChunk = createCommerceFactUploader({ baseUrl, runnerToken });
   const processors = createProviderProcessorRegistry([
@@ -462,25 +469,43 @@ async function serve({
     }
   });
   await bridge.listen({ port: 17653 });
-  let cycleRunning = false;
-  const runCycle = async () => {
-    if (cycleRunning) return;
-    cycleRunning = true;
-    try {
+  let localInboxStatus = { status: "pending" };
+  const cycles = startIndependentCollectorCycles({
+    runWeb: async () => {
       await orchestrator.prepare();
       await diagnosticStore.cleanup();
       await dedicatedRuntime?.runOnce();
       await egoRuntime?.runOnce();
       await experimentalCycle?.runOnce();
-    } finally {
-      cycleRunning = false;
+    },
+    runInbox: async () => {
+      localInboxStatus = await archiveCoordinator.runInboxScan(() => scanWaitingDirectory({
+        root,
+        upload: async collection => {
+          const erpToken = await readErpCollectorToken();
+          return uploadErpCollection(collection, {
+            baseUrl,
+            headers: { authorization: `Bearer ${erpToken}` }
+          });
+        }
+      }));
+      if (localInboxStatus.status === "completed" && localInboxStatus.result?.retrying > 0) {
+        localInboxStatus = {
+          ...localInboxStatus,
+          status: "failed",
+          errorCode: "KUAIMAI_LOCAL_SCAN_RETRY_PENDING"
+        };
+      }
+      if (localInboxStatus.status === "failed") {
+        process.stderr.write(`[local-inbox] ${localInboxStatus.errorCode}\n`);
+      }
     }
-  };
-  await runCycle().catch(() => {});
-  const timer = setInterval(() => void runCycle().catch(() => {}), 60_000);
+  });
   const stop = async () => {
-    clearInterval(timer);
+    const cyclesStopped = cycles.stop();
     await bridge.close();
+    await cyclesStopped;
+    await archiveCoordinator.drain();
     experimentalRunStore?.close();
   };
   process.once("SIGINT", () => void stop().then(() => process.exit(0)));
@@ -495,7 +520,8 @@ async function serve({
     port: bridge.port,
     extensionId: EXTENSION_ID,
     browserMode,
-    experimentalMode
+    experimentalMode,
+    localInboxStatus
   };
 }
 

@@ -62,11 +62,11 @@ export async function readCollectorToken({
   return token;
 }
 
-export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl }) {
+export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl, home = os.homedir() }) {
   const argumentsList = [nodePath, collectorPath, "scan", "--root", root, "--base-url", baseUrl]
     .map(value => `      <string>${xml(value)}</string>`).join("\n");
   // 没有日志时，常驻任务失败只在 launchctl 留下一个退出码，无法定位原因。
-  const logPath = path.join(root, "处理报告", `${LAUNCH_AGENT_LABEL}.log`);
+  const logPath = path.join(home, "Library", "Logs", "product-flow", `${LAUNCH_AGENT_LABEL}.log`);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -109,12 +109,14 @@ export async function installLaunchAgent({
     errorCode: "KUAIMAI_COLLECTOR_ENTRYPOINT_OUTSIDE_REPOSITORY"
   });
   const agentsDirectory = path.join(home, "Library", "LaunchAgents");
+  const logDirectory = path.join(home, "Library", "Logs", "product-flow");
   const plistPath = path.join(agentsDirectory, `${LAUNCH_AGENT_LABEL}.plist`);
   await mkdir(agentsDirectory, { recursive: true, mode: 0o700 });
+  await mkdir(logDirectory, { recursive: true, mode: 0o700 });
   const temporaryPath = `${plistPath}.tmp`;
   await writeFile(
     temporaryPath,
-    collectorLaunchAgentPlist({ nodePath, collectorPath: stableCollectorPath, root, baseUrl }),
+    collectorLaunchAgentPlist({ nodePath, collectorPath: stableCollectorPath, root, baseUrl, home }),
     { mode: 0o600 }
   );
   await rename(temporaryPath, plistPath);

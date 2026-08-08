@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -25,13 +25,16 @@ test("LaunchAgent keeps the loopback runner alive and pins the repository entryp
     nodePath: "/usr/local/bin/node",
     collectorPath: "/repo/scripts/web-data-collector/index.mjs",
     root: "/Users/company/Desktop/company-data-archive",
-    baseUrl: "https://flow.example.com"
+    baseUrl: "https://flow.example.com",
+    home: "/Users/company"
   });
   assert.match(plist, /com\.company\.web-data-collector/);
   assert.match(plist, /<string>serve<\/string>/);
   assert.match(plist, /<string>--browser-mode<\/string>\s*<string>extension<\/string>/);
   assert.match(plist, /<key>KeepAlive<\/key>/);
   assert.match(plist, /<true\/>/);
+  assert.match(plist, /\/Users\/company\/Library\/Logs\/product-flow\/com\.company\.web-data-collector\.log/);
+  assert.doesNotMatch(plist, /Desktop\/company-data-archive\/处理报告/);
   assert.doesNotMatch(plist, /pairing|wdc_|wcp_/i);
 });
 
@@ -67,7 +70,9 @@ test("LaunchAgent installer preserves the requested dedicated fallback mode", as
       }
     });
     const plist = await readFile(result.plistPath, "utf8");
+    const logDirectory = path.join(home, "Library", "Logs", "product-flow");
     assert.match(plist, /<string>--browser-mode<\/string>\s*<string>dedicated<\/string>/);
+    assert.equal((await stat(logDirectory)).mode & 0o777, 0o700);
     assert.equal(commands.some(([program, args]) => (
       program === "/bin/launchctl" && args[0] === "bootstrap"
     )), true);

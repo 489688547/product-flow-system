@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import {
   appendManifestEvent,
@@ -18,6 +20,8 @@ import {
   storeCollectorToken
 } from "../scripts/kuaimai-erp-collector/automation.mjs";
 import { scanWaitingDirectory } from "../scripts/kuaimai-erp-collector/scanner.mjs";
+import { withCollectorLock } from "../scripts/kuaimai-erp-collector/lock.mjs";
+import { runCollector } from "../scripts/kuaimai-erp-collector/index.mjs";
 
 async function tempRoot() {
   return mkdtemp(path.join(os.tmpdir(), "kuaimai-archive-"));
@@ -127,6 +131,125 @@ test("LaunchAgent runs every 15 minutes without embedding secrets", () => {
   assert.doesNotMatch(plist, /kec_|token|password|cookie/i);
 });
 
+test("legacy rollback installer rejects every non-ECS formal target before reading secrets", async () => {
+  for (const baseUrl of [
+    "http://127.0.0.1:8132",
+    "https://retired-backend.pages.dev",
+    "https://deshan-tiyes.cn/path",
+    "https://deshan-tiyes.cn?target=other"
+  ]) {
+    await assert.rejects(
+      runCollector(["install", "--base-url", baseUrl]),
+      error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+    );
+  }
+});
+
+test("collector lock reclaims a stale owner whose process no longer exists", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  await writeFile(path.join(layout.root, ".collector.lock"), `${JSON.stringify({
+    version: 1,
+    ownerId: "old-owner",
+    pid: 987654,
+    createdAt: "2026-08-08T00:00:00.000Z"
+  })}\n`, { mode: 0o600 });
+  let calls = 0;
+
+  const result = await withCollectorLock(root, async () => {
+    calls += 1;
+    return "recovered";
+  }, {
+    processAlive: () => false,
+    now: () => new Date("2026-08-08T07:00:00.000Z")
+  });
+
+  assert.equal(result, "recovered");
+  assert.equal(calls, 1);
+  await assert.rejects(readFile(path.join(layout.root, ".collector.lock")), error => error?.code === "ENOENT");
+});
+
+test("collector lock enters successfully when no legacy sentinel exists", async () => {
+  const root = await tempRoot();
+  let entered = false;
+
+  const result = await withCollectorLock(root, async () => {
+    entered = true;
+    return "completed";
+  });
+
+  assert.equal(result, "completed");
+  assert.equal(entered, true);
+});
+
+test("collector lock never reclaims an ownerless legacy lock by age alone", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  const lockPath = path.join(layout.root, ".collector.lock");
+  await writeFile(lockPath, "", { mode: 0o600 });
+  const old = new Date("2026-08-08T00:00:00.000Z");
+  await utimes(lockPath, old, old);
+  let entered = false;
+
+  const result = await withCollectorLock(root, async () => {
+    entered = true;
+  }, {
+    now: () => new Date("2026-08-08T01:00:00.000Z"),
+    processAlive: () => false
+  });
+
+  assert.deepEqual(result, { status: "already_running" });
+  assert.equal(entered, false);
+  assert.equal((await stat(lockPath)).isFile(), true);
+});
+
+test("multiple processes reclaim one stale collector lock without overlapping", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  await writeFile(path.join(layout.root, ".collector.lock"), `${JSON.stringify({
+    version: 1,
+    ownerId: "shared-stale-owner",
+    pid: 987654,
+    createdAt: "2026-08-08T00:00:00.000Z"
+  })}\n`, { mode: 0o600 });
+  const moduleUrl = pathToFileURL(path.resolve("scripts/kuaimai-erp-collector/lock.mjs")).href;
+  const program = `
+    import { open, rm } from "node:fs/promises";
+    import { join } from "node:path";
+    import { withCollectorLock } from ${JSON.stringify(moduleUrl)};
+    const root = process.argv[1];
+    const result = await withCollectorLock(root, async () => {
+      let marker;
+      try {
+        marker = await open(join(root, ".critical-section"), "wx", 0o600);
+      } catch (error) {
+        if (error?.code === "EEXIST") return "overlap";
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, 75));
+      await marker.close();
+      await rm(join(root, ".critical-section"), { force: true });
+      return "acquired";
+    }, { processAlive: () => false });
+    process.stdout.write(JSON.stringify(result));
+  `;
+  const runChild = () => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", program, root], {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", chunk => { stdout += chunk; });
+    child.stderr.on("data", chunk => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("close", code => code === 0 ? resolve(JSON.parse(stdout)) : reject(new Error(stderr)));
+  });
+
+  const results = await Promise.all(Array.from({ length: 8 }, runChild));
+  assert.equal(results.filter(result => result === "acquired").length >= 1, true);
+  assert.equal(results.includes("overlap"), false);
+});
+
 test("scanner waits for one stable interval before archiving and uploading", async () => {
   const root = await tempRoot();
   const layout = await ensureArchiveLayout(root);
@@ -141,6 +264,31 @@ test("scanner waits for one stable interval before archiving and uploading", asy
   assert.equal(uploads.length, 1);
   assert.equal(uploads[0].archive.relativePath.startsWith("原始归档/orders/"), true);
   assert.equal((await loadLocalManifest(layout.manifest)).values().next().value.status, "processed");
+});
+
+test("retryable upload failures leave the source in waiting for the next scan", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  const source = path.join(layout.waiting, "orders-retry.csv");
+  await writeFile(source, "系统订单号,订单创建时间,店铺名称\nKM2,2026-07-22 11:00:00,抖音旗舰店\n");
+  await scanWaitingDirectory({ root, upload: async () => {} });
+  const retrying = await scanWaitingDirectory({
+    root,
+    upload: async () => {
+      throw Object.assign(new Error("upstream unavailable"), {
+        code: "ERP_COLLECTION_UPLOAD_FAILED",
+        status: 503
+      });
+    }
+  });
+
+  assert.equal(retrying.retrying, 1);
+  assert.deepEqual(await readdir(layout.waiting), ["orders-retry.csv"]);
+  assert.deepEqual(await readdir(layout.failed), []);
+
+  const recovered = await scanWaitingDirectory({ root, upload: async () => ({ batchId: "batch-retry" }) });
+  assert.equal(recovered.processed, 1);
+  assert.deepEqual(await readdir(layout.waiting), []);
 });
 
 test("scanner distinguishes kit and combination snapshots from ordinary product files", async () => {
@@ -201,9 +349,12 @@ test("LaunchAgent writes a log so a failing background run can be diagnosed", ()
     nodePath: "/usr/local/bin/node",
     collectorPath: "/Company/product-flow-system/scripts/kuaimai-erp-collector/index.mjs",
     root: "/Users/roger/Desktop/公司数据中心/快麦ERP",
-    baseUrl: "https://product-flow-system.pages.dev"
+    baseUrl: "https://product-flow-system.pages.dev",
+    home: "/Users/roger"
   });
   assert.match(plist, /<key>StandardOutPath<\/key>/);
   assert.match(plist, /<key>StandardErrorPath<\/key>/);
   assert.match(plist, /com\.company\.kuaimai-erp-collector\.log/);
+  assert.match(plist, /\/Users\/roger\/Library\/Logs\/product-flow\/com\.company\.kuaimai-erp-collector\.log/);
+  assert.doesNotMatch(plist, /Desktop\/公司数据中心\/快麦ERP\/处理报告/);
 });
