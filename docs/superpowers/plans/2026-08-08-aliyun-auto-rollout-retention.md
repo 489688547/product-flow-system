@@ -1,4 +1,4 @@
-# Aliyun Automatic Rollout and Single Local Backup Implementation Plan
+# 阿里云自动发布与本地单份备份实施计划
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task by task.
 

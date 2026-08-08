@@ -33,8 +33,12 @@ bundle；ECS 运行时由 Node.js 24 LTS、Hono 和 SQLite Worker Thread 执行�
   快照、哈希清单并上传 OSS，不依赖宿主机 Wrangler/workerd。
 - `deploy/aliyun/product-flow-backup.{service,timer}`：每日备份任务、超时和
   systemd 沙箱边界。
+- `scripts/aliyun/rollout-acr-main.mjs`：ACR 镜像比较、静态 Compose 合同校验、
+  发布前备份、60 秒健康检查和自动回滚。
+- `deploy/aliyun/product-flow-rollout.{service,timer}`：每两分钟执行的受限发布任务。
 - `scripts/aliyun/check-local-d1.mjs`：验证两个库的表数与关键表。
 - `tests/aliyun-ecs-deployment.test.mjs`：运行时、迁移、备份和 OAuth 契约。
+- `tests/aliyun-auto-rollout.test.mjs`：无变化、失败关闭、替换、回滚与 unit 合同。
 
 ## 接口与契约
 
@@ -109,6 +113,22 @@ docker inspect --format '{{.State.Health.Status}}' product-flow-app
 7. 通过 `dev → main` 发布 ECS 生产镜像并完成钉钉验收。
 8. 删除 Cloudflare Workers、D1 binding、业务 Secret、Git 构建入口和无用后端配置；
    保留镜像构建阶段读取的 `functions/` 业务源代码。
+9. 安装 ACR 自动检查 timer；先证明当前镜像 `no_change`，再通过一次真实 `main`
+   GitOps 发布证明两分钟内自动替换、备份和回滚边界。
+
+## 自动发布迁移与回滚
+
+1. 先发布包含候选 Compose 合同和发布脚本的镜像；此时不启用 timer。
+2. 在 ECS 安装 service/timer，执行 `systemd-analyze verify`，手工运行备份并确认
+   私有 OSS 新前缀与本地单份保留。
+3. 手工运行 rollout，当前镜像必须返回 `no_change`；随后启用 timer。
+4. 下一次 `main` 镜像由 timer 自动发现。健康失败自动恢复固定 rollback 标签；
+   合同不一致则保持当前生产并等待人工同步主机 Compose。
+5. 停用时先 `disable --now` timer；保留 service、当前镜像、rollback 镜像和 OSS
+   历史。恢复旧手工发布不需要删除数据库或备份。
+
+容量影响：本地从多份快照降为一份，约占一份正式库与展示库之和；OSS 保留全部
+历史。发布额外保留当前与 rollback 镜像，成功后只清理未使用镜像，不删除数据卷。
 
 ## Node 正式运行时实施任务
 

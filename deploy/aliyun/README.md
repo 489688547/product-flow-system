@@ -132,7 +132,9 @@ node scripts/aliyun/backup-local-d1.mjs \
 ```
 
 备份脚本直接使用 SQLite Online Backup API 生成可恢复的 `.sqlite` 快照，不依赖
-应用容器运行时。确认首次上传和恢复校验成功后启用每日任务：
+应用容器运行时。每日 service 配置了私有 OSS 前缀：只有两个数据库校验并上传成功
+后，才会删除本地旧目录并只保留当前一份；上传失败时本地历史完全保留。确认首次
+上传和恢复校验成功后启用每日任务：
 
 ```bash
 install -m 0644 deploy/aliyun/product-flow-backup.service /etc/systemd/system/
@@ -142,6 +144,45 @@ systemctl enable --now product-flow-backup.timer
 systemctl start product-flow-backup.service
 systemctl status product-flow-backup.service --no-pager
 ```
+
+## ACR 自动发布
+
+自动发布每两个日历分钟检查固定 ACR `main`。相同镜像只记录 `no_change`，不会
+备份或重启。新镜像先静态复制 Compose 文件并与主机合同比较，不执行候选代码；
+随后要求私有 OSS 备份成功，才临时停止测试容器并替换生产。生产在 60 秒内不健康
+会自动恢复 `product-flow-system:rollback`，测试容器无论成功失败都恢复原状态。
+
+安装并验证 unit：
+
+```bash
+install -m 0644 deploy/aliyun/product-flow-rollout.service /etc/systemd/system/
+install -m 0644 deploy/aliyun/product-flow-rollout.timer /etc/systemd/system/
+systemctl daemon-reload
+systemd-analyze verify product-flow-rollout.service product-flow-rollout.timer
+systemctl start product-flow-backup.service
+find /opt/product-flow/backups -mindepth 1 -maxdepth 1 -type d -printf '%f\n'
+systemctl start product-flow-rollout.service
+journalctl -u product-flow-rollout.service -n 30 --no-pager
+systemctl enable --now product-flow-rollout.timer
+systemctl list-timers product-flow-rollout.timer --no-pager
+```
+
+首次手工 rollout 必须返回 `no_change`。常见安全错误为 `PULL_FAILED`、
+`CONTRACT_MISMATCH`、`BACKUP_FAILED`、`START_FAILED`、`HEALTH_FAILED` 和
+`ROLLBACK_FAILED`；除 `ROLLBACK_FAILED` 外都在替换前停止或自动回滚，最后一项
+必须立即人工恢复。
+
+暂停自动发布但保留当前生产：
+
+```bash
+systemctl disable --now product-flow-rollout.timer
+docker inspect --format '{{.Name}} {{.Image}} {{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' \
+  product-flow-app product-flow-test-api
+```
+
+合同变化时先通过 GitOps 发布代码，再人工更新
+`/opt/product-flow/app/deploy/aliyun/docker-compose.yml` 和发布脚本，重新执行 unit
+校验与一次 `no_change` 检查后恢复 timer。不得用修改镜像标签绕过合同检查。
 
 若阿里云入口异常，进入维护状态，停止写入，恢复上一个已验收镜像及匹配的
 SQLite/OSS 快照。Cloudflare 不再作为生产 API 或数据库回滚入口。
