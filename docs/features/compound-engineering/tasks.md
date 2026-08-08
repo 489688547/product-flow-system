@@ -25,7 +25,7 @@
 
 ### Task 2: 接入经验沉淀与首个实例
 
-- [ ] 接入经验沉淀与首个实例
+- [x] 接入经验沉淀与首个实例
   - 依赖：固定 Skill 已验证。
   - 文件：`.agents/skills/verification/SKILL.md`、`docs/solutions/deployment/`、合同测试。
   - 输入：已验证的 ACR/ECS 502 调查证据。
@@ -33,6 +33,8 @@
   - 失败测试：合同测试因 verification 未触发和经验缺失失败。
   - 实现步骤：添加条件式触发；按 `ce-compound` 生成经验；校验 frontmatter、路径和敏感词。
   - 验证：失败测试转绿，独立代理能查重且不会把猜测写成规则。
+  - 2026-08-08：`verification` 已接入条件式检索、沉淀、刷新与 stale 分流；
+    首份 ECS 502 经验经上游校验器和独立语义审查通过，8 项聚焦测试通过。
   - 提交：`docs: compound verified deployment learning`
 
 ### Task 3: 建立受控上游升级 PR
