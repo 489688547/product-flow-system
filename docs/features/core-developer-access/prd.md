@@ -15,9 +15,9 @@ Token 会丢失个人审计和单独撤销能力。
 
 ## 目标
 
-- 每位获授权核心开发人员只接收一份个人 `developer.env`。
-- 文件固定放到 `~/.config/product-flow-system/developer.env` 后，任意 fork/worktree 的
-  `npm start` 自动使用本地前端和生产 API。
+- 每位获授权核心开发人员只接收一份个人访问文件，交付文件名可以包含成员标识。
+- 文件原样放到 `~/.config/EC-management-system/` 后，任意 fork/worktree 的 `npm start`
+  自动识别目录内唯一文件、收紧为 0600，并使用本地前端和生产 API；旧固定路径只作迁移兼容。
 - 开发人员获得生产业务数据读写权限，所有请求绑定其钉钉稳定身份。
 - 没有该文件时，`npm start` 保持零 Secret 本地 SQLite 沙箱。
 
@@ -70,7 +70,8 @@ Token 会丢失个人审计和单独撤销能力。
 ## 异常与边界
 
 - 同名或组织身份不唯一：拒绝签发。
-- 文件权限不是 `0600`、缺字段或 URL 非正式 HTTPS Origin：启动失败并给出修复路径。
+- 文件不属于当前用户、不是普通文件、同目录存在多份文件、缺字段或 URL 非正式 HTTPS
+  Origin：启动失败；当前用户拥有的普通文件由启动器自动收紧为 `0600`。
 - Token 失效：API 返回稳定错误，前端不得回退共享身份或生产 Cookie。
 - 正式 API 不可用：本地核心开发模式明确失败；开发人员可显式运行
   `npm run start:sandbox` 继续无生产数据开发。

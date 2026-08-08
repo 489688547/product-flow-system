@@ -8,23 +8,26 @@
 git clone https://github.com/<你的 GitHub 用户名>/EC-management-system.git
 cd EC-management-system
 git remote add upstream https://github.com/489688547/EC-management-system.git
+git fetch upstream dev
+git switch -c feat/<功能名> upstream/dev
 npm ci
 ```
 
-把负责人单独发给你的 `developer.env` 从“下载”目录移到固定位置，然后启动：
+把负责人单独发来的个人访问文件原样放进下面的固定文件夹，不需要改名：
 
 ```bash
-mkdir -p ~/.config/product-flow-system
-mv ~/Downloads/developer.env ~/.config/product-flow-system/developer.env
-chmod 600 ~/.config/product-flow-system/developer.env
-npm start
+mkdir -p ~/.config/EC-management-system
+open ~/.config/EC-management-system/
 ```
+
+第二条命令会打开文件夹。把收到的文件拖进去，回到项目目录运行 `npm start`。
+程序只读取该文件夹内唯一的一份个人文件，并自动收紧文件权限。
 
 打开 `http://127.0.0.1:8127/`。保存前端代码后页面会自动更新。
 
 核心开发模式运行“本地 React 前端 + ECS 正式 API + 正式业务数据”。个人 Token 只在
-本机 Node 代理中使用，不会进入浏览器。不要打开、打印、改名、发送到群聊，或把
-`developer.env` 放进仓库和 `.env`；文件丢失时立即通知负责人撤销权限。
+本机 Node 代理中使用，不会进入浏览器。不要打开、打印、修改内容、发送到群聊，或把
+个人访问文件放进仓库和 `.env`；文件丢失时立即通知负责人撤销权限。
 
 ## 开发前先选对模式
 
@@ -61,15 +64,14 @@ brew install gh
 gh auth login --hostname github.com --git-protocol https --web
 ```
 
-每项开发从最新 `dev` 新建分支，完成后推送到自己的 Fork：
+上面已经从最新 `dev` 创建了功能分支。修改完成后提交并推送到自己的 Fork：
 
 ```bash
-git fetch upstream dev
-git switch -c codex/<功能名> upstream/dev
-# 修改代码后，只暂存本次改动的文件
 git status --short
 git add <本次修改的文件>
 git commit -m "feat: 简述本次修改"
+git fetch upstream dev
+git rebase upstream/dev
 git push -u origin HEAD
 gh pr create --repo 489688547/EC-management-system --base dev --web
 ```

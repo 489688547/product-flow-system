@@ -118,7 +118,7 @@
     {
       "id": "local-core-developer-access",
       "name": "核心开发者本地正式数据访问",
-      "description": "个人 0600 文件由本机 Node 代理读取并向已部署阿里云 ECS API 注入 Token；浏览器不接触 Token，不直接连接 SQLite，未部署后端仍使用本地沙箱或固定测试 API。",
+      "description": "个人文件原样放入 ~/.config/EC-management-system/，本机 Node 启动器只接受目录内唯一的当前用户普通文件并自动收紧为 0600，再由代理向已部署阿里云 ECS API 注入 Token；浏览器不接触 Token，不直接连接 SQLite，旧固定路径仅迁移兼容，未部署后端仍使用本地沙箱或固定测试 API。",
       "platforms": ["aliyun", "dingtalk"],
       "requiredIn": [],
       "level": "warning",

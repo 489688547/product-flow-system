@@ -12,7 +12,8 @@
 
 - 本地测试通过服务端生产数据网关实时读取生产 D1，不由浏览器直接持有凭据。
 - 初始只为当前指定的最高权限钉钉身份签发个人访问令牌；稳定身份使用 `userId` 与 `unionId`，不使用姓名。
-- 原始个人令牌只保存在固定的仓库外 `~/.config/product-flow-system/developer.env`
+- 原始个人令牌只保存在仓库外 `~/.config/EC-management-system/` 的唯一个人文件中；加载器
+  自动收紧为 0600，并在迁移期兼容旧 `~/.config/product-flow-system/developer.env`
   文件且权限为 0600；D1/SQLite 只保存 SHA-256 哈希。
 - 显式包含 `core_developer` 能力的个人令牌可把 active 且 `userId/unionId` 稳定匹配的
   核心成员解析为有效 executive 数据会话；其真实组织角色继续保留在会话与审计中。
