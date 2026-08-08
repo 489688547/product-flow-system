@@ -1,0 +1,42 @@
+name: production-drift
+
+# 生产部署由 ECS 上的 rollout timer 轮询 ACR 完成，仓库这边没有任何步骤能保证它走通。
+# 固定站点冒烟只在发布当下验证一次，超时之后就不再有人盯着。这个检查负责持续回答
+# 一个问题：main 的提交到底有没有真的到达生产。
+on:
+  schedule:
+    - cron: "13 */2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-drift
+  cancel-in-progress: true
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          # 需要完整历史：未部署时长要从生产站实际所在的 commit 往前数，浅克隆里
+          # 那个 commit 通常不存在，会退化成按 main HEAD 计时而漏报持续断链。
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Compare production deployment against main
+        shell: bash
+        run: |
+          # 默认 shell 是 bash -e，没有 pipefail：直接管道给 tee 会让漂移失败被 tee 的
+          # 退出码盖掉。脚本的失败信息走 stderr，这里一并并入摘要。
+          set -euo pipefail
+          node scripts/check-production-drift.mjs \
+            --url https://deshan-tiyes.cn \
+            --commit "$(git rev-parse HEAD)" \
+            --grace-minutes 60 \
+            2>&1 | tee -a "$GITHUB_STEP_SUMMARY"

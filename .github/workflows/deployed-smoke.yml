@@ -3,6 +3,8 @@ name: deployed-smoke
 on:
   push:
     branches: [main, dev]
+  # 部署链路失败修复后重新验证，不必再推一个空提交。
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,7 +16,7 @@ concurrency:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -29,13 +31,17 @@ jobs:
           API_URL: ${{ github.ref_name == 'main' && 'https://deshan-tiyes.cn' || 'https://api-test.deshan-tiyes.cn' }}
           EXPECT_ENVIRONMENT: ${{ github.ref_name == 'main' && 'production' || 'preview' }}
           ALLOWED_BROWSER_ORIGIN: https://test.deshan-tiyes.cn
+          # 测试站是 Cloudflare Pages 直接部署，几十秒内就位。生产要走镜像构建、推送 ACR、
+          # ECS rollout timer 最多两分钟轮询、备份、换容器，原本 5 分钟窗口必然误报失败。
+          SMOKE_ATTEMPTS: ${{ github.ref_name == 'main' && '60' || '30' }}
+          SMOKE_INTERVAL: ${{ github.ref_name == 'main' && '20' || '10' }}
         run: |
           EXTRA_ARGS=()
           if [ "$GITHUB_REF_NAME" = "main" ]; then
             EXTRA_ARGS+=(--forbid-server-env-dev)
             ALLOWED_BROWSER_ORIGIN=""
           fi
-          for attempt in $(seq 1 30); do
+          for attempt in $(seq 1 "$SMOKE_ATTEMPTS"); do
             if node scripts/check-deployed-smoke.mjs \
               --url "$TARGET_URL" \
               --api-url "$API_URL" \
@@ -46,6 +52,7 @@ jobs:
               "${EXTRA_ARGS[@]}"; then
               exit 0
             fi
-            sleep 10
+            sleep "$SMOKE_INTERVAL"
           done
+          echo "::error::固定站点在 $(( SMOKE_ATTEMPTS * SMOKE_INTERVAL / 60 )) 分钟内没有到达 ${GITHUB_SHA:0:12}；镜像构建、ACR 推送或 ECS rollout 至少有一环没有走通。"
           exit 1

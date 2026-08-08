@@ -6,13 +6,13 @@ function normalizeUrl(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
-function commitFromHtml(html = "") {
+export function commitFromHtml(html = "") {
   return String(html).match(
     /<meta\s+name=["']pfs-release-commit["']\s+content=["']([0-9a-f]{7,40})["'][^>]*>/i
   )?.[1] || "";
 }
 
-function sameCommit(actual, expected) {
+export function sameCommit(actual, expected) {
   const left = String(actual || "").toLowerCase();
   const right = String(expected || "").toLowerCase();
   return left === right || left.startsWith(right) || right.startsWith(left);
