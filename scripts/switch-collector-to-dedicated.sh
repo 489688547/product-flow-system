@@ -19,7 +19,11 @@ set -euo pipefail
 REPO=/Users/roger/Documents/product-flow-system
 LABEL=com.company.web-data-collector
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-LOG="$HOME/Library/Logs/product-flow/collector.log"
+# 日志路径从 plist 里读回来，不写死。
+# 它是 `<归档根目录>/处理报告/<label>.log`，而归档根目录是每台机器自己配的 --root，
+# 猜一个路径的后果不是报错而是「读不到」——第 5 步的模式与指纹核对会全部落空，
+# 那正好是这个脚本存在的理由。
+LOG=""
 
 say() { printf '\n=== %s ===\n' "$1"; }
 die() { printf '\n✗ %s\n' "$1" >&2; exit 1; }
@@ -60,6 +64,11 @@ echo "  磁盘代码指纹: $EXPECTED"
 say "3. 把浏览器模式改成 dedicated"
 [ -f "$PLIST" ] || die "找不到 $PLIST，这台机器可能没装采集器。"
 cp "$PLIST" "$PLIST.backup-$(date +%Y%m%d-%H%M%S)"
+LOG=$(/usr/libexec/PlistBuddy -c "Print :StandardOutPath" "$PLIST" 2>/dev/null || true)
+[ -n "$LOG" ] || die "plist 里没有 StandardOutPath，读不到日志就无法核对跑的是哪份代码。"
+# 目录不在，launchd 连日志都写不出来，服务会起不来且没有任何线索。
+[ -d "$(dirname "$LOG")" ] || die "日志目录 $(dirname "$LOG") 不存在，launchd 无法写日志。先建好这个目录再跑。"
+echo "  日志文件: $LOG"
 MODE=$(/usr/libexec/PlistBuddy -c "Print :ProgramArguments" "$PLIST" | tr -d ' ' | grep -E '^(extension|dedicated)$' || true)
 echo "  改之前: ${MODE:-未知}"
 if [ "$MODE" = "dedicated" ]; then
@@ -105,12 +114,12 @@ echo "  日志里的指纹: ${ACTUAL:-读不到}"
 [ "$ACTUAL" = "$EXPECTED" ] || die "指纹对不上：磁盘 $EXPECTED，运行中 ${ACTUAL:-读不到}。说明跑的不是这份代码。"
 
 printf '\n✓ 切换完成：dedicated 模式，代码指纹 %s，与磁盘一致。\n' "$EXPECTED"
-cat <<'TIPS'
+cat <<TIPS
 
 接下来：
   1) 专用浏览器需要登录抖音。服务会自己把它拉起来，登录失效时会明确报 login_required。
   2) 只重采一条抖音任务来验证，不要批量重排——批量失败会让通知一条条弹。
   3) 看日志确认任务交给了谁：
-       tail -f ~/Library/Logs/product-flow/collector.log | grep routing
+       tail -f "$LOG" | grep routing
      出现「→ dedicated」才说明走上了新通道。
 TIPS
