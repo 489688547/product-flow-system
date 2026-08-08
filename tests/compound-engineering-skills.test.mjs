@@ -55,8 +55,8 @@ function createTargetFixture(commit, skills = skillNames) {
 test("the repository vendors both pinned Compound Engineering skills and the MIT license", () => {
   const manifest = JSON.parse(readFileSync(upstreamManifestPath, "utf8"));
   assert.equal(manifest.repository, "https://github.com/EveryInc/compound-engineering-plugin.git");
-  assert.equal(manifest.tag, "compound-engineering-v3.21.4");
-  assert.equal(manifest.commit, "0a2957852e2034d04eb01120fd7da6ed5307dc56");
+  assert.match(manifest.tag, /^compound-engineering-v\d+\.\d+\.\d+$/);
+  assert.match(manifest.commit, /^[0-9a-f]{40}$/);
   assert.deepEqual(manifest.skills, skillNames);
   assert.match(readFileSync(upstreamLicensePath, "utf8"), /^MIT License/m);
 
@@ -65,6 +65,14 @@ test("the repository vendors both pinned Compound Engineering skills and the MIT
     assert.equal(existsSync(skill), true, `${name} must be discoverable without installation`);
     assert.equal(lstatSync(skill).isSymbolicLink(), false, `${name} must be vendored, not linked`);
   }
+});
+
+test("the updater compares Compound Engineering releases lexicographically and fails closed on downgrade", async () => {
+  const { compareCompoundEngineeringTags } = await import(new URL("../scripts/sync-compound-engineering-skills.mjs", import.meta.url));
+
+  assert.equal(compareCompoundEngineeringTags("compound-engineering-v3.21.3", "compound-engineering-v3.21.4"), -1);
+  assert.equal(compareCompoundEngineeringTags("compound-engineering-v3.21.4", "compound-engineering-v3.21.4"), 0);
+  assert.equal(compareCompoundEngineeringTags("compound-engineering-v3.22.0", "compound-engineering-v3.21.4"), 1);
 });
 
 test("governance can independently reject an incomplete or linked vendored Skill", async () => {
@@ -257,6 +265,9 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.match(workflowText, /draft/);
   assert.match(workflowText, /prerelease/);
   assert.ok(workflowText.includes("compound-engineering-v\\d+\\.\\d+\\.\\d+"));
+  assert.match(workflowText, /compareCompoundEngineeringTags/);
+  assert.match(workflowText, /comparison < 0/);
+  assert.match(workflowText, /needed=\$\{comparison > 0\}/);
   assert.match(workflowText, /git clone --no-checkout/);
   assert.match(workflowText, /checkout --detach/);
   assert.match(workflowText, /rev-parse HEAD/);
@@ -271,14 +282,28 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.match(workflowText, /npm run build/);
   assert.match(workflowText, /git diff --check/);
   assert.match(workflowText, /BRANCH="codex\/update-compound-engineering-/);
+  assert.match(workflowText, /gh pr list --base dev --head "\$BRANCH" --state open/);
+  assert.match(workflowText, /git ls-remote --exit-code --heads origin "\$BRANCH"/);
+  assert.match(workflowText, /已有同版本的开放升级 PR/);
+  assert.match(workflowText, /已有同名远端分支但没有开放升级 PR/);
   assert.match(workflowText, /git checkout -B "\$BRANCH" origin\/dev/);
   assert.match(workflowText, /git push --set-upstream origin "\$BRANCH"/);
   assert.match(workflowText, /gh pr create[\s\S]*--base dev[\s\S]*--head "\$BRANCH"/);
   assert.match(workflowText, /Integration-Impact: none/);
   assert.match(workflowText, /只更新仓库内开发 Skill，不触及 provider runtime/);
   assert.match(workflowText, /Rule-Writeback: docs\/decisions\/2026-08-08-compound-engineering-skills\.md/);
-  assert.match(workflowText, /版本升级规则/);
+  assert.match(workflowText, /更新当前固定版本记录/);
+  assert.match(workflowText, /当前固定版本/);
+  assert.match(workflowText, /git add[^\n]*docs\/decisions\/2026-08-08-compound-engineering-skills\.md/);
+  assert.match(workflowText, /npm run check:pr -- --base origin\/dev --body-file/);
+  assert.ok(
+    workflowText.indexOf("git commit") < workflowText.indexOf("compound-engineering-pr-body.md")
+      && workflowText.indexOf("compound-engineering-pr-body.md") < workflowText.indexOf("npm run check:pr")
+      && workflowText.indexOf("npm run check:pr") < workflowText.indexOf("git push --set-upstream"),
+    "the governed PR body must be checked after commit and before push"
+  );
   assert.doesNotMatch(workflowText, /auto-merge|--auto/i);
+  assert.doesNotMatch(workflowText, /--force(?:-with-lease)?/);
   assert.doesNotMatch(workflowText, /git push[^\n]*origin\s+(?:dev|main)(?:\s|$)/);
   assert.doesNotMatch(workflowText, /git checkout[^\n]*(?:origin\/main|\bmain\b)/);
 
@@ -287,4 +312,9 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.match(adr, /失败/);
   assert.match(adr, /回滚/);
   assert.match(adr, /不自动合并/);
+  const manifest = JSON.parse(readFileSync(upstreamManifestPath, "utf8"));
+  const currentPin = /^- 当前固定版本：(?<tag>compound-engineering-v\d+\.\d+\.\d+)（commit (?<commit>[0-9a-f]{40})）。$/m.exec(adr);
+  assert.ok(currentPin?.groups, "ADR must record the current pinned tag and complete commit");
+  assert.equal(currentPin.groups.tag, manifest.tag);
+  assert.equal(currentPin.groups.commit, manifest.commit);
 });

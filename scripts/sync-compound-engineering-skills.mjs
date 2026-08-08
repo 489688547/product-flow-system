@@ -12,6 +12,21 @@ function fail(message) {
   throw new Error(`Compound Engineering 同步失败：${message}`);
 }
 
+function versionParts(tag) {
+  if (!TAG_PATTERN.test(tag ?? "")) fail(`tag 不符合正式版本规则：${tag ?? ""}`);
+  return tag.slice("compound-engineering-v".length).split(".").map(Number);
+}
+
+export function compareCompoundEngineeringTags(leftTag, rightTag) {
+  const left = versionParts(leftTag);
+  const right = versionParts(rightTag);
+  for (let index = 0; index < left.length; index += 1) {
+    if (left[index] < right[index]) return -1;
+    if (left[index] > right[index]) return 1;
+  }
+  return 0;
+}
+
 function runGit(source, args) {
   try {
     return execFileSync("git", args, { cwd: source, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();

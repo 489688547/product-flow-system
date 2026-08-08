@@ -12,6 +12,8 @@
 
 将 EveryInc Compound Engineering 正式 release 中的 `ce-compound` 与 `ce-compound-refresh` 完整目录 vendoring 到 `.agents/skills/`。固定记录 tag、完整 commit SHA 和 MIT 许可证。上游更新由每周/手动 GitHub Actions 检查并创建面向 `dev` 的独立 PR；任何更新必须经过项目 CI 与人工评审，不跟随 `main`、不自动合并。
 
+- 当前固定版本：compound-engineering-v3.21.4（commit 0a2957852e2034d04eb01120fd7da6ed5307dc56）。
+
 项目经验保存在 `docs/solutions/`。当前代码、测试和 durable docs 始终高于经验文档；证据不足的冲突标记 `stale`。项目 `verification` Skill 在已验证且可复用的问题出现时触发沉淀或刷新。
 
 ## 备选方案
