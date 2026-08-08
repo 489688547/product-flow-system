@@ -143,3 +143,55 @@ test("the synchronizer rejects version drift, missing directories, symlinks, and
     rmSync(target, { recursive: true, force: true });
   }
 });
+
+test("the synchronizer rejects ignored source files outside the fixed HEAD tree before changing skills", async () => {
+  const { syncCompoundEngineeringSkills } = await import(new URL("../scripts/sync-compound-engineering-skills.mjs", import.meta.url));
+  const { source, commit } = createUpstreamFixture();
+  const target = createTargetFixture(commit);
+  const existingSkill = resolve(target, ".agents/skills/ce-compound/SKILL.md");
+  write(existingSkill, "existing skill\n");
+  try {
+    write(resolve(source, "skills/ce-compound/ignored-extra.md"), "must never be copied\n");
+    write(resolve(source, ".git/info/exclude"), "skills/ce-compound/ignored-extra.md\n");
+    assert.equal(command(source, "status", "--porcelain"), "");
+
+    await assert.rejects(
+      () => syncCompoundEngineeringSkills({ rootDir: target, source, tag: "compound-engineering-v3.21.4", commit }),
+      /HEAD|untracked|source/i
+    );
+    assert.equal(readFileSync(existingSkill, "utf8"), "existing skill\n");
+    assert.equal(existsSync(resolve(target, ".agents/skills/ce-compound/ignored-extra.md")), false);
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("the synchronizer validates the source checkout HEAD and tag instead of only manifest parameters", async () => {
+  const { syncCompoundEngineeringSkills } = await import(new URL("../scripts/sync-compound-engineering-skills.mjs", import.meta.url));
+  const { source, commit } = createUpstreamFixture();
+  const target = createTargetFixture(commit);
+  const existingSkill = resolve(target, ".agents/skills/ce-compound/SKILL.md");
+  write(existingSkill, "existing skill\n");
+  try {
+    write(resolve(source, "skills/ce-compound/SKILL.md"), "changed HEAD\n");
+    command(source, "add", ".");
+    command(source, "commit", "--quiet", "-m", "drift head");
+    await assert.rejects(
+      () => syncCompoundEngineeringSkills({ rootDir: target, source, tag: "compound-engineering-v3.21.4", commit }),
+      /HEAD commit/i
+    );
+    assert.equal(readFileSync(existingSkill, "utf8"), "existing skill\n");
+
+    command(source, "tag", "-f", "compound-engineering-v3.21.4");
+    command(source, "checkout", "--quiet", commit);
+    await assert.rejects(
+      () => syncCompoundEngineeringSkills({ rootDir: target, source, tag: "compound-engineering-v3.21.4", commit }),
+      /tag/i
+    );
+    assert.equal(readFileSync(existingSkill, "utf8"), "existing skill\n");
+  } finally {
+    rmSync(source, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});

@@ -58,6 +58,27 @@ function walkSafeDirectory(root, path) {
   }
 }
 
+function listRegularFiles(root, path, files = []) {
+  for (const entry of readdirSync(path, { withFileTypes: true })) {
+    const child = resolve(path, entry.name);
+    if (entry.isDirectory()) listRegularFiles(root, child, files);
+    else files.push(relative(root, child).replaceAll("\\", "/"));
+  }
+  return files;
+}
+
+function assertSourceMatchesHeadTree(sourceRoot, sourceSkillPaths, sourceLicense) {
+  const paths = [...sourceSkillPaths.map(item => `skills/${item.name}`), "LICENSE"];
+  const tracked = new Set(runGit(sourceRoot, ["ls-tree", "-r", "--name-only", "HEAD", "--", ...paths]).split("\n").filter(Boolean));
+  const actual = new Set([
+    ...sourceSkillPaths.flatMap(item => listRegularFiles(sourceRoot, item.path)),
+    relative(sourceRoot, sourceLicense).replaceAll("\\", "/")
+  ]);
+  const unexpected = [...actual].find(path => !tracked.has(path));
+  const missing = [...tracked].find(path => !actual.has(path));
+  if (unexpected || missing) fail(`上游允许目录与固定 HEAD tree 不一致：${unexpected ?? missing}`);
+}
+
 function copySafeDirectory(source, target) {
   mkdirSync(target, { recursive: true });
   for (const entry of readdirSync(source, { withFileTypes: true })) {
@@ -156,6 +177,7 @@ export async function syncCompoundEngineeringSkills({ rootDir = resolve(dirname(
     walkSafeDirectory(sourceSkills, path);
     return { name, path };
   });
+  assertSourceMatchesHeadTree(sourceRoot, sourceSkillPaths, sourceLicense);
   if (runGit(sourceRoot, ["status", "--porcelain"]) !== "") fail("上游 checkout 存在未提交变更");
 
   const stage = resolve(skills, `.compound-engineering-staging-${randomUUID()}`);
