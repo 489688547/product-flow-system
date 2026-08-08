@@ -1,36 +1,19 @@
 #!/usr/bin/env node
-import { open, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pathToFileURL } from "node:url";
 import { uploadErpArchive, uploadErpCollection } from "./api.mjs";
-import { DEFAULT_ARCHIVE_ROOT, ensureArchiveLayout } from "./archive.mjs";
+import { DEFAULT_ARCHIVE_ROOT } from "./archive.mjs";
 import { installLaunchAgent, readCollectorToken, storeCollectorToken } from "./automation.mjs";
 import { readKuaimaiExport } from "./core.mjs";
 import { nodeRequest } from "./http.mjs";
+import { withCollectorLock } from "./lock.mjs";
 import { archiveExistingFile, archiveExistingRawFile, scanWaitingDirectory, syncLocalArchiveManifest } from "./scanner.mjs";
+import { assertFormalCollectorTarget } from "../web-data-collector/formal-target.mjs";
 
 function argument(argv, name, fallback = "") {
   const index = argv.indexOf(name);
   return index >= 0 ? String(argv[index + 1] || fallback) : fallback;
-}
-
-async function withCollectorLock(root, callback) {
-  const layout = await ensureArchiveLayout(root);
-  const lockPath = resolve(layout.root, ".collector.lock");
-  let handle;
-  try {
-    handle = await open(lockPath, "wx", 0o600);
-  } catch (error) {
-    if (error?.code === "EEXIST") return { status: "already_running" };
-    throw error;
-  }
-  try {
-    return await callback();
-  } finally {
-    await handle.close();
-    await rm(lockPath, { force: true });
-  }
 }
 
 async function runnerHeaders() {
@@ -63,6 +46,7 @@ export async function runCollector(argv = process.argv.slice(2)) {
   const resourceType = argument(argv, "--resource", "");
   if (command === "register") return registerCollector(baseUrl);
   if (command === "install") {
+    assertFormalCollectorTarget({ baseUrl });
     await readCollectorToken();
     return installLaunchAgent({
       collectorPath: resolve(dirname(fileURLToPath(import.meta.url)), "index.mjs"),
