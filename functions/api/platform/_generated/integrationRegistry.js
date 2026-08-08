@@ -515,9 +515,12 @@ const integrationRegistry = {
         "Dockerfile.aliyun",
         "deploy/aliyun/**",
         "scripts/aliyun/**",
+        "scripts/core-developer-access.mjs",
+        "scripts/start-core-developer.mjs",
         "scripts/check-deployed-readiness.mjs",
         "scripts/check-deployed-smoke.mjs",
         "docs/features/aliyun-ecs-deployment/**",
+        "docs/features/core-developer-access/**",
         "docs/platform/integrations.md"
       ],
       "envVars": [
@@ -554,6 +557,8 @@ const integrationRegistry = {
       "evidence": [
         "docs/features/aliyun-ecs-deployment/prd.md",
         "docs/features/aliyun-ecs-deployment/plan.md",
+        "docs/features/core-developer-access/prd.md",
+        "scripts/core-developer-access.mjs",
         "functions/api/platform/_shared/dataStandards.js",
         "migrations/0004_data_standards.sql",
         "docs/decisions/2026-07-29-aliyun-ecs-sqlite-transition.md",

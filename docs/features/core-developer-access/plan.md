@@ -24,9 +24,10 @@
 
 ## 接口与契约
 
-- `developerAccessPath(homeDir) -> ~/.config/product-flow-system/developer.env`。
-- `loadDeveloperAccess({ homeDir }) -> { path, apiUrl, token }`；拒绝非 0600、非 HTTPS
-  正式 Origin 和空 Token。
+- `developerAccessDirectory(homeDir) -> ~/.config/EC-management-system`；目录只接受一份
+  非隐藏个人文件，文件名不参与身份或权限判断。
+- `loadDeveloperAccess({ homeDir }) -> { path, apiUrl, token }`；自动把当前用户拥有的普通
+  文件收紧为 0600，拒绝多文件、非 HTTPS 正式 Origin 和空 Token，并兼容旧固定路径。
 - `issueCoreDeveloperAccess({ db, userId, outputPath, now }) -> { path, fingerprint,
   expiresAt }`；不返回或记录明文 Token。
 - 核心代理头只在本地 Node 代理与生产 API 间使用；中间件按 GET/HEAD=`read`、其他
