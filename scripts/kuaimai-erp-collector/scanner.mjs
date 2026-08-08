@@ -77,7 +77,7 @@ export async function scanWaitingDirectory({ root, upload, resourceType = "" }) 
   const signatures = await readJson(statePath, {});
   const manifest = await loadLocalManifest(layout.manifest);
   const names = (await readdir(layout.waiting)).filter(name => SUPPORTED_EXTENSIONS.has(path.extname(name).toLowerCase())).sort();
-  const result = { discovered: names.length, waiting: 0, processed: 0, failed: 0, duplicates: 0 };
+  const result = { discovered: names.length, waiting: 0, processed: 0, failed: 0, retrying: 0, duplicates: 0 };
   const nextSignatures = {};
   for (const name of names) {
     const sourcePath = path.join(layout.waiting, name);
@@ -88,6 +88,7 @@ export async function scanWaitingDirectory({ root, upload, resourceType = "" }) 
       continue;
     }
     let archived;
+    let uploadStarted = false;
     try {
       const identified = await identifyAndRead(sourcePath, resourceType);
       archived = await archiveSourceFile(sourcePath, { root: layout.root, resourceType: identified.resourceType });
@@ -118,6 +119,7 @@ export async function scanWaitingDirectory({ root, upload, resourceType = "" }) 
         status: "archived",
         archivedAt: new Date().toISOString()
       };
+      uploadStarted = true;
       const uploaded = await upload(identified.parsed);
       await appendManifestEvent(layout.manifest, {
         contentHash: archived.contentHash,
@@ -137,6 +139,26 @@ export async function scanWaitingDirectory({ root, upload, resourceType = "" }) 
       result.processed += 1;
     } catch (error) {
       const fallbackHash = archived?.contentHash || "unknown";
+      const retryableUpload = uploadStarted && (
+        error?.retryable === true
+        || error?.status === undefined
+        || Number(error.status) >= 500
+      );
+      if (retryableUpload) {
+        if (archived) await appendManifestEvent(layout.manifest, {
+          contentHash: archived.contentHash,
+          status: "retry_pending",
+          errorCode: error.code || "KUAIMAI_ARCHIVE_UPLOAD_RETRY_PENDING",
+          processedAt: new Date().toISOString()
+        });
+        await writeReport(layout, fallbackHash === "unknown" ? `${Date.now()}`.padEnd(64, "0") : fallbackHash, {
+          status: "retry_pending",
+          fileName: name,
+          errorCode: error.code || "KUAIMAI_ARCHIVE_UPLOAD_RETRY_PENDING"
+        });
+        result.retrying += 1;
+        continue;
+      }
       if (archived) await appendManifestEvent(layout.manifest, {
         contentHash: archived.contentHash,
         status: "failed",

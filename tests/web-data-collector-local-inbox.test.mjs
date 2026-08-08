@@ -1,21 +1,29 @@
 import assert from "node:assert/strict";
+import { mkdtemp } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 async function moduleUnderTest() {
   return import("../scripts/web-data-collector/local-inbox.mjs").catch(() => ({}));
 }
 
+const tempRoot = () => mkdtemp(join(tmpdir(), "unified-collector-"));
+
 test("browser downloads and local inbox scans share one serial archive boundary", async () => {
   const { createLocalArchiveCoordinator } = await moduleUnderTest();
   assert.equal(typeof createLocalArchiveCoordinator, "function", "createLocalArchiveCoordinator must be implemented");
 
   let releaseBrowser;
+  let announceBrowserStarted;
+  const browserStarted = new Promise(resolve => { announceBrowserStarted = resolve; });
   let active = 0;
   let peak = 0;
-  const coordinator = createLocalArchiveCoordinator({ now: () => 0 });
+  const coordinator = createLocalArchiveCoordinator({ root: await tempRoot(), now: () => 0 });
   const browser = coordinator.runBrowserArchive(async () => {
     active += 1;
     peak = Math.max(peak, active);
+    announceBrowserStarted();
     await new Promise(resolve => { releaseBrowser = resolve; });
     active -= 1;
     return "browser-complete";
@@ -27,7 +35,7 @@ test("browser downloads and local inbox scans share one serial archive boundary"
     return { processed: 1 };
   });
 
-  await Promise.resolve();
+  await browserStarted;
   assert.equal(active, 1);
   releaseBrowser();
   assert.equal(await browser, "browser-complete");
@@ -45,6 +53,7 @@ test("local inbox scan runs immediately and then at most once every 15 minutes",
   let now = 0;
   let calls = 0;
   const coordinator = createLocalArchiveCoordinator({
+    root: await tempRoot(),
     now: () => now,
     intervalMs: 15 * 60 * 1_000
   });
@@ -71,7 +80,7 @@ test("a failed local scan returns only a stable safe error and does not stop lat
   assert.equal(typeof createLocalArchiveCoordinator, "function", "createLocalArchiveCoordinator must be implemented");
 
   let now = 0;
-  const coordinator = createLocalArchiveCoordinator({ now: () => now, intervalMs: 900_000 });
+  const coordinator = createLocalArchiveCoordinator({ root: await tempRoot(), now: () => now, intervalMs: 900_000 });
   const failed = await coordinator.runInboxScan(async () => {
     throw Object.assign(new Error("/Users/company/Desktop/private/report.xlsx"), {
       code: "KUAIMAI_UPLOAD_TIMEOUT"
@@ -89,4 +98,52 @@ test("a failed local scan returns only a stable safe error and does not stop lat
     status: "completed",
     result: { status: "waiting_for_export" }
   });
+});
+
+test("two collector processes cannot mutate the same local archive concurrently", async () => {
+  const { createLocalArchiveCoordinator } = await moduleUnderTest();
+  const root = await tempRoot();
+  const first = createLocalArchiveCoordinator({ root, now: () => 0 });
+  const second = createLocalArchiveCoordinator({ root, now: () => 0 });
+  let release;
+  let announceStarted;
+  const started = new Promise(resolve => { announceStarted = resolve; });
+  const browserArchive = first.runBrowserArchive(async () => {
+    announceStarted();
+    await new Promise(resolve => { release = resolve; });
+    return "done";
+  });
+  await started;
+  let scanCalls = 0;
+
+  assert.deepEqual(await second.runInboxScan(async () => {
+    scanCalls += 1;
+  }), {
+    status: "skipped",
+    reason: "external_lock"
+  });
+  assert.equal(scanCalls, 0);
+  release();
+  assert.equal(await browserArchive, "done");
+});
+
+test("shutdown drain waits for the active archive operation", async () => {
+  const { createLocalArchiveCoordinator } = await moduleUnderTest();
+  const coordinator = createLocalArchiveCoordinator({ root: await tempRoot(), now: () => 0 });
+  let release;
+  let announceStarted;
+  const started = new Promise(resolve => { announceStarted = resolve; });
+  let finished = false;
+  const operation = coordinator.runBrowserArchive(async () => {
+    announceStarted();
+    await new Promise(resolve => { release = resolve; });
+  });
+  await started;
+  const drained = coordinator.drain().then(() => { finished = true; });
+  await Promise.resolve();
+  assert.equal(finished, false);
+  release();
+  await operation;
+  await drained;
+  assert.equal(finished, true);
 });

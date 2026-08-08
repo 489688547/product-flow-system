@@ -1,3 +1,5 @@
+import { withCollectorLock } from "../kuaimai-erp-collector/lock.mjs";
+
 const DEFAULT_INTERVAL_MS = 15 * 60 * 1_000;
 const SAFE_ERROR_CODE = /^[A-Z][A-Z0-9_]{2,79}$/;
 
@@ -7,12 +9,14 @@ function safeErrorCode(error) {
 }
 
 export function createLocalArchiveCoordinator({
+  root,
   intervalMs = DEFAULT_INTERVAL_MS,
   now = () => Date.now()
 } = {}) {
   if (!Number.isFinite(intervalMs) || intervalMs < 1_000) {
     throw new Error("本地快麦扫描周期无效。");
   }
+  if (!root) throw new Error("本地快麦归档目录未配置。");
 
   let serialTail = Promise.resolve();
   let lastScanStartedAt = null;
@@ -29,7 +33,7 @@ export function createLocalArchiveCoordinator({
 
   return Object.freeze({
     runBrowserArchive(operation) {
-      return runSerial(operation);
+      return runSerial(() => withCollectorLock(root, operation, { onBusy: "throw" }));
     },
     async runInboxScan(operation) {
       const startedAt = Number(now());
@@ -40,13 +44,19 @@ export function createLocalArchiveCoordinator({
       lastScanStartedAt = startedAt;
       scanRunning = true;
       try {
-        const result = await runSerial(operation);
+        const result = await runSerial(() => withCollectorLock(root, operation));
+        if (result?.status === "already_running") {
+          return { status: "skipped", reason: "external_lock" };
+        }
         return { status: "completed", result };
       } catch (error) {
         return { status: "failed", errorCode: safeErrorCode(error) };
       } finally {
         scanRunning = false;
       }
+    },
+    drain() {
+      return serialTail;
     }
   });
 }

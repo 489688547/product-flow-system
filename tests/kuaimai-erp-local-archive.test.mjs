@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -141,6 +141,31 @@ test("scanner waits for one stable interval before archiving and uploading", asy
   assert.equal(uploads.length, 1);
   assert.equal(uploads[0].archive.relativePath.startsWith("原始归档/orders/"), true);
   assert.equal((await loadLocalManifest(layout.manifest)).values().next().value.status, "processed");
+});
+
+test("retryable upload failures leave the source in waiting for the next scan", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  const source = path.join(layout.waiting, "orders-retry.csv");
+  await writeFile(source, "系统订单号,订单创建时间,店铺名称\nKM2,2026-07-22 11:00:00,抖音旗舰店\n");
+  await scanWaitingDirectory({ root, upload: async () => {} });
+  const retrying = await scanWaitingDirectory({
+    root,
+    upload: async () => {
+      throw Object.assign(new Error("upstream unavailable"), {
+        code: "ERP_COLLECTION_UPLOAD_FAILED",
+        status: 503
+      });
+    }
+  });
+
+  assert.equal(retrying.retrying, 1);
+  assert.deepEqual(await readdir(layout.waiting), ["orders-retry.csv"]);
+  assert.deepEqual(await readdir(layout.failed), []);
+
+  const recovered = await scanWaitingDirectory({ root, upload: async () => ({ batchId: "batch-retry" }) });
+  assert.equal(recovered.processed, 1);
+  assert.deepEqual(await readdir(layout.waiting), []);
 });
 
 test("scanner distinguishes kit and combination snapshots from ordinary product files", async () => {

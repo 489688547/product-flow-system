@@ -7,9 +7,11 @@ import {
   assertCollectionFileMatchesTask,
   browserModeUsesManagedChrome,
   createCommerceFactUploader,
+  createDownloadProcessor,
   experimentalModeEnabled,
   normalizeBrowserMode,
-  runWebCollector
+  runWebCollector,
+  sourceFingerprint
 } from "../scripts/web-data-collector/index.mjs";
 import { createWebCollectorOrchestrator } from "../scripts/web-data-collector/orchestrator.mjs";
 import {
@@ -80,11 +82,17 @@ test("Ego mode creates no managed Chrome registry", () => {
   assert.equal(browserModeUsesManagedChrome("ego", { experimentalMode: true }), true);
 });
 
-test("formal Ego service refuses non-Aliyun targets while a loopback probe is allowed", () => {
-  assert.doesNotThrow(() => assertAliyunCollectorTarget({
-    baseUrl: "https://deshan-tiyes.cn",
-    browserMode: "ego"
-  }));
+test("every formal collector mode refuses non-Aliyun targets while an Ego loopback probe is allowed", () => {
+  for (const browserMode of ["ego", "extension", "dedicated"]) {
+    assert.doesNotThrow(() => assertAliyunCollectorTarget({
+      baseUrl: "https://deshan-tiyes.cn",
+      browserMode
+    }));
+    assert.throws(
+      () => assertAliyunCollectorTarget({ baseUrl: "https://retired-backend.pages.dev", browserMode }),
+      error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+    );
+  }
   assert.throws(
     () => assertAliyunCollectorTarget({ baseUrl: "https://retired-backend.pages.dev", browserMode: "ego" }),
     error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
@@ -104,16 +112,70 @@ test("formal Ego service refuses non-Aliyun targets while a loopback probe is al
   }));
 });
 
-test("serve rejects a Cloudflare Ego target before reading local service secrets", async () => {
-  await assert.rejects(
-    runWebCollector([
-      "serve",
-      "--browser-mode", "ego",
-      "--base-url", "https://retired-backend.pages.dev",
-      "--ego-cli", "/Users/company/.local/bin/ego-browser"
-    ]),
-    error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
-  );
+test("serve rejects a Cloudflare target in every browser mode before reading local service secrets", async () => {
+  for (const browserMode of ["ego", "extension", "dedicated"]) {
+    await assert.rejects(
+      runWebCollector([
+        "serve",
+        "--browser-mode", browserMode,
+        "--base-url", "https://retired-backend.pages.dev",
+        "--ego-cli", "/Users/company/.local/bin/ego-browser"
+      ]),
+      error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+    );
+  }
+});
+
+test("collector fingerprint changes when the unified runtime or ERP scanner changes", async () => {
+  const baseline = await sourceFingerprint({
+    readSource: async filePath => filePath.endsWith("local-inbox.mjs") ? "inbox-a" : "same"
+  });
+  const inboxChanged = await sourceFingerprint({
+    readSource: async filePath => filePath.endsWith("local-inbox.mjs") ? "inbox-b" : "same"
+  });
+  const scannerChanged = await sourceFingerprint({
+    readSource: async filePath => filePath.endsWith("scanner.mjs") ? "scanner-b" : "same"
+  });
+
+  assert.notEqual(baseline, inboxChanged);
+  assert.notEqual(baseline, scannerChanged);
+});
+
+test("Kuaimai credentials are read only when an ERP archive is uploaded", async () => {
+  let tokenReads = 0;
+  let uploadedAuthorization = "";
+  const processor = createDownloadProcessor({
+    root: "/archive",
+    downloadsDirectory: "/downloads",
+    baseUrl: "https://deshan-tiyes.cn",
+    readErpToken: async () => {
+      tokenReads += 1;
+      return "erp-token";
+    },
+    archiveCoordinator: {
+      runBrowserArchive: operation => operation()
+    },
+    resolveDownloadFile: async () => "/downloads/report.csv",
+    archiveFile: async (_filePath, options) => {
+      await options.upload({ batch: { id: "batch-1" } });
+      return { batchId: "batch-1", contentHash: "hash-1", rowCount: 1 };
+    },
+    uploadCollection: async (_collection, options) => {
+      uploadedAuthorization = options.headers.authorization;
+      return { batchId: "batch-1" };
+    }
+  });
+
+  assert.equal(tokenReads, 0);
+  const result = await processor({
+    jobId: "job-1",
+    fileName: "report.csv",
+    resourceType: "orders",
+    businessDate: "2026-08-07"
+  });
+  assert.equal(tokenReads, 1);
+  assert.equal(uploadedAuthorization, "Bearer erp-token");
+  assert.equal(result.batchId, "batch-1");
 });
 
 test("orchestrator schedules all extension-implemented Kuaimai resources after 10:00", async () => {

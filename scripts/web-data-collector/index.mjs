@@ -139,7 +139,6 @@ export function browserModeUsesManagedChrome(browserMode, { experimentalMode = f
 }
 
 export function assertAliyunCollectorTarget({ baseUrl, browserMode, allowLocalProbe = false } = {}) {
-  if (browserMode !== "ego") return;
   let target;
   try {
     target = new URL(String(baseUrl || ""));
@@ -154,7 +153,7 @@ export function assertAliyunCollectorTarget({ baseUrl, browserMode, allowLocalPr
     && target?.protocol === "http:"
     && ["127.0.0.1", "localhost", "::1"].includes(target.hostname);
   if (!isApprovedAliyun && !isLoopbackProbe) {
-    throw Object.assign(new Error("正式 Ego 采集只允许写入已登记的阿里云 ECS 入口。"), {
+    throw Object.assign(new Error("正式采集服务只允许写入已登记的阿里云 ECS 入口。"), {
       code: "EGO_FORMAL_TARGET_NOT_ALIYUN"
     });
   }
@@ -237,23 +236,35 @@ export function createCommerceFactUploader({
   };
 }
 
-function createDownloadProcessor({ root, downloadsDirectory, baseUrl, erpToken, archiveCoordinator }) {
+export function createDownloadProcessor({
+  root,
+  downloadsDirectory,
+  baseUrl,
+  readErpToken = readErpCollectorToken,
+  archiveCoordinator,
+  resolveDownloadFile = resolveSafeDownload,
+  archiveFile = archiveExistingFile,
+  uploadCollection = uploadErpCollection
+}) {
   return async ({ jobId, fileName, resourceType, businessDate, onValidated }) => {
-    const filePath = await resolveSafeDownload({ directory: downloadsDirectory, fileName });
-    const archived = await archiveCoordinator.runBrowserArchive(() => archiveExistingFile(filePath, {
+    const filePath = await resolveDownloadFile({ directory: downloadsDirectory, fileName });
+    const archived = await archiveCoordinator.runBrowserArchive(() => archiveFile(filePath, {
       root,
       resourceType,
       onValidated: async validation => {
         assertCollectionFileMatchesTask({ resourceType, businessDate, ...validation });
         await onValidated?.(validation);
       },
-      upload: collection => uploadErpCollection(collection, {
-        baseUrl,
-        headers: {
-          authorization: `Bearer ${erpToken}`,
-          "x-web-collection-job-id": jobId
-        }
-      })
+      upload: async collection => {
+        const erpToken = await readErpToken();
+        return uploadCollection(collection, {
+          baseUrl,
+          headers: {
+            authorization: `Bearer ${erpToken}`,
+            "x-web-collection-job-id": jobId
+          }
+        });
+      }
     }));
     return {
       batchId: archived.batchId || null,
@@ -269,10 +280,14 @@ function createDownloadProcessor({ root, downloadsDirectory, baseUrl, erpToken, 
 // 最新修改时间当指纹随任务轮询带给扩展，扩展空闲时自行重载。
 // 采集器自身的代码指纹：取几个关键文件的内容哈希，与 git 提交无关——
 // 即使有人在工作区改了文件没提交，这个值也会变。
-async function sourceFingerprint() {
+export async function sourceFingerprint({ readSource = readFile } = {}) {
   const here = dirname(fileURLToPath(import.meta.url));
   const files = [
+    "index.mjs",
+    "local-inbox.mjs",
     "orchestrator.mjs",
+    "../kuaimai-erp-collector/lock.mjs",
+    "../kuaimai-erp-collector/scanner.mjs",
     "browser/ego-runtime.mjs",
     "browser/providers/douyin.mjs",
     "browser/providers/douyinEgoTask.mjs",
@@ -283,7 +298,7 @@ async function sourceFingerprint() {
   const hash = createHash("sha256");
   for (const name of files) {
     try {
-      hash.update(await readFile(resolve(here, name)));
+      hash.update(await readSource(resolve(here, name)));
     } catch {
       hash.update(`missing:${name}`);
     }
@@ -334,17 +349,16 @@ async function serve({
   profileRoot = DEFAULT_MANAGED_PROFILE_ROOT,
   experimentalMode = false
 }) {
-  const [runnerToken, pairingKey, erpToken] = await Promise.all([
+  const [runnerToken, pairingKey] = await Promise.all([
     readRunnerToken(),
-    readPairingKey(),
-    readErpCollectorToken()
+    readPairingKey()
   ]);
-  const archiveCoordinator = createLocalArchiveCoordinator();
+  const archiveCoordinator = createLocalArchiveCoordinator({ root });
   const processDownload = createDownloadProcessor({
     root,
     downloadsDirectory,
     baseUrl,
-    erpToken,
+    readErpToken: readErpCollectorToken,
     archiveCoordinator
   });
   const api = createWebCollectionApi({ baseUrl, token: runnerToken });
@@ -470,36 +484,62 @@ async function serve({
     }
   });
   await bridge.listen({ port: 17653 });
-  let cycleRunning = false;
+  let stopping = false;
+  let webCyclePromise = null;
+  let inboxCyclePromise = null;
   let localInboxStatus = { status: "pending" };
-  const runCycle = async () => {
-    if (cycleRunning) return;
-    cycleRunning = true;
-    try {
+  const runWebCycle = () => {
+    if (stopping || webCyclePromise) return webCyclePromise;
+    webCyclePromise = (async () => {
       await orchestrator.prepare();
       await diagnosticStore.cleanup();
       await dedicatedRuntime?.runOnce();
       await egoRuntime?.runOnce();
       await experimentalCycle?.runOnce();
+    })().finally(() => {
+      webCyclePromise = null;
+    });
+    return webCyclePromise;
+  };
+  const runInboxCycle = () => {
+    if (stopping || inboxCyclePromise) return inboxCyclePromise;
+    inboxCyclePromise = (async () => {
       localInboxStatus = await archiveCoordinator.runInboxScan(() => scanWaitingDirectory({
         root,
-        upload: collection => uploadErpCollection(collection, {
-          baseUrl,
-          headers: { authorization: `Bearer ${erpToken}` }
-        })
+        upload: async collection => {
+          const erpToken = await readErpCollectorToken();
+          return uploadErpCollection(collection, {
+            baseUrl,
+            headers: { authorization: `Bearer ${erpToken}` }
+          });
+        }
       }));
+      if (localInboxStatus.status === "completed" && localInboxStatus.result?.retrying > 0) {
+        localInboxStatus = {
+          ...localInboxStatus,
+          status: "failed",
+          errorCode: "KUAIMAI_LOCAL_SCAN_RETRY_PENDING"
+        };
+      }
       if (localInboxStatus.status === "failed") {
         process.stderr.write(`[local-inbox] ${localInboxStatus.errorCode}\n`);
       }
-    } finally {
-      cycleRunning = false;
-    }
+    })().finally(() => {
+      inboxCyclePromise = null;
+    });
+    return inboxCyclePromise;
   };
-  await runCycle().catch(() => {});
-  const timer = setInterval(() => void runCycle().catch(() => {}), 60_000);
+  await runWebCycle().catch(() => {});
+  void runInboxCycle().catch(() => {});
+  const webTimer = setInterval(() => void runWebCycle()?.catch(() => {}), 60_000);
+  const inboxTimer = setInterval(() => void runInboxCycle()?.catch(() => {}), 15 * 60 * 1_000);
   const stop = async () => {
-    clearInterval(timer);
+    stopping = true;
+    clearInterval(webTimer);
+    clearInterval(inboxTimer);
     await bridge.close();
+    await Promise.allSettled([webCyclePromise, inboxCyclePromise].filter(Boolean));
+    await archiveCoordinator.drain();
     experimentalRunStore?.close();
   };
   process.once("SIGINT", () => void stop().then(() => process.exit(0)));
