@@ -18,6 +18,8 @@ import {
   storeCollectorToken
 } from "../scripts/kuaimai-erp-collector/automation.mjs";
 import { scanWaitingDirectory } from "../scripts/kuaimai-erp-collector/scanner.mjs";
+import { withCollectorLock } from "../scripts/kuaimai-erp-collector/lock.mjs";
+import { runCollector } from "../scripts/kuaimai-erp-collector/index.mjs";
 
 async function tempRoot() {
   return mkdtemp(path.join(os.tmpdir(), "kuaimai-archive-"));
@@ -125,6 +127,44 @@ test("LaunchAgent runs every 15 minutes without embedding secrets", () => {
   assert.match(plist, /<key>StartInterval<\/key>\s*<integer>900<\/integer>/);
   assert.match(plist, /<string>scan<\/string>/);
   assert.doesNotMatch(plist, /kec_|token|password|cookie/i);
+});
+
+test("legacy rollback installer rejects every non-ECS formal target before reading secrets", async () => {
+  for (const baseUrl of [
+    "http://127.0.0.1:8132",
+    "https://retired-backend.pages.dev",
+    "https://deshan-tiyes.cn/path",
+    "https://deshan-tiyes.cn?target=other"
+  ]) {
+    await assert.rejects(
+      runCollector(["install", "--base-url", baseUrl]),
+      error => error?.code === "EGO_FORMAL_TARGET_NOT_ALIYUN"
+    );
+  }
+});
+
+test("collector lock reclaims a stale owner whose process no longer exists", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  await writeFile(path.join(layout.root, ".collector.lock"), `${JSON.stringify({
+    version: 1,
+    ownerId: "old-owner",
+    pid: 987654,
+    createdAt: "2026-08-08T00:00:00.000Z"
+  })}\n`, { mode: 0o600 });
+  let calls = 0;
+
+  const result = await withCollectorLock(root, async () => {
+    calls += 1;
+    return "recovered";
+  }, {
+    processAlive: () => false,
+    now: () => new Date("2026-08-08T07:00:00.000Z")
+  });
+
+  assert.equal(result, "recovered");
+  assert.equal(calls, 1);
+  await assert.rejects(readFile(path.join(layout.root, ".collector.lock")), error => error?.code === "ENOENT");
 });
 
 test("scanner waits for one stable interval before archiving and uploading", async () => {

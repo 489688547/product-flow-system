@@ -9,6 +9,7 @@ import { readKuaimaiExport } from "./core.mjs";
 import { nodeRequest } from "./http.mjs";
 import { withCollectorLock } from "./lock.mjs";
 import { archiveExistingFile, archiveExistingRawFile, scanWaitingDirectory, syncLocalArchiveManifest } from "./scanner.mjs";
+import { assertFormalCollectorTarget } from "../web-data-collector/formal-target.mjs";
 
 function argument(argv, name, fallback = "") {
   const index = argv.indexOf(name);
@@ -45,6 +46,7 @@ export async function runCollector(argv = process.argv.slice(2)) {
   const resourceType = argument(argv, "--resource", "");
   if (command === "register") return registerCollector(baseUrl);
   if (command === "install") {
+    assertFormalCollectorTarget({ baseUrl });
     await readCollectorToken();
     return installLaunchAgent({
       collectorPath: resolve(dirname(fileURLToPath(import.meta.url)), "index.mjs"),

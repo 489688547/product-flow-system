@@ -14,7 +14,7 @@ import { nodeRequest } from "../kuaimai-erp-collector/http.mjs";
 import { ensureManagedChrome } from "../browser-runtime/managed-chrome.mjs";
 import { createEgoCliRunner } from "../browser-runtime/ego-cli.mjs";
 import { createWebCollectionApi } from "./api.mjs";
-import { createLocalArchiveCoordinator } from "./local-inbox.mjs";
+import { createLocalArchiveCoordinator, startIndependentCollectorCycles } from "./local-inbox.mjs";
 import {
   EXTENSION_ID,
   EXTENSION_ORIGIN,
@@ -25,6 +25,7 @@ import {
   storeRunnerToken
 } from "./automation.mjs";
 import { createCollectorBridge } from "./bridge.mjs";
+import { assertFormalCollectorTarget } from "./formal-target.mjs";
 import { createBrowserProfileRegistry } from "./browser/profile-registry.mjs";
 import {
   createDedicatedBrowserRuntime,
@@ -139,24 +140,7 @@ export function browserModeUsesManagedChrome(browserMode, { experimentalMode = f
 }
 
 export function assertAliyunCollectorTarget({ baseUrl, browserMode, allowLocalProbe = false } = {}) {
-  let target;
-  try {
-    target = new URL(String(baseUrl || ""));
-  } catch {
-    target = null;
-  }
-  const isApprovedAliyun = target?.origin === "https://deshan-tiyes.cn"
-    && target.pathname === "/"
-    && !target.search
-    && !target.hash;
-  const isLoopbackProbe = allowLocalProbe === true
-    && target?.protocol === "http:"
-    && ["127.0.0.1", "localhost", "::1"].includes(target.hostname);
-  if (!isApprovedAliyun && !isLoopbackProbe) {
-    throw Object.assign(new Error("正式采集服务只允许写入已登记的阿里云 ECS 入口。"), {
-      code: "EGO_FORMAL_TARGET_NOT_ALIYUN"
-    });
-  }
+  return assertFormalCollectorTarget({ baseUrl, browserMode, allowLocalProbe });
 }
 
 async function registerRunner(baseUrl, fetchImpl = nodeRequest) {
@@ -484,26 +468,16 @@ async function serve({
     }
   });
   await bridge.listen({ port: 17653 });
-  let stopping = false;
-  let webCyclePromise = null;
-  let inboxCyclePromise = null;
   let localInboxStatus = { status: "pending" };
-  const runWebCycle = () => {
-    if (stopping || webCyclePromise) return webCyclePromise;
-    webCyclePromise = (async () => {
+  const cycles = startIndependentCollectorCycles({
+    runWeb: async () => {
       await orchestrator.prepare();
       await diagnosticStore.cleanup();
       await dedicatedRuntime?.runOnce();
       await egoRuntime?.runOnce();
       await experimentalCycle?.runOnce();
-    })().finally(() => {
-      webCyclePromise = null;
-    });
-    return webCyclePromise;
-  };
-  const runInboxCycle = () => {
-    if (stopping || inboxCyclePromise) return inboxCyclePromise;
-    inboxCyclePromise = (async () => {
+    },
+    runInbox: async () => {
       localInboxStatus = await archiveCoordinator.runInboxScan(() => scanWaitingDirectory({
         root,
         upload: async collection => {
@@ -524,21 +498,12 @@ async function serve({
       if (localInboxStatus.status === "failed") {
         process.stderr.write(`[local-inbox] ${localInboxStatus.errorCode}\n`);
       }
-    })().finally(() => {
-      inboxCyclePromise = null;
-    });
-    return inboxCyclePromise;
-  };
-  await runWebCycle().catch(() => {});
-  void runInboxCycle().catch(() => {});
-  const webTimer = setInterval(() => void runWebCycle()?.catch(() => {}), 60_000);
-  const inboxTimer = setInterval(() => void runInboxCycle()?.catch(() => {}), 15 * 60 * 1_000);
+    }
+  });
   const stop = async () => {
-    stopping = true;
-    clearInterval(webTimer);
-    clearInterval(inboxTimer);
+    const cyclesStopped = cycles.stop();
     await bridge.close();
-    await Promise.allSettled([webCyclePromise, inboxCyclePromise].filter(Boolean));
+    await cyclesStopped;
     await archiveCoordinator.drain();
     experimentalRunStore?.close();
   };

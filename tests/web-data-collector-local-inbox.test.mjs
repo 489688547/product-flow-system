@@ -147,3 +147,37 @@ test("shutdown drain waits for the active archive operation", async () => {
   await drained;
   assert.equal(finished, true);
 });
+
+test("initial inbox scan completes while the first web cycle is still blocked", async () => {
+  const { startIndependentCollectorCycles } = await moduleUnderTest();
+  assert.equal(typeof startIndependentCollectorCycles, "function", "startIndependentCollectorCycles must be implemented");
+  let releaseWeb;
+  let announceWebStarted;
+  let announceInboxFinished;
+  const webStarted = new Promise(resolve => { announceWebStarted = resolve; });
+  const inboxFinished = new Promise(resolve => { announceInboxFinished = resolve; });
+  let webFinished = false;
+  const timers = [];
+  const cycles = startIndependentCollectorCycles({
+    runWeb: async () => {
+      announceWebStarted();
+      await new Promise(resolve => { releaseWeb = resolve; });
+      webFinished = true;
+    },
+    runInbox: async () => {
+      announceInboxFinished();
+    },
+    setTimer: (callback, intervalMs) => {
+      timers.push({ callback, intervalMs });
+      return timers.length;
+    },
+    clearTimer: () => {}
+  });
+
+  await Promise.all([webStarted, inboxFinished]);
+  assert.equal(webFinished, false);
+  assert.deepEqual(timers.map(timer => timer.intervalMs), [60_000, 900_000]);
+  releaseWeb();
+  await cycles.stop();
+  assert.equal(webFinished, true);
+});

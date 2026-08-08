@@ -60,3 +60,47 @@ export function createLocalArchiveCoordinator({
     }
   });
 }
+
+export function startIndependentCollectorCycles({
+  runWeb,
+  runInbox,
+  webIntervalMs = 60_000,
+  inboxIntervalMs = DEFAULT_INTERVAL_MS,
+  setTimer = setInterval,
+  clearTimer = clearInterval
+}) {
+  if (typeof runWeb !== "function" || typeof runInbox !== "function") {
+    throw new TypeError("采集周期操作未配置。");
+  }
+  let stopped = false;
+  let webPromise = null;
+  let inboxPromise = null;
+
+  const invoke = (operation, activePromise, setActivePromise) => {
+    if (stopped || activePromise) return activePromise;
+    const promise = Promise.resolve()
+      .then(operation)
+      .catch(() => {})
+      .finally(() => setActivePromise(null));
+    setActivePromise(promise);
+    return promise;
+  };
+  const runWebOnce = () => invoke(runWeb, webPromise, value => { webPromise = value; });
+  const runInboxOnce = () => invoke(runInbox, inboxPromise, value => { inboxPromise = value; });
+
+  void runWebOnce();
+  void runInboxOnce();
+  const webTimer = setTimer(() => void runWebOnce(), webIntervalMs);
+  const inboxTimer = setTimer(() => void runInboxOnce(), inboxIntervalMs);
+
+  return Object.freeze({
+    async stop() {
+      if (!stopped) {
+        stopped = true;
+        clearTimer(webTimer);
+        clearTimer(inboxTimer);
+      }
+      await Promise.allSettled([webPromise, inboxPromise].filter(Boolean));
+    }
+  });
+}
