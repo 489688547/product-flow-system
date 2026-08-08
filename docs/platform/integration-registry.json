@@ -112,7 +112,7 @@
       "capabilities": ["生产前端与 API", "测试 API", "ECS 容器运行时", "Node/Hono 正式运行时", "双 SQLite 持久化", "版本化数据口径与计算结果", "D1 导入迁移", "OSS 私有备份", "对象存储", "OpenAPI", "基础设施"],
       "businessQuestions": ["阿里云资源属于哪个账号", "生产或测试容器是否健康", "D1 是否已完整迁移", "正式与测试 SQLite 是否隔离", "OSS 备份是否成功", "域名实名、备案与 HTTPS 是否完成", "测试前后端是否指向同一候选 commit", "何时需要迁移 RDS"],
       "keywords": ["阿里云", "Aliyun", "Alibaba Cloud", "OSS", "ECS", "SQLite", "RDS", "OpenAPI", "云服务器", "开放平台"],
-      "codePaths": ["functions/**", "functions/api/hr-management/**", "functions/api/platform/_shared/dataStandards.js", "functions/api/platform/v1/data-standards/**", "migrations/0002_hr_management_core.sql", "migrations/0004_data_standards.sql", "server.mjs", "server/aliyun/**", "Dockerfile.aliyun", "deploy/aliyun/**", "scripts/aliyun/**", "scripts/check-deployed-readiness.mjs", "scripts/check-deployed-smoke.mjs", "docs/features/aliyun-ecs-deployment/**", "docs/platform/integrations.md"],
+      "codePaths": ["functions/**", "functions/api/hr-management/**", "functions/api/platform/_shared/dataStandards.js", "functions/api/platform/v1/data-standards/**", "migrations/0002_hr_management_core.sql", "migrations/0004_data_standards.sql", "server.mjs", "server/aliyun/**", "Dockerfile.aliyun", "deploy/aliyun/**", "scripts/aliyun/**", "scripts/core-developer-access.mjs", "scripts/start-core-developer.mjs", "scripts/check-deployed-readiness.mjs", "scripts/check-deployed-smoke.mjs", "docs/features/aliyun-ecs-deployment/**", "docs/features/core-developer-access/**", "docs/platform/integrations.md"],
       "envVars": ["PFS_PUBLIC_API_ORIGIN", "PFS_PUBLIC_APP_ORIGIN", "PFS_ALLOWED_BROWSER_ORIGIN", "OSS_BACKUP_URI", "OSS_REGION", "OSS_ENDPOINT"],
       "domains": ["deshan-tiyes.cn", "www.deshan-tiyes.cn", "test.deshan-tiyes.cn", "api-test.deshan-tiyes.cn", "aliyun.com", "aliyuncs.com", "help.aliyun.com"],
       "apiRoutes": ["/api/", "/api/platform/v1/data-standards"],
@@ -120,7 +120,7 @@
         { "label": "阿里云帮助中心", "url": "https://help.aliyun.com/" },
         { "label": "阿里云 OpenAPI", "url": "https://help.aliyun.com/zh/openapi/api-overview/" }
       ],
-      "evidence": ["docs/features/aliyun-ecs-deployment/prd.md", "docs/features/aliyun-ecs-deployment/plan.md", "functions/api/platform/_shared/dataStandards.js", "migrations/0004_data_standards.sql", "docs/decisions/2026-07-29-aliyun-ecs-sqlite-transition.md", "docs/decisions/2026-08-07-aliyun-node-hono-runtime.md", "docs/platform/integrations.md"],
+      "evidence": ["docs/features/aliyun-ecs-deployment/prd.md", "docs/features/aliyun-ecs-deployment/plan.md", "docs/features/core-developer-access/prd.md", "scripts/core-developer-access.mjs", "functions/api/platform/_shared/dataStandards.js", "migrations/0004_data_standards.sql", "docs/decisions/2026-07-29-aliyun-ecs-sqlite-transition.md", "docs/decisions/2026-08-07-aliyun-node-hono-runtime.md", "docs/platform/integrations.md"],
       "relations": [
         { "platformId": "cloudflare-pages", "type": "hosts-static-test-front", "description": "Cloudflare Pages 只托管测试静态前端，浏览器直接调用 ECS 测试 API。" },
         { "platformId": "cloudflare-d1", "type": "retired-migration-source", "description": "正式与展示 D1 已一次性导入两个独立本地 SQLite；运行时不双写、不回退 D1。" },

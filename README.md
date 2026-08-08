@@ -8,23 +8,26 @@
 git clone https://github.com/<你的 GitHub 用户名>/EC-management-system.git
 cd EC-management-system
 git remote add upstream https://github.com/489688547/EC-management-system.git
+git fetch upstream dev
+git switch -c feat/<功能名> upstream/dev
 npm ci
 ```
 
-把负责人单独发给你的 `developer.env` 从“下载”目录移到固定位置，然后启动：
+把负责人单独发来的个人访问文件原样放进下面的固定文件夹，不需要改名：
 
 ```bash
-mkdir -p ~/.config/product-flow-system
-mv ~/Downloads/developer.env ~/.config/product-flow-system/developer.env
-chmod 600 ~/.config/product-flow-system/developer.env
-npm start
+mkdir -p ~/.config/EC-management-system
+open ~/.config/EC-management-system/
 ```
+
+第二条命令会打开文件夹。把收到的文件拖进去，回到项目目录运行 `npm start`。
+程序只读取该文件夹内唯一的一份个人文件，并自动收紧文件权限。
 
 打开 `http://127.0.0.1:8127/`。保存前端代码后页面会自动更新。
 
 核心开发模式运行“本地 React 前端 + ECS 正式 API + 正式业务数据”。个人 Token 只在
-本机 Node 代理中使用，不会进入浏览器。不要打开、打印、改名、发送到群聊，或把
-`developer.env` 放进仓库和 `.env`；文件丢失时立即通知负责人撤销权限。
+本机 Node 代理中使用，不会进入浏览器。不要打开、打印、修改内容、发送到群聊，或把
+个人访问文件放进仓库和 `.env`；文件丢失时立即通知负责人撤销权限。
 
 ## 开发前先选对模式
 
@@ -54,10 +57,29 @@ npm start
 
 ## 提交代码
 
+首次提交前安装并登录 GitHub CLI。每个人使用自己的 GitHub 账号，不共享 Token：
+
 ```bash
-git fetch upstream dev
-git switch -c codex/<功能名> upstream/dev
+brew install gh
+gh auth login --hostname github.com --git-protocol https --web
 ```
 
-推送到自己的 Fork 后，向原仓库提交 PR，目标分支选 `dev`。固定测试环境验收通过后，再由 `dev → main` 发布。
-提交前运行项目 `AGENTS.md` 中的完整验证命令。
+上面已经从最新 `dev` 创建了功能分支。修改完成后提交并推送到自己的 Fork：
+
+```bash
+git status --short
+git add <本次修改的文件>
+git commit -m "feat: 简述本次修改"
+git fetch upstream dev
+git rebase upstream/dev
+git push -u origin HEAD
+gh pr create --repo 489688547/EC-management-system --base dev --web
+```
+
+最后一条命令会打开 GitHub 的 PR 页面：目标分支保持 `dev`，按页面模板填写后提交。
+提交前运行项目 `AGENTS.md` 中的完整验证命令；固定测试环境验收通过后，再由
+`dev → main` 发布。
+
+如果 Codex 的 GitHub App 返回 `403 Resource not accessible by integration`，说明 App
+没有该私有仓库的 PR 写权限，不是代码或个人账号出错。不要反复重试 App；确认
+`gh auth status` 显示自己的账号后，使用上面的 `gh pr create` 提交。
