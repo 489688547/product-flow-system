@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, stat, utimes, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -167,6 +167,27 @@ test("collector lock reclaims a stale owner whose process no longer exists", asy
   assert.equal(result, "recovered");
   assert.equal(calls, 1);
   await assert.rejects(readFile(path.join(layout.root, ".collector.lock")), error => error?.code === "ENOENT");
+});
+
+test("collector lock never reclaims an ownerless legacy lock by age alone", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  const lockPath = path.join(layout.root, ".collector.lock");
+  await writeFile(lockPath, "", { mode: 0o600 });
+  const old = new Date("2026-08-08T00:00:00.000Z");
+  await utimes(lockPath, old, old);
+  let entered = false;
+
+  const result = await withCollectorLock(root, async () => {
+    entered = true;
+  }, {
+    now: () => new Date("2026-08-08T01:00:00.000Z"),
+    processAlive: () => false
+  });
+
+  assert.deepEqual(result, { status: "already_running" });
+  assert.equal(entered, false);
+  assert.equal((await stat(lockPath)).isFile(), true);
 });
 
 test("multiple processes reclaim one stale collector lock without overlapping", async () => {

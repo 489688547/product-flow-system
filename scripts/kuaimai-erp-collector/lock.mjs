@@ -1,11 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { open, readFile, rm, stat } from "node:fs/promises";
+import { open, readFile, rm } from "node:fs/promises";
 import { resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { ensureArchiveLayout } from "./archive.mjs";
-
-const LEGACY_LOCK_STALE_MS = 30 * 60 * 1_000;
 
 function defaultProcessAlive(pid) {
   try {
@@ -50,25 +48,24 @@ function openLockDatabase(databasePath) {
 
 async function readLegacyOwner(lockPath) {
   try {
-    const info = await stat(lockPath);
     let owner = null;
     try {
       owner = JSON.parse(await readFile(lockPath, "utf8"));
     } catch {
-      // Old empty lock files are reclaimed only after the conservative age limit.
+      // An ownerless legacy lock stays fail-closed because age cannot prove its process exited.
     }
-    return { info, owner };
+    return { owner };
   } catch (error) {
     if (error?.code === "ENOENT") return null;
     throw error;
   }
 }
 
-function legacyLockIsStale(snapshot, { now, processAlive }) {
+function legacyLockIsStale(snapshot, { processAlive }) {
   if (Number.isInteger(snapshot?.owner?.pid) && snapshot.owner.pid > 0) {
     return !processAlive(snapshot.owner.pid);
   }
-  return now().valueOf() - snapshot.info.mtimeMs > LEGACY_LOCK_STALE_MS;
+  return false;
 }
 
 async function acquireLegacySentinel(lockPath, owner, options) {
