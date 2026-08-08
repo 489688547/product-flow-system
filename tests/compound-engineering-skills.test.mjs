@@ -357,7 +357,13 @@ test("Compound Engineering upgrades stay manual and use the ordinary read-only q
   const workflow = load(workflowText);
   assert.equal(workflow.permissions.contents, "read");
   assert.equal(workflow.on.workflow_dispatch, undefined, "quality must not expose a candidate-SHA dispatch path");
-  assert.equal(workflow.on.pull_request, null);
+  // 断言的是触发器身份，不是它的字面形状：pull_request 带 types 列表时解析结果是对象而非 null。
+  assert.ok("pull_request" in workflow.on, "quality must keep gating pull requests");
+  assert.equal(
+    workflow.on.pull_request_target,
+    undefined,
+    "quality must not run untrusted pull requests with repository secrets"
+  );
   assert.ok(workflow.on.push);
   assert.match(workflowText, /node --test tests\/compound-engineering-skills\.test\.mjs/);
   assert.doesNotMatch(workflowText, /candidate_sha|CANDIDATE_SHA/);
