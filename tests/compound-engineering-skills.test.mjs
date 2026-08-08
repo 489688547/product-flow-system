@@ -8,6 +8,8 @@ import test from "node:test";
 const root = resolve(import.meta.dirname, "..");
 const upstreamManifestPath = resolve(root, ".agents/skills/compound-engineering-upstream.json");
 const upstreamLicensePath = resolve(root, ".agents/skills/compound-engineering-LICENSE");
+const verificationSkillPath = resolve(root, ".agents/skills/verification/SKILL.md");
+const firstLearningPath = resolve(root, "docs/solutions/runtime-errors/replace-wrangler-pages-dev-with-node-hono-runtime.md");
 const skillNames = ["ce-compound", "ce-compound-refresh"];
 
 function write(path, content) {
@@ -194,4 +196,45 @@ test("the synchronizer validates the source checkout HEAD and tag instead of onl
     rmSync(source, { recursive: true, force: true });
     rmSync(target, { recursive: true, force: true });
   }
+});
+
+test("verification conditionally compounds verified reusable learnings and refreshes drift", () => {
+  const verification = readFileSync(verificationSkillPath, "utf8");
+
+  assert.match(verification, /docs\/solutions\//i, "verification must search the learning store by documented metadata");
+  assert.match(verification, /module.*tags.*problem_type|problem_type.*module.*tags/is, "learning searches must use module, tags, and problem type");
+  assert.match(verification, /current code.*tests?.*PRODUCT.*design.*platform.*ADR|current code.*tests?.*durable/i, "durable project truth must outrank learning docs");
+  assert.match(verification, /non-trivial.*resolved.*verified.*reusable|resolved.*verified.*reusable.*non-trivial/is, "only verified reusable problems may be compounded");
+  assert.match(verification, /ce-compound/, "verification must name the capture skill");
+  assert.match(verification, /ce-compound-refresh/, "verification must name the refresh skill");
+  assert.match(verification, /contradic|overlap|drift/i, "contradictions, overlaps, and drift must trigger refresh");
+  assert.match(verification, /stale/i, "insufficient evidence must preserve the current rule and mark learning stale");
+  assert.doesNotMatch(verification, /every (?:delivery|handoff).*ce-compound|unconditionally.*ce-compound/is, "learning capture must stay conditional");
+});
+
+test("the first ECS runtime learning is parser-safe, grounded, and secret-free", () => {
+  const learning = readFileSync(firstLearningPath, "utf8");
+  const expectedBodyClaims = [
+    "# ECS 502 应先区分运行时退出与内存不足",
+    "不是“2 GiB 内存必然不足”",
+    "Node/Hono",
+    "docs/decisions/2026-08-07-aliyun-node-hono-runtime.md:10"
+  ];
+
+  assert.match(learning, /^---\n[\s\S]*?^---\n/m, "learning must include YAML frontmatter");
+  assert.match(learning, /^category: runtime-errors$/m);
+  assert.match(learning, /^problem_type: runtime_error$/m);
+  for (const claim of expectedBodyClaims) {
+    assert.ok(learning.includes(claim), `learning must retain verified claim: ${claim}`);
+  }
+  assert.doesNotMatch(learning, /(?:\b(?:token|secret|credential|password)\b|\bip\s*address\b|\b\d{1,3}(?:\.\d{1,3}){3}\b)/i, "learning must not contain credentials, tokens, or IP addresses");
+
+  execFileSync("python3", [
+    resolve(root, ".agents/skills/ce-compound/scripts/validate-frontmatter.py"),
+    firstLearningPath
+  ], { encoding: "utf8" });
+  execFileSync("python3", [
+    resolve(root, ".agents/skills/ce-compound/scripts/validate-doc-claims.py"),
+    firstLearningPath
+  ], { cwd: root, encoding: "utf8" });
 });
