@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -33,6 +33,27 @@ async function writeHistoricalMigrationExport(exportDir) {
     source: "archived-cloudflare-migration",
     databases
   }), "utf8");
+}
+
+async function writeLocalD1Fixtures(persistDir, databases) {
+  const { localD1DatabasePath } = await import("../scripts/aliyun/d1-transfer.mjs");
+  for (const database of databases) {
+    const source = localD1DatabasePath(persistDir, database);
+    await mkdir(dirname(source), { recursive: true });
+    await execFileAsync("python3", [
+      "-c",
+      [
+        "import sqlite3, sys",
+        "db = sqlite3.connect(sys.argv[1])",
+        "db.execute('CREATE TABLE proof (value TEXT NOT NULL)')",
+        "db.execute('INSERT INTO proof (value) VALUES (?)', (sys.argv[2],))",
+        "db.commit()",
+        "db.close()"
+      ].join("\n"),
+      source,
+      database.name
+    ]);
+  }
 }
 
 test("Aliyun production, test API, static test frontend, and OSS backup are declared safely", async () => {
@@ -214,31 +235,14 @@ test("D1 transfer rejects a changed SQL export and unsafe OSS destination", asyn
 test("local D1 backup creates restorable SQLite snapshots before OSS upload", async () => {
   const {
     backupLocalD1,
-    DATABASES,
-    localD1DatabasePath
+    DATABASES
   } = await import("../scripts/aliyun/d1-transfer.mjs");
   const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-backup-"));
   const persistDir = join(tempRoot, "persist");
   const backupDir = join(tempRoot, "backup");
   const uploaded = [];
 
-  for (const database of DATABASES) {
-    const source = localD1DatabasePath(persistDir, database);
-    await mkdir(dirname(source), { recursive: true });
-    await execFileAsync("python3", [
-      "-c",
-      [
-        "import sqlite3, sys",
-        "db = sqlite3.connect(sys.argv[1])",
-        "db.execute('CREATE TABLE proof (value TEXT NOT NULL)')",
-        "db.execute('INSERT INTO proof (value) VALUES (?)', (sys.argv[2],))",
-        "db.commit()",
-        "db.close()"
-      ].join("\n"),
-      source,
-      database.name
-    ]);
-  }
+  await writeLocalD1Fixtures(persistDir, DATABASES);
 
   const manifest = await backupLocalD1({
     backupDir,
@@ -286,6 +290,78 @@ test("local D1 backup creates restorable SQLite snapshots before OSS upload", as
     ], { encoding: "utf8" });
     assert.equal(stdout, `ok\n${database.name}\n`);
   }
+});
+
+test("successful private OSS backup keeps only the current direct snapshot directory", async () => {
+  const { DATABASES, retainOnlyCurrentBackup } = await import("../scripts/aliyun/d1-transfer.mjs");
+  const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-retention-"));
+  const backupRoot = join(tempRoot, "backups");
+  const current = join(backupRoot, "20260808T080000Z");
+  await mkdir(current, { recursive: true });
+  await mkdir(join(backupRoot, "20260807T080000Z"));
+  await mkdir(join(backupRoot, "20260806T080000Z"));
+  await writeFile(join(backupRoot, "operator-note.txt"), "keep\n");
+  await symlink(join(backupRoot, "20260807T080000Z"), join(backupRoot, "linked-snapshot"));
+
+  await retainOnlyCurrentBackup({
+    backupDir: current,
+    ossUri: "oss://test-bucket/product-flow/backups/",
+    manifest: {
+      databases: DATABASES.map(database => ({ name: database.name, file: database.backupFile }))
+    }
+  });
+
+  assert.deepEqual((await readdir(backupRoot)).sort(), [
+    "20260808T080000Z",
+    "linked-snapshot",
+    "operator-note.txt"
+  ]);
+});
+
+test("retention fails closed without OSS proof or a complete manifest", async () => {
+  const { DATABASES, retainOnlyCurrentBackup } = await import("../scripts/aliyun/d1-transfer.mjs");
+  const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-retention-closed-"));
+  const backupRoot = join(tempRoot, "backups");
+  const current = join(backupRoot, "current");
+  const old = join(backupRoot, "old");
+  await mkdir(current, { recursive: true });
+  await mkdir(old);
+
+  await assert.rejects(() => retainOnlyCurrentBackup({
+    backupDir: current,
+    ossUri: "",
+    manifest: { databases: DATABASES }
+  }), /OSS/);
+  await assert.rejects(() => retainOnlyCurrentBackup({
+    backupDir: current,
+    ossUri: "oss://test-bucket/product-flow/backups/",
+    manifest: { databases: [DATABASES[0]] }
+  }), /清单/);
+  assert.deepEqual((await readdir(backupRoot)).sort(), ["current", "old"]);
+});
+
+test("failed OSS upload preserves every local backup directory", async () => {
+  const { backupLocalD1, DATABASES } = await import("../scripts/aliyun/d1-transfer.mjs");
+  const tempRoot = await mkdtemp(join(tmpdir(), "pfs-aliyun-upload-failure-"));
+  const backupRoot = join(tempRoot, "backups");
+  const backupDir = join(backupRoot, "current");
+  const old = join(backupRoot, "old");
+  const persistDir = join(tempRoot, "persist");
+  await mkdir(old, { recursive: true });
+  await writeLocalD1Fixtures(persistDir, DATABASES);
+
+  await assert.rejects(() => backupLocalD1({
+    backupDir,
+    persistDir,
+    ossUri: "oss://test-bucket/product-flow/backups/",
+    keepLocalBackups: 1,
+    run: async (command, args) => {
+      if (command === "ossutil") throw new Error("simulated OSS outage");
+      await execFileAsync(command, args);
+    }
+  }), /simulated OSS outage/);
+
+  assert.deepEqual((await readdir(backupRoot)).sort(), ["current", "old"]);
 });
 
 test("Aliyun compose binds only to loopback and joins the existing proxy network", async () => {

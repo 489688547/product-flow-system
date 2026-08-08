@@ -1,0 +1,19 @@
+[Unit]
+Description=Roll out the Product Flow ACR main image safely
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/product-flow/app
+Environment=HOME=/root
+Environment=PATH=/opt/node-v22.22.3/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/opt/node-v22.22.3/bin/node /opt/product-flow/app/scripts/aliyun/rollout-acr-main.mjs
+TimeoutStartSec=5min
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
