@@ -39,7 +39,7 @@
 
 ### Task 3: 建立受控上游升级 PR
 
-- [ ] 建立受控上游升级 PR
+- [x] 建立受控上游升级 PR
   - 依赖：安全同步器已验证。
   - 文件：`.github/workflows/update-compound-engineering.yml`、合同测试、ADR。
   - 输入：GitHub 最新正式 release。
@@ -47,6 +47,8 @@
   - 失败测试：合同测试因工作流缺失或目标分支错误失败。
   - 实现步骤：检出 `dev`；读取 release tag 与 commit；同步；检查；创建 `codex/*` 分支和 PR；不自动合并。
   - 验证：静态合同、治理检查和 workflow YAML 解析通过。
+  - 2026-08-08：每周/手动升级工作流已实现；拒绝降级和孤儿分支，对已有开放 PR
+    幂等退出，并在 push 前通过真实 `check:pr`。10 项聚焦合同及独立复审通过。
   - 提交：`ci: propose compound engineering updates`
 
 ### Task 4: 完整验收与交付
