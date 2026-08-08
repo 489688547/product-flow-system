@@ -1,7 +1,10 @@
 name: quality
 
 on:
+  # 声明门只读 pull_request 事件负载。不订阅 edited，写错的 Integration-Impact 或
+  # Rule-Writeback 就只能靠推一个空提交来重跑：gh run rerun 会回放同一份旧负载。
   pull_request:
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main, dev]
 
@@ -22,7 +25,10 @@ jobs:
           cache: npm
       - if: github.event_name == 'pull_request'
         run: node scripts/check-pr-branch-flow.mjs
-      - run: npm run check:branch-base
+      # 分支基线只对「即将合并到哪里」有意义。push 事件上代码已经落地，
+      # 这一步无法阻止任何事，只会在发布后把 dev 和 main 染红。
+      - if: github.event_name == 'pull_request'
+        run: npm run check:branch-base
       - run: npm ci
       - run: node --test tests/compound-engineering-skills.test.mjs
       - run: npm run audit:dependencies
