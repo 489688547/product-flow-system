@@ -19,7 +19,7 @@
   - 验证：聚焦测试全绿，plist 无秘密且稳定主检出路径不变。
   - 提交：`fix(collector): move launch agent logs out of desktop`。
 
-- [ ] 将本地快麦扫描并入网页采集进程
+- [x] 将本地快麦扫描并入网页采集进程
   - 依赖：日志目录修复。
   - 文件：`local-inbox.mjs`、web collector index 与 runtime 测试。
   - 输入：归档 root、ERP uploader、900 秒周期和共享串行器。
@@ -27,6 +27,7 @@
   - 失败测试：runtime 测试因本地周期接口不存在失败。
   - 实现步骤：实现纯周期对象，向 `serve()` 注入，再让浏览器下载和扫描共用串行器。
   - 验证：聚焦测试和 `npm run test:web-collector` 全绿。
+  - 实际验证：本地归档/运行时聚焦测试 61/61，`npm run test:web-collector` 216/216，`npm run lint` 通过。
   - 提交：`refactor(collector): unify local ERP scanning runtime`。
 
 - [ ] 写回规则并完成真实切换

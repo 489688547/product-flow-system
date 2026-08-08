@@ -6,7 +6,7 @@ import { mkdir, readdir, stat } from "node:fs/promises";
 import path, { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { archiveExistingFile } from "../kuaimai-erp-collector/scanner.mjs";
+import { archiveExistingFile, scanWaitingDirectory } from "../kuaimai-erp-collector/scanner.mjs";
 import { DEFAULT_ARCHIVE_ROOT } from "../kuaimai-erp-collector/archive.mjs";
 import { uploadErpCollection } from "../kuaimai-erp-collector/api.mjs";
 import { readCollectorToken as readErpCollectorToken } from "../kuaimai-erp-collector/automation.mjs";
@@ -14,6 +14,7 @@ import { nodeRequest } from "../kuaimai-erp-collector/http.mjs";
 import { ensureManagedChrome } from "../browser-runtime/managed-chrome.mjs";
 import { createEgoCliRunner } from "../browser-runtime/ego-cli.mjs";
 import { createWebCollectionApi } from "./api.mjs";
+import { createLocalArchiveCoordinator } from "./local-inbox.mjs";
 import {
   EXTENSION_ID,
   EXTENSION_ORIGIN,
@@ -236,11 +237,10 @@ export function createCommerceFactUploader({
   };
 }
 
-async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
-  const erpToken = await readErpCollectorToken();
+function createDownloadProcessor({ root, downloadsDirectory, baseUrl, erpToken, archiveCoordinator }) {
   return async ({ jobId, fileName, resourceType, businessDate, onValidated }) => {
     const filePath = await resolveSafeDownload({ directory: downloadsDirectory, fileName });
-    const archived = await archiveExistingFile(filePath, {
+    const archived = await archiveCoordinator.runBrowserArchive(() => archiveExistingFile(filePath, {
       root,
       resourceType,
       onValidated: async validation => {
@@ -254,7 +254,7 @@ async function createDownloadProcessor({ root, downloadsDirectory, baseUrl }) {
           "x-web-collection-job-id": jobId
         }
       })
-    });
+    }));
     return {
       batchId: archived.batchId || null,
       archiveId: archived.contentHash,
@@ -334,11 +334,19 @@ async function serve({
   profileRoot = DEFAULT_MANAGED_PROFILE_ROOT,
   experimentalMode = false
 }) {
-  const [runnerToken, pairingKey, processDownload] = await Promise.all([
+  const [runnerToken, pairingKey, erpToken] = await Promise.all([
     readRunnerToken(),
     readPairingKey(),
-    createDownloadProcessor({ root, downloadsDirectory, baseUrl })
+    readErpCollectorToken()
   ]);
+  const archiveCoordinator = createLocalArchiveCoordinator();
+  const processDownload = createDownloadProcessor({
+    root,
+    downloadsDirectory,
+    baseUrl,
+    erpToken,
+    archiveCoordinator
+  });
   const api = createWebCollectionApi({ baseUrl, token: runnerToken });
   const uploadFactChunk = createCommerceFactUploader({ baseUrl, runnerToken });
   const processors = createProviderProcessorRegistry([
@@ -463,6 +471,7 @@ async function serve({
   });
   await bridge.listen({ port: 17653 });
   let cycleRunning = false;
+  let localInboxStatus = { status: "pending" };
   const runCycle = async () => {
     if (cycleRunning) return;
     cycleRunning = true;
@@ -472,6 +481,16 @@ async function serve({
       await dedicatedRuntime?.runOnce();
       await egoRuntime?.runOnce();
       await experimentalCycle?.runOnce();
+      localInboxStatus = await archiveCoordinator.runInboxScan(() => scanWaitingDirectory({
+        root,
+        upload: collection => uploadErpCollection(collection, {
+          baseUrl,
+          headers: { authorization: `Bearer ${erpToken}` }
+        })
+      }));
+      if (localInboxStatus.status === "failed") {
+        process.stderr.write(`[local-inbox] ${localInboxStatus.errorCode}\n`);
+      }
     } finally {
       cycleRunning = false;
     }
@@ -495,7 +514,8 @@ async function serve({
     port: bridge.port,
     extensionId: EXTENSION_ID,
     browserMode,
-    experimentalMode
+    experimentalMode,
+    localInboxStatus
   };
 }
 
