@@ -47,6 +47,10 @@
 - `import-local-d1.mjs`：只向空白 ECS 数据卷导入两个数据库。
 - `backup-local-d1.mjs`：SQLite Online Backup 一致性快照、哈希和可选 OSS
   上传；避免宿主机 Wrangler/workerd 的 GLIBC 依赖。
+- `rollout-acr-main.mjs`：检查固定 ACR `main` 镜像、静态校验 Compose 合同、
+  强制发布前备份、串行替换生产并在健康失败时回滚。
+- `product-flow-rollout.{service,timer}`：以 root 使用现有 Docker 登录态，每两个
+  日历分钟执行一次受限 oneshot；不存储新的凭据。
 
 ## 页面状态
 
@@ -89,3 +93,15 @@
 4. SQLite 操作经 Worker Thread 串行进入各自连接；HTTP 主线程继续处理静态资源、
    其他请求与流式响应。
 5. 新 API 可直接注册为 Hono 路由；旧 bundle 作为兼容兜底，直至所有路由迁完。
+
+## 自动发布状态机
+
+1. 拉取 ACR `main` 并比较镜像 ID；相同则记录 `no_change` 后结束。
+2. 对变化镜像执行 `docker create` 和 `docker cp`，比较候选与主机 Compose 的
+   SHA-256；检查容器从不启动。
+3. 合同一致后启动备份 oneshot。双 SQLite 校验与 OSS 上传全部成功后，本地清理
+   为仅保留当前快照；任一步失败均不改变运行容器。
+4. 保存当前生产镜像为固定回滚标签，记录测试容器原状态，按需暂停测试，再仅重建
+   `product-flow-app`。
+5. 候选 60 秒内健康则恢复测试并清理未使用镜像；否则恢复回滚标签和生产容器，
+   验证健康后恢复测试。自动回滚失败时输出安全错误码并停止继续尝试本次替换。

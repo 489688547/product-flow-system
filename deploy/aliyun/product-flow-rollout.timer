@@ -1,0 +1,11 @@
+[Unit]
+Description=Check the Product Flow ACR main image every two minutes
+
+[Timer]
+OnCalendar=*-*-* *:0/2:00
+AccuracySec=1s
+Persistent=true
+Unit=product-flow-rollout.service
+
+[Install]
+WantedBy=timers.target

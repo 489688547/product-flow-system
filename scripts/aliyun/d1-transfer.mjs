@@ -1,7 +1,7 @@
 import { createHash, createHmac } from "node:crypto";
 import { spawn } from "node:child_process";
-import { access, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
-import { basename, isAbsolute, join, resolve } from "node:path";
+import { access, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 
 export const DATABASES = Object.freeze([
   Object.freeze({
@@ -162,6 +162,29 @@ function validateOssUri(value) {
   return uri;
 }
 
+export async function retainOnlyCurrentBackup({ backupDir, ossUri, manifest }) {
+  const directory = requiredAbsolutePath(backupDir, "backupDir");
+  if (!validateOssUri(ossUri)) throw new Error("OSS 上传成功证明不能为空。");
+  const complete = DATABASES.every(database =>
+    manifest?.databases?.some(entry =>
+      entry.name === database.name && entry.file === database.backupFile
+    )
+  );
+  if (!complete) throw new Error("备份清单不完整，拒绝清理本地快照。");
+
+  const backupRoot = dirname(directory);
+  const currentName = basename(directory);
+  if (!currentName || join(backupRoot, currentName) !== directory) {
+    throw new Error("当前备份目录必须是备份根目录的直接子目录。");
+  }
+  const entries = await readdir(backupRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.name !== currentName && entry.isDirectory()) {
+      await rm(join(backupRoot, entry.name), { recursive: true, force: true });
+    }
+  }
+}
+
 export async function backupLocalD1({
   backupDir,
   persistDir,
@@ -170,6 +193,7 @@ export async function backupLocalD1({
   ossutilBin = "ossutil",
   sqliteBin = "sqlite3",
   pythonBin = "python3",
+  keepLocalBackups = null,
   now = () => new Date().toISOString()
 }) {
   const ossDestination = validateOssUri(ossUri);
@@ -208,6 +232,11 @@ export async function backupLocalD1({
   if (ossDestination) {
     const snapshotDestination = `${ossDestination}${basename(directory)}/`;
     await run(ossutilBin, ["cp", directory, snapshotDestination, "--recursive", "--force"]);
+    if (keepLocalBackups === 1) {
+      await retainOnlyCurrentBackup({ backupDir: directory, ossUri: ossDestination, manifest });
+    } else if (keepLocalBackups !== null) {
+      throw new Error("keepLocalBackups 当前只支持 1。");
+    }
   }
   return manifest;
 }

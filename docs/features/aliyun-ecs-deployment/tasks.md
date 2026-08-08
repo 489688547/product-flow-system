@@ -134,3 +134,15 @@
     `/healthz` 返回 `node-hono`，进程树不再包含 Wrangler、workerd 或 esbuild。
     正式站、正式 healthz 与测试 healthz 均为 200；正式/测试容器分别约 190 MiB
     与 46 MiB，空闲 CPU 接近 0%，主机负载回落到约 1.0。
+
+- [x] 实现 ACR 自动发布与本地备份单份保留（DEV-000018，代码阶段）
+  - 输出：两分钟镜像检查、静态 Compose 合同门、OSS 成功后本地只留一份、
+    60 秒健康检查、自动回滚和测试容器恢复。
+  - 验证：`node --test tests/aliyun-auto-rollout.test.mjs tests/aliyun-ecs-deployment.test.mjs`。
+  - 安全：不执行候选代码、不新增 webhook/AccessKey/长期 GitHub Token，备份失败不换容器。
+
+- [ ] 通过 GitOps 发布并完成 ECS timer 生产验收（DEV-000018，发布阶段）
+  - 前置：完整门禁、PR 到 `dev`、固定测试站验收、唯一 `dev -> main` 发布完成。
+  - 验收：当前镜像先返回 `no_change`；下一版由 timer 自动发现并在两分钟窗口内
+    完成备份与替换；本地一个快照、OSS 历史、生产/测试健康和真实 readiness 均有证据。
+  - 回滚：合同不一致保持现状；候选不健康恢复上一镜像；自动回滚失败转人工处理。

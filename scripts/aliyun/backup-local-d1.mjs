@@ -11,7 +11,8 @@ if (!process.argv[2] || !process.argv[3]) {
   backupLocalD1({
     backupDir,
     persistDir,
-    ossUri: process.env.OSS_BACKUP_URI || ""
+    ossUri: process.env.OSS_BACKUP_URI || "",
+    keepLocalBackups: process.env.OSS_BACKUP_URI ? 1 : null
   })
     .then(manifest => console.log(`已备份 ${manifest.databases.length} 个数据库：${backupDir}`))
     .catch(error => {
