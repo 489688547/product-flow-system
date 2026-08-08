@@ -1,0 +1,71 @@
+# 生产部署可观测：冒烟窗口与漂移检查
+
+## 状态
+
+已实施，2026-08-08。补充 `2026-08-08-aliyun-auto-rollout-retention.md` 的验证侧，
+不改变 ACR 轮询发布本身的机制。
+
+## 背景
+
+2026-08-08 的发布 `b78a3ebf` 暴露了一个断链：`deployed-smoke` 在 push 到 `main` 后
+断言生产站已经在该 commit 上，但仓库里没有任何步骤能让它到达那里。冒烟以 30 次 × 10 秒
+共 5 分钟的窗口轮询，超时即失败。
+
+历史数据印证这不是偶发：`main` 上的 `deployed-smoke` 在 8/6 的 `f551714c`、`0dcfd29e`
+与 8/7 的 `1755f073` 同样失败，而生产站当时仍停在上一个已部署 commit。也就是说这个门
+一直在赌「有人在 5 分钟内手工部署完」，赌赢记成功，赌输记失败，两种结果都不反映代码质量。
+
+同日落地的 ACR 自动发布（`eb62d1a8`）补上了链路的下半段：ECS 上的 rollout timer 每两
+分钟轮询固定 ACR `main` 镜像，命中新镜像后先备份再替换生产容器，60 秒内不健康自动回滚。
+这使得部署不再依赖人，但也让端到端耗时明确变长：镜像构建、推送 ACR、最多两分钟轮询、
+备份、替换容器。原本 5 分钟的窗口在链路完全正常时也可能不够。
+
+链路上半段——把镜像构建并推送到 ACR 的 `:main` 标签——不由本仓库的任何工作流完成。
+它或者由 ACR 侧的源码构建规则触发，或者仍需人工推送；本仓库无法观测该环节的状态。
+
+## 决策
+
+- `deployed-smoke` 的等待窗口按目标区分：测试站保持 30 次 × 10 秒，生产改为
+  60 次 × 20 秒（20 分钟），以覆盖真实的异步发布链路。作业超时同步提高到 30 分钟。
+- `deployed-smoke` 增加 `workflow_dispatch`，修复部署链路后可以直接重新验证，
+  不必再推一个空提交。
+- 冒烟超时的失败信息明确指出断点候选：镜像构建、ACR 推送或 ECS rollout。
+- 新增 `production-drift` 计划任务，每两小时比较生产站 `pfs-release-commit` 与 `main`：
+  一致记 `current`；落后但发布提交在 60 分钟宽限期内记 `deploying`；超过宽限期记 `stale`
+  并失败；站点不可访问或不返回 commit 记 `unreachable` / `unknown` 并失败。
+- 判定逻辑放在 `scripts/check-production-drift.mjs` 的纯函数 `evaluateDrift` 中，
+  复用 `check-deployed-smoke.mjs` 已有的 `commitFromHtml` 与 `sameCommit`，不重复实现。
+
+## 备选方案
+
+- **GitHub Actions 直接部署 ECS**：生产应用只监听 `127.0.0.1:8080`，公网入口在
+  Nginx Proxy Manager 之后。托管 runner 要够到它必须开入站 SSH 给 GitHub 的宽 IP 段，
+  并把私钥放进仓库 Secret，安全代价不成比例。
+- **在 ECS 装 self-hosted runner 由 CI 执行部署**：可行，但 ACR 轮询发布已经覆盖同一职责，
+  再引入一条部署路径会产生两个互相不知情的发布来源；且能改 workflow 的人将获得生产机上的
+  任意命令执行能力。
+- **仅延长冒烟窗口**：能消掉误报，但发布当下之后就再没有任何东西回答「生产是否跟上 main」，
+  断链会静默存在到下一次发布。
+- **漂移时自动开 issue**：需要 `issues: write`，且要处理去重与关闭。计划任务失败本身已经
+  是 GitHub 的标准告警信道，先不引入额外写权限。
+
+## 后果
+
+- 生产冒烟失败从此是真实信号：链路正常时 20 分钟足够，失败即代表某一环确实断了。
+- 漂移检查独立于发布事件运行，断链不再依赖「恰好有人在看那次冒烟」。
+- 漂移检查是只读的，不具备 `contents: write` 或部署能力，误判最坏后果是一个红色计划任务。
+- 计划任务只从默认分支运行，因此本决策要在合并进 `main` 之后才开始生效。
+- 宽限期 60 分钟意味着断链最长 60 分钟后才报出，这是为避免发布当下误报而付出的代价。
+
+## 兼容与迁移
+
+- 无数据库、接口或运行时改动。生产镜像内容不受影响。
+- `smoke` 仍是 `main` 的必需状态检查，且仍由 push 到 `dev` 的那次运行提供，
+  发布 PR 的门禁不变。
+- 回滚：把 `deployed-smoke` 的窗口改回 30 次 × 10 秒并删除 `production-drift` 工作流与脚本。
+
+## 关联与替代
+
+- 补充 `2026-08-08-aliyun-auto-rollout-retention.md`。
+- 相关 `2026-07-29-aliyun-ecs-sqlite-transition.md`、`2026-07-28-main-dev-gitops.md`。
+- 相关 `docs/features/production-deployment-observability/`。
