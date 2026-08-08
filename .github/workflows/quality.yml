@@ -24,6 +24,7 @@ jobs:
         run: node scripts/check-pr-branch-flow.mjs
       - run: npm run check:branch-base
       - run: npm ci
+      - run: node --test tests/compound-engineering-skills.test.mjs
       - run: npm run audit:dependencies
       - run: npm run lint
       - run: npm run check:governance

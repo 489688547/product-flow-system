@@ -8,6 +8,10 @@
 - `docs/decisions/` records architecture decisions and their consequences.
 - Code and executable tests must remain consistent with these documents. When behavior changes, update the durable source in the same pull request.
 
+`docs/solutions/` contains documented solutions to past problems, organized by category with searchable YAML frontmatter (`module`, `tags`, `problem_type`). It is relevant before implementing or debugging in a documented area, but current code, tests, and the durable sources above remain authoritative.
+
+`ce-compound` has a repo-local hard gate, including direct Skill invocation: write a learning only when the problem is resolved, verified, non-trivial, and reusable. If any condition is false, skip capture. Use `ce-compound-refresh` for contradictory, overlapping, or drifted learnings; insufficient evidence marks the learning `stale` rather than changing authoritative code or durable documentation.
+
 ## Architecture boundaries
 
 - `src/domain`: pure business rules; no React, browser globals, or network requests.

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkCompoundEngineeringSkills } from "./sync-compound-engineering-skills.mjs";
 
 export const REQUIRED_REPOSITORY_FILES = [
   "AGENTS.md",
@@ -70,6 +71,8 @@ export function checkProjectGovernance(rootDir) {
       errors.push(`文档包含未完成标记：${relativePath(root, path)}`);
     }
   }
+
+  errors.push(...checkCompoundEngineeringSkills(root).errors);
 
   return { errors };
 }
