@@ -128,7 +128,7 @@ test("serve rejects a Cloudflare target in every browser mode before reading loc
 
 test("collector fingerprint changes when the unified runtime or ERP scanner changes", async () => {
   const baseline = await sourceFingerprint({
-    readSource: async filePath => filePath.endsWith("local-inbox.mjs") ? "inbox-a" : "same"
+    readSource: async () => "same"
   });
   const inboxChanged = await sourceFingerprint({
     readSource: async filePath => filePath.endsWith("local-inbox.mjs") ? "inbox-b" : "same"
@@ -136,9 +136,13 @@ test("collector fingerprint changes when the unified runtime or ERP scanner chan
   const scannerChanged = await sourceFingerprint({
     readSource: async filePath => filePath.endsWith("scanner.mjs") ? "scanner-b" : "same"
   });
+  const formalTargetChanged = await sourceFingerprint({
+    readSource: async filePath => filePath.endsWith("formal-target.mjs") ? "target-b" : "same"
+  });
 
   assert.notEqual(baseline, inboxChanged);
   assert.notEqual(baseline, scannerChanged);
+  assert.notEqual(baseline, formalTargetChanged);
 });
 
 test("Kuaimai credentials are read only when an ERP archive is uploaded", async () => {

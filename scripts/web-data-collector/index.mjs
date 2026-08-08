@@ -268,6 +268,7 @@ export async function sourceFingerprint({ readSource = readFile } = {}) {
   const here = dirname(fileURLToPath(import.meta.url));
   const files = [
     "index.mjs",
+    "formal-target.mjs",
     "local-inbox.mjs",
     "orchestrator.mjs",
     "../kuaimai-erp-collector/lock.mjs",

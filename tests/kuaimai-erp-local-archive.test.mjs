@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtemp, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import {
   appendManifestEvent,
@@ -165,6 +167,53 @@ test("collector lock reclaims a stale owner whose process no longer exists", asy
   assert.equal(result, "recovered");
   assert.equal(calls, 1);
   await assert.rejects(readFile(path.join(layout.root, ".collector.lock")), error => error?.code === "ENOENT");
+});
+
+test("multiple processes reclaim one stale collector lock without overlapping", async () => {
+  const root = await tempRoot();
+  const layout = await ensureArchiveLayout(root);
+  await writeFile(path.join(layout.root, ".collector.lock"), `${JSON.stringify({
+    version: 1,
+    ownerId: "shared-stale-owner",
+    pid: 987654,
+    createdAt: "2026-08-08T00:00:00.000Z"
+  })}\n`, { mode: 0o600 });
+  const moduleUrl = pathToFileURL(path.resolve("scripts/kuaimai-erp-collector/lock.mjs")).href;
+  const program = `
+    import { open, rm } from "node:fs/promises";
+    import { join } from "node:path";
+    import { withCollectorLock } from ${JSON.stringify(moduleUrl)};
+    const root = process.argv[1];
+    const result = await withCollectorLock(root, async () => {
+      let marker;
+      try {
+        marker = await open(join(root, ".critical-section"), "wx", 0o600);
+      } catch (error) {
+        if (error?.code === "EEXIST") return "overlap";
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, 75));
+      await marker.close();
+      await rm(join(root, ".critical-section"), { force: true });
+      return "acquired";
+    }, { processAlive: () => false });
+    process.stdout.write(JSON.stringify(result));
+  `;
+  const runChild = () => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, ["--input-type=module", "-e", program, root], {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", chunk => { stdout += chunk; });
+    child.stderr.on("data", chunk => { stderr += chunk; });
+    child.once("error", reject);
+    child.once("close", code => code === 0 ? resolve(JSON.parse(stdout)) : reject(new Error(stderr)));
+  });
+
+  const results = await Promise.all(Array.from({ length: 8 }, runChild));
+  assert.equal(results.filter(result => result === "acquired").length >= 1, true);
+  assert.equal(results.includes("overlap"), false);
 });
 
 test("scanner waits for one stable interval before archiving and uploading", async () => {
