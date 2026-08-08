@@ -26,7 +26,7 @@ tests/production-drift.test.mjs           判定与工作流约束的验证
 
 - 发布：合并到 `main` → `deployed-smoke` 以 20 分钟窗口轮询生产站 commit →
   命中即通过；超时输出断点候选并失败。
-- 持续观测：计划任务每两小时检出 `main` → 读生产站 commit → 一致或在宽限期内则通过 →
+- 持续观测：计划任务以完整历史检出 `main` → 读生产站 commit → 从该 commit 往前数出最老未部署提交 → 一致或在宽限期内则通过 →
   超过宽限期失败并在作业摘要中留下结论。
 - 修复后复验：运维处理完断点 → 在 Actions 页面 `workflow_dispatch` 触发 `deployed-smoke`，
   不需要推空提交。
@@ -40,10 +40,12 @@ tests/production-drift.test.mjs           判定与工作流约束的验证
 
 ## 新增组件
 
-- `evaluateDrift({ deployedCommit, expectedCommit, commitTimestampMs, nowMs, graceMinutes })`
-  纯函数，返回 `{ status, drifted, ageMinutes?, message }`。不做网络请求，便于覆盖全部分支。
-- `checkProductionDrift({ url, expectedCommit, commitTimestampMs, graceMinutes, nowMs, fetchImpl })`
-  负责取页面并委托 `evaluateDrift`；`fetchImpl` 可注入，网络失败映射为 `unreachable`。
+- `evaluateDrift({ deployedCommit, expectedCommit, undeployedSinceMs, nowMs, graceMinutes })`
+  纯函数，返回 `{ status, drifted, ageMinutes?, message }`。不做网络请求也不碰 git，便于覆盖全部分支。
+- `oldestUndeployedTimestampMs({ deployedCommit, expectedCommit, runGit })`
+  取生产缺失的最老提交时间；`runGit` 注入，生产 commit 不在历史中时退回发布提交时间。
+- `checkProductionDrift({ url, expectedCommit, undeployedSinceMs, resolveUndeployedSinceMs, graceMinutes, nowMs, fetchImpl })`
+  取页面后按实际部署 commit 解析未部署时长，再委托 `evaluateDrift`；`fetchImpl` 与解析器均可注入，网络失败映射为 `unreachable`。
 - `DEFAULT_GRACE_MINUTES` 常量，默认 60。
 - 复用边界限于生产部署版本比较，不承担 readiness、CORS 或平台能力校验，那些仍属冒烟脚本。
 
@@ -63,8 +65,8 @@ tests/production-drift.test.mjs           判定与工作流约束的验证
 ## 交互文案
 
 - `current`：`生产站已在 <commit>。`
-- `deploying`：`生产站在 <a>，main 是 <b>；发布提交 N 分钟前产生，仍在 M 分钟宽限期内。`
-- `stale`：`生产站停留在 <a>，main 已是 <b> 且已过去 N 分钟（宽限期 M 分钟）。镜像构建、ACR 推送或 ECS rollout 至少有一环没有走通。`
+- `deploying`：`生产站在 <a>，main 是 <b>；最老的未部署提交 N 分钟前产生，仍在 M 分钟宽限期内。`
+- `stale`：`生产站停留在 <a>，main 已是 <b>，最老的未部署提交已经过去 N 分钟（宽限期 M 分钟）。镜像构建、ACR 推送或 ECS rollout 至少有一环没有走通。`
 - `unknown`：`生产站没有返回 pfs-release-commit，无法确认部署版本。`
 - `unreachable`：`无法访问生产站 <url>：<原因>`
 - 冒烟超时：`固定站点在 N 分钟内没有到达 <commit>；镜像构建、ACR 推送或 ECS rollout 至少有一环没有走通。`

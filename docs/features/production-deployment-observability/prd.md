@@ -60,7 +60,7 @@
 ## 业务规则
 
 - 生产等待窗口 60 次 × 20 秒；测试站保持 30 次 × 10 秒。
-- 漂移判定：一致为 `current`；落后但发布提交在 60 分钟宽限期内为 `deploying`；
+- 漂移判定：一致为 `current`；落后但未部署时长在 60 分钟宽限期内为 `deploying`；
   超过宽限期为 `stale`；站点不可访问为 `unreachable`；未返回 commit 为 `unknown`。
 - `current` 与 `deploying` 通过，其余三种失败关闭。
 - 部署版本以生产站 HTML 的 `pfs-release-commit` 为准，短 commit 与长 commit 互为前缀视为同一版本。
@@ -70,7 +70,9 @@
 
 - `deployedCommit`：生产站 `<meta name="pfs-release-commit">` 的值。
 - `expectedCommit`：`main` 的 HEAD。
-- `commitTimestampMs`：`main` HEAD 的提交时间，来自 `git log -1 --format=%ct`，单位毫秒。
+- `undeployedSinceMs`：生产缺失的最老那个提交的时间，来自 `git log <生产 commit>..main --format=%ct --reverse` 的第一条，单位毫秒。
+  不使用 `main` HEAD 的时间：那会在每次发布时重置年龄，让持续断链被永远判成 `deploying`。
+  生产 commit 不在历史中时退回发布提交自身时间，宁可早报不漏报。
 - `graceMinutes`：宽限期，默认 60 分钟。
 - 无持久化数据，判定不写入任何数据库。
 
@@ -78,7 +80,7 @@
 
 - 生产站网络失败或非 200：判定 `unreachable` 并失败，不把网络故障当成部署正常。
 - 生产站返回页面但没有 commit 元信息：判定 `unknown` 并失败，不静默通过。
-- 缺少有效预期 commit 或提交时间：抛错失败关闭。
+- 缺少有效预期 commit 或未部署提交时间：抛错失败关闭。
 - 发布刚完成：宽限期内判定 `deploying` 并通过，避免每次发布都误报。
 - 宽限期边界：恰好到点按包含处理，不报警。
 - 计划任务只从默认分支运行，合并进 `main` 之前不会执行。
@@ -86,8 +88,9 @@
 ## 验收标准
 
 - 生产站与 `main` 一致时判定 `current` 且退出码为 0。
-- 生产站落后但发布提交 10 分钟前产生时判定 `deploying` 且退出码为 0。
-- 生产站落后且发布提交超过宽限期时判定 `stale`、退出码为 1，且信息含「ACR」与「rollout」。
+- 生产站落后但最老未部署提交 10 分钟前产生时判定 `deploying` 且退出码为 0。
+- 生产站落后且最老未部署提交超过宽限期时判定 `stale`、退出码为 1，且信息含「ACR」与「rollout」。
+- `main` 在断链期间持续前进时仍判定 `stale`，未部署时长不因新发布而重置。
 - 生产站不可访问时判定 `unreachable` 且失败。
 - 生产站不返回 commit 时判定 `unknown` 且失败。
 - `production-drift.yml` 含 `schedule`、`workflow_dispatch`、`contents: read`，且不含任何写权限。

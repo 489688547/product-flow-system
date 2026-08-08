@@ -49,7 +49,23 @@
     实际结果 16 项通过，原有冒烟内容断言未回归。
   - 提交：`fix(ci): 冒烟等待窗口匹配真实发布链路`。
 
-### Task 4: durable 规则反写
+### Task 4: 未部署时长改按最老未部署提交计算
+
+- [x] 未部署时长改按最老未部署提交计算
+  - 依赖：Task 1、2。
+  - 文件：`scripts/check-production-drift.mjs`、`tests/production-drift.test.mjs`、`.github/workflows/production-drift.yml`。
+  - 输入：生产站实际所在 commit 与 `main` HEAD 之间的提交区间。
+  - 输出：`oldestUndeployedTimestampMs`；`evaluateDrift` 的入参由 `commitTimestampMs` 改为 `undeployedSinceMs`。
+  - 失败测试：新增「main 持续前进不会重置未部署时长」用例，在旧实现下判定为 `deploying` 而非 `stale`。
+  - 实现步骤：把年龄基准从 `main` HEAD 改为 `git log <生产 commit>..main --reverse` 的第一条 →
+    生产 commit 不在历史中时退回发布提交时间 → 工作流改用 `fetch-depth: 0`。
+  - 验证：`node --test tests/production-drift.test.mjs`，实际结果 14 项通过；
+    对真实生产站执行脚本，在生产追上 `d0fb8422` 后输出 `current` 且退出码 0。
+  - 提交：`fix(ci): 未部署时长按最老未部署提交计算`。
+  - 备注：该缺陷由真实数据发现——生产停在两小时前的提交而 `main` 五分钟前刚动过，
+    旧实现报「正在部署」。只要发布比宽限期频繁，断链会被永远掩盖。
+
+### Task 5: durable 规则反写
 
 - [x] durable 规则反写
   - 依赖：Task 1、2、3。

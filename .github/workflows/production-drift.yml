@@ -23,7 +23,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 1
+          # 需要完整历史：未部署时长要从生产站实际所在的 commit 往前数，浅克隆里
+          # 那个 commit 通常不存在，会退化成按 main HEAD 计时而漏报持续断链。
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -33,11 +35,8 @@ jobs:
           # 默认 shell 是 bash -e，没有 pipefail：直接管道给 tee 会让漂移失败被 tee 的
           # 退出码盖掉。脚本的失败信息走 stderr，这里一并并入摘要。
           set -euo pipefail
-          COMMIT="$(git rev-parse HEAD)"
-          TIMESTAMP="$(git log -1 --format=%ct)"
           node scripts/check-production-drift.mjs \
             --url https://deshan-tiyes.cn \
-            --commit "$COMMIT" \
-            --commit-timestamp "$TIMESTAMP" \
+            --commit "$(git rev-parse HEAD)" \
             --grace-minutes 60 \
             2>&1 | tee -a "$GITHUB_STEP_SUMMARY"

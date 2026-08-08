@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
 import { commitFromHtml, sameCommit } from "./check-deployed-smoke.mjs";
@@ -7,10 +8,13 @@ import { commitFromHtml, sameCommit } from "./check-deployed-smoke.mjs";
 // 只有持续超过宽限期才说明链路没有走通。
 export const DEFAULT_GRACE_MINUTES = 60;
 
+// undeployedSinceMs 必须是「生产缺失的最老那个提交」的时间，不能用 main HEAD 的时间。
+// 用 HEAD 会让年龄在每次发布时重置：只要发布比宽限期来得频繁，一条永久断掉的链路
+// 会被永远判成 deploying。实测中生产停在两小时前的提交，而 main 五分钟前刚动过。
 export function evaluateDrift({
   deployedCommit,
   expectedCommit,
-  commitTimestampMs,
+  undeployedSinceMs,
   nowMs,
   graceMinutes = DEFAULT_GRACE_MINUTES
 } = {}) {
@@ -34,10 +38,10 @@ export function evaluateDrift({
     };
   }
 
-  const ageMs = Number(nowMs) - Number(commitTimestampMs);
+  const ageMs = Number(nowMs) - Number(undeployedSinceMs);
   const graceMs = graceMinutes * 60_000;
   if (!Number.isFinite(ageMs)) {
-    throw new Error("缺少有效的发布提交时间。");
+    throw new Error("缺少有效的未部署提交时间。");
   }
   const ageMinutes = Math.floor(ageMs / 60_000);
   if (ageMs <= graceMs) {
@@ -47,7 +51,7 @@ export function evaluateDrift({
       ageMinutes,
       message:
         `生产站在 ${deployed.slice(0, 12)}，main 是 ${expected.slice(0, 12)}；` +
-        `发布提交 ${ageMinutes} 分钟前产生，仍在 ${graceMinutes} 分钟宽限期内。`
+        `最老的未部署提交 ${ageMinutes} 分钟前产生，仍在 ${graceMinutes} 分钟宽限期内。`
     };
   }
   return {
@@ -55,7 +59,8 @@ export function evaluateDrift({
     drifted: true,
     ageMinutes,
     message:
-      `生产站停留在 ${deployed.slice(0, 12)}，main 已是 ${expected.slice(0, 12)} 且已过去 ${ageMinutes} 分钟` +
+      `生产站停留在 ${deployed.slice(0, 12)}，main 已是 ${expected.slice(0, 12)}，` +
+      `最老的未部署提交已经过去 ${ageMinutes} 分钟` +
       `（宽限期 ${graceMinutes} 分钟）。镜像构建、ACR 推送或 ECS rollout 至少有一环没有走通。`
   };
 }
@@ -65,10 +70,27 @@ function argument(name, argv = process.argv) {
   return index >= 0 ? argv[index + 1] || "" : "";
 }
 
+// 最老未部署提交的时间只能在拿到生产站实际 commit 之后才算得出来，因此由调用方注入一个
+// 解析器：CI 里用 git 历史，测试里直接给值，判定本身保持纯函数。
+export function oldestUndeployedTimestampMs({ deployedCommit, expectedCommit, runGit }) {
+  const range = `${deployedCommit}..${expectedCommit}`;
+  try {
+    // 生产报的 commit 不在历史里（浅克隆、极旧版本、元信息异常）时退回发布提交自身的时间，
+    // 宁可早报也不要漏报。
+    runGit(["cat-file", "-e", `${deployedCommit}^{commit}`]);
+    const seconds = runGit(["log", range, "--format=%ct", "--reverse"]).split(/\r?\n/).filter(Boolean)[0];
+    if (seconds) return Number(seconds) * 1000;
+  } catch {
+    // 落到下面的回退
+  }
+  return Number(runGit(["log", "-1", "--format=%ct", expectedCommit])) * 1000;
+}
+
 export async function checkProductionDrift({
   url,
   expectedCommit,
-  commitTimestampMs,
+  undeployedSinceMs,
+  resolveUndeployedSinceMs,
   graceMinutes = DEFAULT_GRACE_MINUTES,
   nowMs = Date.now(),
   fetchImpl = fetch
@@ -86,16 +108,21 @@ export async function checkProductionDrift({
       message: `无法访问生产站 ${baseUrl}：${error.message}`
     };
   }
-  return evaluateDrift({ deployedCommit, expectedCommit, commitTimestampMs, nowMs, graceMinutes });
+  const since = deployedCommit && resolveUndeployedSinceMs
+    ? resolveUndeployedSinceMs(deployedCommit)
+    : undeployedSinceMs;
+  return evaluateDrift({ deployedCommit, expectedCommit, undeployedSinceMs: since, nowMs, graceMinutes });
 }
 
 async function main() {
   const graceMinutes = Number(argument("--grace-minutes")) || DEFAULT_GRACE_MINUTES;
-  const timestampSeconds = Number(argument("--commit-timestamp"));
+  const expectedCommit = argument("--commit") || process.env.GITHUB_SHA;
+  const runGit = args => execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const result = await checkProductionDrift({
     url: argument("--url"),
-    expectedCommit: argument("--commit") || process.env.GITHUB_SHA,
-    commitTimestampMs: timestampSeconds * 1000,
+    expectedCommit,
+    resolveUndeployedSinceMs: deployedCommit =>
+      oldestUndeployedTimestampMs({ deployedCommit, expectedCommit, runGit }),
     graceMinutes
   });
   const line = `生产发布漂移检查：${result.status} — ${result.message}\n`;

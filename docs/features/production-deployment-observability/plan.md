@@ -32,12 +32,14 @@ ECS 会产生两个互不知情的发布来源。本功能只做观测。
 
 - `evaluateDrift(input) -> { status, drifted, ageMinutes?, message }`
   - `status` ∈ `current` | `deploying` | `stale` | `unknown`
+  - `undeployedSinceMs` 必须是生产缺失的最老提交时间，不是 `main` HEAD 时间
   - `drifted` 为 `true` 时命令行退出码为 1
-  - 缺少有效 `expectedCommit` 或 `commitTimestampMs` 时抛错
+  - 缺少有效 `expectedCommit` 或 `undeployedSinceMs` 时抛错
+- `oldestUndeployedTimestampMs({ deployedCommit, expectedCommit, runGit }) -> number`
 - `checkProductionDrift(input) -> Promise<同上，另含 unreachable>`
   - `fetchImpl` 可注入；抛出的网络异常映射为 `unreachable` 而非向上传播
 - `DEFAULT_GRACE_MINUTES = 60`
-- 命令行：`--url`、`--commit`、`--commit-timestamp`（秒）、`--grace-minutes`；
+- 命令行：`--url`、`--commit`、`--grace-minutes`；未部署时长由脚本自行从 git 历史解析；
   退出码 0 表示不漂移，1 表示漂移或判定失败。
 
 ## 数据迁移
@@ -48,6 +50,8 @@ ECS 会产生两个互不知情的发布来源。本功能只做观测。
 
 - 风险：宽限期 60 分钟内的断链不会被报出。这是为避免发布当下误报的有意取舍，
   发布当下的 20 分钟冒烟窗口覆盖了这段时间的主要场景。
+- 风险：漂移工作流若以浅克隆检出，生产所在 commit 不在历史中，未部署时长会退化为按发布
+  提交计时。因此工作流固定 `fetch-depth: 0`，并由测试覆盖退回路径。
 - 风险：漂移检查误判导致计划任务红灯。最坏后果仅为一个红色只读作业，
   它没有 `contents: write` 也没有部署能力。
 - 风险：生产站改版导致 `pfs-release-commit` 元信息缺失。此时判定为 `unknown` 并失败，

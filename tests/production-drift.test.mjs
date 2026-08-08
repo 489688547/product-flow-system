@@ -6,7 +6,8 @@ import { resolve } from "node:path";
 import {
   DEFAULT_GRACE_MINUTES,
   checkProductionDrift,
-  evaluateDrift
+  evaluateDrift,
+  oldestUndeployedTimestampMs
 } from "../scripts/check-production-drift.mjs";
 
 const MAIN = "b78a3ebf1062f0d5b0d3a2f1c4e5a6b7c8d9e0f1";
@@ -21,7 +22,7 @@ test("生产站已在 main 时不算漂移", () => {
   const result = evaluateDrift({
     deployedCommit: MAIN,
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(5),
+    undeployedSinceMs: minutesAgo(5),
     nowMs: NOW
   });
   assert.equal(result.status, "current");
@@ -32,7 +33,7 @@ test("短 commit 与长 commit 互为前缀时视为同一版本", () => {
   const result = evaluateDrift({
     deployedCommit: MAIN.slice(0, 12),
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(5),
+    undeployedSinceMs: minutesAgo(5),
     nowMs: NOW
   });
   assert.equal(result.status, "current");
@@ -43,7 +44,7 @@ test("发布刚完成、仍在宽限期内的落后不报警", () => {
   const result = evaluateDrift({
     deployedCommit: PREVIOUS,
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(10),
+    undeployedSinceMs: minutesAgo(10),
     nowMs: NOW
   });
   assert.equal(result.status, "deploying");
@@ -55,7 +56,7 @@ test("超过宽限期仍未部署则判定漂移并指出可能断点", () => {
   const result = evaluateDrift({
     deployedCommit: PREVIOUS,
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(DEFAULT_GRACE_MINUTES + 30),
+    undeployedSinceMs: minutesAgo(DEFAULT_GRACE_MINUTES + 30),
     nowMs: NOW
   });
   assert.equal(result.status, "stale");
@@ -68,7 +69,7 @@ test("宽限期边界按包含处理，恰好到点不报警", () => {
   const result = evaluateDrift({
     deployedCommit: PREVIOUS,
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(DEFAULT_GRACE_MINUTES),
+    undeployedSinceMs: minutesAgo(DEFAULT_GRACE_MINUTES),
     nowMs: NOW
   });
   assert.equal(result.drifted, false);
@@ -78,11 +79,48 @@ test("生产站不返回 commit 时判定漂移而不是静默通过", () => {
   const result = evaluateDrift({
     deployedCommit: "",
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(5),
+    undeployedSinceMs: minutesAgo(5),
     nowMs: NOW
   });
   assert.equal(result.status, "unknown");
   assert.equal(result.drifted, true);
+});
+
+test("main 持续前进不会重置未部署时长，断链仍然报出", () => {
+  // 回归：早期实现量的是 main HEAD 的年龄，于是只要发布比宽限期来得频繁，
+  // 一条永久断掉的链路会被永远判成 deploying。实测中生产停在两小时前的提交，
+  // 而 main 五分钟前刚动过，检查却报了「正在部署」。
+  const result = evaluateDrift({
+    deployedCommit: PREVIOUS,
+    expectedCommit: MAIN,
+    undeployedSinceMs: minutesAgo(120),
+    nowMs: NOW
+  });
+  assert.equal(result.status, "stale");
+  assert.equal(result.drifted, true);
+  assert.equal(result.ageMinutes, 120);
+});
+
+test("未部署时长取生产缺失的最老提交，而不是 main HEAD", () => {
+  const calls = [];
+  const runGit = args => {
+    calls.push(args.join(" "));
+    if (args[0] === "cat-file") return "";
+    if (args[1] === PREVIOUS + ".." + MAIN) return String(Math.floor(minutesAgo(120) / 1000)) + "\n" + String(Math.floor(minutesAgo(5) / 1000));
+    return String(Math.floor(minutesAgo(5) / 1000));
+  };
+  const ms = oldestUndeployedTimestampMs({ deployedCommit: PREVIOUS, expectedCommit: MAIN, runGit });
+  assert.equal(ms, minutesAgo(120), "应取区间内最老的提交时间");
+  assert.ok(calls.some(c => c.includes("--reverse")), "必须按时间正序取第一个");
+});
+
+test("生产 commit 不在历史中时退回发布提交时间，宁可早报不漏报", () => {
+  const runGit = args => {
+    if (args[0] === "cat-file") throw new Error("not found");
+    return String(Math.floor(minutesAgo(90) / 1000));
+  };
+  const ms = oldestUndeployedTimestampMs({ deployedCommit: "deadbeef", expectedCommit: MAIN, runGit });
+  assert.equal(ms, minutesAgo(90));
 });
 
 test("缺少有效预期 commit 时失败关闭", () => {
@@ -96,7 +134,7 @@ test("站点不可访问时判定漂移，不把网络故障当成部署正常",
   const result = await checkProductionDrift({
     url: "https://deshan-tiyes.cn",
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(5),
+    undeployedSinceMs: minutesAgo(5),
     nowMs: NOW,
     fetchImpl: async () => {
       throw new Error("ECONNRESET");
@@ -111,7 +149,7 @@ test("从生产站 HTML 读取部署 commit", async () => {
   const result = await checkProductionDrift({
     url: "https://deshan-tiyes.cn/",
     expectedCommit: MAIN,
-    commitTimestampMs: minutesAgo(5),
+    undeployedSinceMs: minutesAgo(5),
     nowMs: NOW,
     fetchImpl: async () => ({ ok: true, text: async () => html })
   });

@@ -31,10 +31,17 @@
   不必再推一个空提交。
 - 冒烟超时的失败信息明确指出断点候选：镜像构建、ACR 推送或 ECS rollout。
 - 新增 `production-drift` 计划任务，每两小时比较生产站 `pfs-release-commit` 与 `main`：
-  一致记 `current`；落后但发布提交在 60 分钟宽限期内记 `deploying`；超过宽限期记 `stale`
+  一致记 `current`；落后但未部署时长在 60 分钟宽限期内记 `deploying`；超过宽限期记 `stale`
   并失败；站点不可访问或不返回 commit 记 `unreachable` / `unknown` 并失败。
+- 未部署时长以**生产缺失的最老那个提交**为准（`git log <生产 commit>..main --reverse` 的第一条），
+  不以 `main` HEAD 的时间为准。后者会在每次发布时重置年龄，使得只要发布比宽限期来得频繁，
+  一条永久断掉的链路就被永远判成 `deploying`。该缺陷在实现过程中由真实数据发现：
+  生产停在两小时前的提交，而 `main` 五分钟前刚动过，检查却报了「正在部署」。
+- 生产站报出的 commit 不在历史中时（浅克隆、极旧版本、元信息异常），退回发布提交自身的
+  时间，宁可早报也不漏报。漂移工作流因此必须以 `fetch-depth: 0` 检出。
 - 判定逻辑放在 `scripts/check-production-drift.mjs` 的纯函数 `evaluateDrift` 中，
   复用 `check-deployed-smoke.mjs` 已有的 `commitFromHtml` 与 `sameCommit`，不重复实现。
+  未部署时长的解析由调用方注入，判定本身不触碰 git 与网络。
 
 ## 备选方案
 
