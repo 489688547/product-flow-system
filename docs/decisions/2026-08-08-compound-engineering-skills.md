@@ -37,7 +37,7 @@
 - 写权限工作流只运行可信的机械校验和 `check:pr`，推送候选分支后显式 dispatch `quality.yml` 到候选 SHA。该工作流以 `contents: read` 运行项目合同测试、治理、集成、环境、lint、完整测试和 build；全部成功后才创建 base 为 `dev` 的 PR。任何路径都不自动合并。
 - 已有开放 PR 幂等退出；已存在但没有开放 PR 的同名远端分支，只有在其 Git tree 与从最新 `origin/dev` 重建的候选 tree 完全一致时才复用并补建 PR，否则失败关闭。
 - 任何 release 读取、clone、同步、机械校验、候选质量、推送或 PR 创建失败都会使工作流失败，`dev` 和 `main` 保持不变。升级和质量工作流都使用完整 commit SHA 固定 `actions/checkout` 与 `actions/setup-node` 的 v4 实现。
-- 写权限 checkout 禁止持久化凭据；唯一的候选分支 push 通过进程内 credential helper 显式使用当前短生命周期 `GITHUB_TOKEN`，不把 token 或认证 header 写入 Git config。跨 step 使用的上游 checkout 在工作流最后由 `always()` step 清理，且只接受 `$RUNNER_TEMP/compound-engineering.*` 的直接子目录。
+- 写权限 checkout 禁止持久化凭据；candidate step 的所有 origin fetch、ls-remote 和 push 都通过唯一的进程内 credential helper 显式使用当前短生命周期 `GITHUB_TOKEN`，不展开或打印 token，也不把 token 或认证 header 写入 Git config。跨 step 使用的上游 checkout 在工作流最后由 `always()` step 清理，且只接受 `$RUNNER_TEMP/compound-engineering.*` 的直接子目录。
 
 ## 回滚
 

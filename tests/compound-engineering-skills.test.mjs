@@ -364,7 +364,6 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.equal(updaterCheckout?.with?.["persist-credentials"], false, "write-capable checkout must not persist GITHUB_TOKEN in git config");
   assert.match(workflowText, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262\s+# v4/);
   assert.match(workflowText, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\s+# v4/);
-  assert.match(workflowText, /git fetch origin dev/);
   assert.match(workflowText, /releases\/latest/);
   assert.match(workflowText, /draft/);
   assert.match(workflowText, /prerelease/);
@@ -380,13 +379,22 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.match(workflowText, /git diff --check/);
   assert.match(workflowText, /BRANCH="codex\/update-compound-engineering-/);
   assert.match(workflowText, /gh pr list --base dev --head "\$BRANCH" --state open/);
-  assert.match(workflowText, /git ls-remote --exit-code --heads origin "\$BRANCH"/);
   assert.match(workflowText, /\^\{tree\}/);
   assert.match(workflowText, /候选 tree|candidate tree|tree 不一致/i);
   assert.match(workflowText, /复用.*远端分支|reuse.*remote branch/i);
   assert.match(workflowText, /git checkout -B "\$BRANCH" origin\/dev/);
-  assert.match(workflowText, /git -c 'credential\.helper=![^']*\$GH_TOKEN[^']*'\s*\\?\s*push --set-upstream origin "\$BRANCH"/);
-  assert.doesNotMatch(workflowText, /^\s*git push --set-upstream/m, "push must not depend on persisted checkout credentials");
+  const candidateStep = workflow.jobs["propose-update"].steps.find(step => step.id === "candidate");
+  const candidateRun = candidateStep?.run ?? "";
+  assert.equal((candidateRun.match(/^auth_git\(\)/gm) ?? []).length, 1, "candidate step must define one command-scoped Git authenticator");
+  assert.match(candidateRun, /auth_git\(\)[\s\S]*credential\.helper=![^']*\$GH_TOKEN/);
+  const remoteOriginLines = candidateRun.split("\n").filter(line => /\b(?:fetch|ls-remote|push)\b.*\borigin\b/.test(line));
+  assert.equal(remoteOriginLines.length, 4, "candidate step must have exactly four authenticated origin operations");
+  for (const line of remoteOriginLines) {
+    assert.match(line, /^\s*(?:if\s+)?auth_git\s+(?:fetch|ls-remote|push)\b/, `origin operation must use auth_git: ${line.trim()}`);
+  }
+  assert.doesNotMatch(candidateRun, /^\s*git fetch origin/m);
+  assert.doesNotMatch(candidateRun, /^\s*(?:if\s+)?git ls-remote[^\n]*\borigin\b/m);
+  assert.doesNotMatch(candidateRun, /^\s*git push\b/m);
   assert.doesNotMatch(workflowText, /git config[^\n]*(?:credential|extraheader|token)/i, "credentials must not be written to persistent git config");
   assert.match(workflowText, /gh workflow run quality\.yml[\s\S]*--ref "\$BRANCH"[\s\S]*candidate_sha/);
   assert.match(workflowText, /gh run watch "\$RUN_ID" --exit-status/);

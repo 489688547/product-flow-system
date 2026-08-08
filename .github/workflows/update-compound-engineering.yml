@@ -92,7 +92,10 @@ jobs:
           UPSTREAM_DIR: ${{ steps.upstream.outputs.path }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          git fetch origin dev
+          auth_git() {
+            git -c 'credential.helper=!f() { printf "%s\n" "username=x-access-token" "password=$GH_TOKEN"; }; f' "$@"
+          }
+          auth_git fetch origin dev
           BRANCH="codex/update-compound-engineering-${TAG#compound-engineering-v}"
           git checkout -B "$BRANCH" origin/dev
           node scripts/sync-compound-engineering-skills.mjs --source "$UPSTREAM_DIR" --tag "$TAG" --commit "$COMMIT"
@@ -133,8 +136,8 @@ jobs:
           LOCAL_SHA="$(git rev-parse HEAD)"
           LOCAL_TREE="$(git rev-parse 'HEAD^{tree}')"
           OPEN_PR=false
-          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
-            git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
+          if auth_git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            auth_git fetch origin "refs/heads/$BRANCH:refs/remotes/origin/$BRANCH"
             REMOTE_SHA="$(git rev-parse "refs/remotes/origin/$BRANCH")"
             REMOTE_TREE="$(git rev-parse "${REMOTE_SHA}^{tree}")"
             if [ "$REMOTE_TREE" != "$LOCAL_TREE" ]; then
@@ -148,8 +151,7 @@ jobs:
               echo "已有 tree 一致的开放升级 PR，不重复创建。"
             fi
           else
-            git -c 'credential.helper=!f() { printf "%s\n" "username=x-access-token" "password=$GH_TOKEN"; }; f' \
-              push --set-upstream origin "$BRANCH"
+            auth_git push --set-upstream origin "$BRANCH"
             CANDIDATE_SHA="$LOCAL_SHA"
           fi
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
