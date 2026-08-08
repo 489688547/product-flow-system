@@ -14,7 +14,7 @@ const verificationSkillPath = resolve(root, ".agents/skills/verification/SKILL.m
 const firstLearningPath = resolve(root, "docs/solutions/runtime-errors/replace-wrangler-pages-dev-with-node-hono-runtime.md");
 const compoundEngineeringAdrPath = resolve(root, "docs/decisions/2026-08-08-compound-engineering-skills.md");
 const qualityWorkflowPath = resolve(root, ".github/workflows/quality.yml");
-const updaterWorkflowPath = resolve(root, ".github/workflows/update-compound-engineering.yml");
+const automaticUpdaterWorkflowPath = resolve(root, ".github/workflows/update-compound-engineering.yml");
 const agentsPath = resolve(root, "AGENTS.md");
 const skillNames = ["ce-compound", "ce-compound-refresh"];
 
@@ -100,7 +100,7 @@ test("the repository vendors both pinned Compound Engineering skills and the MIT
   }
 });
 
-test("the updater compares releases and rejects a moved current tag", async () => {
+test("the manual synchronizer rejects downgrades and a moved current tag", async () => {
   const { compareCompoundEngineeringTags, decideCompoundEngineeringRelease } = await import(new URL("../scripts/sync-compound-engineering-skills.mjs", import.meta.url));
 
   assert.equal(compareCompoundEngineeringTags("compound-engineering-v3.21.3", "compound-engineering-v3.21.4"), -1);
@@ -350,113 +350,25 @@ test("the first ECS runtime learning is parser-safe, grounded, and secret-free",
   }
 });
 
-test("the controlled updater only proposes a pinned formal-release PR to dev", async () => {
-  const workflowText = readFileSync(updaterWorkflowPath, "utf8");
+test("Compound Engineering upgrades stay manual and use the ordinary read-only quality workflow", () => {
+  assert.equal(existsSync(automaticUpdaterWorkflowPath), false, "the repository must not schedule or push Skill upgrades");
+
+  const workflowText = readFileSync(qualityWorkflowPath, "utf8");
   const workflow = load(workflowText);
-
-  assert.ok(Array.isArray(workflow.on.schedule), "updater must run on a weekly schedule");
-  assert.ok(workflow.on.schedule.some(item => typeof item.cron === "string"), "schedule must use cron");
-  assert.deepEqual(workflow.on.workflow_dispatch, {}, "updater must be manually runnable");
-  assert.equal(workflow.permissions.contents, "write");
-  assert.equal(workflow.permissions["pull-requests"], "write");
-  assert.equal(workflow.permissions.actions, "write");
-  const updaterCheckout = workflow.jobs["propose-update"].steps.find(step => String(step.uses ?? "").startsWith("actions/checkout@"));
-  assert.equal(updaterCheckout?.with?.["persist-credentials"], false, "write-capable checkout must not persist GITHUB_TOKEN in git config");
-  assert.match(workflowText, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262\s+# v4/);
-  assert.match(workflowText, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\s+# v4/);
-  assert.match(workflowText, /releases\/latest/);
-  assert.match(workflowText, /draft/);
-  assert.match(workflowText, /prerelease/);
-  assert.ok(workflowText.includes("compound-engineering-v\\d+\\.\\d+\\.\\d+"));
-  assert.match(workflowText, /decideCompoundEngineeringRelease/);
-  assert.match(workflowText, /needed=\$\{decision\.needed\}/);
-  assert.match(workflowText, /git clone --no-checkout/);
-  assert.match(workflowText, /checkout --detach "refs\/tags\/\$TAG"/);
-  assert.match(workflowText, /rev-parse HEAD/);
-  assert.match(workflowText, /sync-compound-engineering-skills\.mjs/);
-  assert.match(workflowText, /compound-engineering-upstream\.json/);
-  assert.doesNotMatch(workflowText, /(?:python(?:3)?|node --test|npm test|npm run (?:lint|build|check:governance|check:integrations|check:environment-capabilities))/, "write-capable updater must never execute vendored files or project tests");
-  assert.match(workflowText, /git diff --check/);
-  assert.match(workflowText, /BRANCH="codex\/update-compound-engineering-/);
-  assert.match(workflowText, /gh pr list --base dev --head "\$BRANCH" --state open/);
-  assert.match(workflowText, /\^\{tree\}/);
-  assert.match(workflowText, /候选 tree|candidate tree|tree 不一致/i);
-  assert.match(workflowText, /复用.*远端分支|reuse.*remote branch/i);
-  assert.match(workflowText, /git checkout -B "\$BRANCH" origin\/dev/);
-  const candidateStep = workflow.jobs["propose-update"].steps.find(step => step.id === "candidate");
-  const candidateRun = candidateStep?.run ?? "";
-  assert.equal((candidateRun.match(/^auth_git\(\)/gm) ?? []).length, 1, "candidate step must define one command-scoped Git authenticator");
-  assert.match(candidateRun, /auth_git\(\)[\s\S]*credential\.helper=![^']*\$GH_TOKEN/);
-  const remoteOriginLines = candidateRun.split("\n").filter(line => /\b(?:fetch|ls-remote|push)\b.*\borigin\b/.test(line));
-  assert.equal(remoteOriginLines.length, 4, "candidate step must have exactly four authenticated origin operations");
-  for (const line of remoteOriginLines) {
-    assert.match(line, /^\s*(?:if\s+)?auth_git\s+(?:fetch|ls-remote|push)\b/, `origin operation must use auth_git: ${line.trim()}`);
-  }
-  assert.doesNotMatch(candidateRun, /^\s*git fetch origin/m);
-  assert.doesNotMatch(candidateRun, /^\s*(?:if\s+)?git ls-remote[^\n]*\borigin\b/m);
-  assert.doesNotMatch(candidateRun, /^\s*git push\b/m);
-  assert.doesNotMatch(workflowText, /git config[^\n]*(?:credential|extraheader|token)/i, "credentials must not be written to persistent git config");
-  assert.match(workflowText, /gh workflow run quality\.yml[\s\S]*--ref "\$BRANCH"[\s\S]*candidate_sha/);
-  assert.match(workflowText, /gh run watch "\$RUN_ID" --exit-status/);
-  assert.match(workflowText, /gh pr create[\s\S]*--base dev[\s\S]*--head "\$BRANCH"/);
-  assert.match(workflowText, /Integration-Impact: none/);
-  assert.match(workflowText, /只更新仓库内开发 Skill，不触及 provider runtime/);
-  assert.match(workflowText, /Rule-Writeback: docs\/decisions\/2026-08-08-compound-engineering-skills\.md/);
-  assert.match(workflowText, /更新当前固定版本记录/);
-  assert.match(workflowText, /当前固定版本/);
-  assert.match(workflowText, /git add[^\n]*docs\/decisions\/2026-08-08-compound-engineering-skills\.md/);
-  assert.match(workflowText, /npm run check:pr -- --base origin\/dev --body-file/);
-  assert.ok(
-    workflowText.indexOf("git commit") < workflowText.indexOf("compound-engineering-pr-body.md")
-      && workflowText.indexOf("compound-engineering-pr-body.md") < workflowText.indexOf("npm run check:pr")
-      && workflowText.indexOf("npm run check:pr") < workflowText.indexOf("push --set-upstream")
-      && workflowText.indexOf("push --set-upstream") < workflowText.indexOf("gh workflow run quality.yml")
-      && workflowText.indexOf("gh workflow run quality.yml") < workflowText.indexOf("gh pr create"),
-    "the governed PR body must be checked after commit and before push"
-  );
-  assert.doesNotMatch(workflowText, /auto-merge|--auto/i);
-  assert.doesNotMatch(workflowText, /--force(?:-with-lease)?/);
-  assert.doesNotMatch(workflowText, /git push[^\n]*origin\s+(?:dev|main)(?:\s|$)/);
-  assert.doesNotMatch(workflowText, /git checkout[^\n]*(?:origin\/main|\bmain\b)/);
-
-  const updaterSteps = workflow.jobs["propose-update"].steps;
-  const cleanupStep = updaterSteps.at(-1);
-  assert.equal(cleanupStep?.if, "always()", "upstream cleanup must run after success, no-update, or failure paths");
-  assert.equal(cleanupStep?.env?.UPSTREAM_DIR, "${{ steps.upstream.outputs.path }}");
-  assert.match(cleanupStep?.run ?? "", /RUNNER_TEMP[^\n]*compound-engineering\./);
-  assert.match(cleanupStep?.run ?? "", /rm -rf -- "\$UPSTREAM_DIR"/);
-  assert.match(cleanupStep?.run ?? "", /拒绝清理|refus|reject/i, "cleanup must reject paths outside its dedicated RUNNER_TEMP child");
-  assert.ok(workflowText.lastIndexOf("if: always()") > workflowText.indexOf("gh pr create"), "cleanup must stay after every cross-step consumer");
+  assert.equal(workflow.permissions.contents, "read");
+  assert.equal(workflow.on.workflow_dispatch, undefined, "quality must not expose a candidate-SHA dispatch path");
+  assert.equal(workflow.on.pull_request, null);
+  assert.ok(workflow.on.push);
+  assert.match(workflowText, /node --test tests\/compound-engineering-skills\.test\.mjs/);
+  assert.doesNotMatch(workflowText, /candidate_sha|CANDIDATE_SHA/);
 
   const adr = readFileSync(compoundEngineeringAdrPath, "utf8");
-  assert.match(adr, /自动化边界/);
-  assert.match(adr, /失败/);
-  assert.match(adr, /回滚/);
-  assert.match(adr, /不自动合并/);
+  assert.match(adr, /人工升级边界/);
+  assert.match(adr, /没有定时任务、写权限机器人、候选分支编排或自动合并/);
   const manifest = JSON.parse(readFileSync(upstreamManifestPath, "utf8"));
   const currentPin = /^- 当前固定版本：(?<tag>compound-engineering-v\d+\.\d+\.\d+)（commit (?<commit>[0-9a-f]{40})；内容 SHA-256 `(?<contentSha256>[0-9a-f]{64})`）。$/m.exec(adr);
   assert.ok(currentPin?.groups, "ADR must record the current pinned tag, complete commit, and content digest");
   assert.equal(currentPin.groups.tag, manifest.tag);
   assert.equal(currentPin.groups.commit, manifest.commit);
   assert.equal(currentPin.groups.contentSha256, manifest.contentSha256);
-});
-
-test("quality can be explicitly dispatched at an exact candidate SHA with read-only permissions", () => {
-  const workflowText = readFileSync(qualityWorkflowPath, "utf8");
-  const workflow = load(workflowText);
-
-  assert.equal(workflow.permissions.contents, "read");
-  assert.ok(workflow.on.workflow_dispatch, "quality must support explicit dispatch");
-  assert.ok(workflow.on.workflow_dispatch.inputs.candidate_sha, "dispatch must carry the expected candidate SHA");
-  assert.match(workflowText, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262\s+# v4/);
-  assert.match(workflowText, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\s+# v4/);
-  assert.match(workflowText, /GITHUB_SHA[\s\S]*candidate_sha|candidate_sha[\s\S]*GITHUB_SHA/);
-  assert.match(workflowText, /GITHUB_BASE_REF:[^\n]*workflow_dispatch[^\n]*dev/);
-  assert.match(workflowText, /node --test tests\/compound-engineering-skills\.test\.mjs/);
-  assert.match(workflowText, /npm run lint/);
-  assert.match(workflowText, /npm run check:governance/);
-  assert.match(workflowText, /npm run check:integrations/);
-  assert.match(workflowText, /npm run check:environment-capabilities/);
-  assert.match(workflowText, /npm test/);
-  assert.match(workflowText, /npm run build/);
 });

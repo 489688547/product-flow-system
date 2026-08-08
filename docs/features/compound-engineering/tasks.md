@@ -37,22 +37,17 @@
     首份 ECS 502 经验经上游校验器和独立语义审查通过，8 项聚焦测试通过。
   - 提交：`docs: compound verified deployment learning`
 
-### Task 3: 建立受控上游升级 PR
+### Task 3: 建立人工受控升级
 
-- [x] 建立受控上游升级 PR
+- [x] 建立人工受控升级
   - 依赖：安全同步器已验证。
-  - 文件：`.github/workflows/update-compound-engineering.yml`、合同测试、ADR。
-  - 输入：GitHub 最新正式 release。
-  - 输出：每周/手动检查，只向 `dev` 创建带治理声明的升级 PR。
-  - 失败测试：合同测试因工作流缺失或目标分支错误失败。
-  - 实现步骤：检出 `dev`；读取 release tag 与实际 commit；同步；机械检查并创建候选；显式触发候选 SHA 的只读 `quality.yml`；质量成功后创建 `codex/*` 分支 PR；不自动合并。
-  - 验证：静态合同、治理检查和 workflow YAML 解析通过。
-  - 2026-08-08：每周/手动升级工作流已实现；同名 tag 移动和降级失败关闭；对已有开放 PR
-    幂等退出，只在重建候选树完全一致时复用孤儿分支；push 前通过真实 `check:pr`，候选 SHA
-    的只读质量工作流成功后才创建 PR。高权限 job 不执行 vendored 内容，不持久化 Git 凭据，
-    candidate 的所有 origin 操作共用唯一进程内 credential helper；
-    两个 workflow 的第三方 Actions 固定完整 SHA，跨 step 上游目录由尾部受限清理，14 项聚焦合同通过。
-  - 提交：`ci: propose compound engineering updates`
+  - 文件：`scripts/sync-compound-engineering-skills.mjs`、普通 `quality.yml`、合同测试、ADR。
+  - 输入：维护者明确选择的正式 tag、完整 commit 和本地 checkout。
+  - 输出：一条人工同步命令；审查差异后通过普通功能 PR 进入 `dev`。
+  - 失败测试：存在自动升级 workflow 或普通质量门未运行合同测试时失败。
+  - 实现步骤：删除定时更新器和候选调度；保留安全同步器；普通 PR CI 运行合同和完整 DoD。
+  - 验证：人工同步合同、治理检查和普通 quality YAML 解析通过。
+  - 提交：`refactor: simplify compound skill updates`
 
 ### Task 4: 完整验收与交付
 

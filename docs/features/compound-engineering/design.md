@@ -9,7 +9,7 @@
 1. 强制契约：项目当前代码、测试和 durable docs。
 2. 执行流程：`ce-compound`、`ce-compound-refresh` 与 `verification` 的触发关系。
 3. 经验内容：`docs/solutions/` 中按问题类型分类的文档。
-4. 供应链信息：固定 tag、commit、许可证和升级 PR。
+4. 供应链信息：固定 tag、commit、许可证和人工升级命令。
 
 ## 页面结构
 
@@ -27,7 +27,7 @@ docs/solutions/
 
 - 沉淀：取得聚焦验证证据 → 判断是否非简单且可复用 → 查重和对照代码 → 写入或更新经验 → 校验引用 → 重新运行最终完整 DoD。
 - 刷新：发现重构、冲突或漂移 → 聚类相关经验 → 选择保留、更新、合并、替换、删除 → 证据不足标记 `stale`。
-- 升级：定时或手动解析 release 与实际 tag commit → 在临时目录检出精确 `refs/tags/*` → 只同步允许目录并生成内容摘要 → 机械检查和提交候选分支 → 显式触发候选 SHA 的只读质量工作流 → 成功后创建面向 `dev` 的 PR。
+- 升级：维护者按需检出精确 tag 与 commit → 运行本地同步命令 → 审查差异 → 提交普通功能 PR。
 
 ## 组件复用
 
@@ -38,12 +38,11 @@ docs/solutions/
 ## 新增组件
 
 - `sync-compound-engineering-skills.mjs`：接收本地上游 checkout、tag 和 commit；校验实际 tag、版本方向、文件类型、HEAD tree 与 allowlist 后原子替换允许的 Skill，并更新来源清单、内容摘要与许可证。
-- `update-compound-engineering.yml`：每周或手动检查正式 release；写权限 job 不执行 vendored 内容，只在候选 SHA 的只读 `quality.yml` 成功后创建升级 PR。
-- `compound-engineering-skills.test.mjs`：验证来源、发现性、安全边界、工作流目标分支和项目触发关系。
+- `compound-engineering-skills.test.mjs`：验证来源、发现性、人工同步安全边界和项目触发关系。
 
 ## 页面状态
 
-无 UI 状态。命令行结果必须区分：已是最新版、发现新版并创建 PR、同步失败、tag 移动、候选树冲突、CI 失败、Actions 无 PR 权限。
+无 UI 状态。命令行结果只需区分：同步成功、来源非法、tag 移动、版本降级和内容校验失败。
 
 ## 响应式与钉钉 WebView
 
@@ -51,8 +50,8 @@ docs/solutions/
 
 ## 交互文案
 
-- 已是最新版：`Compound Engineering 已锁定清单声明的最新正式版本。`
-- 发现新版：`已创建升级 PR；合并前必须审查 Skill、脚本和许可证变化。`
+- 已是当前固定版：`Compound Engineering 已锁定清单声明的正式版本。`
+- 完成人工同步：`请审查 Skill、脚本和许可证差异后提交普通 PR。`
 - 非法来源：`上游内容未通过固定版本或目录安全检查，未修改项目 Skill。`
 
 ## 无障碍

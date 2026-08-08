@@ -2,11 +2,11 @@
 
 ## 目标
 
-在仓库中固定引入 EveryInc `compound-engineering-v3.21.4` 的两个经验 Skill，并建立验证、冲突维护和受控升级 PR。
+在仓库中固定引入 EveryInc `compound-engineering-v3.21.4` 的两个经验 Skill，并提供验证、冲突维护和按需人工升级。
 
 ## 架构方案
 
-把两个上游 Skill 的完整目录作为审查过的 vendored source 提交到 `.agents/skills/`，使 Fork 零安装可用；用来源清单固定 tag `compound-engineering-v3.21.4`、commit `0a2957852e2034d04eb01120fd7da6ed5307dc56` 和 vendored 内容 SHA-256。同步脚本只从本地 checkout 复制允许目录和 LICENSE，升级工作流负责检出最新正式 release、机械生成候选并触发只读质量工作流，成功后才创建面向 `dev` 的 PR。项目 `verification` Skill 负责在最终完整 DoD 前完成经验沉淀或刷新。
+把两个上游 Skill 的完整目录作为审查过的 vendored source 提交到 `.agents/skills/`，使 Fork 零安装可用；用来源清单固定 tag `compound-engineering-v3.21.4`、commit `0a2957852e2034d04eb01120fd7da6ed5307dc56` 和 vendored 内容 SHA-256。同步脚本只从维护者提供的本地 checkout 复制允许目录和 LICENSE。仓库不定时查询上游、不自动建分支或 PR；需要升级时由维护者运行同步命令并走普通功能 PR。项目 `verification` Skill 负责在最终完整 DoD 前完成经验沉淀或刷新。
 
 ## 文件职责
 
@@ -17,9 +17,8 @@
 - `.agents/skills/verification/SKILL.md`：在产生已验证可复用经验时触发 `ce-compound`，在漂移时触发刷新。
 - `scripts/sync-compound-engineering-skills.mjs`：安全同步两个完整 Skill。
 - `scripts/check-project-governance.mjs`：调用固定版本与目录完整性检查。
-- `.github/workflows/update-compound-engineering.yml`：以写权限机械生成候选、校验候选树并编排只读质量门禁，只创建升级 PR。
-- `.github/workflows/quality.yml`：支持在精确候选 SHA 上手动触发，以 `contents: read` 运行聚焦合同和完整 DoD。
-- `tests/compound-engineering-skills.test.mjs`：合同、供应链、安全和工作流测试。
+- `.github/workflows/quality.yml`：在普通 PR/push 上以 `contents: read` 运行 Compound Engineering 合同和完整 DoD。
+- `tests/compound-engineering-skills.test.mjs`：固定来源、人工同步、安全和触发规则测试。
 - `docs/solutions/`：团队可版本化经验。
 
 ## 接口与契约
@@ -39,10 +38,8 @@ node scripts/sync-compound-engineering-skills.mjs \
 
 ## 风险与回滚
 
-- 上游脚本供应链风险：锁定 tag+commit+内容摘要；写权限工作流只复制不执行；候选分支使用只读质量工作流完成完整 CI，再进入 PR 审核。
-- Actions 与凭据风险：升级和质量 workflow 的第三方 Actions 固定完整 commit；写权限 checkout 不持久化 token，candidate 的全部 origin 操作只用唯一进程内短时 credential helper；跨 step 上游目录在尾部 `always()` step 做受限清理。
-- 上游行为变化：升级不自动合并；回滚升级提交恢复上一固定版本。
-- 重复运行与孤儿分支：已有开放 PR 幂等退出；无 PR 的远端分支仅在其 Git tree 与重建候选完全一致时复用，否则失败关闭。
+- 上游脚本供应链风险：锁定 tag、commit 和内容摘要；人工同步只复制允许目录，不执行上游脚本。
+- 上游行为变化：升级由维护者审查差异并走普通 PR；回滚升级提交即可恢复上一固定版本。
 - 经验污染：未验证不写入；冲突证据不足标记 `stale`。
 - 上下文膨胀：仅在触发时加载 Skill，经验按需读取。
 
@@ -66,5 +63,5 @@ npm run build
 1. 写供应链与行为合同失败测试。
 2. 实现安全同步器并导入固定版两个 Skill。
 3. 接入 verification，使用真实 ECS 事故生成首份经验并验证两个 Skill。
-4. 实现上游 release 检查和升级 PR 工作流。
+4. 删除自动升级 workflow，保留人工同步和普通 PR 质量门。
 5. 运行完整验收、提交 PR，并把 DEV-000016 提交待验收。

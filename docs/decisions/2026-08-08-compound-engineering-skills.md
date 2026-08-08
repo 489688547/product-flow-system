@@ -10,7 +10,7 @@
 
 ## 决策
 
-将 EveryInc Compound Engineering 正式 release 中的 `ce-compound` 与 `ce-compound-refresh` 完整目录 vendoring 到 `.agents/skills/`。固定记录 tag、完整 commit SHA 和 MIT 许可证。上游更新由每周/手动 GitHub Actions 检查并创建面向 `dev` 的独立 PR；任何更新必须经过项目 CI 与人工评审，不跟随 `main`、不自动合并。
+将 EveryInc Compound Engineering 正式 release 中的 `ce-compound` 与 `ce-compound-refresh` 完整目录 vendoring 到 `.agents/skills/`。固定记录 tag、完整 commit SHA、内容摘要和 MIT 许可证。仓库不自动查询或升级上游；需要升级时，由维护者检出明确版本、运行本地同步命令并提交普通功能 PR。
 
 - 当前固定版本：compound-engineering-v3.21.4（commit 0a2957852e2034d04eb01120fd7da6ed5307dc56；内容 SHA-256 `b8ade34542777b1d612ba081f654d8f9168828327bf30ac687cc3093a44be235`）。
 
@@ -27,18 +27,16 @@
 
 - 所有开发者获得一致、可复现的经验闭环。
 - 仓库增加约 360 KB vendored 内容和少量治理脚本。
-- 每次上游升级需要审查 Skill 中的执行指令和脚本变化；自动检查只减少发现成本，不替代判断。
+- 每次上游升级需要维护者主动发起并审查 Skill 中的执行指令、脚本和许可证变化。
 - 删除或替换经验依赖 Git 历史恢复，不建立污染搜索结果的归档目录。
 
-## 自动化边界
+## 人工升级边界
 
-- 每周和手动工作流只读取 GitHub latest 正式 release；draft、prerelease、非 `compound-engineering-vX.Y.Z` tag 和非完整 commit 都失败关闭。即使 tag 与当前清单相同，也重新解析实际 commit；tag 被移动或 latest 降级时失败关闭。
-- 工作流从最新 `origin/dev` 建立 `codex/*` 分支，安全同步器只复制两个 allowlisted Skill 与 MIT LICENSE，生成确定性内容 SHA-256；治理检查独立重算摘要。同步器与具有写权限的工作流都不执行上游或 vendored 脚本，也不向 `dev` 或 `main` 直接推送。
-- 写权限工作流只运行可信的机械校验和 `check:pr`，推送候选分支后显式 dispatch `quality.yml` 到候选 SHA。该工作流以 `contents: read` 运行项目合同测试、治理、集成、环境、lint、完整测试和 build；全部成功后才创建 base 为 `dev` 的 PR。任何路径都不自动合并。
-- 已有开放 PR 幂等退出；已存在但没有开放 PR 的同名远端分支，只有在其 Git tree 与从最新 `origin/dev` 重建的候选 tree 完全一致时才复用并补建 PR，否则失败关闭。
-- 任何 release 读取、clone、同步、机械校验、候选质量、推送或 PR 创建失败都会使工作流失败，`dev` 和 `main` 保持不变。升级和质量工作流都使用完整 commit SHA 固定 `actions/checkout` 与 `actions/setup-node` 的 v4 实现。
-- 写权限 checkout 禁止持久化凭据；candidate step 的所有 origin fetch、ls-remote 和 push 都通过唯一的进程内 credential helper 显式使用当前短生命周期 `GITHUB_TOKEN`，不展开或打印 token，也不把 token 或认证 header 写入 Git config。跨 step 使用的上游 checkout 在工作流最后由 `always()` step 清理，且只接受 `$RUNNER_TEMP/compound-engineering.*` 的直接子目录。
+1. 维护者在仓库外检出明确的正式 tag，并记录其完整 commit。
+2. 运行计划文档中的 `sync-compound-engineering-skills.mjs` 命令；同步器校验实际 HEAD、tag、版本方向、allowlist、符号链接和当前内容摘要。
+3. 审查两个 Skill、来源清单和许可证的 Git diff，不执行未评审的上游脚本。
+4. 通过普通 `codex/* → dev` PR 运行只读 quality 和人工评审；没有定时任务、写权限机器人、候选分支编排或自动合并。
 
 ## 回滚
 
-回滚对应升级或首次引入提交；关闭或删除工作流可停止后续自动检查。已创建但未合并的升级 PR 直接关闭即可；孤儿升级分支只在 tree 可重建时复用，否则由维护者检查后删除或改名处理。已合并版本通过单独的 `dev` 回滚 PR 恢复前一固定 tag、commit 和内容摘要。已有经验文档可保留，或通过单独 PR 删除，产品运行时与数据不受影响。
+回滚对应升级或首次引入提交。已合并版本通过单独的 `dev` 回滚 PR 恢复前一固定 tag、commit 和内容摘要。已有经验文档可保留，或通过单独 PR 删除，产品运行时与数据不受影响。
