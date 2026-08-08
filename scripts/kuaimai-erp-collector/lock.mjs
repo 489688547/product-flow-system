@@ -48,9 +48,10 @@ function openLockDatabase(databasePath) {
 
 async function readLegacyOwner(lockPath) {
   try {
+    const contents = await readFile(lockPath, "utf8");
     let owner = null;
     try {
-      owner = JSON.parse(await readFile(lockPath, "utf8"));
+      owner = JSON.parse(contents);
     } catch {
       // An ownerless legacy lock stays fail-closed because age cannot prove its process exited.
     }

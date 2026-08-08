@@ -169,6 +169,19 @@ test("collector lock reclaims a stale owner whose process no longer exists", asy
   await assert.rejects(readFile(path.join(layout.root, ".collector.lock")), error => error?.code === "ENOENT");
 });
 
+test("collector lock enters successfully when no legacy sentinel exists", async () => {
+  const root = await tempRoot();
+  let entered = false;
+
+  const result = await withCollectorLock(root, async () => {
+    entered = true;
+    return "completed";
+  });
+
+  assert.equal(result, "completed");
+  assert.equal(entered, true);
+});
+
 test("collector lock never reclaims an ownerless legacy lock by age alone", async () => {
   const root = await tempRoot();
   const layout = await ensureArchiveLayout(root);
