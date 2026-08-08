@@ -201,9 +201,12 @@ test("LaunchAgent writes a log so a failing background run can be diagnosed", ()
     nodePath: "/usr/local/bin/node",
     collectorPath: "/Company/product-flow-system/scripts/kuaimai-erp-collector/index.mjs",
     root: "/Users/roger/Desktop/公司数据中心/快麦ERP",
-    baseUrl: "https://product-flow-system.pages.dev"
+    baseUrl: "https://product-flow-system.pages.dev",
+    home: "/Users/roger"
   });
   assert.match(plist, /<key>StandardOutPath<\/key>/);
   assert.match(plist, /<key>StandardErrorPath<\/key>/);
   assert.match(plist, /com\.company\.kuaimai-erp-collector\.log/);
+  assert.match(plist, /\/Users\/roger\/Library\/Logs\/product-flow\/com\.company\.kuaimai-erp-collector\.log/);
+  assert.doesNotMatch(plist, /Desktop\/公司数据中心\/快麦ERP\/处理报告/);
 });

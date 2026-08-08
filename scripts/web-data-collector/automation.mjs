@@ -60,7 +60,15 @@ export const readRunnerToken = (options = {}) => readSecret({ service: RUNNER_KE
 export const storePairingKey = (value, options = {}) => storeSecret(value, { service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 export const readPairingKey = (options = {}) => readSecret({ service: PAIRING_KEYCHAIN_SERVICE, validate: validatePairingKey, ...options });
 
-export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseUrl, browserMode = "extension", egoCli = "" }) {
+export function collectorLaunchAgentPlist({
+  nodePath,
+  collectorPath,
+  root,
+  baseUrl,
+  browserMode = "extension",
+  egoCli = "",
+  home = os.homedir()
+}) {
   if (!["extension", "dedicated", "ego"].includes(browserMode)) {
     throw Object.assign(new Error("浏览器模式无效。"), { code: "WEB_COLLECTION_BROWSER_MODE_INVALID" });
   }
@@ -81,7 +89,7 @@ export function collectorLaunchAgentPlist({ nodePath, collectorPath, root, baseU
   ]
     .map(value => `      <string>${xml(value)}</string>`).join("\n");
   // 没有日志时，常驻任务失败只在 launchctl 留下一个退出码，无法定位原因。
-  const logPath = path.join(root, "处理报告", `${LAUNCH_AGENT_LABEL}.log`);
+  const logPath = path.join(home, "Library", "Logs", "product-flow", `${LAUNCH_AGENT_LABEL}.log`);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -129,8 +137,10 @@ export async function installLaunchAgent({
   const { worktreeRoot, gitCommonDir } = await readCollectorGitLayout(command, collectorPath);
   const stableCollectorPath = resolveStableCollectorPath({ collectorPath, worktreeRoot, gitCommonDir });
   const directory = path.join(home, "Library", "LaunchAgents");
+  const logDirectory = path.join(home, "Library", "Logs", "product-flow");
   const plistPath = path.join(directory, `${LAUNCH_AGENT_LABEL}.plist`);
   await mkdir(directory, { recursive: true, mode: 0o700 });
+  await mkdir(logDirectory, { recursive: true, mode: 0o700 });
   const temporaryPath = `${plistPath}.tmp`;
   await writeFile(
     temporaryPath,
@@ -140,7 +150,8 @@ export async function installLaunchAgent({
       root,
       baseUrl,
       browserMode,
-      egoCli
+      egoCli,
+      home
     }),
     { mode: 0o600 }
   );

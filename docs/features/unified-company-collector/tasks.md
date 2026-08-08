@@ -9,7 +9,7 @@
 
 ## 任务
 
-- [ ] 修复 LaunchAgent 日志目录
+- [x] 修复 LaunchAgent 日志目录
   - 依赖：无。
   - 文件：两个 collector automation 与对应测试。
   - 输入：用户 home、label、现有 collector 参数。
