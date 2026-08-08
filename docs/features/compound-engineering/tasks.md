@@ -11,7 +11,7 @@
 
 ### Task 1: 固定来源与安全同步
 
-- [ ] 固定来源与安全同步
+- [x] 固定来源与安全同步
   - 依赖：DEV-000016 已由 `codex/compound-engineering-skills` 认领。
   - 文件：`tests/compound-engineering-skills.test.mjs`、`scripts/sync-compound-engineering-skills.mjs`、`.agents/skills/ce-compound/`、`.agents/skills/ce-compound-refresh/`、来源清单和许可证。
   - 输入：EveryInc tag `compound-engineering-v3.21.4`、commit `0a2957852e2034d04eb01120fd7da6ed5307dc56`。
@@ -19,6 +19,8 @@
   - 失败测试：`node --test tests/compound-engineering-skills.test.mjs` 因文件缺失失败。
   - 实现步骤：校验来源和符号链接；复制允许目录；写清单与许可证；拒绝越界。
   - 验证：合同测试、治理检查和两个 Skill 的独立代理场景通过。
+  - 2026-08-08：固定版两个 Skill、MIT LICENSE、安全同步器与治理检查已提交；
+    6 项聚焦合同测试通过，独立审查确认 ignored 文件、实际 HEAD 和 tag 漂移均会被拒绝。
   - 提交：`feat: vendor compound engineering skills`
 
 ### Task 2: 接入经验沉淀与首个实例
