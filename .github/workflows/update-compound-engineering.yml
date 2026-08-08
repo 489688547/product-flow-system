@@ -1,0 +1,144 @@
+name: update-compound-engineering
+
+on:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: update-compound-engineering
+  cancel-in-progress: false
+
+jobs:
+  propose-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: 安装项目依赖
+        run: npm ci
+
+      - name: 读取最新正式 Compound Engineering release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/EveryInc/compound-engineering-plugin/releases/latest > "$RUNNER_TEMP/compound-engineering-release.json"
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readFileSync } from "node:fs";
+
+          const release = JSON.parse(readFileSync(process.env.RUNNER_TEMP + "/compound-engineering-release.json", "utf8"));
+          const manifest = JSON.parse(readFileSync(".agents/skills/compound-engineering-upstream.json", "utf8"));
+          const parseTag = tag => {
+            const match = /^compound-engineering-v(\d+)\.(\d+)\.(\d+)$/.exec(tag ?? "");
+            if (!match) throw new Error("latest release tag 不是受支持的 Compound Engineering 正式版本");
+            return match.slice(1).map(Number);
+          };
+          const compare = (left, right) => left.find((part, index) => part !== right[index]) ?? 0;
+
+          if (release.draft || release.prerelease) throw new Error("latest release 不能是 draft 或 prerelease");
+          const latest = parseTag(release.tag_name);
+          const current = parseTag(manifest.tag);
+          const difference = compare(latest, current);
+          console.log(`tag=${release.tag_name}`);
+          console.log(`needed=${difference > 0}`);
+          NODE
+
+      - name: 检出受控 release 并验证完整 commit
+        if: steps.release.outputs.needed == 'true'
+        id: upstream
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          node --input-type=module <<'NODE'
+          if (!/^compound-engineering-v\d+\.\d+\.\d+$/.test(process.env.TAG ?? "")) {
+            throw new Error("release tag 未通过固定格式校验");
+          }
+          NODE
+          UPSTREAM_DIR="$(mktemp -d "$RUNNER_TEMP/compound-engineering.XXXXXX")"
+          echo "path=$UPSTREAM_DIR" >> "$GITHUB_OUTPUT"
+          git clone --no-checkout https://github.com/EveryInc/compound-engineering-plugin.git "$UPSTREAM_DIR"
+          git -C "$UPSTREAM_DIR" checkout --detach "$TAG"
+          COMMIT="$(git -C "$UPSTREAM_DIR" rev-parse HEAD)"
+          COMMIT="$COMMIT" node --input-type=module <<'NODE'
+          if (!/^[0-9a-f]{40}$/.test(process.env.COMMIT ?? "")) {
+            throw new Error("release commit 必须是完整 SHA");
+          }
+          NODE
+          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+
+      - name: 同步并提出升级 PR
+        if: steps.release.outputs.needed == 'true'
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+          COMMIT: ${{ steps.upstream.outputs.commit }}
+          UPSTREAM_DIR: ${{ steps.upstream.outputs.path }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          trap 'rm -rf "$UPSTREAM_DIR"' EXIT
+          git fetch origin dev
+          BRANCH="codex/update-compound-engineering-${TAG#compound-engineering-v}"
+          git checkout -B "$BRANCH" origin/dev
+          TAG="$TAG" COMMIT="$COMMIT" node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from "node:fs";
+
+          const path = ".agents/skills/compound-engineering-upstream.json";
+          const manifest = JSON.parse(readFileSync(path, "utf8"));
+          const tag = process.env.TAG;
+          const commit = process.env.COMMIT;
+          if (!/^compound-engineering-v\d+\.\d+\.\d+$/.test(tag ?? "") || !/^[0-9a-f]{40}$/.test(commit ?? "")) {
+            throw new Error("上游 tag 或 commit 未通过固定格式校验");
+          }
+          if (manifest.repository !== "https://github.com/EveryInc/compound-engineering-plugin.git" || manifest.license !== "MIT") {
+            throw new Error("固定来源清单不受信任，拒绝升级");
+          }
+          if (JSON.stringify(manifest.skills) !== JSON.stringify(["ce-compound", "ce-compound-refresh"])) {
+            throw new Error("固定来源清单 allowlist 不受信任，拒绝升级");
+          }
+          manifest.tag = tag;
+          manifest.commit = commit;
+          writeFileSync(path, JSON.stringify(manifest, null, 2) + "\n");
+          NODE
+          node scripts/sync-compound-engineering-skills.mjs --source "$UPSTREAM_DIR" --tag "$TAG" --commit "$COMMIT"
+          node --test tests/compound-engineering-skills.test.mjs
+          npm run lint
+          npm run check:governance
+          npm run check:integrations
+          npm run check:environment-capabilities
+          npm test
+          npm run build
+          git diff --check
+          if git diff --quiet; then
+            echo "正式 release 与固定版本内容无差异，不创建 PR。"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .agents/skills/compound-engineering-upstream.json .agents/skills/ce-compound .agents/skills/ce-compound-refresh .agents/skills/compound-engineering-LICENSE
+          git commit -m "chore: update Compound Engineering Skills to $TAG"
+          git push --set-upstream origin "$BRANCH"
+          cat > "$RUNNER_TEMP/compound-engineering-pr-body.md" <<'EOF'
+          自动发现 EveryInc 最新正式 Compound Engineering release，并以固定 tag 与完整 commit 同步两个允许的仓库内开发 Skill。升级不会执行上游脚本；合并前仍需审查 Skill、脚本和许可证差异。
+
+          Integration-Impact: none
+          Integration-Impact-Reason: 只更新仓库内开发 Skill，不触及 provider runtime、环境绑定或外部平台
+          Rule-Writeback: docs/decisions/2026-08-08-compound-engineering-skills.md
+          Rule-Writeback-Reason: 本次遵循受控上游版本升级规则，固定 tag 和 commit 并只创建待审 PR
+          EOF
+          gh pr create \
+            --base dev \
+            --head "$BRANCH" \
+            --title "chore: update Compound Engineering Skills to $TAG" \
+            --body-file "$RUNNER_TEMP/compound-engineering-pr-body.md"

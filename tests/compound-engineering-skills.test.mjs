@@ -10,6 +10,7 @@ const upstreamManifestPath = resolve(root, ".agents/skills/compound-engineering-
 const upstreamLicensePath = resolve(root, ".agents/skills/compound-engineering-LICENSE");
 const verificationSkillPath = resolve(root, ".agents/skills/verification/SKILL.md");
 const firstLearningPath = resolve(root, "docs/solutions/runtime-errors/replace-wrangler-pages-dev-with-node-hono-runtime.md");
+const compoundEngineeringAdrPath = resolve(root, "docs/decisions/2026-08-08-compound-engineering-skills.md");
 const skillNames = ["ce-compound", "ce-compound-refresh"];
 
 function write(path, content) {
@@ -237,4 +238,53 @@ test("the first ECS runtime learning is parser-safe, grounded, and secret-free",
     resolve(root, ".agents/skills/ce-compound/scripts/validate-doc-claims.py"),
     firstLearningPath
   ], { cwd: root, encoding: "utf8" });
+});
+
+test("the controlled updater only proposes a pinned formal-release PR to dev", async () => {
+  const { load } = await import("js-yaml");
+  const workflowPath = resolve(root, ".github/workflows/update-compound-engineering.yml");
+  const workflowText = readFileSync(workflowPath, "utf8");
+  const workflow = load(workflowText);
+
+  assert.ok(Array.isArray(workflow.on.schedule), "updater must run on a weekly schedule");
+  assert.ok(workflow.on.schedule.some(item => typeof item.cron === "string"), "schedule must use cron");
+  assert.deepEqual(workflow.on.workflow_dispatch, {}, "updater must be manually runnable");
+  assert.equal(workflow.permissions.contents, "write");
+  assert.equal(workflow.permissions["pull-requests"], "write");
+  assert.match(workflowText, /actions\/checkout@v4/);
+  assert.match(workflowText, /git fetch origin dev/);
+  assert.match(workflowText, /releases\/latest/);
+  assert.match(workflowText, /draft/);
+  assert.match(workflowText, /prerelease/);
+  assert.ok(workflowText.includes("compound-engineering-v\\d+\\.\\d+\\.\\d+"));
+  assert.match(workflowText, /git clone --no-checkout/);
+  assert.match(workflowText, /checkout --detach/);
+  assert.match(workflowText, /rev-parse HEAD/);
+  assert.match(workflowText, /sync-compound-engineering-skills\.mjs/);
+  assert.match(workflowText, /compound-engineering-upstream\.json/);
+  assert.match(workflowText, /node --test tests\/compound-engineering-skills\.test\.mjs/);
+  assert.match(workflowText, /npm run check:governance/);
+  assert.match(workflowText, /npm run check:integrations/);
+  assert.match(workflowText, /npm run check:environment-capabilities/);
+  assert.match(workflowText, /npm run lint/);
+  assert.match(workflowText, /npm test/);
+  assert.match(workflowText, /npm run build/);
+  assert.match(workflowText, /git diff --check/);
+  assert.match(workflowText, /BRANCH="codex\/update-compound-engineering-/);
+  assert.match(workflowText, /git checkout -B "\$BRANCH" origin\/dev/);
+  assert.match(workflowText, /git push --set-upstream origin "\$BRANCH"/);
+  assert.match(workflowText, /gh pr create[\s\S]*--base dev[\s\S]*--head "\$BRANCH"/);
+  assert.match(workflowText, /Integration-Impact: none/);
+  assert.match(workflowText, /只更新仓库内开发 Skill，不触及 provider runtime/);
+  assert.match(workflowText, /Rule-Writeback: docs\/decisions\/2026-08-08-compound-engineering-skills\.md/);
+  assert.match(workflowText, /版本升级规则/);
+  assert.doesNotMatch(workflowText, /auto-merge|--auto/i);
+  assert.doesNotMatch(workflowText, /git push[^\n]*origin\s+(?:dev|main)(?:\s|$)/);
+  assert.doesNotMatch(workflowText, /git checkout[^\n]*(?:origin\/main|\bmain\b)/);
+
+  const adr = readFileSync(compoundEngineeringAdrPath, "utf8");
+  assert.match(adr, /自动化边界/);
+  assert.match(adr, /失败/);
+  assert.match(adr, /回滚/);
+  assert.match(adr, /不自动合并/);
 });
