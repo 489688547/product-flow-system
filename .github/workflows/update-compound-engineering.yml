@@ -23,6 +23,7 @@ jobs:
         with:
           ref: dev
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -147,7 +148,8 @@ jobs:
               echo "已有 tree 一致的开放升级 PR，不重复创建。"
             fi
           else
-            git push --set-upstream origin "$BRANCH"
+            git -c 'credential.helper=!f() { printf "%s\n" "username=x-access-token" "password=$GH_TOKEN"; }; f' \
+              push --set-upstream origin "$BRANCH"
             CANDIDATE_SHA="$LOCAL_SHA"
           fi
           echo "branch=$BRANCH" >> "$GITHUB_OUTPUT"
@@ -187,3 +189,25 @@ jobs:
             --head "$BRANCH" \
             --title "chore: update Compound Engineering Skills to $TAG" \
             --body-file "$RUNNER_TEMP/compound-engineering-pr-body.md"
+
+      - name: 清理受控上游临时目录
+        if: always()
+        env:
+          UPSTREAM_DIR: ${{ steps.upstream.outputs.path }}
+        run: |
+          if [ -z "${UPSTREAM_DIR:-}" ]; then
+            exit 0
+          fi
+          PREFIX="$RUNNER_TEMP/compound-engineering."
+          SUFFIX="${UPSTREAM_DIR#"$PREFIX"}"
+          if [ "$SUFFIX" = "$UPSTREAM_DIR" ] || [ -z "$SUFFIX" ]; then
+            echo "::error::拒绝清理专用 RUNNER_TEMP 子目录之外的路径。"
+            exit 1
+          fi
+          case "$SUFFIX" in
+            */* | "." | "..")
+              echo "::error::拒绝清理包含路径分隔或遍历的上游临时目录。"
+              exit 1
+              ;;
+          esac
+          rm -rf -- "$UPSTREAM_DIR"

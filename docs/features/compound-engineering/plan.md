@@ -40,6 +40,7 @@ node scripts/sync-compound-engineering-skills.mjs \
 ## 风险与回滚
 
 - 上游脚本供应链风险：锁定 tag+commit+内容摘要；写权限工作流只复制不执行；候选分支使用只读质量工作流完成完整 CI，再进入 PR 审核。
+- Actions 与凭据风险：升级和质量 workflow 的第三方 Actions 固定完整 commit；写权限 checkout 不持久化 token，唯一 push 只用进程内短时 credential helper；跨 step 上游目录在尾部 `always()` step 做受限清理。
 - 上游行为变化：升级不自动合并；回滚升级提交恢复上一固定版本。
 - 重复运行与孤儿分支：已有开放 PR 幂等退出；无 PR 的远端分支仅在其 Git tree 与重建候选完全一致时复用，否则失败关闭。
 - 经验污染：未验证不写入；冲突证据不足标记 `stale`。

@@ -49,7 +49,8 @@
   - 验证：静态合同、治理检查和 workflow YAML 解析通过。
   - 2026-08-08：每周/手动升级工作流已实现；同名 tag 移动和降级失败关闭；对已有开放 PR
     幂等退出，只在重建候选树完全一致时复用孤儿分支；push 前通过真实 `check:pr`，候选 SHA
-    的只读质量工作流成功后才创建 PR。高权限 job 不执行 vendored 内容，14 项聚焦合同通过。
+    的只读质量工作流成功后才创建 PR。高权限 job 不执行 vendored 内容，不持久化 Git 凭据；
+    两个 workflow 的第三方 Actions 固定完整 SHA，跨 step 上游目录由尾部受限清理，14 项聚焦合同通过。
   - 提交：`ci: propose compound engineering updates`
 
 ### Task 4: 完整验收与交付

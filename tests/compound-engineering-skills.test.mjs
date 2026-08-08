@@ -360,6 +360,8 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.equal(workflow.permissions.contents, "write");
   assert.equal(workflow.permissions["pull-requests"], "write");
   assert.equal(workflow.permissions.actions, "write");
+  const updaterCheckout = workflow.jobs["propose-update"].steps.find(step => String(step.uses ?? "").startsWith("actions/checkout@"));
+  assert.equal(updaterCheckout?.with?.["persist-credentials"], false, "write-capable checkout must not persist GITHUB_TOKEN in git config");
   assert.match(workflowText, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262\s+# v4/);
   assert.match(workflowText, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\s+# v4/);
   assert.match(workflowText, /git fetch origin dev/);
@@ -383,7 +385,9 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.match(workflowText, /候选 tree|candidate tree|tree 不一致/i);
   assert.match(workflowText, /复用.*远端分支|reuse.*remote branch/i);
   assert.match(workflowText, /git checkout -B "\$BRANCH" origin\/dev/);
-  assert.match(workflowText, /git push --set-upstream origin "\$BRANCH"/);
+  assert.match(workflowText, /git -c 'credential\.helper=![^']*\$GH_TOKEN[^']*'\s*\\?\s*push --set-upstream origin "\$BRANCH"/);
+  assert.doesNotMatch(workflowText, /^\s*git push --set-upstream/m, "push must not depend on persisted checkout credentials");
+  assert.doesNotMatch(workflowText, /git config[^\n]*(?:credential|extraheader|token)/i, "credentials must not be written to persistent git config");
   assert.match(workflowText, /gh workflow run quality\.yml[\s\S]*--ref "\$BRANCH"[\s\S]*candidate_sha/);
   assert.match(workflowText, /gh run watch "\$RUN_ID" --exit-status/);
   assert.match(workflowText, /gh pr create[\s\S]*--base dev[\s\S]*--head "\$BRANCH"/);
@@ -397,8 +401,8 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.ok(
     workflowText.indexOf("git commit") < workflowText.indexOf("compound-engineering-pr-body.md")
       && workflowText.indexOf("compound-engineering-pr-body.md") < workflowText.indexOf("npm run check:pr")
-      && workflowText.indexOf("npm run check:pr") < workflowText.indexOf("git push --set-upstream")
-      && workflowText.indexOf("git push --set-upstream") < workflowText.indexOf("gh workflow run quality.yml")
+      && workflowText.indexOf("npm run check:pr") < workflowText.indexOf("push --set-upstream")
+      && workflowText.indexOf("push --set-upstream") < workflowText.indexOf("gh workflow run quality.yml")
       && workflowText.indexOf("gh workflow run quality.yml") < workflowText.indexOf("gh pr create"),
     "the governed PR body must be checked after commit and before push"
   );
@@ -406,6 +410,15 @@ test("the controlled updater only proposes a pinned formal-release PR to dev", a
   assert.doesNotMatch(workflowText, /--force(?:-with-lease)?/);
   assert.doesNotMatch(workflowText, /git push[^\n]*origin\s+(?:dev|main)(?:\s|$)/);
   assert.doesNotMatch(workflowText, /git checkout[^\n]*(?:origin\/main|\bmain\b)/);
+
+  const updaterSteps = workflow.jobs["propose-update"].steps;
+  const cleanupStep = updaterSteps.at(-1);
+  assert.equal(cleanupStep?.if, "always()", "upstream cleanup must run after success, no-update, or failure paths");
+  assert.equal(cleanupStep?.env?.UPSTREAM_DIR, "${{ steps.upstream.outputs.path }}");
+  assert.match(cleanupStep?.run ?? "", /RUNNER_TEMP[^\n]*compound-engineering\./);
+  assert.match(cleanupStep?.run ?? "", /rm -rf -- "\$UPSTREAM_DIR"/);
+  assert.match(cleanupStep?.run ?? "", /拒绝清理|refus|reject/i, "cleanup must reject paths outside its dedicated RUNNER_TEMP child");
+  assert.ok(workflowText.lastIndexOf("if: always()") > workflowText.indexOf("gh pr create"), "cleanup must stay after every cross-step consumer");
 
   const adr = readFileSync(compoundEngineeringAdrPath, "utf8");
   assert.match(adr, /自动化边界/);
@@ -427,6 +440,8 @@ test("quality can be explicitly dispatched at an exact candidate SHA with read-o
   assert.equal(workflow.permissions.contents, "read");
   assert.ok(workflow.on.workflow_dispatch, "quality must support explicit dispatch");
   assert.ok(workflow.on.workflow_dispatch.inputs.candidate_sha, "dispatch must carry the expected candidate SHA");
+  assert.match(workflowText, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262\s+# v4/);
+  assert.match(workflowText, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020\s+# v4/);
   assert.match(workflowText, /GITHUB_SHA[\s\S]*candidate_sha|candidate_sha[\s\S]*GITHUB_SHA/);
   assert.match(workflowText, /GITHUB_BASE_REF:[^\n]*workflow_dispatch[^\n]*dev/);
   assert.match(workflowText, /node --test tests\/compound-engineering-skills\.test\.mjs/);
