@@ -17,7 +17,7 @@
   - 输入：EveryInc tag `compound-engineering-v3.21.4`、commit `0a2957852e2034d04eb01120fd7da6ed5307dc56`。
   - 输出：Fork 零安装可发现的两个完整 Skill。
   - 失败测试：`node --test tests/compound-engineering-skills.test.mjs` 因文件缺失失败。
-  - 实现步骤：校验来源和符号链接；复制允许目录；写清单与许可证；拒绝越界。
+  - 实现步骤：校验来源、实际 tag commit、版本方向和符号链接；复制允许目录；写清单、确定性内容摘要与许可证；拒绝越界和篡改。
   - 验证：合同测试、治理检查和两个 Skill 的独立代理场景通过。
   - 2026-08-08：固定版两个 Skill、MIT LICENSE、安全同步器与治理检查已提交；
     6 项聚焦合同测试通过，独立审查确认 ignored 文件、实际 HEAD 和 tag 漂移均会被拒绝。
@@ -27,7 +27,7 @@
 
 - [x] 接入经验沉淀与首个实例
   - 依赖：固定 Skill 已验证。
-  - 文件：`.agents/skills/verification/SKILL.md`、`docs/solutions/deployment/`、合同测试。
+  - 文件：`.agents/skills/verification/SKILL.md`、`docs/solutions/runtime-errors/`、合同测试。
   - 输入：已验证的 ACR/ECS 502 调查证据。
   - 输出：交付前触发规则和首份无秘密结构化经验。
   - 失败测试：合同测试因 verification 未触发和经验缺失失败。
@@ -45,10 +45,11 @@
   - 输入：GitHub 最新正式 release。
   - 输出：每周/手动检查，只向 `dev` 创建带治理声明的升级 PR。
   - 失败测试：合同测试因工作流缺失或目标分支错误失败。
-  - 实现步骤：检出 `dev`；读取 release tag 与 commit；同步；检查；创建 `codex/*` 分支和 PR；不自动合并。
+  - 实现步骤：检出 `dev`；读取 release tag 与实际 commit；同步；机械检查并创建候选；显式触发候选 SHA 的只读 `quality.yml`；质量成功后创建 `codex/*` 分支 PR；不自动合并。
   - 验证：静态合同、治理检查和 workflow YAML 解析通过。
-  - 2026-08-08：每周/手动升级工作流已实现；拒绝降级和孤儿分支，对已有开放 PR
-    幂等退出，并在 push 前通过真实 `check:pr`。10 项聚焦合同及独立复审通过。
+  - 2026-08-08：每周/手动升级工作流已实现；同名 tag 移动和降级失败关闭；对已有开放 PR
+    幂等退出，只在重建候选树完全一致时复用孤儿分支；push 前通过真实 `check:pr`，候选 SHA
+    的只读质量工作流成功后才创建 PR。高权限 job 不执行 vendored 内容，14 项聚焦合同通过。
   - 提交：`ci: propose compound engineering updates`
 
 ### Task 4: 完整验收与交付

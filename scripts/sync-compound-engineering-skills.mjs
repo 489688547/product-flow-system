@@ -1,12 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync } from "node:fs";
-import { randomUUID } from "node:crypto";
+import { copyFileSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const ALLOWED_SKILLS = ["ce-compound", "ce-compound-refresh"];
 const TAG_PATTERN = /^compound-engineering-v\d+\.\d+\.\d+$/;
+const COMMIT_PATTERN = /^[0-9a-f]{40}$/;
+const CONTENT_SHA_PATTERN = /^[0-9a-f]{64}$/;
 
 function fail(message) {
   throw new Error(`Compound Engineering 同步失败：${message}`);
@@ -25,6 +27,18 @@ export function compareCompoundEngineeringTags(leftTag, rightTag) {
     if (left[index] > right[index]) return 1;
   }
   return 0;
+}
+
+export function decideCompoundEngineeringRelease({ latestTag, latestCommit, currentTag, currentCommit }) {
+  if (!COMMIT_PATTERN.test(latestCommit ?? "") || !COMMIT_PATTERN.test(currentCommit ?? "")) {
+    fail("release commit 必须为完整 SHA");
+  }
+  const comparison = compareCompoundEngineeringTags(latestTag, currentTag);
+  if (comparison < 0) fail("latest release 低于当前固定版本，拒绝降级");
+  if (comparison === 0 && latestCommit !== currentCommit) {
+    fail("当前 release tag 的 commit 已漂移，拒绝移动固定 tag");
+  }
+  return { needed: comparison > 0, comparison };
 }
 
 function runGit(source, args) {
@@ -82,6 +96,40 @@ function listRegularFiles(root, path, files = []) {
   return files;
 }
 
+function contentSha256FromSkillsRoot(skillsRoot, skillNames = ALLOWED_SKILLS) {
+  const files = [];
+  for (const name of skillNames) {
+    const skill = resolve(skillsRoot, name);
+    if (!isInside(skillsRoot, skill)) fail(`Skill digest 路径越界：${name}`);
+    walkSafeDirectory(skillsRoot, skill);
+    listRegularFiles(skillsRoot, skill, files);
+  }
+  const license = resolve(skillsRoot, "compound-engineering-LICENSE");
+  if (!isInside(skillsRoot, license)) fail("许可证 digest 路径越界");
+  assertRegularFile(license, "Compound Engineering MIT LICENSE");
+  files.push("compound-engineering-LICENSE");
+
+  const hash = createHash("sha256");
+  for (const relativePath of files.sort()) {
+    const path = resolve(skillsRoot, relativePath);
+    if (!isInside(skillsRoot, path)) fail(`digest 文件路径越界：${relativePath}`);
+    assertRegularFile(path, `digest 文件 ${relativePath}`);
+    const content = readFileSync(path);
+    hash.update(relativePath);
+    hash.update("\0");
+    hash.update(String(content.byteLength));
+    hash.update("\0");
+    hash.update(content);
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+}
+
+export function computeCompoundEngineeringContentSha256(rootDir = resolve(dirname(scriptPath), "..")) {
+  const { skills } = assertSafeTargetRoot(rootDir);
+  return contentSha256FromSkillsRoot(skills);
+}
+
 function assertSourceMatchesHeadTree(sourceRoot, sourceSkillPaths, sourceLicense) {
   const paths = [...sourceSkillPaths.map(item => `skills/${item.name}`), "LICENSE"];
   const tracked = new Set(runGit(sourceRoot, ["ls-tree", "-r", "--name-only", "HEAD", "--", ...paths]).split("\n").filter(Boolean));
@@ -114,7 +162,8 @@ function readManifest(rootDir) {
     fail("固定来源清单不是有效 JSON");
   }
   if (!TAG_PATTERN.test(manifest.tag ?? "")) fail("固定来源清单 tag 不符合正式版本规则");
-  if (!/^[0-9a-f]{40}$/.test(manifest.commit ?? "")) fail("固定来源清单 commit 必须为完整 SHA");
+  if (!COMMIT_PATTERN.test(manifest.commit ?? "")) fail("固定来源清单 commit 必须为完整 SHA");
+  if (!CONTENT_SHA_PATTERN.test(manifest.contentSha256 ?? "")) fail("固定来源清单 contentSha256 必须为完整 SHA-256");
   if (manifest.repository !== "https://github.com/EveryInc/compound-engineering-plugin.git") fail("固定来源清单 repository 不受信任");
   if (manifest.license !== "MIT") fail("固定来源清单 license 必须为 MIT");
   if (!Array.isArray(manifest.skills) || manifest.skills.length !== ALLOWED_SKILLS.length || manifest.skills.some((name, index) => name !== ALLOWED_SKILLS[index])) {
@@ -138,6 +187,10 @@ export function checkCompoundEngineeringSkills(rootDir = resolve(dirname(scriptP
       assertDirectory(skill, `vendored Skill ${name}`);
       assertRegularFile(resolve(skill, "SKILL.md"), `vendored Skill ${name} 的 SKILL.md`);
       walkSafeDirectory(skills, skill);
+    }
+    const actualContentSha256 = contentSha256FromSkillsRoot(skills, manifest.skills);
+    if (actualContentSha256 !== manifest.contentSha256) {
+      fail(`vendored 内容完整性校验失败：expected ${manifest.contentSha256}, actual ${actualContentSha256}`);
     }
   } catch (error) {
     errors.push(error.message);
@@ -171,8 +224,16 @@ export async function syncCompoundEngineeringSkills({ rootDir = resolve(dirname(
   if (!source || !tag || !commit) fail("必须提供 --source、--tag 和 --commit");
   const { root, skills } = assertSafeTargetRoot(rootDir);
   const manifest = readManifest(root);
-  if (tag !== manifest.tag) fail(`tag 与固定来源清单不一致：${tag}`);
-  if (commit !== manifest.commit) fail("commit 与固定来源清单不一致");
+  const baseline = checkCompoundEngineeringSkills(root);
+  if (baseline.errors.length > 0) {
+    fail(`当前 vendored 基线未通过完整性校验：${baseline.errors.join("；")}`);
+  }
+  decideCompoundEngineeringRelease({
+    latestTag: tag,
+    latestCommit: commit,
+    currentTag: manifest.tag,
+    currentCommit: manifest.commit
+  });
 
   const sourceRoot = resolve(source);
   assertDirectory(sourceRoot, "上游 checkout");
@@ -183,7 +244,7 @@ export async function syncCompoundEngineeringSkills({ rootDir = resolve(dirname(
   assertRegularFile(sourceLicense, "上游 LICENSE");
   if (runGit(sourceRoot, ["remote", "get-url", "origin"]) !== manifest.repository) fail("上游 repository 与固定来源清单不一致");
   if (runGit(sourceRoot, ["rev-parse", "HEAD"]) !== commit) fail("上游 HEAD commit 与固定来源清单不一致");
-  if (runGit(sourceRoot, ["rev-parse", `${tag}^{commit}`]) !== commit) fail("上游 tag 与固定来源清单不一致");
+  if (runGit(sourceRoot, ["rev-parse", `refs/tags/${tag}^{commit}`]) !== commit) fail("上游 tag 与固定来源清单不一致");
 
   const sourceSkillPaths = manifest.skills.map(name => {
     const path = resolve(sourceSkills, name);
@@ -202,10 +263,17 @@ export async function syncCompoundEngineeringSkills({ rootDir = resolve(dirname(
     mkdirSync(backup, { recursive: true });
     for (const { name, path } of sourceSkillPaths) copySafeDirectory(path, resolve(stage, name));
     copyFileSync(sourceLicense, resolve(stage, "compound-engineering-LICENSE"));
+    const nextManifest = {
+      ...manifest,
+      tag,
+      commit,
+      contentSha256: contentSha256FromSkillsRoot(stage, manifest.skills)
+    };
+    writeFileSync(resolve(stage, "compound-engineering-upstream.json"), `${JSON.stringify(nextManifest, null, 2)}\n`);
 
     const swapped = [];
     try {
-      for (const name of [...manifest.skills, "compound-engineering-LICENSE"]) {
+      for (const name of [...manifest.skills, "compound-engineering-LICENSE", "compound-engineering-upstream.json"]) {
         const destination = resolve(skills, name);
         if (!isInside(skills, destination)) fail(`目标路径越界：${name}`);
         const backupPath = resolve(backup, name);

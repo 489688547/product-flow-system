@@ -12,7 +12,7 @@
 
 将 EveryInc Compound Engineering 正式 release 中的 `ce-compound` 与 `ce-compound-refresh` 完整目录 vendoring 到 `.agents/skills/`。固定记录 tag、完整 commit SHA 和 MIT 许可证。上游更新由每周/手动 GitHub Actions 检查并创建面向 `dev` 的独立 PR；任何更新必须经过项目 CI 与人工评审，不跟随 `main`、不自动合并。
 
-- 当前固定版本：compound-engineering-v3.21.4（commit 0a2957852e2034d04eb01120fd7da6ed5307dc56）。
+- 当前固定版本：compound-engineering-v3.21.4（commit 0a2957852e2034d04eb01120fd7da6ed5307dc56；内容 SHA-256 `b8ade34542777b1d612ba081f654d8f9168828327bf30ac687cc3093a44be235`）。
 
 项目经验保存在 `docs/solutions/`。当前代码、测试和 durable docs 始终高于经验文档；证据不足的冲突标记 `stale`。项目 `verification` Skill 在已验证且可复用的问题出现时触发沉淀或刷新。
 
@@ -32,11 +32,12 @@
 
 ## 自动化边界
 
-- 每周和手动工作流只读取 GitHub latest 正式 release；draft、prerelease、非 `compound-engineering-vX.Y.Z` tag 和非完整 commit 都失败关闭。
-- 工作流从最新 `origin/dev` 建立 `codex/*` 分支，安全同步器只复制两个 allowlisted Skill 与 MIT LICENSE；它不执行上游脚本，也不向 `dev` 或 `main` 直接推送。
-- 项目合同测试、治理、集成、环境、lint、完整测试和 build 全部通过后，工作流才推送升级分支并创建 base 为 `dev` 的 PR；它不自动合并。
-- 任何 release 读取、clone、同步、门禁、推送或 PR 创建失败都会使工作流失败，`dev` 和 `main` 保持不变；已推送但无法建 PR 的分支由维护者人工检查后处理。
+- 每周和手动工作流只读取 GitHub latest 正式 release；draft、prerelease、非 `compound-engineering-vX.Y.Z` tag 和非完整 commit 都失败关闭。即使 tag 与当前清单相同，也重新解析实际 commit；tag 被移动或 latest 降级时失败关闭。
+- 工作流从最新 `origin/dev` 建立 `codex/*` 分支，安全同步器只复制两个 allowlisted Skill 与 MIT LICENSE，生成确定性内容 SHA-256；治理检查独立重算摘要。同步器与具有写权限的工作流都不执行上游或 vendored 脚本，也不向 `dev` 或 `main` 直接推送。
+- 写权限工作流只运行可信的机械校验和 `check:pr`，推送候选分支后显式 dispatch `quality.yml` 到候选 SHA。该工作流以 `contents: read` 运行项目合同测试、治理、集成、环境、lint、完整测试和 build；全部成功后才创建 base 为 `dev` 的 PR。任何路径都不自动合并。
+- 已有开放 PR 幂等退出；已存在但没有开放 PR 的同名远端分支，只有在其 Git tree 与从最新 `origin/dev` 重建的候选 tree 完全一致时才复用并补建 PR，否则失败关闭。
+- 任何 release 读取、clone、同步、机械校验、候选质量、推送或 PR 创建失败都会使工作流失败，`dev` 和 `main` 保持不变。升级工作流使用完整 commit SHA 固定 `actions/checkout` 与 `actions/setup-node` 的 v4 实现。
 
 ## 回滚
 
-回滚对应升级或首次引入提交；关闭或删除工作流可停止后续自动检查。已创建但未合并的升级分支或 PR 直接关闭即可；已合并版本通过单独的 `dev` 回滚 PR 恢复前一固定 tag 和 commit。已有经验文档可保留，或通过单独 PR 删除，产品运行时与数据不受影响。
+回滚对应升级或首次引入提交；关闭或删除工作流可停止后续自动检查。已创建但未合并的升级 PR 直接关闭即可；孤儿升级分支只在 tree 可重建时复用，否则由维护者检查后删除或改名处理。已合并版本通过单独的 `dev` 回滚 PR 恢复前一固定 tag、commit 和内容摘要。已有经验文档可保留，或通过单独 PR 删除，产品运行时与数据不受影响。
